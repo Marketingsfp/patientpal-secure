@@ -21,6 +21,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import {
   CalendarDays, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X,
   MoreHorizontal, Star, Flag,
@@ -94,6 +95,8 @@ function AgendaPage() {
   const [editing, setEditing] = useState<Agendamento | null>(null);
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
+  const [pagamentoOpen, setPagamentoOpen] = useState(false);
+  const [pagamentoDesc, setPagamentoDesc] = useState("");
 
   const load = async () => {
     if (!clinicaAtual) return;
@@ -216,7 +219,7 @@ function AgendaPage() {
     setOpen(true);
   };
 
-  const submit = async (e: FormEvent) => {
+  const submit = async (e: FormEvent, irParaPagamento = false) => {
     e.preventDefault();
     if (!clinicaAtual) return;
     if (!form.paciente_nome.trim()) { toast.error("Informe o paciente"); return; }
@@ -239,6 +242,11 @@ function AgendaPage() {
     setSaving(false);
     if (error) { toast.error(error.message); return; }
     toast.success("Salvo"); setOpen(false); await load();
+    if (irParaPagamento) {
+      const desc = `${payload.procedimento ?? "Atendimento"} — ${payload.paciente_nome}`;
+      setPagamentoDesc(desc);
+      setPagamentoOpen(true);
+    }
   };
 
   const remove = async (a: Agendamento) => {
@@ -344,6 +352,15 @@ function AgendaPage() {
               </div>
               <DialogFooter>
                 <Button type="button" variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={saving}
+                  onClick={(e) => submit(e as unknown as FormEvent, true)}
+                  className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                >
+                  Salvar e Pagar
+                </Button>
                 <Button type="submit" disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
               </DialogFooter>
             </form>
@@ -351,6 +368,13 @@ function AgendaPage() {
           </Dialog>
         </div>
       </div>
+
+      <LancamentoDialog
+        open={pagamentoOpen}
+        onOpenChange={setPagamentoOpen}
+        tipo="receita"
+        initialDescricao={pagamentoDesc}
+      />
 
       {/* Filtros */}
       <div className="rounded-lg border border-border bg-card p-4 space-y-4">
