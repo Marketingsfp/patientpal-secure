@@ -14,6 +14,9 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
+import { Route as AuthenticatedAppRateioRouteImport } from './routes/_authenticated/app.rateio'
+import { Route as AuthenticatedAppMedicosRouteImport } from './routes/_authenticated/app.medicos'
+import { Route as AuthenticatedAppEquipeRouteImport } from './routes/_authenticated/app.equipe'
 import { Route as AuthenticatedAppClinicasRouteImport } from './routes/_authenticated/app.clinicas'
 
 const SignupRoute = SignupRouteImport.update({
@@ -40,6 +43,21 @@ const AuthenticatedAppRoute = AuthenticatedAppRouteImport.update({
   path: '/app',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedAppRateioRoute = AuthenticatedAppRateioRouteImport.update({
+  id: '/rateio',
+  path: '/rateio',
+  getParentRoute: () => AuthenticatedAppRoute,
+} as any)
+const AuthenticatedAppMedicosRoute = AuthenticatedAppMedicosRouteImport.update({
+  id: '/medicos',
+  path: '/medicos',
+  getParentRoute: () => AuthenticatedAppRoute,
+} as any)
+const AuthenticatedAppEquipeRoute = AuthenticatedAppEquipeRouteImport.update({
+  id: '/equipe',
+  path: '/equipe',
+  getParentRoute: () => AuthenticatedAppRoute,
+} as any)
 const AuthenticatedAppClinicasRoute =
   AuthenticatedAppClinicasRouteImport.update({
     id: '/clinicas',
@@ -53,6 +71,9 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/app': typeof AuthenticatedAppRouteWithChildren
   '/app/clinicas': typeof AuthenticatedAppClinicasRoute
+  '/app/equipe': typeof AuthenticatedAppEquipeRoute
+  '/app/medicos': typeof AuthenticatedAppMedicosRoute
+  '/app/rateio': typeof AuthenticatedAppRateioRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -60,6 +81,9 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/app': typeof AuthenticatedAppRouteWithChildren
   '/app/clinicas': typeof AuthenticatedAppClinicasRoute
+  '/app/equipe': typeof AuthenticatedAppEquipeRoute
+  '/app/medicos': typeof AuthenticatedAppMedicosRoute
+  '/app/rateio': typeof AuthenticatedAppRateioRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -69,12 +93,31 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/_authenticated/app': typeof AuthenticatedAppRouteWithChildren
   '/_authenticated/app/clinicas': typeof AuthenticatedAppClinicasRoute
+  '/_authenticated/app/equipe': typeof AuthenticatedAppEquipeRoute
+  '/_authenticated/app/medicos': typeof AuthenticatedAppMedicosRoute
+  '/_authenticated/app/rateio': typeof AuthenticatedAppRateioRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/signup' | '/app' | '/app/clinicas'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/signup'
+    | '/app'
+    | '/app/clinicas'
+    | '/app/equipe'
+    | '/app/medicos'
+    | '/app/rateio'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/signup' | '/app' | '/app/clinicas'
+  to:
+    | '/'
+    | '/login'
+    | '/signup'
+    | '/app'
+    | '/app/clinicas'
+    | '/app/equipe'
+    | '/app/medicos'
+    | '/app/rateio'
   id:
     | '__root__'
     | '/'
@@ -83,6 +126,9 @@ export interface FileRouteTypes {
     | '/signup'
     | '/_authenticated/app'
     | '/_authenticated/app/clinicas'
+    | '/_authenticated/app/equipe'
+    | '/_authenticated/app/medicos'
+    | '/_authenticated/app/rateio'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -129,6 +175,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/app/rateio': {
+      id: '/_authenticated/app/rateio'
+      path: '/rateio'
+      fullPath: '/app/rateio'
+      preLoaderRoute: typeof AuthenticatedAppRateioRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/medicos': {
+      id: '/_authenticated/app/medicos'
+      path: '/medicos'
+      fullPath: '/app/medicos'
+      preLoaderRoute: typeof AuthenticatedAppMedicosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/equipe': {
+      id: '/_authenticated/app/equipe'
+      path: '/equipe'
+      fullPath: '/app/equipe'
+      preLoaderRoute: typeof AuthenticatedAppEquipeRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/app/clinicas': {
       id: '/_authenticated/app/clinicas'
       path: '/clinicas'
@@ -141,10 +208,16 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedAppRouteChildren {
   AuthenticatedAppClinicasRoute: typeof AuthenticatedAppClinicasRoute
+  AuthenticatedAppEquipeRoute: typeof AuthenticatedAppEquipeRoute
+  AuthenticatedAppMedicosRoute: typeof AuthenticatedAppMedicosRoute
+  AuthenticatedAppRateioRoute: typeof AuthenticatedAppRateioRoute
 }
 
 const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppClinicasRoute: AuthenticatedAppClinicasRoute,
+  AuthenticatedAppEquipeRoute: AuthenticatedAppEquipeRoute,
+  AuthenticatedAppMedicosRoute: AuthenticatedAppMedicosRoute,
+  AuthenticatedAppRateioRoute: AuthenticatedAppRateioRoute,
 }
 
 const AuthenticatedAppRouteWithChildren =
