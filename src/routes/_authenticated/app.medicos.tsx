@@ -427,9 +427,6 @@ function MedicosPage() {
                   </div>
                 </TabsContent>
 
-                <TabsContent value="repasse" className="space-y-4 pt-4">
-                </TabsContent>
-
                 <TabsContent value="convenios" className="space-y-3 pt-4">
                   <div className="flex items-center justify-between">
                     <div>
@@ -478,7 +475,7 @@ function MedicosPage() {
                   </div>
                 </TabsContent>
 
-                <TabsContent value="repasse-old-hidden" className="hidden">
+                <TabsContent value="repasse" className="space-y-4 pt-4">
                   <div className="space-y-2">
                 <Label>Tipo de repasse</Label>
                 <div className="flex gap-4 text-sm">
