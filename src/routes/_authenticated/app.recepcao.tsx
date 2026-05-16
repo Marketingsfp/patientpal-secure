@@ -82,11 +82,11 @@ function RecepcaoPage() {
   }
 
   async function setStatus(id: string, status: "atendida" | "cancelada") {
-    const campo = status === "atendida" ? "atendida_em" : "cancelada_em";
-    const { error } = await supabase
-      .from("senhas")
-      .update({ status, [campo]: new Date().toISOString() })
-      .eq("id", id);
+    const now = new Date().toISOString();
+    const patch = status === "atendida"
+      ? { status, atendida_em: now }
+      : { status, cancelada_em: now };
+    const { error } = await supabase.from("senhas").update(patch).eq("id", id);
     if (error) toast.error(error.message);
   }
 
