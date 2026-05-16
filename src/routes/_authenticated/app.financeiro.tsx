@@ -1,0 +1,65 @@
+import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
+import {
+  LayoutDashboard, ArrowLeftRight, BarChart3, LineChart, Stethoscope,
+  Building, FileText, FileBarChart, PieChart, Bell, Tag, Wallet,
+  Sparkles, AlertTriangle,
+} from "lucide-react";
+
+export const Route = createFileRoute("/_authenticated/app/financeiro")({
+  component: FinLayout,
+  head: () => ({ meta: [{ title: "Financeiro — ClinicaOS" }] }),
+});
+
+const subnav = [
+  { to: "/app/financeiro", label: "Dashboard", icon: LayoutDashboard, exact: true },
+  { to: "/app/financeiro/movimento", label: "Mov. Caixa", icon: ArrowLeftRight },
+  { to: "/app/financeiro/bi", label: "BI", icon: BarChart3 },
+  { to: "/app/financeiro/analitico", label: "Analítico", icon: LineChart },
+  { to: "/app/financeiro/atendimentos", label: "Atendimentos", icon: Stethoscope },
+  { to: "/app/financeiro/empresas", label: "Empresas", icon: Building },
+  { to: "/app/financeiro/notas", label: "Notas Pacientes", icon: FileText },
+  { to: "/app/financeiro/relatorios", label: "Relatórios", icon: FileBarChart },
+  { to: "/app/financeiro/estatisticas", label: "Estatísticas", icon: PieChart },
+  { to: "/app/financeiro/lembretes", label: "Lembretes", icon: Bell },
+  { to: "/app/financeiro/categorias", label: "Categorias", icon: Tag },
+  { to: "/app/financeiro/contas", label: "Contas", icon: Wallet },
+  { to: "/app/financeiro/regras-ia", label: "Regras IA", icon: Sparkles },
+  { to: "/app/financeiro/alertas", label: "Alertas", icon: AlertTriangle },
+] as const;
+
+function FinLayout() {
+  const location = useLocation();
+  return (
+    <div className="flex gap-6 -m-6 min-h-[calc(100vh-4rem)]">
+      <aside className="w-60 bg-card border-r border-border p-3 shrink-0 overflow-y-auto">
+        <p className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Financeiro
+        </p>
+        <nav className="space-y-0.5">
+          {subnav.map((item) => {
+            const active = item.exact
+              ? location.pathname === item.to
+              : location.pathname === item.to || location.pathname.startsWith(item.to + "/");
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${
+                  active
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "text-foreground/70 hover:bg-muted hover:text-foreground"
+                }`}
+              >
+                <item.icon className="h-4 w-4" />
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+      </aside>
+      <div className="flex-1 p-6 overflow-auto min-w-0">
+        <Outlet />
+      </div>
+    </div>
+  );
+}

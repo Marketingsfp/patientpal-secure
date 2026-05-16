@@ -19,6 +19,7 @@ import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/ap
 import { Route as AuthenticatedAppRecepcaoRouteImport } from './routes/_authenticated/app.recepcao'
 import { Route as AuthenticatedAppRateioRouteImport } from './routes/_authenticated/app.rateio'
 import { Route as AuthenticatedAppMedicosRouteImport } from './routes/_authenticated/app.medicos'
+import { Route as AuthenticatedAppFinanceiroRouteImport } from './routes/_authenticated/app.financeiro'
 import { Route as AuthenticatedAppEquipeRouteImport } from './routes/_authenticated/app.equipe'
 import { Route as AuthenticatedAppClinicasRouteImport } from './routes/_authenticated/app.clinicas'
 
@@ -72,6 +73,12 @@ const AuthenticatedAppMedicosRoute = AuthenticatedAppMedicosRouteImport.update({
   path: '/medicos',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
+const AuthenticatedAppFinanceiroRoute =
+  AuthenticatedAppFinanceiroRouteImport.update({
+    id: '/financeiro',
+    path: '/financeiro',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppEquipeRoute = AuthenticatedAppEquipeRouteImport.update({
   id: '/equipe',
   path: '/equipe',
@@ -93,6 +100,7 @@ export interface FileRoutesByFullPath {
   '/app': typeof AuthenticatedAppRouteWithChildren
   '/app/clinicas': typeof AuthenticatedAppClinicasRoute
   '/app/equipe': typeof AuthenticatedAppEquipeRoute
+  '/app/financeiro': typeof AuthenticatedAppFinanceiroRoute
   '/app/medicos': typeof AuthenticatedAppMedicosRoute
   '/app/rateio': typeof AuthenticatedAppRateioRoute
   '/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
@@ -106,6 +114,7 @@ export interface FileRoutesByTo {
   '/app': typeof AuthenticatedAppRouteWithChildren
   '/app/clinicas': typeof AuthenticatedAppClinicasRoute
   '/app/equipe': typeof AuthenticatedAppEquipeRoute
+  '/app/financeiro': typeof AuthenticatedAppFinanceiroRoute
   '/app/medicos': typeof AuthenticatedAppMedicosRoute
   '/app/rateio': typeof AuthenticatedAppRateioRoute
   '/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
@@ -121,6 +130,7 @@ export interface FileRoutesById {
   '/_authenticated/app': typeof AuthenticatedAppRouteWithChildren
   '/_authenticated/app/clinicas': typeof AuthenticatedAppClinicasRoute
   '/_authenticated/app/equipe': typeof AuthenticatedAppEquipeRoute
+  '/_authenticated/app/financeiro': typeof AuthenticatedAppFinanceiroRoute
   '/_authenticated/app/medicos': typeof AuthenticatedAppMedicosRoute
   '/_authenticated/app/rateio': typeof AuthenticatedAppRateioRoute
   '/_authenticated/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
@@ -136,6 +146,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/app/clinicas'
     | '/app/equipe'
+    | '/app/financeiro'
     | '/app/medicos'
     | '/app/rateio'
     | '/app/recepcao'
@@ -149,6 +160,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/app/clinicas'
     | '/app/equipe'
+    | '/app/financeiro'
     | '/app/medicos'
     | '/app/rateio'
     | '/app/recepcao'
@@ -163,6 +175,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app'
     | '/_authenticated/app/clinicas'
     | '/_authenticated/app/equipe'
+    | '/_authenticated/app/financeiro'
     | '/_authenticated/app/medicos'
     | '/_authenticated/app/rateio'
     | '/_authenticated/app/recepcao'
@@ -249,6 +262,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppMedicosRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/app/financeiro': {
+      id: '/_authenticated/app/financeiro'
+      path: '/financeiro'
+      fullPath: '/app/financeiro'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/app/equipe': {
       id: '/_authenticated/app/equipe'
       path: '/equipe'
@@ -269,6 +289,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedAppRouteChildren {
   AuthenticatedAppClinicasRoute: typeof AuthenticatedAppClinicasRoute
   AuthenticatedAppEquipeRoute: typeof AuthenticatedAppEquipeRoute
+  AuthenticatedAppFinanceiroRoute: typeof AuthenticatedAppFinanceiroRoute
   AuthenticatedAppMedicosRoute: typeof AuthenticatedAppMedicosRoute
   AuthenticatedAppRateioRoute: typeof AuthenticatedAppRateioRoute
   AuthenticatedAppRecepcaoRoute: typeof AuthenticatedAppRecepcaoRoute
@@ -277,6 +298,7 @@ interface AuthenticatedAppRouteChildren {
 const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppClinicasRoute: AuthenticatedAppClinicasRoute,
   AuthenticatedAppEquipeRoute: AuthenticatedAppEquipeRoute,
+  AuthenticatedAppFinanceiroRoute: AuthenticatedAppFinanceiroRoute,
   AuthenticatedAppMedicosRoute: AuthenticatedAppMedicosRoute,
   AuthenticatedAppRateioRoute: AuthenticatedAppRateioRoute,
   AuthenticatedAppRecepcaoRoute: AuthenticatedAppRecepcaoRoute,
@@ -308,3 +330,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
