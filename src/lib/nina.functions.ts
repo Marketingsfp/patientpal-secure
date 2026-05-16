@@ -72,7 +72,7 @@ function montarContextoTexto(ctx: {
     crm_uf: string;
     horarios: Array<{ dia: string; inicio: string; fim: string; obs: string | null }>;
   }>;
-  procedimentos: Array<{ nome: string; valor_dinheiro_pix: number; valor_cartao: number; grupo: string | null }>;
+  procedimentos: Array<{ nome: string; valor_dinheiro_pix: number; valor_cartao: number; grupo: string | null; preparo?: string | null }>;
 }) {
   const meds = ctx.medicos
     .map((m) => {
