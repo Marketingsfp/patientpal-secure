@@ -115,7 +115,7 @@ export const chatNina = createServerFn({ method: "POST" })
         .eq("ativo", true),
       supabase
         .from("procedimentos")
-        .select("nome, grupo, valor_dinheiro_pix, valor_cartao")
+        .select("nome, grupo, valor_dinheiro_pix, valor_cartao, preparo")
         .eq("clinica_id", data.clinicaId)
         .eq("ativo", true),
     ]);
