@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
-import { Plus, Stethoscope } from "lucide-react";
+import { Plus, Stethoscope, Pencil, Download } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { exportToExcel } from "@/lib/export-csv";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,6 +38,7 @@ function MedicosPage() {
   const [esps, setEsps] = useState<Especialidade[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({
     nome: "", crm: "", crm_uf: "",
     especialidades: [] as string[],
@@ -61,11 +63,35 @@ function MedicosPage() {
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [clinicaAtual?.clinica_id]);
 
+  const resetForm = () => {
+    setEditId(null);
+    setForm({ nome: "", crm: "", crm_uf: "", especialidades: [], tipo_repasse: "percentual", percentual: "50", valor: "" });
+  };
+
+  const openNew = () => {
+    resetForm();
+    setOpen(true);
+  };
+
+  const openEdit = (m: Medico) => {
+    setEditId(m.id);
+    setForm({
+      nome: m.nome,
+      crm: m.crm,
+      crm_uf: m.crm_uf,
+      especialidades: m.medico_especialidades?.map((me) => me.especialidade?.id).filter(Boolean) as string[],
+      tipo_repasse: m.tipo_repasse,
+      percentual: String(m.percentual_repasse_padrao ?? ""),
+      valor: m.valor_repasse_padrao != null ? String(m.valor_repasse_padrao) : "",
+    });
+    setOpen(true);
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!clinicaAtual) return;
     setLoading(true);
-    const { data: novo, error } = await supabase.from("medicos").insert({
+    const payload = {
       clinica_id: clinicaAtual.clinica_id,
       nome: form.nome,
       crm: form.crm,
@@ -74,17 +100,26 @@ function MedicosPage() {
       tipo_repasse: form.tipo_repasse,
       percentual_repasse_padrao: form.tipo_repasse === "percentual" ? parseFloat(form.percentual || "0") : 0,
       valor_repasse_padrao: form.tipo_repasse === "valor" ? parseFloat(form.valor || "0") : null,
-    }).select("id").single();
-    if (error || !novo) { setLoading(false); toast.error(error?.message ?? "Erro"); return; }
-    if (form.especialidades.length) {
-      const rows = form.especialidades.map((eid) => ({ medico_id: novo.id, especialidade_id: eid }));
+    };
+    let medicoId = editId;
+    if (editId) {
+      const { error } = await supabase.from("medicos").update(payload).eq("id", editId);
+      if (error) { setLoading(false); toast.error(error.message); return; }
+      await supabase.from("medico_especialidades").delete().eq("medico_id", editId);
+    } else {
+      const { data: novo, error } = await supabase.from("medicos").insert(payload).select("id").single();
+      if (error || !novo) { setLoading(false); toast.error(error?.message ?? "Erro"); return; }
+      medicoId = novo.id;
+    }
+    if (medicoId && form.especialidades.length) {
+      const rows = form.especialidades.map((eid) => ({ medico_id: medicoId!, especialidade_id: eid }));
       const { error: e2 } = await supabase.from("medico_especialidades").insert(rows);
       if (e2) { setLoading(false); toast.error(e2.message); return; }
     }
     setLoading(false);
-    toast.success("Médico cadastrado!");
+    toast.success(editId ? "Médico atualizado!" : "Médico cadastrado!");
     setOpen(false);
-    setForm({ nome: "", crm: "", crm_uf: "", especialidades: [], tipo_repasse: "percentual", percentual: "50", valor: "" });
+    resetForm();
     void load();
   };
 
@@ -102,6 +137,27 @@ function MedicosPage() {
       ? `R$ ${Number(m.valor_repasse_padrao ?? 0).toFixed(2)}`
       : `${m.percentual_repasse_padrao}%`;
 
+  const handleExport = () => {
+    if (medicos.length === 0) { toast.info("Sem dados para exportar."); return; }
+    exportToExcel(
+      medicos.map((m) => ({
+        nome: m.nome,
+        crm: `${m.crm}/${m.crm_uf}`,
+        especialidades: m.medico_especialidades?.map((me) => me.especialidade?.nome).filter(Boolean).join(", ") || "",
+        repasse: fmtRepasse(m),
+        ativo: m.ativo ? "Sim" : "Não",
+      })),
+      `medicos-${new Date().toISOString().slice(0, 10)}`,
+      [
+        { key: "nome", label: "Nome" },
+        { key: "crm", label: "CRM" },
+        { key: "especialidades", label: "Especialidades" },
+        { key: "repasse", label: "Repasse" },
+        { key: "ativo", label: "Ativo" },
+      ],
+    );
+  };
+
   if (!clinicaAtual) {
     return <p className="text-muted-foreground">Selecione uma clínica primeiro.</p>;
   }
@@ -113,12 +169,16 @@ function MedicosPage() {
           <h1 className="text-2xl font-semibold">Médicos</h1>
           <p className="text-sm text-muted-foreground">{clinicaAtual.clinica.nome}</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button><Plus className="h-4 w-4 mr-2" /> Novo médico</Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExport}>
+            <Download className="h-4 w-4 mr-2" /> Exportar Excel
+          </Button>
+          <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) resetForm(); }}>
+            <DialogTrigger asChild>
+              <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" /> Novo médico</Button>
+            </DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>Novo médico</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{editId ? "Editar médico" : "Novo médico"}</DialogTitle></DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label>Nome *</Label>
@@ -180,7 +240,8 @@ function MedicosPage() {
               <DialogFooter><Button type="submit" disabled={loading}>{loading ? "Salvando..." : "Salvar"}</Button></DialogFooter>
             </form>
           </DialogContent>
-        </Dialog>
+          </Dialog>
+        </div>
       </div>
 
       {medicos.length === 0 ? (
@@ -197,6 +258,7 @@ function MedicosPage() {
                 <TableHead>CRM</TableHead>
                 <TableHead>Especialidades</TableHead>
                 <TableHead className="text-right">Repasse</TableHead>
+                <TableHead className="w-12"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -206,6 +268,11 @@ function MedicosPage() {
                   <TableCell>{m.crm}/{m.crm_uf}</TableCell>
                   <TableCell>{m.medico_especialidades?.map((me) => me.especialidade?.nome).filter(Boolean).join(", ") || "—"}</TableCell>
                   <TableCell className="text-right">{fmtRepasse(m)}</TableCell>
+                  <TableCell className="text-right">
+                    <Button size="icon" variant="ghost" onClick={() => openEdit(m)} aria-label="Editar">
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
