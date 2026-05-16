@@ -1,6 +1,6 @@
 import { Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect } from "react";
-import { Activity, Building2, Users, Wallet, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target } from "lucide-react";
+import { Activity, Building2, Users, Wallet, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
@@ -22,6 +22,7 @@ const nav = [
   { to: "/app/financeiro", label: "Financeiro", icon: DollarSign },
   { to: "/app/clinicas", label: "Clínicas", icon: Building2 },
   { to: "/app/medicos", label: "Médicos", icon: Stethoscope },
+  { to: "/app/disponibilidades", label: "Horários médicos", icon: Clock },
   { to: "/app/rateio", label: "Regras de rateio", icon: Wallet },
   { to: "/app/equipe", label: "Equipe", icon: Users },
 ] as const;
