@@ -285,8 +285,9 @@ function MedicosPage() {
             <DialogHeader><DialogTitle>{editId ? "Editar médico" : "Novo médico"}</DialogTitle></DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <Tabs defaultValue="dados">
-                <TabsList className="grid grid-cols-6 w-full">
+                <TabsList className="grid grid-cols-7 w-full">
                   <TabsTrigger value="dados">Dados</TabsTrigger>
+                  <TabsTrigger value="especialidades">Especialidades</TabsTrigger>
                   <TabsTrigger value="contato">Contato</TabsTrigger>
                   <TabsTrigger value="endereco">Endereço</TabsTrigger>
                   <TabsTrigger value="banco">Banco</TabsTrigger>
@@ -334,27 +335,30 @@ function MedicosPage() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                <Label>Especialidades</Label>
-                <Input
-                  placeholder="Filtrar especialidade..."
-                  value={espFilter}
-                  onChange={(e) => setEspFilter(e.target.value)}
-                  className="h-8"
-                />
-                <div className="border rounded-md p-3 max-h-40 overflow-y-auto space-y-2">
-                  {esps.length === 0 && <p className="text-sm text-muted-foreground">Nenhuma especialidade cadastrada.</p>}
-                  {esps
-                    .filter((e) => e.nome.toLowerCase().includes(espFilter.toLowerCase()))
-                    .map((e) => (
-                    <label key={e.id} className="flex items-center gap-2 cursor-pointer text-sm">
-                      <Checkbox
-                        checked={form.especialidades.includes(e.id)}
-                        onCheckedChange={() => toggleEsp(e.id)}
-                      />
-                      {e.nome}
-                    </label>
-                  ))}
-                </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="especialidades" className="space-y-2 pt-4">
+                  <Label>Especialidades</Label>
+                  <Input
+                    placeholder="Filtrar especialidade..."
+                    value={espFilter}
+                    onChange={(e) => setEspFilter(e.target.value)}
+                    className="h-8"
+                  />
+                  <div className="border rounded-md p-3 max-h-80 overflow-y-auto space-y-2">
+                    {esps.length === 0 && <p className="text-sm text-muted-foreground">Nenhuma especialidade cadastrada.</p>}
+                    {esps
+                      .filter((e) => e.nome.toLowerCase().includes(espFilter.toLowerCase()))
+                      .map((e) => (
+                      <label key={e.id} className="flex items-center gap-2 cursor-pointer text-sm">
+                        <Checkbox
+                          checked={form.especialidades.includes(e.id)}
+                          onCheckedChange={() => toggleEsp(e.id)}
+                        />
+                        {e.nome}
+                      </label>
+                    ))}
                   </div>
                 </TabsContent>
 
