@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
-import { Plus, Stethoscope, Pencil, Download } from "lucide-react";
+import { Plus, Stethoscope, Pencil, Download, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -38,6 +38,19 @@ interface Medico {
   medico_especialidades: { especialidade: { id: string; nome: string } | null }[];
 }
 interface Especialidade { id: string; nome: string }
+interface ConvenioRow {
+  id?: string;
+  nome: string;
+  tipo_repasse: "percentual" | "valor";
+  percentual: string;
+  valor: string;
+  ativo: boolean;
+}
+
+const CONVENIOS_PADRAO: ConvenioRow[] = [
+  { nome: "Cartão Consulta", tipo_repasse: "percentual", percentual: "50", valor: "", ativo: true },
+  { nome: "Cartão Desconto", tipo_repasse: "percentual", percentual: "50", valor: "", ativo: true },
+];
 
 function MedicosPage() {
   const { clinicaAtual } = useClinica();
@@ -48,6 +61,7 @@ function MedicosPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [espFilter, setEspFilter] = useState("");
   const [busca, setBusca] = useState("");
+  const [convenios, setConvenios] = useState<ConvenioRow[]>(CONVENIOS_PADRAO);
   const [form, setForm] = useState({
     nome: "", crm: "", crm_uf: "",
     especialidades: [] as string[],
@@ -78,6 +92,7 @@ function MedicosPage() {
 
   const resetForm = () => {
     setEditId(null);
+    setConvenios(CONVENIOS_PADRAO.map((c) => ({ ...c })));
     setForm({
       nome: "", crm: "", crm_uf: "", especialidades: [],
       tipo_repasse: "percentual", percentual: "50", valor: "",
@@ -93,8 +108,25 @@ function MedicosPage() {
     setOpen(true);
   };
 
-  const openEdit = (m: Medico) => {
+  const openEdit = async (m: Medico) => {
     setEditId(m.id);
+    const { data: convs } = await supabase
+      .from("medico_convenios")
+      .select("id, nome, tipo_repasse, percentual, valor, ativo")
+      .eq("medico_id", m.id)
+      .order("created_at");
+    if (convs && convs.length) {
+      setConvenios(convs.map((c) => ({
+        id: c.id,
+        nome: c.nome,
+        tipo_repasse: (c.tipo_repasse as "percentual" | "valor") ?? "percentual",
+        percentual: c.percentual != null ? String(c.percentual) : "",
+        valor: c.valor != null ? String(c.valor) : "",
+        ativo: c.ativo ?? true,
+      })));
+    } else {
+      setConvenios(CONVENIOS_PADRAO.map((c) => ({ ...c })));
+    }
     setForm({
       nome: m.nome,
       crm: m.crm,
@@ -159,6 +191,23 @@ function MedicosPage() {
       const rows = form.especialidades.map((eid) => ({ medico_id: medicoId!, especialidade_id: eid }));
       const { error: e2 } = await supabase.from("medico_especialidades").insert(rows);
       if (e2) { setLoading(false); toast.error(e2.message); return; }
+    }
+    if (medicoId) {
+      await supabase.from("medico_convenios").delete().eq("medico_id", medicoId);
+      const convRows = convenios
+        .filter((c) => c.nome.trim())
+        .map((c) => ({
+          medico_id: medicoId!,
+          nome: c.nome.trim(),
+          tipo_repasse: c.tipo_repasse,
+          percentual: c.tipo_repasse === "percentual" ? parseFloat(c.percentual || "0") : 0,
+          valor: c.tipo_repasse === "valor" ? parseFloat(c.valor || "0") : null,
+          ativo: c.ativo,
+        }));
+      if (convRows.length) {
+        const { error: e3 } = await supabase.from("medico_convenios").insert(convRows);
+        if (e3) { setLoading(false); toast.error(e3.message); return; }
+      }
     }
     setLoading(false);
     toast.success(editId ? "Médico atualizado!" : "Médico cadastrado!");
