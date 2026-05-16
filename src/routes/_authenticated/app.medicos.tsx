@@ -39,6 +39,7 @@ function MedicosPage() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+  const [espFilter, setEspFilter] = useState("");
   const [form, setForm] = useState({
     nome: "", crm: "", crm_uf: "",
     especialidades: [] as string[],
@@ -196,9 +197,17 @@ function MedicosPage() {
               </div>
               <div className="space-y-2">
                 <Label>Especialidades</Label>
+                <Input
+                  placeholder="Filtrar especialidade..."
+                  value={espFilter}
+                  onChange={(e) => setEspFilter(e.target.value)}
+                  className="h-8"
+                />
                 <div className="border rounded-md p-3 max-h-40 overflow-y-auto space-y-2">
                   {esps.length === 0 && <p className="text-sm text-muted-foreground">Nenhuma especialidade cadastrada.</p>}
-                  {esps.map((e) => (
+                  {esps
+                    .filter((e) => e.nome.toLowerCase().includes(espFilter.toLowerCase()))
+                    .map((e) => (
                     <label key={e.id} className="flex items-center gap-2 cursor-pointer text-sm">
                       <Checkbox
                         checked={form.especialidades.includes(e.id)}
