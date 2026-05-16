@@ -833,6 +833,48 @@ export type Database = {
           },
         ]
       }
+      procedimentos: {
+        Row: {
+          ativo: boolean
+          clinica_id: string
+          codigo: string | null
+          created_at: string
+          duracao_minutos: number
+          id: string
+          nome: string
+          observacoes: string | null
+          tipo: Database["public"]["Enums"]["procedimento_tipo"]
+          updated_at: string
+          valor_padrao: number
+        }
+        Insert: {
+          ativo?: boolean
+          clinica_id: string
+          codigo?: string | null
+          created_at?: string
+          duracao_minutos?: number
+          id?: string
+          nome: string
+          observacoes?: string | null
+          tipo?: Database["public"]["Enums"]["procedimento_tipo"]
+          updated_at?: string
+          valor_padrao?: number
+        }
+        Update: {
+          ativo?: boolean
+          clinica_id?: string
+          codigo?: string | null
+          created_at?: string
+          duracao_minutos?: number
+          id?: string
+          nome?: string
+          observacoes?: string | null
+          tipo?: Database["public"]["Enums"]["procedimento_tipo"]
+          updated_at?: string
+          valor_padrao?: number
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -1122,6 +1164,7 @@ export type Database = {
         | "cartao_proprio"
         | "boleto"
         | "transferencia"
+      procedimento_tipo: "consulta" | "exame" | "procedimento"
       status_senha: "emitida" | "chamada" | "atendida" | "cancelada"
       tipo_senha: "N" | "P" | "E" | "R"
     }
@@ -1279,6 +1322,7 @@ export const Constants = {
         "boleto",
         "transferencia",
       ],
+      procedimento_tipo: ["consulta", "exame", "procedimento"],
       status_senha: ["emitida", "chamada", "atendida", "cancelada"],
       tipo_senha: ["N", "P", "E", "R"],
     },
