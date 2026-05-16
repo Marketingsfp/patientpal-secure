@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Plus, Pencil, Trash2, Stethoscope } from "lucide-react";
+import { Plus, Pencil, Trash2, Stethoscope, Download } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { exportToExcel } from "@/lib/export-csv";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -115,6 +116,40 @@ function Page() {
       <div className="flex items-center justify-between">
         <div><h1 className="text-2xl font-semibold">Atendimentos</h1>
           <p className="text-sm text-muted-foreground">Procedimentos realizados com repasse automático</p></div>
+        <div className="flex gap-2">
+        <Button
+          variant="outline"
+          onClick={() => {
+            if (!items.length) { toast.info("Sem dados para exportar."); return; }
+            exportToExcel(
+              items.map((a) => ({
+                data: new Date(a.data).toLocaleDateString("pt-BR"),
+                medico: a.medico_id ? medMap.get(a.medico_id) ?? "" : "",
+                paciente: a.paciente_id ? pacMap.get(a.paciente_id) ?? "" : "",
+                procedimento: a.procedimento ?? "",
+                valor_total: Number(a.valor_total).toFixed(2),
+                valor_medico: Number(a.valor_medico).toFixed(2),
+                valor_clinica: Number(a.valor_clinica).toFixed(2),
+                forma_pagamento: a.forma_pagamento ?? "",
+                status: a.status,
+              })),
+              `atendimentos-${new Date().toISOString().slice(0, 10)}`,
+              [
+                { key: "data", label: "Data" },
+                { key: "medico", label: "Médico" },
+                { key: "paciente", label: "Paciente" },
+                { key: "procedimento", label: "Procedimento" },
+                { key: "valor_total", label: "Valor total (R$)" },
+                { key: "valor_medico", label: "Repasse médico (R$)" },
+                { key: "valor_clinica", label: "Clínica (R$)" },
+                { key: "forma_pagamento", label: "Forma pagamento" },
+                { key: "status", label: "Status" },
+              ],
+            );
+          }}
+        >
+          <Download className="h-4 w-4 mr-2" />Exportar Excel
+        </Button>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild><Button onClick={openNew} disabled={!clinicaAtual}><Plus className="h-4 w-4 mr-2" />Novo atendimento</Button></DialogTrigger>
           <DialogContent className="max-w-lg">
@@ -165,6 +200,7 @@ function Page() {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
       <Card><CardContent className="p-0">
         {loading ? <div className="py-12 text-center text-muted-foreground">Carregando...</div>
