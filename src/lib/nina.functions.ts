@@ -44,7 +44,7 @@ export const getContextoClinica = createServerFn({ method: "POST" })
         .order("hora_inicio"),
       supabase
         .from("procedimentos")
-        .select("id, nome, tipo, grupo, valor_dinheiro_pix, valor_cartao, duracao_minutos")
+        .select("id, nome, tipo, grupo, valor_dinheiro_pix, valor_cartao, duracao_minutos, preparo")
         .eq("clinica_id", data.clinicaId)
         .eq("ativo", true)
         .order("nome"),
