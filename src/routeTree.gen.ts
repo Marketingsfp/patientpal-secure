@@ -28,6 +28,7 @@ import { Route as AuthenticatedAppFinanceiroRouteImport } from './routes/_authen
 import { Route as AuthenticatedAppEstoqueRouteImport } from './routes/_authenticated/app.estoque'
 import { Route as AuthenticatedAppEquipeRouteImport } from './routes/_authenticated/app.equipe'
 import { Route as AuthenticatedAppDocumentosRouteImport } from './routes/_authenticated/app.documentos'
+import { Route as AuthenticatedAppCrmRouteImport } from './routes/_authenticated/app.crm'
 import { Route as AuthenticatedAppClinicasRouteImport } from './routes/_authenticated/app.clinicas'
 import { Route as AuthenticatedAppClientesRouteImport } from './routes/_authenticated/app.clientes'
 import { Route as AuthenticatedAppBoletosRouteImport } from './routes/_authenticated/app.boletos'
@@ -148,6 +149,11 @@ const AuthenticatedAppDocumentosRoute =
     path: '/documentos',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
+const AuthenticatedAppCrmRoute = AuthenticatedAppCrmRouteImport.update({
+  id: '/crm',
+  path: '/crm',
+  getParentRoute: () => AuthenticatedAppRoute,
+} as any)
 const AuthenticatedAppClinicasRoute =
   AuthenticatedAppClinicasRouteImport.update({
     id: '/clinicas',
@@ -273,6 +279,7 @@ export interface FileRoutesByFullPath {
   '/app/boletos': typeof AuthenticatedAppBoletosRoute
   '/app/clientes': typeof AuthenticatedAppClientesRoute
   '/app/clinicas': typeof AuthenticatedAppClinicasRoute
+  '/app/crm': typeof AuthenticatedAppCrmRoute
   '/app/documentos': typeof AuthenticatedAppDocumentosRoute
   '/app/equipe': typeof AuthenticatedAppEquipeRoute
   '/app/estoque': typeof AuthenticatedAppEstoqueRoute
@@ -311,6 +318,7 @@ export interface FileRoutesByTo {
   '/app/boletos': typeof AuthenticatedAppBoletosRoute
   '/app/clientes': typeof AuthenticatedAppClientesRoute
   '/app/clinicas': typeof AuthenticatedAppClinicasRoute
+  '/app/crm': typeof AuthenticatedAppCrmRoute
   '/app/documentos': typeof AuthenticatedAppDocumentosRoute
   '/app/equipe': typeof AuthenticatedAppEquipeRoute
   '/app/estoque': typeof AuthenticatedAppEstoqueRoute
@@ -351,6 +359,7 @@ export interface FileRoutesById {
   '/_authenticated/app/boletos': typeof AuthenticatedAppBoletosRoute
   '/_authenticated/app/clientes': typeof AuthenticatedAppClientesRoute
   '/_authenticated/app/clinicas': typeof AuthenticatedAppClinicasRoute
+  '/_authenticated/app/crm': typeof AuthenticatedAppCrmRoute
   '/_authenticated/app/documentos': typeof AuthenticatedAppDocumentosRoute
   '/_authenticated/app/equipe': typeof AuthenticatedAppEquipeRoute
   '/_authenticated/app/estoque': typeof AuthenticatedAppEstoqueRoute
@@ -392,6 +401,7 @@ export interface FileRouteTypes {
     | '/app/boletos'
     | '/app/clientes'
     | '/app/clinicas'
+    | '/app/crm'
     | '/app/documentos'
     | '/app/equipe'
     | '/app/estoque'
@@ -430,6 +440,7 @@ export interface FileRouteTypes {
     | '/app/boletos'
     | '/app/clientes'
     | '/app/clinicas'
+    | '/app/crm'
     | '/app/documentos'
     | '/app/equipe'
     | '/app/estoque'
@@ -469,6 +480,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/boletos'
     | '/_authenticated/app/clientes'
     | '/_authenticated/app/clinicas'
+    | '/_authenticated/app/crm'
     | '/_authenticated/app/documentos'
     | '/_authenticated/app/equipe'
     | '/_authenticated/app/estoque'
@@ -639,6 +651,13 @@ declare module '@tanstack/react-router' {
       path: '/documentos'
       fullPath: '/app/documentos'
       preLoaderRoute: typeof AuthenticatedAppDocumentosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/crm': {
+      id: '/_authenticated/app/crm'
+      path: '/crm'
+      fullPath: '/app/crm'
+      preLoaderRoute: typeof AuthenticatedAppCrmRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/clinicas': {
@@ -834,6 +853,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppBoletosRoute: typeof AuthenticatedAppBoletosRoute
   AuthenticatedAppClientesRoute: typeof AuthenticatedAppClientesRoute
   AuthenticatedAppClinicasRoute: typeof AuthenticatedAppClinicasRoute
+  AuthenticatedAppCrmRoute: typeof AuthenticatedAppCrmRoute
   AuthenticatedAppDocumentosRoute: typeof AuthenticatedAppDocumentosRoute
   AuthenticatedAppEquipeRoute: typeof AuthenticatedAppEquipeRoute
   AuthenticatedAppEstoqueRoute: typeof AuthenticatedAppEstoqueRoute
@@ -854,6 +874,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppBoletosRoute: AuthenticatedAppBoletosRoute,
   AuthenticatedAppClientesRoute: AuthenticatedAppClientesRoute,
   AuthenticatedAppClinicasRoute: AuthenticatedAppClinicasRoute,
+  AuthenticatedAppCrmRoute: AuthenticatedAppCrmRoute,
   AuthenticatedAppDocumentosRoute: AuthenticatedAppDocumentosRoute,
   AuthenticatedAppEquipeRoute: AuthenticatedAppEquipeRoute,
   AuthenticatedAppEstoqueRoute: AuthenticatedAppEstoqueRoute,
