@@ -591,6 +591,39 @@ export type Database = {
           },
         ]
       }
+      medico_especialidades: {
+        Row: {
+          created_at: string
+          especialidade_id: string
+          medico_id: string
+        }
+        Insert: {
+          created_at?: string
+          especialidade_id: string
+          medico_id: string
+        }
+        Update: {
+          created_at?: string
+          especialidade_id?: string
+          medico_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medico_especialidades_especialidade_id_fkey"
+            columns: ["especialidade_id"]
+            isOneToOne: false
+            referencedRelation: "especialidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medico_especialidades_medico_id_fkey"
+            columns: ["medico_id"]
+            isOneToOne: false
+            referencedRelation: "medicos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       medicos: {
         Row: {
           ativo: boolean
@@ -604,8 +637,10 @@ export type Database = {
           nome: string
           percentual_repasse_padrao: number
           telefone: string | null
+          tipo_repasse: string
           updated_at: string
           user_id: string | null
+          valor_repasse_padrao: number | null
         }
         Insert: {
           ativo?: boolean
@@ -619,8 +654,10 @@ export type Database = {
           nome: string
           percentual_repasse_padrao?: number
           telefone?: string | null
+          tipo_repasse?: string
           updated_at?: string
           user_id?: string | null
+          valor_repasse_padrao?: number | null
         }
         Update: {
           ativo?: boolean
@@ -634,8 +671,10 @@ export type Database = {
           nome?: string
           percentual_repasse_padrao?: number
           telefone?: string | null
+          tipo_repasse?: string
           updated_at?: string
           user_id?: string | null
+          valor_repasse_padrao?: number | null
         }
         Relationships: [
           {

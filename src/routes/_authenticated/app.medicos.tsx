@@ -8,12 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -25,8 +23,11 @@ export const Route = createFileRoute("/_authenticated/app/medicos")({
 
 interface Medico {
   id: string; nome: string; crm: string; crm_uf: string;
-  percentual_repasse_padrao: number; ativo: boolean;
-  especialidade: { nome: string } | null;
+  percentual_repasse_padrao: number;
+  valor_repasse_padrao: number | null;
+  tipo_repasse: "percentual" | "valor";
+  ativo: boolean;
+  medico_especialidades: { especialidade: { id: string; nome: string } | null }[];
 }
 interface Especialidade { id: string; nome: string }
 
@@ -37,14 +38,18 @@ function MedicosPage() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
-    nome: "", crm: "", crm_uf: "", especialidade_id: "", percentual: "70",
+    nome: "", crm: "", crm_uf: "",
+    especialidades: [] as string[],
+    tipo_repasse: "percentual" as "percentual" | "valor",
+    percentual: "70",
+    valor: "",
   });
 
   const load = async () => {
     if (!clinicaAtual) return;
     const { data } = await supabase
       .from("medicos")
-      .select("id, nome, crm, crm_uf, percentual_repasse_padrao, ativo, especialidade:especialidades(nome)")
+      .select("id, nome, crm, crm_uf, percentual_repasse_padrao, valor_repasse_padrao, tipo_repasse, ativo, medico_especialidades(especialidade:especialidades(id, nome))")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("nome");
     setMedicos((data as unknown as Medico[]) ?? []);
@@ -60,21 +65,42 @@ function MedicosPage() {
     e.preventDefault();
     if (!clinicaAtual) return;
     setLoading(true);
-    const { error } = await supabase.from("medicos").insert({
+    const { data: novo, error } = await supabase.from("medicos").insert({
       clinica_id: clinicaAtual.clinica_id,
       nome: form.nome,
       crm: form.crm,
       crm_uf: form.crm_uf.toUpperCase(),
-      especialidade_id: form.especialidade_id || null,
-      percentual_repasse_padrao: parseFloat(form.percentual),
-    });
+      especialidade_id: form.especialidades[0] || null,
+      tipo_repasse: form.tipo_repasse,
+      percentual_repasse_padrao: form.tipo_repasse === "percentual" ? parseFloat(form.percentual || "0") : 0,
+      valor_repasse_padrao: form.tipo_repasse === "valor" ? parseFloat(form.valor || "0") : null,
+    }).select("id").single();
+    if (error || !novo) { setLoading(false); toast.error(error?.message ?? "Erro"); return; }
+    if (form.especialidades.length) {
+      const rows = form.especialidades.map((eid) => ({ medico_id: novo.id, especialidade_id: eid }));
+      const { error: e2 } = await supabase.from("medico_especialidades").insert(rows);
+      if (e2) { setLoading(false); toast.error(e2.message); return; }
+    }
     setLoading(false);
-    if (error) { toast.error(error.message); return; }
     toast.success("Médico cadastrado!");
     setOpen(false);
-    setForm({ nome: "", crm: "", crm_uf: "", especialidade_id: "", percentual: "70" });
+    setForm({ nome: "", crm: "", crm_uf: "", especialidades: [], tipo_repasse: "percentual", percentual: "70", valor: "" });
     void load();
   };
+
+  const toggleEsp = (id: string) => {
+    setForm((f) => ({
+      ...f,
+      especialidades: f.especialidades.includes(id)
+        ? f.especialidades.filter((x) => x !== id)
+        : [...f.especialidades, id],
+    }));
+  };
+
+  const fmtRepasse = (m: Medico) =>
+    m.tipo_repasse === "valor"
+      ? `R$ ${Number(m.valor_repasse_padrao ?? 0).toFixed(2)}`
+      : `${m.percentual_repasse_padrao}%`;
 
   if (!clinicaAtual) {
     return <p className="text-muted-foreground">Selecione uma clínica primeiro.</p>;
@@ -109,18 +135,48 @@ function MedicosPage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>Especialidade</Label>
-                <Select value={form.especialidade_id} onValueChange={(v) => setForm({ ...form, especialidade_id: v })}>
-                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                  <SelectContent>
-                    {esps.map((e) => <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Label>Especialidades</Label>
+                <div className="border rounded-md p-3 max-h-40 overflow-y-auto space-y-2">
+                  {esps.length === 0 && <p className="text-sm text-muted-foreground">Nenhuma especialidade cadastrada.</p>}
+                  {esps.map((e) => (
+                    <label key={e.id} className="flex items-center gap-2 cursor-pointer text-sm">
+                      <Checkbox
+                        checked={form.especialidades.includes(e.id)}
+                        onCheckedChange={() => toggleEsp(e.id)}
+                      />
+                      {e.nome}
+                    </label>
+                  ))}
+                </div>
               </div>
               <div className="space-y-2">
-                <Label>% repasse padrão</Label>
-                <Input type="number" min={0} max={100} step={0.01} value={form.percentual} onChange={(e) => setForm({ ...form, percentual: e.target.value })} />
+                <Label>Tipo de repasse</Label>
+                <div className="flex gap-4 text-sm">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="tipo_repasse" checked={form.tipo_repasse === "percentual"}
+                      onChange={() => setForm({ ...form, tipo_repasse: "percentual" })} />
+                    Percentual (%)
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="tipo_repasse" checked={form.tipo_repasse === "valor"}
+                      onChange={() => setForm({ ...form, tipo_repasse: "valor" })} />
+                    Valor fixo (R$)
+                  </label>
+                </div>
               </div>
+              {form.tipo_repasse === "percentual" ? (
+                <div className="space-y-2">
+                  <Label>% repasse padrão</Label>
+                  <Input type="number" min={0} max={100} step={0.01} value={form.percentual}
+                    onChange={(e) => setForm({ ...form, percentual: e.target.value })} />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label>Valor repasse padrão (R$)</Label>
+                  <Input type="number" min={0} step={0.01} value={form.valor}
+                    onChange={(e) => setForm({ ...form, valor: e.target.value })} />
+                </div>
+              )}
               <DialogFooter><Button type="submit" disabled={loading}>{loading ? "Salvando..." : "Salvar"}</Button></DialogFooter>
             </form>
           </DialogContent>
@@ -139,8 +195,8 @@ function MedicosPage() {
               <TableRow>
                 <TableHead>Nome</TableHead>
                 <TableHead>CRM</TableHead>
-                <TableHead>Especialidade</TableHead>
-                <TableHead className="text-right">% Repasse</TableHead>
+                <TableHead>Especialidades</TableHead>
+                <TableHead className="text-right">Repasse</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -148,8 +204,8 @@ function MedicosPage() {
                 <TableRow key={m.id}>
                   <TableCell className="font-medium">{m.nome}</TableCell>
                   <TableCell>{m.crm}/{m.crm_uf}</TableCell>
-                  <TableCell>{m.especialidade?.nome ?? "—"}</TableCell>
-                  <TableCell className="text-right">{m.percentual_repasse_padrao}%</TableCell>
+                  <TableCell>{m.medico_especialidades?.map((me) => me.especialidade?.nome).filter(Boolean).join(", ") || "—"}</TableCell>
+                  <TableCell className="text-right">{fmtRepasse(m)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
