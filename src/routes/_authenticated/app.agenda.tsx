@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   CalendarDays, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X,
-  MoreHorizontal, DollarSign, Star, Flag,
+  MoreHorizontal, Star, Flag,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/agenda")({
