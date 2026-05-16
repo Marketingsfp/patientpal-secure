@@ -310,6 +310,7 @@ export type Database = {
           estado: string | null
           id: string
           nome: string
+          paytime_recipient_id: string | null
           telefone: string | null
           updated_at: string
         }
@@ -324,6 +325,7 @@ export type Database = {
           estado?: string | null
           id?: string
           nome: string
+          paytime_recipient_id?: string | null
           telefone?: string | null
           updated_at?: string
         }
@@ -338,6 +340,7 @@ export type Database = {
           estado?: string | null
           id?: string
           nome?: string
+          paytime_recipient_id?: string | null
           telefone?: string | null
           updated_at?: string
         }
@@ -1091,6 +1094,7 @@ export type Database = {
           especialidade_id: string | null
           id: string
           nome: string
+          paytime_recipient_id: string | null
           percentual_repasse_padrao: number
           telefone: string | null
           tipo_repasse: string
@@ -1108,6 +1112,7 @@ export type Database = {
           especialidade_id?: string | null
           id?: string
           nome: string
+          paytime_recipient_id?: string | null
           percentual_repasse_padrao?: number
           telefone?: string | null
           tipo_repasse?: string
@@ -1125,6 +1130,7 @@ export type Database = {
           especialidade_id?: string | null
           id?: string
           nome?: string
+          paytime_recipient_id?: string | null
           percentual_repasse_padrao?: number
           telefone?: string | null
           tipo_repasse?: string
@@ -1366,6 +1372,251 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      pagamento_splits: {
+        Row: {
+          beneficiario_tipo: Database["public"]["Enums"]["split_beneficiario_tipo"]
+          clinica_id: string
+          created_at: string
+          emite_nf: boolean
+          id: string
+          medico_id: string | null
+          nfse_id: string | null
+          pagamento_id: string
+          paytime_recipient_id: string | null
+          percentual: number | null
+          prestador_id: string | null
+          rotulo: string | null
+          status: string
+          valor: number
+        }
+        Insert: {
+          beneficiario_tipo: Database["public"]["Enums"]["split_beneficiario_tipo"]
+          clinica_id: string
+          created_at?: string
+          emite_nf?: boolean
+          id?: string
+          medico_id?: string | null
+          nfse_id?: string | null
+          pagamento_id: string
+          paytime_recipient_id?: string | null
+          percentual?: number | null
+          prestador_id?: string | null
+          rotulo?: string | null
+          status?: string
+          valor: number
+        }
+        Update: {
+          beneficiario_tipo?: Database["public"]["Enums"]["split_beneficiario_tipo"]
+          clinica_id?: string
+          created_at?: string
+          emite_nf?: boolean
+          id?: string
+          medico_id?: string | null
+          nfse_id?: string | null
+          pagamento_id?: string
+          paytime_recipient_id?: string | null
+          percentual?: number | null
+          prestador_id?: string | null
+          rotulo?: string | null
+          status?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pagamento_splits_pagamento_id_fkey"
+            columns: ["pagamento_id"]
+            isOneToOne: false
+            referencedRelation: "pagamentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pagamentos: {
+        Row: {
+          agendamento_id: string | null
+          atendimento_id: string | null
+          autorizacao: string | null
+          clinica_id: string
+          created_at: string
+          criado_por: string | null
+          forma: Database["public"]["Enums"]["pagamento_forma"]
+          id: string
+          nsu: string | null
+          observacoes: string | null
+          paciente_id: string | null
+          parcelas: number
+          paytime_payload: Json | null
+          paytime_transaction_id: string | null
+          procedimento_id: string | null
+          status: Database["public"]["Enums"]["pagamento_status"]
+          updated_at: string
+          valor_bruto: number
+          valor_liquido: number
+          valor_taxa: number
+        }
+        Insert: {
+          agendamento_id?: string | null
+          atendimento_id?: string | null
+          autorizacao?: string | null
+          clinica_id: string
+          created_at?: string
+          criado_por?: string | null
+          forma?: Database["public"]["Enums"]["pagamento_forma"]
+          id?: string
+          nsu?: string | null
+          observacoes?: string | null
+          paciente_id?: string | null
+          parcelas?: number
+          paytime_payload?: Json | null
+          paytime_transaction_id?: string | null
+          procedimento_id?: string | null
+          status?: Database["public"]["Enums"]["pagamento_status"]
+          updated_at?: string
+          valor_bruto: number
+          valor_liquido?: number
+          valor_taxa?: number
+        }
+        Update: {
+          agendamento_id?: string | null
+          atendimento_id?: string | null
+          autorizacao?: string | null
+          clinica_id?: string
+          created_at?: string
+          criado_por?: string | null
+          forma?: Database["public"]["Enums"]["pagamento_forma"]
+          id?: string
+          nsu?: string | null
+          observacoes?: string | null
+          paciente_id?: string | null
+          parcelas?: number
+          paytime_payload?: Json | null
+          paytime_transaction_id?: string | null
+          procedimento_id?: string | null
+          status?: Database["public"]["Enums"]["pagamento_status"]
+          updated_at?: string
+          valor_bruto?: number
+          valor_liquido?: number
+          valor_taxa?: number
+        }
+        Relationships: []
+      }
+      prestadores: {
+        Row: {
+          agencia: string | null
+          ativo: boolean
+          banco: string | null
+          clinica_id: string
+          cnpj: string | null
+          conta: string | null
+          created_at: string
+          email: string | null
+          emite_nf_propria: boolean
+          id: string
+          inscricao_municipal: string | null
+          nome: string
+          observacoes: string | null
+          pix_chave: string | null
+          responsavel: string | null
+          telefone: string | null
+          tipo: Database["public"]["Enums"]["prestador_tipo"]
+          updated_at: string
+        }
+        Insert: {
+          agencia?: string | null
+          ativo?: boolean
+          banco?: string | null
+          clinica_id: string
+          cnpj?: string | null
+          conta?: string | null
+          created_at?: string
+          email?: string | null
+          emite_nf_propria?: boolean
+          id?: string
+          inscricao_municipal?: string | null
+          nome: string
+          observacoes?: string | null
+          pix_chave?: string | null
+          responsavel?: string | null
+          telefone?: string | null
+          tipo?: Database["public"]["Enums"]["prestador_tipo"]
+          updated_at?: string
+        }
+        Update: {
+          agencia?: string | null
+          ativo?: boolean
+          banco?: string | null
+          clinica_id?: string
+          cnpj?: string | null
+          conta?: string | null
+          created_at?: string
+          email?: string | null
+          emite_nf_propria?: boolean
+          id?: string
+          inscricao_municipal?: string | null
+          nome?: string
+          observacoes?: string | null
+          pix_chave?: string | null
+          responsavel?: string | null
+          telefone?: string | null
+          tipo?: Database["public"]["Enums"]["prestador_tipo"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      procedimento_split_regras: {
+        Row: {
+          ativo: boolean
+          beneficiario_tipo: Database["public"]["Enums"]["split_beneficiario_tipo"]
+          clinica_id: string
+          created_at: string
+          emite_nf: boolean
+          id: string
+          medico_id: string | null
+          observacoes: string | null
+          ordem: number
+          percentual: number | null
+          prestador_id: string | null
+          procedimento_id: string
+          rotulo: string | null
+          updated_at: string
+          valor_fixo: number | null
+        }
+        Insert: {
+          ativo?: boolean
+          beneficiario_tipo: Database["public"]["Enums"]["split_beneficiario_tipo"]
+          clinica_id: string
+          created_at?: string
+          emite_nf?: boolean
+          id?: string
+          medico_id?: string | null
+          observacoes?: string | null
+          ordem?: number
+          percentual?: number | null
+          prestador_id?: string | null
+          procedimento_id: string
+          rotulo?: string | null
+          updated_at?: string
+          valor_fixo?: number | null
+        }
+        Update: {
+          ativo?: boolean
+          beneficiario_tipo?: Database["public"]["Enums"]["split_beneficiario_tipo"]
+          clinica_id?: string
+          created_at?: string
+          emite_nf?: boolean
+          id?: string
+          medico_id?: string | null
+          observacoes?: string | null
+          ordem?: number
+          percentual?: number | null
+          prestador_id?: string | null
+          procedimento_id?: string
+          rotulo?: string | null
+          updated_at?: string
+          valor_fixo?: number | null
+        }
+        Relationships: []
       }
       procedimentos: {
         Row: {
@@ -1799,7 +2050,31 @@ export type Database = {
         | "cartao_proprio"
         | "boleto"
         | "transferencia"
+      pagamento_forma:
+        | "paytime_credito"
+        | "paytime_debito"
+        | "paytime_pix"
+        | "dinheiro"
+        | "pix"
+        | "cartao_credito"
+        | "cartao_debito"
+        | "boleto"
+        | "outro"
+      pagamento_status:
+        | "pendente"
+        | "autorizado"
+        | "capturado"
+        | "falhou"
+        | "estornado"
+        | "cancelado"
+      prestador_tipo:
+        | "laboratorio"
+        | "clinica_imagem"
+        | "locador_equipamento"
+        | "parceiro_pj"
+        | "outro"
       procedimento_tipo: "consulta" | "exame" | "procedimento"
+      split_beneficiario_tipo: "clinica" | "medico" | "prestador" | "outro"
       status_senha: "emitida" | "chamada" | "atendida" | "cancelada"
       tipo_documento:
         | "atestado"
@@ -1966,7 +2241,34 @@ export const Constants = {
         "boleto",
         "transferencia",
       ],
+      pagamento_forma: [
+        "paytime_credito",
+        "paytime_debito",
+        "paytime_pix",
+        "dinheiro",
+        "pix",
+        "cartao_credito",
+        "cartao_debito",
+        "boleto",
+        "outro",
+      ],
+      pagamento_status: [
+        "pendente",
+        "autorizado",
+        "capturado",
+        "falhou",
+        "estornado",
+        "cancelado",
+      ],
+      prestador_tipo: [
+        "laboratorio",
+        "clinica_imagem",
+        "locador_equipamento",
+        "parceiro_pj",
+        "outro",
+      ],
       procedimento_tipo: ["consulta", "exame", "procedimento"],
+      split_beneficiario_tipo: ["clinica", "medico", "prestador", "outro"],
       status_senha: ["emitida", "chamada", "atendida", "cancelada"],
       tipo_documento: [
         "atestado",
