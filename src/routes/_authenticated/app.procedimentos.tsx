@@ -37,7 +37,11 @@ interface Procedimento {
   codigo: string | null;
   valor_padrao: number;
   valor_dinheiro_pix: number;
+  valor_dinheiro: number;
+  valor_pix: number;
   valor_cartao: number;
+  valor_cartao_credito: number;
+  valor_cartao_debito: number;
   valor_cartao_consulta: number;
   valor_cartao_desconto: number;
   duracao_minutos: number;
@@ -61,7 +65,8 @@ const TIPO_COR: Record<Tipo, string> = {
 
 const EMPTY = {
   nome: "", grupo: "", tipo: "exame" as Tipo, codigo: "",
-  valor_dinheiro_pix: "0", valor_cartao: "0",
+  valor_dinheiro: "0", valor_pix: "0",
+  valor_cartao_credito: "0", valor_cartao_debito: "0",
   valor_cartao_consulta: "0", valor_cartao_desconto: "0",
   duracao_minutos: "30", observacoes: "", ativo: true,
 };
