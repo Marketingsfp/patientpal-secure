@@ -19,7 +19,9 @@ import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/ap
 import { Route as AuthenticatedAppIndexRouteImport } from './routes/_authenticated/app.index'
 import { Route as AuthenticatedAppRecepcaoRouteImport } from './routes/_authenticated/app.recepcao'
 import { Route as AuthenticatedAppRateioRouteImport } from './routes/_authenticated/app.rateio'
+import { Route as AuthenticatedAppProntuariosRouteImport } from './routes/_authenticated/app.prontuarios'
 import { Route as AuthenticatedAppProcedimentosRouteImport } from './routes/_authenticated/app.procedimentos'
+import { Route as AuthenticatedAppModelosDocumentosRouteImport } from './routes/_authenticated/app.modelos-documentos'
 import { Route as AuthenticatedAppMedicosRouteImport } from './routes/_authenticated/app.medicos'
 import { Route as AuthenticatedAppFinanceiroRouteImport } from './routes/_authenticated/app.financeiro'
 import { Route as AuthenticatedAppEquipeRouteImport } from './routes/_authenticated/app.equipe'
@@ -91,10 +93,22 @@ const AuthenticatedAppRateioRoute = AuthenticatedAppRateioRouteImport.update({
   path: '/rateio',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
+const AuthenticatedAppProntuariosRoute =
+  AuthenticatedAppProntuariosRouteImport.update({
+    id: '/prontuarios',
+    path: '/prontuarios',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppProcedimentosRoute =
   AuthenticatedAppProcedimentosRouteImport.update({
     id: '/procedimentos',
     path: '/procedimentos',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppModelosDocumentosRoute =
+  AuthenticatedAppModelosDocumentosRouteImport.update({
+    id: '/modelos-documentos',
+    path: '/modelos-documentos',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppMedicosRoute = AuthenticatedAppMedicosRouteImport.update({
@@ -228,7 +242,9 @@ export interface FileRoutesByFullPath {
   '/app/equipe': typeof AuthenticatedAppEquipeRoute
   '/app/financeiro': typeof AuthenticatedAppFinanceiroRouteWithChildren
   '/app/medicos': typeof AuthenticatedAppMedicosRoute
+  '/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
   '/app/procedimentos': typeof AuthenticatedAppProcedimentosRoute
+  '/app/prontuarios': typeof AuthenticatedAppProntuariosRoute
   '/app/rateio': typeof AuthenticatedAppRateioRoute
   '/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
   '/app/': typeof AuthenticatedAppIndexRoute
@@ -258,7 +274,9 @@ export interface FileRoutesByTo {
   '/app/clinicas': typeof AuthenticatedAppClinicasRoute
   '/app/equipe': typeof AuthenticatedAppEquipeRoute
   '/app/medicos': typeof AuthenticatedAppMedicosRoute
+  '/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
   '/app/procedimentos': typeof AuthenticatedAppProcedimentosRoute
+  '/app/prontuarios': typeof AuthenticatedAppProntuariosRoute
   '/app/rateio': typeof AuthenticatedAppRateioRoute
   '/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
   '/app': typeof AuthenticatedAppIndexRoute
@@ -292,7 +310,9 @@ export interface FileRoutesById {
   '/_authenticated/app/equipe': typeof AuthenticatedAppEquipeRoute
   '/_authenticated/app/financeiro': typeof AuthenticatedAppFinanceiroRouteWithChildren
   '/_authenticated/app/medicos': typeof AuthenticatedAppMedicosRoute
+  '/_authenticated/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
   '/_authenticated/app/procedimentos': typeof AuthenticatedAppProcedimentosRoute
+  '/_authenticated/app/prontuarios': typeof AuthenticatedAppProntuariosRoute
   '/_authenticated/app/rateio': typeof AuthenticatedAppRateioRoute
   '/_authenticated/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
   '/_authenticated/app/': typeof AuthenticatedAppIndexRoute
@@ -326,7 +346,9 @@ export interface FileRouteTypes {
     | '/app/equipe'
     | '/app/financeiro'
     | '/app/medicos'
+    | '/app/modelos-documentos'
     | '/app/procedimentos'
+    | '/app/prontuarios'
     | '/app/rateio'
     | '/app/recepcao'
     | '/app/'
@@ -356,7 +378,9 @@ export interface FileRouteTypes {
     | '/app/clinicas'
     | '/app/equipe'
     | '/app/medicos'
+    | '/app/modelos-documentos'
     | '/app/procedimentos'
+    | '/app/prontuarios'
     | '/app/rateio'
     | '/app/recepcao'
     | '/app'
@@ -389,7 +413,9 @@ export interface FileRouteTypes {
     | '/_authenticated/app/equipe'
     | '/_authenticated/app/financeiro'
     | '/_authenticated/app/medicos'
+    | '/_authenticated/app/modelos-documentos'
     | '/_authenticated/app/procedimentos'
+    | '/_authenticated/app/prontuarios'
     | '/_authenticated/app/rateio'
     | '/_authenticated/app/recepcao'
     | '/_authenticated/app/'
@@ -490,11 +516,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppRateioRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/app/prontuarios': {
+      id: '/_authenticated/app/prontuarios'
+      path: '/prontuarios'
+      fullPath: '/app/prontuarios'
+      preLoaderRoute: typeof AuthenticatedAppProntuariosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/app/procedimentos': {
       id: '/_authenticated/app/procedimentos'
       path: '/procedimentos'
       fullPath: '/app/procedimentos'
       preLoaderRoute: typeof AuthenticatedAppProcedimentosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/modelos-documentos': {
+      id: '/_authenticated/app/modelos-documentos'
+      path: '/modelos-documentos'
+      fullPath: '/app/modelos-documentos'
+      preLoaderRoute: typeof AuthenticatedAppModelosDocumentosRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/medicos': {
@@ -698,7 +738,9 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppEquipeRoute: typeof AuthenticatedAppEquipeRoute
   AuthenticatedAppFinanceiroRoute: typeof AuthenticatedAppFinanceiroRouteWithChildren
   AuthenticatedAppMedicosRoute: typeof AuthenticatedAppMedicosRoute
+  AuthenticatedAppModelosDocumentosRoute: typeof AuthenticatedAppModelosDocumentosRoute
   AuthenticatedAppProcedimentosRoute: typeof AuthenticatedAppProcedimentosRoute
+  AuthenticatedAppProntuariosRoute: typeof AuthenticatedAppProntuariosRoute
   AuthenticatedAppRateioRoute: typeof AuthenticatedAppRateioRoute
   AuthenticatedAppRecepcaoRoute: typeof AuthenticatedAppRecepcaoRoute
   AuthenticatedAppIndexRoute: typeof AuthenticatedAppIndexRoute
@@ -711,7 +753,10 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppEquipeRoute: AuthenticatedAppEquipeRoute,
   AuthenticatedAppFinanceiroRoute: AuthenticatedAppFinanceiroRouteWithChildren,
   AuthenticatedAppMedicosRoute: AuthenticatedAppMedicosRoute,
+  AuthenticatedAppModelosDocumentosRoute:
+    AuthenticatedAppModelosDocumentosRoute,
   AuthenticatedAppProcedimentosRoute: AuthenticatedAppProcedimentosRoute,
+  AuthenticatedAppProntuariosRoute: AuthenticatedAppProntuariosRoute,
   AuthenticatedAppRateioRoute: AuthenticatedAppRateioRoute,
   AuthenticatedAppRecepcaoRoute: AuthenticatedAppRecepcaoRoute,
   AuthenticatedAppIndexRoute: AuthenticatedAppIndexRoute,
@@ -743,3 +788,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
