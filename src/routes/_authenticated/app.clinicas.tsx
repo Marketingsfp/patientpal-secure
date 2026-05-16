@@ -30,29 +30,20 @@ function ClinicasPage() {
     e.preventDefault();
     if (!user) return;
     setLoading(true);
-    const { data: clinica, error } = await supabase
-      .from("clinicas")
-      .insert({
-        nome: form.nome,
-        cnpj: form.cnpj || null,
-        cidade: form.cidade || null,
-        estado: form.estado || null,
-        telefone: form.telefone || null,
-      })
-      .select()
-      .single();
-    if (error || !clinica) { toast.error(error?.message ?? "Erro"); setLoading(false); return; }
-
-    const { error: mErr } = await supabase.from("clinica_memberships").insert({
-      user_id: user.id, clinica_id: clinica.id, role: "admin",
+    const { data: clinicaId, error } = await supabase.rpc("criar_clinica_com_admin", {
+      _nome: form.nome,
+      _cnpj: form.cnpj || undefined,
+      _telefone: form.telefone || undefined,
+      _cidade: form.cidade || undefined,
+      _estado: form.estado || undefined,
     });
     setLoading(false);
-    if (mErr) { toast.error(mErr.message); return; }
+    if (error || !clinicaId) { toast.error(error?.message ?? "Erro ao criar clínica"); return; }
     toast.success("Clínica criada!");
     setOpen(false);
     setForm({ nome: "", cnpj: "", cidade: "", estado: "", telefone: "" });
     await refresh();
-    setClinicaAtual(clinica.id);
+    setClinicaAtual(clinicaId as unknown as string);
   };
 
   return (
