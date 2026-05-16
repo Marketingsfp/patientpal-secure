@@ -31,6 +31,7 @@ type Procedimento = {
   valor_dinheiro_pix: number;
   valor_cartao: number;
   duracao_minutos: number;
+  preparo: string | null;
 };
 
 const fmtMoney = (n: number) =>
@@ -173,32 +174,37 @@ function ConsultaRapidaPage() {
             <Card>
               <div className="divide-y">
                 {procsFiltrados.map((p) => (
-                  <div
-                    key={p.id}
-                    className="px-4 py-3 flex items-center justify-between gap-3 hover:bg-muted/30"
-                  >
-                    <div className="min-w-0">
-                      <div className="font-medium truncate">{p.nome}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {p.grupo ?? "—"} · {p.duracao_minutos} min
+                  <div key={p.id} className="px-4 py-3 hover:bg-muted/30">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-medium truncate">{p.nome}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {p.grupo ?? "—"} · {p.duracao_minutos} min
+                        </div>
+                      </div>
+                      <div className="flex gap-4 text-sm shrink-0">
+                        <div className="text-right">
+                          <div className="text-[10px] text-muted-foreground uppercase">
+                            Dinheiro/PIX
+                          </div>
+                          <div className="font-semibold text-emerald-600">
+                            {fmtMoney(p.valor_dinheiro_pix)}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-[10px] text-muted-foreground uppercase">
+                            Cartão
+                          </div>
+                          <div className="font-semibold">{fmtMoney(p.valor_cartao)}</div>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex gap-4 text-sm shrink-0">
-                      <div className="text-right">
-                        <div className="text-[10px] text-muted-foreground uppercase">
-                          Dinheiro/PIX
-                        </div>
-                        <div className="font-semibold text-emerald-600">
-                          {fmtMoney(p.valor_dinheiro_pix)}
-                        </div>
+                    {p.preparo && (
+                      <div className="mt-2 rounded-md border border-amber-300/60 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-xs">
+                        <span className="font-semibold text-amber-800 dark:text-amber-200">Preparo: </span>
+                        <span className="text-amber-900 dark:text-amber-100 whitespace-pre-wrap">{p.preparo}</span>
                       </div>
-                      <div className="text-right">
-                        <div className="text-[10px] text-muted-foreground uppercase">
-                          Cartão
-                        </div>
-                        <div className="font-semibold">{fmtMoney(p.valor_cartao)}</div>
-                      </div>
-                    </div>
+                    )}
                   </div>
                 ))}
               </div>
