@@ -230,6 +230,39 @@ export type Database = {
         }
         Relationships: []
       }
+      cartoes_convenio: {
+        Row: {
+          ativo: boolean
+          clinica_id: string
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+          percentual_desconto: number
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          clinica_id: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          percentual_desconto?: number
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          clinica_id?: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          percentual_desconto?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       clinica_memberships: {
         Row: {
           ativo: boolean
@@ -1341,11 +1374,16 @@ export type Database = {
           codigo: string | null
           created_at: string
           duracao_minutos: number
+          grupo: string | null
           id: string
           nome: string
           observacoes: string | null
           tipo: Database["public"]["Enums"]["procedimento_tipo"]
           updated_at: string
+          valor_cartao: number
+          valor_cartao_consulta: number
+          valor_cartao_desconto: number
+          valor_dinheiro_pix: number
           valor_padrao: number
         }
         Insert: {
@@ -1354,11 +1392,16 @@ export type Database = {
           codigo?: string | null
           created_at?: string
           duracao_minutos?: number
+          grupo?: string | null
           id?: string
           nome: string
           observacoes?: string | null
           tipo?: Database["public"]["Enums"]["procedimento_tipo"]
           updated_at?: string
+          valor_cartao?: number
+          valor_cartao_consulta?: number
+          valor_cartao_desconto?: number
+          valor_dinheiro_pix?: number
           valor_padrao?: number
         }
         Update: {
@@ -1367,11 +1410,16 @@ export type Database = {
           codigo?: string | null
           created_at?: string
           duracao_minutos?: number
+          grupo?: string | null
           id?: string
           nome?: string
           observacoes?: string | null
           tipo?: Database["public"]["Enums"]["procedimento_tipo"]
           updated_at?: string
+          valor_cartao?: number
+          valor_cartao_consulta?: number
+          valor_cartao_desconto?: number
+          valor_dinheiro_pix?: number
           valor_padrao?: number
         }
         Relationships: []
