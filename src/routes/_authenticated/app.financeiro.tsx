@@ -37,7 +37,7 @@ function FinLayout() {
         </p>
         <nav className="space-y-0.5">
           {subnav.map((item) => {
-            const active = item.exact
+            const active = "exact" in item && item.exact
               ? location.pathname === item.to
               : location.pathname === item.to || location.pathname.startsWith(item.to + "/");
             return (
