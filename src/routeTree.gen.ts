@@ -23,6 +23,7 @@ import { Route as AuthenticatedAppMedicosRouteImport } from './routes/_authentic
 import { Route as AuthenticatedAppFinanceiroRouteImport } from './routes/_authenticated/app.financeiro'
 import { Route as AuthenticatedAppEquipeRouteImport } from './routes/_authenticated/app.equipe'
 import { Route as AuthenticatedAppClinicasRouteImport } from './routes/_authenticated/app.clinicas'
+import { Route as AuthenticatedAppClientesRouteImport } from './routes/_authenticated/app.clientes'
 import { Route as AuthenticatedAppAgendaRouteImport } from './routes/_authenticated/app.agenda'
 import { Route as AuthenticatedAppFinanceiroIndexRouteImport } from './routes/_authenticated/app.financeiro.index'
 import { Route as AuthenticatedAppFinanceiroRelatoriosRouteImport } from './routes/_authenticated/app.financeiro.relatorios'
@@ -109,6 +110,12 @@ const AuthenticatedAppClinicasRoute =
   AuthenticatedAppClinicasRouteImport.update({
     id: '/clinicas',
     path: '/clinicas',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppClientesRoute =
+  AuthenticatedAppClientesRouteImport.update({
+    id: '/clientes',
+    path: '/clientes',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppAgendaRoute = AuthenticatedAppAgendaRouteImport.update({
@@ -209,6 +216,7 @@ export interface FileRoutesByFullPath {
   '/totem': typeof TotemRoute
   '/app': typeof AuthenticatedAppRouteWithChildren
   '/app/agenda': typeof AuthenticatedAppAgendaRoute
+  '/app/clientes': typeof AuthenticatedAppClientesRoute
   '/app/clinicas': typeof AuthenticatedAppClinicasRoute
   '/app/equipe': typeof AuthenticatedAppEquipeRoute
   '/app/financeiro': typeof AuthenticatedAppFinanceiroRouteWithChildren
@@ -238,6 +246,7 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/totem': typeof TotemRoute
   '/app/agenda': typeof AuthenticatedAppAgendaRoute
+  '/app/clientes': typeof AuthenticatedAppClientesRoute
   '/app/clinicas': typeof AuthenticatedAppClinicasRoute
   '/app/equipe': typeof AuthenticatedAppEquipeRoute
   '/app/medicos': typeof AuthenticatedAppMedicosRoute
@@ -269,6 +278,7 @@ export interface FileRoutesById {
   '/totem': typeof TotemRoute
   '/_authenticated/app': typeof AuthenticatedAppRouteWithChildren
   '/_authenticated/app/agenda': typeof AuthenticatedAppAgendaRoute
+  '/_authenticated/app/clientes': typeof AuthenticatedAppClientesRoute
   '/_authenticated/app/clinicas': typeof AuthenticatedAppClinicasRoute
   '/_authenticated/app/equipe': typeof AuthenticatedAppEquipeRoute
   '/_authenticated/app/financeiro': typeof AuthenticatedAppFinanceiroRouteWithChildren
@@ -301,6 +311,7 @@ export interface FileRouteTypes {
     | '/totem'
     | '/app'
     | '/app/agenda'
+    | '/app/clientes'
     | '/app/clinicas'
     | '/app/equipe'
     | '/app/financeiro'
@@ -330,6 +341,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/totem'
     | '/app/agenda'
+    | '/app/clientes'
     | '/app/clinicas'
     | '/app/equipe'
     | '/app/medicos'
@@ -360,6 +372,7 @@ export interface FileRouteTypes {
     | '/totem'
     | '/_authenticated/app'
     | '/_authenticated/app/agenda'
+    | '/_authenticated/app/clientes'
     | '/_authenticated/app/clinicas'
     | '/_authenticated/app/equipe'
     | '/_authenticated/app/financeiro'
@@ -490,6 +503,13 @@ declare module '@tanstack/react-router' {
       path: '/clinicas'
       fullPath: '/app/clinicas'
       preLoaderRoute: typeof AuthenticatedAppClinicasRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/clientes': {
+      id: '/_authenticated/app/clientes'
+      path: '/clientes'
+      fullPath: '/app/clientes'
+      preLoaderRoute: typeof AuthenticatedAppClientesRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/agenda': {
@@ -653,6 +673,7 @@ const AuthenticatedAppFinanceiroRouteWithChildren =
 
 interface AuthenticatedAppRouteChildren {
   AuthenticatedAppAgendaRoute: typeof AuthenticatedAppAgendaRoute
+  AuthenticatedAppClientesRoute: typeof AuthenticatedAppClientesRoute
   AuthenticatedAppClinicasRoute: typeof AuthenticatedAppClinicasRoute
   AuthenticatedAppEquipeRoute: typeof AuthenticatedAppEquipeRoute
   AuthenticatedAppFinanceiroRoute: typeof AuthenticatedAppFinanceiroRouteWithChildren
@@ -664,6 +685,7 @@ interface AuthenticatedAppRouteChildren {
 
 const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppAgendaRoute: AuthenticatedAppAgendaRoute,
+  AuthenticatedAppClientesRoute: AuthenticatedAppClientesRoute,
   AuthenticatedAppClinicasRoute: AuthenticatedAppClinicasRoute,
   AuthenticatedAppEquipeRoute: AuthenticatedAppEquipeRoute,
   AuthenticatedAppFinanceiroRoute: AuthenticatedAppFinanceiroRouteWithChildren,
@@ -699,3 +721,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
