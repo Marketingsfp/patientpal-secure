@@ -87,7 +87,7 @@ function montarContextoTexto(ctx: {
   const procs = ctx.procedimentos
     .map(
       (p) =>
-        `- ${p.nome}${p.grupo ? ` [${p.grupo}]` : ""}: dinheiro/PIX R$ ${Number(p.valor_dinheiro_pix).toFixed(2)} / cartão R$ ${Number(p.valor_cartao).toFixed(2)}`,
+        `- ${p.nome}${p.grupo ? ` [${p.grupo}]` : ""}: dinheiro/PIX R$ ${Number(p.valor_dinheiro_pix).toFixed(2)} / cartão R$ ${Number(p.valor_cartao).toFixed(2)}${p.preparo ? ` | PREPARO: ${p.preparo.replace(/\s+/g, " ").trim()}` : ""}`,
     )
     .join("\n");
 
