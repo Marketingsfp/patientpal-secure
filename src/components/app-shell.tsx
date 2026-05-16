@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
-import { Activity, Building2, Users, Wallet, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList } from "lucide-react";
+import { Activity, Building2, Users, Wallet, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target } from "lucide-react";
 import { VoiceInput } from "@/components/voice-input";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -15,6 +15,8 @@ const nav = [
   { to: "/app/agenda", label: "Agenda", icon: CalendarDays },
   { to: "/app/clientes", label: "Clientes", icon: Users },
   { to: "/app/procedimentos", label: "Procedimentos", icon: ClipboardList },
+  { to: "/app/crm", label: "CRM", icon: Target },
+  { to: "/app/nina", label: "Nina — WhatsApp", icon: MessageCircle },
   { to: "/app/financeiro", label: "Financeiro", icon: DollarSign },
   { to: "/app/clinicas", label: "Clínicas", icon: Building2 },
   { to: "/app/medicos", label: "Médicos", icon: Stethoscope },
@@ -41,6 +43,8 @@ export function AppShell() {
       /rateio|repasse/.test(t) ? "/app/rateio" :
       /equipe|usu[áa]rio/.test(t) ? "/app/equipe" :
       /prontu[áa]rio/.test(t) ? "/app/prontuarios" :
+      /crm|lead|oportunidade/.test(t) ? "/app/crm" :
+      /nina|whats|whatsapp|conversa/.test(t) ? "/app/nina" :
       /dashboard|in[íi]cio|home/.test(t) ? "/app" : null;
     if (route) {
       toast.success(`Abrindo: ${text}`);
