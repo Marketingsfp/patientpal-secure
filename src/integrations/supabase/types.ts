@@ -14,16 +14,316 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      clinica_memberships: {
+        Row: {
+          ativo: boolean
+          clinica_id: string
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          ativo?: boolean
+          clinica_id: string
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          ativo?: boolean
+          clinica_id?: string
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clinica_memberships_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clinicas: {
+        Row: {
+          ativo: boolean
+          cep: string | null
+          cidade: string | null
+          cnpj: string | null
+          created_at: string
+          email: string | null
+          endereco: string | null
+          estado: string | null
+          id: string
+          nome: string
+          telefone: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          cep?: string | null
+          cidade?: string | null
+          cnpj?: string | null
+          created_at?: string
+          email?: string | null
+          endereco?: string | null
+          estado?: string | null
+          id?: string
+          nome: string
+          telefone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          cep?: string | null
+          cidade?: string | null
+          cnpj?: string | null
+          created_at?: string
+          email?: string | null
+          endereco?: string | null
+          estado?: string | null
+          id?: string
+          nome?: string
+          telefone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      especialidades: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+        }
+        Relationships: []
+      }
+      medicos: {
+        Row: {
+          ativo: boolean
+          clinica_id: string
+          created_at: string
+          crm: string
+          crm_uf: string
+          email: string | null
+          especialidade_id: string | null
+          id: string
+          nome: string
+          percentual_repasse_padrao: number
+          telefone: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          clinica_id: string
+          created_at?: string
+          crm: string
+          crm_uf: string
+          email?: string | null
+          especialidade_id?: string | null
+          id?: string
+          nome: string
+          percentual_repasse_padrao?: number
+          telefone?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          clinica_id?: string
+          created_at?: string
+          crm?: string
+          crm_uf?: string
+          email?: string | null
+          especialidade_id?: string | null
+          id?: string
+          nome?: string
+          percentual_repasse_padrao?: number
+          telefone?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medicos_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medicos_especialidade_id_fkey"
+            columns: ["especialidade_id"]
+            isOneToOne: false
+            referencedRelation: "especialidades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          id: string
+          nome: string
+          telefone: string | null
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          id: string
+          nome: string
+          telefone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          id?: string
+          nome?: string
+          telefone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      regras_rateio: {
+        Row: {
+          ativo: boolean
+          clinica_id: string
+          created_at: string
+          especialidade_id: string | null
+          forma_pagamento: Database["public"]["Enums"]["forma_pagamento"] | null
+          id: string
+          medico_id: string | null
+          nome: string
+          observacoes: string | null
+          percentual_clinica: number
+          percentual_medico: number
+          prioridade: number
+          procedimento: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          clinica_id: string
+          created_at?: string
+          especialidade_id?: string | null
+          forma_pagamento?:
+            | Database["public"]["Enums"]["forma_pagamento"]
+            | null
+          id?: string
+          medico_id?: string | null
+          nome: string
+          observacoes?: string | null
+          percentual_clinica: number
+          percentual_medico: number
+          prioridade?: number
+          procedimento?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          clinica_id?: string
+          created_at?: string
+          especialidade_id?: string | null
+          forma_pagamento?:
+            | Database["public"]["Enums"]["forma_pagamento"]
+            | null
+          id?: string
+          medico_id?: string | null
+          nome?: string
+          observacoes?: string | null
+          percentual_clinica?: number
+          percentual_medico?: number
+          prioridade?: number
+          procedimento?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "regras_rateio_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "regras_rateio_especialidade_id_fkey"
+            columns: ["especialidade_id"]
+            isOneToOne: false
+            referencedRelation: "especialidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "regras_rateio_medico_id_fkey"
+            columns: ["medico_id"]
+            isOneToOne: false
+            referencedRelation: "medicos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      can_manage_clinica: {
+        Args: { _clinica_id: string; _user_id: string }
+        Returns: boolean
+      }
+      has_role: {
+        Args: {
+          _clinica_id: string
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_member: {
+        Args: { _clinica_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role:
+        | "admin"
+        | "gestor"
+        | "medico"
+        | "enfermeiro"
+        | "recepcao"
+        | "financeiro"
+      forma_pagamento:
+        | "dinheiro"
+        | "pix"
+        | "cartao_credito"
+        | "cartao_debito"
+        | "convenio"
+        | "cartao_proprio"
+        | "boleto"
+        | "transferencia"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +450,25 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: [
+        "admin",
+        "gestor",
+        "medico",
+        "enfermeiro",
+        "recepcao",
+        "financeiro",
+      ],
+      forma_pagamento: [
+        "dinheiro",
+        "pix",
+        "cartao_credito",
+        "cartao_debito",
+        "convenio",
+        "cartao_proprio",
+        "boleto",
+        "transferencia",
+      ],
+    },
   },
 } as const
