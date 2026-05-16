@@ -26,6 +26,7 @@ interface Paciente {
   id: string;
   nome: string;
   cpf: string | null;
+  numero_pasta: string | null;
   telefone: string | null;
   email: string | null;
   data_nascimento: string | null;
@@ -45,7 +46,7 @@ interface Paciente {
 }
 
 type FormState = {
-  nome: string; cpf: string; telefone: string; email: string;
+  nome: string; cpf: string; numero_pasta: string; telefone: string; email: string;
   data_nascimento: string; ativo: boolean;
   cep: string; logradouro: string; numero: string; complemento: string;
   bairro: string; cidade: string; estado: string;
@@ -54,7 +55,7 @@ type FormState = {
 };
 
 const EMPTY: FormState = {
-  nome: "", cpf: "", telefone: "", email: "",
+  nome: "", cpf: "", numero_pasta: "", telefone: "", email: "",
   data_nascimento: "", ativo: true,
   cep: "", logradouro: "", numero: "", complemento: "",
   bairro: "", cidade: "", estado: "",
