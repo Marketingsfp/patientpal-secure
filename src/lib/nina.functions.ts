@@ -141,6 +141,7 @@ export const chatNina = createServerFn({ method: "POST" })
         valor_dinheiro_pix: number;
         valor_cartao: number;
         grupo: string | null;
+        preparo: string | null;
       }>,
     });
 
