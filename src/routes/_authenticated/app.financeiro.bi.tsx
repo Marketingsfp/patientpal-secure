@@ -1,20 +1,77 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Card, CardContent } from "@/components/ui/card";
-import { Construction } from "lucide-react";
+import { useEffect, useState } from "react";
+import { BarChart3 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useClinica } from "@/hooks/use-clinica";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+} from "recharts";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro/bi")({
-  component: FinBiPage,
+  component: Page,
+  head: () => ({ meta: [{ title: "BI — Financeiro" }] }),
 });
 
-function FinBiPage() {
+interface Row { mes: string; Receitas: number; Despesas: number }
+const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+function Page() {
+  const { clinicaAtual } = useClinica();
+  const [data, setData] = useState<Row[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      if (!clinicaAtual) { setData([]); setLoading(false); return; }
+      setLoading(true);
+      const since = new Date(); since.setMonth(since.getMonth() - 5); since.setDate(1);
+      const { data: rows } = await supabase.from("fin_lancamentos")
+        .select("tipo, valor, data")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .gte("data", since.toISOString().slice(0, 10))
+        .neq("status", "cancelado");
+      const buckets: Record<string, Row> = {};
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(); d.setMonth(d.getMonth() - i); d.setDate(1);
+        const key = d.toISOString().slice(0, 7);
+        buckets[key] = { mes: d.toLocaleDateString("pt-BR", { month: "short" }), Receitas: 0, Despesas: 0 };
+      }
+      (rows ?? []).forEach((r) => {
+        const key = (r.data as string).slice(0, 7);
+        const b = buckets[key]; if (!b) return;
+        if (r.tipo === "receita") b.Receitas += Number(r.valor); else b.Despesas += Number(r.valor);
+      });
+      setData(Object.values(buckets));
+      setLoading(false);
+    })();
+  }, [clinicaAtual?.clinica_id]);
+
+  const totalR = data.reduce((s, r) => s + r.Receitas, 0);
+  const totalD = data.reduce((s, r) => s + r.Despesas, 0);
+
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-semibold capitalize">bi</h1>
-      <Card>
-        <CardContent className="py-12 text-center text-muted-foreground">
-          <Construction className="h-10 w-10 mx-auto mb-3 text-primary/60" />
-          <p className="font-medium">Módulo em construção</p>
-          <p className="text-sm mt-1">Será entregue nas próximas etapas (BI, IA, Relatórios e Atendimentos).</p>
+    <div className="space-y-6">
+      <div><h1 className="text-2xl font-semibold flex items-center gap-2"><BarChart3 className="h-6 w-6 text-primary" />BI Financeiro</h1>
+        <p className="text-sm text-muted-foreground">Comparativo dos últimos 6 meses</p></div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Receitas (6m)</p><p className="text-2xl font-semibold text-green-600">{fmt(totalR)}</p></CardContent></Card>
+        <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Despesas (6m)</p><p className="text-2xl font-semibold text-red-600">{fmt(totalD)}</p></CardContent></Card>
+        <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Saldo (6m)</p><p className={`text-2xl font-semibold ${totalR - totalD >= 0 ? "text-green-600" : "text-red-600"}`}>{fmt(totalR - totalD)}</p></CardContent></Card>
+      </div>
+      <Card><CardHeader><CardTitle>Receitas vs Despesas</CardTitle></CardHeader>
+        <CardContent>
+          {loading ? <div className="py-12 text-center text-muted-foreground">Carregando...</div>
+            : <ResponsiveContainer width="100%" height={320}>
+              <BarChart data={data}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="mes" /><YAxis />
+                <Tooltip formatter={(v: number) => fmt(v)} />
+                <Legend />
+                <Bar dataKey="Receitas" fill="#10b981" />
+                <Bar dataKey="Despesas" fill="#ef4444" />
+              </BarChart>
+            </ResponsiveContainer>}
         </CardContent>
       </Card>
     </div>
