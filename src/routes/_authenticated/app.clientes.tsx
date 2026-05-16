@@ -386,21 +386,21 @@ function ClientesPage() {
               <TabsContent value="dados" className="space-y-4 pt-4">
                 <div className="space-y-1">
                   <Label>Nome *</Label>
-                  <InputVoz field="nome" required />
+                  <InputVoz {...fieldProps("nome")} required />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label>CPF</Label>
-                    <InputVoz field="cpf" />
+                    <InputVoz {...fieldProps("cpf")} />
                   </div>
                   <div className="space-y-1">
                     <Label>Telefone</Label>
-                    <InputVoz field="telefone" />
+                    <InputVoz {...fieldProps("telefone")} />
                   </div>
                 </div>
                 <div className="space-y-1">
                   <Label>E-mail <span className="text-xs text-muted-foreground">(usado em nota fiscal)</span></Label>
-                  <InputVoz field="email" type="email" />
+                  <InputVoz {...fieldProps("email")} type="email" />
                 </div>
                 <div className="grid grid-cols-2 gap-3 items-end">
                   <div className="space-y-1">
@@ -444,26 +444,26 @@ function ClientesPage() {
                 </div>
                 <div className="space-y-1">
                   <Label>Logradouro</Label>
-                  <InputVoz field="logradouro" />
+                  <InputVoz {...fieldProps("logradouro")} />
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   <div className="space-y-1">
                     <Label>Número</Label>
-                    <InputVoz field="numero" />
+                    <InputVoz {...fieldProps("numero")} />
                   </div>
                   <div className="space-y-1 col-span-2">
                     <Label>Complemento</Label>
-                    <InputVoz field="complemento" />
+                    <InputVoz {...fieldProps("complemento")} />
                   </div>
                 </div>
                 <div className="space-y-1">
                   <Label>Bairro</Label>
-                  <InputVoz field="bairro" />
+                  <InputVoz {...fieldProps("bairro")} />
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   <div className="space-y-1 col-span-2">
                     <Label>Cidade</Label>
-                    <InputVoz field="cidade" />
+                    <InputVoz {...fieldProps("cidade")} />
                   </div>
                   <div className="space-y-1">
                     <Label>UF</Label>
@@ -479,16 +479,16 @@ function ClientesPage() {
                 </p>
                 <div className="space-y-1">
                   <Label>Nome do responsável</Label>
-                  <InputVoz field="responsavel_nome" />
+                  <InputVoz {...fieldProps("responsavel_nome")} />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label>CPF</Label>
-                    <InputVoz field="responsavel_cpf" />
+                    <InputVoz {...fieldProps("responsavel_cpf")} />
                   </div>
                   <div className="space-y-1">
                     <Label>Telefone</Label>
-                    <InputVoz field="responsavel_telefone" />
+                    <InputVoz {...fieldProps("responsavel_telefone")} />
                   </div>
                 </div>
                 <div className="space-y-1">
