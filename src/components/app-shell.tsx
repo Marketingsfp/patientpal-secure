@@ -86,7 +86,10 @@ export function AppShell() {
 
   return (
     <div className="min-h-screen flex bg-muted/30">
-      <aside className="w-64 bg-sidebar text-sidebar-foreground flex flex-col shrink-0">
+      <aside
+        className="w-64 text-white flex flex-col shrink-0"
+        style={{ backgroundColor: clinicaAtual ? corDaClinica(clinicaAtual.clinica.nome) : undefined }}
+      >
         <div className="px-6 py-5 flex items-center gap-2 border-b border-sidebar-border">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
             <Activity className="h-5 w-5" />
