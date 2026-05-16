@@ -1,6 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { MessageCircle, Send, Mic, Bot, CheckCheck, Phone, FileText, DollarSign, Cake, Calendar, Sparkles } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { MessageCircle, Send, Mic, Bot, CheckCheck, Phone, FileText, DollarSign, Cake, Calendar, Sparkles, Brain, Loader2 } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { useClinica } from "@/hooks/use-clinica";
+import { chatNina } from "@/lib/nina.functions";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,10 +78,16 @@ function NinaPage() {
 
       <Tabs defaultValue="chat" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="chat">Conversas</TabsTrigger>
+          <TabsTrigger value="treinada">Nina treinada</TabsTrigger>
+          <TabsTrigger value="chat">Conversas WhatsApp</TabsTrigger>
           <TabsTrigger value="automacoes">Automações</TabsTrigger>
           <TabsTrigger value="config">Configuração</TabsTrigger>
         </TabsList>
+
+        {/* ============ NINA TREINADA ============ */}
+        <TabsContent value="treinada">
+          <NinaTreinada />
+        </TabsContent>
 
         {/* ============ CONVERSAS ============ */}
         <TabsContent value="chat">
