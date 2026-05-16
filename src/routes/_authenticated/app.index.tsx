@@ -105,7 +105,7 @@ function DashboardPage() {
         pagos: atends.filter(a => a.medico_id === m.id).length,
         novos: agendados.filter(a => a.paciente_id && pacIds.includes(a.paciente_id)).length,
       };
-    }).filter(m => m.total > 0).sort((a, b) => b.total - a.total).slice(0, 9);
+    }).sort((a, b) => b.total - a.total);
 
     setData({
       alertas: alertasR.data ?? [],
