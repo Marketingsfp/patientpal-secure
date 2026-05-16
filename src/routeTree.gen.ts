@@ -23,6 +23,19 @@ import { Route as AuthenticatedAppFinanceiroRouteImport } from './routes/_authen
 import { Route as AuthenticatedAppEquipeRouteImport } from './routes/_authenticated/app.equipe'
 import { Route as AuthenticatedAppClinicasRouteImport } from './routes/_authenticated/app.clinicas'
 import { Route as AuthenticatedAppFinanceiroIndexRouteImport } from './routes/_authenticated/app.financeiro.index'
+import { Route as AuthenticatedAppFinanceiroRelatoriosRouteImport } from './routes/_authenticated/app.financeiro.relatorios'
+import { Route as AuthenticatedAppFinanceiroRegrasIaRouteImport } from './routes/_authenticated/app.financeiro.regras-ia'
+import { Route as AuthenticatedAppFinanceiroNotasRouteImport } from './routes/_authenticated/app.financeiro.notas'
+import { Route as AuthenticatedAppFinanceiroMovimentoRouteImport } from './routes/_authenticated/app.financeiro.movimento'
+import { Route as AuthenticatedAppFinanceiroLembretesRouteImport } from './routes/_authenticated/app.financeiro.lembretes'
+import { Route as AuthenticatedAppFinanceiroEstatisticasRouteImport } from './routes/_authenticated/app.financeiro.estatisticas'
+import { Route as AuthenticatedAppFinanceiroEmpresasRouteImport } from './routes/_authenticated/app.financeiro.empresas'
+import { Route as AuthenticatedAppFinanceiroContasRouteImport } from './routes/_authenticated/app.financeiro.contas'
+import { Route as AuthenticatedAppFinanceiroCategoriasRouteImport } from './routes/_authenticated/app.financeiro.categorias'
+import { Route as AuthenticatedAppFinanceiroBiRouteImport } from './routes/_authenticated/app.financeiro.bi'
+import { Route as AuthenticatedAppFinanceiroAtendimentosRouteImport } from './routes/_authenticated/app.financeiro.atendimentos'
+import { Route as AuthenticatedAppFinanceiroAnaliticoRouteImport } from './routes/_authenticated/app.financeiro.analitico'
+import { Route as AuthenticatedAppFinanceiroAlertasRouteImport } from './routes/_authenticated/app.financeiro.alertas'
 
 const TotemRoute = TotemRouteImport.update({
   id: '/totem',
@@ -97,6 +110,84 @@ const AuthenticatedAppFinanceiroIndexRoute =
     path: '/',
     getParentRoute: () => AuthenticatedAppFinanceiroRoute,
   } as any)
+const AuthenticatedAppFinanceiroRelatoriosRoute =
+  AuthenticatedAppFinanceiroRelatoriosRouteImport.update({
+    id: '/relatorios',
+    path: '/relatorios',
+    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
+const AuthenticatedAppFinanceiroRegrasIaRoute =
+  AuthenticatedAppFinanceiroRegrasIaRouteImport.update({
+    id: '/regras-ia',
+    path: '/regras-ia',
+    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
+const AuthenticatedAppFinanceiroNotasRoute =
+  AuthenticatedAppFinanceiroNotasRouteImport.update({
+    id: '/notas',
+    path: '/notas',
+    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
+const AuthenticatedAppFinanceiroMovimentoRoute =
+  AuthenticatedAppFinanceiroMovimentoRouteImport.update({
+    id: '/movimento',
+    path: '/movimento',
+    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
+const AuthenticatedAppFinanceiroLembretesRoute =
+  AuthenticatedAppFinanceiroLembretesRouteImport.update({
+    id: '/lembretes',
+    path: '/lembretes',
+    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
+const AuthenticatedAppFinanceiroEstatisticasRoute =
+  AuthenticatedAppFinanceiroEstatisticasRouteImport.update({
+    id: '/estatisticas',
+    path: '/estatisticas',
+    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
+const AuthenticatedAppFinanceiroEmpresasRoute =
+  AuthenticatedAppFinanceiroEmpresasRouteImport.update({
+    id: '/empresas',
+    path: '/empresas',
+    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
+const AuthenticatedAppFinanceiroContasRoute =
+  AuthenticatedAppFinanceiroContasRouteImport.update({
+    id: '/contas',
+    path: '/contas',
+    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
+const AuthenticatedAppFinanceiroCategoriasRoute =
+  AuthenticatedAppFinanceiroCategoriasRouteImport.update({
+    id: '/categorias',
+    path: '/categorias',
+    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
+const AuthenticatedAppFinanceiroBiRoute =
+  AuthenticatedAppFinanceiroBiRouteImport.update({
+    id: '/bi',
+    path: '/bi',
+    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
+const AuthenticatedAppFinanceiroAtendimentosRoute =
+  AuthenticatedAppFinanceiroAtendimentosRouteImport.update({
+    id: '/atendimentos',
+    path: '/atendimentos',
+    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
+const AuthenticatedAppFinanceiroAnaliticoRoute =
+  AuthenticatedAppFinanceiroAnaliticoRouteImport.update({
+    id: '/analitico',
+    path: '/analitico',
+    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
+const AuthenticatedAppFinanceiroAlertasRoute =
+  AuthenticatedAppFinanceiroAlertasRouteImport.update({
+    id: '/alertas',
+    path: '/alertas',
+    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -111,6 +202,19 @@ export interface FileRoutesByFullPath {
   '/app/medicos': typeof AuthenticatedAppMedicosRoute
   '/app/rateio': typeof AuthenticatedAppRateioRoute
   '/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
+  '/app/financeiro/alertas': typeof AuthenticatedAppFinanceiroAlertasRoute
+  '/app/financeiro/analitico': typeof AuthenticatedAppFinanceiroAnaliticoRoute
+  '/app/financeiro/atendimentos': typeof AuthenticatedAppFinanceiroAtendimentosRoute
+  '/app/financeiro/bi': typeof AuthenticatedAppFinanceiroBiRoute
+  '/app/financeiro/categorias': typeof AuthenticatedAppFinanceiroCategoriasRoute
+  '/app/financeiro/contas': typeof AuthenticatedAppFinanceiroContasRoute
+  '/app/financeiro/empresas': typeof AuthenticatedAppFinanceiroEmpresasRoute
+  '/app/financeiro/estatisticas': typeof AuthenticatedAppFinanceiroEstatisticasRoute
+  '/app/financeiro/lembretes': typeof AuthenticatedAppFinanceiroLembretesRoute
+  '/app/financeiro/movimento': typeof AuthenticatedAppFinanceiroMovimentoRoute
+  '/app/financeiro/notas': typeof AuthenticatedAppFinanceiroNotasRoute
+  '/app/financeiro/regras-ia': typeof AuthenticatedAppFinanceiroRegrasIaRoute
+  '/app/financeiro/relatorios': typeof AuthenticatedAppFinanceiroRelatoriosRoute
   '/app/financeiro/': typeof AuthenticatedAppFinanceiroIndexRoute
 }
 export interface FileRoutesByTo {
@@ -125,6 +229,19 @@ export interface FileRoutesByTo {
   '/app/medicos': typeof AuthenticatedAppMedicosRoute
   '/app/rateio': typeof AuthenticatedAppRateioRoute
   '/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
+  '/app/financeiro/alertas': typeof AuthenticatedAppFinanceiroAlertasRoute
+  '/app/financeiro/analitico': typeof AuthenticatedAppFinanceiroAnaliticoRoute
+  '/app/financeiro/atendimentos': typeof AuthenticatedAppFinanceiroAtendimentosRoute
+  '/app/financeiro/bi': typeof AuthenticatedAppFinanceiroBiRoute
+  '/app/financeiro/categorias': typeof AuthenticatedAppFinanceiroCategoriasRoute
+  '/app/financeiro/contas': typeof AuthenticatedAppFinanceiroContasRoute
+  '/app/financeiro/empresas': typeof AuthenticatedAppFinanceiroEmpresasRoute
+  '/app/financeiro/estatisticas': typeof AuthenticatedAppFinanceiroEstatisticasRoute
+  '/app/financeiro/lembretes': typeof AuthenticatedAppFinanceiroLembretesRoute
+  '/app/financeiro/movimento': typeof AuthenticatedAppFinanceiroMovimentoRoute
+  '/app/financeiro/notas': typeof AuthenticatedAppFinanceiroNotasRoute
+  '/app/financeiro/regras-ia': typeof AuthenticatedAppFinanceiroRegrasIaRoute
+  '/app/financeiro/relatorios': typeof AuthenticatedAppFinanceiroRelatoriosRoute
   '/app/financeiro': typeof AuthenticatedAppFinanceiroIndexRoute
 }
 export interface FileRoutesById {
@@ -142,6 +259,19 @@ export interface FileRoutesById {
   '/_authenticated/app/medicos': typeof AuthenticatedAppMedicosRoute
   '/_authenticated/app/rateio': typeof AuthenticatedAppRateioRoute
   '/_authenticated/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
+  '/_authenticated/app/financeiro/alertas': typeof AuthenticatedAppFinanceiroAlertasRoute
+  '/_authenticated/app/financeiro/analitico': typeof AuthenticatedAppFinanceiroAnaliticoRoute
+  '/_authenticated/app/financeiro/atendimentos': typeof AuthenticatedAppFinanceiroAtendimentosRoute
+  '/_authenticated/app/financeiro/bi': typeof AuthenticatedAppFinanceiroBiRoute
+  '/_authenticated/app/financeiro/categorias': typeof AuthenticatedAppFinanceiroCategoriasRoute
+  '/_authenticated/app/financeiro/contas': typeof AuthenticatedAppFinanceiroContasRoute
+  '/_authenticated/app/financeiro/empresas': typeof AuthenticatedAppFinanceiroEmpresasRoute
+  '/_authenticated/app/financeiro/estatisticas': typeof AuthenticatedAppFinanceiroEstatisticasRoute
+  '/_authenticated/app/financeiro/lembretes': typeof AuthenticatedAppFinanceiroLembretesRoute
+  '/_authenticated/app/financeiro/movimento': typeof AuthenticatedAppFinanceiroMovimentoRoute
+  '/_authenticated/app/financeiro/notas': typeof AuthenticatedAppFinanceiroNotasRoute
+  '/_authenticated/app/financeiro/regras-ia': typeof AuthenticatedAppFinanceiroRegrasIaRoute
+  '/_authenticated/app/financeiro/relatorios': typeof AuthenticatedAppFinanceiroRelatoriosRoute
   '/_authenticated/app/financeiro/': typeof AuthenticatedAppFinanceiroIndexRoute
 }
 export interface FileRouteTypes {
@@ -159,6 +289,19 @@ export interface FileRouteTypes {
     | '/app/medicos'
     | '/app/rateio'
     | '/app/recepcao'
+    | '/app/financeiro/alertas'
+    | '/app/financeiro/analitico'
+    | '/app/financeiro/atendimentos'
+    | '/app/financeiro/bi'
+    | '/app/financeiro/categorias'
+    | '/app/financeiro/contas'
+    | '/app/financeiro/empresas'
+    | '/app/financeiro/estatisticas'
+    | '/app/financeiro/lembretes'
+    | '/app/financeiro/movimento'
+    | '/app/financeiro/notas'
+    | '/app/financeiro/regras-ia'
+    | '/app/financeiro/relatorios'
     | '/app/financeiro/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -173,6 +316,19 @@ export interface FileRouteTypes {
     | '/app/medicos'
     | '/app/rateio'
     | '/app/recepcao'
+    | '/app/financeiro/alertas'
+    | '/app/financeiro/analitico'
+    | '/app/financeiro/atendimentos'
+    | '/app/financeiro/bi'
+    | '/app/financeiro/categorias'
+    | '/app/financeiro/contas'
+    | '/app/financeiro/empresas'
+    | '/app/financeiro/estatisticas'
+    | '/app/financeiro/lembretes'
+    | '/app/financeiro/movimento'
+    | '/app/financeiro/notas'
+    | '/app/financeiro/regras-ia'
+    | '/app/financeiro/relatorios'
     | '/app/financeiro'
   id:
     | '__root__'
@@ -189,6 +345,19 @@ export interface FileRouteTypes {
     | '/_authenticated/app/medicos'
     | '/_authenticated/app/rateio'
     | '/_authenticated/app/recepcao'
+    | '/_authenticated/app/financeiro/alertas'
+    | '/_authenticated/app/financeiro/analitico'
+    | '/_authenticated/app/financeiro/atendimentos'
+    | '/_authenticated/app/financeiro/bi'
+    | '/_authenticated/app/financeiro/categorias'
+    | '/_authenticated/app/financeiro/contas'
+    | '/_authenticated/app/financeiro/empresas'
+    | '/_authenticated/app/financeiro/estatisticas'
+    | '/_authenticated/app/financeiro/lembretes'
+    | '/_authenticated/app/financeiro/movimento'
+    | '/_authenticated/app/financeiro/notas'
+    | '/_authenticated/app/financeiro/regras-ia'
+    | '/_authenticated/app/financeiro/relatorios'
     | '/_authenticated/app/financeiro/'
   fileRoutesById: FileRoutesById
 }
@@ -301,15 +470,143 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppFinanceiroIndexRouteImport
       parentRoute: typeof AuthenticatedAppFinanceiroRoute
     }
+    '/_authenticated/app/financeiro/relatorios': {
+      id: '/_authenticated/app/financeiro/relatorios'
+      path: '/relatorios'
+      fullPath: '/app/financeiro/relatorios'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroRelatoriosRouteImport
+      parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
+    '/_authenticated/app/financeiro/regras-ia': {
+      id: '/_authenticated/app/financeiro/regras-ia'
+      path: '/regras-ia'
+      fullPath: '/app/financeiro/regras-ia'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroRegrasIaRouteImport
+      parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
+    '/_authenticated/app/financeiro/notas': {
+      id: '/_authenticated/app/financeiro/notas'
+      path: '/notas'
+      fullPath: '/app/financeiro/notas'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroNotasRouteImport
+      parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
+    '/_authenticated/app/financeiro/movimento': {
+      id: '/_authenticated/app/financeiro/movimento'
+      path: '/movimento'
+      fullPath: '/app/financeiro/movimento'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroMovimentoRouteImport
+      parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
+    '/_authenticated/app/financeiro/lembretes': {
+      id: '/_authenticated/app/financeiro/lembretes'
+      path: '/lembretes'
+      fullPath: '/app/financeiro/lembretes'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroLembretesRouteImport
+      parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
+    '/_authenticated/app/financeiro/estatisticas': {
+      id: '/_authenticated/app/financeiro/estatisticas'
+      path: '/estatisticas'
+      fullPath: '/app/financeiro/estatisticas'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroEstatisticasRouteImport
+      parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
+    '/_authenticated/app/financeiro/empresas': {
+      id: '/_authenticated/app/financeiro/empresas'
+      path: '/empresas'
+      fullPath: '/app/financeiro/empresas'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroEmpresasRouteImport
+      parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
+    '/_authenticated/app/financeiro/contas': {
+      id: '/_authenticated/app/financeiro/contas'
+      path: '/contas'
+      fullPath: '/app/financeiro/contas'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroContasRouteImport
+      parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
+    '/_authenticated/app/financeiro/categorias': {
+      id: '/_authenticated/app/financeiro/categorias'
+      path: '/categorias'
+      fullPath: '/app/financeiro/categorias'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroCategoriasRouteImport
+      parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
+    '/_authenticated/app/financeiro/bi': {
+      id: '/_authenticated/app/financeiro/bi'
+      path: '/bi'
+      fullPath: '/app/financeiro/bi'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroBiRouteImport
+      parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
+    '/_authenticated/app/financeiro/atendimentos': {
+      id: '/_authenticated/app/financeiro/atendimentos'
+      path: '/atendimentos'
+      fullPath: '/app/financeiro/atendimentos'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroAtendimentosRouteImport
+      parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
+    '/_authenticated/app/financeiro/analitico': {
+      id: '/_authenticated/app/financeiro/analitico'
+      path: '/analitico'
+      fullPath: '/app/financeiro/analitico'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroAnaliticoRouteImport
+      parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
+    '/_authenticated/app/financeiro/alertas': {
+      id: '/_authenticated/app/financeiro/alertas'
+      path: '/alertas'
+      fullPath: '/app/financeiro/alertas'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroAlertasRouteImport
+      parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
   }
 }
 
 interface AuthenticatedAppFinanceiroRouteChildren {
+  AuthenticatedAppFinanceiroAlertasRoute: typeof AuthenticatedAppFinanceiroAlertasRoute
+  AuthenticatedAppFinanceiroAnaliticoRoute: typeof AuthenticatedAppFinanceiroAnaliticoRoute
+  AuthenticatedAppFinanceiroAtendimentosRoute: typeof AuthenticatedAppFinanceiroAtendimentosRoute
+  AuthenticatedAppFinanceiroBiRoute: typeof AuthenticatedAppFinanceiroBiRoute
+  AuthenticatedAppFinanceiroCategoriasRoute: typeof AuthenticatedAppFinanceiroCategoriasRoute
+  AuthenticatedAppFinanceiroContasRoute: typeof AuthenticatedAppFinanceiroContasRoute
+  AuthenticatedAppFinanceiroEmpresasRoute: typeof AuthenticatedAppFinanceiroEmpresasRoute
+  AuthenticatedAppFinanceiroEstatisticasRoute: typeof AuthenticatedAppFinanceiroEstatisticasRoute
+  AuthenticatedAppFinanceiroLembretesRoute: typeof AuthenticatedAppFinanceiroLembretesRoute
+  AuthenticatedAppFinanceiroMovimentoRoute: typeof AuthenticatedAppFinanceiroMovimentoRoute
+  AuthenticatedAppFinanceiroNotasRoute: typeof AuthenticatedAppFinanceiroNotasRoute
+  AuthenticatedAppFinanceiroRegrasIaRoute: typeof AuthenticatedAppFinanceiroRegrasIaRoute
+  AuthenticatedAppFinanceiroRelatoriosRoute: typeof AuthenticatedAppFinanceiroRelatoriosRoute
   AuthenticatedAppFinanceiroIndexRoute: typeof AuthenticatedAppFinanceiroIndexRoute
 }
 
 const AuthenticatedAppFinanceiroRouteChildren: AuthenticatedAppFinanceiroRouteChildren =
   {
+    AuthenticatedAppFinanceiroAlertasRoute:
+      AuthenticatedAppFinanceiroAlertasRoute,
+    AuthenticatedAppFinanceiroAnaliticoRoute:
+      AuthenticatedAppFinanceiroAnaliticoRoute,
+    AuthenticatedAppFinanceiroAtendimentosRoute:
+      AuthenticatedAppFinanceiroAtendimentosRoute,
+    AuthenticatedAppFinanceiroBiRoute: AuthenticatedAppFinanceiroBiRoute,
+    AuthenticatedAppFinanceiroCategoriasRoute:
+      AuthenticatedAppFinanceiroCategoriasRoute,
+    AuthenticatedAppFinanceiroContasRoute:
+      AuthenticatedAppFinanceiroContasRoute,
+    AuthenticatedAppFinanceiroEmpresasRoute:
+      AuthenticatedAppFinanceiroEmpresasRoute,
+    AuthenticatedAppFinanceiroEstatisticasRoute:
+      AuthenticatedAppFinanceiroEstatisticasRoute,
+    AuthenticatedAppFinanceiroLembretesRoute:
+      AuthenticatedAppFinanceiroLembretesRoute,
+    AuthenticatedAppFinanceiroMovimentoRoute:
+      AuthenticatedAppFinanceiroMovimentoRoute,
+    AuthenticatedAppFinanceiroNotasRoute: AuthenticatedAppFinanceiroNotasRoute,
+    AuthenticatedAppFinanceiroRegrasIaRoute:
+      AuthenticatedAppFinanceiroRegrasIaRoute,
+    AuthenticatedAppFinanceiroRelatoriosRoute:
+      AuthenticatedAppFinanceiroRelatoriosRoute,
     AuthenticatedAppFinanceiroIndexRoute: AuthenticatedAppFinanceiroIndexRoute,
   }
 
