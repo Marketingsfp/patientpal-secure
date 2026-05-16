@@ -24,8 +24,10 @@ import {
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import {
   CalendarDays, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X,
-  MoreHorizontal, Star, Flag,
+  MoreHorizontal, Star, Flag, Printer,
 } from "lucide-react";
+import { printGuiaAtendimento } from "@/lib/print-gr";
+import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/_authenticated/app/agenda")({
   component: AgendaPage,
@@ -75,6 +77,7 @@ const EMPTY = {
 
 function AgendaPage() {
   const { clinicaAtual } = useClinica();
+  const { user } = useAuth();
   const [dataRef, setDataRef] = useState(() => new Date().toISOString().slice(0, 10));
   const [apenasData, setApenasData] = useState(true);
   const [filtroMedico, setFiltroMedico] = useState<string>("todos");
@@ -258,6 +261,19 @@ function AgendaPage() {
   const mudarStatus = async (a: Agendamento, status: Status) => {
     const { error } = await supabase.from("agendamentos").update({ status }).eq("id", a.id);
     if (error) toast.error(error.message); else await load();
+  };
+
+  const imprimirGR = async (a: Agendamento) => {
+    if (!clinicaAtual) return;
+    try {
+      await printGuiaAtendimento({
+        agendamentoId: a.id,
+        clinicaId: clinicaAtual.clinica_id,
+        usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
+      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha ao imprimir GR");
+    }
   };
 
   const shiftData = (delta: number) => {
@@ -521,6 +537,9 @@ function AgendaPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => openEdit(a)}><Pencil className="h-4 w-4 mr-2" /> Editar</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => imprimirGR(a)}>
+                          <Printer className="h-4 w-4 mr-2" /> Imprimir GR
+                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         {(Object.keys(STATUS_LABEL) as Status[]).map(s => (
                           <DropdownMenuItem key={s} onClick={() => mudarStatus(a, s)}>
