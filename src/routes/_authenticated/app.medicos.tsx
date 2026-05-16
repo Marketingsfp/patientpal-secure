@@ -40,6 +40,7 @@ function MedicosPage() {
   const [loading, setLoading] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [espFilter, setEspFilter] = useState("");
+  const [busca, setBusca] = useState("");
   const [form, setForm] = useState({
     nome: "", crm: "", crm_uf: "",
     especialidades: [] as string[],
@@ -162,6 +163,17 @@ function MedicosPage() {
   if (!clinicaAtual) {
     return <p className="text-muted-foreground">Selecione uma clínica primeiro.</p>;
   }
+
+  const medicosFiltrados = medicos.filter((m) => {
+    const q = busca.trim().toLowerCase();
+    if (!q) return true;
+    const especs = m.medico_especialidades?.map((me) => me.especialidade?.nome ?? "").join(" ").toLowerCase() ?? "";
+    return (
+      m.nome.toLowerCase().includes(q) ||
+      `${m.crm}/${m.crm_uf}`.toLowerCase().includes(q) ||
+      especs.includes(q)
+    );
+  });
 
   return (
     <div className="space-y-6">
