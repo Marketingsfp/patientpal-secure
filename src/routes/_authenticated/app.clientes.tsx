@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Plus, Search, Pencil, Trash2, Users, Mic, MicOff, Loader2, MapPin } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Users, Mic, MicOff, Loader2, MapPin, Download } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { exportToExcel } from "@/lib/export-csv";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -310,6 +311,48 @@ function ClientesPage() {
           <p className="text-sm text-muted-foreground">Cadastre e gerencie os pacientes da clínica.</p>
         </div>
         <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" /> Novo cliente</Button>
+        <Button
+          variant="outline"
+          onClick={async () => {
+            if (!clinicaAtual) return;
+            const { data, error } = await supabase
+              .from("pacientes")
+              .select("nome,cpf,telefone,email,data_nascimento,cidade,estado,bairro,logradouro,numero,cep,ativo")
+              .eq("clinica_id", clinicaAtual.clinica_id)
+              .order("nome");
+            if (error) { toast.error(error.message); return; }
+            if (!data?.length) { toast.info("Sem dados para exportar."); return; }
+            exportToExcel(
+              data.map((p: any) => ({
+                nome: p.nome,
+                cpf: p.cpf ?? "",
+                telefone: p.telefone ?? "",
+                email: p.email ?? "",
+                nascimento: p.data_nascimento ?? "",
+                cidade_uf: p.cidade ? `${p.cidade}${p.estado ? "/" + p.estado : ""}` : "",
+                bairro: p.bairro ?? "",
+                endereco: [p.logradouro, p.numero].filter(Boolean).join(", "),
+                cep: p.cep ?? "",
+                ativo: p.ativo ? "Sim" : "Não",
+              })),
+              `clientes-${new Date().toISOString().slice(0, 10)}`,
+              [
+                { key: "nome", label: "Nome" },
+                { key: "cpf", label: "CPF" },
+                { key: "telefone", label: "Telefone" },
+                { key: "email", label: "E-mail" },
+                { key: "nascimento", label: "Nascimento" },
+                { key: "cidade_uf", label: "Cidade/UF" },
+                { key: "bairro", label: "Bairro" },
+                { key: "endereco", label: "Endereço" },
+                { key: "cep", label: "CEP" },
+                { key: "ativo", label: "Ativo" },
+              ],
+            );
+          }}
+        >
+          <Download className="h-4 w-4 mr-2" /> Exportar Excel
+        </Button>
       </div>
 
       <div className="rounded-lg border border-border bg-card p-4">
