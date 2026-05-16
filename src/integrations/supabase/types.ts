@@ -1124,17 +1124,33 @@ export type Database = {
       }
       medicos: {
         Row: {
+          agencia: string | null
           ativo: boolean
+          bairro: string | null
+          banco: string | null
+          cep: string | null
+          cidade: string | null
           clinica_id: string
+          complemento: string | null
+          conta: string | null
+          cpf: string | null
           created_at: string
           crm: string
           crm_uf: string
+          data_nascimento: string | null
           email: string | null
           especialidade_id: string | null
+          estado: string | null
+          estado_civil: string | null
           id: string
+          logradouro: string | null
+          nacionalidade: string | null
           nome: string
+          numero: string | null
           paytime_recipient_id: string | null
           percentual_repasse_padrao: number
+          pix_chave: string | null
+          rg: string | null
           telefone: string | null
           tipo_repasse: string
           updated_at: string
@@ -1142,17 +1158,33 @@ export type Database = {
           valor_repasse_padrao: number | null
         }
         Insert: {
+          agencia?: string | null
           ativo?: boolean
+          bairro?: string | null
+          banco?: string | null
+          cep?: string | null
+          cidade?: string | null
           clinica_id: string
+          complemento?: string | null
+          conta?: string | null
+          cpf?: string | null
           created_at?: string
           crm: string
           crm_uf: string
+          data_nascimento?: string | null
           email?: string | null
           especialidade_id?: string | null
+          estado?: string | null
+          estado_civil?: string | null
           id?: string
+          logradouro?: string | null
+          nacionalidade?: string | null
           nome: string
+          numero?: string | null
           paytime_recipient_id?: string | null
           percentual_repasse_padrao?: number
+          pix_chave?: string | null
+          rg?: string | null
           telefone?: string | null
           tipo_repasse?: string
           updated_at?: string
@@ -1160,17 +1192,33 @@ export type Database = {
           valor_repasse_padrao?: number | null
         }
         Update: {
+          agencia?: string | null
           ativo?: boolean
+          bairro?: string | null
+          banco?: string | null
+          cep?: string | null
+          cidade?: string | null
           clinica_id?: string
+          complemento?: string | null
+          conta?: string | null
+          cpf?: string | null
           created_at?: string
           crm?: string
           crm_uf?: string
+          data_nascimento?: string | null
           email?: string | null
           especialidade_id?: string | null
+          estado?: string | null
+          estado_civil?: string | null
           id?: string
+          logradouro?: string | null
+          nacionalidade?: string | null
           nome?: string
+          numero?: string | null
           paytime_recipient_id?: string | null
           percentual_repasse_padrao?: number
+          pix_chave?: string | null
+          rg?: string | null
           telefone?: string | null
           tipo_repasse?: string
           updated_at?: string

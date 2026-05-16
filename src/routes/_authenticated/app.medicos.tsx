@@ -16,6 +16,7 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export const Route = createFileRoute("/_authenticated/app/medicos")({
   component: MedicosPage,
@@ -28,6 +29,12 @@ interface Medico {
   valor_repasse_padrao: number | null;
   tipo_repasse: "percentual" | "valor";
   ativo: boolean;
+  cpf?: string | null; rg?: string | null; data_nascimento?: string | null;
+  email?: string | null; telefone?: string | null;
+  nacionalidade?: string | null; estado_civil?: string | null;
+  cep?: string | null; logradouro?: string | null; numero?: string | null;
+  complemento?: string | null; bairro?: string | null; cidade?: string | null; estado?: string | null;
+  banco?: string | null; agencia?: string | null; conta?: string | null; pix_chave?: string | null;
   medico_especialidades: { especialidade: { id: string; nome: string } | null }[];
 }
 interface Especialidade { id: string; nome: string }
@@ -47,13 +54,17 @@ function MedicosPage() {
     tipo_repasse: "percentual" as "percentual" | "valor",
     percentual: "50",
     valor: "",
+    cpf: "", rg: "", data_nascimento: "", email: "", telefone: "",
+    nacionalidade: "Brasileira", estado_civil: "",
+    cep: "", logradouro: "", numero: "", complemento: "", bairro: "", cidade: "", estado: "",
+    banco: "", agencia: "", conta: "", pix_chave: "",
   });
 
   const load = async () => {
     if (!clinicaAtual) return;
     const { data } = await supabase
       .from("medicos")
-      .select("id, nome, crm, crm_uf, percentual_repasse_padrao, valor_repasse_padrao, tipo_repasse, ativo, medico_especialidades(especialidade:especialidades(id, nome))")
+      .select("id, nome, crm, crm_uf, percentual_repasse_padrao, valor_repasse_padrao, tipo_repasse, ativo, cpf, rg, data_nascimento, email, telefone, nacionalidade, estado_civil, cep, logradouro, numero, complemento, bairro, cidade, estado, banco, agencia, conta, pix_chave, medico_especialidades(especialidade:especialidades(id, nome))")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("nome");
     setMedicos((data as unknown as Medico[]) ?? []);
@@ -67,7 +78,14 @@ function MedicosPage() {
 
   const resetForm = () => {
     setEditId(null);
-    setForm({ nome: "", crm: "", crm_uf: "", especialidades: [], tipo_repasse: "percentual", percentual: "50", valor: "" });
+    setForm({
+      nome: "", crm: "", crm_uf: "", especialidades: [],
+      tipo_repasse: "percentual", percentual: "50", valor: "",
+      cpf: "", rg: "", data_nascimento: "", email: "", telefone: "",
+      nacionalidade: "Brasileira", estado_civil: "",
+      cep: "", logradouro: "", numero: "", complemento: "", bairro: "", cidade: "", estado: "",
+      banco: "", agencia: "", conta: "", pix_chave: "",
+    });
   };
 
   const openNew = () => {
@@ -85,6 +103,12 @@ function MedicosPage() {
       tipo_repasse: m.tipo_repasse,
       percentual: String(m.percentual_repasse_padrao ?? ""),
       valor: m.valor_repasse_padrao != null ? String(m.valor_repasse_padrao) : "",
+      cpf: m.cpf ?? "", rg: m.rg ?? "", data_nascimento: m.data_nascimento ?? "",
+      email: m.email ?? "", telefone: m.telefone ?? "",
+      nacionalidade: m.nacionalidade ?? "Brasileira", estado_civil: m.estado_civil ?? "",
+      cep: m.cep ?? "", logradouro: m.logradouro ?? "", numero: m.numero ?? "",
+      complemento: m.complemento ?? "", bairro: m.bairro ?? "", cidade: m.cidade ?? "", estado: m.estado ?? "",
+      banco: m.banco ?? "", agencia: m.agencia ?? "", conta: m.conta ?? "", pix_chave: m.pix_chave ?? "",
     });
     setOpen(true);
   };
@@ -102,6 +126,24 @@ function MedicosPage() {
       tipo_repasse: form.tipo_repasse,
       percentual_repasse_padrao: form.tipo_repasse === "percentual" ? parseFloat(form.percentual || "0") : 0,
       valor_repasse_padrao: form.tipo_repasse === "valor" ? parseFloat(form.valor || "0") : null,
+      cpf: form.cpf || null,
+      rg: form.rg || null,
+      data_nascimento: form.data_nascimento || null,
+      email: form.email || null,
+      telefone: form.telefone || null,
+      nacionalidade: form.nacionalidade || null,
+      estado_civil: form.estado_civil || null,
+      cep: form.cep || null,
+      logradouro: form.logradouro || null,
+      numero: form.numero || null,
+      complemento: form.complemento || null,
+      bairro: form.bairro || null,
+      cidade: form.cidade || null,
+      estado: form.estado ? form.estado.toUpperCase() : null,
+      banco: form.banco || null,
+      agencia: form.agencia || null,
+      conta: form.conta || null,
+      pix_chave: form.pix_chave || null,
     };
     let medicoId = editId;
     if (editId) {
@@ -190,24 +232,58 @@ function MedicosPage() {
             <DialogTrigger asChild>
               <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" /> Novo médico</Button>
             </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>{editId ? "Editar médico" : "Novo médico"}</DialogTitle></DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label>Nome *</Label>
-                <Input required value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} />
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div className="col-span-2 space-y-2">
-                  <Label>CRM *</Label>
-                  <Input required value={form.crm} onChange={(e) => setForm({ ...form, crm: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <Label>UF *</Label>
-                  <Input required maxLength={2} value={form.crm_uf} onChange={(e) => setForm({ ...form, crm_uf: e.target.value.toUpperCase() })} />
-                </div>
-              </div>
-              <div className="space-y-2">
+              <Tabs defaultValue="dados">
+                <TabsList className="grid grid-cols-5 w-full">
+                  <TabsTrigger value="dados">Dados</TabsTrigger>
+                  <TabsTrigger value="contato">Contato</TabsTrigger>
+                  <TabsTrigger value="endereco">Endereço</TabsTrigger>
+                  <TabsTrigger value="banco">Banco</TabsTrigger>
+                  <TabsTrigger value="repasse">Repasse</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="dados" className="space-y-4 pt-4">
+                  <div className="space-y-2">
+                    <Label>Nome completo *</Label>
+                    <Input required value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} />
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="col-span-2 space-y-2">
+                      <Label>CRM *</Label>
+                      <Input required value={form.crm} onChange={(e) => setForm({ ...form, crm: e.target.value })} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>UF *</Label>
+                      <Input required maxLength={2} value={form.crm_uf} onChange={(e) => setForm({ ...form, crm_uf: e.target.value.toUpperCase() })} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label>CPF</Label>
+                      <Input value={form.cpf} onChange={(e) => setForm({ ...form, cpf: e.target.value })} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>RG</Label>
+                      <Input value={form.rg} onChange={(e) => setForm({ ...form, rg: e.target.value })} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-2">
+                      <Label>Data de nascimento</Label>
+                      <Input type="date" value={form.data_nascimento} onChange={(e) => setForm({ ...form, data_nascimento: e.target.value })} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Nacionalidade</Label>
+                      <Input value={form.nacionalidade} onChange={(e) => setForm({ ...form, nacionalidade: e.target.value })} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Estado civil</Label>
+                      <Input value={form.estado_civil} onChange={(e) => setForm({ ...form, estado_civil: e.target.value })} />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
                 <Label>Especialidades</Label>
                 <Input
                   placeholder="Filtrar especialidade..."
@@ -229,8 +305,80 @@ function MedicosPage() {
                     </label>
                   ))}
                 </div>
-              </div>
-              <div className="space-y-2">
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="contato" className="space-y-4 pt-4">
+                  <div className="space-y-2">
+                    <Label>E-mail</Label>
+                    <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Telefone</Label>
+                    <Input value={form.telefone} onChange={(e) => setForm({ ...form, telefone: e.target.value })} />
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="endereco" className="space-y-4 pt-4">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-2">
+                      <Label>CEP</Label>
+                      <Input value={form.cep} onChange={(e) => setForm({ ...form, cep: e.target.value })} />
+                    </div>
+                    <div className="col-span-2 space-y-2">
+                      <Label>Logradouro</Label>
+                      <Input value={form.logradouro} onChange={(e) => setForm({ ...form, logradouro: e.target.value })} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-2">
+                      <Label>Número</Label>
+                      <Input value={form.numero} onChange={(e) => setForm({ ...form, numero: e.target.value })} />
+                    </div>
+                    <div className="col-span-2 space-y-2">
+                      <Label>Complemento</Label>
+                      <Input value={form.complemento} onChange={(e) => setForm({ ...form, complemento: e.target.value })} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-2">
+                      <Label>Bairro</Label>
+                      <Input value={form.bairro} onChange={(e) => setForm({ ...form, bairro: e.target.value })} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Cidade</Label>
+                      <Input value={form.cidade} onChange={(e) => setForm({ ...form, cidade: e.target.value })} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>UF</Label>
+                      <Input maxLength={2} value={form.estado} onChange={(e) => setForm({ ...form, estado: e.target.value.toUpperCase() })} />
+                    </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="banco" className="space-y-4 pt-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label>Banco</Label>
+                      <Input value={form.banco} onChange={(e) => setForm({ ...form, banco: e.target.value })} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Agência</Label>
+                      <Input value={form.agencia} onChange={(e) => setForm({ ...form, agencia: e.target.value })} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Conta</Label>
+                      <Input value={form.conta} onChange={(e) => setForm({ ...form, conta: e.target.value })} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Chave PIX</Label>
+                      <Input value={form.pix_chave} onChange={(e) => setForm({ ...form, pix_chave: e.target.value })} />
+                    </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="repasse" className="space-y-4 pt-4">
+                  <div className="space-y-2">
                 <Label>Tipo de repasse</Label>
                 <div className="flex gap-4 text-sm">
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -244,7 +392,7 @@ function MedicosPage() {
                     Valor fixo (R$)
                   </label>
                 </div>
-              </div>
+                  </div>
               {form.tipo_repasse === "percentual" ? (
                 <div className="space-y-2">
                   <Label>% repasse padrão</Label>
@@ -258,6 +406,8 @@ function MedicosPage() {
                     onChange={(e) => setForm({ ...form, valor: e.target.value })} />
                 </div>
               )}
+                </TabsContent>
+              </Tabs>
               <DialogFooter><Button type="submit" disabled={loading}>{loading ? "Salvando..." : "Salvar"}</Button></DialogFooter>
             </form>
           </DialogContent>
