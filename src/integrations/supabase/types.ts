@@ -294,6 +294,16 @@ export type Database = {
         Args: { _clinica_id: string; _user_id: string }
         Returns: boolean
       }
+      criar_clinica_com_admin: {
+        Args: {
+          _cidade?: string
+          _cnpj?: string
+          _estado?: string
+          _nome: string
+          _telefone?: string
+        }
+        Returns: string
+      }
       has_role: {
         Args: {
           _clinica_id: string
@@ -306,6 +316,7 @@ export type Database = {
         Args: { _clinica_id: string; _user_id: string }
         Returns: boolean
       }
+      user_is_any_manager: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       app_role:
