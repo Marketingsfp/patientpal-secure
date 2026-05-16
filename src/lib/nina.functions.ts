@@ -44,7 +44,7 @@ export const getContextoClinica = createServerFn({ method: "POST" })
         .order("hora_inicio"),
       supabase
         .from("procedimentos")
-        .select("id, nome, tipo, grupo, valor_dinheiro_pix, valor_cartao, duracao_minutos")
+        .select("id, nome, tipo, grupo, valor_dinheiro_pix, valor_cartao, duracao_minutos, preparo")
         .eq("clinica_id", data.clinicaId)
         .eq("ativo", true)
         .order("nome"),
@@ -72,7 +72,7 @@ function montarContextoTexto(ctx: {
     crm_uf: string;
     horarios: Array<{ dia: string; inicio: string; fim: string; obs: string | null }>;
   }>;
-  procedimentos: Array<{ nome: string; valor_dinheiro_pix: number; valor_cartao: number; grupo: string | null }>;
+  procedimentos: Array<{ nome: string; valor_dinheiro_pix: number; valor_cartao: number; grupo: string | null; preparo?: string | null }>;
 }) {
   const meds = ctx.medicos
     .map((m) => {
@@ -87,7 +87,7 @@ function montarContextoTexto(ctx: {
   const procs = ctx.procedimentos
     .map(
       (p) =>
-        `- ${p.nome}${p.grupo ? ` [${p.grupo}]` : ""}: dinheiro/PIX R$ ${Number(p.valor_dinheiro_pix).toFixed(2)} / cartão R$ ${Number(p.valor_cartao).toFixed(2)}`,
+        `- ${p.nome}${p.grupo ? ` [${p.grupo}]` : ""}: dinheiro/PIX R$ ${Number(p.valor_dinheiro_pix).toFixed(2)} / cartão R$ ${Number(p.valor_cartao).toFixed(2)}${p.preparo ? ` | PREPARO: ${p.preparo.replace(/\s+/g, " ").trim()}` : ""}`,
     )
     .join("\n");
 
@@ -115,7 +115,7 @@ export const chatNina = createServerFn({ method: "POST" })
         .eq("ativo", true),
       supabase
         .from("procedimentos")
-        .select("nome, grupo, valor_dinheiro_pix, valor_cartao")
+        .select("nome, grupo, valor_dinheiro_pix, valor_cartao, preparo")
         .eq("clinica_id", data.clinicaId)
         .eq("ativo", true),
     ]);
@@ -141,10 +141,11 @@ export const chatNina = createServerFn({ method: "POST" })
         valor_dinheiro_pix: number;
         valor_cartao: number;
         grupo: string | null;
+        preparo: string | null;
       }>,
     });
 
-    const systemPrompt = `Você é a Nina, assistente virtual de uma clínica médica. Responda SEMPRE em português do Brasil, de forma curta, direta e amigável. Use APENAS as informações da base abaixo para responder sobre médicos, horários, exames e preços. Se a pergunta for sobre algo que não está na base, diga que não tem essa informação e oriente a equipe a confirmar com o gestor. Não invente dados, valores ou horários.\n\n=== BASE DE DADOS DA CLÍNICA ===\n${contextoTexto}\n=== FIM DA BASE ===`;
+    const systemPrompt = `Você é a Nina, assistente virtual de uma clínica médica. Responda SEMPRE em português do Brasil, de forma curta, direta e amigável. Use APENAS as informações da base abaixo para responder sobre médicos, horários, exames, preços e preparos (jejum, suspensão de medicamentos, etc.). Quando o exame tiver PREPARO cadastrado, SEMPRE inclua o preparo na resposta. Se a pergunta for sobre algo que não está na base, diga que não tem essa informação e oriente a equipe a confirmar com o gestor. Não invente dados, valores, horários ou preparos.\n\n=== BASE DE DADOS DA CLÍNICA ===\n${contextoTexto}\n=== FIM DA BASE ===`;
 
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",

@@ -46,6 +46,7 @@ interface Procedimento {
   valor_cartao_desconto: number;
   duracao_minutos: number;
   observacoes: string | null;
+  preparo: string | null;
   ativo: boolean;
 }
 interface Cartao {
@@ -67,7 +68,7 @@ const EMPTY = {
   nome: "", grupo: "", tipo: "exame" as Tipo, codigo: "",
   valor_dinheiro: "0", valor_pix_cartao: "0",
   valor_cartao_consulta: "0", valor_cartao_desconto: "0",
-  duracao_minutos: "30", observacoes: "", ativo: true,
+  duracao_minutos: "30", observacoes: "", preparo: "", ativo: true,
 };
 
 const EMPTY_CARTAO = { nome: "", descricao: "", percentual_desconto: "0", ativo: true };
@@ -364,7 +365,7 @@ function ProcedimentosPage() {
       ),
       valor_cartao_consulta: String(p.valor_cartao_consulta ?? 0),
       valor_cartao_desconto: String(p.valor_cartao_desconto ?? 0),
-      duracao_minutos: String(p.duracao_minutos), observacoes: p.observacoes ?? "", ativo: p.ativo,
+      duracao_minutos: String(p.duracao_minutos), observacoes: p.observacoes ?? "", preparo: p.preparo ?? "", ativo: p.ativo,
     });
     setOpen(true);
   };
@@ -393,6 +394,7 @@ function ProcedimentosPage() {
       valor_cartao_desconto: Number(form.valor_cartao_desconto) || 0,
       duracao_minutos: Math.max(0, Number(form.duracao_minutos) || 0),
       observacoes: form.observacoes.trim() || null,
+      preparo: form.preparo.trim() || null,
       ativo: form.ativo,
     };
     const { error } = editing
@@ -748,6 +750,18 @@ function ProcedimentosPage() {
             <div className="space-y-1">
               <Label>Observações</Label>
               <Textarea rows={2} value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <Label>Preparo do exame</Label>
+              <Textarea
+                rows={3}
+                placeholder="Ex.: Jejum de 8h. Trazer pedido médico. Suspender medicamentos X..."
+                value={form.preparo}
+                onChange={(e) => setForm({ ...form, preparo: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground">
+                Aparece na Consulta Rápida e a Nina responde quando perguntarem sobre o preparo.
+              </p>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
