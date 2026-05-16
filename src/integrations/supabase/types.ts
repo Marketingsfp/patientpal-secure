@@ -1254,37 +1254,73 @@ export type Database = {
       pacientes: {
         Row: {
           ativo: boolean
+          bairro: string | null
+          cep: string | null
+          cidade: string | null
           clinica_id: string
+          complemento: string | null
           consentimento_lgpd_em: string | null
           cpf: string | null
           created_at: string
           data_nascimento: string | null
+          email: string | null
+          estado: string | null
           id: string
+          logradouro: string | null
           nome: string
+          numero: string | null
+          responsavel_cpf: string | null
+          responsavel_nome: string | null
+          responsavel_parentesco: string | null
+          responsavel_telefone: string | null
           telefone: string | null
           updated_at: string
         }
         Insert: {
           ativo?: boolean
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
           clinica_id: string
+          complemento?: string | null
           consentimento_lgpd_em?: string | null
           cpf?: string | null
           created_at?: string
           data_nascimento?: string | null
+          email?: string | null
+          estado?: string | null
           id?: string
+          logradouro?: string | null
           nome: string
+          numero?: string | null
+          responsavel_cpf?: string | null
+          responsavel_nome?: string | null
+          responsavel_parentesco?: string | null
+          responsavel_telefone?: string | null
           telefone?: string | null
           updated_at?: string
         }
         Update: {
           ativo?: boolean
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
           clinica_id?: string
+          complemento?: string | null
           consentimento_lgpd_em?: string | null
           cpf?: string | null
           created_at?: string
           data_nascimento?: string | null
+          email?: string | null
+          estado?: string | null
           id?: string
+          logradouro?: string | null
           nome?: string
+          numero?: string | null
+          responsavel_cpf?: string | null
+          responsavel_nome?: string | null
+          responsavel_parentesco?: string | null
+          responsavel_telefone?: string | null
           telefone?: string | null
           updated_at?: string
         }
