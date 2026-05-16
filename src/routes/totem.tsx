@@ -71,7 +71,7 @@ function TotemPage() {
     const { data, error } = await supabase.rpc("emitir_senha", {
       _clinica_id: clinicaAtual.clinica_id,
       _tipo,
-      _paciente_id: pacienteId ?? null,
+      _paciente_id: pacienteId,
       _identificado_facial: identificado,
     });
     setBusy(false);
