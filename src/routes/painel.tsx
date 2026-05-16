@@ -1,8 +1,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useClinica } from "@/hooks/use-clinica";
-import { ClinicaProvider } from "@/hooks/use-clinica";
+import { ClinicaProvider, useClinica } from "@/hooks/use-clinica";
 
 export const Route = createFileRoute("/painel")({
   beforeLoad: async () => {
