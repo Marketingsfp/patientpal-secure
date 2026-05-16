@@ -1050,6 +1050,45 @@ export type Database = {
           },
         ]
       }
+      medico_disponibilidades: {
+        Row: {
+          ativo: boolean
+          clinica_id: string
+          created_at: string
+          dia_semana: number
+          hora_fim: string
+          hora_inicio: string
+          id: string
+          medico_id: string
+          observacoes: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          clinica_id: string
+          created_at?: string
+          dia_semana: number
+          hora_fim: string
+          hora_inicio: string
+          id?: string
+          medico_id: string
+          observacoes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          clinica_id?: string
+          created_at?: string
+          dia_semana?: number
+          hora_fim?: string
+          hora_inicio?: string
+          id?: string
+          medico_id?: string
+          observacoes?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       medico_especialidades: {
         Row: {
           created_at: string
