@@ -32,7 +32,7 @@ function TotemPage() {
   const [step, setStep] = useState<Step>("home");
   const [tipo, setTipo] = useState<TipoSenha | null>(null);
   const [busy, setBusy] = useState(false);
-  const [ticket, setTicket] = useState<{ codigo: string; tipo: TipoSenha; identificado: boolean; nome?: string } | null>(null);
+  const [ticket, setTicket] = useState<{ codigo: string; tipo: TipoSenha; identificado: boolean; nome?: string | null } | null>(null);
   const [scanMsg, setScanMsg] = useState("Posicione seu rosto na câmera");
   const [manual, setManual] = useState({ nome: "", cpf: "", telefone: "" });
 
