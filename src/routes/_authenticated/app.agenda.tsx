@@ -81,8 +81,7 @@ function AgendaPage() {
   const [filtroDiaSemana, setFiltroDiaSemana] = useState<string>("todos");
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [filtroCliente, setFiltroCliente] = useState("");
-  const [horaDe, setHoraDe] = useState("");
-  const [horaAte, setHoraAte] = useState("");
+  const [filtroFicha, setFiltroFicha] = useState("");
   const [page, setPage] = useState(1);
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [items, setItems] = useState<Agendamento[]>([]);
@@ -144,11 +143,21 @@ function AgendaPage() {
   useEffect(() => { loadRef(); }, [clinicaAtual?.clinica_id]);
   useEffect(() => { load(); }, [clinicaAtual?.clinica_id, dataRef, apenasData]);
 
+  const fichaPorId = useMemo(() => {
+    const m = new Map<string, string>();
+    items.forEach((a, i) => m.set(a.id, String(i + 1).padStart(3, "0")));
+    return m;
+  }, [items]);
+
   const filtrados = useMemo(() => {
     return items.filter((a) => {
       if (filtroMedico !== "todos" && a.medico_id !== filtroMedico) return false;
       if (filtroStatus !== "todos" && a.status !== filtroStatus) return false;
       if (filtroCliente && !a.paciente_nome.toLowerCase().includes(filtroCliente.toLowerCase())) return false;
+      if (filtroFicha) {
+        const f = fichaPorId.get(a.id) ?? "";
+        if (!f.includes(filtroFicha.padStart(Math.min(filtroFicha.length, 3), "0"))) return false;
+      }
       if (filtroDiaSemana !== "todos") {
         const d = new Date(a.inicio).getDay();
         if (String(d) !== filtroDiaSemana) return false;
@@ -158,17 +167,9 @@ function AgendaPage() {
         const set = medicoEspec.get(a.medico_id);
         if (!set || !set.has(filtroEspecialidade)) return false;
       }
-      if (horaDe) {
-        const h = new Date(a.inicio).toTimeString().slice(0, 5);
-        if (h < horaDe) return false;
-      }
-      if (horaAte) {
-        const h = new Date(a.inicio).toTimeString().slice(0, 5);
-        if (h > horaAte) return false;
-      }
       return true;
     });
-  }, [items, filtroMedico, filtroStatus, filtroCliente, filtroDiaSemana, filtroEspecialidade, horaDe, horaAte, medicoEspec]);
+  }, [items, filtroMedico, filtroStatus, filtroCliente, filtroFicha, filtroDiaSemana, filtroEspecialidade, medicoEspec, fichaPorId]);
 
   const totais = useMemo(() => ({
     total: filtrados.length,
@@ -181,7 +182,7 @@ function AgendaPage() {
 
   const limparFiltros = () => {
     setFiltroMedico("todos"); setFiltroEspecialidade("todos"); setFiltroDiaSemana("todos");
-    setFiltroStatus("todos"); setFiltroCliente(""); setHoraDe(""); setHoraAte("");
+    setFiltroStatus("todos"); setFiltroCliente(""); setFiltroFicha("");
   };
 
   const toggleSel = (id: string) => {
@@ -387,12 +388,8 @@ function AgendaPage() {
             <Input value={filtroCliente} onChange={(e) => setFiltroCliente(e.target.value)} placeholder="Buscar paciente…" />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Hora de</Label>
-            <Input type="time" value={horaDe} onChange={(e) => setHoraDe(e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Hora até</Label>
-            <Input type="time" value={horaAte} onChange={(e) => setHoraAte(e.target.value)} />
+            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Nº Ficha</Label>
+            <Input value={filtroFicha} onChange={(e) => setFiltroFicha(e.target.value.replace(/\D/g, ""))} placeholder="Ex.: 001" inputMode="numeric" />
           </div>
           <div className="space-y-1">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Especialidade</Label>
@@ -468,8 +465,8 @@ function AgendaPage() {
               <TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
             ) : paginados.length === 0 ? (
               <TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground">Nenhum agendamento encontrado.</TableCell></TableRow>
-            ) : paginados.map((a, idx) => {
-              const fichaNum = String((page - 1) * PAGE_SIZE + idx + 1).padStart(3, "0");
+            ) : paginados.map((a) => {
+              const fichaNum = fichaPorId.get(a.id) ?? "";
               const realizado = a.status === "realizado";
               return (
                 <TableRow key={a.id} className={realizado ? "bg-emerald-50 dark:bg-emerald-950/20" : ""}>
