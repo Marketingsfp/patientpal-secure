@@ -26,6 +26,7 @@ const hojeISO = () => new Date().toISOString().slice(0, 10);
 
 function DashboardPage() {
   const { memberships, clinicaAtual, loading } = useClinica();
+  const podeVerFinanceiro = ["admin", "gestor", "financeiro"].includes(clinicaAtual?.role ?? "");
   const [periodo, setPeriodo] = useState<Periodo>({ de: hojeISO(), ate: hojeISO() });
   const [carregando, setCarregando] = useState(false);
   const [data, setData] = useState({
@@ -226,40 +227,50 @@ function DashboardPage() {
           ]} />
         </KpiCard>
 
+        {podeVerFinanceiro && (
         <KpiCard icon={Handshake} title="Vendas" big={fmtMoney(data.vendas.total)}>
           <SubGrid items={[
             { label: "Conversão", value: "—" },
             { label: "Orçamentos", value: fmtMoney(data.vendas.orcamentos) },
           ]} />
         </KpiCard>
+        )}
 
+        {podeVerFinanceiro && (
         <KpiCard icon={CreditCard} title="Pagamentos" big={fmtMoney(data.pagamentos.realizado + data.pagamentos.aPagar)}>
           <SubGrid items={[
             { label: "Realizado", value: fmtMoney(data.pagamentos.realizado) },
             { label: "À pagar", value: fmtMoney(data.pagamentos.aPagar) },
           ]} />
         </KpiCard>
+        )}
 
+        {podeVerFinanceiro && (
         <KpiCard icon={Banknote} title="Recebimentos" big={fmtMoney(data.recebimentos.realizado + data.recebimentos.aReceber)}>
           <SubGrid items={[
             { label: "Realizado", value: fmtMoney(data.recebimentos.realizado) },
             { label: "À receber", value: fmtMoney(data.recebimentos.aReceber) },
           ]} />
         </KpiCard>
+        )}
 
+        {podeVerFinanceiro && (
         <KpiCard icon={Receipt} title="Recebimentos Qtd." big={fmtInt(data.recebimentos.qtdRealizado + data.recebimentos.qtdAReceber)}>
           <SubGrid items={[
             { label: "Realizado", value: fmtInt(data.recebimentos.qtdRealizado) },
             { label: "À receber", value: fmtInt(data.recebimentos.qtdAReceber) },
           ]} />
         </KpiCard>
+        )}
 
+        {podeVerFinanceiro && (
         <KpiCard icon={BadgeDollarSign} title="Comissões Pagas" big={fmtMoney(data.comissoes.pagas)}>
           <SubGrid items={[
             { label: "% da Receita", value: `${data.comissoes.percentReceita.toFixed(1)}%` },
             { label: "Pendentes", value: fmtMoney(data.comissoes.pendentes) },
           ]} />
         </KpiCard>
+        )}
       </div>
 
       {data.porMedico.length > 0 && (
