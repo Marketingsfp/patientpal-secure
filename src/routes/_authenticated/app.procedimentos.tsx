@@ -19,6 +19,9 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 
 export const Route = createFileRoute("/_authenticated/app/procedimentos")({
   component: ProcedimentosPage,
@@ -67,37 +70,147 @@ const EMPTY_CARTAO = { nome: "", descricao: "", percentual_desconto: "0", ativo:
 
 const fmtBRL = (n: number) => Number(n || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-// Lista padrão de ultrassonografias
-const ULTRAS_PADRAO = [
-  "Ultrassonografia Abdominal Total",
-  "Ultrassonografia Abdominal Superior",
-  "Ultrassonografia de Rins e Vias Urinárias",
-  "Ultrassonografia de Tireoide",
-  "Ultrassonografia Cervical",
-  "Ultrassonografia de Mama",
-  "Ultrassonografia das Axilas",
-  "Ultrassonografia Transvaginal",
-  "Ultrassonografia Pélvica",
-  "Ultrassonografia Obstétrica",
-  "Ultrassonografia Obstétrica Morfológica 1º Trimestre",
-  "Ultrassonografia Obstétrica Morfológica 2º Trimestre",
-  "Ultrassonografia Obstétrica com Doppler",
-  "Ultrassonografia Próstata Suprapúbica",
-  "Ultrassonografia Próstata Transretal",
-  "Ultrassonografia de Bolsa Escrotal",
-  "Ultrassonografia de Pênis com Doppler",
-  "Ultrassonografia de Glândulas Salivares",
-  "Ultrassonografia de Articulação (Ombro)",
-  "Ultrassonografia de Articulação (Joelho)",
-  "Ultrassonografia de Articulação (Punho)",
-  "Ultrassonografia de Partes Moles",
-  "Ultrassonografia Muscular",
-  "Ultrassonografia Doppler de Carótidas",
-  "Ultrassonografia Doppler Venoso de MMII",
-  "Ultrassonografia Doppler Arterial de MMII",
-  "Ultrassonografia Doppler Renal",
-  "Ultrassonografia Pediátrica - Quadril",
-  "Ultrassonografia Pediátrica - Transfontanela",
+// Pacotes pré-prontos de exames por grupo
+type PacoteExames = { id: string; label: string; grupo: string; duracao: number; itens: string[] };
+const PACOTES_EXAMES: PacoteExames[] = [
+  {
+    id: "ultrassom",
+    label: "Ultrassonografia (todos)",
+    grupo: "Ultrassonografia",
+    duracao: 30,
+    itens: [
+      "Ultrassonografia Abdominal Total",
+      "Ultrassonografia Abdominal Superior",
+      "Ultrassonografia de Rins e Vias Urinárias",
+      "Ultrassonografia de Tireoide",
+      "Ultrassonografia Cervical",
+      "Ultrassonografia de Mama",
+      "Ultrassonografia das Axilas",
+      "Ultrassonografia Transvaginal",
+      "Ultrassonografia Pélvica",
+      "Ultrassonografia Obstétrica",
+      "Ultrassonografia Obstétrica Morfológica 1º Trimestre",
+      "Ultrassonografia Obstétrica Morfológica 2º Trimestre",
+      "Ultrassonografia Obstétrica com Doppler",
+      "Ultrassonografia Próstata Suprapúbica",
+      "Ultrassonografia Próstata Transretal",
+      "Ultrassonografia de Bolsa Escrotal",
+      "Ultrassonografia de Pênis com Doppler",
+      "Ultrassonografia de Glândulas Salivares",
+      "Ultrassonografia de Articulação (Ombro)",
+      "Ultrassonografia de Articulação (Joelho)",
+      "Ultrassonografia de Articulação (Punho)",
+      "Ultrassonografia de Partes Moles",
+      "Ultrassonografia Muscular",
+      "Ultrassonografia Doppler de Carótidas",
+      "Ultrassonografia Doppler Venoso de MMII",
+      "Ultrassonografia Doppler Arterial de MMII",
+      "Ultrassonografia Doppler Renal",
+      "Ultrassonografia Pediátrica - Quadril",
+      "Ultrassonografia Pediátrica - Transfontanela",
+    ],
+  },
+  {
+    id: "tomografia",
+    label: "Tomografia (TC)",
+    grupo: "Tomografia",
+    duracao: 20,
+    itens: [
+      "Tomografia de Crânio",
+      "Tomografia de Seios da Face",
+      "Tomografia de Pescoço",
+      "Tomografia de Tórax",
+      "Tomografia de Abdome Superior",
+      "Tomografia de Abdome Total",
+      "Tomografia de Pelve",
+      "Tomografia de Coluna Cervical",
+      "Tomografia de Coluna Torácica",
+      "Tomografia de Coluna Lombar",
+      "Tomografia de Articulação (Ombro)",
+      "Tomografia de Articulação (Joelho)",
+      "Tomografia de Articulação (Quadril)",
+      "Angiotomografia de Aorta",
+      "Angiotomografia de Carótidas",
+      "Angiotomografia Coronariana",
+      "Tomografia de Tórax de Alta Resolução",
+      "Tomografia de Mastoides",
+    ],
+  },
+  {
+    id: "rx",
+    label: "Raio-X (RX)",
+    grupo: "Raio-X",
+    duracao: 15,
+    itens: [
+      "RX de Tórax (PA e Perfil)",
+      "RX de Tórax (AP)",
+      "RX de Abdome Simples",
+      "RX de Abdome Agudo (3 incidências)",
+      "RX de Crânio",
+      "RX de Seios da Face",
+      "RX de Coluna Cervical",
+      "RX de Coluna Torácica",
+      "RX de Coluna Lombossacra",
+      "RX de Bacia",
+      "RX de Ombro",
+      "RX de Cotovelo",
+      "RX de Punho",
+      "RX de Mão",
+      "RX de Dedos",
+      "RX de Quadril",
+      "RX de Joelho",
+      "RX de Tornozelo",
+      "RX de Pé",
+      "RX Panorâmico de MMII",
+      "RX Escanometria de MMII",
+    ],
+  },
+  {
+    id: "cardio",
+    label: "Exames Cardiológicos",
+    grupo: "Cardiologia",
+    duracao: 30,
+    itens: [
+      "Eletrocardiograma (ECG)",
+      "Teste Ergométrico",
+      "Ecocardiograma Transtorácico",
+      "Ecocardiograma com Doppler",
+      "Ecocardiograma Transesofágico",
+      "Ecocardiograma de Estresse",
+      "Ecocardiograma Fetal",
+      "Holter 24h",
+      "Holter 48h",
+      "MAPA - Monitorização Ambulatorial da Pressão Arterial",
+      "Tilt Test",
+      "Estudo Eletrofisiológico",
+      "Consulta Cardiológica",
+    ],
+  },
+  {
+    id: "endoscopia",
+    label: "Endoscopia / Colonoscopia",
+    grupo: "Endoscopia",
+    duracao: 40,
+    itens: [
+      "Endoscopia Digestiva Alta",
+      "Endoscopia Digestiva Alta com Biópsia",
+      "Colonoscopia",
+      "Colonoscopia com Polipectomia",
+      "Retossigmoidoscopia",
+    ],
+  },
+  {
+    id: "mamografia",
+    label: "Mamografia / Densitometria",
+    grupo: "Mamografia",
+    duracao: 20,
+    itens: [
+      "Mamografia Bilateral",
+      "Mamografia Diagnóstica",
+      "Densitometria Óssea Coluna e Fêmur",
+      "Densitometria Óssea Corpo Total",
+    ],
+  },
 ];
 
 function ProcedimentosPage() {
@@ -222,34 +335,40 @@ function ProcedimentosPage() {
     void load();
   };
 
-  const seedUltras = async () => {
+  const seedPacote = async (pacote: PacoteExames) => {
     if (!clinicaAtual) return;
     setSeeding(true);
-    // pega já cadastrados pra não duplicar
     const { data: existentes } = await supabase
       .from("procedimentos")
       .select("nome")
       .eq("clinica_id", clinicaAtual.clinica_id)
-      .eq("grupo", "Ultrassonografia");
-    const existSet = new Set((existentes ?? []).map((r: any) => r.nome.toLowerCase()));
-    const novos = ULTRAS_PADRAO
+      .eq("grupo", pacote.grupo);
+    const existSet = new Set((existentes ?? []).map((r: any) => String(r.nome).toLowerCase()));
+    const novos = pacote.itens
       .filter(n => !existSet.has(n.toLowerCase()))
       .map(nome => ({
         clinica_id: clinicaAtual.clinica_id,
-        nome, grupo: "Ultrassonografia", tipo: "exame" as Tipo,
+        nome, grupo: pacote.grupo, tipo: "exame" as Tipo,
         valor_padrao: 0, valor_dinheiro_pix: 0, valor_cartao: 0,
         valor_cartao_consulta: 0, valor_cartao_desconto: 0,
-        duracao_minutos: 30, ativo: true,
+        duracao_minutos: pacote.duracao, ativo: true,
       }));
     if (novos.length === 0) {
-      toast.info("Todos os exames de ultrassom já estão cadastrados.");
+      toast.info(`Todos os exames de ${pacote.grupo} já estão cadastrados.`);
       setSeeding(false); return;
     }
     const { error } = await supabase.from("procedimentos").insert(novos);
     setSeeding(false);
     if (error) { toast.error(error.message); return; }
-    toast.success(`${novos.length} exames de ultrassom cadastrados. Ajuste os valores em cada um.`);
+    toast.success(`${novos.length} exames de ${pacote.grupo} cadastrados. Ajuste os valores em cada um.`);
     void load();
+  };
+
+  const seedTodosPacotes = async () => {
+    for (const p of PACOTES_EXAMES) {
+      // eslint-disable-next-line no-await-in-loop
+      await seedPacote(p);
+    }
   };
 
   const seedCartoesPadrao = async () => {
@@ -324,10 +443,29 @@ function ProcedimentosPage() {
         {/* ============ PROCEDIMENTOS ============ */}
         <TabsContent value="procedimentos" className="space-y-4 pt-4">
           <div className="flex flex-wrap gap-2 justify-end">
-            <Button variant="outline" onClick={seedUltras} disabled={seeding}>
-              <Sparkles className="h-4 w-4 mr-2" />
-              {seeding ? "Cadastrando…" : "Carregar exames de Ultrassom"}
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" disabled={seeding}>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  {seeding ? "Cadastrando…" : "Carregar pacote de exames"}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuLabel>Pacotes prontos</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {PACOTES_EXAMES.map(p => (
+                  <DropdownMenuItem key={p.id} onClick={() => seedPacote(p)}>
+                    <span className="font-medium">{p.label}</span>
+                    <span className="ml-auto text-xs text-muted-foreground">{p.itens.length}</span>
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={seedTodosPacotes}>
+                  <Sparkles className="h-4 w-4 mr-2 text-primary" />
+                  Carregar todos os pacotes
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" /> Novo</Button>
           </div>
 
