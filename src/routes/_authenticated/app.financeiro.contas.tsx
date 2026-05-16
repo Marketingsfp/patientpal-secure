@@ -57,7 +57,7 @@ function Page() {
     if (!clinicaAtual) return;
     setSaving(true);
     const payload = {
-      clinica_id: clinicaAtual.clinica_id, nome: form.nome.trim(), tipo: form.tipo,
+      clinica_id: clinicaAtual.clinica_id, nome: form.nome.trim(), tipo: form.tipo as "banco" | "caixa" | "cartao" | "maquininha" | "outro",
       banco: form.banco.trim() || null, agencia: form.agencia.trim() || null,
       conta: form.conta.trim() || null, saldo_inicial: Number(form.saldo_inicial || 0),
     };

@@ -91,7 +91,7 @@ function Page() {
     setSaving(true);
     const payload = {
       clinica_id: clinicaAtual.clinica_id, tipo: form.tipo, descricao: form.descricao.trim(),
-      valor: Number(form.valor), data: form.data, status: form.status,
+      valor: Number(form.valor), data: form.data, status: form.status as "cancelado" | "confirmado" | "pendente",
       categoria_id: form.categoria_id || null, conta_id: form.conta_id || null,
       forma_pagamento: form.forma_pagamento || null, observacoes: form.observacoes || null,
     };
