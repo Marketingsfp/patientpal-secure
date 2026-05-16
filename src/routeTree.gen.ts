@@ -16,6 +16,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
+import { Route as AuthenticatedAppRecepcaoRouteImport } from './routes/_authenticated/app.recepcao'
 import { Route as AuthenticatedAppRateioRouteImport } from './routes/_authenticated/app.rateio'
 import { Route as AuthenticatedAppMedicosRouteImport } from './routes/_authenticated/app.medicos'
 import { Route as AuthenticatedAppEquipeRouteImport } from './routes/_authenticated/app.equipe'
@@ -55,6 +56,12 @@ const AuthenticatedAppRoute = AuthenticatedAppRouteImport.update({
   path: '/app',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedAppRecepcaoRoute =
+  AuthenticatedAppRecepcaoRouteImport.update({
+    id: '/recepcao',
+    path: '/recepcao',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppRateioRoute = AuthenticatedAppRateioRouteImport.update({
   id: '/rateio',
   path: '/rateio',
@@ -88,6 +95,7 @@ export interface FileRoutesByFullPath {
   '/app/equipe': typeof AuthenticatedAppEquipeRoute
   '/app/medicos': typeof AuthenticatedAppMedicosRoute
   '/app/rateio': typeof AuthenticatedAppRateioRoute
+  '/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -100,6 +108,7 @@ export interface FileRoutesByTo {
   '/app/equipe': typeof AuthenticatedAppEquipeRoute
   '/app/medicos': typeof AuthenticatedAppMedicosRoute
   '/app/rateio': typeof AuthenticatedAppRateioRoute
+  '/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -114,6 +123,7 @@ export interface FileRoutesById {
   '/_authenticated/app/equipe': typeof AuthenticatedAppEquipeRoute
   '/_authenticated/app/medicos': typeof AuthenticatedAppMedicosRoute
   '/_authenticated/app/rateio': typeof AuthenticatedAppRateioRoute
+  '/_authenticated/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -128,6 +138,7 @@ export interface FileRouteTypes {
     | '/app/equipe'
     | '/app/medicos'
     | '/app/rateio'
+    | '/app/recepcao'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -140,6 +151,7 @@ export interface FileRouteTypes {
     | '/app/equipe'
     | '/app/medicos'
     | '/app/rateio'
+    | '/app/recepcao'
   id:
     | '__root__'
     | '/'
@@ -153,6 +165,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/equipe'
     | '/_authenticated/app/medicos'
     | '/_authenticated/app/rateio'
+    | '/_authenticated/app/recepcao'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -215,6 +228,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/app/recepcao': {
+      id: '/_authenticated/app/recepcao'
+      path: '/recepcao'
+      fullPath: '/app/recepcao'
+      preLoaderRoute: typeof AuthenticatedAppRecepcaoRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/app/rateio': {
       id: '/_authenticated/app/rateio'
       path: '/rateio'
@@ -251,6 +271,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppEquipeRoute: typeof AuthenticatedAppEquipeRoute
   AuthenticatedAppMedicosRoute: typeof AuthenticatedAppMedicosRoute
   AuthenticatedAppRateioRoute: typeof AuthenticatedAppRateioRoute
+  AuthenticatedAppRecepcaoRoute: typeof AuthenticatedAppRecepcaoRoute
 }
 
 const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
@@ -258,6 +279,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppEquipeRoute: AuthenticatedAppEquipeRoute,
   AuthenticatedAppMedicosRoute: AuthenticatedAppMedicosRoute,
   AuthenticatedAppRateioRoute: AuthenticatedAppRateioRoute,
+  AuthenticatedAppRecepcaoRoute: AuthenticatedAppRecepcaoRoute,
 }
 
 const AuthenticatedAppRouteWithChildren =

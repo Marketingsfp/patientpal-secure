@@ -1,0 +1,169 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useClinica } from "@/hooks/use-clinica";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { Bell, Check, X, ExternalLink } from "lucide-react";
+
+export const Route = createFileRoute("/_authenticated/app/recepcao")({
+  component: RecepcaoPage,
+});
+
+type Senha = {
+  id: string;
+  codigo: string;
+  tipo: "N" | "P" | "E" | "R";
+  status: string;
+  guiche: string | null;
+  emitida_em: string;
+  chamada_em: string | null;
+  identificado_por_facial: boolean;
+  paciente_id: string | null;
+  pacientes?: { nome: string } | null;
+};
+
+const TIPO_COR: Record<string, string> = {
+  N: "bg-primary/10 text-primary",
+  P: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
+  E: "bg-rose-500/15 text-rose-700 dark:text-rose-400",
+  R: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+};
+
+function RecepcaoPage() {
+  const { clinicaAtual } = useClinica();
+  const [guiche, setGuiche] = useState<string>(() => localStorage.getItem("guiche") ?? "1");
+  const [fila, setFila] = useState<Senha[]>([]);
+  const [chamadas, setChamadas] = useState<Senha[]>([]);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => { localStorage.setItem("guiche", guiche); }, [guiche]);
+
+  const carregar = async () => {
+    if (!clinicaAtual) return;
+    const hoje = new Date().toISOString().slice(0, 10);
+    const sel = "id, codigo, tipo, status, guiche, emitida_em, chamada_em, identificado_por_facial, paciente_id, pacientes(nome)";
+    const [{ data: emit }, { data: cham }] = await Promise.all([
+      supabase.from("senhas").select(sel).eq("clinica_id", clinicaAtual.clinica_id).eq("data_dia", hoje).eq("status", "emitida").order("emitida_em"),
+      supabase.from("senhas").select(sel).eq("clinica_id", clinicaAtual.clinica_id).eq("data_dia", hoje).eq("status", "chamada").order("chamada_em", { ascending: false }).limit(10),
+    ]);
+    setFila((emit ?? []) as unknown as Senha[]);
+    setChamadas((cham ?? []) as unknown as Senha[]);
+  };
+
+  useEffect(() => {
+    if (!clinicaAtual) return;
+    void carregar();
+    const ch = supabase
+      .channel(`recepcao-${clinicaAtual.clinica_id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "senhas", filter: `clinica_id=eq.${clinicaAtual.clinica_id}` },
+        () => void carregar(),
+      )
+      .subscribe();
+    return () => { void supabase.removeChannel(ch); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clinicaAtual?.clinica_id]);
+
+  async function chamarProxima() {
+    if (!clinicaAtual) return;
+    if (!guiche.trim()) { toast.error("Informe o guichê"); return; }
+    setBusy(true);
+    const { data, error } = await supabase.rpc("chamar_proxima_senha", {
+      _clinica_id: clinicaAtual.clinica_id,
+      _guiche: guiche.trim(),
+    });
+    setBusy(false);
+    if (error) { toast.error(error.message); return; }
+    if (!data) { toast.info("Não há senhas na fila"); return; }
+    const row = Array.isArray(data) ? data[0] : data;
+    toast.success(`Chamada ${row.codigo} no guichê ${guiche}`);
+  }
+
+  async function setStatus(id: string, status: "atendida" | "cancelada") {
+    const campo = status === "atendida" ? "atendida_em" : "cancelada_em";
+    const { error } = await supabase
+      .from("senhas")
+      .update({ status, [campo]: new Date().toISOString() })
+      .eq("id", id);
+    if (error) toast.error(error.message);
+  }
+
+  if (!clinicaAtual) return <div>Selecione uma clínica.</div>;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Recepção · Filas</h1>
+          <p className="text-sm text-muted-foreground">Chame a próxima senha e acompanhe a fila em tempo real.</p>
+        </div>
+        <div className="flex items-end gap-3">
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Meu guichê</label>
+            <input
+              value={guiche}
+              onChange={(e) => setGuiche(e.target.value.slice(0, 10))}
+              className="h-10 w-24 px-3 rounded-md border bg-background text-lg font-semibold"
+            />
+          </div>
+          <Button size="lg" onClick={chamarProxima} disabled={busy}>
+            <Bell className="h-4 w-4 mr-2" /> Chamar próxima
+          </Button>
+          <a href="/totem" target="_blank" rel="noreferrer">
+            <Button variant="outline"><ExternalLink className="h-4 w-4 mr-2" /> Totem</Button>
+          </a>
+          <a href="/painel" target="_blank" rel="noreferrer">
+            <Button variant="outline"><ExternalLink className="h-4 w-4 mr-2" /> Painel</Button>
+          </a>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <section className="bg-card border rounded-xl p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-semibold">Fila ({fila.length})</h2>
+            <span className="text-xs text-muted-foreground">Ordem: E · P · R · N</span>
+          </div>
+          <div className="space-y-2 max-h-[60vh] overflow-auto">
+            {fila.length === 0 && <div className="text-sm text-muted-foreground py-6 text-center">Fila vazia</div>}
+            {fila.map((s) => (
+              <div key={s.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/40">
+                <div className="flex items-center gap-3">
+                  <span className={`px-2 py-0.5 rounded text-xs font-semibold ${TIPO_COR[s.tipo]}`}>{s.tipo}</span>
+                  <span className="font-bold tabular-nums">{s.codigo}</span>
+                  <span className="text-sm text-muted-foreground">
+                    {s.pacientes?.nome ?? "Anônimo"}{s.identificado_por_facial ? " · 📷" : ""}
+                  </span>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => setStatus(s.id, "cancelada")}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="bg-card border rounded-xl p-5">
+          <h2 className="font-semibold mb-3">Em atendimento / chamadas recentes</h2>
+          <div className="space-y-2 max-h-[60vh] overflow-auto">
+            {chamadas.length === 0 && <div className="text-sm text-muted-foreground py-6 text-center">Nenhuma chamada hoje</div>}
+            {chamadas.map((s) => (
+              <div key={s.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/40">
+                <div className="flex items-center gap-3">
+                  <span className={`px-2 py-0.5 rounded text-xs font-semibold ${TIPO_COR[s.tipo]}`}>{s.tipo}</span>
+                  <span className="font-bold tabular-nums">{s.codigo}</span>
+                  <span className="text-sm text-muted-foreground">Guichê {s.guiche ?? "—"}</span>
+                </div>
+                <Button size="sm" variant="outline" onClick={() => setStatus(s.id, "atendida")}>
+                  <Check className="h-4 w-4 mr-1" /> Concluir
+                </Button>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
