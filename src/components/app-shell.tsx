@@ -1,6 +1,6 @@
 import { Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
+import { lazy, Suspense, useEffect } from "react";
 import { Activity, Building2, Users, Wallet, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target } from "lucide-react";
-import { VoiceInput } from "@/components/voice-input";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
@@ -8,6 +8,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+
+const VoiceInput = lazy(() => import("@/components/voice-input").then((m) => ({ default: m.VoiceInput })));
 
 const nav = [
   { to: "/app", label: "Dashboard", icon: LayoutDashboard },
@@ -25,10 +27,14 @@ const nav = [
 ] as const;
 
 export function AppShell() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, loading } = useAuth();
   const { memberships, clinicaAtual, setClinicaAtual } = useClinica();
   const location = useLocation();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && !user) navigate({ to: "/login", replace: true });
+  }, [loading, navigate, user]);
 
   const handleVoiceCommand = (text: string) => {
     const t = text.toLowerCase();
@@ -56,8 +62,16 @@ export function AppShell() {
 
   const handleSignOut = async () => {
     await signOut();
-    navigate({ to: "/login" });
+    navigate({ to: "/login", replace: true });
   };
+
+  if (loading || !user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
+        Entrando…
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex bg-muted/30">
@@ -102,12 +116,14 @@ export function AppShell() {
             {clinicaAtual ? clinicaAtual.clinica.nome : "Nenhuma clínica selecionada"}
           </div>
           <div className="flex items-center gap-2">
-            <VoiceInput
-              append={false}
-              onTranscript={handleVoiceCommand}
-              title="Busca por voz (diga: agenda, clientes, financeiro…)"
-              prompt="Transcreva o comando de voz curto em português do Brasil. Retorne apenas as palavras ditas."
-            />
+            <Suspense fallback={null}>
+              <VoiceInput
+                append={false}
+                onTranscript={handleVoiceCommand}
+                title="Busca por voz (diga: agenda, clientes, financeiro…)"
+                prompt="Transcreva o comando de voz curto em português do Brasil. Retorne apenas as palavras ditas."
+              />
+            </Suspense>
             {memberships.length > 0 && (
               <Select value={clinicaAtual?.clinica_id} onValueChange={setClinicaAtual}>
                 <SelectTrigger className="w-64">
