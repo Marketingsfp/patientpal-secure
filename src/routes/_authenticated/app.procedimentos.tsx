@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Plus, Search, Pencil, Trash2, ClipboardList } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, ClipboardList, Sparkles, CreditCard } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -9,11 +9,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -28,19 +29,27 @@ type Tipo = "consulta" | "exame" | "procedimento";
 interface Procedimento {
   id: string;
   nome: string;
+  grupo: string | null;
   tipo: Tipo;
   codigo: string | null;
   valor_padrao: number;
+  valor_dinheiro_pix: number;
+  valor_cartao: number;
+  valor_cartao_consulta: number;
+  valor_cartao_desconto: number;
   duracao_minutos: number;
   observacoes: string | null;
   ativo: boolean;
 }
+interface Cartao {
+  id: string;
+  nome: string;
+  descricao: string | null;
+  percentual_desconto: number;
+  ativo: boolean;
+}
 
-const TIPO_LABEL: Record<Tipo, string> = {
-  consulta: "Consulta",
-  exame: "Exame",
-  procedimento: "Procedimento",
-};
+const TIPO_LABEL: Record<Tipo, string> = { consulta: "Consulta", exame: "Exame", procedimento: "Procedimento" };
 const TIPO_COR: Record<Tipo, string> = {
   consulta: "bg-primary/10 text-primary",
   exame: "bg-blue-500/15 text-blue-700 dark:text-blue-400",
@@ -48,55 +57,128 @@ const TIPO_COR: Record<Tipo, string> = {
 };
 
 const EMPTY = {
-  nome: "", tipo: "consulta" as Tipo, codigo: "",
-  valor_padrao: "0", duracao_minutos: "30", observacoes: "", ativo: true,
+  nome: "", grupo: "", tipo: "exame" as Tipo, codigo: "",
+  valor_dinheiro_pix: "0", valor_cartao: "0",
+  valor_cartao_consulta: "0", valor_cartao_desconto: "0",
+  duracao_minutos: "30", observacoes: "", ativo: true,
 };
 
-const fmtBRL = (n: number) =>
-  n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const EMPTY_CARTAO = { nome: "", descricao: "", percentual_desconto: "0", ativo: true };
+
+const fmtBRL = (n: number) => Number(n || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+// Lista padrão de ultrassonografias
+const ULTRAS_PADRAO = [
+  "Ultrassonografia Abdominal Total",
+  "Ultrassonografia Abdominal Superior",
+  "Ultrassonografia de Rins e Vias Urinárias",
+  "Ultrassonografia de Tireoide",
+  "Ultrassonografia Cervical",
+  "Ultrassonografia de Mama",
+  "Ultrassonografia das Axilas",
+  "Ultrassonografia Transvaginal",
+  "Ultrassonografia Pélvica",
+  "Ultrassonografia Obstétrica",
+  "Ultrassonografia Obstétrica Morfológica 1º Trimestre",
+  "Ultrassonografia Obstétrica Morfológica 2º Trimestre",
+  "Ultrassonografia Obstétrica com Doppler",
+  "Ultrassonografia Próstata Suprapúbica",
+  "Ultrassonografia Próstata Transretal",
+  "Ultrassonografia de Bolsa Escrotal",
+  "Ultrassonografia de Pênis com Doppler",
+  "Ultrassonografia de Glândulas Salivares",
+  "Ultrassonografia de Articulação (Ombro)",
+  "Ultrassonografia de Articulação (Joelho)",
+  "Ultrassonografia de Articulação (Punho)",
+  "Ultrassonografia de Partes Moles",
+  "Ultrassonografia Muscular",
+  "Ultrassonografia Doppler de Carótidas",
+  "Ultrassonografia Doppler Venoso de MMII",
+  "Ultrassonografia Doppler Arterial de MMII",
+  "Ultrassonografia Doppler Renal",
+  "Ultrassonografia Pediátrica - Quadril",
+  "Ultrassonografia Pediátrica - Transfontanela",
+];
 
 function ProcedimentosPage() {
   const { clinicaAtual } = useClinica();
+  const [tab, setTab] = useState("procedimentos");
+
+  // ----- Procedimentos -----
   const [items, setItems] = useState<Procedimento[]>([]);
   const [busca, setBusca] = useState("");
+  const [filtroGrupo, setFiltroGrupo] = useState<string>("todos");
   const [filtroTipo, setFiltroTipo] = useState<"todos" | Tipo>("todos");
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Procedimento | null>(null);
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
+  const [seeding, setSeeding] = useState(false);
 
   const load = async () => {
     if (!clinicaAtual) return;
     setLoading(true);
     const { data, error } = await supabase
       .from("procedimentos")
-      .select("id, nome, tipo, codigo, valor_padrao, duracao_minutos, observacoes, ativo")
+      .select("*")
       .eq("clinica_id", clinicaAtual.clinica_id)
+      .order("grupo", { ascending: true, nullsFirst: false })
       .order("nome");
     setLoading(false);
     if (error) { toast.error(error.message); return; }
-    setItems((data ?? []) as Procedimento[]);
+    setItems((data ?? []) as any);
   };
 
-  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clinicaAtual?.clinica_id]);
+  // ----- Cartões -----
+  const [cartoes, setCartoes] = useState<Cartao[]>([]);
+  const [openCartao, setOpenCartao] = useState(false);
+  const [editingCartao, setEditingCartao] = useState<Cartao | null>(null);
+  const [formCartao, setFormCartao] = useState(EMPTY_CARTAO);
+
+  const loadCartoes = async () => {
+    if (!clinicaAtual) return;
+    const { data, error } = await supabase
+      .from("cartoes_convenio")
+      .select("*")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .order("nome");
+    if (error) { toast.error(error.message); return; }
+    setCartoes((data ?? []) as any);
+  };
+
+  useEffect(() => {
+    void load();
+    void loadCartoes();
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [clinicaAtual?.clinica_id]);
+
+  const grupos = useMemo(() => {
+    const s = new Set<string>();
+    items.forEach(p => { if (p.grupo) s.add(p.grupo); });
+    return Array.from(s).sort();
+  }, [items]);
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase();
     return items.filter(p => {
       if (filtroTipo !== "todos" && p.tipo !== filtroTipo) return false;
-      if (q && !p.nome.toLowerCase().includes(q) && !(p.codigo ?? "").toLowerCase().includes(q)) return false;
+      if (filtroGrupo !== "todos" && (p.grupo ?? "") !== filtroGrupo) return false;
+      if (q && !p.nome.toLowerCase().includes(q) && !(p.codigo ?? "").toLowerCase().includes(q) && !(p.grupo ?? "").toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [items, busca, filtroTipo]);
+  }, [items, busca, filtroTipo, filtroGrupo]);
 
   const openNew = () => { setEditing(null); setForm(EMPTY); setOpen(true); };
   const openEdit = (p: Procedimento) => {
     setEditing(p);
     setForm({
-      nome: p.nome, tipo: p.tipo, codigo: p.codigo ?? "",
-      valor_padrao: String(p.valor_padrao), duracao_minutos: String(p.duracao_minutos),
-      observacoes: p.observacoes ?? "", ativo: p.ativo,
+      nome: p.nome, grupo: p.grupo ?? "", tipo: p.tipo, codigo: p.codigo ?? "",
+      valor_dinheiro_pix: String(p.valor_dinheiro_pix ?? p.valor_padrao ?? 0),
+      valor_cartao: String(p.valor_cartao ?? 0),
+      valor_cartao_consulta: String(p.valor_cartao_consulta ?? 0),
+      valor_cartao_desconto: String(p.valor_cartao_desconto ?? 0),
+      duracao_minutos: String(p.duracao_minutos), observacoes: p.observacoes ?? "", ativo: p.ativo,
     });
     setOpen(true);
   };
@@ -106,12 +188,18 @@ function ProcedimentosPage() {
     if (!clinicaAtual) return;
     if (!form.nome.trim()) { toast.error("Informe o nome."); return; }
     setSaving(true);
+    const vDinheiro = Number(form.valor_dinheiro_pix) || 0;
     const payload = {
       clinica_id: clinicaAtual.clinica_id,
       nome: form.nome.trim(),
+      grupo: form.grupo.trim() || null,
       tipo: form.tipo,
       codigo: form.codigo.trim() || null,
-      valor_padrao: Number(form.valor_padrao) || 0,
+      valor_padrao: vDinheiro, // mantém compatibilidade com agenda/financeiro
+      valor_dinheiro_pix: vDinheiro,
+      valor_cartao: Number(form.valor_cartao) || 0,
+      valor_cartao_consulta: Number(form.valor_cartao_consulta) || 0,
+      valor_cartao_desconto: Number(form.valor_cartao_desconto) || 0,
       duracao_minutos: Math.max(0, Number(form.duracao_minutos) || 0),
       observacoes: form.observacoes.trim() || null,
       ativo: form.ativo,
@@ -134,82 +222,241 @@ function ProcedimentosPage() {
     void load();
   };
 
+  const seedUltras = async () => {
+    if (!clinicaAtual) return;
+    setSeeding(true);
+    // pega já cadastrados pra não duplicar
+    const { data: existentes } = await supabase
+      .from("procedimentos")
+      .select("nome")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("grupo", "Ultrassonografia");
+    const existSet = new Set((existentes ?? []).map((r: any) => r.nome.toLowerCase()));
+    const novos = ULTRAS_PADRAO
+      .filter(n => !existSet.has(n.toLowerCase()))
+      .map(nome => ({
+        clinica_id: clinicaAtual.clinica_id,
+        nome, grupo: "Ultrassonografia", tipo: "exame" as Tipo,
+        valor_padrao: 0, valor_dinheiro_pix: 0, valor_cartao: 0,
+        valor_cartao_consulta: 0, valor_cartao_desconto: 0,
+        duracao_minutos: 30, ativo: true,
+      }));
+    if (novos.length === 0) {
+      toast.info("Todos os exames de ultrassom já estão cadastrados.");
+      setSeeding(false); return;
+    }
+    const { error } = await supabase.from("procedimentos").insert(novos);
+    setSeeding(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success(`${novos.length} exames de ultrassom cadastrados. Ajuste os valores em cada um.`);
+    void load();
+  };
+
+  const seedCartoesPadrao = async () => {
+    if (!clinicaAtual) return;
+    const nomes = new Set(cartoes.map(c => c.nome.toLowerCase()));
+    const novos = [
+      { nome: "Cartão Consulta", descricao: "Cartão de benefício para consultas", percentual_desconto: 0 },
+      { nome: "Cartão Desconto", descricao: "Cartão de benefício com desconto em exames", percentual_desconto: 0 },
+    ]
+      .filter(c => !nomes.has(c.nome.toLowerCase()))
+      .map(c => ({ ...c, ativo: true, clinica_id: clinicaAtual.clinica_id }));
+    if (novos.length === 0) { toast.info("Cartões padrão já cadastrados."); return; }
+    const { error } = await supabase.from("cartoes_convenio").insert(novos);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Cartões cadastrados.");
+    void loadCartoes();
+  };
+
+  const openNewCartao = () => { setEditingCartao(null); setFormCartao(EMPTY_CARTAO); setOpenCartao(true); };
+  const openEditCartao = (c: Cartao) => {
+    setEditingCartao(c);
+    setFormCartao({
+      nome: c.nome, descricao: c.descricao ?? "",
+      percentual_desconto: String(c.percentual_desconto ?? 0), ativo: c.ativo,
+    });
+    setOpenCartao(true);
+  };
+  const onSubmitCartao = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!clinicaAtual) return;
+    if (!formCartao.nome.trim()) { toast.error("Informe o nome."); return; }
+    const payload = {
+      clinica_id: clinicaAtual.clinica_id,
+      nome: formCartao.nome.trim(),
+      descricao: formCartao.descricao.trim() || null,
+      percentual_desconto: Number(formCartao.percentual_desconto) || 0,
+      ativo: formCartao.ativo,
+    };
+    const { error } = editingCartao
+      ? await supabase.from("cartoes_convenio").update(payload).eq("id", editingCartao.id)
+      : await supabase.from("cartoes_convenio").insert(payload);
+    if (error) { toast.error(error.message); return; }
+    toast.success(editingCartao ? "Cartão atualizado." : "Cartão cadastrado.");
+    setOpenCartao(false);
+    void loadCartoes();
+  };
+  const onDeleteCartao = async (c: Cartao) => {
+    if (!confirm(`Excluir ${c.nome}?`)) return;
+    const { error } = await supabase.from("cartoes_convenio").delete().eq("id", c.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Excluído.");
+    void loadCartoes();
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-semibold flex items-center gap-2">
             <ClipboardList className="h-6 w-6 text-primary" /> Procedimentos
           </h1>
-          <p className="text-sm text-muted-foreground">Cadastre consultas, exames e procedimentos oferecidos pela clínica.</p>
+          <p className="text-sm text-muted-foreground">Consultas, exames e procedimentos — com valores por forma de pagamento.</p>
         </div>
-        <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" /> Novo</Button>
       </div>
 
-      <div className="rounded-lg border border-border bg-card p-4 flex flex-wrap gap-3">
-        <div className="relative flex-1 min-w-[240px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nome ou código…" className="pl-9" />
-        </div>
-        <Select value={filtroTipo} onValueChange={(v) => setFiltroTipo(v as typeof filtroTipo)}>
-          <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos os tipos</SelectItem>
-            <SelectItem value="consulta">Consulta</SelectItem>
-            <SelectItem value="exame">Exame</SelectItem>
-            <SelectItem value="procedimento">Procedimento</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList>
+          <TabsTrigger value="procedimentos">Procedimentos / Exames</TabsTrigger>
+          <TabsTrigger value="cartoes">Cartões de convênio</TabsTrigger>
+        </TabsList>
 
-      <div className="rounded-lg border border-border bg-card overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/40">
-              <TableHead>Nome</TableHead>
-              <TableHead className="w-28">Tipo</TableHead>
-              <TableHead className="w-24">Código</TableHead>
-              <TableHead className="w-28 text-right">Valor</TableHead>
-              <TableHead className="w-24 text-right">Duração</TableHead>
-              <TableHead className="w-24">Situação</TableHead>
-              <TableHead className="w-28 text-right">Ações</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>
-            ) : !clinicaAtual ? (
-              <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
-            ) : filtrados.length === 0 ? (
-              <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Nenhum procedimento cadastrado.</TableCell></TableRow>
-            ) : filtrados.map(p => (
-              <TableRow key={p.id}>
-                <TableCell className="font-medium">{p.nome}</TableCell>
-                <TableCell>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${TIPO_COR[p.tipo]}`}>{TIPO_LABEL[p.tipo]}</span>
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground">{p.codigo ?? "—"}</TableCell>
-                <TableCell className="text-right text-sm">{fmtBRL(Number(p.valor_padrao))}</TableCell>
-                <TableCell className="text-right text-sm text-muted-foreground">{p.duracao_minutos} min</TableCell>
-                <TableCell>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${p.ativo ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}>
-                    {p.ativo ? "Ativo" : "Inativo"}
-                  </span>
-                </TableCell>
-                <TableCell className="text-right">
-                  <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Pencil className="h-4 w-4" /></Button>
-                  <Button variant="ghost" size="icon" onClick={() => onDelete(p)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+        {/* ============ PROCEDIMENTOS ============ */}
+        <TabsContent value="procedimentos" className="space-y-4 pt-4">
+          <div className="flex flex-wrap gap-2 justify-end">
+            <Button variant="outline" onClick={seedUltras} disabled={seeding}>
+              <Sparkles className="h-4 w-4 mr-2" />
+              {seeding ? "Cadastrando…" : "Carregar exames de Ultrassom"}
+            </Button>
+            <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" /> Novo</Button>
+          </div>
 
+          <div className="rounded-lg border border-border bg-card p-4 flex flex-wrap gap-3">
+            <div className="relative flex-1 min-w-[240px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nome, grupo ou código…" className="pl-9" />
+            </div>
+            <Select value={filtroGrupo} onValueChange={setFiltroGrupo}>
+              <SelectTrigger className="w-56"><SelectValue placeholder="Grupo" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os grupos</SelectItem>
+                {grupos.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={filtroTipo} onValueChange={(v) => setFiltroTipo(v as typeof filtroTipo)}>
+              <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os tipos</SelectItem>
+                <SelectItem value="consulta">Consulta</SelectItem>
+                <SelectItem value="exame">Exame</SelectItem>
+                <SelectItem value="procedimento">Procedimento</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="rounded-lg border border-border bg-card overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/40">
+                  <TableHead>Nome</TableHead>
+                  <TableHead className="w-44">Grupo</TableHead>
+                  <TableHead className="w-24">Tipo</TableHead>
+                  <TableHead className="w-28 text-right">Din/Pix</TableHead>
+                  <TableHead className="w-28 text-right">Cartão</TableHead>
+                  <TableHead className="w-28 text-right">C. Consulta</TableHead>
+                  <TableHead className="w-28 text-right">C. Desconto</TableHead>
+                  <TableHead className="w-24">Situação</TableHead>
+                  <TableHead className="w-28 text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>
+                ) : !clinicaAtual ? (
+                  <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
+                ) : filtrados.length === 0 ? (
+                  <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Nenhum procedimento.</TableCell></TableRow>
+                ) : filtrados.map(p => (
+                  <TableRow key={p.id}>
+                    <TableCell className="font-medium">{p.nome}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{p.grupo ?? "—"}</TableCell>
+                    <TableCell>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${TIPO_COR[p.tipo]}`}>{TIPO_LABEL[p.tipo]}</span>
+                    </TableCell>
+                    <TableCell className="text-right text-sm">{fmtBRL(Number(p.valor_dinheiro_pix))}</TableCell>
+                    <TableCell className="text-right text-sm">{fmtBRL(Number(p.valor_cartao))}</TableCell>
+                    <TableCell className="text-right text-sm">{fmtBRL(Number(p.valor_cartao_consulta))}</TableCell>
+                    <TableCell className="text-right text-sm">{fmtBRL(Number(p.valor_cartao_desconto))}</TableCell>
+                    <TableCell>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${p.ativo ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}>
+                        {p.ativo ? "Ativo" : "Inativo"}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Pencil className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => onDelete(p)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+
+        {/* ============ CARTÕES ============ */}
+        <TabsContent value="cartoes" className="space-y-4 pt-4">
+          <div className="flex flex-wrap gap-2 justify-end">
+            <Button variant="outline" onClick={seedCartoesPadrao}>
+              <Sparkles className="h-4 w-4 mr-2" />Cadastrar Cartão Consulta e Desconto
+            </Button>
+            <Button onClick={openNewCartao}><Plus className="h-4 w-4 mr-2" /> Novo cartão</Button>
+          </div>
+
+          <div className="rounded-lg border border-border bg-card overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/40">
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Descrição</TableHead>
+                  <TableHead className="w-32 text-right">Desconto %</TableHead>
+                  <TableHead className="w-24">Situação</TableHead>
+                  <TableHead className="w-28 text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {cartoes.length === 0 ? (
+                  <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Nenhum cartão cadastrado.</TableCell></TableRow>
+                ) : cartoes.map(c => (
+                  <TableRow key={c.id}>
+                    <TableCell className="font-medium flex items-center gap-2"><CreditCard className="h-4 w-4 text-primary" />{c.nome}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{c.descricao ?? "—"}</TableCell>
+                    <TableCell className="text-right text-sm">{Number(c.percentual_desconto)}%</TableCell>
+                    <TableCell>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${c.ativo ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}>
+                        {c.ativo ? "Ativo" : "Inativo"}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="icon" onClick={() => openEditCartao(c)}><Pencil className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => onDeleteCartao(c)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Os cartões aparecem como forma de pagamento. O valor cobrado vem da coluna correspondente do procedimento (C. Consulta / C. Desconto).
+          </p>
+        </TabsContent>
+      </Tabs>
+
+      {/* ============ DIALOG PROCEDIMENTO ============ */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? "Editar procedimento" : "Novo procedimento"}</DialogTitle>
+            <DialogDescription>Preencha valores para cada forma de pagamento.</DialogDescription>
           </DialogHeader>
           <form onSubmit={onSubmit} className="space-y-4">
             <div className="grid grid-cols-3 gap-3">
@@ -219,10 +466,19 @@ function ProcedimentosPage() {
               </div>
               <div className="space-y-1">
                 <Label>Código</Label>
-                <Input value={form.codigo} onChange={(e) => setForm({ ...form, codigo: e.target.value })} placeholder="Ex.: TUSS" />
+                <Input value={form.codigo} onChange={(e) => setForm({ ...form, codigo: e.target.value })} placeholder="TUSS" />
               </div>
             </div>
             <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1 col-span-2">
+                <Label>Grupo</Label>
+                <Input value={form.grupo} list="grupos-list"
+                  onChange={(e) => setForm({ ...form, grupo: e.target.value })}
+                  placeholder="Ex.: Ultrassonografia, Consulta, Endoscopia…" />
+                <datalist id="grupos-list">
+                  {grupos.map(g => <option key={g} value={g} />)}
+                </datalist>
+              </div>
               <div className="space-y-1">
                 <Label>Tipo</Label>
                 <Select value={form.tipo} onValueChange={(v) => setForm({ ...form, tipo: v as Tipo })}>
@@ -234,26 +490,85 @@ function ProcedimentosPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1">
-                <Label>Valor padrão (R$)</Label>
-                <Input type="number" step="0.01" min="0" value={form.valor_padrao} onChange={(e) => setForm({ ...form, valor_padrao: e.target.value })} />
+            </div>
+
+            <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
+              <p className="text-xs font-medium text-muted-foreground uppercase">Valores por forma de pagamento</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>Dinheiro / Pix (R$)</Label>
+                  <Input type="number" step="0.01" min="0" value={form.valor_dinheiro_pix}
+                    onChange={(e) => setForm({ ...form, valor_dinheiro_pix: e.target.value })} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Cartão Crédito / Débito (R$)</Label>
+                  <Input type="number" step="0.01" min="0" value={form.valor_cartao}
+                    onChange={(e) => setForm({ ...form, valor_cartao: e.target.value })} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Cartão Consulta (R$)</Label>
+                  <Input type="number" step="0.01" min="0" value={form.valor_cartao_consulta}
+                    onChange={(e) => setForm({ ...form, valor_cartao_consulta: e.target.value })} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Cartão Desconto (R$)</Label>
+                  <Input type="number" step="0.01" min="0" value={form.valor_cartao_desconto}
+                    onChange={(e) => setForm({ ...form, valor_cartao_desconto: e.target.value })} />
+                </div>
               </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label>Duração (min)</Label>
-                <Input type="number" min="0" value={form.duracao_minutos} onChange={(e) => setForm({ ...form, duracao_minutos: e.target.value })} />
+                <Input type="number" min="0" value={form.duracao_minutos}
+                  onChange={(e) => setForm({ ...form, duracao_minutos: e.target.value })} />
               </div>
+              <label className="flex items-end gap-2 text-sm cursor-pointer pb-2">
+                <Checkbox checked={form.ativo} onCheckedChange={(v) => setForm({ ...form, ativo: !!v })} />
+                Ativo
+              </label>
             </div>
             <div className="space-y-1">
               <Label>Observações</Label>
               <Textarea rows={2} value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} />
             </div>
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <Checkbox checked={form.ativo} onCheckedChange={(v) => setForm({ ...form, ativo: !!v })} />
-              Ativo
-            </label>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
               <Button type="submit" disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ============ DIALOG CARTÃO ============ */}
+      <Dialog open={openCartao} onOpenChange={setOpenCartao}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingCartao ? "Editar cartão" : "Novo cartão"}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={onSubmitCartao} className="space-y-4">
+            <div className="space-y-1">
+              <Label>Nome *</Label>
+              <Input value={formCartao.nome} onChange={(e) => setFormCartao({ ...formCartao, nome: e.target.value })} required />
+            </div>
+            <div className="space-y-1">
+              <Label>Descrição</Label>
+              <Textarea rows={2} value={formCartao.descricao} onChange={(e) => setFormCartao({ ...formCartao, descricao: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <Label>Desconto padrão (%)</Label>
+              <Input type="number" min="0" max="100" step="0.1" value={formCartao.percentual_desconto}
+                onChange={(e) => setFormCartao({ ...formCartao, percentual_desconto: e.target.value })} />
+              <p className="text-xs text-muted-foreground">Informativo. O valor real cobrado vem do procedimento.</p>
+            </div>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <Checkbox checked={formCartao.ativo} onCheckedChange={(v) => setFormCartao({ ...formCartao, ativo: !!v })} />
+              Ativo
+            </label>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setOpenCartao(false)}>Cancelar</Button>
+              <Button type="submit">Salvar</Button>
             </DialogFooter>
           </form>
         </DialogContent>
