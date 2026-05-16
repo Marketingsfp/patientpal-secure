@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SimpleCrud } from "@/components/simple-crud/SimpleCrud";
 import { VoiceInput } from "@/components/voice-input";
+import { Cid10Picker } from "@/components/cid10-picker";
 
 export const Route = createFileRoute("/_authenticated/app/prontuarios")({
   component: ProntuariosPage,
@@ -105,13 +106,24 @@ function ProntuariosPage() {
             <div key={key} className="space-y-1">
               <div className="flex items-center justify-between">
                 <Label>{label}</Label>
-                <VoiceInput
-                  size="sm"
-                  currentValue={(f[key] ?? "") as string}
-                  onTranscript={(t) => set({ ...f, [key]: t })}
-                  prompt={`Transcreva o áudio em português do Brasil como anotação médica do campo "${label}". Retorne apenas o texto.`}
-                  title={`Ditar ${label}`}
-                />
+                <div className="flex items-center gap-1">
+                  {key === "hipotese_diagnostica" && (
+                    <Cid10Picker
+                      onPick={(texto) => {
+                        const atual = ((f[key] ?? "") as string).trim();
+                        const novo = atual ? `${atual} ${texto}` : texto;
+                        set({ ...f, [key]: novo });
+                      }}
+                    />
+                  )}
+                  <VoiceInput
+                    size="sm"
+                    currentValue={(f[key] ?? "") as string}
+                    onTranscript={(t) => set({ ...f, [key]: t })}
+                    prompt={`Transcreva o áudio em português do Brasil como anotação médica do campo "${label}". Retorne apenas o texto.`}
+                    title={`Ditar ${label}`}
+                  />
+                </div>
               </div>
               <Textarea
                 rows={rows}
