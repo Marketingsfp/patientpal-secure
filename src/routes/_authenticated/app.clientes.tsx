@@ -72,6 +72,61 @@ function calcIdade(dn: string | null): number | null {
   return a;
 }
 
+// Converte palavras ditadas em pontuação real (ponto, arroba, hífen…)
+function normalizarFalaEmail(t: string): string {
+  return t
+    .toLowerCase()
+    .replace(/\s*\barroba\b\s*/g, "@")
+    .replace(/\s*\bponto\b\s*/g, ".")
+    .replace(/\s*\bhífen\b\s*/g, "-")
+    .replace(/\s*\bhifen\b\s*/g, "-")
+    .replace(/\s*\btraço\b\s*/g, "-")
+    .replace(/\s*\btraco\b\s*/g, "-")
+    .replace(/\s*\bunderline\b\s*/g, "_")
+    .replace(/\s*\bunder ?score\b\s*/g, "_")
+    .replace(/\s+/g, "");
+}
+function normalizarFalaDigitos(t: string): string {
+  return t.replace(/\D+/g, "");
+}
+function normalizarFala(field: string, raw: string): string {
+  if (field === "email") return normalizarFalaEmail(raw);
+  if (field === "cpf" || field === "telefone" || field === "cep" ||
+      field === "responsavel_cpf" || field === "responsavel_telefone" ||
+      field === "numero") return normalizarFalaDigitos(raw);
+  return raw;
+}
+
+// Componente estável fora do pai — evita remount/perda de foco a cada tecla.
+function InputVoz({
+  field, type = "text", value, onChange, onVoice, voiceActive, speechSupported, ...rest
+}: {
+  field: string;
+  type?: string;
+  value: string;
+  onChange: (v: string) => void;
+  onVoice: () => void;
+  voiceActive: boolean;
+  speechSupported: boolean;
+  [k: string]: any;
+}) {
+  return (
+    <div className="flex gap-2">
+      <Input type={type} value={value} onChange={(e) => onChange(e.target.value)} {...rest} />
+      {speechSupported && (
+        <Button
+          type="button" size="icon" variant={voiceActive ? "default" : "outline"}
+          className="h-9 w-9 shrink-0"
+          onClick={onVoice}
+          title="Ditar por voz"
+        >
+          {voiceActive ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+        </Button>
+      )}
+    </div>
+  );
+}
+
 function ClientesPage() {
   const { clinicaAtual } = useClinica();
   const [items, setItems] = useState<Paciente[]>([]);
