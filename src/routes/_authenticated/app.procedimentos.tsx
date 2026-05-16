@@ -715,14 +715,24 @@ function ProcedimentosPage() {
               <p className="text-xs font-medium text-muted-foreground uppercase">Valores por forma de pagamento</p>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label>Dinheiro / Pix (R$)</Label>
-                  <Input type="number" step="0.01" min="0" value={form.valor_dinheiro_pix}
-                    onChange={(e) => setForm({ ...form, valor_dinheiro_pix: e.target.value })} />
+                  <Label>Dinheiro (R$)</Label>
+                  <Input type="number" step="0.01" min="0" value={form.valor_dinheiro}
+                    onChange={(e) => setForm({ ...form, valor_dinheiro: e.target.value })} />
                 </div>
                 <div className="space-y-1">
-                  <Label>Cartão Crédito / Débito (R$)</Label>
-                  <Input type="number" step="0.01" min="0" value={form.valor_cartao}
-                    onChange={(e) => setForm({ ...form, valor_cartao: e.target.value })} />
+                  <Label>Pix (R$)</Label>
+                  <Input type="number" step="0.01" min="0" value={form.valor_pix}
+                    onChange={(e) => setForm({ ...form, valor_pix: e.target.value })} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Cartão de Crédito (R$)</Label>
+                  <Input type="number" step="0.01" min="0" value={form.valor_cartao_credito}
+                    onChange={(e) => setForm({ ...form, valor_cartao_credito: e.target.value })} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Cartão de Débito (R$)</Label>
+                  <Input type="number" step="0.01" min="0" value={form.valor_cartao_debito}
+                    onChange={(e) => setForm({ ...form, valor_cartao_debito: e.target.value })} />
                 </div>
                 <div className="space-y-1">
                   <Label>Cartão Consulta (R$)</Label>
