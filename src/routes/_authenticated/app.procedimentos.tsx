@@ -751,6 +751,18 @@ function ProcedimentosPage() {
               <Label>Observações</Label>
               <Textarea rows={2} value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} />
             </div>
+            <div className="space-y-1">
+              <Label>Preparo do exame</Label>
+              <Textarea
+                rows={3}
+                placeholder="Ex.: Jejum de 8h. Trazer pedido médico. Suspender medicamentos X..."
+                value={form.preparo}
+                onChange={(e) => setForm({ ...form, preparo: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground">
+                Aparece na Consulta Rápida e a Nina responde quando perguntarem sobre o preparo.
+              </p>
+            </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
               <Button type="submit" disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
