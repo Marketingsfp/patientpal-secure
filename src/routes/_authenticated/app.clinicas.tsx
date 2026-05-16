@@ -108,12 +108,12 @@ function ClinicasPage() {
           <h1 className="text-2xl font-semibold">Clínicas</h1>
           <p className="text-sm text-muted-foreground">Gerencie suas unidades</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (!next) resetForm(); }}>
           <DialogTrigger asChild>
-            <Button><Plus className="h-4 w-4 mr-2" /> Nova clínica</Button>
+            <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" /> Nova clínica</Button>
           </DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>Nova clínica</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{editingId ? "Editar clínica" : "Nova clínica"}</DialogTitle></DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label>Nome *</Label>
@@ -140,7 +140,7 @@ function ClinicasPage() {
                 </div>
               </div>
               <DialogFooter>
-                <Button type="submit" disabled={loading}>{loading ? "Criando..." : "Criar"}</Button>
+                <Button type="submit" disabled={loading}>{loading ? "Salvando..." : editingId ? "Salvar" : "Criar"}</Button>
               </DialogFooter>
             </form>
           </DialogContent>
@@ -154,7 +154,7 @@ function ClinicasPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {memberships.map((m) => (
-            <Card key={m.id}>
+            <Card key={m.id} className="transition-shadow hover:shadow-md">
               <CardContent className="pt-6">
                 <div className="flex items-start gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
@@ -169,6 +169,14 @@ function ClinicasPage() {
                     )}
                     <Badge variant="secondary" className="mt-2 capitalize">{m.role}</Badge>
                   </div>
+                </div>
+                <div className="mt-5 flex gap-2">
+                  <Button className="flex-1" variant="secondary" onClick={() => selectClinica(m.clinica_id)}>
+                    <CheckCircle2 className="h-4 w-4 mr-2" /> Selecionar
+                  </Button>
+                  <Button variant="outline" onClick={() => openEdit(m.clinica_id)} disabled={loading}>
+                    <Pencil className="h-4 w-4 mr-2" /> Editar
+                  </Button>
                 </div>
               </CardContent>
             </Card>
