@@ -81,8 +81,7 @@ function AgendaPage() {
   const [filtroDiaSemana, setFiltroDiaSemana] = useState<string>("todos");
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [filtroCliente, setFiltroCliente] = useState("");
-  const [horaDe, setHoraDe] = useState("");
-  const [horaAte, setHoraAte] = useState("");
+  const [filtroFicha, setFiltroFicha] = useState("");
   const [page, setPage] = useState(1);
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [items, setItems] = useState<Agendamento[]>([]);
@@ -158,17 +157,9 @@ function AgendaPage() {
         const set = medicoEspec.get(a.medico_id);
         if (!set || !set.has(filtroEspecialidade)) return false;
       }
-      if (horaDe) {
-        const h = new Date(a.inicio).toTimeString().slice(0, 5);
-        if (h < horaDe) return false;
-      }
-      if (horaAte) {
-        const h = new Date(a.inicio).toTimeString().slice(0, 5);
-        if (h > horaAte) return false;
-      }
       return true;
     });
-  }, [items, filtroMedico, filtroStatus, filtroCliente, filtroDiaSemana, filtroEspecialidade, horaDe, horaAte, medicoEspec]);
+  }, [items, filtroMedico, filtroStatus, filtroCliente, filtroDiaSemana, filtroEspecialidade, medicoEspec]);
 
   const totais = useMemo(() => ({
     total: filtrados.length,
@@ -181,7 +172,7 @@ function AgendaPage() {
 
   const limparFiltros = () => {
     setFiltroMedico("todos"); setFiltroEspecialidade("todos"); setFiltroDiaSemana("todos");
-    setFiltroStatus("todos"); setFiltroCliente(""); setHoraDe(""); setHoraAte("");
+    setFiltroStatus("todos"); setFiltroCliente(""); setFiltroFicha("");
   };
 
   const toggleSel = (id: string) => {
@@ -387,12 +378,8 @@ function AgendaPage() {
             <Input value={filtroCliente} onChange={(e) => setFiltroCliente(e.target.value)} placeholder="Buscar paciente…" />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Hora de</Label>
-            <Input type="time" value={horaDe} onChange={(e) => setHoraDe(e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Hora até</Label>
-            <Input type="time" value={horaAte} onChange={(e) => setHoraAte(e.target.value)} />
+            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Nº Ficha</Label>
+            <Input value={filtroFicha} onChange={(e) => setFiltroFicha(e.target.value.replace(/\D/g, ""))} placeholder="Ex.: 001" inputMode="numeric" />
           </div>
           <div className="space-y-1">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Especialidade</Label>
