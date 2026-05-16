@@ -65,8 +65,7 @@ const TIPO_COR: Record<Tipo, string> = {
 
 const EMPTY = {
   nome: "", grupo: "", tipo: "exame" as Tipo, codigo: "",
-  valor_dinheiro: "0", valor_pix: "0",
-  valor_cartao_credito: "0", valor_cartao_debito: "0",
+  valor_dinheiro: "0", valor_pix_cartao: "0",
   valor_cartao_consulta: "0", valor_cartao_desconto: "0",
   duracao_minutos: "30", observacoes: "", ativo: true,
 };
@@ -360,9 +359,9 @@ function ProcedimentosPage() {
     setForm({
       nome: p.nome, grupo: p.grupo ?? "", tipo: p.tipo, codigo: p.codigo ?? "",
       valor_dinheiro: String(p.valor_dinheiro ?? p.valor_dinheiro_pix ?? p.valor_padrao ?? 0),
-      valor_pix: String(p.valor_pix ?? p.valor_dinheiro_pix ?? p.valor_padrao ?? 0),
-      valor_cartao_credito: String(p.valor_cartao_credito ?? p.valor_cartao ?? 0),
-      valor_cartao_debito: String(p.valor_cartao_debito ?? p.valor_cartao ?? 0),
+      valor_pix_cartao: String(
+        p.valor_pix ?? p.valor_cartao_credito ?? p.valor_cartao_debito ?? p.valor_cartao ?? 0
+      ),
       valor_cartao_consulta: String(p.valor_cartao_consulta ?? 0),
       valor_cartao_desconto: String(p.valor_cartao_desconto ?? 0),
       duracao_minutos: String(p.duracao_minutos), observacoes: p.observacoes ?? "", ativo: p.ativo,
@@ -376,9 +375,7 @@ function ProcedimentosPage() {
     if (!form.nome.trim()) { toast.error("Informe o nome."); return; }
     setSaving(true);
     const vDinheiro = Number(form.valor_dinheiro) || 0;
-    const vPix = Number(form.valor_pix) || 0;
-    const vCredito = Number(form.valor_cartao_credito) || 0;
-    const vDebito = Number(form.valor_cartao_debito) || 0;
+    const vPixCartao = Number(form.valor_pix_cartao) || 0;
     const payload = {
       clinica_id: clinicaAtual.clinica_id,
       nome: form.nome.trim(),
@@ -387,11 +384,11 @@ function ProcedimentosPage() {
       codigo: form.codigo.trim() || null,
       valor_padrao: vDinheiro, // mantém compatibilidade com agenda/financeiro
       valor_dinheiro: vDinheiro,
-      valor_pix: vPix,
+      valor_pix: vPixCartao,
       valor_dinheiro_pix: vDinheiro, // legado
-      valor_cartao_credito: vCredito,
-      valor_cartao_debito: vDebito,
-      valor_cartao: vCredito, // legado
+      valor_cartao_credito: vPixCartao,
+      valor_cartao_debito: vPixCartao,
+      valor_cartao: vPixCartao, // legado
       valor_cartao_consulta: Number(form.valor_cartao_consulta) || 0,
       valor_cartao_desconto: Number(form.valor_cartao_desconto) || 0,
       duracao_minutos: Math.max(0, Number(form.duracao_minutos) || 0),
@@ -581,9 +578,7 @@ function ProcedimentosPage() {
                   <TableHead className="w-44">Grupo</TableHead>
                   <TableHead className="w-24">Tipo</TableHead>
                   <TableHead className="w-24 text-right">Dinheiro</TableHead>
-                  <TableHead className="w-24 text-right">Pix</TableHead>
-                  <TableHead className="w-24 text-right">Crédito</TableHead>
-                  <TableHead className="w-24 text-right">Débito</TableHead>
+                  <TableHead className="w-32 text-right">Pix / Crédito / Débito</TableHead>
                   <TableHead className="w-24 text-right">C. Consulta</TableHead>
                   <TableHead className="w-24 text-right">C. Desconto</TableHead>
                   <TableHead className="w-24">Situação</TableHead>
@@ -605,9 +600,7 @@ function ProcedimentosPage() {
                       <span className={`text-xs px-2 py-0.5 rounded-full ${TIPO_COR[p.tipo]}`}>{TIPO_LABEL[p.tipo]}</span>
                     </TableCell>
                     <TableCell className="text-right text-sm">{fmtBRL(Number(p.valor_dinheiro ?? p.valor_dinheiro_pix))}</TableCell>
-                    <TableCell className="text-right text-sm">{fmtBRL(Number(p.valor_pix ?? p.valor_dinheiro_pix))}</TableCell>
-                    <TableCell className="text-right text-sm">{fmtBRL(Number(p.valor_cartao_credito ?? p.valor_cartao))}</TableCell>
-                    <TableCell className="text-right text-sm">{fmtBRL(Number(p.valor_cartao_debito ?? p.valor_cartao))}</TableCell>
+                    <TableCell className="text-right text-sm">{fmtBRL(Number(p.valor_pix ?? p.valor_cartao_credito ?? p.valor_cartao))}</TableCell>
                     <TableCell className="text-right text-sm">{fmtBRL(Number(p.valor_cartao_consulta))}</TableCell>
                     <TableCell className="text-right text-sm">{fmtBRL(Number(p.valor_cartao_desconto))}</TableCell>
                     <TableCell>
@@ -724,19 +717,9 @@ function ProcedimentosPage() {
                     onChange={(e) => setForm({ ...form, valor_dinheiro: e.target.value })} />
                 </div>
                 <div className="space-y-1">
-                  <Label>Pix (R$)</Label>
-                  <Input type="number" step="0.01" min="0" value={form.valor_pix}
-                    onChange={(e) => setForm({ ...form, valor_pix: e.target.value })} />
-                </div>
-                <div className="space-y-1">
-                  <Label>Cartão de Crédito (R$)</Label>
-                  <Input type="number" step="0.01" min="0" value={form.valor_cartao_credito}
-                    onChange={(e) => setForm({ ...form, valor_cartao_credito: e.target.value })} />
-                </div>
-                <div className="space-y-1">
-                  <Label>Cartão de Débito (R$)</Label>
-                  <Input type="number" step="0.01" min="0" value={form.valor_cartao_debito}
-                    onChange={(e) => setForm({ ...form, valor_cartao_debito: e.target.value })} />
+                  <Label>Pix / Crédito / Débito (R$)</Label>
+                  <Input type="number" step="0.01" min="0" value={form.valor_pix_cartao}
+                    onChange={(e) => setForm({ ...form, valor_pix_cartao: e.target.value })} />
                 </div>
                 <div className="space-y-1">
                   <Label>Cartão Consulta (R$)</Label>
