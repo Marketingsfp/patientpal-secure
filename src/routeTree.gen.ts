@@ -21,6 +21,7 @@ import { Route as AuthenticatedAppRecepcaoRouteImport } from './routes/_authenti
 import { Route as AuthenticatedAppRateioRouteImport } from './routes/_authenticated/app.rateio'
 import { Route as AuthenticatedAppProntuariosRouteImport } from './routes/_authenticated/app.prontuarios'
 import { Route as AuthenticatedAppProcedimentosRouteImport } from './routes/_authenticated/app.procedimentos'
+import { Route as AuthenticatedAppNfseRouteImport } from './routes/_authenticated/app.nfse'
 import { Route as AuthenticatedAppModelosDocumentosRouteImport } from './routes/_authenticated/app.modelos-documentos'
 import { Route as AuthenticatedAppMedicosRouteImport } from './routes/_authenticated/app.medicos'
 import { Route as AuthenticatedAppFinanceiroRouteImport } from './routes/_authenticated/app.financeiro'
@@ -109,6 +110,11 @@ const AuthenticatedAppProcedimentosRoute =
     path: '/procedimentos',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
+const AuthenticatedAppNfseRoute = AuthenticatedAppNfseRouteImport.update({
+  id: '/nfse',
+  path: '/nfse',
+  getParentRoute: () => AuthenticatedAppRoute,
+} as any)
 const AuthenticatedAppModelosDocumentosRoute =
   AuthenticatedAppModelosDocumentosRouteImport.update({
     id: '/modelos-documentos',
@@ -273,6 +279,7 @@ export interface FileRoutesByFullPath {
   '/app/financeiro': typeof AuthenticatedAppFinanceiroRouteWithChildren
   '/app/medicos': typeof AuthenticatedAppMedicosRoute
   '/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
+  '/app/nfse': typeof AuthenticatedAppNfseRoute
   '/app/procedimentos': typeof AuthenticatedAppProcedimentosRoute
   '/app/prontuarios': typeof AuthenticatedAppProntuariosRoute
   '/app/rateio': typeof AuthenticatedAppRateioRoute
@@ -309,6 +316,7 @@ export interface FileRoutesByTo {
   '/app/estoque': typeof AuthenticatedAppEstoqueRoute
   '/app/medicos': typeof AuthenticatedAppMedicosRoute
   '/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
+  '/app/nfse': typeof AuthenticatedAppNfseRoute
   '/app/procedimentos': typeof AuthenticatedAppProcedimentosRoute
   '/app/prontuarios': typeof AuthenticatedAppProntuariosRoute
   '/app/rateio': typeof AuthenticatedAppRateioRoute
@@ -349,6 +357,7 @@ export interface FileRoutesById {
   '/_authenticated/app/financeiro': typeof AuthenticatedAppFinanceiroRouteWithChildren
   '/_authenticated/app/medicos': typeof AuthenticatedAppMedicosRoute
   '/_authenticated/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
+  '/_authenticated/app/nfse': typeof AuthenticatedAppNfseRoute
   '/_authenticated/app/procedimentos': typeof AuthenticatedAppProcedimentosRoute
   '/_authenticated/app/prontuarios': typeof AuthenticatedAppProntuariosRoute
   '/_authenticated/app/rateio': typeof AuthenticatedAppRateioRoute
@@ -389,6 +398,7 @@ export interface FileRouteTypes {
     | '/app/financeiro'
     | '/app/medicos'
     | '/app/modelos-documentos'
+    | '/app/nfse'
     | '/app/procedimentos'
     | '/app/prontuarios'
     | '/app/rateio'
@@ -425,6 +435,7 @@ export interface FileRouteTypes {
     | '/app/estoque'
     | '/app/medicos'
     | '/app/modelos-documentos'
+    | '/app/nfse'
     | '/app/procedimentos'
     | '/app/prontuarios'
     | '/app/rateio'
@@ -464,6 +475,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/financeiro'
     | '/_authenticated/app/medicos'
     | '/_authenticated/app/modelos-documentos'
+    | '/_authenticated/app/nfse'
     | '/_authenticated/app/procedimentos'
     | '/_authenticated/app/prontuarios'
     | '/_authenticated/app/rateio'
@@ -578,6 +590,13 @@ declare module '@tanstack/react-router' {
       path: '/procedimentos'
       fullPath: '/app/procedimentos'
       preLoaderRoute: typeof AuthenticatedAppProcedimentosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/nfse': {
+      id: '/_authenticated/app/nfse'
+      path: '/nfse'
+      fullPath: '/app/nfse'
+      preLoaderRoute: typeof AuthenticatedAppNfseRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/modelos-documentos': {
@@ -821,6 +840,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppFinanceiroRoute: typeof AuthenticatedAppFinanceiroRouteWithChildren
   AuthenticatedAppMedicosRoute: typeof AuthenticatedAppMedicosRoute
   AuthenticatedAppModelosDocumentosRoute: typeof AuthenticatedAppModelosDocumentosRoute
+  AuthenticatedAppNfseRoute: typeof AuthenticatedAppNfseRoute
   AuthenticatedAppProcedimentosRoute: typeof AuthenticatedAppProcedimentosRoute
   AuthenticatedAppProntuariosRoute: typeof AuthenticatedAppProntuariosRoute
   AuthenticatedAppRateioRoute: typeof AuthenticatedAppRateioRoute
@@ -841,6 +861,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppMedicosRoute: AuthenticatedAppMedicosRoute,
   AuthenticatedAppModelosDocumentosRoute:
     AuthenticatedAppModelosDocumentosRoute,
+  AuthenticatedAppNfseRoute: AuthenticatedAppNfseRoute,
   AuthenticatedAppProcedimentosRoute: AuthenticatedAppProcedimentosRoute,
   AuthenticatedAppProntuariosRoute: AuthenticatedAppProntuariosRoute,
   AuthenticatedAppRateioRoute: AuthenticatedAppRateioRoute,
