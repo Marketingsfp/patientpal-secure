@@ -1633,9 +1633,13 @@ export type Database = {
           updated_at: string
           valor_cartao: number
           valor_cartao_consulta: number
+          valor_cartao_credito: number
+          valor_cartao_debito: number
           valor_cartao_desconto: number
+          valor_dinheiro: number
           valor_dinheiro_pix: number
           valor_padrao: number
+          valor_pix: number
         }
         Insert: {
           ativo?: boolean
@@ -1651,9 +1655,13 @@ export type Database = {
           updated_at?: string
           valor_cartao?: number
           valor_cartao_consulta?: number
+          valor_cartao_credito?: number
+          valor_cartao_debito?: number
           valor_cartao_desconto?: number
+          valor_dinheiro?: number
           valor_dinheiro_pix?: number
           valor_padrao?: number
+          valor_pix?: number
         }
         Update: {
           ativo?: boolean
@@ -1669,9 +1677,13 @@ export type Database = {
           updated_at?: string
           valor_cartao?: number
           valor_cartao_consulta?: number
+          valor_cartao_credito?: number
+          valor_cartao_debito?: number
           valor_cartao_desconto?: number
+          valor_dinheiro?: number
           valor_dinheiro_pix?: number
           valor_padrao?: number
+          valor_pix?: number
         }
         Relationships: []
       }
