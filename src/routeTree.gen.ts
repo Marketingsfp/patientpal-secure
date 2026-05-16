@@ -31,6 +31,7 @@ import { Route as AuthenticatedAppEquipeRouteImport } from './routes/_authentica
 import { Route as AuthenticatedAppDocumentosRouteImport } from './routes/_authenticated/app.documentos'
 import { Route as AuthenticatedAppDisponibilidadesRouteImport } from './routes/_authenticated/app.disponibilidades'
 import { Route as AuthenticatedAppCrmRouteImport } from './routes/_authenticated/app.crm'
+import { Route as AuthenticatedAppConsultaRapidaRouteImport } from './routes/_authenticated/app.consulta-rapida'
 import { Route as AuthenticatedAppClinicasRouteImport } from './routes/_authenticated/app.clinicas'
 import { Route as AuthenticatedAppClientesRouteImport } from './routes/_authenticated/app.clientes'
 import { Route as AuthenticatedAppCampanhasRouteImport } from './routes/_authenticated/app.campanhas'
@@ -168,6 +169,12 @@ const AuthenticatedAppCrmRoute = AuthenticatedAppCrmRouteImport.update({
   path: '/crm',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
+const AuthenticatedAppConsultaRapidaRoute =
+  AuthenticatedAppConsultaRapidaRouteImport.update({
+    id: '/consulta-rapida',
+    path: '/consulta-rapida',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppClinicasRoute =
   AuthenticatedAppClinicasRouteImport.update({
     id: '/clinicas',
@@ -300,6 +307,7 @@ export interface FileRoutesByFullPath {
   '/app/campanhas': typeof AuthenticatedAppCampanhasRoute
   '/app/clientes': typeof AuthenticatedAppClientesRoute
   '/app/clinicas': typeof AuthenticatedAppClinicasRoute
+  '/app/consulta-rapida': typeof AuthenticatedAppConsultaRapidaRoute
   '/app/crm': typeof AuthenticatedAppCrmRoute
   '/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
   '/app/documentos': typeof AuthenticatedAppDocumentosRoute
@@ -342,6 +350,7 @@ export interface FileRoutesByTo {
   '/app/campanhas': typeof AuthenticatedAppCampanhasRoute
   '/app/clientes': typeof AuthenticatedAppClientesRoute
   '/app/clinicas': typeof AuthenticatedAppClinicasRoute
+  '/app/consulta-rapida': typeof AuthenticatedAppConsultaRapidaRoute
   '/app/crm': typeof AuthenticatedAppCrmRoute
   '/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
   '/app/documentos': typeof AuthenticatedAppDocumentosRoute
@@ -386,6 +395,7 @@ export interface FileRoutesById {
   '/_authenticated/app/campanhas': typeof AuthenticatedAppCampanhasRoute
   '/_authenticated/app/clientes': typeof AuthenticatedAppClientesRoute
   '/_authenticated/app/clinicas': typeof AuthenticatedAppClinicasRoute
+  '/_authenticated/app/consulta-rapida': typeof AuthenticatedAppConsultaRapidaRoute
   '/_authenticated/app/crm': typeof AuthenticatedAppCrmRoute
   '/_authenticated/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
   '/_authenticated/app/documentos': typeof AuthenticatedAppDocumentosRoute
@@ -431,6 +441,7 @@ export interface FileRouteTypes {
     | '/app/campanhas'
     | '/app/clientes'
     | '/app/clinicas'
+    | '/app/consulta-rapida'
     | '/app/crm'
     | '/app/disponibilidades'
     | '/app/documentos'
@@ -473,6 +484,7 @@ export interface FileRouteTypes {
     | '/app/campanhas'
     | '/app/clientes'
     | '/app/clinicas'
+    | '/app/consulta-rapida'
     | '/app/crm'
     | '/app/disponibilidades'
     | '/app/documentos'
@@ -516,6 +528,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/campanhas'
     | '/_authenticated/app/clientes'
     | '/_authenticated/app/clinicas'
+    | '/_authenticated/app/consulta-rapida'
     | '/_authenticated/app/crm'
     | '/_authenticated/app/disponibilidades'
     | '/_authenticated/app/documentos'
@@ -710,6 +723,13 @@ declare module '@tanstack/react-router' {
       path: '/crm'
       fullPath: '/app/crm'
       preLoaderRoute: typeof AuthenticatedAppCrmRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/consulta-rapida': {
+      id: '/_authenticated/app/consulta-rapida'
+      path: '/consulta-rapida'
+      fullPath: '/app/consulta-rapida'
+      preLoaderRoute: typeof AuthenticatedAppConsultaRapidaRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/clinicas': {
@@ -913,6 +933,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppCampanhasRoute: typeof AuthenticatedAppCampanhasRoute
   AuthenticatedAppClientesRoute: typeof AuthenticatedAppClientesRoute
   AuthenticatedAppClinicasRoute: typeof AuthenticatedAppClinicasRoute
+  AuthenticatedAppConsultaRapidaRoute: typeof AuthenticatedAppConsultaRapidaRoute
   AuthenticatedAppCrmRoute: typeof AuthenticatedAppCrmRoute
   AuthenticatedAppDisponibilidadesRoute: typeof AuthenticatedAppDisponibilidadesRoute
   AuthenticatedAppDocumentosRoute: typeof AuthenticatedAppDocumentosRoute
@@ -937,6 +958,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppCampanhasRoute: AuthenticatedAppCampanhasRoute,
   AuthenticatedAppClientesRoute: AuthenticatedAppClientesRoute,
   AuthenticatedAppClinicasRoute: AuthenticatedAppClinicasRoute,
+  AuthenticatedAppConsultaRapidaRoute: AuthenticatedAppConsultaRapidaRoute,
   AuthenticatedAppCrmRoute: AuthenticatedAppCrmRoute,
   AuthenticatedAppDisponibilidadesRoute: AuthenticatedAppDisponibilidadesRoute,
   AuthenticatedAppDocumentosRoute: AuthenticatedAppDocumentosRoute,
@@ -981,13 +1003,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

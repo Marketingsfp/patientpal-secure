@@ -1,6 +1,6 @@
 import { Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect } from "react";
-import { Activity, Building2, Users, Wallet, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock } from "lucide-react";
+import { Activity, Building2, Users, Wallet, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
@@ -23,6 +23,7 @@ const nav = [
   { to: "/app/clinicas", label: "Clínicas", icon: Building2 },
   { to: "/app/medicos", label: "Médicos", icon: Stethoscope },
   { to: "/app/disponibilidades", label: "Horários médicos", icon: Clock },
+  { to: "/app/consulta-rapida", label: "Consulta rápida", icon: BookOpen },
   { to: "/app/rateio", label: "Regras de rateio", icon: Wallet },
   { to: "/app/equipe", label: "Equipe", icon: Users },
 ] as const;
@@ -52,6 +53,7 @@ export function AppShell() {
       /prontu[áa]rio/.test(t) ? "/app/prontuarios" :
       /crm|lead|oportunidade/.test(t) ? "/app/crm" :
       /nina|whats|whatsapp|conversa/.test(t) ? "/app/nina" :
+      /consulta r[áa]pida|lembrete|valor|tabela|hor[áa]rio/.test(t) ? "/app/consulta-rapida" :
       /dashboard|in[íi]cio|home/.test(t) ? "/app" : null;
     if (route) {
       toast.success(`Abrindo: ${text}`);
