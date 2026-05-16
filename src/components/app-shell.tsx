@@ -11,6 +11,7 @@ const nav = [
   { to: "/app", label: "Dashboard", icon: LayoutDashboard },
   { to: "/app/recepcao", label: "Recepção / Filas", icon: Bell },
   { to: "/app/agenda", label: "Agenda", icon: CalendarDays },
+  { to: "/app/clientes", label: "Clientes", icon: Users },
   { to: "/app/financeiro", label: "Financeiro", icon: DollarSign },
   { to: "/app/clinicas", label: "Clínicas", icon: Building2 },
   { to: "/app/medicos", label: "Médicos", icon: Stethoscope },
