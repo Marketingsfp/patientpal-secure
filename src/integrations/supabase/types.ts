@@ -14,6 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      agendamentos: {
+        Row: {
+          clinica_id: string
+          created_at: string
+          criado_por: string | null
+          fim: string
+          id: string
+          inicio: string
+          medico_id: string | null
+          observacoes: string | null
+          paciente_id: string | null
+          paciente_nome: string
+          procedimento: string | null
+          status: Database["public"]["Enums"]["agendamento_status"]
+          updated_at: string
+        }
+        Insert: {
+          clinica_id: string
+          created_at?: string
+          criado_por?: string | null
+          fim: string
+          id?: string
+          inicio: string
+          medico_id?: string | null
+          observacoes?: string | null
+          paciente_id?: string | null
+          paciente_nome: string
+          procedimento?: string | null
+          status?: Database["public"]["Enums"]["agendamento_status"]
+          updated_at?: string
+        }
+        Update: {
+          clinica_id?: string
+          created_at?: string
+          criado_por?: string | null
+          fim?: string
+          id?: string
+          inicio?: string
+          medico_id?: string | null
+          observacoes?: string | null
+          paciente_id?: string | null
+          paciente_nome?: string
+          procedimento?: string | null
+          status?: Database["public"]["Enums"]["agendamento_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       clinica_memberships: {
         Row: {
           ativo: boolean
@@ -1049,6 +1097,12 @@ export type Database = {
       user_is_any_manager: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
+      agendamento_status:
+        | "agendado"
+        | "confirmado"
+        | "realizado"
+        | "cancelado"
+        | "faltou"
       app_role:
         | "admin"
         | "gestor"
@@ -1197,6 +1251,13 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      agendamento_status: [
+        "agendado",
+        "confirmado",
+        "realizado",
+        "cancelado",
+        "faltou",
+      ],
       app_role: [
         "admin",
         "gestor",
