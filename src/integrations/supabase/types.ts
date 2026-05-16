@@ -118,6 +118,479 @@ export type Database = {
         }
         Relationships: []
       }
+      fin_alertas: {
+        Row: {
+          clinica_id: string
+          created_at: string
+          data_alerta: string
+          id: string
+          lancamento_id: string | null
+          lido: boolean
+          mensagem: string
+          tipo_alerta: string
+        }
+        Insert: {
+          clinica_id: string
+          created_at?: string
+          data_alerta?: string
+          id?: string
+          lancamento_id?: string | null
+          lido?: boolean
+          mensagem: string
+          tipo_alerta: string
+        }
+        Update: {
+          clinica_id?: string
+          created_at?: string
+          data_alerta?: string
+          id?: string
+          lancamento_id?: string | null
+          lido?: boolean
+          mensagem?: string
+          tipo_alerta?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fin_alertas_lancamento_id_fkey"
+            columns: ["lancamento_id"]
+            isOneToOne: false
+            referencedRelation: "fin_lancamentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fin_atendimentos: {
+        Row: {
+          clinica_id: string
+          created_at: string
+          data: string
+          forma_pagamento: string | null
+          id: string
+          lancamento_id: string | null
+          medico_id: string | null
+          observacoes: string | null
+          paciente_id: string | null
+          procedimento: string | null
+          status: string
+          updated_at: string
+          valor_clinica: number
+          valor_medico: number
+          valor_total: number
+        }
+        Insert: {
+          clinica_id: string
+          created_at?: string
+          data?: string
+          forma_pagamento?: string | null
+          id?: string
+          lancamento_id?: string | null
+          medico_id?: string | null
+          observacoes?: string | null
+          paciente_id?: string | null
+          procedimento?: string | null
+          status?: string
+          updated_at?: string
+          valor_clinica?: number
+          valor_medico?: number
+          valor_total?: number
+        }
+        Update: {
+          clinica_id?: string
+          created_at?: string
+          data?: string
+          forma_pagamento?: string | null
+          id?: string
+          lancamento_id?: string | null
+          medico_id?: string | null
+          observacoes?: string | null
+          paciente_id?: string | null
+          procedimento?: string | null
+          status?: string
+          updated_at?: string
+          valor_clinica?: number
+          valor_medico?: number
+          valor_total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fin_atendimentos_lancamento_id_fkey"
+            columns: ["lancamento_id"]
+            isOneToOne: false
+            referencedRelation: "fin_lancamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fin_atendimentos_medico_id_fkey"
+            columns: ["medico_id"]
+            isOneToOne: false
+            referencedRelation: "medicos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fin_atendimentos_paciente_id_fkey"
+            columns: ["paciente_id"]
+            isOneToOne: false
+            referencedRelation: "pacientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fin_categorias: {
+        Row: {
+          ativo: boolean
+          clinica_id: string
+          cor: string
+          created_at: string
+          id: string
+          nome: string
+          tipo: Database["public"]["Enums"]["fin_tipo_lancamento"]
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          clinica_id: string
+          cor?: string
+          created_at?: string
+          id?: string
+          nome: string
+          tipo: Database["public"]["Enums"]["fin_tipo_lancamento"]
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          clinica_id?: string
+          cor?: string
+          created_at?: string
+          id?: string
+          nome?: string
+          tipo?: Database["public"]["Enums"]["fin_tipo_lancamento"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      fin_contas: {
+        Row: {
+          agencia: string | null
+          ativo: boolean
+          banco: string | null
+          clinica_id: string
+          conta: string | null
+          created_at: string
+          id: string
+          nome: string
+          saldo_inicial: number
+          tipo: Database["public"]["Enums"]["fin_tipo_conta"]
+          updated_at: string
+        }
+        Insert: {
+          agencia?: string | null
+          ativo?: boolean
+          banco?: string | null
+          clinica_id: string
+          conta?: string | null
+          created_at?: string
+          id?: string
+          nome: string
+          saldo_inicial?: number
+          tipo?: Database["public"]["Enums"]["fin_tipo_conta"]
+          updated_at?: string
+        }
+        Update: {
+          agencia?: string | null
+          ativo?: boolean
+          banco?: string | null
+          clinica_id?: string
+          conta?: string | null
+          created_at?: string
+          id?: string
+          nome?: string
+          saldo_inicial?: number
+          tipo?: Database["public"]["Enums"]["fin_tipo_conta"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      fin_empresas: {
+        Row: {
+          ativo: boolean
+          clinica_id: string
+          cnpj: string | null
+          created_at: string
+          email: string | null
+          id: string
+          nome: string
+          observacoes: string | null
+          telefone: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          clinica_id: string
+          cnpj?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          nome: string
+          observacoes?: string | null
+          telefone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          clinica_id?: string
+          cnpj?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          nome?: string
+          observacoes?: string | null
+          telefone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      fin_lancamentos: {
+        Row: {
+          categoria_id: string | null
+          clinica_id: string
+          conta_id: string | null
+          created_at: string
+          criado_por: string | null
+          data: string
+          data_vencimento: string | null
+          descricao: string
+          empresa_id: string | null
+          forma_pagamento: string | null
+          id: string
+          medico_id: string | null
+          observacoes: string | null
+          paciente_id: string | null
+          status: Database["public"]["Enums"]["fin_status_lancamento"]
+          tipo: Database["public"]["Enums"]["fin_tipo_lancamento"]
+          updated_at: string
+          valor: number
+        }
+        Insert: {
+          categoria_id?: string | null
+          clinica_id: string
+          conta_id?: string | null
+          created_at?: string
+          criado_por?: string | null
+          data?: string
+          data_vencimento?: string | null
+          descricao: string
+          empresa_id?: string | null
+          forma_pagamento?: string | null
+          id?: string
+          medico_id?: string | null
+          observacoes?: string | null
+          paciente_id?: string | null
+          status?: Database["public"]["Enums"]["fin_status_lancamento"]
+          tipo: Database["public"]["Enums"]["fin_tipo_lancamento"]
+          updated_at?: string
+          valor: number
+        }
+        Update: {
+          categoria_id?: string | null
+          clinica_id?: string
+          conta_id?: string | null
+          created_at?: string
+          criado_por?: string | null
+          data?: string
+          data_vencimento?: string | null
+          descricao?: string
+          empresa_id?: string | null
+          forma_pagamento?: string | null
+          id?: string
+          medico_id?: string | null
+          observacoes?: string | null
+          paciente_id?: string | null
+          status?: Database["public"]["Enums"]["fin_status_lancamento"]
+          tipo?: Database["public"]["Enums"]["fin_tipo_lancamento"]
+          updated_at?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fin_lancamentos_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "fin_categorias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fin_lancamentos_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "fin_contas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fin_lancamentos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "fin_empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fin_lancamentos_medico_id_fkey"
+            columns: ["medico_id"]
+            isOneToOne: false
+            referencedRelation: "medicos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fin_lancamentos_paciente_id_fkey"
+            columns: ["paciente_id"]
+            isOneToOne: false
+            referencedRelation: "pacientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fin_lembretes: {
+        Row: {
+          clinica_id: string
+          concluido: boolean
+          created_at: string
+          data_lembrete: string
+          descricao: string | null
+          id: string
+          prioridade: string
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          clinica_id: string
+          concluido?: boolean
+          created_at?: string
+          data_lembrete: string
+          descricao?: string | null
+          id?: string
+          prioridade?: string
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          clinica_id?: string
+          concluido?: boolean
+          created_at?: string
+          data_lembrete?: string
+          descricao?: string | null
+          id?: string
+          prioridade?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      fin_notas_pacientes: {
+        Row: {
+          clinica_id: string
+          created_at: string
+          data_emissao: string
+          id: string
+          lancamento_id: string | null
+          numero: string | null
+          observacoes: string | null
+          paciente_id: string | null
+          serie: string | null
+          status: string
+          updated_at: string
+          url_pdf: string | null
+          valor: number
+        }
+        Insert: {
+          clinica_id: string
+          created_at?: string
+          data_emissao?: string
+          id?: string
+          lancamento_id?: string | null
+          numero?: string | null
+          observacoes?: string | null
+          paciente_id?: string | null
+          serie?: string | null
+          status?: string
+          updated_at?: string
+          url_pdf?: string | null
+          valor?: number
+        }
+        Update: {
+          clinica_id?: string
+          created_at?: string
+          data_emissao?: string
+          id?: string
+          lancamento_id?: string | null
+          numero?: string | null
+          observacoes?: string | null
+          paciente_id?: string | null
+          serie?: string | null
+          status?: string
+          updated_at?: string
+          url_pdf?: string | null
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fin_notas_pacientes_lancamento_id_fkey"
+            columns: ["lancamento_id"]
+            isOneToOne: false
+            referencedRelation: "fin_lancamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fin_notas_pacientes_paciente_id_fkey"
+            columns: ["paciente_id"]
+            isOneToOne: false
+            referencedRelation: "pacientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fin_regras_ia: {
+        Row: {
+          ativo: boolean
+          categoria_id: string | null
+          clinica_id: string
+          created_at: string
+          id: string
+          nome: string
+          padrao_descricao: string | null
+          prioridade: number
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          categoria_id?: string | null
+          clinica_id: string
+          created_at?: string
+          id?: string
+          nome: string
+          padrao_descricao?: string | null
+          prioridade?: number
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          categoria_id?: string | null
+          clinica_id?: string
+          created_at?: string
+          id?: string
+          nome?: string
+          padrao_descricao?: string | null
+          prioridade?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fin_regras_ia_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "fin_categorias"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       medicos: {
         Row: {
           ativo: boolean
@@ -544,6 +1017,9 @@ export type Database = {
         | "enfermeiro"
         | "recepcao"
         | "financeiro"
+      fin_status_lancamento: "pendente" | "confirmado" | "cancelado"
+      fin_tipo_conta: "caixa" | "banco" | "cartao" | "maquininha" | "outro"
+      fin_tipo_lancamento: "receita" | "despesa"
       forma_pagamento:
         | "dinheiro"
         | "pix"
@@ -690,6 +1166,9 @@ export const Constants = {
         "recepcao",
         "financeiro",
       ],
+      fin_status_lancamento: ["pendente", "confirmado", "cancelado"],
+      fin_tipo_conta: ["caixa", "banco", "cartao", "maquininha", "outro"],
+      fin_tipo_lancamento: ["receita", "despesa"],
       forma_pagamento: [
         "dinheiro",
         "pix",
