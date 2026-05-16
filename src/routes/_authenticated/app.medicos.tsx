@@ -16,6 +16,7 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export const Route = createFileRoute("/_authenticated/app/medicos")({
   component: MedicosPage,
@@ -28,6 +29,12 @@ interface Medico {
   valor_repasse_padrao: number | null;
   tipo_repasse: "percentual" | "valor";
   ativo: boolean;
+  cpf?: string | null; rg?: string | null; data_nascimento?: string | null;
+  email?: string | null; telefone?: string | null;
+  nacionalidade?: string | null; estado_civil?: string | null;
+  cep?: string | null; logradouro?: string | null; numero?: string | null;
+  complemento?: string | null; bairro?: string | null; cidade?: string | null; estado?: string | null;
+  banco?: string | null; agencia?: string | null; conta?: string | null; pix_chave?: string | null;
   medico_especialidades: { especialidade: { id: string; nome: string } | null }[];
 }
 interface Especialidade { id: string; nome: string }
@@ -47,13 +54,17 @@ function MedicosPage() {
     tipo_repasse: "percentual" as "percentual" | "valor",
     percentual: "50",
     valor: "",
+    cpf: "", rg: "", data_nascimento: "", email: "", telefone: "",
+    nacionalidade: "Brasileira", estado_civil: "",
+    cep: "", logradouro: "", numero: "", complemento: "", bairro: "", cidade: "", estado: "",
+    banco: "", agencia: "", conta: "", pix_chave: "",
   });
 
   const load = async () => {
     if (!clinicaAtual) return;
     const { data } = await supabase
       .from("medicos")
-      .select("id, nome, crm, crm_uf, percentual_repasse_padrao, valor_repasse_padrao, tipo_repasse, ativo, medico_especialidades(especialidade:especialidades(id, nome))")
+      .select("id, nome, crm, crm_uf, percentual_repasse_padrao, valor_repasse_padrao, tipo_repasse, ativo, cpf, rg, data_nascimento, email, telefone, nacionalidade, estado_civil, cep, logradouro, numero, complemento, bairro, cidade, estado, banco, agencia, conta, pix_chave, medico_especialidades(especialidade:especialidades(id, nome))")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("nome");
     setMedicos((data as unknown as Medico[]) ?? []);
@@ -67,7 +78,14 @@ function MedicosPage() {
 
   const resetForm = () => {
     setEditId(null);
-    setForm({ nome: "", crm: "", crm_uf: "", especialidades: [], tipo_repasse: "percentual", percentual: "50", valor: "" });
+    setForm({
+      nome: "", crm: "", crm_uf: "", especialidades: [],
+      tipo_repasse: "percentual", percentual: "50", valor: "",
+      cpf: "", rg: "", data_nascimento: "", email: "", telefone: "",
+      nacionalidade: "Brasileira", estado_civil: "",
+      cep: "", logradouro: "", numero: "", complemento: "", bairro: "", cidade: "", estado: "",
+      banco: "", agencia: "", conta: "", pix_chave: "",
+    });
   };
 
   const openNew = () => {
@@ -85,6 +103,12 @@ function MedicosPage() {
       tipo_repasse: m.tipo_repasse,
       percentual: String(m.percentual_repasse_padrao ?? ""),
       valor: m.valor_repasse_padrao != null ? String(m.valor_repasse_padrao) : "",
+      cpf: m.cpf ?? "", rg: m.rg ?? "", data_nascimento: m.data_nascimento ?? "",
+      email: m.email ?? "", telefone: m.telefone ?? "",
+      nacionalidade: m.nacionalidade ?? "Brasileira", estado_civil: m.estado_civil ?? "",
+      cep: m.cep ?? "", logradouro: m.logradouro ?? "", numero: m.numero ?? "",
+      complemento: m.complemento ?? "", bairro: m.bairro ?? "", cidade: m.cidade ?? "", estado: m.estado ?? "",
+      banco: m.banco ?? "", agencia: m.agencia ?? "", conta: m.conta ?? "", pix_chave: m.pix_chave ?? "",
     });
     setOpen(true);
   };
@@ -102,6 +126,24 @@ function MedicosPage() {
       tipo_repasse: form.tipo_repasse,
       percentual_repasse_padrao: form.tipo_repasse === "percentual" ? parseFloat(form.percentual || "0") : 0,
       valor_repasse_padrao: form.tipo_repasse === "valor" ? parseFloat(form.valor || "0") : null,
+      cpf: form.cpf || null,
+      rg: form.rg || null,
+      data_nascimento: form.data_nascimento || null,
+      email: form.email || null,
+      telefone: form.telefone || null,
+      nacionalidade: form.nacionalidade || null,
+      estado_civil: form.estado_civil || null,
+      cep: form.cep || null,
+      logradouro: form.logradouro || null,
+      numero: form.numero || null,
+      complemento: form.complemento || null,
+      bairro: form.bairro || null,
+      cidade: form.cidade || null,
+      estado: form.estado ? form.estado.toUpperCase() : null,
+      banco: form.banco || null,
+      agencia: form.agencia || null,
+      conta: form.conta || null,
+      pix_chave: form.pix_chave || null,
     };
     let medicoId = editId;
     if (editId) {
