@@ -53,6 +53,7 @@ export function AppShell() {
       /prontu[áa]rio/.test(t) ? "/app/prontuarios" :
       /crm|lead|oportunidade/.test(t) ? "/app/crm" :
       /nina|whats|whatsapp|conversa/.test(t) ? "/app/nina" :
+      /consulta r[áa]pida|lembrete|valor|tabela|hor[áa]rio/.test(t) ? "/app/consulta-rapida" :
       /dashboard|in[íi]cio|home/.test(t) ? "/app" : null;
     if (route) {
       toast.success(`Abrindo: ${text}`);
