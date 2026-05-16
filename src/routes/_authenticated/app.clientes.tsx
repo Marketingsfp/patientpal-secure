@@ -220,8 +220,15 @@ function ClientesPage() {
     r.continuous = false;
     r.interimResults = false;
     r.onresult = (e: any) => {
-      const text = e.results[0][0].transcript as string;
-      setForm(f => ({ ...f, [field]: (f[field] ? f[field] + " " : "") + text } as FormState));
+      const raw = e.results[0][0].transcript as string;
+      const text = normalizarFala(field as string, raw);
+      setForm(f => {
+        const cur = (f[field] as string) ?? "";
+        const sep = cur && field !== "email" && field !== "cpf" && field !== "telefone" &&
+                    field !== "cep" && field !== "numero" &&
+                    field !== "responsavel_cpf" && field !== "responsavel_telefone" ? " " : "";
+        return { ...f, [field]: cur + sep + text } as FormState;
+      });
     };
     r.onerror = () => { toast.error("Erro no reconhecimento de voz."); setRecording(false); setVoiceField(null); };
     r.onend = () => { setRecording(false); setVoiceField(null); };
@@ -277,32 +284,17 @@ function ClientesPage() {
   const idade = calcIdade(form.data_nascimento);
   const sugerirResponsavel = idade !== null && (idade < 18 || idade >= 70);
 
-  const VoiceBtn = ({ field }: { field: keyof FormState }) => {
-    if (!speechSupported) return null;
+  const fieldProps = (field: keyof FormState) => {
     const active = recording && voiceField === field;
-    return (
-      <Button
-        type="button" size="icon" variant={active ? "default" : "outline"}
-        className="h-9 w-9 shrink-0"
-        onClick={() => active ? stopVoice() : startVoice(field)}
-        title="Ditar por voz"
-      >
-        {active ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-      </Button>
-    );
+    return {
+      field: field as string,
+      value: form[field] as string,
+      onChange: (v: string) => setForm(f => ({ ...f, [field]: v } as FormState)),
+      onVoice: () => active ? stopVoice() : startVoice(field),
+      voiceActive: active,
+      speechSupported,
+    };
   };
-
-  const InputVoz = ({ field, type = "text", ...rest }: { field: keyof FormState; type?: string; [k: string]: any }) => (
-    <div className="flex gap-2">
-      <Input
-        type={type}
-        value={form[field] as string}
-        onChange={(e) => setForm({ ...form, [field]: e.target.value } as FormState)}
-        {...rest}
-      />
-      <VoiceBtn field={field} />
-    </div>
-  );
 
   return (
     <div className="space-y-6">
