@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 import { Activity, Mail, Lock, Eye, EyeOff, ShieldCheck, CalendarCheck2, Stethoscope } from "lucide-react";
 import { toast } from "sonner";
@@ -9,10 +9,6 @@ import { Label } from "@/components/ui/label";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
-  beforeLoad: async () => {
-    const { data } = await supabase.auth.getSession();
-    if (data.session) throw redirect({ to: "/app" });
-  },
   head: () => ({ meta: [{ title: "Entrar — ClinicaOS" }] }),
 });
 
@@ -30,7 +26,7 @@ function LoginPage() {
     setLoading(false);
     if (error) { toast.error(error.message); return; }
     toast.success("Bem-vindo!");
-    navigate({ to: "/app" });
+    navigate({ to: "/app", replace: true });
   };
 
   return (
