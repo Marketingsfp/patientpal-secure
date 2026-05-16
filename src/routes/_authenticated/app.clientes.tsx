@@ -171,7 +171,10 @@ function ClientesPage() {
       p.nome.toLowerCase().includes(q) ||
       (p.cpf ?? "").toLowerCase().includes(q) ||
       (p.telefone ?? "").toLowerCase().includes(q) ||
-      (p.email ?? "").toLowerCase().includes(q)
+      (p.email ?? "").toLowerCase().includes(q) ||
+      (p.numero_pasta ?? "").toLowerCase().includes(q) ||
+      (p.data_nascimento ?? "").toLowerCase().includes(q) ||
+      (p.data_nascimento ? p.data_nascimento.split("-").reverse().join("/") : "").includes(q)
     );
   }, [items, busca]);
 
@@ -183,7 +186,8 @@ function ClientesPage() {
     setEditing(p);
     setForm({
       nome: paciente.nome,
-      cpf: paciente.cpf ?? "", telefone: paciente.telefone ?? "", email: paciente.email ?? "",
+      cpf: paciente.cpf ?? "", numero_pasta: paciente.numero_pasta ?? "",
+      telefone: paciente.telefone ?? "", email: paciente.email ?? "",
       data_nascimento: paciente.data_nascimento ?? "", ativo: paciente.ativo,
       cep: paciente.cep ?? "", logradouro: paciente.logradouro ?? "", numero: paciente.numero ?? "",
       complemento: paciente.complemento ?? "", bairro: paciente.bairro ?? "",
@@ -252,6 +256,7 @@ function ClientesPage() {
     const payload = {
       nome: form.nome.trim(),
       cpf: form.cpf.trim() || null,
+      numero_pasta: form.numero_pasta.trim() || null,
       telefone: form.telefone.trim() || null,
       email: form.email.trim() || null,
       data_nascimento: form.data_nascimento || null,
@@ -364,7 +369,7 @@ function ClientesPage() {
           <Input
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
-            placeholder="Buscar por nome, CPF, telefone ou e-mail…"
+            placeholder="Buscar por nº pasta, nome, CPF, telefone, e-mail ou nascimento (dd/mm/aaaa)…"
             className="pl-9"
           />
         </div>
