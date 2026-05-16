@@ -272,6 +272,14 @@ function MedicosPage() {
         </CardContent></Card>
       ) : (
         <Card>
+          <div className="p-3 border-b">
+            <Input
+              placeholder="Buscar por nome, CRM ou especialidade…"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              className="max-w-md"
+            />
+          </div>
           <Table>
             <TableHeader>
               <TableRow>
@@ -283,7 +291,7 @@ function MedicosPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {medicos.map((m) => (
+              {medicosFiltrados.map((m) => (
                 <TableRow key={m.id}>
                   <TableCell className="font-medium">{m.nome}</TableCell>
                   <TableCell>{m.crm}/{m.crm_uf}</TableCell>
