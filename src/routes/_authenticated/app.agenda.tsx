@@ -143,11 +143,21 @@ function AgendaPage() {
   useEffect(() => { loadRef(); }, [clinicaAtual?.clinica_id]);
   useEffect(() => { load(); }, [clinicaAtual?.clinica_id, dataRef, apenasData]);
 
+  const fichaPorId = useMemo(() => {
+    const m = new Map<string, string>();
+    items.forEach((a, i) => m.set(a.id, String(i + 1).padStart(3, "0")));
+    return m;
+  }, [items]);
+
   const filtrados = useMemo(() => {
     return items.filter((a) => {
       if (filtroMedico !== "todos" && a.medico_id !== filtroMedico) return false;
       if (filtroStatus !== "todos" && a.status !== filtroStatus) return false;
       if (filtroCliente && !a.paciente_nome.toLowerCase().includes(filtroCliente.toLowerCase())) return false;
+      if (filtroFicha) {
+        const f = fichaPorId.get(a.id) ?? "";
+        if (!f.includes(filtroFicha.padStart(Math.min(filtroFicha.length, 3), "0"))) return false;
+      }
       if (filtroDiaSemana !== "todos") {
         const d = new Date(a.inicio).getDay();
         if (String(d) !== filtroDiaSemana) return false;
@@ -159,7 +169,7 @@ function AgendaPage() {
       }
       return true;
     });
-  }, [items, filtroMedico, filtroStatus, filtroCliente, filtroDiaSemana, filtroEspecialidade, medicoEspec]);
+  }, [items, filtroMedico, filtroStatus, filtroCliente, filtroFicha, filtroDiaSemana, filtroEspecialidade, medicoEspec, fichaPorId]);
 
   const totais = useMemo(() => ({
     total: filtrados.length,
