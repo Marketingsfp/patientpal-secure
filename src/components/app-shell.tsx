@@ -96,7 +96,7 @@ export function AppShell() {
           </div>
           <span className="font-semibold tracking-tight">ClinicaOS</span>
         </div>
-        <nav className="flex-1 p-3 space-y-1">
+        <nav className="flex-1 p-3 space-y-1 font-sans">
           {nav.map((item) => {
             const active = location.pathname === item.to ||
               (item.to !== "/app" && location.pathname.startsWith(item.to));
@@ -104,10 +104,10 @@ export function AppShell() {
               <Link
                 key={item.to}
                 to={item.to}
-                className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
+                className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold tracking-wide transition-colors ${
                   active
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    ? "bg-[#14532d] text-white"
+                    : "text-white hover:bg-[#14532d] hover:text-white"
                 }`}
               >
                 <item.icon className="h-4 w-4" />
