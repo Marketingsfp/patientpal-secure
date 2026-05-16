@@ -580,21 +580,23 @@ function ProcedimentosPage() {
                   <TableHead>Nome</TableHead>
                   <TableHead className="w-44">Grupo</TableHead>
                   <TableHead className="w-24">Tipo</TableHead>
-                  <TableHead className="w-28 text-right">Din/Pix</TableHead>
-                  <TableHead className="w-28 text-right">Cartão</TableHead>
-                  <TableHead className="w-28 text-right">C. Consulta</TableHead>
-                  <TableHead className="w-28 text-right">C. Desconto</TableHead>
+                  <TableHead className="w-24 text-right">Dinheiro</TableHead>
+                  <TableHead className="w-24 text-right">Pix</TableHead>
+                  <TableHead className="w-24 text-right">Crédito</TableHead>
+                  <TableHead className="w-24 text-right">Débito</TableHead>
+                  <TableHead className="w-24 text-right">C. Consulta</TableHead>
+                  <TableHead className="w-24 text-right">C. Desconto</TableHead>
                   <TableHead className="w-24">Situação</TableHead>
                   <TableHead className="w-28 text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
-                  <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>
                 ) : !clinicaAtual ? (
-                  <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
                 ) : filtrados.length === 0 ? (
-                  <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Nenhum procedimento.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Nenhum procedimento.</TableCell></TableRow>
                 ) : filtrados.map(p => (
                   <TableRow key={p.id}>
                     <TableCell className="font-medium">{p.nome}</TableCell>
@@ -602,8 +604,10 @@ function ProcedimentosPage() {
                     <TableCell>
                       <span className={`text-xs px-2 py-0.5 rounded-full ${TIPO_COR[p.tipo]}`}>{TIPO_LABEL[p.tipo]}</span>
                     </TableCell>
-                    <TableCell className="text-right text-sm">{fmtBRL(Number(p.valor_dinheiro_pix))}</TableCell>
-                    <TableCell className="text-right text-sm">{fmtBRL(Number(p.valor_cartao))}</TableCell>
+                    <TableCell className="text-right text-sm">{fmtBRL(Number(p.valor_dinheiro ?? p.valor_dinheiro_pix))}</TableCell>
+                    <TableCell className="text-right text-sm">{fmtBRL(Number(p.valor_pix ?? p.valor_dinheiro_pix))}</TableCell>
+                    <TableCell className="text-right text-sm">{fmtBRL(Number(p.valor_cartao_credito ?? p.valor_cartao))}</TableCell>
+                    <TableCell className="text-right text-sm">{fmtBRL(Number(p.valor_cartao_debito ?? p.valor_cartao))}</TableCell>
                     <TableCell className="text-right text-sm">{fmtBRL(Number(p.valor_cartao_consulta))}</TableCell>
                     <TableCell className="text-right text-sm">{fmtBRL(Number(p.valor_cartao_desconto))}</TableCell>
                     <TableCell>
