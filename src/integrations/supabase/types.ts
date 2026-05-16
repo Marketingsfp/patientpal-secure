@@ -1668,6 +1668,7 @@ export type Database = {
           id: string
           nome: string
           observacoes: string | null
+          preparo: string | null
           tipo: Database["public"]["Enums"]["procedimento_tipo"]
           updated_at: string
           valor_cartao: number
@@ -1690,6 +1691,7 @@ export type Database = {
           id?: string
           nome: string
           observacoes?: string | null
+          preparo?: string | null
           tipo?: Database["public"]["Enums"]["procedimento_tipo"]
           updated_at?: string
           valor_cartao?: number
@@ -1712,6 +1714,7 @@ export type Database = {
           id?: string
           nome?: string
           observacoes?: string | null
+          preparo?: string | null
           tipo?: Database["public"]["Enums"]["procedimento_tipo"]
           updated_at?: string
           valor_cartao?: number
