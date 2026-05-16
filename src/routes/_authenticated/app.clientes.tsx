@@ -310,7 +310,7 @@ function ClientesPage() {
           </h1>
           <p className="text-sm text-muted-foreground">Cadastre e gerencie os pacientes da clínica.</p>
         </div>
-        <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" /> Novo cliente</Button>
+        <div className="flex gap-2">
         <Button
           variant="outline"
           onClick={async () => {
@@ -353,6 +353,8 @@ function ClientesPage() {
         >
           <Download className="h-4 w-4 mr-2" /> Exportar Excel
         </Button>
+          <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" /> Novo cliente</Button>
+        </div>
       </div>
 
       <div className="rounded-lg border border-border bg-card p-4">
