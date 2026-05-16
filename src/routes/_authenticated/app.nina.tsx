@@ -250,3 +250,137 @@ function AutoCard({ icon: Icon, cor, titulo, desc, ativa }: { icon: any; cor: st
     </Card>
   );
 }
+
+type NinaMsg = { role: "user" | "assistant"; content: string };
+
+function NinaTreinada() {
+  const { clinicaAtual } = useClinica();
+  const ask = useServerFn(chatNina);
+  const [messages, setMessages] = useState<NinaMsg[]>([
+    {
+      role: "assistant",
+      content:
+        "Olá! Sou a Nina 💚. Estou treinada com os médicos, horários e valores de exames desta clínica. Pergunte coisas como:\n• Quais dias atende o Dr. Fulano?\n• Quanto custa um ultrassom no PIX?\n• Tem cardiologista na quinta de manhã?",
+    },
+  ]);
+  const [draft, setDraft] = useState("");
+  const [loading, setLoading] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages, loading]);
+
+  const send = async () => {
+    const text = draft.trim();
+    if (!text || loading || !clinicaAtual) return;
+    const next: NinaMsg[] = [...messages, { role: "user", content: text }];
+    setMessages(next);
+    setDraft("");
+    setLoading(true);
+    try {
+      const r = await ask({
+        data: {
+          clinicaId: clinicaAtual.clinica_id,
+          messages: next.slice(-20),
+        },
+      });
+      if (r.error) {
+        toast.error(r.error);
+        setMessages((m) => [...m, { role: "assistant", content: `⚠️ ${r.error}` }]);
+      } else {
+        setMessages((m) => [...m, { role: "assistant", content: r.reply || "(sem resposta)" }]);
+      }
+    } catch (e) {
+      toast.error("Falha ao falar com a Nina");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="grid lg:grid-cols-3 gap-4">
+      <Card className="lg:col-span-2 flex flex-col h-[calc(100vh-280px)] min-h-[500px]">
+        <CardHeader className="py-3 border-b">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Brain className="h-5 w-5 text-emerald-500" /> Nina treinada — pergunte qualquer coisa
+          </CardTitle>
+          <CardDescription>
+            Responde em tempo real consultando médicos, horários e valores cadastrados.
+          </CardDescription>
+        </CardHeader>
+        <div ref={scrollRef} className="flex-1 overflow-auto p-4 space-y-3 bg-muted/20">
+          {messages.map((m, i) => (
+            <div key={i} className={`flex ${m.role === "assistant" ? "justify-start" : "justify-end"}`}>
+              <div
+                className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm shadow-sm whitespace-pre-wrap ${
+                  m.role === "assistant"
+                    ? "bg-card border border-border rounded-bl-sm"
+                    : "bg-emerald-500 text-white rounded-br-sm"
+                }`}
+              >
+                {m.content}
+              </div>
+            </div>
+          ))}
+          {loading && (
+            <div className="flex justify-start">
+              <div className="bg-card border border-border rounded-2xl rounded-bl-sm px-4 py-2 text-sm flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" /> Nina está digitando…
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="border-t p-3 flex items-center gap-2">
+          <Input
+            placeholder="Ex.: Quanto custa raio-x no PIX?"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                send();
+              }
+            }}
+            disabled={loading}
+            className="flex-1"
+          />
+          <Button
+            onClick={send}
+            disabled={loading || !draft.trim()}
+            className="bg-emerald-500 hover:bg-emerald-600"
+          >
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          </Button>
+        </div>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" /> Sugestões
+          </CardTitle>
+          <CardDescription>Clique para perguntar</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {[
+            "Quais médicos atendem na segunda-feira?",
+            "Quanto custa ultrassom abdominal no PIX?",
+            "Tem cardiologista de manhã?",
+            "Lista todos os tipos de raio-x e os valores",
+            "Em quais dias o Dr. atende à tarde?",
+          ].map((s, i) => (
+            <button
+              key={i}
+              onClick={() => setDraft(s)}
+              disabled={loading}
+              className="w-full text-left text-sm px-3 py-2 rounded-md border border-border hover:bg-muted/50 transition-colors disabled:opacity-50"
+            >
+              {s}
+            </button>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
