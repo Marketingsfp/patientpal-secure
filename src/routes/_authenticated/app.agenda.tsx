@@ -465,8 +465,8 @@ function AgendaPage() {
               <TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
             ) : paginados.length === 0 ? (
               <TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground">Nenhum agendamento encontrado.</TableCell></TableRow>
-            ) : paginados.map((a, idx) => {
-              const fichaNum = String((page - 1) * PAGE_SIZE + idx + 1).padStart(3, "0");
+            ) : paginados.map((a) => {
+              const fichaNum = fichaPorId.get(a.id) ?? "";
               const realizado = a.status === "realizado";
               return (
                 <TableRow key={a.id} className={realizado ? "bg-emerald-50 dark:bg-emerald-950/20" : ""}>
