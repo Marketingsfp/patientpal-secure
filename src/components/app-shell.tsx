@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
-import { Activity, Building2, Users, Wallet, LayoutDashboard, LogOut, Stethoscope } from "lucide-react";
+import { Activity, Building2, Users, Wallet, LayoutDashboard, LogOut, Stethoscope, Bell } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
 import {
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 
 const nav = [
   { to: "/app", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/app/recepcao", label: "Recepção / Filas", icon: Bell },
   { to: "/app/clinicas", label: "Clínicas", icon: Building2 },
   { to: "/app/medicos", label: "Médicos", icon: Stethoscope },
   { to: "/app/rateio", label: "Regras de rateio", icon: Wallet },
