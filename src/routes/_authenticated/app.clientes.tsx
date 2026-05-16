@@ -72,6 +72,61 @@ function calcIdade(dn: string | null): number | null {
   return a;
 }
 
+// Converte palavras ditadas em pontuação real (ponto, arroba, hífen…)
+function normalizarFalaEmail(t: string): string {
+  return t
+    .toLowerCase()
+    .replace(/\s*\barroba\b\s*/g, "@")
+    .replace(/\s*\bponto\b\s*/g, ".")
+    .replace(/\s*\bhífen\b\s*/g, "-")
+    .replace(/\s*\bhifen\b\s*/g, "-")
+    .replace(/\s*\btraço\b\s*/g, "-")
+    .replace(/\s*\btraco\b\s*/g, "-")
+    .replace(/\s*\bunderline\b\s*/g, "_")
+    .replace(/\s*\bunder ?score\b\s*/g, "_")
+    .replace(/\s+/g, "");
+}
+function normalizarFalaDigitos(t: string): string {
+  return t.replace(/\D+/g, "");
+}
+function normalizarFala(field: string, raw: string): string {
+  if (field === "email") return normalizarFalaEmail(raw);
+  if (field === "cpf" || field === "telefone" || field === "cep" ||
+      field === "responsavel_cpf" || field === "responsavel_telefone" ||
+      field === "numero") return normalizarFalaDigitos(raw);
+  return raw;
+}
+
+// Componente estável fora do pai — evita remount/perda de foco a cada tecla.
+function InputVoz({
+  field, type = "text", value, onChange, onVoice, voiceActive, speechSupported, ...rest
+}: {
+  field: string;
+  type?: string;
+  value: string;
+  onChange: (v: string) => void;
+  onVoice: () => void;
+  voiceActive: boolean;
+  speechSupported: boolean;
+  [k: string]: any;
+}) {
+  return (
+    <div className="flex gap-2">
+      <Input type={type} value={value} onChange={(e) => onChange(e.target.value)} {...rest} />
+      {speechSupported && (
+        <Button
+          type="button" size="icon" variant={voiceActive ? "default" : "outline"}
+          className="h-9 w-9 shrink-0"
+          onClick={onVoice}
+          title="Ditar por voz"
+        >
+          {voiceActive ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+        </Button>
+      )}
+    </div>
+  );
+}
+
 function ClientesPage() {
   const { clinicaAtual } = useClinica();
   const [items, setItems] = useState<Paciente[]>([]);
@@ -165,8 +220,15 @@ function ClientesPage() {
     r.continuous = false;
     r.interimResults = false;
     r.onresult = (e: any) => {
-      const text = e.results[0][0].transcript as string;
-      setForm(f => ({ ...f, [field]: (f[field] ? f[field] + " " : "") + text } as FormState));
+      const raw = e.results[0][0].transcript as string;
+      const text = normalizarFala(field as string, raw);
+      setForm(f => {
+        const cur = (f[field] as string) ?? "";
+        const sep = cur && field !== "email" && field !== "cpf" && field !== "telefone" &&
+                    field !== "cep" && field !== "numero" &&
+                    field !== "responsavel_cpf" && field !== "responsavel_telefone" ? " " : "";
+        return { ...f, [field]: cur + sep + text } as FormState;
+      });
     };
     r.onerror = () => { toast.error("Erro no reconhecimento de voz."); setRecording(false); setVoiceField(null); };
     r.onend = () => { setRecording(false); setVoiceField(null); };
@@ -222,32 +284,17 @@ function ClientesPage() {
   const idade = calcIdade(form.data_nascimento);
   const sugerirResponsavel = idade !== null && (idade < 18 || idade >= 70);
 
-  const VoiceBtn = ({ field }: { field: keyof FormState }) => {
-    if (!speechSupported) return null;
+  const fieldProps = (field: keyof FormState) => {
     const active = recording && voiceField === field;
-    return (
-      <Button
-        type="button" size="icon" variant={active ? "default" : "outline"}
-        className="h-9 w-9 shrink-0"
-        onClick={() => active ? stopVoice() : startVoice(field)}
-        title="Ditar por voz"
-      >
-        {active ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-      </Button>
-    );
+    return {
+      field: field as string,
+      value: form[field] as string,
+      onChange: (v: string) => setForm(f => ({ ...f, [field]: v } as FormState)),
+      onVoice: () => active ? stopVoice() : startVoice(field),
+      voiceActive: active,
+      speechSupported,
+    };
   };
-
-  const InputVoz = ({ field, type = "text", ...rest }: { field: keyof FormState; type?: string; [k: string]: any }) => (
-    <div className="flex gap-2">
-      <Input
-        type={type}
-        value={form[field] as string}
-        onChange={(e) => setForm({ ...form, [field]: e.target.value } as FormState)}
-        {...rest}
-      />
-      <VoiceBtn field={field} />
-    </div>
-  );
 
   return (
     <div className="space-y-6">
@@ -339,21 +386,21 @@ function ClientesPage() {
               <TabsContent value="dados" className="space-y-4 pt-4">
                 <div className="space-y-1">
                   <Label>Nome *</Label>
-                  <InputVoz field="nome" required />
+                  <InputVoz {...fieldProps("nome")} required />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label>CPF</Label>
-                    <InputVoz field="cpf" />
+                    <InputVoz {...fieldProps("cpf")} />
                   </div>
                   <div className="space-y-1">
                     <Label>Telefone</Label>
-                    <InputVoz field="telefone" />
+                    <InputVoz {...fieldProps("telefone")} />
                   </div>
                 </div>
                 <div className="space-y-1">
                   <Label>E-mail <span className="text-xs text-muted-foreground">(usado em nota fiscal)</span></Label>
-                  <InputVoz field="email" type="email" />
+                  <InputVoz {...fieldProps("email")} type="email" />
                 </div>
                 <div className="grid grid-cols-2 gap-3 items-end">
                   <div className="space-y-1">
@@ -397,26 +444,26 @@ function ClientesPage() {
                 </div>
                 <div className="space-y-1">
                   <Label>Logradouro</Label>
-                  <InputVoz field="logradouro" />
+                  <InputVoz {...fieldProps("logradouro")} />
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   <div className="space-y-1">
                     <Label>Número</Label>
-                    <InputVoz field="numero" />
+                    <InputVoz {...fieldProps("numero")} />
                   </div>
                   <div className="space-y-1 col-span-2">
                     <Label>Complemento</Label>
-                    <InputVoz field="complemento" />
+                    <InputVoz {...fieldProps("complemento")} />
                   </div>
                 </div>
                 <div className="space-y-1">
                   <Label>Bairro</Label>
-                  <InputVoz field="bairro" />
+                  <InputVoz {...fieldProps("bairro")} />
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   <div className="space-y-1 col-span-2">
                     <Label>Cidade</Label>
-                    <InputVoz field="cidade" />
+                    <InputVoz {...fieldProps("cidade")} />
                   </div>
                   <div className="space-y-1">
                     <Label>UF</Label>
@@ -432,16 +479,16 @@ function ClientesPage() {
                 </p>
                 <div className="space-y-1">
                   <Label>Nome do responsável</Label>
-                  <InputVoz field="responsavel_nome" />
+                  <InputVoz {...fieldProps("responsavel_nome")} />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label>CPF</Label>
-                    <InputVoz field="responsavel_cpf" />
+                    <InputVoz {...fieldProps("responsavel_cpf")} />
                   </div>
                   <div className="space-y-1">
                     <Label>Telefone</Label>
-                    <InputVoz field="responsavel_telefone" />
+                    <InputVoz {...fieldProps("responsavel_telefone")} />
                   </div>
                 </div>
                 <div className="space-y-1">
