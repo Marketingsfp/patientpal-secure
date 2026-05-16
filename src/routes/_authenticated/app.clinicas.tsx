@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
-import { Plus, Building2 } from "lucide-react";
+import { CheckCircle2, Pencil, Plus, Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -24,24 +24,79 @@ function ClinicasPage() {
   const { memberships, refresh, setClinicaAtual } = useClinica();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ nome: "", cnpj: "", cidade: "", estado: "", telefone: "" });
+
+  const resetForm = () => {
+    setEditingId(null);
+    setForm({ nome: "", cnpj: "", cidade: "", estado: "", telefone: "" });
+  };
+
+  const openNew = () => {
+    resetForm();
+    setOpen(true);
+  };
+
+  const selectClinica = (clinicaId: string) => {
+    setClinicaAtual(clinicaId);
+    toast.success("Clínica selecionada");
+  };
+
+  const openEdit = async (clinicaId: string) => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("clinicas")
+      .select("nome, cnpj, cidade, estado, telefone")
+      .eq("id", clinicaId)
+      .single();
+    setLoading(false);
+    if (error || !data) { toast.error(error?.message ?? "Erro ao carregar clínica"); return; }
+    setEditingId(clinicaId);
+    setForm({
+      nome: data.nome ?? "",
+      cnpj: data.cnpj ?? "",
+      cidade: data.cidade ?? "",
+      estado: data.estado ?? "",
+      telefone: data.telefone ?? "",
+    });
+    setOpen(true);
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!user) return;
     setLoading(true);
+    if (editingId) {
+      const { error } = await supabase
+        .from("clinicas")
+        .update({
+          nome: form.nome.trim(),
+          cnpj: form.cnpj.trim() || null,
+          telefone: form.telefone.trim() || null,
+          cidade: form.cidade.trim() || null,
+          estado: form.estado.trim() || null,
+        })
+        .eq("id", editingId);
+      setLoading(false);
+      if (error) { toast.error(error.message); return; }
+      toast.success("Clínica atualizada!");
+      setOpen(false);
+      resetForm();
+      await refresh();
+      return;
+    }
     const { data: clinicaId, error } = await supabase.rpc("criar_clinica_com_admin", {
-      _nome: form.nome,
-      _cnpj: form.cnpj || undefined,
-      _telefone: form.telefone || undefined,
-      _cidade: form.cidade || undefined,
-      _estado: form.estado || undefined,
+      _nome: form.nome.trim(),
+      _cnpj: form.cnpj.trim() || undefined,
+      _telefone: form.telefone.trim() || undefined,
+      _cidade: form.cidade.trim() || undefined,
+      _estado: form.estado.trim() || undefined,
     });
     setLoading(false);
     if (error || !clinicaId) { toast.error(error?.message ?? "Erro ao criar clínica"); return; }
     toast.success("Clínica criada!");
     setOpen(false);
-    setForm({ nome: "", cnpj: "", cidade: "", estado: "", telefone: "" });
+    resetForm();
     await refresh();
     setClinicaAtual(clinicaId as unknown as string);
   };
