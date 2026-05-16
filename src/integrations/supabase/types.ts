@@ -1347,6 +1347,7 @@ export type Database = {
           logradouro: string | null
           nome: string
           numero: string | null
+          numero_pasta: string | null
           responsavel_cpf: string | null
           responsavel_nome: string | null
           responsavel_parentesco: string | null
@@ -1371,6 +1372,7 @@ export type Database = {
           logradouro?: string | null
           nome: string
           numero?: string | null
+          numero_pasta?: string | null
           responsavel_cpf?: string | null
           responsavel_nome?: string | null
           responsavel_parentesco?: string | null
@@ -1395,6 +1397,7 @@ export type Database = {
           logradouro?: string | null
           nome?: string
           numero?: string | null
+          numero_pasta?: string | null
           responsavel_cpf?: string | null
           responsavel_nome?: string | null
           responsavel_parentesco?: string | null
