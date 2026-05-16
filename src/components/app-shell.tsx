@@ -4,6 +4,9 @@ import { Activity, Building2, Users, Wallet, LayoutDashboard, LogOut, Stethoscop
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
+import logoSaoFrancisco from "@/assets/logo-sao-francisco.png";
+import logoMeninoJesus from "@/assets/logo-menino-jesus.png";
+import logoConsultaHoje from "@/assets/logo-consulta-hoje.png";
 
 function corDaClinica(nome?: string): string {
   const n = (nome ?? "").toLowerCase();
@@ -11,6 +14,14 @@ function corDaClinica(nome?: string): string {
   if (n.includes("menino jesus")) return "#1d4ed8"; // azul royal
   if (n.includes("consulta hoje")) return "#8b5cf6"; // roxinho
   return "hsl(var(--muted-foreground))";
+}
+
+function logoDaClinica(nome?: string): string | null {
+  const n = (nome ?? "").toLowerCase();
+  if (n.includes("são francisco") || n.includes("sao francisco")) return logoSaoFrancisco;
+  if (n.includes("menino jesus")) return logoMeninoJesus;
+  if (n.includes("consulta hoje")) return logoConsultaHoje;
+  return null;
 }
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
