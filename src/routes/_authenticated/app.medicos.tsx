@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
-import { Plus, Stethoscope, Pencil, Download } from "lucide-react";
+import { Plus, Stethoscope, Pencil, Download, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -38,6 +38,19 @@ interface Medico {
   medico_especialidades: { especialidade: { id: string; nome: string } | null }[];
 }
 interface Especialidade { id: string; nome: string }
+interface ConvenioRow {
+  id?: string;
+  nome: string;
+  tipo_repasse: "percentual" | "valor";
+  percentual: string;
+  valor: string;
+  ativo: boolean;
+}
+
+const CONVENIOS_PADRAO: ConvenioRow[] = [
+  { nome: "Cartão Consulta", tipo_repasse: "percentual", percentual: "50", valor: "", ativo: true },
+  { nome: "Cartão Desconto", tipo_repasse: "percentual", percentual: "50", valor: "", ativo: true },
+];
 
 function MedicosPage() {
   const { clinicaAtual } = useClinica();
@@ -48,6 +61,7 @@ function MedicosPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [espFilter, setEspFilter] = useState("");
   const [busca, setBusca] = useState("");
+  const [convenios, setConvenios] = useState<ConvenioRow[]>(CONVENIOS_PADRAO);
   const [form, setForm] = useState({
     nome: "", crm: "", crm_uf: "",
     especialidades: [] as string[],
@@ -78,6 +92,7 @@ function MedicosPage() {
 
   const resetForm = () => {
     setEditId(null);
+    setConvenios(CONVENIOS_PADRAO.map((c) => ({ ...c })));
     setForm({
       nome: "", crm: "", crm_uf: "", especialidades: [],
       tipo_repasse: "percentual", percentual: "50", valor: "",
@@ -93,8 +108,25 @@ function MedicosPage() {
     setOpen(true);
   };
 
-  const openEdit = (m: Medico) => {
+  const openEdit = async (m: Medico) => {
     setEditId(m.id);
+    const { data: convs } = await supabase
+      .from("medico_convenios")
+      .select("id, nome, tipo_repasse, percentual, valor, ativo")
+      .eq("medico_id", m.id)
+      .order("created_at");
+    if (convs && convs.length) {
+      setConvenios(convs.map((c) => ({
+        id: c.id,
+        nome: c.nome,
+        tipo_repasse: (c.tipo_repasse as "percentual" | "valor") ?? "percentual",
+        percentual: c.percentual != null ? String(c.percentual) : "",
+        valor: c.valor != null ? String(c.valor) : "",
+        ativo: c.ativo ?? true,
+      })));
+    } else {
+      setConvenios(CONVENIOS_PADRAO.map((c) => ({ ...c })));
+    }
     setForm({
       nome: m.nome,
       crm: m.crm,
@@ -159,6 +191,23 @@ function MedicosPage() {
       const rows = form.especialidades.map((eid) => ({ medico_id: medicoId!, especialidade_id: eid }));
       const { error: e2 } = await supabase.from("medico_especialidades").insert(rows);
       if (e2) { setLoading(false); toast.error(e2.message); return; }
+    }
+    if (medicoId) {
+      await supabase.from("medico_convenios").delete().eq("medico_id", medicoId);
+      const convRows = convenios
+        .filter((c) => c.nome.trim())
+        .map((c) => ({
+          medico_id: medicoId!,
+          nome: c.nome.trim(),
+          tipo_repasse: c.tipo_repasse,
+          percentual: c.tipo_repasse === "percentual" ? parseFloat(c.percentual || "0") : 0,
+          valor: c.tipo_repasse === "valor" ? parseFloat(c.valor || "0") : null,
+          ativo: c.ativo,
+        }));
+      if (convRows.length) {
+        const { error: e3 } = await supabase.from("medico_convenios").insert(convRows);
+        if (e3) { setLoading(false); toast.error(e3.message); return; }
+      }
     }
     setLoading(false);
     toast.success(editId ? "Médico atualizado!" : "Médico cadastrado!");
@@ -236,11 +285,12 @@ function MedicosPage() {
             <DialogHeader><DialogTitle>{editId ? "Editar médico" : "Novo médico"}</DialogTitle></DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <Tabs defaultValue="dados">
-                <TabsList className="grid grid-cols-5 w-full">
+                <TabsList className="grid grid-cols-6 w-full">
                   <TabsTrigger value="dados">Dados</TabsTrigger>
                   <TabsTrigger value="contato">Contato</TabsTrigger>
                   <TabsTrigger value="endereco">Endereço</TabsTrigger>
                   <TabsTrigger value="banco">Banco</TabsTrigger>
+                  <TabsTrigger value="convenios">Convênios</TabsTrigger>
                   <TabsTrigger value="repasse">Repasse</TabsTrigger>
                 </TabsList>
 
@@ -374,6 +424,54 @@ function MedicosPage() {
                       <Label>Chave PIX</Label>
                       <Input value={form.pix_chave} onChange={(e) => setForm({ ...form, pix_chave: e.target.value })} />
                     </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="convenios" className="space-y-3 pt-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>Convênios / Procedimentos</Label>
+                      <p className="text-xs text-muted-foreground">Cartão Consulta, Cartão Desconto, fimose e outros procedimentos.</p>
+                    </div>
+                    <Button type="button" size="sm" variant="outline"
+                      onClick={() => setConvenios((cs) => [...cs, { nome: "", tipo_repasse: "percentual", percentual: "50", valor: "", ativo: true }])}>
+                      <Plus className="h-4 w-4 mr-1" /> Adicionar
+                    </Button>
+                  </div>
+                  <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                    {convenios.map((c, i) => (
+                      <div key={i} className="grid grid-cols-12 gap-2 items-end border rounded-md p-2">
+                        <div className="col-span-5 space-y-1">
+                          <Label className="text-xs">Nome</Label>
+                          <Input value={c.nome} placeholder="Ex: Fimose"
+                            onChange={(e) => setConvenios((cs) => cs.map((x, j) => j === i ? { ...x, nome: e.target.value } : x))} />
+                        </div>
+                        <div className="col-span-3 space-y-1">
+                          <Label className="text-xs">Tipo</Label>
+                          <select className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+                            value={c.tipo_repasse}
+                            onChange={(e) => setConvenios((cs) => cs.map((x, j) => j === i ? { ...x, tipo_repasse: e.target.value as "percentual" | "valor" } : x))}>
+                            <option value="percentual">% Percentual</option>
+                            <option value="valor">R$ Valor</option>
+                          </select>
+                        </div>
+                        <div className="col-span-3 space-y-1">
+                          <Label className="text-xs">{c.tipo_repasse === "percentual" ? "%" : "R$"}</Label>
+                          <Input type="number" step="0.01" min={0}
+                            value={c.tipo_repasse === "percentual" ? c.percentual : c.valor}
+                            onChange={(e) => setConvenios((cs) => cs.map((x, j) => j === i ? (c.tipo_repasse === "percentual" ? { ...x, percentual: e.target.value } : { ...x, valor: e.target.value }) : x))} />
+                        </div>
+                        <div className="col-span-1">
+                          <Button type="button" size="icon" variant="ghost"
+                            onClick={() => setConvenios((cs) => cs.filter((_, j) => j !== i))} aria-label="Remover">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                    {convenios.length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-4">Nenhum convênio. Clique em "Adicionar".</p>
+                    )}
                   </div>
                 </TabsContent>
 

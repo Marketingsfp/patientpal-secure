@@ -1050,6 +1050,50 @@ export type Database = {
           },
         ]
       }
+      medico_convenios: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          id: string
+          medico_id: string
+          nome: string
+          percentual: number | null
+          tipo_repasse: string
+          updated_at: string
+          valor: number | null
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          medico_id: string
+          nome: string
+          percentual?: number | null
+          tipo_repasse?: string
+          updated_at?: string
+          valor?: number | null
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          medico_id?: string
+          nome?: string
+          percentual?: number | null
+          tipo_repasse?: string
+          updated_at?: string
+          valor?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medico_convenios_medico_id_fkey"
+            columns: ["medico_id"]
+            isOneToOne: false
+            referencedRelation: "medicos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       medico_disponibilidades: {
         Row: {
           ativo: boolean
