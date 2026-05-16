@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SimpleCrud } from "@/components/simple-crud/SimpleCrud";
+import { VoiceInput } from "@/components/voice-input";
 
 export const Route = createFileRoute("/_authenticated/app/prontuarios")({
   component: ProntuariosPage,
@@ -92,13 +93,33 @@ function ProntuariosPage() {
               <SelectContent>{medicos.map(m => <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>)}</SelectContent>
             </Select>
           </div>
-          <div className="space-y-1"><Label>Queixa principal</Label><Textarea rows={2} value={f.queixa_principal ?? ""} onChange={e => set({ ...f, queixa_principal: e.target.value })} /></div>
-          <div className="space-y-1"><Label>História da doença</Label><Textarea rows={2} value={f.historia_doenca ?? ""} onChange={e => set({ ...f, historia_doenca: e.target.value })} /></div>
-          <div className="space-y-1"><Label>Exame físico</Label><Textarea rows={2} value={f.exame_fisico ?? ""} onChange={e => set({ ...f, exame_fisico: e.target.value })} /></div>
-          <div className="space-y-1"><Label>Hipótese diagnóstica</Label><Textarea rows={2} value={f.hipotese_diagnostica ?? ""} onChange={e => set({ ...f, hipotese_diagnostica: e.target.value })} /></div>
-          <div className="space-y-1"><Label>Conduta</Label><Textarea rows={2} value={f.conduta ?? ""} onChange={e => set({ ...f, conduta: e.target.value })} /></div>
-          <div className="space-y-1"><Label>Prescrição</Label><Textarea rows={3} value={f.prescricao ?? ""} onChange={e => set({ ...f, prescricao: e.target.value })} /></div>
-          <div className="space-y-1"><Label>Observações</Label><Textarea rows={2} value={f.observacoes ?? ""} onChange={e => set({ ...f, observacoes: e.target.value })} /></div>
+          {([
+            ["queixa_principal", "Queixa principal", 2],
+            ["historia_doenca", "História da doença", 2],
+            ["exame_fisico", "Exame físico", 2],
+            ["hipotese_diagnostica", "Hipótese diagnóstica", 2],
+            ["conduta", "Conduta", 2],
+            ["prescricao", "Prescrição", 3],
+            ["observacoes", "Observações", 2],
+          ] as const).map(([key, label, rows]) => (
+            <div key={key} className="space-y-1">
+              <div className="flex items-center justify-between">
+                <Label>{label}</Label>
+                <VoiceInput
+                  size="sm"
+                  currentValue={(f[key] ?? "") as string}
+                  onTranscript={(t) => set({ ...f, [key]: t })}
+                  prompt={`Transcreva o áudio em português do Brasil como anotação médica do campo "${label}". Retorne apenas o texto.`}
+                  title={`Ditar ${label}`}
+                />
+              </div>
+              <Textarea
+                rows={rows}
+                value={(f[key] ?? "") as string}
+                onChange={(e) => set({ ...f, [key]: e.target.value })}
+              />
+            </div>
+          ))}
         </div>
       )}
     />

@@ -1,5 +1,7 @@
 import { Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { Activity, Building2, Users, Wallet, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList } from "lucide-react";
+import { VoiceInput } from "@/components/voice-input";
+import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
 import {
@@ -25,6 +27,28 @@ export function AppShell() {
   const { memberships, clinicaAtual, setClinicaAtual } = useClinica();
   const location = useLocation();
   const navigate = useNavigate();
+
+  const handleVoiceCommand = (text: string) => {
+    const t = text.toLowerCase();
+    const route =
+      /agenda|agendamento/.test(t) ? "/app/agenda" :
+      /recep|fila/.test(t) ? "/app/recepcao" :
+      /cliente|paciente/.test(t) ? "/app/clientes" :
+      /procediment|exame/.test(t) ? "/app/procedimentos" :
+      /financ|caixa|conta|boleto/.test(t) ? "/app/financeiro" :
+      /cl[ií]nica/.test(t) ? "/app/clinicas" :
+      /m[eé]dico|profissional/.test(t) ? "/app/medicos" :
+      /rateio|repasse/.test(t) ? "/app/rateio" :
+      /equipe|usu[áa]rio/.test(t) ? "/app/equipe" :
+      /prontu[áa]rio/.test(t) ? "/app/prontuarios" :
+      /dashboard|in[íi]cio|home/.test(t) ? "/app" : null;
+    if (route) {
+      toast.success(`Abrindo: ${text}`);
+      navigate({ to: route });
+    } else {
+      toast.info(`Não entendi: "${text}"`);
+    }
+  };
 
   const handleSignOut = async () => {
     await signOut();
@@ -73,20 +97,28 @@ export function AppShell() {
           <div className="text-sm text-muted-foreground">
             {clinicaAtual ? clinicaAtual.clinica.nome : "Nenhuma clínica selecionada"}
           </div>
-          {memberships.length > 0 && (
-            <Select value={clinicaAtual?.clinica_id} onValueChange={setClinicaAtual}>
-              <SelectTrigger className="w-64">
-                <SelectValue placeholder="Selecione a clínica" />
-              </SelectTrigger>
-              <SelectContent>
-                {memberships.map((m) => (
-                  <SelectItem key={m.clinica_id} value={m.clinica_id}>
-                    {m.clinica.nome} {m.clinica.cidade ? `— ${m.clinica.cidade}` : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+          <div className="flex items-center gap-2">
+            <VoiceInput
+              append={false}
+              onTranscript={handleVoiceCommand}
+              title="Busca por voz (diga: agenda, clientes, financeiro…)"
+              prompt="Transcreva o comando de voz curto em português do Brasil. Retorne apenas as palavras ditas."
+            />
+            {memberships.length > 0 && (
+              <Select value={clinicaAtual?.clinica_id} onValueChange={setClinicaAtual}>
+                <SelectTrigger className="w-64">
+                  <SelectValue placeholder="Selecione a clínica" />
+                </SelectTrigger>
+                <SelectContent>
+                  {memberships.map((m) => (
+                    <SelectItem key={m.clinica_id} value={m.clinica_id}>
+                      {m.clinica.nome} {m.clinica.cidade ? `— ${m.clinica.cidade}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
         </header>
         <main className="flex-1 p-6 overflow-auto">
           <Outlet />

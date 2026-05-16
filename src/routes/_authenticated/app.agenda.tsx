@@ -27,6 +27,7 @@ import {
   MoreHorizontal, Star, Flag, Printer,
 } from "lucide-react";
 import { printGuiaAtendimento } from "@/lib/print-gr";
+import { VoiceInput } from "@/components/voice-input";
 import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/_authenticated/app/agenda")({
@@ -363,7 +364,15 @@ function AgendaPage() {
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label>Observações</Label>
+                <div className="flex items-center justify-between">
+                  <Label>Observações</Label>
+                  <VoiceInput
+                    size="sm"
+                    currentValue={form.observacoes}
+                    onTranscript={(t) => setForm(f => ({ ...f, observacoes: t }))}
+                    title="Ditar observações"
+                  />
+                </div>
                 <Textarea value={form.observacoes} onChange={(e) => setForm(f => ({ ...f, observacoes: e.target.value }))} rows={2} />
               </div>
               <DialogFooter>
