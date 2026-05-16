@@ -40,6 +40,7 @@ function MedicosPage() {
   const [loading, setLoading] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [espFilter, setEspFilter] = useState("");
+  const [busca, setBusca] = useState("");
   const [form, setForm] = useState({
     nome: "", crm: "", crm_uf: "",
     especialidades: [] as string[],
@@ -163,6 +164,17 @@ function MedicosPage() {
     return <p className="text-muted-foreground">Selecione uma clínica primeiro.</p>;
   }
 
+  const medicosFiltrados = medicos.filter((m) => {
+    const q = busca.trim().toLowerCase();
+    if (!q) return true;
+    const especs = m.medico_especialidades?.map((me) => me.especialidade?.nome ?? "").join(" ").toLowerCase() ?? "";
+    return (
+      m.nome.toLowerCase().includes(q) ||
+      `${m.crm}/${m.crm_uf}`.toLowerCase().includes(q) ||
+      especs.includes(q)
+    );
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -260,6 +272,14 @@ function MedicosPage() {
         </CardContent></Card>
       ) : (
         <Card>
+          <div className="p-3 border-b">
+            <Input
+              placeholder="Buscar por nome, CRM ou especialidade…"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              className="max-w-md"
+            />
+          </div>
           <Table>
             <TableHeader>
               <TableRow>
@@ -271,7 +291,7 @@ function MedicosPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {medicos.map((m) => (
+              {medicosFiltrados.map((m) => (
                 <TableRow key={m.id}>
                   <TableCell className="font-medium">{m.nome}</TableCell>
                   <TableCell>{m.crm}/{m.crm_uf}</TableCell>

@@ -26,6 +26,7 @@ interface Paciente {
   id: string;
   nome: string;
   cpf: string | null;
+  numero_pasta: string | null;
   telefone: string | null;
   email: string | null;
   data_nascimento: string | null;
@@ -45,7 +46,7 @@ interface Paciente {
 }
 
 type FormState = {
-  nome: string; cpf: string; telefone: string; email: string;
+  nome: string; cpf: string; numero_pasta: string; telefone: string; email: string;
   data_nascimento: string; ativo: boolean;
   cep: string; logradouro: string; numero: string; complemento: string;
   bairro: string; cidade: string; estado: string;
@@ -54,7 +55,7 @@ type FormState = {
 };
 
 const EMPTY: FormState = {
-  nome: "", cpf: "", telefone: "", email: "",
+  nome: "", cpf: "", numero_pasta: "", telefone: "", email: "",
   data_nascimento: "", ativo: true,
   cep: "", logradouro: "", numero: "", complemento: "",
   bairro: "", cidade: "", estado: "",
@@ -170,7 +171,10 @@ function ClientesPage() {
       p.nome.toLowerCase().includes(q) ||
       (p.cpf ?? "").toLowerCase().includes(q) ||
       (p.telefone ?? "").toLowerCase().includes(q) ||
-      (p.email ?? "").toLowerCase().includes(q)
+      (p.email ?? "").toLowerCase().includes(q) ||
+      (p.numero_pasta ?? "").toLowerCase().includes(q) ||
+      (p.data_nascimento ?? "").toLowerCase().includes(q) ||
+      (p.data_nascimento ? p.data_nascimento.split("-").reverse().join("/") : "").includes(q)
     );
   }, [items, busca]);
 
@@ -182,7 +186,8 @@ function ClientesPage() {
     setEditing(p);
     setForm({
       nome: paciente.nome,
-      cpf: paciente.cpf ?? "", telefone: paciente.telefone ?? "", email: paciente.email ?? "",
+      cpf: paciente.cpf ?? "", numero_pasta: paciente.numero_pasta ?? "",
+      telefone: paciente.telefone ?? "", email: paciente.email ?? "",
       data_nascimento: paciente.data_nascimento ?? "", ativo: paciente.ativo,
       cep: paciente.cep ?? "", logradouro: paciente.logradouro ?? "", numero: paciente.numero ?? "",
       complemento: paciente.complemento ?? "", bairro: paciente.bairro ?? "",
@@ -251,6 +256,7 @@ function ClientesPage() {
     const payload = {
       nome: form.nome.trim(),
       cpf: form.cpf.trim() || null,
+      numero_pasta: form.numero_pasta.trim() || null,
       telefone: form.telefone.trim() || null,
       email: form.email.trim() || null,
       data_nascimento: form.data_nascimento || null,
@@ -363,7 +369,7 @@ function ClientesPage() {
           <Input
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
-            placeholder="Buscar por nome, CPF, telefone ou e-mail…"
+            placeholder="Buscar por nº pasta, nome, CPF, telefone, e-mail ou nascimento (dd/mm/aaaa)…"
             className="pl-9"
           />
         </div>
@@ -436,6 +442,10 @@ function ClientesPage() {
                 <div className="space-y-1">
                   <Label>Nome *</Label>
                   <InputVoz {...fieldProps("nome")} required />
+                </div>
+                <div className="space-y-1">
+                  <Label>Número de pasta</Label>
+                  <InputVoz {...fieldProps("numero_pasta")} placeholder="Ex.: 1234" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
