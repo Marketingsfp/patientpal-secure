@@ -24,10 +24,11 @@ import {
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import {
   CalendarDays, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X,
-  MoreHorizontal, Star, Flag, Printer,
+  MoreHorizontal, Star, Flag, Printer, Download,
 } from "lucide-react";
 import { printGuiaAtendimento } from "@/lib/print-gr";
 import { VoiceInput } from "@/components/voice-input";
+import { exportToExcel } from "@/lib/export-csv";
 import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/_authenticated/app/agenda")({
@@ -303,6 +304,39 @@ function AgendaPage() {
         <div className="flex gap-2">
           <Button variant="outline" disabled={selecionados.size === 0}>
             Opções ({selecionados.size})
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => {
+              if (!filtrados.length) { toast.info("Sem dados para exportar."); return; }
+              exportToExcel(
+                filtrados.map((a) => ({
+                  data: new Date(a.inicio).toLocaleDateString("pt-BR"),
+                  dia: fmtDiaSemana(a.inicio),
+                  inicio: fmtHora(a.inicio),
+                  fim: fmtHora(a.fim),
+                  profissional: medicoNome(a.medico_id),
+                  paciente: a.paciente_nome,
+                  procedimento: a.procedimento ?? "CONSULTA",
+                  status: a.status,
+                  observacoes: a.observacoes ?? "",
+                })),
+                `agenda-${dataRef}`,
+                [
+                  { key: "data", label: "Data" },
+                  { key: "dia", label: "Dia" },
+                  { key: "inicio", label: "Início" },
+                  { key: "fim", label: "Fim" },
+                  { key: "profissional", label: "Profissional" },
+                  { key: "paciente", label: "Cliente" },
+                  { key: "procedimento", label: "Procedimento" },
+                  { key: "status", label: "Status" },
+                  { key: "observacoes", label: "Observações" },
+                ],
+              );
+            }}
+          >
+            <Download className="h-4 w-4 mr-2" /> Exportar Excel
           </Button>
           <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>

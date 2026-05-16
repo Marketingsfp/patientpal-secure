@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Plus, Search, Pencil, Trash2, ClipboardList, Sparkles, CreditCard } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, ClipboardList, Sparkles, CreditCard, Download } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { exportToExcel } from "@/lib/export-csv";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -546,6 +547,43 @@ function ProcedimentosPage() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (!filtrados.length) { toast.info("Sem dados para exportar."); return; }
+                exportToExcel(
+                  filtrados.map((p) => ({
+                    nome: p.nome,
+                    grupo: p.grupo ?? "",
+                    tipo: TIPO_LABEL[p.tipo],
+                    codigo: p.codigo ?? "",
+                    dinheiro: Number(p.valor_dinheiro ?? p.valor_dinheiro_pix ?? 0).toFixed(2),
+                    pix_credito: Number(p.valor_pix ?? p.valor_cartao_credito ?? p.valor_cartao ?? 0).toFixed(2),
+                    cartao_consulta: Number(p.valor_cartao_consulta ?? 0).toFixed(2),
+                    cartao_desconto: Number(p.valor_cartao_desconto ?? 0).toFixed(2),
+                    duracao: p.duracao_minutos,
+                    preparo: p.preparo ?? "",
+                    ativo: p.ativo ? "Sim" : "Não",
+                  })),
+                  `procedimentos-${new Date().toISOString().slice(0, 10)}`,
+                  [
+                    { key: "nome", label: "Nome" },
+                    { key: "grupo", label: "Grupo" },
+                    { key: "tipo", label: "Tipo" },
+                    { key: "codigo", label: "Código" },
+                    { key: "dinheiro", label: "Dinheiro (R$)" },
+                    { key: "pix_credito", label: "Pix/Crédito (R$)" },
+                    { key: "cartao_consulta", label: "C. Consulta (R$)" },
+                    { key: "cartao_desconto", label: "C. Desconto (R$)" },
+                    { key: "duracao", label: "Duração (min)" },
+                    { key: "preparo", label: "Preparo" },
+                    { key: "ativo", label: "Ativo" },
+                  ],
+                );
+              }}
+            >
+              <Download className="h-4 w-4 mr-2" /> Exportar Excel
+            </Button>
             <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" /> Novo</Button>
           </div>
 

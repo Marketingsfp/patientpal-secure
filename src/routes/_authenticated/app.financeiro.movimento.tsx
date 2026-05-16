@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Plus, Pencil, Trash2, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
+import { Plus, Pencil, Trash2, ArrowUpCircle, ArrowDownCircle, Download } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { exportToExcel } from "@/lib/export-csv";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -116,6 +117,40 @@ function Page() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div><h1 className="text-2xl font-semibold">Movimento de Caixa</h1>
           <p className="text-sm text-muted-foreground">Receitas e despesas do período</p></div>
+        <div className="flex gap-2">
+        <Button
+          variant="outline"
+          onClick={() => {
+            if (!items.length) { toast.info("Sem dados para exportar."); return; }
+            const catMap = new Map(cats.map((c) => [c.id, c.nome]));
+            const contaMap = new Map(contas.map((c) => [c.id, c.nome]));
+            exportToExcel(
+              items.map((l) => ({
+                data: new Date(l.data).toLocaleDateString("pt-BR"),
+                tipo: l.tipo,
+                descricao: l.descricao,
+                categoria: l.categoria_id ? catMap.get(l.categoria_id) ?? "" : "",
+                conta: l.conta_id ? contaMap.get(l.conta_id) ?? "" : "",
+                forma_pagamento: l.forma_pagamento ?? "",
+                status: l.status,
+                valor: Number(l.valor).toFixed(2),
+              })),
+              `movimento-${fromDate}_a_${toDate}`,
+              [
+                { key: "data", label: "Data" },
+                { key: "tipo", label: "Tipo" },
+                { key: "descricao", label: "Descrição" },
+                { key: "categoria", label: "Categoria" },
+                { key: "conta", label: "Conta" },
+                { key: "forma_pagamento", label: "Forma pagamento" },
+                { key: "status", label: "Status" },
+                { key: "valor", label: "Valor (R$)" },
+              ],
+            );
+          }}
+        >
+          <Download className="h-4 w-4 mr-2" />Exportar Excel
+        </Button>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild><Button onClick={openNew} disabled={!clinicaAtual}><Plus className="h-4 w-4 mr-2" />Novo lançamento</Button></DialogTrigger>
           <DialogContent className="max-w-lg">
@@ -174,6 +209,7 @@ function Page() {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
