@@ -547,13 +547,3 @@ function Paginacao({ page, totalPages, onChange }: { page: number; totalPages: n
     </div>
   );
 }
-
-// noop helpers preserved for potential future use
-const _UNUSED_ICONS = { DollarSign };
-
-function _Footer() {
-  return (
-    <div className="rounded-lg border border-border bg-card divide-y divide-border">
-        </div>
-  );
-}
