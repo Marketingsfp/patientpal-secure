@@ -334,8 +334,6 @@ function MedicosPage() {
                       <Input value={form.estado_civil} onChange={(e) => setForm({ ...form, estado_civil: e.target.value })} />
                     </div>
                   </div>
-                  <div className="space-y-2">
-                  </div>
                 </TabsContent>
 
                 <TabsContent value="especialidades" className="space-y-2 pt-4">
