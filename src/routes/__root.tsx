@@ -10,7 +10,6 @@ import {
 
 import appCss from "../styles.css?url";
 import { AuthProvider } from "@/hooks/use-auth";
-import { ClinicaProvider } from "@/hooks/use-clinica";
 import { Toaster } from "@/components/ui/sonner";
 
 function NotFoundComponent() {
@@ -117,10 +116,8 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <ClinicaProvider>
-          <Outlet />
-          <Toaster richColors position="top-right" />
-        </ClinicaProvider>
+        <Outlet />
+        <Toaster richColors position="top-right" />
       </AuthProvider>
     </QueryClientProvider>
   );

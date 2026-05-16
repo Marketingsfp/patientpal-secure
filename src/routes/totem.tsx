@@ -1,7 +1,7 @@
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useClinica } from "@/hooks/use-clinica";
+import { ClinicaProvider, useClinica } from "@/hooks/use-clinica";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Accessibility, Stethoscope, Hash, RotateCcw, Camera, ShieldCheck, X, ArrowLeft, Loader2 } from "lucide-react";
@@ -12,8 +12,16 @@ export const Route = createFileRoute("/totem")({
     const { data } = await supabase.auth.getSession();
     if (!data.session) throw redirect({ to: "/login" });
   },
-  component: TotemPage,
+  component: TotemRoute,
 });
+
+function TotemRoute() {
+  return (
+    <ClinicaProvider>
+      <TotemPage />
+    </ClinicaProvider>
+  );
+}
 
 type TipoSenha = "N" | "P" | "E" | "R";
 

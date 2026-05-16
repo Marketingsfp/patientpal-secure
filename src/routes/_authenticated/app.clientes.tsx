@@ -151,9 +151,10 @@ function ClientesPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from("pacientes")
-      .select("*")
+      .select("id,nome,cpf,telefone,email,ativo,cidade,estado,created_at")
       .eq("clinica_id", clinicaAtual.clinica_id)
-      .order("nome");
+      .order("nome")
+      .limit(100);
     setLoading(false);
     if (error) { toast.error(error.message); return; }
     setItems((data ?? []) as any);
@@ -173,19 +174,22 @@ function ClientesPage() {
   }, [items, busca]);
 
   const openNew = () => { setEditing(null); setForm(EMPTY); setTab("dados"); setOpen(true); };
-  const openEdit = (p: Paciente) => {
+  const openEdit = async (p: Paciente) => {
+    const { data, error } = await supabase.from("pacientes").select("*").eq("id", p.id).single();
+    if (error) { toast.error(error.message); return; }
+    const paciente = data as Paciente;
     setEditing(p);
     setForm({
-      nome: p.nome,
-      cpf: p.cpf ?? "", telefone: p.telefone ?? "", email: p.email ?? "",
-      data_nascimento: p.data_nascimento ?? "", ativo: p.ativo,
-      cep: p.cep ?? "", logradouro: p.logradouro ?? "", numero: p.numero ?? "",
-      complemento: p.complemento ?? "", bairro: p.bairro ?? "",
-      cidade: p.cidade ?? "", estado: p.estado ?? "",
-      responsavel_nome: p.responsavel_nome ?? "",
-      responsavel_cpf: p.responsavel_cpf ?? "",
-      responsavel_telefone: p.responsavel_telefone ?? "",
-      responsavel_parentesco: p.responsavel_parentesco ?? "",
+      nome: paciente.nome,
+      cpf: paciente.cpf ?? "", telefone: paciente.telefone ?? "", email: paciente.email ?? "",
+      data_nascimento: paciente.data_nascimento ?? "", ativo: paciente.ativo,
+      cep: paciente.cep ?? "", logradouro: paciente.logradouro ?? "", numero: paciente.numero ?? "",
+      complemento: paciente.complemento ?? "", bairro: paciente.bairro ?? "",
+      cidade: paciente.cidade ?? "", estado: paciente.estado ?? "",
+      responsavel_nome: paciente.responsavel_nome ?? "",
+      responsavel_cpf: paciente.responsavel_cpf ?? "",
+      responsavel_telefone: paciente.responsavel_telefone ?? "",
+      responsavel_parentesco: paciente.responsavel_parentesco ?? "",
     });
     setTab("dados");
     setOpen(true);

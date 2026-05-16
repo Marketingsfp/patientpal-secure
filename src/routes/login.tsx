@@ -1,27 +1,29 @@
-import { createFileRoute, Link, useNavigate, redirect } from "@tanstack/react-router";
-import { useState, type FormEvent } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState, type FormEvent } from "react";
 import { Activity, Mail, Lock, Eye, EyeOff, ShieldCheck, CalendarCheck2, Stethoscope } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
-  beforeLoad: async () => {
-    const { data } = await supabase.auth.getSession();
-    if (data.session) throw redirect({ to: "/app" });
-  },
   head: () => ({ meta: [{ title: "Entrar — ClinicaOS" }] }),
 });
 
 function LoginPage() {
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPwd, setShowPwd] = useState(false);
+
+  useEffect(() => {
+    if (!authLoading && user) navigate({ to: "/app", replace: true });
+  }, [authLoading, navigate, user]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -30,7 +32,7 @@ function LoginPage() {
     setLoading(false);
     if (error) { toast.error(error.message); return; }
     toast.success("Bem-vindo!");
-    navigate({ to: "/app" });
+    navigate({ to: "/app", replace: true });
   };
 
   return (
