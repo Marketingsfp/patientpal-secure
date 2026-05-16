@@ -73,8 +73,8 @@
   --card-foreground: oklch(0.21 0.05 250);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.21 0.05 250);
-  /* Clinical blue (#2563eb) */
-  --primary: oklch(0.555 0.215 261);
+  /* Medical teal (#13b5a3) — OnDoctor style */
+  --primary: oklch(0.72 0.13 178);
   --primary-foreground: oklch(0.99 0 0);
   /* Medical green (#16a34a) */
   --secondary: oklch(0.965 0.015 155);
@@ -91,7 +91,7 @@
   --warning-foreground: oklch(0.25 0.05 75);
   --border: oklch(0.92 0.01 250);
   --input: oklch(0.92 0.01 250);
-  --ring: oklch(0.555 0.215 261);
+  --ring: oklch(0.72 0.13 178);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
