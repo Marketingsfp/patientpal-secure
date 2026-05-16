@@ -359,8 +359,10 @@ function ProcedimentosPage() {
     setEditing(p);
     setForm({
       nome: p.nome, grupo: p.grupo ?? "", tipo: p.tipo, codigo: p.codigo ?? "",
-      valor_dinheiro_pix: String(p.valor_dinheiro_pix ?? p.valor_padrao ?? 0),
-      valor_cartao: String(p.valor_cartao ?? 0),
+      valor_dinheiro: String(p.valor_dinheiro ?? p.valor_dinheiro_pix ?? p.valor_padrao ?? 0),
+      valor_pix: String(p.valor_pix ?? p.valor_dinheiro_pix ?? p.valor_padrao ?? 0),
+      valor_cartao_credito: String(p.valor_cartao_credito ?? p.valor_cartao ?? 0),
+      valor_cartao_debito: String(p.valor_cartao_debito ?? p.valor_cartao ?? 0),
       valor_cartao_consulta: String(p.valor_cartao_consulta ?? 0),
       valor_cartao_desconto: String(p.valor_cartao_desconto ?? 0),
       duracao_minutos: String(p.duracao_minutos), observacoes: p.observacoes ?? "", ativo: p.ativo,
@@ -373,7 +375,10 @@ function ProcedimentosPage() {
     if (!clinicaAtual) return;
     if (!form.nome.trim()) { toast.error("Informe o nome."); return; }
     setSaving(true);
-    const vDinheiro = Number(form.valor_dinheiro_pix) || 0;
+    const vDinheiro = Number(form.valor_dinheiro) || 0;
+    const vPix = Number(form.valor_pix) || 0;
+    const vCredito = Number(form.valor_cartao_credito) || 0;
+    const vDebito = Number(form.valor_cartao_debito) || 0;
     const payload = {
       clinica_id: clinicaAtual.clinica_id,
       nome: form.nome.trim(),
@@ -381,8 +386,12 @@ function ProcedimentosPage() {
       tipo: form.tipo,
       codigo: form.codigo.trim() || null,
       valor_padrao: vDinheiro, // mantém compatibilidade com agenda/financeiro
-      valor_dinheiro_pix: vDinheiro,
-      valor_cartao: Number(form.valor_cartao) || 0,
+      valor_dinheiro: vDinheiro,
+      valor_pix: vPix,
+      valor_dinheiro_pix: vDinheiro, // legado
+      valor_cartao_credito: vCredito,
+      valor_cartao_debito: vDebito,
+      valor_cartao: vCredito, // legado
       valor_cartao_consulta: Number(form.valor_cartao_consulta) || 0,
       valor_cartao_desconto: Number(form.valor_cartao_desconto) || 0,
       duracao_minutos: Math.max(0, Number(form.duracao_minutos) || 0),
