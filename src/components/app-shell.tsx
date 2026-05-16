@@ -101,11 +101,19 @@ export function AppShell() {
         className="w-64 text-white flex flex-col shrink-0"
         style={{ backgroundColor: clinicaAtual ? corDaClinica(clinicaAtual.clinica.nome) : undefined }}
       >
-        <div className="px-6 py-5 flex items-center gap-2 border-b border-sidebar-border">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-            <Activity className="h-5 w-5" />
-          </div>
-          <span className="font-semibold tracking-tight">ClinicaOS</span>
+        <div className="px-4 py-4 flex items-center justify-center border-b border-white/20 bg-white/95 min-h-[88px]">
+          {logoDaClinica(clinicaAtual?.clinica.nome) ? (
+            <img
+              src={logoDaClinica(clinicaAtual?.clinica.nome)!}
+              alt={clinicaAtual?.clinica.nome ?? "Clínica"}
+              className="max-h-16 w-auto object-contain"
+            />
+          ) : (
+            <div className="flex items-center gap-2 text-foreground">
+              <Activity className="h-5 w-5" />
+              <span className="font-semibold tracking-tight">ClinicaOS</span>
+            </div>
+          )}
         </div>
         <nav className="flex-1 p-3 space-y-1 font-sans">
           {nav.map((item) => {
@@ -137,8 +145,11 @@ export function AppShell() {
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 border-b border-border bg-card flex items-center justify-between px-6">
-          <div className="text-sm font-semibold flex items-center gap-2" style={{ color: corDaClinica(clinicaAtual?.clinica.nome) }}>
-            {clinicaAtual && (
+          <div className="text-sm font-semibold flex items-center gap-3" style={{ color: corDaClinica(clinicaAtual?.clinica.nome) }}>
+            {clinicaAtual && logoDaClinica(clinicaAtual.clinica.nome) && (
+              <img src={logoDaClinica(clinicaAtual.clinica.nome)!} alt="" className="h-8 w-auto object-contain" />
+            )}
+            {clinicaAtual && !logoDaClinica(clinicaAtual.clinica.nome) && (
               <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: corDaClinica(clinicaAtual.clinica.nome) }} />
             )}
             {clinicaAtual ? clinicaAtual.clinica.nome : "Nenhuma clínica selecionada"}
