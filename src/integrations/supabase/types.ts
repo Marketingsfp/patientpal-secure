@@ -181,6 +181,98 @@ export type Database = {
           },
         ]
       }
+      paciente_biometria: {
+        Row: {
+          clinica_id: string
+          consentimento_em: string
+          created_at: string
+          descriptor: Json
+          id: string
+          paciente_id: string
+          revogado_em: string | null
+        }
+        Insert: {
+          clinica_id: string
+          consentimento_em?: string
+          created_at?: string
+          descriptor: Json
+          id?: string
+          paciente_id: string
+          revogado_em?: string | null
+        }
+        Update: {
+          clinica_id?: string
+          consentimento_em?: string
+          created_at?: string
+          descriptor?: Json
+          id?: string
+          paciente_id?: string
+          revogado_em?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paciente_biometria_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paciente_biometria_paciente_id_fkey"
+            columns: ["paciente_id"]
+            isOneToOne: false
+            referencedRelation: "pacientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pacientes: {
+        Row: {
+          ativo: boolean
+          clinica_id: string
+          consentimento_lgpd_em: string | null
+          cpf: string | null
+          created_at: string
+          data_nascimento: string | null
+          id: string
+          nome: string
+          telefone: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          clinica_id: string
+          consentimento_lgpd_em?: string | null
+          cpf?: string | null
+          created_at?: string
+          data_nascimento?: string | null
+          id?: string
+          nome: string
+          telefone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          clinica_id?: string
+          consentimento_lgpd_em?: string | null
+          cpf?: string | null
+          created_at?: string
+          data_nascimento?: string | null
+          id?: string
+          nome?: string
+          telefone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pacientes_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -285,6 +377,75 @@ export type Database = {
           },
         ]
       }
+      senhas: {
+        Row: {
+          atendida_em: string | null
+          cancelada_em: string | null
+          chamada_em: string | null
+          chamada_por: string | null
+          clinica_id: string
+          codigo: string
+          data_dia: string
+          emitida_em: string
+          guiche: string | null
+          id: string
+          identificado_por_facial: boolean
+          numero: number
+          paciente_id: string | null
+          status: Database["public"]["Enums"]["status_senha"]
+          tipo: Database["public"]["Enums"]["tipo_senha"]
+        }
+        Insert: {
+          atendida_em?: string | null
+          cancelada_em?: string | null
+          chamada_em?: string | null
+          chamada_por?: string | null
+          clinica_id: string
+          codigo: string
+          data_dia?: string
+          emitida_em?: string
+          guiche?: string | null
+          id?: string
+          identificado_por_facial?: boolean
+          numero: number
+          paciente_id?: string | null
+          status?: Database["public"]["Enums"]["status_senha"]
+          tipo: Database["public"]["Enums"]["tipo_senha"]
+        }
+        Update: {
+          atendida_em?: string | null
+          cancelada_em?: string | null
+          chamada_em?: string | null
+          chamada_por?: string | null
+          clinica_id?: string
+          codigo?: string
+          data_dia?: string
+          emitida_em?: string
+          guiche?: string | null
+          id?: string
+          identificado_por_facial?: boolean
+          numero?: number
+          paciente_id?: string | null
+          status?: Database["public"]["Enums"]["status_senha"]
+          tipo?: Database["public"]["Enums"]["tipo_senha"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "senhas_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "senhas_paciente_id_fkey"
+            columns: ["paciente_id"]
+            isOneToOne: false
+            referencedRelation: "pacientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -293,6 +454,32 @@ export type Database = {
       can_manage_clinica: {
         Args: { _clinica_id: string; _user_id: string }
         Returns: boolean
+      }
+      chamar_proxima_senha: {
+        Args: { _clinica_id: string; _guiche: string }
+        Returns: {
+          atendida_em: string | null
+          cancelada_em: string | null
+          chamada_em: string | null
+          chamada_por: string | null
+          clinica_id: string
+          codigo: string
+          data_dia: string
+          emitida_em: string
+          guiche: string | null
+          id: string
+          identificado_por_facial: boolean
+          numero: number
+          paciente_id: string | null
+          status: Database["public"]["Enums"]["status_senha"]
+          tipo: Database["public"]["Enums"]["tipo_senha"]
+        }
+        SetofOptions: {
+          from: "*"
+          to: "senhas"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       criar_clinica_com_admin: {
         Args: {
@@ -303,6 +490,37 @@ export type Database = {
           _telefone?: string
         }
         Returns: string
+      }
+      emitir_senha: {
+        Args: {
+          _clinica_id: string
+          _identificado_facial?: boolean
+          _paciente_id?: string
+          _tipo: Database["public"]["Enums"]["tipo_senha"]
+        }
+        Returns: {
+          atendida_em: string | null
+          cancelada_em: string | null
+          chamada_em: string | null
+          chamada_por: string | null
+          clinica_id: string
+          codigo: string
+          data_dia: string
+          emitida_em: string
+          guiche: string | null
+          id: string
+          identificado_por_facial: boolean
+          numero: number
+          paciente_id: string | null
+          status: Database["public"]["Enums"]["status_senha"]
+          tipo: Database["public"]["Enums"]["tipo_senha"]
+        }
+        SetofOptions: {
+          from: "*"
+          to: "senhas"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       has_role: {
         Args: {
@@ -335,6 +553,8 @@ export type Database = {
         | "cartao_proprio"
         | "boleto"
         | "transferencia"
+      status_senha: "emitida" | "chamada" | "atendida" | "cancelada"
+      tipo_senha: "N" | "P" | "E" | "R"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -480,6 +700,8 @@ export const Constants = {
         "boleto",
         "transferencia",
       ],
+      status_senha: ["emitida", "chamada", "atendida", "cancelada"],
+      tipo_senha: ["N", "P", "E", "R"],
     },
   },
 } as const
