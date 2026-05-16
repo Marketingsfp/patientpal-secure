@@ -4,6 +4,14 @@ import { Activity, Building2, Users, Wallet, LayoutDashboard, LogOut, Stethoscop
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
+
+function corDaClinica(nome?: string): string {
+  const n = (nome ?? "").toLowerCase();
+  if (n.includes("são francisco") || n.includes("sao francisco")) return "#16a34a"; // verde
+  if (n.includes("menino jesus")) return "#1d4ed8"; // azul royal
+  if (n.includes("consulta hoje")) return "#8b5cf6"; // roxinho
+  return "hsl(var(--muted-foreground))";
+}
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -115,7 +123,10 @@ export function AppShell() {
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 border-b border-border bg-card flex items-center justify-between px-6">
-          <div className="text-sm text-muted-foreground">
+          <div className="text-sm font-semibold flex items-center gap-2" style={{ color: corDaClinica(clinicaAtual?.clinica.nome) }}>
+            {clinicaAtual && (
+              <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: corDaClinica(clinicaAtual.clinica.nome) }} />
+            )}
             {clinicaAtual ? clinicaAtual.clinica.nome : "Nenhuma clínica selecionada"}
           </div>
           <div className="flex items-center gap-2">
@@ -129,13 +140,16 @@ export function AppShell() {
             </Suspense>
             {memberships.length > 0 && (
               <Select value={clinicaAtual?.clinica_id} onValueChange={setClinicaAtual}>
-                <SelectTrigger className="w-64">
+                <SelectTrigger className="w-64 font-semibold" style={{ color: corDaClinica(clinicaAtual?.clinica.nome) }}>
                   <SelectValue placeholder="Selecione a clínica" />
                 </SelectTrigger>
                 <SelectContent>
                   {memberships.map((m) => (
                     <SelectItem key={m.clinica_id} value={m.clinica_id}>
-                      {m.clinica.nome} {m.clinica.cidade ? `— ${m.clinica.cidade}` : ""}
+                      <span className="flex items-center gap-2 font-semibold" style={{ color: corDaClinica(m.clinica.nome) }}>
+                        <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: corDaClinica(m.clinica.nome) }} />
+                        {m.clinica.nome} {m.clinica.cidade ? `— ${m.clinica.cidade}` : ""}
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>
