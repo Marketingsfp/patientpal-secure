@@ -29,6 +29,7 @@ import { Route as AuthenticatedAppFinanceiroRouteImport } from './routes/_authen
 import { Route as AuthenticatedAppEstoqueRouteImport } from './routes/_authenticated/app.estoque'
 import { Route as AuthenticatedAppEquipeRouteImport } from './routes/_authenticated/app.equipe'
 import { Route as AuthenticatedAppDocumentosRouteImport } from './routes/_authenticated/app.documentos'
+import { Route as AuthenticatedAppDisponibilidadesRouteImport } from './routes/_authenticated/app.disponibilidades'
 import { Route as AuthenticatedAppCrmRouteImport } from './routes/_authenticated/app.crm'
 import { Route as AuthenticatedAppClinicasRouteImport } from './routes/_authenticated/app.clinicas'
 import { Route as AuthenticatedAppClientesRouteImport } from './routes/_authenticated/app.clientes'
@@ -154,6 +155,12 @@ const AuthenticatedAppDocumentosRoute =
   AuthenticatedAppDocumentosRouteImport.update({
     id: '/documentos',
     path: '/documentos',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppDisponibilidadesRoute =
+  AuthenticatedAppDisponibilidadesRouteImport.update({
+    id: '/disponibilidades',
+    path: '/disponibilidades',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppCrmRoute = AuthenticatedAppCrmRouteImport.update({
@@ -294,6 +301,7 @@ export interface FileRoutesByFullPath {
   '/app/clientes': typeof AuthenticatedAppClientesRoute
   '/app/clinicas': typeof AuthenticatedAppClinicasRoute
   '/app/crm': typeof AuthenticatedAppCrmRoute
+  '/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
   '/app/documentos': typeof AuthenticatedAppDocumentosRoute
   '/app/equipe': typeof AuthenticatedAppEquipeRoute
   '/app/estoque': typeof AuthenticatedAppEstoqueRoute
@@ -335,6 +343,7 @@ export interface FileRoutesByTo {
   '/app/clientes': typeof AuthenticatedAppClientesRoute
   '/app/clinicas': typeof AuthenticatedAppClinicasRoute
   '/app/crm': typeof AuthenticatedAppCrmRoute
+  '/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
   '/app/documentos': typeof AuthenticatedAppDocumentosRoute
   '/app/equipe': typeof AuthenticatedAppEquipeRoute
   '/app/estoque': typeof AuthenticatedAppEstoqueRoute
@@ -378,6 +387,7 @@ export interface FileRoutesById {
   '/_authenticated/app/clientes': typeof AuthenticatedAppClientesRoute
   '/_authenticated/app/clinicas': typeof AuthenticatedAppClinicasRoute
   '/_authenticated/app/crm': typeof AuthenticatedAppCrmRoute
+  '/_authenticated/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
   '/_authenticated/app/documentos': typeof AuthenticatedAppDocumentosRoute
   '/_authenticated/app/equipe': typeof AuthenticatedAppEquipeRoute
   '/_authenticated/app/estoque': typeof AuthenticatedAppEstoqueRoute
@@ -422,6 +432,7 @@ export interface FileRouteTypes {
     | '/app/clientes'
     | '/app/clinicas'
     | '/app/crm'
+    | '/app/disponibilidades'
     | '/app/documentos'
     | '/app/equipe'
     | '/app/estoque'
@@ -463,6 +474,7 @@ export interface FileRouteTypes {
     | '/app/clientes'
     | '/app/clinicas'
     | '/app/crm'
+    | '/app/disponibilidades'
     | '/app/documentos'
     | '/app/equipe'
     | '/app/estoque'
@@ -505,6 +517,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/clientes'
     | '/_authenticated/app/clinicas'
     | '/_authenticated/app/crm'
+    | '/_authenticated/app/disponibilidades'
     | '/_authenticated/app/documentos'
     | '/_authenticated/app/equipe'
     | '/_authenticated/app/estoque'
@@ -683,6 +696,13 @@ declare module '@tanstack/react-router' {
       path: '/documentos'
       fullPath: '/app/documentos'
       preLoaderRoute: typeof AuthenticatedAppDocumentosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/disponibilidades': {
+      id: '/_authenticated/app/disponibilidades'
+      path: '/disponibilidades'
+      fullPath: '/app/disponibilidades'
+      preLoaderRoute: typeof AuthenticatedAppDisponibilidadesRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/crm': {
@@ -894,6 +914,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppClientesRoute: typeof AuthenticatedAppClientesRoute
   AuthenticatedAppClinicasRoute: typeof AuthenticatedAppClinicasRoute
   AuthenticatedAppCrmRoute: typeof AuthenticatedAppCrmRoute
+  AuthenticatedAppDisponibilidadesRoute: typeof AuthenticatedAppDisponibilidadesRoute
   AuthenticatedAppDocumentosRoute: typeof AuthenticatedAppDocumentosRoute
   AuthenticatedAppEquipeRoute: typeof AuthenticatedAppEquipeRoute
   AuthenticatedAppEstoqueRoute: typeof AuthenticatedAppEstoqueRoute
@@ -917,6 +938,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppClientesRoute: AuthenticatedAppClientesRoute,
   AuthenticatedAppClinicasRoute: AuthenticatedAppClinicasRoute,
   AuthenticatedAppCrmRoute: AuthenticatedAppCrmRoute,
+  AuthenticatedAppDisponibilidadesRoute: AuthenticatedAppDisponibilidadesRoute,
   AuthenticatedAppDocumentosRoute: AuthenticatedAppDocumentosRoute,
   AuthenticatedAppEquipeRoute: AuthenticatedAppEquipeRoute,
   AuthenticatedAppEstoqueRoute: AuthenticatedAppEstoqueRoute,
@@ -959,3 +981,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
