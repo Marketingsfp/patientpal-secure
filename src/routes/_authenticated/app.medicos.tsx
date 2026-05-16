@@ -41,7 +41,7 @@ function MedicosPage() {
     nome: "", crm: "", crm_uf: "",
     especialidades: [] as string[],
     tipo_repasse: "percentual" as "percentual" | "valor",
-    percentual: "70",
+    percentual: "50",
     valor: "",
   });
 
@@ -84,7 +84,7 @@ function MedicosPage() {
     setLoading(false);
     toast.success("Médico cadastrado!");
     setOpen(false);
-    setForm({ nome: "", crm: "", crm_uf: "", especialidades: [], tipo_repasse: "percentual", percentual: "70", valor: "" });
+    setForm({ nome: "", crm: "", crm_uf: "", especialidades: [], tipo_repasse: "percentual", percentual: "50", valor: "" });
     void load();
   };
 
