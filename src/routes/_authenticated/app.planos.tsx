@@ -33,7 +33,7 @@ type Plano = {
   ativo: boolean;
 };
 
-function PlanosPage() {
+export function PlanosPage() {
   const { clinicaAtual } = useClinica();
   const [list, setList] = useState<Plano[]>([]);
   const [loading, setLoading] = useState(true);

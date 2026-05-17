@@ -29,7 +29,7 @@ type Contrato = { id: string; numero: number; paciente_nome: string; plano_id: s
 type Mens = { id: string; numero_parcela: number; vencimento: string; valor: number; status: string; pago_em: string | null; forma_pagamento: string | null };
 type Dep = { id: string; paciente_nome: string; parentesco: string | null; tipo: string };
 
-function ContratosPage() {
+export function ContratosPage() {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
   const [list, setList] = useState<Contrato[]>([]);
