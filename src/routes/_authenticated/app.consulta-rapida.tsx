@@ -185,7 +185,7 @@ function ConsultaRapidaPage() {
                       <div className="flex gap-4 text-sm shrink-0">
                         <div className="text-right">
                           <div className="text-[10px] text-muted-foreground uppercase">
-                            Dinheiro/PIX
+                            Dinheiro
                           </div>
                           <div className="font-semibold text-emerald-600">
                             {fmtMoney(p.valor_dinheiro_pix)}
@@ -193,7 +193,7 @@ function ConsultaRapidaPage() {
                         </div>
                         <div className="text-right">
                           <div className="text-[10px] text-muted-foreground uppercase">
-                            Cartão
+                            PIX / Cartão
                           </div>
                           <div className="font-semibold">{fmtMoney(p.valor_cartao)}</div>
                         </div>
