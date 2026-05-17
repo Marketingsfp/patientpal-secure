@@ -2554,6 +2554,7 @@ export type Database = {
         Args: { _clinica_id: string; _user_id: string }
         Returns: boolean
       }
+      meus_cartoes: { Args: never; Returns: Json }
       minhas_consultas: {
         Args: never
         Returns: {
