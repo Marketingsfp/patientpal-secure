@@ -20,6 +20,8 @@ export type Database = {
           created_at: string
           criado_por: string | null
           fim: string
+          fluxo_atualizado_em: string
+          fluxo_etapa: Database["public"]["Enums"]["fluxo_etapa"]
           id: string
           inicio: string
           link_teleconsulta: string | null
@@ -38,6 +40,8 @@ export type Database = {
           created_at?: string
           criado_por?: string | null
           fim: string
+          fluxo_atualizado_em?: string
+          fluxo_etapa?: Database["public"]["Enums"]["fluxo_etapa"]
           id?: string
           inicio: string
           link_teleconsulta?: string | null
@@ -56,6 +60,8 @@ export type Database = {
           created_at?: string
           criado_por?: string | null
           fim?: string
+          fluxo_atualizado_em?: string
+          fluxo_etapa?: Database["public"]["Enums"]["fluxo_etapa"]
           id?: string
           inicio?: string
           link_teleconsulta?: string | null
@@ -2225,6 +2231,14 @@ export type Database = {
       fin_status_lancamento: "pendente" | "confirmado" | "cancelado"
       fin_tipo_conta: "caixa" | "banco" | "cartao" | "maquininha" | "outro"
       fin_tipo_lancamento: "receita" | "despesa"
+      fluxo_etapa:
+        | "aguardando_recepcao"
+        | "recepcao"
+        | "caixa"
+        | "triagem"
+        | "atendimento"
+        | "exame"
+        | "finalizado"
       forma_pagamento:
         | "dinheiro"
         | "pix"
@@ -2415,6 +2429,15 @@ export const Constants = {
       fin_status_lancamento: ["pendente", "confirmado", "cancelado"],
       fin_tipo_conta: ["caixa", "banco", "cartao", "maquininha", "outro"],
       fin_tipo_lancamento: ["receita", "despesa"],
+      fluxo_etapa: [
+        "aguardando_recepcao",
+        "recepcao",
+        "caixa",
+        "triagem",
+        "atendimento",
+        "exame",
+        "finalizado",
+      ],
       forma_pagamento: [
         "dinheiro",
         "pix",
