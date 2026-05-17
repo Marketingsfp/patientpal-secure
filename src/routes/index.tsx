@@ -59,13 +59,13 @@ function LandingPage() {
 
           <nav className="hidden items-center gap-8 md:flex">
             {NAV.map((n) => (
-              <a
+              <Link
                 key={n.label}
-                href={n.hash ? `#${n.hash}` : "/"}
+                to={n.to}
                 className="text-sm font-medium text-foreground/80 transition-colors hover:text-primary"
               >
                 {n.label}
-              </a>
+              </Link>
             ))}
           </nav>
 
