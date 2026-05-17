@@ -784,7 +784,7 @@ function ProcedimentosPage() {
                     onChange={(e) => setForm({ ...form, valor_dinheiro: e.target.value })} />
                 </div>
                 <div className="space-y-1">
-                  <Label>Pix / Crédito / Débito (R$)</Label>
+                  <Label>Cartão (R$)</Label>
                   <Input type="number" step="0.01" min="0" value={form.valor_pix_cartao}
                     onChange={(e) => setForm({ ...form, valor_pix_cartao: e.target.value })} />
                 </div>
