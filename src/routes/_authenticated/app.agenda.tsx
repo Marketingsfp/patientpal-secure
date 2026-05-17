@@ -608,7 +608,21 @@ function AgendaPage() {
           </div>
           <div className="space-y-1">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Cliente</Label>
-            <Input value={filtroCliente} onChange={(e) => setFiltroCliente(e.target.value)} placeholder="Buscar paciente…" />
+            <div className="flex gap-1">
+              <Input value={filtroCliente} onChange={(e) => setFiltroCliente(e.target.value)} placeholder="Buscar paciente…" />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                title="Cadastrar paciente rápido"
+                onClick={() => {
+                  setNovoPac({ nome: filtroCliente.trim(), cpf: "", telefone: "", data_nascimento: "", email: "" });
+                  setNovoPacOpen(true);
+                }}
+              >
+                <UserPlus className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
           <div className="space-y-1">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Nº Ficha</Label>
