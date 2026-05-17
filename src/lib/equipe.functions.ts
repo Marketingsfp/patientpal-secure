@@ -5,9 +5,9 @@ import { z } from "zod";
 
 const ROLES = ["admin", "gestor", "medico", "enfermeiro", "recepcao", "financeiro"] as const;
 
-async function assertManager(supabase: any, clinicaId: string) {
-  const { data, error } = await supabase.rpc("can_manage_clinica", {
-    _user_id: (await supabase.auth.getUser()).data.user?.id,
+async function assertManager(userId: string, clinicaId: string) {
+  const { data, error } = await supabaseAdmin.rpc("can_manage_clinica", {
+    _user_id: userId,
     _clinica_id: clinicaId,
   });
   if (error) throw new Error(error.message);
@@ -64,7 +64,7 @@ export const cadastrarUsuario = createServerFn({ method: "POST" })
     }).parse(input),
   )
   .handler(async ({ data, context }) => {
-    await assertManager(context.supabase, data.clinicaId);
+    await assertManager(context.userId, data.clinicaId);
 
     // Check if user already exists by email
     let userId: string | null = null;
@@ -123,7 +123,7 @@ export const editarMembro = createServerFn({ method: "POST" })
     }).parse(input),
   )
   .handler(async ({ data, context }) => {
-    await assertManager(context.supabase, data.clinicaId);
+    await assertManager(context.userId, data.clinicaId);
 
     const { data: mem, error: mErr } = await supabaseAdmin
       .from("clinica_memberships")
