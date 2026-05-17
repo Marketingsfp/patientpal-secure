@@ -11,9 +11,17 @@ import logoConsultaHoje from "@/assets/logo-consulta-hoje.png";
 function corDaClinica(nome?: string): string {
   const n = (nome ?? "").toLowerCase();
   if (n.includes("são francisco") || n.includes("sao francisco")) return "#16a34a"; // verde
-  if (n.includes("menino jesus")) return "#1d4ed8"; // azul royal
+  if (n.includes("menino jesus")) return "#1e3a8a"; // azul royal mais escuro
   if (n.includes("consulta hoje")) return "#8b5cf6"; // roxinho
   return "hsl(var(--muted-foreground))";
+}
+
+function corHoverDaClinica(nome?: string): string {
+  const n = (nome ?? "").toLowerCase();
+  if (n.includes("são francisco") || n.includes("sao francisco")) return "#14532d"; // verde escuro
+  if (n.includes("menino jesus")) return "#172554"; // azul ainda mais escuro
+  if (n.includes("consulta hoje")) return "#5b21b6"; // roxo escuro
+  return "rgba(0,0,0,0.25)";
 }
 
 function logoDaClinica(nome?: string): string | null {
