@@ -14,7 +14,7 @@ export const SceneAgendar: React.FC = () => {
 
   const slots = ["08:00", "08:30", "09:00", "09:30", "10:00", "10:30"];
   return (
-    <Frame title="Consulta rápida" step="Etapa 2 — Escolher horário">
+    <Frame title="Consulta rápida" step="Etapa 2 — Por senha (horário como referência)">
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1.4fr", gap: 24, opacity: s, transform: `translateY(${(1 - s) * 12}px)` }}>
         <div style={{ background: "#fff", borderRadius: 16, padding: 24, border: `1px solid ${C.line}` }}>
           <div style={{ fontSize: 20, color: C.sub, fontFamily: dm }}>Paciente</div>
@@ -34,24 +34,27 @@ export const SceneAgendar: React.FC = () => {
 
         <div style={{ background: "#fff", borderRadius: 16, padding: 24, border: `1px solid ${C.line}` }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-            <div style={{ fontSize: 22, fontWeight: 600, fontFamily: dm }}>Hoje · 17 de maio</div>
-            <div style={{ fontSize: 18, color: C.sub }}>{slots.length} horários</div>
+            <div style={{ fontSize: 22, fontWeight: 600, fontFamily: dm }}>Hoje · 17 de maio · por ordem de chegada</div>
+            <div style={{ fontSize: 18, color: C.sub }}>{slots.length} senhas</div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
             {slots.map((t, i) => {
               const selected = i === slotIdx;
               const taken = i === 0 || i === 3;
+              const senha = `Nº ${String(i + 1).padStart(3, "0")}`;
               return (
                 <div key={t} style={{
-                  padding: "18px 0", textAlign: "center", borderRadius: 12,
+                  padding: "14px 0 12px", textAlign: "center", borderRadius: 12,
                   background: selected ? C.primary : taken ? "#F2F4F9" : "#fff",
                   color: selected ? "#fff" : taken ? C.sub : C.ink,
                   border: `1px solid ${selected ? C.primary : C.line}`,
-                  fontSize: 22, fontWeight: 600, fontFamily: dm,
                   textDecoration: taken ? "line-through" : "none",
                   boxShadow: selected ? "0 10px 24px rgba(29,78,216,.3)" : "none",
                 }}>
-                  {t}
+                  <div style={{ fontSize: 26, fontWeight: 800, fontFamily: dm, letterSpacing: 0.5 }}>{senha}</div>
+                  <div style={{ fontSize: 14, marginTop: 2, opacity: selected ? 0.85 : 0.6, fontFamily: dm }}>
+                    ref. {t}
+                  </div>
                 </div>
               );
             })}
