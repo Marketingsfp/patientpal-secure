@@ -145,15 +145,12 @@ export function AppShell() {
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 border-b border-border bg-card flex items-center justify-between px-6">
-          <div className="text-sm font-semibold flex items-center gap-3" style={{ color: corDaClinica(clinicaAtual?.clinica.nome) }}>
-            {clinicaAtual && logoDaClinica(clinicaAtual.clinica.nome) && (
-              <img src={logoDaClinica(clinicaAtual.clinica.nome)!} alt="" className="h-8 w-auto object-contain" />
-            )}
-            {clinicaAtual && !logoDaClinica(clinicaAtual.clinica.nome) && (
-              <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: corDaClinica(clinicaAtual.clinica.nome) }} />
-            )}
-            {clinicaAtual ? clinicaAtual.clinica.nome : "Nenhuma clínica selecionada"}
-          </div>
+          <Link to="/app" className="flex items-center gap-2 text-foreground">
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <Activity className="h-5 w-5" />
+            </span>
+            <span className="text-base font-semibold tracking-tight">ClinicaOS</span>
+          </Link>
           <div className="flex items-center gap-2">
             <Suspense fallback={null}>
               <VoiceInput
