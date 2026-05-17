@@ -1,14 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { FileHeart, Plus, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useClinica } from "@/hooks/use-clinica";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SimpleCrud } from "@/components/simple-crud/SimpleCrud";
-import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/app/prontuario-modelos")({
   component: ModelosPage,
@@ -21,22 +17,6 @@ type Form = Omit<Modelo, "id">;
 const EMPTY: Form = { nome: "", prompt_ia: "", ativo: true, secoes: [{ chave: "queixa_principal", titulo: "Queixa principal", placeholder: "" }] };
 
 function ModelosPage() {
-  const { clinicaAtual } = useClinica();
-  const [seeding, setSeeding] = useState(false);
-
-  async function semear() {
-    if (!clinicaAtual) return;
-    setSeeding(true);
-    try {
-      const { error } = await supabase.rpc("seed_prontuario_modelos_padrao", { _clinica_id: clinicaAtual.clinica_id });
-      if (error) throw error;
-      toast.success("Modelos padrão restaurados");
-      window.location.reload();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Falha");
-    } finally { setSeeding(false); }
-  }
-
   return (
     <SimpleCrud<Modelo, Form>
       table="prontuario_modelos"
@@ -45,11 +25,6 @@ function ModelosPage() {
       subtitle="Estrutura SOAP por especialidade, usada no Atendimento com IA."
       icon={<FileHeart className="h-6 w-6 text-primary" />}
       orderBy={{ column: "nome", ascending: true }}
-      extraHeaderActions={
-        <Button variant="outline" size="sm" onClick={semear} disabled={seeding}>
-          Restaurar modelos padrão
-        </Button>
-      }
       columns={[
         { key: "nome", header: "Modelo", render: (r) => <span className="font-medium">{r.nome}</span> },
         { key: "secoes", header: "Seções", render: (r) => <span className="text-sm text-muted-foreground">{r.secoes?.length ?? 0} campos</span> },
