@@ -365,6 +365,10 @@ function ProcedimentosPage() {
     });
   }, [items, busca, filtroTipo, filtroGrupo]);
 
+  // Performance: limita a renderização. O DOM trava com 2000+ linhas de tabela.
+  const LIMITE_RENDER = 200;
+  const visiveis = useMemo(() => filtrados.slice(0, LIMITE_RENDER), [filtrados]);
+
   const openNew = () => { setEditing(null); setForm(EMPTY); setOpen(true); };
   const openEdit = (p: Procedimento) => {
     setEditing(p);
