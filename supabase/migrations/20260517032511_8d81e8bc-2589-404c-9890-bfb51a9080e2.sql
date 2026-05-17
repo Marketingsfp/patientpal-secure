@@ -1,0 +1,1 @@
+UPDATE procedimentos SET valor_pix = valor_cartao_credito WHERE clinica_id='a2e1ffd6-084e-4954-84a0-8fe7788274ae' AND grupo='Oftalmologia';
