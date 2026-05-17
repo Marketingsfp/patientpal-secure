@@ -123,7 +123,7 @@ function NovoContratoDialog({ open, onClose, planos, clinicaId, userId, onCreate
   const [depResults, setDepResults] = useState<Paciente[]>([]);
   const [deps, setDeps] = useState<Array<Paciente & { parentesco: string; tipo: string }>>([]);
   const [saving, setSaving] = useState(false);
-  const [faceOpen, setFaceOpen] = useState<null | { tipo: "titular" } | { tipo: "dep"; idx: number }>(null);
+  const [faceOpen, setFaceOpen] = useState<null | "titular" | number>(null);
 
   useEffect(() => {
     if (plano) { setValor(Number(plano.valor_mensal)); setTaxa(Number(plano.taxa_adesao)); }
@@ -207,7 +207,7 @@ function NovoContratoDialog({ open, onClose, planos, clinicaId, userId, onCreate
                     : <Badge variant="outline" className="gap-1 text-amber-600 border-amber-400">Sem foto</Badge>}
                 </span>
                 <div className="flex gap-1">
-                  <Button size="sm" variant="outline" onClick={() => setFaceOpen({ tipo: "titular" })}>
+                  <Button size="sm" variant="outline" onClick={() => setFaceOpen("titular")}>
                     <Camera className="h-3 w-3 mr-1"/>{titular.face_descriptor?.length ? "Refazer foto" : "Tirar foto"}
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => setTitular(null)}>Trocar</Button>
@@ -269,7 +269,7 @@ function NovoContratoDialog({ open, onClose, planos, clinicaId, userId, onCreate
                       <SelectTrigger className="col-span-2 h-8"><SelectValue/></SelectTrigger>
                       <SelectContent><SelectItem value="dependente">Dependente</SelectItem><SelectItem value="agregado">Agregado</SelectItem></SelectContent>
                     </Select>
-                    <Button size="sm" variant="outline" className="col-span-3 h-8" onClick={() => setFaceOpen({ tipo: "dep", idx: i })}>
+                    <Button size="sm" variant="outline" className="col-span-3 h-8" onClick={() => setFaceOpen(i)}>
                       <Camera className="h-3 w-3 mr-1"/>{d.face_descriptor?.length ? "Refazer" : "Foto"}
                     </Button>
                     <Button size="sm" variant="ghost" className="col-span-1" onClick={() => setDeps(deps.filter((_, j) => j !== i))}><Trash2 className="h-3 w-3 text-destructive"/></Button>
@@ -288,13 +288,15 @@ function NovoContratoDialog({ open, onClose, planos, clinicaId, userId, onCreate
           <FaceCaptureDialog
             open={!!faceOpen}
             onClose={() => setFaceOpen(null)}
-            titulo={faceOpen.tipo === "titular" ? `Foto — ${titular?.nome ?? "Titular"}` : `Foto — ${deps[faceOpen.idx]?.nome ?? "Dependente"}`}
+            titulo={faceOpen === "titular" ? `Foto — ${titular?.nome ?? "Titular"}` : `Foto — ${deps[faceOpen as number]?.nome ?? "Dependente"}`}
             onCaptured={async (descriptor) => {
-              const alvoId = faceOpen.tipo === "titular" ? titular!.id : deps[faceOpen.idx].id;
+              const isTitular = faceOpen === "titular";
+              const idx = typeof faceOpen === "number" ? faceOpen : -1;
+              const alvoId = isTitular ? titular!.id : deps[idx].id;
               const { error } = await supabase.from("pacientes").update({ face_descriptor: descriptor }).eq("id", alvoId);
               if (error) throw error;
-              if (faceOpen.tipo === "titular") setTitular({ ...titular!, face_descriptor: descriptor });
-              else setDeps(deps.map((x, j) => j === faceOpen.idx ? { ...x, face_descriptor: descriptor } : x));
+              if (isTitular) setTitular({ ...titular!, face_descriptor: descriptor });
+              else setDeps(deps.map((x, j) => j === idx ? { ...x, face_descriptor: descriptor } : x));
               toast.success("Foto registrada");
             }}
           />
