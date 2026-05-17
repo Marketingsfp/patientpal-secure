@@ -54,15 +54,20 @@ function RecepcaoPage() {
   useEffect(() => {
     if (!clinicaAtual) return;
     void carregar();
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const debouncedReload = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => { void carregar(); }, 400);
+    };
     const ch = supabase
       .channel(`recepcao-${clinicaAtual.clinica_id}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "senhas", filter: `clinica_id=eq.${clinicaAtual.clinica_id}` },
-        () => void carregar(),
+        debouncedReload,
       )
       .subscribe();
-    return () => { void supabase.removeChannel(ch); };
+    return () => { if (timer) clearTimeout(timer); void supabase.removeChannel(ch); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clinicaAtual?.clinica_id]);
 

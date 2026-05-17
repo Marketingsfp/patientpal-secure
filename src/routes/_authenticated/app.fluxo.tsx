@@ -84,15 +84,20 @@ function FluxoPage() {
   useEffect(() => {
     void carregar();
     if (!clinicaAtual) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const debouncedReload = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => { void carregar(); }, 400);
+    };
     const ch = supabase
       .channel(`fluxo-${clinicaAtual.clinica_id}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "agendamentos", filter: `clinica_id=eq.${clinicaAtual.clinica_id}` },
-        () => void carregar(),
+        debouncedReload,
       )
       .subscribe();
-    return () => { void supabase.removeChannel(ch); };
+    return () => { if (timer) clearTimeout(timer); void supabase.removeChannel(ch); };
   }, [carregar, clinicaAtual]);
 
   async function setEtapa(id: string, etapa: Etapa) {
