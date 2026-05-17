@@ -20,7 +20,6 @@ import { Route as PTokenRouteImport } from './routes/p.$token'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
 import { Route as AuthenticatedAppIndexRouteImport } from './routes/_authenticated/app.index'
 import { Route as AuthenticatedAppRecepcaoRouteImport } from './routes/_authenticated/app.recepcao'
-import { Route as AuthenticatedAppRateioRouteImport } from './routes/_authenticated/app.rateio'
 import { Route as AuthenticatedAppProntuariosRouteImport } from './routes/_authenticated/app.prontuarios'
 import { Route as AuthenticatedAppProcedimentosRouteImport } from './routes/_authenticated/app.procedimentos'
 import { Route as AuthenticatedAppNinaRouteImport } from './routes/_authenticated/app.nina'
@@ -111,11 +110,6 @@ const AuthenticatedAppRecepcaoRoute =
     path: '/recepcao',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
-const AuthenticatedAppRateioRoute = AuthenticatedAppRateioRouteImport.update({
-  id: '/rateio',
-  path: '/rateio',
-  getParentRoute: () => AuthenticatedAppRoute,
-} as any)
 const AuthenticatedAppProntuariosRoute =
   AuthenticatedAppProntuariosRouteImport.update({
     id: '/prontuarios',
@@ -342,7 +336,6 @@ export interface FileRoutesByFullPath {
   '/app/nina': typeof AuthenticatedAppNinaRoute
   '/app/procedimentos': typeof AuthenticatedAppProcedimentosRoute
   '/app/prontuarios': typeof AuthenticatedAppProntuariosRoute
-  '/app/rateio': typeof AuthenticatedAppRateioRoute
   '/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
   '/app/': typeof AuthenticatedAppIndexRoute
   '/app/financeiro/alertas': typeof AuthenticatedAppFinanceiroAlertasRoute
@@ -387,7 +380,6 @@ export interface FileRoutesByTo {
   '/app/nina': typeof AuthenticatedAppNinaRoute
   '/app/procedimentos': typeof AuthenticatedAppProcedimentosRoute
   '/app/prontuarios': typeof AuthenticatedAppProntuariosRoute
-  '/app/rateio': typeof AuthenticatedAppRateioRoute
   '/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
   '/app': typeof AuthenticatedAppIndexRoute
   '/app/financeiro/alertas': typeof AuthenticatedAppFinanceiroAlertasRoute
@@ -436,7 +428,6 @@ export interface FileRoutesById {
   '/_authenticated/app/nina': typeof AuthenticatedAppNinaRoute
   '/_authenticated/app/procedimentos': typeof AuthenticatedAppProcedimentosRoute
   '/_authenticated/app/prontuarios': typeof AuthenticatedAppProntuariosRoute
-  '/_authenticated/app/rateio': typeof AuthenticatedAppRateioRoute
   '/_authenticated/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
   '/_authenticated/app/': typeof AuthenticatedAppIndexRoute
   '/_authenticated/app/financeiro/alertas': typeof AuthenticatedAppFinanceiroAlertasRoute
@@ -485,7 +476,6 @@ export interface FileRouteTypes {
     | '/app/nina'
     | '/app/procedimentos'
     | '/app/prontuarios'
-    | '/app/rateio'
     | '/app/recepcao'
     | '/app/'
     | '/app/financeiro/alertas'
@@ -530,7 +520,6 @@ export interface FileRouteTypes {
     | '/app/nina'
     | '/app/procedimentos'
     | '/app/prontuarios'
-    | '/app/rateio'
     | '/app/recepcao'
     | '/app'
     | '/app/financeiro/alertas'
@@ -578,7 +567,6 @@ export interface FileRouteTypes {
     | '/_authenticated/app/nina'
     | '/_authenticated/app/procedimentos'
     | '/_authenticated/app/prontuarios'
-    | '/_authenticated/app/rateio'
     | '/_authenticated/app/recepcao'
     | '/_authenticated/app/'
     | '/_authenticated/app/financeiro/alertas'
@@ -685,13 +673,6 @@ declare module '@tanstack/react-router' {
       path: '/recepcao'
       fullPath: '/app/recepcao'
       preLoaderRoute: typeof AuthenticatedAppRecepcaoRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/rateio': {
-      id: '/_authenticated/app/rateio'
-      path: '/rateio'
-      fullPath: '/app/rateio'
-      preLoaderRoute: typeof AuthenticatedAppRateioRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/prontuarios': {
@@ -1007,7 +988,6 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppNinaRoute: typeof AuthenticatedAppNinaRoute
   AuthenticatedAppProcedimentosRoute: typeof AuthenticatedAppProcedimentosRoute
   AuthenticatedAppProntuariosRoute: typeof AuthenticatedAppProntuariosRoute
-  AuthenticatedAppRateioRoute: typeof AuthenticatedAppRateioRoute
   AuthenticatedAppRecepcaoRoute: typeof AuthenticatedAppRecepcaoRoute
   AuthenticatedAppIndexRoute: typeof AuthenticatedAppIndexRoute
 }
@@ -1034,7 +1014,6 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppNinaRoute: AuthenticatedAppNinaRoute,
   AuthenticatedAppProcedimentosRoute: AuthenticatedAppProcedimentosRoute,
   AuthenticatedAppProntuariosRoute: AuthenticatedAppProntuariosRoute,
-  AuthenticatedAppRateioRoute: AuthenticatedAppRateioRoute,
   AuthenticatedAppRecepcaoRoute: AuthenticatedAppRecepcaoRoute,
   AuthenticatedAppIndexRoute: AuthenticatedAppIndexRoute,
 }
@@ -1067,3 +1046,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
