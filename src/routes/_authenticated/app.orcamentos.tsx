@@ -219,14 +219,18 @@ function NovoOrcamentoDialog({
     return () => { cancel = true; clearTimeout(t); };
   }, [procQuery, clinicaId]);
 
-  const valorDoProc = (p: Procedimento) => {
-    const f = formasPagamento[0] ?? "Dinheiro";
+  const valorPorForma = (p: Procedimento, f: string) => {
     if (f === "Dinheiro") return Number(p.valor_dinheiro ?? p.valor_dinheiro_pix ?? p.valor_padrao ?? 0);
     if (f === "PIX") return Number(p.valor_pix ?? p.valor_dinheiro_pix ?? p.valor_padrao ?? 0);
     if (f === "Cartão de Crédito") return Number(p.valor_cartao_credito ?? p.valor_cartao ?? p.valor_padrao ?? 0);
     if (f === "Cartão de Débito") return Number(p.valor_cartao_debito ?? p.valor_cartao ?? p.valor_padrao ?? 0);
     return Number(p.valor_padrao ?? p.valor_dinheiro_pix ?? 0);
   };
+  const valorDoProc = (p: Procedimento) => valorPorForma(p, formasPagamento[0] ?? "Dinheiro");
+  const abreviar = (f: string) =>
+    f === "Cartão de Crédito" ? "Crédito"
+    : f === "Cartão de Débito" ? "Débito"
+    : f;
 
   const toggleForma = (f: string) => {
     setFormasPagamento((cur) => {
