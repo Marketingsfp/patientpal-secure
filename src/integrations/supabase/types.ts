@@ -1401,6 +1401,8 @@ export type Database = {
           especialidade_id: string | null
           estado: string | null
           estado_civil: string | null
+          face_atualizado_em: string | null
+          face_descriptor: number[] | null
           id: string
           logradouro: string | null
           nacionalidade: string | null
@@ -1435,6 +1437,8 @@ export type Database = {
           especialidade_id?: string | null
           estado?: string | null
           estado_civil?: string | null
+          face_atualizado_em?: string | null
+          face_descriptor?: number[] | null
           id?: string
           logradouro?: string | null
           nacionalidade?: string | null
@@ -1469,6 +1473,8 @@ export type Database = {
           especialidade_id?: string | null
           estado?: string | null
           estado_civil?: string | null
+          face_atualizado_em?: string | null
+          face_descriptor?: number[] | null
           id?: string
           logradouro?: string | null
           nacionalidade?: string | null
@@ -1757,6 +1763,8 @@ export type Database = {
           data_nascimento: string | null
           email: string | null
           estado: string | null
+          face_atualizado_em: string | null
+          face_descriptor: number[] | null
           id: string
           logradouro: string | null
           nome: string
@@ -1782,6 +1790,8 @@ export type Database = {
           data_nascimento?: string | null
           email?: string | null
           estado?: string | null
+          face_atualizado_em?: string | null
+          face_descriptor?: number[] | null
           id?: string
           logradouro?: string | null
           nome: string
@@ -1807,6 +1817,8 @@ export type Database = {
           data_nascimento?: string | null
           email?: string | null
           estado?: string | null
+          face_atualizado_em?: string | null
+          face_descriptor?: number[] | null
           id?: string
           logradouro?: string | null
           nome?: string
@@ -2554,6 +2566,16 @@ export type Database = {
         Args: { _clinica_id: string; _user_id: string }
         Returns: boolean
       }
+      medicos_face_lista: {
+        Args: { _clinica_id: string }
+        Returns: {
+          descriptor: number[]
+          email: string
+          id: string
+          nome: string
+          user_id: string
+        }[]
+      }
       meus_cartoes: { Args: never; Returns: Json }
       minhas_consultas: {
         Args: never
@@ -2571,6 +2593,15 @@ export type Database = {
           token_publico: string
         }[]
       }
+      pacientes_face_lista: {
+        Args: { _clinica_id: string }
+        Returns: {
+          descriptor: number[]
+          id: string
+          nome: string
+        }[]
+      }
+      pendencias_paciente: { Args: { _paciente_id: string }; Returns: Json }
       salvar_anamnese_publica: {
         Args: { _modelo_id: string; _respostas: Json; _token: string }
         Returns: string
