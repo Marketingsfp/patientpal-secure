@@ -25,7 +25,7 @@ const BRL = (v: number) => Number(v || 0).toLocaleString("pt-BR", { style: "curr
 const fmtD = (s?: string | null) => (s ? new Date(s + (s.length === 10 ? "T00:00:00" : "")).toLocaleDateString("pt-BR") : "—");
 
 type Plano = { id: string; nome: string; tipo: string; valor_mensal: number; taxa_adesao: number; max_dependentes: number; max_agregados: number; num_parcelas: number; vigencia_meses: number };
-type Paciente = { id: string; nome: string; cpf: string | null; telefone: string | null };
+type Paciente = { id: string; nome: string; cpf: string | null; telefone: string | null; email: string | null };
 type Contrato = { id: string; numero: number; paciente_nome: string; plano_id: string; valor_mensal: number; status: string; data_inicio: string; data_fim: string | null; assinado_em: string | null; token_publico: string; forma_pagamento: string | null };
 type Mens = { id: string; numero_parcela: number; vencimento: string; valor: number; status: string; pago_em: string | null; forma_pagamento: string | null };
 type Dep = { id: string; paciente_nome: string; parentesco: string | null; tipo: string };
@@ -130,7 +130,7 @@ function NovoContratoDialog({ open, onClose, planos, clinicaId, userId, onCreate
   const buscarPac = async (term: string, setRes: (r: Paciente[]) => void) => {
     if (term.trim().length < 2) return setRes([]);
     const { data } = await supabase.from("pacientes")
-      .select("id, nome, cpf, telefone").eq("clinica_id", clinicaId).eq("ativo", true)
+      .select("id, nome, cpf, telefone, email").eq("clinica_id", clinicaId).eq("ativo", true)
       .ilike("nome", `%${term}%`).limit(8);
     setRes((data ?? []) as Paciente[]);
   };
@@ -146,6 +146,9 @@ function NovoContratoDialog({ open, onClose, planos, clinicaId, userId, onCreate
 
   const salvar = async () => {
     if (!titular || !plano) return toast.error("Selecione paciente e plano");
+    if (!titular.email) return toast.error("Titular precisa ter e-mail para acessar o app. Cadastre o e-mail no paciente antes de gerar o contrato.");
+    const semEmailDeps = deps.filter((d) => !d.email);
+    if (semEmailDeps.length > 0 && !confirm(`${semEmailDeps.length} dependente(s) sem e-mail não conseguirão acessar o app. Continuar mesmo assim?`)) return;
     setSaving(true);
     const { data: contrato, error } = await supabase.from("contratos_assinatura").insert({
       clinica_id: clinicaId, plano_id: plano.id, paciente_id: titular.id, paciente_nome: titular.nome,
