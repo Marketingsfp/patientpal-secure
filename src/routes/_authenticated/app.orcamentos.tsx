@@ -49,6 +49,7 @@ type Item = {
   valor_unitario: number;
   procedimento_id: string | null;
   preparo: string | null;
+  valores_formas?: Record<string, number> | null;
 };
 
 const FORMAS = ["Dinheiro", "PIX", "Cartão de Crédito", "Cartão de Débito", "Boleto", "Outro"];
@@ -219,14 +220,18 @@ function NovoOrcamentoDialog({
     return () => { cancel = true; clearTimeout(t); };
   }, [procQuery, clinicaId]);
 
-  const valorDoProc = (p: Procedimento) => {
-    const f = formasPagamento[0] ?? "Dinheiro";
+  const valorPorForma = (p: Procedimento, f: string) => {
     if (f === "Dinheiro") return Number(p.valor_dinheiro ?? p.valor_dinheiro_pix ?? p.valor_padrao ?? 0);
     if (f === "PIX") return Number(p.valor_pix ?? p.valor_dinheiro_pix ?? p.valor_padrao ?? 0);
     if (f === "Cartão de Crédito") return Number(p.valor_cartao_credito ?? p.valor_cartao ?? p.valor_padrao ?? 0);
     if (f === "Cartão de Débito") return Number(p.valor_cartao_debito ?? p.valor_cartao ?? p.valor_padrao ?? 0);
     return Number(p.valor_padrao ?? p.valor_dinheiro_pix ?? 0);
   };
+  const valorDoProc = (p: Procedimento) => valorPorForma(p, formasPagamento[0] ?? "Dinheiro");
+  const abreviar = (f: string) =>
+    f === "Cartão de Crédito" ? "Crédito"
+    : f === "Cartão de Débito" ? "Débito"
+    : f;
 
   const toggleForma = (f: string) => {
     setFormasPagamento((cur) => {
@@ -240,7 +245,17 @@ function NovoOrcamentoDialog({
   };
 
   const adicionarProc = (p: Procedimento) => {
-    setItens((arr) => [...arr, { descricao: p.nome, quantidade: 1, valor_unitario: valorDoProc(p), procedimento_id: p.id, preparo: p.preparo ?? null }]);
+    const formas = formasPagamento.length ? formasPagamento : ["Dinheiro"];
+    const valores: Record<string, number> = {};
+    for (const f of formas) valores[f] = valorPorForma(p, f);
+    setItens((arr) => [...arr, {
+      descricao: p.nome,
+      quantidade: 1,
+      valor_unitario: valorDoProc(p),
+      procedimento_id: p.id,
+      preparo: p.preparo ?? null,
+      valores_formas: valores,
+    }]);
     if (p.preparo && p.preparo.trim()) {
       toast.warning(`⚠ ${p.nome} exige preparo`, { description: p.preparo, duration: 6000 });
     }
@@ -353,7 +368,14 @@ function NovoOrcamentoDialog({
                           </span>
                         )}
                       </span>
-                      <span className="text-sm font-semibold text-primary whitespace-nowrap">{BRL(valorDoProc(p))}</span>
+                      <span className="text-sm font-semibold whitespace-nowrap flex gap-2">
+                        {(formasPagamento.length ? formasPagamento : ["Dinheiro"]).map((f, i) => (
+                          <span key={f} className={i === 0 ? "text-primary" : "text-muted-foreground"}>
+                            <span className="text-[10px] uppercase mr-1">{abreviar(f)}</span>
+                            {BRL(valorPorForma(p, f))}
+                          </span>
+                        ))}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -390,7 +412,18 @@ function NovoOrcamentoDialog({
                 <tbody>
                   {itens.map((it, idx) => (
                     <tr key={idx} className="border-t">
-                      <td className="px-2 py-1"><Input value={it.descricao} onChange={(e) => setItens((a) => a.map((x, i) => i === idx ? { ...x, descricao: e.target.value } : x))} /></td>
+                      <td className="px-2 py-1">
+                        <Input value={it.descricao} onChange={(e) => setItens((a) => a.map((x, i) => i === idx ? { ...x, descricao: e.target.value } : x))} />
+                        {formasPagamento.length > 1 && it.valores_formas && (
+                          <div className="flex gap-3 mt-1 text-[11px] text-muted-foreground">
+                            {formasPagamento.map((f) => (
+                              <span key={f}>
+                                <b className="uppercase">{abreviar(f)}:</b> {BRL(Number(it.valores_formas?.[f] ?? 0))}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </td>
                       <td className="px-2 py-1"><Input type="number" min={1} step="1" value={it.quantidade} onChange={(e) => setItens((a) => a.map((x, i) => i === idx ? { ...x, quantidade: Number(e.target.value) || 0 } : x))} /></td>
                       <td className="px-2 py-1"><Input type="number" step="0.01" value={it.valor_unitario} onChange={(e) => setItens((a) => a.map((x, i) => i === idx ? { ...x, valor_unitario: Number(e.target.value) || 0 } : x))} /></td>
                       <td className="px-2 py-1 text-right font-medium">{BRL(it.quantidade * it.valor_unitario)}</td>
