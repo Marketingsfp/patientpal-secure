@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { ChevronLeft, ChevronRight, CheckCircle2, Workflow } from "lucide-react";
+import { PendenciasAlert } from "@/components/PendenciasAlert";
 
 export const Route = createFileRoute("/_authenticated/app/fluxo")({
   component: FluxoPage,
@@ -34,6 +35,7 @@ const ETAPAS: { id: Etapa; label: string; cor: string }[] = [
 
 type Ag = {
   id: string;
+  paciente_id: string | null;
   paciente_nome: string;
   procedimento: string | null;
   inicio: string;
@@ -69,7 +71,7 @@ function FluxoPage() {
     const fim = `${hoje}T23:59:59`;
     const { data, error } = await supabase
       .from("agendamentos")
-      .select("id, paciente_nome, procedimento, inicio, fluxo_etapa, medicos(nome)")
+      .select("id, paciente_id, paciente_nome, procedimento, inicio, fluxo_etapa, medicos(nome)")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .gte("inicio", ini)
       .lte("inicio", fim)
