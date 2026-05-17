@@ -118,7 +118,10 @@ export function AppShell() {
     <div className="min-h-screen flex bg-muted/30">
       <aside
         className="w-64 text-white flex flex-col shrink-0"
-        style={{ backgroundColor: clinicaAtual ? corDaClinica(clinicaAtual.clinica.nome) : undefined }}
+        style={{
+          backgroundColor: clinicaAtual ? corDaClinica(clinicaAtual.clinica.nome) : undefined,
+          ["--nav-hover" as never]: clinicaAtual ? corHoverDaClinica(clinicaAtual.clinica.nome) : "rgba(0,0,0,0.25)",
+        }}
       >
         <div className="px-4 py-4 flex items-center justify-center gap-2 border-b border-white/20 min-h-[88px] text-white">
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/15 backdrop-blur">
@@ -136,11 +139,11 @@ export function AppShell() {
                 to={item.to}
                 className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold tracking-wide transition-colors ${
                   active
-                    ? "bg-[#14532d] text-white"
-                    : "text-white hover:bg-[#14532d] hover:text-white"
+                    ? "bg-[var(--nav-hover)] text-white"
+                    : "text-white hover:bg-[var(--nav-hover)] hover:text-white"
                 }`}
               >
-                <item.icon className="h-4 w-4" style={{ color: item.iconColor }} />
+                <item.icon className="h-4 w-4 text-white" />
                 {item.label}
               </Link>
             );
