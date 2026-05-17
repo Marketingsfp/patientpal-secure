@@ -90,7 +90,7 @@ const SceneAgenda: React.FC = () => {
             })}
           </div>
           {opened && (
-            <p style={{ marginTop: 18, fontFamily: inter.fontFamily, fontSize: 22, opacity: 0.6, transform: `translateY(${(1 - openSpring) * 10}px)`, opacity: openSpring }}>
+            <p style={{ marginTop: 18, fontFamily: inter.fontFamily, fontSize: 22, color: theme.ink, opacity: openSpring * 0.7, transform: `translateY(${(1 - openSpring) * 10}px)` }}>
               Os pacientes já podem agendar online.
             </p>
           )}
