@@ -1265,6 +1265,39 @@ export type Database = {
           },
         ]
       }
+      medico_biometria: {
+        Row: {
+          clinica_id: string
+          consentimento_em: string
+          created_at: string
+          descriptor: Json
+          id: string
+          medico_id: string
+          revogado_em: string | null
+          user_id: string | null
+        }
+        Insert: {
+          clinica_id: string
+          consentimento_em?: string
+          created_at?: string
+          descriptor: Json
+          id?: string
+          medico_id: string
+          revogado_em?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          clinica_id?: string
+          consentimento_em?: string
+          created_at?: string
+          descriptor?: Json
+          id?: string
+          medico_id?: string
+          revogado_em?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       medico_convenios: {
         Row: {
           ativo: boolean
@@ -2569,9 +2602,9 @@ export type Database = {
       medicos_face_lista: {
         Args: { _clinica_id: string }
         Returns: {
-          descriptor: number[]
+          descriptor: Json
           email: string
-          id: string
+          medico_id: string
           nome: string
           user_id: string
         }[]
@@ -2596,7 +2629,7 @@ export type Database = {
       pacientes_face_lista: {
         Args: { _clinica_id: string }
         Returns: {
-          descriptor: number[]
+          descriptor: Json
           id: string
           nome: string
         }[]
