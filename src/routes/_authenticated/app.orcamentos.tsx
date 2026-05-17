@@ -412,7 +412,18 @@ function NovoOrcamentoDialog({
                 <tbody>
                   {itens.map((it, idx) => (
                     <tr key={idx} className="border-t">
-                      <td className="px-2 py-1"><Input value={it.descricao} onChange={(e) => setItens((a) => a.map((x, i) => i === idx ? { ...x, descricao: e.target.value } : x))} /></td>
+                      <td className="px-2 py-1">
+                        <Input value={it.descricao} onChange={(e) => setItens((a) => a.map((x, i) => i === idx ? { ...x, descricao: e.target.value } : x))} />
+                        {formasPagamento.length > 1 && it.valores_formas && (
+                          <div className="flex gap-3 mt-1 text-[11px] text-muted-foreground">
+                            {formasPagamento.map((f) => (
+                              <span key={f}>
+                                <b className="uppercase">{abreviar(f)}:</b> {BRL(Number(it.valores_formas?.[f] ?? 0))}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </td>
                       <td className="px-2 py-1"><Input type="number" min={1} step="1" value={it.quantidade} onChange={(e) => setItens((a) => a.map((x, i) => i === idx ? { ...x, quantidade: Number(e.target.value) || 0 } : x))} /></td>
                       <td className="px-2 py-1"><Input type="number" step="0.01" value={it.valor_unitario} onChange={(e) => setItens((a) => a.map((x, i) => i === idx ? { ...x, valor_unitario: Number(e.target.value) || 0 } : x))} /></td>
                       <td className="px-2 py-1 text-right font-medium">{BRL(it.quantidade * it.valor_unitario)}</td>
