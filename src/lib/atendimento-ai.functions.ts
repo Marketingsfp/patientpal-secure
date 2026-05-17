@@ -105,7 +105,12 @@ NÃO substitua o julgamento clínico do médico. Use português do Brasil.`;
     const content = json.choices?.[0]?.message?.content ?? "{}";
     const parsed = extractJson(content) as { cids?: Array<{ codigo?: string; descricao?: string }>; exames?: string[]; prescricao?: string };
     return {
-      cids: Array.isArray(parsed.cids) ? parsed.cids.filter((c) => c?.codigo).slice(0, 5) : [],
+      cids: Array.isArray(parsed.cids)
+        ? parsed.cids
+            .filter((c) => c?.codigo)
+            .slice(0, 5)
+            .map((c) => ({ codigo: String(c.codigo ?? ""), descricao: String(c.descricao ?? "") }))
+        : [],
       exames: Array.isArray(parsed.exames) ? parsed.exames.filter(Boolean).slice(0, 8) : [],
       prescricao: typeof parsed.prescricao === "string" ? parsed.prescricao : "",
     };
