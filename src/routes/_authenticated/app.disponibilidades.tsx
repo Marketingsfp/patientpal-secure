@@ -25,7 +25,7 @@ function Page() {
   const [disps, setDisps] = useState<Disp[]>([]);
   const [filtro, setFiltro] = useState("");
   const [novo, setNovo] = useState({ medico_id: "", dia_semana: "1", hora_inicio: "08:00", hora_fim: "12:00" });
-  const [gerar, setGerar] = useState({ medico_id: "all", duracao: "30", dias: "30" });
+  const [gerar, setGerar] = useState({ medico_id: "all", duracao: "5", dias: "30" });
   const [gerando, setGerando] = useState(false);
 
   const load = async () => {
