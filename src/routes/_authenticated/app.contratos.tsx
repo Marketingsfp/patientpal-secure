@@ -146,7 +146,6 @@ function NovoContratoDialog({ open, onClose, planos, clinicaId, userId, onCreate
 
   const salvar = async () => {
     if (!titular || !plano) return toast.error("Selecione paciente e plano");
-    if (!titular->{}, false) {} // placeholder
     if (!titular.email) return toast.error("Titular precisa ter e-mail para acessar o app. Cadastre o e-mail no paciente antes de gerar o contrato.");
     const semEmailDeps = deps.filter((d) => !d.email);
     if (semEmailDeps.length > 0 && !confirm(`${semEmailDeps.length} dependente(s) sem e-mail não conseguirão acessar o app. Continuar mesmo assim?`)) return;
