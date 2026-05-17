@@ -38,6 +38,7 @@ interface Medico {
   medico_especialidades: { especialidade: { id: string; nome: string } | null }[];
 }
 interface Especialidade { id: string; nome: string }
+interface Procedimento { id: string; nome: string; grupo: string | null; tipo: string; valor_padrao: number }
 interface ConvenioRow {
   id?: string;
   nome: string;
@@ -56,6 +57,9 @@ function MedicosPage() {
   const { clinicaAtual } = useClinica();
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [esps, setEsps] = useState<Especialidade[]>([]);
+  const [procs, setProcs] = useState<Procedimento[]>([]);
+  const [procFilter, setProcFilter] = useState("");
+  const [procGrupo, setProcGrupo] = useState<string>("__todos__");
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -88,6 +92,17 @@ function MedicosPage() {
     void load();
     supabase.from("especialidades").select("id, nome").order("nome").then(({ data }) => setEsps(data ?? []));
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [clinicaAtual?.clinica_id]);
+
+  useEffect(() => {
+    if (!clinicaAtual) return;
+    supabase
+      .from("procedimentos")
+      .select("id, nome, grupo, tipo, valor_padrao")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("ativo", true)
+      .order("nome")
+      .then(({ data }) => setProcs((data as Procedimento[]) ?? []));
   }, [clinicaAtual?.clinica_id]);
 
   const resetForm = () => {
@@ -461,13 +476,72 @@ function MedicosPage() {
                     <div className="flex items-center justify-between">
                       <div>
                         <Label>Convênios / Procedimentos</Label>
-                        <p className="text-xs text-muted-foreground">Cartão Consulta, Cartão Desconto, fimose e outros procedimentos.</p>
+                        <p className="text-xs text-muted-foreground">Selecione procedimentos cadastrados ou adicione manualmente (ex: Cartão Consulta).</p>
                       </div>
                       <Button type="button" size="sm" variant="outline"
                         onClick={() => setConvenios((cs) => [...cs, { nome: "", tipo_repasse: "percentual", percentual: "50", valor: "", ativo: true }])}>
-                        <Plus className="h-4 w-4 mr-1" /> Adicionar
+                        <Plus className="h-4 w-4 mr-1" /> Manual
                       </Button>
                     </div>
+
+                    {/* Picker de procedimentos cadastrados */}
+                    <div className="rounded-md border p-2 space-y-2 bg-muted/30">
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input
+                          placeholder="Filtrar procedimento..."
+                          value={procFilter}
+                          onChange={(e) => setProcFilter(e.target.value)}
+                          className="h-8"
+                        />
+                        <select
+                          className="h-8 rounded-md border bg-background px-2 text-sm"
+                          value={procGrupo}
+                          onChange={(e) => setProcGrupo(e.target.value)}
+                        >
+                          <option value="__todos__">Todos os grupos</option>
+                          {Array.from(new Set(procs.map((p) => p.grupo).filter(Boolean) as string[]))
+                            .sort()
+                            .map((g) => (
+                              <option key={g} value={g}>{g}</option>
+                            ))}
+                        </select>
+                      </div>
+                      <div className="max-h-48 overflow-y-auto space-y-1">
+                        {procs.length === 0 && (
+                          <p className="text-xs text-muted-foreground text-center py-3">
+                            Nenhum procedimento cadastrado. Cadastre em "Procedimentos".
+                          </p>
+                        )}
+                        {procs
+                          .filter((p) => procGrupo === "__todos__" || p.grupo === procGrupo)
+                          .filter((p) => p.nome.toLowerCase().includes(procFilter.toLowerCase()))
+                          .map((p) => {
+                            const checked = convenios.some((c) => c.nome.trim().toLowerCase() === p.nome.toLowerCase());
+                            return (
+                              <label key={p.id} className="flex items-center gap-2 text-sm py-1 px-1 hover:bg-background rounded cursor-pointer">
+                                <Checkbox
+                                  checked={checked}
+                                  onCheckedChange={(v) => {
+                                    if (v) {
+                                      setConvenios((cs) => [...cs, {
+                                        nome: p.nome, tipo_repasse: form.tipo_repasse,
+                                        percentual: form.percentual || "50",
+                                        valor: form.valor || "",
+                                        ativo: true,
+                                      }]);
+                                    } else {
+                                      setConvenios((cs) => cs.filter((c) => c.nome.trim().toLowerCase() !== p.nome.toLowerCase()));
+                                    }
+                                  }}
+                                />
+                                <span className="flex-1 truncate">{p.nome}</span>
+                                {p.grupo && <span className="text-xs text-muted-foreground">{p.grupo}</span>}
+                              </label>
+                            );
+                          })}
+                      </div>
+                    </div>
+
                     <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
                       {convenios.map((c, i) => (
                         <div key={i} className="grid grid-cols-12 gap-2 items-end border rounded-md p-2">
