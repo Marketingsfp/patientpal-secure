@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
-import { Activity, Mail, Lock, Eye, EyeOff, ShieldCheck, CalendarCheck2, Stethoscope } from "lucide-react";
+import { Activity, Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -36,42 +36,9 @@ function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen grid lg:grid-cols-2 bg-background">
-      {/* Brand panel */}
-      <div className="relative hidden lg:flex flex-col justify-between overflow-hidden bg-gradient-to-br from-primary via-primary to-emerald-700 text-primary-foreground p-12">
-        <div className="absolute inset-0 opacity-20 pointer-events-none">
-          <div className="absolute -top-24 -left-24 h-96 w-96 rounded-full bg-white/30 blur-3xl" />
-          <div className="absolute bottom-0 right-0 h-[28rem] w-[28rem] rounded-full bg-emerald-300/40 blur-3xl" />
-        </div>
-        <Link to="/" className="relative flex items-center gap-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/15 backdrop-blur">
-            <Activity className="h-5 w-5" />
-          </div>
-          <span className="text-xl font-semibold tracking-tight">ClinicaOS</span>
-        </Link>
-        <div className="relative space-y-6 max-w-md">
-          <h2 className="text-4xl font-semibold leading-tight">Gerencie sua clínica com leveza.</h2>
-          <p className="text-base text-primary-foreground/80">Agenda, prontuário, financeiro e equipe em um só lugar — pensado para o dia a dia da sua operação.</p>
-          <ul className="space-y-3 pt-2">
-            {[
-              { icon: CalendarCheck2, label: "Agenda inteligente com confirmação automática" },
-              { icon: Stethoscope, label: "Cadastro de pacientes, procedimentos e equipe" },
-              { icon: ShieldCheck, label: "Dados protegidos com isolamento por clínica" },
-            ].map(({ icon: Icon, label }) => (
-              <li key={label} className="flex items-center gap-3 text-sm">
-                <span className="flex h-8 w-8 items-center justify-center rounded-md bg-white/15 backdrop-blur">
-                  <Icon className="h-4 w-4" />
-                </span>
-                {label}
-              </li>
-            ))}
-          </ul>
-        </div>
-        <p className="relative text-xs text-primary-foreground/60">© {new Date().getFullYear()} ClinicaOS — todos os direitos reservados.</p>
-      </div>
-
+    <div className="min-h-screen flex items-center justify-center bg-background">
       {/* Form panel */}
-      <div className="flex items-center justify-center px-6 py-12 sm:px-10">
+      <div className="flex items-center justify-center px-6 py-12 sm:px-10 w-full">
         <div className="w-full max-w-md">
           <Link to="/" className="flex lg:hidden items-center justify-center gap-2 mb-8">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
