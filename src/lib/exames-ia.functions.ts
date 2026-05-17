@@ -1,0 +1,112 @@
+import { createServerFn } from "@tanstack/react-start";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { z } from "zod";
+
+const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const MODEL = "google/gemini-2.5-flash";
+
+async function callAI(body: Record<string, unknown>) {
+  const key = process.env.LOVABLE_API_KEY;
+  if (!key) throw new Error("LOVABLE_API_KEY ausente");
+  const res = await fetch(GATEWAY, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ model: MODEL, ...body }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    console.error("Lovable AI error", res.status, text);
+    if (res.status === 429) throw new Error("Limite de uso atingido. Tente em instantes.");
+    if (res.status === 402) throw new Error("Créditos de IA esgotados.");
+    throw new Error(`Falha IA (${res.status})`);
+  }
+  return (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+}
+
+function extractJson(text: string): unknown {
+  const cleaned = text.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "").trim();
+  const start = cleaned.indexOf("{");
+  const end = cleaned.lastIndexOf("}");
+  if (start < 0 || end < 0) throw new Error("Resposta IA não é JSON");
+  return JSON.parse(cleaned.slice(start, end + 1));
+}
+
+const Schema = z.object({
+  tipo_exame: z.string().min(1).max(200),
+  resultado_texto: z.string().min(3).max(20_000),
+  paciente_nome: z.string().max(200).optional(),
+  idade: z.number().min(0).max(130).optional(),
+  sexo: z.enum(["M", "F", "O"]).optional(),
+  contexto: z.string().max(2000).optional(),
+});
+
+export type ClassificacaoExame = {
+  status: "normal" | "alterado" | "critico";
+  severidade: "baixa" | "media" | "alta";
+  achados_relevantes: string[];
+  resumo: string;
+  recomendacao: string;
+  mensagem_paciente: string;
+  precisa_contato: boolean;
+};
+
+export const classificarResultadoExame = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => Schema.parse(i))
+  .handler(async ({ data }): Promise<ClassificacaoExame> => {
+    const sys = `Você é uma enfermeira clínica experiente analisando resultados de exames em português do Brasil.
+Receberá o nome do exame e o texto do resultado e deve classificar.
+Use a melhor evidência clínica. Seja objetiva.
+
+Responda APENAS um JSON com este formato exato:
+{
+  "status": "normal" | "alterado" | "critico",
+  "severidade": "baixa" | "media" | "alta",
+  "achados_relevantes": ["item curto", "..."],
+  "resumo": "1-2 frases para o prontuário",
+  "recomendacao": "conduta sugerida para a equipe (ex: solicitar retorno, exame complementar)",
+  "mensagem_paciente": "mensagem curta, empática, em português coloquial, sem causar pânico, orientando o próximo passo. Não dê diagnóstico definitivo.",
+  "precisa_contato": true|false
+}
+
+Regras:
+- "critico" = valor com risco iminente que exige contato imediato.
+- "alterado" = fora da faixa, mas sem urgência imediata.
+- "normal" = dentro da faixa de referência.
+- "precisa_contato" deve ser true se status != "normal".`;
+
+    const user = `Paciente: ${data.paciente_nome ?? "—"}${data.idade ? `, ${data.idade} anos` : ""}${data.sexo ? `, sexo ${data.sexo}` : ""}.
+Exame: ${data.tipo_exame}
+${data.contexto ? `Contexto: ${data.contexto}\n` : ""}
+Resultado:
+${data.resultado_texto}`;
+
+    const json = await callAI({
+      messages: [
+        { role: "system", content: sys },
+        { role: "user", content: user },
+      ],
+      response_format: { type: "json_object" },
+    });
+    const content = json.choices?.[0]?.message?.content ?? "{}";
+    const parsed = extractJson(content) as Partial<ClassificacaoExame>;
+
+    const status = (["normal", "alterado", "critico"].includes(parsed.status as string)
+      ? parsed.status
+      : "alterado") as ClassificacaoExame["status"];
+    const severidade = (["baixa", "media", "alta"].includes(parsed.severidade as string)
+      ? parsed.severidade
+      : status === "critico" ? "alta" : status === "alterado" ? "media" : "baixa") as ClassificacaoExame["severidade"];
+
+    return {
+      status,
+      severidade,
+      achados_relevantes: Array.isArray(parsed.achados_relevantes)
+        ? parsed.achados_relevantes.map(String).slice(0, 12)
+        : [],
+      resumo: typeof parsed.resumo === "string" ? parsed.resumo : "",
+      recomendacao: typeof parsed.recomendacao === "string" ? parsed.recomendacao : "",
+      mensagem_paciente: typeof parsed.mensagem_paciente === "string" ? parsed.mensagem_paciente : "",
+      precisa_contato: status !== "normal" || Boolean(parsed.precisa_contato),
+    };
+  });

@@ -33,6 +33,7 @@ import { Route as AuthenticatedAppModelosDocumentosRouteImport } from './routes/
 import { Route as AuthenticatedAppMedicosRouteImport } from './routes/_authenticated/app.medicos'
 import { Route as AuthenticatedAppFluxoRouteImport } from './routes/_authenticated/app.fluxo'
 import { Route as AuthenticatedAppFinanceiroRouteImport } from './routes/_authenticated/app.financeiro'
+import { Route as AuthenticatedAppExamesResultadosRouteImport } from './routes/_authenticated/app.exames-resultados'
 import { Route as AuthenticatedAppEstoqueRouteImport } from './routes/_authenticated/app.estoque'
 import { Route as AuthenticatedAppEspecialidadesRouteImport } from './routes/_authenticated/app.especialidades'
 import { Route as AuthenticatedAppEquipeRouteImport } from './routes/_authenticated/app.equipe'
@@ -48,6 +49,7 @@ import { Route as AuthenticatedAppCampanhasRouteImport } from './routes/_authent
 import { Route as AuthenticatedAppBoletosRouteImport } from './routes/_authenticated/app.boletos'
 import { Route as AuthenticatedAppAtendimentoIaRouteImport } from './routes/_authenticated/app.atendimento-ia'
 import { Route as AuthenticatedAppAnamnesesRouteImport } from './routes/_authenticated/app.anamneses'
+import { Route as AuthenticatedAppAlertasEnfermagemRouteImport } from './routes/_authenticated/app.alertas-enfermagem'
 import { Route as AuthenticatedAppAgendaRouteImport } from './routes/_authenticated/app.agenda'
 import { Route as AuthenticatedAppFinanceiroIndexRouteImport } from './routes/_authenticated/app.financeiro.index'
 import { Route as AuthenticatedAppFinanceiroRelatoriosRouteImport } from './routes/_authenticated/app.financeiro.relatorios'
@@ -193,6 +195,12 @@ const AuthenticatedAppFinanceiroRoute =
     path: '/financeiro',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
+const AuthenticatedAppExamesResultadosRoute =
+  AuthenticatedAppExamesResultadosRouteImport.update({
+    id: '/exames-resultados',
+    path: '/exames-resultados',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppEstoqueRoute = AuthenticatedAppEstoqueRouteImport.update({
   id: '/estoque',
   path: '/estoque',
@@ -277,6 +285,12 @@ const AuthenticatedAppAnamnesesRoute =
   AuthenticatedAppAnamnesesRouteImport.update({
     id: '/anamneses',
     path: '/anamneses',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppAlertasEnfermagemRoute =
+  AuthenticatedAppAlertasEnfermagemRouteImport.update({
+    id: '/alertas-enfermagem',
+    path: '/alertas-enfermagem',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppAgendaRoute = AuthenticatedAppAgendaRouteImport.update({
@@ -398,6 +412,7 @@ export interface FileRoutesByFullPath {
   '/paciente/cartoes': typeof PacienteCartoesRoute
   '/paciente/consultas': typeof PacienteConsultasRoute
   '/app/agenda': typeof AuthenticatedAppAgendaRoute
+  '/app/alertas-enfermagem': typeof AuthenticatedAppAlertasEnfermagemRoute
   '/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
   '/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaRoute
   '/app/boletos': typeof AuthenticatedAppBoletosRoute
@@ -413,6 +428,7 @@ export interface FileRoutesByFullPath {
   '/app/equipe': typeof AuthenticatedAppEquipeRoute
   '/app/especialidades': typeof AuthenticatedAppEspecialidadesRoute
   '/app/estoque': typeof AuthenticatedAppEstoqueRoute
+  '/app/exames-resultados': typeof AuthenticatedAppExamesResultadosRoute
   '/app/financeiro': typeof AuthenticatedAppFinanceiroRouteWithChildren
   '/app/fluxo': typeof AuthenticatedAppFluxoRoute
   '/app/medicos': typeof AuthenticatedAppMedicosRoute
@@ -455,6 +471,7 @@ export interface FileRoutesByTo {
   '/paciente/cartoes': typeof PacienteCartoesRoute
   '/paciente/consultas': typeof PacienteConsultasRoute
   '/app/agenda': typeof AuthenticatedAppAgendaRoute
+  '/app/alertas-enfermagem': typeof AuthenticatedAppAlertasEnfermagemRoute
   '/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
   '/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaRoute
   '/app/boletos': typeof AuthenticatedAppBoletosRoute
@@ -470,6 +487,7 @@ export interface FileRoutesByTo {
   '/app/equipe': typeof AuthenticatedAppEquipeRoute
   '/app/especialidades': typeof AuthenticatedAppEspecialidadesRoute
   '/app/estoque': typeof AuthenticatedAppEstoqueRoute
+  '/app/exames-resultados': typeof AuthenticatedAppExamesResultadosRoute
   '/app/fluxo': typeof AuthenticatedAppFluxoRoute
   '/app/medicos': typeof AuthenticatedAppMedicosRoute
   '/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
@@ -514,6 +532,7 @@ export interface FileRoutesById {
   '/paciente/cartoes': typeof PacienteCartoesRoute
   '/paciente/consultas': typeof PacienteConsultasRoute
   '/_authenticated/app/agenda': typeof AuthenticatedAppAgendaRoute
+  '/_authenticated/app/alertas-enfermagem': typeof AuthenticatedAppAlertasEnfermagemRoute
   '/_authenticated/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
   '/_authenticated/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaRoute
   '/_authenticated/app/boletos': typeof AuthenticatedAppBoletosRoute
@@ -529,6 +548,7 @@ export interface FileRoutesById {
   '/_authenticated/app/equipe': typeof AuthenticatedAppEquipeRoute
   '/_authenticated/app/especialidades': typeof AuthenticatedAppEspecialidadesRoute
   '/_authenticated/app/estoque': typeof AuthenticatedAppEstoqueRoute
+  '/_authenticated/app/exames-resultados': typeof AuthenticatedAppExamesResultadosRoute
   '/_authenticated/app/financeiro': typeof AuthenticatedAppFinanceiroRouteWithChildren
   '/_authenticated/app/fluxo': typeof AuthenticatedAppFluxoRoute
   '/_authenticated/app/medicos': typeof AuthenticatedAppMedicosRoute
@@ -574,6 +594,7 @@ export interface FileRouteTypes {
     | '/paciente/cartoes'
     | '/paciente/consultas'
     | '/app/agenda'
+    | '/app/alertas-enfermagem'
     | '/app/anamneses'
     | '/app/atendimento-ia'
     | '/app/boletos'
@@ -589,6 +610,7 @@ export interface FileRouteTypes {
     | '/app/equipe'
     | '/app/especialidades'
     | '/app/estoque'
+    | '/app/exames-resultados'
     | '/app/financeiro'
     | '/app/fluxo'
     | '/app/medicos'
@@ -631,6 +653,7 @@ export interface FileRouteTypes {
     | '/paciente/cartoes'
     | '/paciente/consultas'
     | '/app/agenda'
+    | '/app/alertas-enfermagem'
     | '/app/anamneses'
     | '/app/atendimento-ia'
     | '/app/boletos'
@@ -646,6 +669,7 @@ export interface FileRouteTypes {
     | '/app/equipe'
     | '/app/especialidades'
     | '/app/estoque'
+    | '/app/exames-resultados'
     | '/app/fluxo'
     | '/app/medicos'
     | '/app/modelos-documentos'
@@ -689,6 +713,7 @@ export interface FileRouteTypes {
     | '/paciente/cartoes'
     | '/paciente/consultas'
     | '/_authenticated/app/agenda'
+    | '/_authenticated/app/alertas-enfermagem'
     | '/_authenticated/app/anamneses'
     | '/_authenticated/app/atendimento-ia'
     | '/_authenticated/app/boletos'
@@ -704,6 +729,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/equipe'
     | '/_authenticated/app/especialidades'
     | '/_authenticated/app/estoque'
+    | '/_authenticated/app/exames-resultados'
     | '/_authenticated/app/financeiro'
     | '/_authenticated/app/fluxo'
     | '/_authenticated/app/medicos'
@@ -920,6 +946,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppFinanceiroRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/app/exames-resultados': {
+      id: '/_authenticated/app/exames-resultados'
+      path: '/exames-resultados'
+      fullPath: '/app/exames-resultados'
+      preLoaderRoute: typeof AuthenticatedAppExamesResultadosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/app/estoque': {
       id: '/_authenticated/app/estoque'
       path: '/estoque'
@@ -1023,6 +1056,13 @@ declare module '@tanstack/react-router' {
       path: '/anamneses'
       fullPath: '/app/anamneses'
       preLoaderRoute: typeof AuthenticatedAppAnamnesesRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/alertas-enfermagem': {
+      id: '/_authenticated/app/alertas-enfermagem'
+      path: '/alertas-enfermagem'
+      fullPath: '/app/alertas-enfermagem'
+      preLoaderRoute: typeof AuthenticatedAppAlertasEnfermagemRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/agenda': {
@@ -1228,6 +1268,7 @@ const AuthenticatedAppFinanceiroRouteWithChildren =
 
 interface AuthenticatedAppRouteChildren {
   AuthenticatedAppAgendaRoute: typeof AuthenticatedAppAgendaRoute
+  AuthenticatedAppAlertasEnfermagemRoute: typeof AuthenticatedAppAlertasEnfermagemRoute
   AuthenticatedAppAnamnesesRoute: typeof AuthenticatedAppAnamnesesRoute
   AuthenticatedAppAtendimentoIaRoute: typeof AuthenticatedAppAtendimentoIaRoute
   AuthenticatedAppBoletosRoute: typeof AuthenticatedAppBoletosRoute
@@ -1243,6 +1284,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppEquipeRoute: typeof AuthenticatedAppEquipeRoute
   AuthenticatedAppEspecialidadesRoute: typeof AuthenticatedAppEspecialidadesRoute
   AuthenticatedAppEstoqueRoute: typeof AuthenticatedAppEstoqueRoute
+  AuthenticatedAppExamesResultadosRoute: typeof AuthenticatedAppExamesResultadosRoute
   AuthenticatedAppFinanceiroRoute: typeof AuthenticatedAppFinanceiroRouteWithChildren
   AuthenticatedAppFluxoRoute: typeof AuthenticatedAppFluxoRoute
   AuthenticatedAppMedicosRoute: typeof AuthenticatedAppMedicosRoute
@@ -1260,6 +1302,8 @@ interface AuthenticatedAppRouteChildren {
 
 const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppAgendaRoute: AuthenticatedAppAgendaRoute,
+  AuthenticatedAppAlertasEnfermagemRoute:
+    AuthenticatedAppAlertasEnfermagemRoute,
   AuthenticatedAppAnamnesesRoute: AuthenticatedAppAnamnesesRoute,
   AuthenticatedAppAtendimentoIaRoute: AuthenticatedAppAtendimentoIaRoute,
   AuthenticatedAppBoletosRoute: AuthenticatedAppBoletosRoute,
@@ -1276,6 +1320,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppEquipeRoute: AuthenticatedAppEquipeRoute,
   AuthenticatedAppEspecialidadesRoute: AuthenticatedAppEspecialidadesRoute,
   AuthenticatedAppEstoqueRoute: AuthenticatedAppEstoqueRoute,
+  AuthenticatedAppExamesResultadosRoute: AuthenticatedAppExamesResultadosRoute,
   AuthenticatedAppFinanceiroRoute: AuthenticatedAppFinanceiroRouteWithChildren,
   AuthenticatedAppFluxoRoute: AuthenticatedAppFluxoRoute,
   AuthenticatedAppMedicosRoute: AuthenticatedAppMedicosRoute,
@@ -1323,3 +1368,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
