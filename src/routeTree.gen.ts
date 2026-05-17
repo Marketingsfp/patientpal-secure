@@ -45,6 +45,7 @@ import { Route as AuthenticatedAppClientesRouteImport } from './routes/_authenti
 import { Route as AuthenticatedAppCartaoBeneficiosRouteImport } from './routes/_authenticated/app.cartao-beneficios'
 import { Route as AuthenticatedAppCampanhasRouteImport } from './routes/_authenticated/app.campanhas'
 import { Route as AuthenticatedAppBoletosRouteImport } from './routes/_authenticated/app.boletos'
+import { Route as AuthenticatedAppAtendimentoIaRouteImport } from './routes/_authenticated/app.atendimento-ia'
 import { Route as AuthenticatedAppAnamnesesRouteImport } from './routes/_authenticated/app.anamneses'
 import { Route as AuthenticatedAppAgendaRouteImport } from './routes/_authenticated/app.agenda'
 import { Route as AuthenticatedAppFinanceiroIndexRouteImport } from './routes/_authenticated/app.financeiro.index'
@@ -259,6 +260,12 @@ const AuthenticatedAppBoletosRoute = AuthenticatedAppBoletosRouteImport.update({
   path: '/boletos',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
+const AuthenticatedAppAtendimentoIaRoute =
+  AuthenticatedAppAtendimentoIaRouteImport.update({
+    id: '/atendimento-ia',
+    path: '/atendimento-ia',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppAnamnesesRoute =
   AuthenticatedAppAnamnesesRouteImport.update({
     id: '/anamneses',
@@ -385,6 +392,7 @@ export interface FileRoutesByFullPath {
   '/paciente/consultas': typeof PacienteConsultasRoute
   '/app/agenda': typeof AuthenticatedAppAgendaRoute
   '/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
+  '/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaRoute
   '/app/boletos': typeof AuthenticatedAppBoletosRoute
   '/app/campanhas': typeof AuthenticatedAppCampanhasRoute
   '/app/cartao-beneficios': typeof AuthenticatedAppCartaoBeneficiosRouteWithChildren
@@ -440,6 +448,7 @@ export interface FileRoutesByTo {
   '/paciente/consultas': typeof PacienteConsultasRoute
   '/app/agenda': typeof AuthenticatedAppAgendaRoute
   '/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
+  '/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaRoute
   '/app/boletos': typeof AuthenticatedAppBoletosRoute
   '/app/campanhas': typeof AuthenticatedAppCampanhasRoute
   '/app/cartao-beneficios': typeof AuthenticatedAppCartaoBeneficiosRouteWithChildren
@@ -497,6 +506,7 @@ export interface FileRoutesById {
   '/paciente/consultas': typeof PacienteConsultasRoute
   '/_authenticated/app/agenda': typeof AuthenticatedAppAgendaRoute
   '/_authenticated/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
+  '/_authenticated/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaRoute
   '/_authenticated/app/boletos': typeof AuthenticatedAppBoletosRoute
   '/_authenticated/app/campanhas': typeof AuthenticatedAppCampanhasRoute
   '/_authenticated/app/cartao-beneficios': typeof AuthenticatedAppCartaoBeneficiosRouteWithChildren
@@ -555,6 +565,7 @@ export interface FileRouteTypes {
     | '/paciente/consultas'
     | '/app/agenda'
     | '/app/anamneses'
+    | '/app/atendimento-ia'
     | '/app/boletos'
     | '/app/campanhas'
     | '/app/cartao-beneficios'
@@ -610,6 +621,7 @@ export interface FileRouteTypes {
     | '/paciente/consultas'
     | '/app/agenda'
     | '/app/anamneses'
+    | '/app/atendimento-ia'
     | '/app/boletos'
     | '/app/campanhas'
     | '/app/cartao-beneficios'
@@ -666,6 +678,7 @@ export interface FileRouteTypes {
     | '/paciente/consultas'
     | '/_authenticated/app/agenda'
     | '/_authenticated/app/anamneses'
+    | '/_authenticated/app/atendimento-ia'
     | '/_authenticated/app/boletos'
     | '/_authenticated/app/campanhas'
     | '/_authenticated/app/cartao-beneficios'
@@ -978,6 +991,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppBoletosRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/app/atendimento-ia': {
+      id: '/_authenticated/app/atendimento-ia'
+      path: '/atendimento-ia'
+      fullPath: '/app/atendimento-ia'
+      preLoaderRoute: typeof AuthenticatedAppAtendimentoIaRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/app/anamneses': {
       id: '/_authenticated/app/anamneses'
       path: '/anamneses'
@@ -1189,6 +1209,7 @@ const AuthenticatedAppFinanceiroRouteWithChildren =
 interface AuthenticatedAppRouteChildren {
   AuthenticatedAppAgendaRoute: typeof AuthenticatedAppAgendaRoute
   AuthenticatedAppAnamnesesRoute: typeof AuthenticatedAppAnamnesesRoute
+  AuthenticatedAppAtendimentoIaRoute: typeof AuthenticatedAppAtendimentoIaRoute
   AuthenticatedAppBoletosRoute: typeof AuthenticatedAppBoletosRoute
   AuthenticatedAppCampanhasRoute: typeof AuthenticatedAppCampanhasRoute
   AuthenticatedAppCartaoBeneficiosRoute: typeof AuthenticatedAppCartaoBeneficiosRouteWithChildren
@@ -1219,6 +1240,7 @@ interface AuthenticatedAppRouteChildren {
 const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppAgendaRoute: AuthenticatedAppAgendaRoute,
   AuthenticatedAppAnamnesesRoute: AuthenticatedAppAnamnesesRoute,
+  AuthenticatedAppAtendimentoIaRoute: AuthenticatedAppAtendimentoIaRoute,
   AuthenticatedAppBoletosRoute: AuthenticatedAppBoletosRoute,
   AuthenticatedAppCampanhasRoute: AuthenticatedAppCampanhasRoute,
   AuthenticatedAppCartaoBeneficiosRoute:
@@ -1278,3 +1300,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
