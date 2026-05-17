@@ -22,6 +22,7 @@ import { Route as AuthenticatedAppIndexRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedAppRecepcaoRouteImport } from './routes/_authenticated/app.recepcao'
 import { Route as AuthenticatedAppProntuariosRouteImport } from './routes/_authenticated/app.prontuarios'
 import { Route as AuthenticatedAppProcedimentosRouteImport } from './routes/_authenticated/app.procedimentos'
+import { Route as AuthenticatedAppPlanosRouteImport } from './routes/_authenticated/app.planos'
 import { Route as AuthenticatedAppOrcamentosRouteImport } from './routes/_authenticated/app.orcamentos'
 import { Route as AuthenticatedAppNinaRouteImport } from './routes/_authenticated/app.nina'
 import { Route as AuthenticatedAppNfseRouteImport } from './routes/_authenticated/app.nfse'
@@ -124,6 +125,11 @@ const AuthenticatedAppProcedimentosRoute =
     path: '/procedimentos',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
+const AuthenticatedAppPlanosRoute = AuthenticatedAppPlanosRouteImport.update({
+  id: '/planos',
+  path: '/planos',
+  getParentRoute: () => AuthenticatedAppRoute,
+} as any)
 const AuthenticatedAppOrcamentosRoute =
   AuthenticatedAppOrcamentosRouteImport.update({
     id: '/orcamentos',
@@ -349,6 +355,7 @@ export interface FileRoutesByFullPath {
   '/app/nfse': typeof AuthenticatedAppNfseRoute
   '/app/nina': typeof AuthenticatedAppNinaRoute
   '/app/orcamentos': typeof AuthenticatedAppOrcamentosRoute
+  '/app/planos': typeof AuthenticatedAppPlanosRoute
   '/app/procedimentos': typeof AuthenticatedAppProcedimentosRoute
   '/app/prontuarios': typeof AuthenticatedAppProntuariosRoute
   '/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
@@ -395,6 +402,7 @@ export interface FileRoutesByTo {
   '/app/nfse': typeof AuthenticatedAppNfseRoute
   '/app/nina': typeof AuthenticatedAppNinaRoute
   '/app/orcamentos': typeof AuthenticatedAppOrcamentosRoute
+  '/app/planos': typeof AuthenticatedAppPlanosRoute
   '/app/procedimentos': typeof AuthenticatedAppProcedimentosRoute
   '/app/prontuarios': typeof AuthenticatedAppProntuariosRoute
   '/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
@@ -445,6 +453,7 @@ export interface FileRoutesById {
   '/_authenticated/app/nfse': typeof AuthenticatedAppNfseRoute
   '/_authenticated/app/nina': typeof AuthenticatedAppNinaRoute
   '/_authenticated/app/orcamentos': typeof AuthenticatedAppOrcamentosRoute
+  '/_authenticated/app/planos': typeof AuthenticatedAppPlanosRoute
   '/_authenticated/app/procedimentos': typeof AuthenticatedAppProcedimentosRoute
   '/_authenticated/app/prontuarios': typeof AuthenticatedAppProntuariosRoute
   '/_authenticated/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
@@ -495,6 +504,7 @@ export interface FileRouteTypes {
     | '/app/nfse'
     | '/app/nina'
     | '/app/orcamentos'
+    | '/app/planos'
     | '/app/procedimentos'
     | '/app/prontuarios'
     | '/app/recepcao'
@@ -541,6 +551,7 @@ export interface FileRouteTypes {
     | '/app/nfse'
     | '/app/nina'
     | '/app/orcamentos'
+    | '/app/planos'
     | '/app/procedimentos'
     | '/app/prontuarios'
     | '/app/recepcao'
@@ -590,6 +601,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/nfse'
     | '/_authenticated/app/nina'
     | '/_authenticated/app/orcamentos'
+    | '/_authenticated/app/planos'
     | '/_authenticated/app/procedimentos'
     | '/_authenticated/app/prontuarios'
     | '/_authenticated/app/recepcao'
@@ -712,6 +724,13 @@ declare module '@tanstack/react-router' {
       path: '/procedimentos'
       fullPath: '/app/procedimentos'
       preLoaderRoute: typeof AuthenticatedAppProcedimentosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/planos': {
+      id: '/_authenticated/app/planos'
+      path: '/planos'
+      fullPath: '/app/planos'
+      preLoaderRoute: typeof AuthenticatedAppPlanosRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/orcamentos': {
@@ -1027,6 +1046,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppNfseRoute: typeof AuthenticatedAppNfseRoute
   AuthenticatedAppNinaRoute: typeof AuthenticatedAppNinaRoute
   AuthenticatedAppOrcamentosRoute: typeof AuthenticatedAppOrcamentosRoute
+  AuthenticatedAppPlanosRoute: typeof AuthenticatedAppPlanosRoute
   AuthenticatedAppProcedimentosRoute: typeof AuthenticatedAppProcedimentosRoute
   AuthenticatedAppProntuariosRoute: typeof AuthenticatedAppProntuariosRoute
   AuthenticatedAppRecepcaoRoute: typeof AuthenticatedAppRecepcaoRoute
@@ -1055,6 +1075,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppNfseRoute: AuthenticatedAppNfseRoute,
   AuthenticatedAppNinaRoute: AuthenticatedAppNinaRoute,
   AuthenticatedAppOrcamentosRoute: AuthenticatedAppOrcamentosRoute,
+  AuthenticatedAppPlanosRoute: AuthenticatedAppPlanosRoute,
   AuthenticatedAppProcedimentosRoute: AuthenticatedAppProcedimentosRoute,
   AuthenticatedAppProntuariosRoute: AuthenticatedAppProntuariosRoute,
   AuthenticatedAppRecepcaoRoute: AuthenticatedAppRecepcaoRoute,

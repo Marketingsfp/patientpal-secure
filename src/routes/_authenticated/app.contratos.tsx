@@ -1,0 +1,355 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
+import { FileSignature, Plus, Printer, Search, Trash2, Link2, Check, ChevronRight } from "lucide-react";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useClinica } from "@/hooks/use-clinica";
+import { useAuth } from "@/hooks/use-auth";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { printContrato } from "@/lib/print-contrato";
+
+export const Route = createFileRoute("/_authenticated/app/contratos")({
+  component: ContratosPage,
+  head: () => ({ meta: [{ title: "Contratos — ClinicaOS" }] }),
+});
+
+const BRL = (v: number) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const fmtD = (s?: string | null) => (s ? new Date(s + (s.length === 10 ? "T00:00:00" : "")).toLocaleDateString("pt-BR") : "—");
+
+type Plano = { id: string; nome: string; tipo: string; valor_mensal: number; taxa_adesao: number; max_dependentes: number; max_agregados: number; num_parcelas: number; vigencia_meses: number };
+type Paciente = { id: string; nome: string; cpf: string | null; telefone: string | null };
+type Contrato = { id: string; numero: number; paciente_nome: string; plano_id: string; valor_mensal: number; status: string; data_inicio: string; data_fim: string | null; assinado_em: string | null; token_publico: string; forma_pagamento: string | null };
+type Mens = { id: string; numero_parcela: number; vencimento: string; valor: number; status: string; pago_em: string | null; forma_pagamento: string | null };
+type Dep = { id: string; paciente_nome: string; parentesco: string | null; tipo: string };
+
+function ContratosPage() {
+  const { clinicaAtual } = useClinica();
+  const { user } = useAuth();
+  const [list, setList] = useState<Contrato[]>([]);
+  const [planos, setPlanos] = useState<Plano[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [q, setQ] = useState("");
+  const [openNew, setOpenNew] = useState(false);
+  const [detail, setDetail] = useState<Contrato | null>(null);
+
+  const load = async () => {
+    if (!clinicaAtual) return;
+    setLoading(true);
+    const [cs, ps] = await Promise.all([
+      supabase.from("contratos_assinatura").select("*").eq("clinica_id", clinicaAtual.clinica_id).order("created_at", { ascending: false }).limit(500),
+      supabase.from("planos_assinatura").select("*").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
+    ]);
+    if (cs.error) toast.error(cs.error.message);
+    setList((cs.data ?? []) as Contrato[]);
+    setPlanos((ps.data ?? []) as Plano[]);
+    setLoading(false);
+  };
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [clinicaAtual?.clinica_id]);
+
+  const filtered = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    if (!s) return list;
+    return list.filter((c) => `${c.numero} ${c.paciente_nome}`.toLowerCase().includes(s));
+  }, [list, q]);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold flex items-center gap-2"><FileSignature className="h-6 w-6 text-primary"/>Contratos</h1>
+        <Button onClick={() => setOpenNew(true)} disabled={planos.length === 0}><Plus className="h-4 w-4 mr-2"/>Novo contrato</Button>
+      </div>
+      {planos.length === 0 && !loading ? (
+        <div className="rounded-md border bg-muted/40 p-3 text-sm">Cadastre um plano antes em <strong>Planos de Assinatura</strong>.</div>
+      ) : null}
+      <div className="relative max-w-md">
+        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground"/>
+        <Input className="pl-8" placeholder="Buscar por número ou paciente…" value={q} onChange={(e) => setQ(e.target.value)}/>
+      </div>
+      <div className="rounded-md border bg-card">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Nº</TableHead><TableHead>Paciente</TableHead><TableHead>Início</TableHead>
+              <TableHead>Mensal</TableHead><TableHead>Pagamento</TableHead><TableHead>Status</TableHead>
+              <TableHead>Assinado</TableHead><TableHead></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">Carregando…</TableCell></TableRow> : null}
+            {!loading && filtered.length === 0 ? <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">Nenhum contrato.</TableCell></TableRow> : null}
+            {filtered.map((c) => (
+              <TableRow key={c.id} className="cursor-pointer" onClick={() => setDetail(c)}>
+                <TableCell className="font-semibold">{c.numero}</TableCell>
+                <TableCell>{c.paciente_nome}</TableCell>
+                <TableCell>{fmtD(c.data_inicio)}</TableCell>
+                <TableCell>{BRL(c.valor_mensal)}</TableCell>
+                <TableCell>{c.forma_pagamento ?? "—"}</TableCell>
+                <TableCell><Badge variant={c.status === "ativo" ? "default" : "secondary"}>{c.status}</Badge></TableCell>
+                <TableCell>{c.assinado_em ? <Badge variant="default"><Check className="h-3 w-3 mr-1"/>Sim</Badge> : <Badge variant="outline">Pendente</Badge>}</TableCell>
+                <TableCell><ChevronRight className="h-4 w-4 text-muted-foreground"/></TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+      {openNew ? <NovoContratoDialog open={openNew} onClose={() => setOpenNew(false)} planos={planos} clinicaId={clinicaAtual!.clinica_id} userId={user?.id ?? null} onCreated={load}/> : null}
+      {detail ? <DetalheContrato contrato={detail} onClose={() => { setDetail(null); load(); }}/> : null}
+    </div>
+  );
+}
+
+function NovoContratoDialog({ open, onClose, planos, clinicaId, userId, onCreated }: { open: boolean; onClose: () => void; planos: Plano[]; clinicaId: string; userId: string | null; onCreated: () => void }) {
+  const [planoId, setPlanoId] = useState(planos[0]?.id ?? "");
+  const plano = planos.find((p) => p.id === planoId);
+  const [titular, setTitular] = useState<Paciente | null>(null);
+  const [pacBusca, setPacBusca] = useState("");
+  const [pacResults, setPacResults] = useState<Paciente[]>([]);
+  const [valor, setValor] = useState(0);
+  const [taxa, setTaxa] = useState(0);
+  const [diaVenc, setDiaVenc] = useState(10);
+  const [dataInicio, setDataInicio] = useState(new Date().toISOString().slice(0, 10));
+  const [forma, setForma] = useState("dinheiro");
+  const [obs, setObs] = useState("");
+  const [depBusca, setDepBusca] = useState("");
+  const [depResults, setDepResults] = useState<Paciente[]>([]);
+  const [deps, setDeps] = useState<Array<Paciente & { parentesco: string; tipo: string }>>([]);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (plano) { setValor(Number(plano.valor_mensal)); setTaxa(Number(plano.taxa_adesao)); }
+  }, [planoId]);
+
+  const buscarPac = async (term: string, setRes: (r: Paciente[]) => void) => {
+    if (term.trim().length < 2) return setRes([]);
+    const { data } = await supabase.from("pacientes")
+      .select("id, nome, cpf, telefone").eq("clinica_id", clinicaId).eq("ativo", true)
+      .ilike("nome", `%${term}%`).limit(8);
+    setRes((data ?? []) as Paciente[]);
+  };
+
+  const addDep = (p: Paciente) => {
+    if (!plano) return;
+    const max = plano.max_dependentes + plano.max_agregados;
+    if (deps.length >= max) return toast.error(`Limite de ${max} dependentes/agregados`);
+    if (deps.find((d) => d.id === p.id) || titular?.id === p.id) return;
+    setDeps([...deps, { ...p, parentesco: "", tipo: deps.length < plano.max_dependentes ? "dependente" : "agregado" }]);
+    setDepBusca(""); setDepResults([]);
+  };
+
+  const salvar = async () => {
+    if (!titular || !plano) return toast.error("Selecione paciente e plano");
+    setSaving(true);
+    const { data: contrato, error } = await supabase.from("contratos_assinatura").insert({
+      clinica_id: clinicaId, plano_id: plano.id, paciente_id: titular.id, paciente_nome: titular.nome,
+      data_inicio: dataInicio, dia_vencimento: diaVenc, valor_mensal: valor, taxa_adesao: taxa,
+      num_parcelas: plano.num_parcelas, forma_pagamento: forma, observacoes: obs, criado_por: userId,
+    }).select("*").single();
+    if (error || !contrato) { setSaving(false); return toast.error(error?.message ?? "Erro"); }
+
+    if (deps.length > 0) {
+      await supabase.from("contrato_dependentes").insert(deps.map((d) => ({
+        contrato_id: contrato.id, paciente_id: d.id, paciente_nome: d.nome,
+        parentesco: d.parentesco || null, tipo: d.tipo,
+      })));
+    }
+
+    // Gerar 12 parcelas
+    const base = new Date(dataInicio + "T00:00:00");
+    const parcelas = Array.from({ length: plano.num_parcelas }, (_, i) => {
+      const venc = new Date(base.getFullYear(), base.getMonth() + i, diaVenc);
+      return {
+        contrato_id: contrato.id, clinica_id: clinicaId,
+        numero_parcela: i + 1, vencimento: venc.toISOString().slice(0, 10),
+        valor, status: "pendente",
+      };
+    });
+    await supabase.from("contrato_mensalidades").insert(parcelas);
+
+    setSaving(false);
+    toast.success(`Contrato #${contrato.numero} criado com ${plano.num_parcelas} mensalidades`);
+    onCreated(); onClose();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader><DialogTitle>Novo contrato</DialogTitle></DialogHeader>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2"><Label>Plano</Label>
+            <Select value={planoId} onValueChange={setPlanoId}>
+              <SelectTrigger><SelectValue/></SelectTrigger>
+              <SelectContent>{planos.map((p) => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div className="col-span-2"><Label>Paciente titular</Label>
+            {titular ? (
+              <div className="flex items-center justify-between rounded-md border p-2 bg-muted/30">
+                <span className="font-medium">{titular.nome} {titular.cpf ? `— ${titular.cpf}` : ""}</span>
+                <Button size="sm" variant="ghost" onClick={() => setTitular(null)}>Trocar</Button>
+              </div>
+            ) : (
+              <>
+                <Input placeholder="Buscar paciente…" value={pacBusca} onChange={(e) => { setPacBusca(e.target.value); buscarPac(e.target.value, setPacResults); }}/>
+                {pacResults.length > 0 ? (
+                  <div className="rounded-md border mt-1 max-h-40 overflow-auto">
+                    {pacResults.map((p) => (
+                      <button type="button" key={p.id} className="block w-full text-left px-3 py-2 hover:bg-muted text-sm" onClick={() => { setTitular(p); setPacBusca(""); setPacResults([]); }}>
+                        {p.nome} {p.cpf ? `— ${p.cpf}` : ""}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </>
+            )}
+          </div>
+          <div><Label>Data início</Label><Input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)}/></div>
+          <div><Label>Dia de vencimento</Label><Input type="number" min={1} max={28} value={diaVenc} onChange={(e) => setDiaVenc(Number(e.target.value))}/></div>
+          <div><Label>Valor mensal (R$)</Label><Input type="number" step="0.01" value={valor} onChange={(e) => setValor(Number(e.target.value))}/></div>
+          <div><Label>Taxa de adesão (R$)</Label><Input type="number" step="0.01" value={taxa} onChange={(e) => setTaxa(Number(e.target.value))}/></div>
+          <div className="col-span-2"><Label>Forma de pagamento</Label>
+            <Select value={forma} onValueChange={setForma}>
+              <SelectTrigger><SelectValue/></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                <SelectItem value="carne">Carnê</SelectItem>
+                <SelectItem value="boleto">Boleto</SelectItem>
+                <SelectItem value="pix">PIX</SelectItem>
+                <SelectItem value="cartao_credito">Cartão de Crédito</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="col-span-2 border-t pt-3">
+            <Label>Dependentes / Agregados {plano ? `(máx ${plano.max_dependentes + plano.max_agregados})` : ""}</Label>
+            <Input className="mt-1" placeholder="Buscar paciente para incluir…" value={depBusca} onChange={(e) => { setDepBusca(e.target.value); buscarPac(e.target.value, setDepResults); }}/>
+            {depResults.length > 0 ? (
+              <div className="rounded-md border mt-1 max-h-32 overflow-auto">
+                {depResults.map((p) => (
+                  <button type="button" key={p.id} className="block w-full text-left px-3 py-2 hover:bg-muted text-sm" onClick={() => addDep(p)}>
+                    + {p.nome}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            {deps.length > 0 ? (
+              <div className="mt-2 space-y-1">
+                {deps.map((d, i) => (
+                  <div key={d.id} className="grid grid-cols-12 gap-2 items-center">
+                    <span className="col-span-4 text-sm truncate">{d.nome}</span>
+                    <Input className="col-span-3 h-8" placeholder="Parentesco" value={d.parentesco} onChange={(e) => setDeps(deps.map((x, j) => j === i ? { ...x, parentesco: e.target.value } : x))}/>
+                    <Select value={d.tipo} onValueChange={(v) => setDeps(deps.map((x, j) => j === i ? { ...x, tipo: v } : x))}>
+                      <SelectTrigger className="col-span-3 h-8"><SelectValue/></SelectTrigger>
+                      <SelectContent><SelectItem value="dependente">Dependente</SelectItem><SelectItem value="agregado">Agregado</SelectItem></SelectContent>
+                    </Select>
+                    <Button size="sm" variant="ghost" className="col-span-2" onClick={() => setDeps(deps.filter((_, j) => j !== i))}><Trash2 className="h-3 w-3 text-destructive"/></Button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+          <div className="col-span-2"><Label>Observações</Label><Textarea rows={2} value={obs} onChange={(e) => setObs(e.target.value)}/></div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button onClick={salvar} disabled={saving || !titular || !plano}>Gerar contrato + {plano?.num_parcelas ?? 12} parcelas</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DetalheContrato({ contrato, onClose }: { contrato: Contrato; onClose: () => void }) {
+  const [mens, setMens] = useState<Mens[]>([]);
+  const [deps, setDeps] = useState<Dep[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = async () => {
+    setLoading(true);
+    const [m, d] = await Promise.all([
+      supabase.from("contrato_mensalidades").select("*").eq("contrato_id", contrato.id).order("numero_parcela"),
+      supabase.from("contrato_dependentes").select("id, paciente_nome, parentesco, tipo").eq("contrato_id", contrato.id).eq("ativo", true),
+    ]);
+    setMens((m.data ?? []) as Mens[]);
+    setDeps((d.data ?? []) as Dep[]);
+    setLoading(false);
+  };
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [contrato.id]);
+
+  const marcarPago = async (id: string, paga: boolean) => {
+    const patch = paga
+      ? { status: "pago", pago_em: new Date().toISOString().slice(0, 10) }
+      : { status: "pendente", pago_em: null };
+    const { error } = await supabase.from("contrato_mensalidades").update(patch).eq("id", id);
+    if (error) return toast.error(error.message);
+    load();
+  };
+
+  const copiarLink = async () => {
+    const url = `${window.location.origin}/p/contrato/${contrato.token_publico}`;
+    await navigator.clipboard.writeText(url);
+    toast.success("Link de assinatura copiado");
+  };
+
+  const pagas = mens.filter((m) => m.status === "pago").length;
+  const totalPago = mens.filter((m) => m.status === "pago").reduce((s, m) => s + Number(m.valor), 0);
+  const aReceber = mens.filter((m) => m.status !== "pago").reduce((s, m) => s + Number(m.valor), 0);
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader><DialogTitle>Contrato #{contrato.numero} — {contrato.paciente_nome}</DialogTitle></DialogHeader>
+        <div className="grid grid-cols-3 gap-3 text-sm">
+          <div className="rounded-md border p-3"><div className="text-muted-foreground text-xs">Pagas</div><div className="font-bold text-lg">{pagas}/{mens.length}</div></div>
+          <div className="rounded-md border p-3"><div className="text-muted-foreground text-xs">Recebido</div><div className="font-bold text-lg text-green-600">{BRL(totalPago)}</div></div>
+          <div className="rounded-md border p-3"><div className="text-muted-foreground text-xs">A receber</div><div className="font-bold text-lg text-orange-600">{BRL(aReceber)}</div></div>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          <Button size="sm" onClick={() => printContrato(contrato.id)}><Printer className="h-4 w-4 mr-1"/>Imprimir A4</Button>
+          <Button size="sm" variant="outline" onClick={copiarLink}><Link2 className="h-4 w-4 mr-1"/>Link de assinatura</Button>
+          {contrato.assinado_em ? <Badge variant="default"><Check className="h-3 w-3 mr-1"/>Assinado em {fmtD(contrato.assinado_em)}</Badge> : <Badge variant="outline">Aguardando assinatura</Badge>}
+        </div>
+
+        {deps.length > 0 ? (
+          <div>
+            <h3 className="font-semibold text-sm mb-1">Dependentes/Agregados</h3>
+            <div className="rounded-md border bg-muted/30 p-2 text-sm space-y-1">
+              {deps.map((d) => <div key={d.id}>• {d.paciente_nome} <span className="text-muted-foreground">— {d.parentesco ?? "—"} ({d.tipo})</span></div>)}
+            </div>
+          </div>
+        ) : null}
+
+        <div>
+          <h3 className="font-semibold text-sm mb-1">Mensalidades</h3>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader><TableRow><TableHead>#</TableHead><TableHead>Vencimento</TableHead><TableHead>Valor</TableHead><TableHead>Status</TableHead><TableHead>Pago em</TableHead><TableHead></TableHead></TableRow></TableHeader>
+              <TableBody>
+                {loading ? <TableRow><TableCell colSpan={6} className="text-center py-4 text-muted-foreground">Carregando…</TableCell></TableRow> : null}
+                {mens.map((m) => (
+                  <TableRow key={m.id}>
+                    <TableCell>{m.numero_parcela}</TableCell>
+                    <TableCell>{fmtD(m.vencimento)}</TableCell>
+                    <TableCell>{BRL(m.valor)}</TableCell>
+                    <TableCell><Badge variant={m.status === "pago" ? "default" : new Date(m.vencimento) < new Date() ? "destructive" : "outline"}>{m.status === "pago" ? "Pago" : new Date(m.vencimento) < new Date() ? "Atrasado" : "Pendente"}</Badge></TableCell>
+                    <TableCell>{fmtD(m.pago_em)}</TableCell>
+                    <TableCell>
+                      {m.status === "pago"
+                        ? <Button size="sm" variant="outline" onClick={() => marcarPago(m.id, false)}>Reverter</Button>
+                        : <Button size="sm" onClick={() => marcarPago(m.id, true)}><Check className="h-3 w-3 mr-1"/>Pagar</Button>}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
