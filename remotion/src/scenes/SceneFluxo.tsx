@@ -45,7 +45,7 @@ export const SceneFluxo: React.FC = () => {
       }}>
         <div style={{ display: "flex", justifyContent: "space-between" }}>
           <div style={{ fontWeight: 700, fontFamily: dm, fontSize: 20 }}>Maria Souza</div>
-          <div style={{ color: C.sub, fontSize: 16 }}>09:30</div>
+          <div style={{ color: C.sub, fontSize: 16, fontFamily: dm }}>Nº 002 · ref. 09:30</div>
         </div>
         <div style={{ color: C.sub, fontSize: 16, marginTop: 4 }}>Consulta Cardio · Dr. Roberto</div>
         <div style={{ marginTop: 10, display: "flex", justifyContent: "flex-end" }}>
