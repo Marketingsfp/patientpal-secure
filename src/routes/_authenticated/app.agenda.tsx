@@ -411,15 +411,23 @@ function AgendaPage() {
                 )}
               </div>
               <div className="space-y-1">
-                <Label>Médico</Label>
+                <Label>Médico ou Exame</Label>
                 <SearchableSelect
                   value={form.medico_id || "none"}
-                  onChange={(v) => setForm(f => ({ ...f, medico_id: v === "none" ? "" : v }))}
-                  placeholder="Selecione"
-                  searchPlaceholder="Buscar médico..."
+                  onChange={(v) => {
+                    if (v.startsWith("exame:")) {
+                      const nome = v.slice(6);
+                      setForm(f => ({ ...f, medico_id: "", procedimento: nome }));
+                    } else {
+                      setForm(f => ({ ...f, medico_id: v === "none" ? "" : v }));
+                    }
+                  }}
+                  placeholder="Selecione médico ou exame"
+                  searchPlaceholder="Buscar médico ou exame..."
                   options={[
                     { value: "none", label: "— Sem médico —" },
-                    ...medicos.map(m => ({ value: m.id, label: m.nome })),
+                    ...medicos.map(m => ({ value: m.id, label: `👨‍⚕️ ${m.nome}` })),
+                    ...exames.map(e => ({ value: `exame:${e.nome}`, label: `🧪 ${e.nome}` })),
                   ]}
                 />
               </div>
