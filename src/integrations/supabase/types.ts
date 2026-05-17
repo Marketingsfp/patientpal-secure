@@ -2275,6 +2275,42 @@ export type Database = {
         }
         Relationships: []
       }
+      prontuario_modelos: {
+        Row: {
+          ativo: boolean
+          clinica_id: string
+          created_at: string
+          especialidade_id: string | null
+          id: string
+          nome: string
+          prompt_ia: string | null
+          secoes: Json
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          clinica_id: string
+          created_at?: string
+          especialidade_id?: string | null
+          id?: string
+          nome: string
+          prompt_ia?: string | null
+          secoes?: Json
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          clinica_id?: string
+          created_at?: string
+          especialidade_id?: string | null
+          id?: string
+          nome?: string
+          prompt_ia?: string | null
+          secoes?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       prontuarios: {
         Row: {
           clinica_id: string
@@ -2638,6 +2674,10 @@ export type Database = {
       salvar_anamnese_publica: {
         Args: { _modelo_id: string; _respostas: Json; _token: string }
         Returns: string
+      }
+      seed_prontuario_modelos_padrao: {
+        Args: { _clinica_id: string }
+        Returns: undefined
       }
       user_is_any_manager: { Args: { _user_id: string }; Returns: boolean }
     }
