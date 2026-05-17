@@ -17,9 +17,10 @@ interface Props {
   tipo: Tipo;
   onSaved?: () => void;
   initialDescricao?: string;
+  initialValor?: string;
 }
 
-export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, initialDescricao }: Props) {
+export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, initialDescricao, initialValor }: Props) {
   const { clinicaAtual } = useClinica();
   const [descricao, setDescricao] = useState("");
   const [valor, setValor] = useState("");
@@ -35,6 +36,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, initialDes
   useEffect(() => {
     if (!open || !clinicaAtual) return;
     if (initialDescricao !== undefined) setDescricao(initialDescricao);
+    if (initialValor !== undefined) setValor(initialValor);
     (async () => {
       const [{ data: cats }, { data: cs }] = await Promise.all([
         supabase.from("fin_categorias").select("id, nome").eq("clinica_id", clinicaAtual.clinica_id).eq("tipo", tipo).eq("ativo", true).order("nome"),
