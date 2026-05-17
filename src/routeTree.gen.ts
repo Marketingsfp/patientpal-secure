@@ -15,6 +15,7 @@ import { Route as PainelRouteImport } from './routes/painel'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PacienteConsultasRouteImport } from './routes/paciente.consultas'
 import { Route as PTokenRouteImport } from './routes/p.$token'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
 import { Route as AuthenticatedAppIndexRouteImport } from './routes/_authenticated/app.index'
@@ -81,6 +82,11 @@ const AuthenticatedRoute = AuthenticatedRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PacienteConsultasRoute = PacienteConsultasRouteImport.update({
+  id: '/paciente/consultas',
+  path: '/paciente/consultas',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PTokenRoute = PTokenRouteImport.update({
@@ -308,6 +314,7 @@ export interface FileRoutesByFullPath {
   '/totem': typeof TotemRoute
   '/app': typeof AuthenticatedAppRouteWithChildren
   '/p/$token': typeof PTokenRoute
+  '/paciente/consultas': typeof PacienteConsultasRoute
   '/app/agenda': typeof AuthenticatedAppAgendaRoute
   '/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
   '/app/boletos': typeof AuthenticatedAppBoletosRoute
@@ -352,6 +359,7 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/totem': typeof TotemRoute
   '/p/$token': typeof PTokenRoute
+  '/paciente/consultas': typeof PacienteConsultasRoute
   '/app/agenda': typeof AuthenticatedAppAgendaRoute
   '/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
   '/app/boletos': typeof AuthenticatedAppBoletosRoute
@@ -398,6 +406,7 @@ export interface FileRoutesById {
   '/totem': typeof TotemRoute
   '/_authenticated/app': typeof AuthenticatedAppRouteWithChildren
   '/p/$token': typeof PTokenRoute
+  '/paciente/consultas': typeof PacienteConsultasRoute
   '/_authenticated/app/agenda': typeof AuthenticatedAppAgendaRoute
   '/_authenticated/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
   '/_authenticated/app/boletos': typeof AuthenticatedAppBoletosRoute
@@ -445,6 +454,7 @@ export interface FileRouteTypes {
     | '/totem'
     | '/app'
     | '/p/$token'
+    | '/paciente/consultas'
     | '/app/agenda'
     | '/app/anamneses'
     | '/app/boletos'
@@ -489,6 +499,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/totem'
     | '/p/$token'
+    | '/paciente/consultas'
     | '/app/agenda'
     | '/app/anamneses'
     | '/app/boletos'
@@ -534,6 +545,7 @@ export interface FileRouteTypes {
     | '/totem'
     | '/_authenticated/app'
     | '/p/$token'
+    | '/paciente/consultas'
     | '/_authenticated/app/agenda'
     | '/_authenticated/app/anamneses'
     | '/_authenticated/app/boletos'
@@ -580,6 +592,7 @@ export interface RootRouteChildren {
   SignupRoute: typeof SignupRoute
   TotemRoute: typeof TotemRoute
   PTokenRoute: typeof PTokenRoute
+  PacienteConsultasRoute: typeof PacienteConsultasRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -624,6 +637,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/paciente/consultas': {
+      id: '/paciente/consultas'
+      path: '/paciente/consultas'
+      fullPath: '/paciente/consultas'
+      preLoaderRoute: typeof PacienteConsultasRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/p/$token': {
@@ -1020,7 +1040,18 @@ const rootRouteChildren: RootRouteChildren = {
   SignupRoute: SignupRoute,
   TotemRoute: TotemRoute,
   PTokenRoute: PTokenRoute,
+  PacienteConsultasRoute: PacienteConsultasRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
