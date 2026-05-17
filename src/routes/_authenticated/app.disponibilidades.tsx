@@ -190,7 +190,7 @@ function Page() {
               <Select value={gerar.duracao} onValueChange={(v) => setGerar({ ...gerar, duracao: v })}>
                 <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {["15", "20", "30", "45", "60"].map((v) => <SelectItem key={v} value={v}>{v} min</SelectItem>)}
+                  {["5", "10", "15", "20", "30", "40", "45", "60"].map((v) => <SelectItem key={v} value={v}>{v} min</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

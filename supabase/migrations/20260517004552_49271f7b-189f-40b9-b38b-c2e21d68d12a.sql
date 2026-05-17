@@ -1,0 +1,1 @@
+DELETE FROM public.agendamentos WHERE paciente_nome = 'DISPONÍVEL' AND observacoes = 'Slot gerado automaticamente';
