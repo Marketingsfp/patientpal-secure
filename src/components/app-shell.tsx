@@ -62,6 +62,7 @@ export function AppShell() {
     const t = text.toLowerCase();
     const route =
       /agenda|agendamento/.test(t) ? "/app/agenda" :
+      /fluxo|kanban|triagem/.test(t) ? "/app/fluxo" :
       /recep|fila/.test(t) ? "/app/recepcao" :
       /cliente|paciente/.test(t) ? "/app/clientes" :
       /procediment|exame/.test(t) ? "/app/procedimentos" :
