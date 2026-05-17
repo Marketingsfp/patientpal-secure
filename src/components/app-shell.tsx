@@ -101,19 +101,11 @@ export function AppShell() {
         className="w-64 text-white flex flex-col shrink-0"
         style={{ backgroundColor: clinicaAtual ? corDaClinica(clinicaAtual.clinica.nome) : undefined }}
       >
-        <div className="px-4 py-4 flex items-center justify-center border-b border-white/20 bg-white/95 min-h-[88px]">
-          {logoDaClinica(clinicaAtual?.clinica.nome) ? (
-            <img
-              src={logoDaClinica(clinicaAtual?.clinica.nome)!}
-              alt={clinicaAtual?.clinica.nome ?? "Clínica"}
-              className="max-h-16 w-auto object-contain"
-            />
-          ) : (
-            <div className="flex items-center gap-2 text-foreground">
-              <Activity className="h-5 w-5" />
-              <span className="font-semibold tracking-tight">ClinicaOS</span>
-            </div>
-          )}
+        <div className="px-4 py-4 flex items-center justify-center gap-2 border-b border-white/20 min-h-[88px] text-white">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/15 backdrop-blur">
+            <Activity className="h-5 w-5" />
+          </span>
+          <span className="text-lg font-semibold tracking-tight">ClinicaOS</span>
         </div>
         <nav className="flex-1 p-3 space-y-1 font-sans">
           {nav.map((item) => {
@@ -145,11 +137,14 @@ export function AppShell() {
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 border-b border-border bg-card flex items-center justify-between px-6">
-          <Link to="/app" className="flex items-center gap-2 text-foreground">
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <Activity className="h-5 w-5" />
-            </span>
-            <span className="text-base font-semibold tracking-tight">ClinicaOS</span>
+          <Link to="/app" className="flex items-center gap-3">
+            {clinicaAtual && logoDaClinica(clinicaAtual.clinica.nome) ? (
+              <img src={logoDaClinica(clinicaAtual.clinica.nome)!} alt={clinicaAtual.clinica.nome} className="h-12 w-auto object-contain" />
+            ) : (
+              <span className="text-sm font-semibold" style={{ color: corDaClinica(clinicaAtual?.clinica.nome) }}>
+                {clinicaAtual ? clinicaAtual.clinica.nome : "Nenhuma clínica selecionada"}
+              </span>
+            )}
           </Link>
           <div className="flex items-center gap-2">
             <Suspense fallback={null}>
