@@ -93,6 +93,7 @@ function AgendaPage() {
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [items, setItems] = useState<Agendamento[]>([]);
   const [medicos, setMedicos] = useState<Medico[]>([]);
+  const [exames, setExames] = useState<{ id: string; nome: string }[]>([]);
   const [especialidades, setEspecialidades] = useState<Especialidade[]>([]);
   const [medicoEspec, setMedicoEspec] = useState<Map<string, Set<string>>>(new Map());
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
@@ -161,15 +162,17 @@ function AgendaPage() {
 
   const loadRef = async () => {
     if (!clinicaAtual) return;
-    const [m, p, e, me] = await Promise.all([
+    const [m, p, e, me, ex] = await Promise.all([
       supabase.from("medicos").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("pacientes").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome").limit(500),
       supabase.from("especialidades").select("id,nome").order("nome"),
       supabase.from("medico_especialidades").select("medico_id,especialidade_id"),
+      supabase.from("procedimentos").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("tipo", "exame").eq("ativo", true).order("nome"),
     ]);
     setMedicos((m.data ?? []) as Medico[]);
     setPacientes((p.data ?? []) as Paciente[]);
     setEspecialidades((e.data ?? []) as Especialidade[]);
+    setExames((ex.data ?? []) as { id: string; nome: string }[]);
     const map = new Map<string, Set<string>>();
     for (const r of (me.data ?? []) as Array<{ medico_id: string; especialidade_id: string }>) {
       if (!map.has(r.medico_id)) map.set(r.medico_id, new Set());
@@ -408,15 +411,23 @@ function AgendaPage() {
                 )}
               </div>
               <div className="space-y-1">
-                <Label>Médico</Label>
+                <Label>Médico ou Exame</Label>
                 <SearchableSelect
                   value={form.medico_id || "none"}
-                  onChange={(v) => setForm(f => ({ ...f, medico_id: v === "none" ? "" : v }))}
-                  placeholder="Selecione"
-                  searchPlaceholder="Buscar médico..."
+                  onChange={(v) => {
+                    if (v.startsWith("exame:")) {
+                      const nome = v.slice(6);
+                      setForm(f => ({ ...f, medico_id: "", procedimento: nome }));
+                    } else {
+                      setForm(f => ({ ...f, medico_id: v === "none" ? "" : v }));
+                    }
+                  }}
+                  placeholder="Selecione médico ou exame"
+                  searchPlaceholder="Buscar médico ou exame..."
                   options={[
                     { value: "none", label: "— Sem médico —" },
-                    ...medicos.map(m => ({ value: m.id, label: m.nome })),
+                    ...medicos.map(m => ({ value: m.id, label: `👨‍⚕️ ${m.nome}` })),
+                    ...exames.map(e => ({ value: `exame:${e.nome}`, label: `🧪 ${e.nome}` })),
                   ]}
                 />
               </div>
