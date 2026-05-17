@@ -19,6 +19,7 @@ import { Route as PacienteConsultasRouteImport } from './routes/paciente.consult
 import { Route as PTokenRouteImport } from './routes/p.$token'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
 import { Route as AuthenticatedAppIndexRouteImport } from './routes/_authenticated/app.index'
+import { Route as PContratoTokenRouteImport } from './routes/p.contrato.$token'
 import { Route as AuthenticatedAppRecepcaoRouteImport } from './routes/_authenticated/app.recepcao'
 import { Route as AuthenticatedAppProntuariosRouteImport } from './routes/_authenticated/app.prontuarios'
 import { Route as AuthenticatedAppProcedimentosRouteImport } from './routes/_authenticated/app.procedimentos'
@@ -36,6 +37,7 @@ import { Route as AuthenticatedAppEquipeRouteImport } from './routes/_authentica
 import { Route as AuthenticatedAppDocumentosRouteImport } from './routes/_authenticated/app.documentos'
 import { Route as AuthenticatedAppDisponibilidadesRouteImport } from './routes/_authenticated/app.disponibilidades'
 import { Route as AuthenticatedAppCrmRouteImport } from './routes/_authenticated/app.crm'
+import { Route as AuthenticatedAppContratosRouteImport } from './routes/_authenticated/app.contratos'
 import { Route as AuthenticatedAppConsultaRapidaRouteImport } from './routes/_authenticated/app.consulta-rapida'
 import { Route as AuthenticatedAppClinicasRouteImport } from './routes/_authenticated/app.clinicas'
 import { Route as AuthenticatedAppClientesRouteImport } from './routes/_authenticated/app.clientes'
@@ -106,6 +108,11 @@ const AuthenticatedAppIndexRoute = AuthenticatedAppIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthenticatedAppRoute,
+} as any)
+const PContratoTokenRoute = PContratoTokenRouteImport.update({
+  id: '/p/contrato/$token',
+  path: '/p/contrato/$token',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAppRecepcaoRoute =
   AuthenticatedAppRecepcaoRouteImport.update({
@@ -201,6 +208,12 @@ const AuthenticatedAppCrmRoute = AuthenticatedAppCrmRouteImport.update({
   path: '/crm',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
+const AuthenticatedAppContratosRoute =
+  AuthenticatedAppContratosRouteImport.update({
+    id: '/contratos',
+    path: '/contratos',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppConsultaRapidaRoute =
   AuthenticatedAppConsultaRapidaRouteImport.update({
     id: '/consulta-rapida',
@@ -342,6 +355,7 @@ export interface FileRoutesByFullPath {
   '/app/clientes': typeof AuthenticatedAppClientesRoute
   '/app/clinicas': typeof AuthenticatedAppClinicasRoute
   '/app/consulta-rapida': typeof AuthenticatedAppConsultaRapidaRoute
+  '/app/contratos': typeof AuthenticatedAppContratosRoute
   '/app/crm': typeof AuthenticatedAppCrmRoute
   '/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
   '/app/documentos': typeof AuthenticatedAppDocumentosRoute
@@ -359,6 +373,7 @@ export interface FileRoutesByFullPath {
   '/app/procedimentos': typeof AuthenticatedAppProcedimentosRoute
   '/app/prontuarios': typeof AuthenticatedAppProntuariosRoute
   '/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
+  '/p/contrato/$token': typeof PContratoTokenRoute
   '/app/': typeof AuthenticatedAppIndexRoute
   '/app/financeiro/alertas': typeof AuthenticatedAppFinanceiroAlertasRoute
   '/app/financeiro/analitico': typeof AuthenticatedAppFinanceiroAnaliticoRoute
@@ -390,6 +405,7 @@ export interface FileRoutesByTo {
   '/app/clientes': typeof AuthenticatedAppClientesRoute
   '/app/clinicas': typeof AuthenticatedAppClinicasRoute
   '/app/consulta-rapida': typeof AuthenticatedAppConsultaRapidaRoute
+  '/app/contratos': typeof AuthenticatedAppContratosRoute
   '/app/crm': typeof AuthenticatedAppCrmRoute
   '/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
   '/app/documentos': typeof AuthenticatedAppDocumentosRoute
@@ -406,6 +422,7 @@ export interface FileRoutesByTo {
   '/app/procedimentos': typeof AuthenticatedAppProcedimentosRoute
   '/app/prontuarios': typeof AuthenticatedAppProntuariosRoute
   '/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
+  '/p/contrato/$token': typeof PContratoTokenRoute
   '/app': typeof AuthenticatedAppIndexRoute
   '/app/financeiro/alertas': typeof AuthenticatedAppFinanceiroAlertasRoute
   '/app/financeiro/analitico': typeof AuthenticatedAppFinanceiroAnaliticoRoute
@@ -440,6 +457,7 @@ export interface FileRoutesById {
   '/_authenticated/app/clientes': typeof AuthenticatedAppClientesRoute
   '/_authenticated/app/clinicas': typeof AuthenticatedAppClinicasRoute
   '/_authenticated/app/consulta-rapida': typeof AuthenticatedAppConsultaRapidaRoute
+  '/_authenticated/app/contratos': typeof AuthenticatedAppContratosRoute
   '/_authenticated/app/crm': typeof AuthenticatedAppCrmRoute
   '/_authenticated/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
   '/_authenticated/app/documentos': typeof AuthenticatedAppDocumentosRoute
@@ -457,6 +475,7 @@ export interface FileRoutesById {
   '/_authenticated/app/procedimentos': typeof AuthenticatedAppProcedimentosRoute
   '/_authenticated/app/prontuarios': typeof AuthenticatedAppProntuariosRoute
   '/_authenticated/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
+  '/p/contrato/$token': typeof PContratoTokenRoute
   '/_authenticated/app/': typeof AuthenticatedAppIndexRoute
   '/_authenticated/app/financeiro/alertas': typeof AuthenticatedAppFinanceiroAlertasRoute
   '/_authenticated/app/financeiro/analitico': typeof AuthenticatedAppFinanceiroAnaliticoRoute
@@ -491,6 +510,7 @@ export interface FileRouteTypes {
     | '/app/clientes'
     | '/app/clinicas'
     | '/app/consulta-rapida'
+    | '/app/contratos'
     | '/app/crm'
     | '/app/disponibilidades'
     | '/app/documentos'
@@ -508,6 +528,7 @@ export interface FileRouteTypes {
     | '/app/procedimentos'
     | '/app/prontuarios'
     | '/app/recepcao'
+    | '/p/contrato/$token'
     | '/app/'
     | '/app/financeiro/alertas'
     | '/app/financeiro/analitico'
@@ -539,6 +560,7 @@ export interface FileRouteTypes {
     | '/app/clientes'
     | '/app/clinicas'
     | '/app/consulta-rapida'
+    | '/app/contratos'
     | '/app/crm'
     | '/app/disponibilidades'
     | '/app/documentos'
@@ -555,6 +577,7 @@ export interface FileRouteTypes {
     | '/app/procedimentos'
     | '/app/prontuarios'
     | '/app/recepcao'
+    | '/p/contrato/$token'
     | '/app'
     | '/app/financeiro/alertas'
     | '/app/financeiro/analitico'
@@ -588,6 +611,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/clientes'
     | '/_authenticated/app/clinicas'
     | '/_authenticated/app/consulta-rapida'
+    | '/_authenticated/app/contratos'
     | '/_authenticated/app/crm'
     | '/_authenticated/app/disponibilidades'
     | '/_authenticated/app/documentos'
@@ -605,6 +629,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/procedimentos'
     | '/_authenticated/app/prontuarios'
     | '/_authenticated/app/recepcao'
+    | '/p/contrato/$token'
     | '/_authenticated/app/'
     | '/_authenticated/app/financeiro/alertas'
     | '/_authenticated/app/financeiro/analitico'
@@ -631,6 +656,7 @@ export interface RootRouteChildren {
   TotemRoute: typeof TotemRoute
   PTokenRoute: typeof PTokenRoute
   PacienteConsultasRoute: typeof PacienteConsultasRoute
+  PContratoTokenRoute: typeof PContratoTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -704,6 +730,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/app/'
       preLoaderRoute: typeof AuthenticatedAppIndexRouteImport
       parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/p/contrato/$token': {
+      id: '/p/contrato/$token'
+      path: '/p/contrato/$token'
+      fullPath: '/p/contrato/$token'
+      preLoaderRoute: typeof PContratoTokenRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/app/recepcao': {
       id: '/_authenticated/app/recepcao'
@@ -822,6 +855,13 @@ declare module '@tanstack/react-router' {
       path: '/crm'
       fullPath: '/app/crm'
       preLoaderRoute: typeof AuthenticatedAppCrmRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/contratos': {
+      id: '/_authenticated/app/contratos'
+      path: '/contratos'
+      fullPath: '/app/contratos'
+      preLoaderRoute: typeof AuthenticatedAppContratosRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/consulta-rapida': {
@@ -1033,6 +1073,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppClientesRoute: typeof AuthenticatedAppClientesRoute
   AuthenticatedAppClinicasRoute: typeof AuthenticatedAppClinicasRoute
   AuthenticatedAppConsultaRapidaRoute: typeof AuthenticatedAppConsultaRapidaRoute
+  AuthenticatedAppContratosRoute: typeof AuthenticatedAppContratosRoute
   AuthenticatedAppCrmRoute: typeof AuthenticatedAppCrmRoute
   AuthenticatedAppDisponibilidadesRoute: typeof AuthenticatedAppDisponibilidadesRoute
   AuthenticatedAppDocumentosRoute: typeof AuthenticatedAppDocumentosRoute
@@ -1061,6 +1102,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppClientesRoute: AuthenticatedAppClientesRoute,
   AuthenticatedAppClinicasRoute: AuthenticatedAppClinicasRoute,
   AuthenticatedAppConsultaRapidaRoute: AuthenticatedAppConsultaRapidaRoute,
+  AuthenticatedAppContratosRoute: AuthenticatedAppContratosRoute,
   AuthenticatedAppCrmRoute: AuthenticatedAppCrmRoute,
   AuthenticatedAppDisponibilidadesRoute: AuthenticatedAppDisponibilidadesRoute,
   AuthenticatedAppDocumentosRoute: AuthenticatedAppDocumentosRoute,
@@ -1106,7 +1148,18 @@ const rootRouteChildren: RootRouteChildren = {
   TotemRoute: TotemRoute,
   PTokenRoute: PTokenRoute,
   PacienteConsultasRoute: PacienteConsultasRoute,
+  PContratoTokenRoute: PContratoTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
