@@ -382,7 +382,7 @@ function ProcedimentosPage() {
       nome: p.nome, grupo: p.grupo ?? "", tipo: p.tipo, codigo: p.codigo ?? "",
       valor_dinheiro: String(p.valor_dinheiro ?? p.valor_dinheiro_pix ?? p.valor_padrao ?? 0),
       valor_pix_cartao: String(
-        p.valor_pix ?? p.valor_cartao_credito ?? p.valor_cartao_debito ?? p.valor_cartao ?? 0
+        p.valor_cartao_credito ?? p.valor_cartao_debito ?? p.valor_cartao ?? p.valor_pix ?? 0
       ),
       valor_cartao_consulta: String(p.valor_cartao_consulta ?? 0),
       valor_cartao_desconto: String(p.valor_cartao_desconto ?? 0),
@@ -397,7 +397,7 @@ function ProcedimentosPage() {
     if (!form.nome.trim()) { toast.error("Informe o nome."); return; }
     setSaving(true);
     const vDinheiro = Number(form.valor_dinheiro) || 0;
-    const vPixCartao = Number(form.valor_pix_cartao) || 0;
+    const vCartao = Number(form.valor_pix_cartao) || 0;
     const payload = {
       clinica_id: clinicaAtual.clinica_id,
       nome: form.nome.trim(),
@@ -406,11 +406,11 @@ function ProcedimentosPage() {
       codigo: form.codigo.trim() || null,
       valor_padrao: vDinheiro, // mantém compatibilidade com agenda/financeiro
       valor_dinheiro: vDinheiro,
-      valor_pix: vPixCartao,
+      valor_pix: vDinheiro,
       valor_dinheiro_pix: vDinheiro, // legado
-      valor_cartao_credito: vPixCartao,
-      valor_cartao_debito: vPixCartao,
-      valor_cartao: vPixCartao, // legado
+      valor_cartao_credito: vCartao,
+      valor_cartao_debito: vCartao,
+      valor_cartao: vCartao, // legado
       valor_cartao_consulta: Number(form.valor_cartao_consulta) || 0,
       valor_cartao_desconto: Number(form.valor_cartao_desconto) || 0,
       duracao_minutos: Math.max(0, Number(form.duracao_minutos) || 0),
