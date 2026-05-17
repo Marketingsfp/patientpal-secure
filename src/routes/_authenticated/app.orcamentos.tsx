@@ -357,7 +357,14 @@ function NovoOrcamentoDialog({
                           </span>
                         )}
                       </span>
-                      <span className="text-sm font-semibold text-primary whitespace-nowrap">{BRL(valorDoProc(p))}</span>
+                      <span className="text-sm font-semibold whitespace-nowrap flex gap-2">
+                        {(formasPagamento.length ? formasPagamento : ["Dinheiro"]).map((f, i) => (
+                          <span key={f} className={i === 0 ? "text-primary" : "text-muted-foreground"}>
+                            <span className="text-[10px] uppercase mr-1">{abreviar(f)}</span>
+                            {BRL(valorPorForma(p, f))}
+                          </span>
+                        ))}
+                      </span>
                     </button>
                   ))}
                 </div>
