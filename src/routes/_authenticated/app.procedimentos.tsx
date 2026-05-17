@@ -578,7 +578,7 @@ function ProcedimentosPage() {
                     tipo: TIPO_LABEL[p.tipo],
                     codigo: p.codigo ?? "",
                     dinheiro: Number(p.valor_dinheiro ?? p.valor_dinheiro_pix ?? 0).toFixed(2),
-                    pix_credito: Number(p.valor_pix ?? p.valor_cartao_credito ?? p.valor_cartao ?? 0).toFixed(2),
+                    cartao: Number(p.valor_cartao_credito ?? p.valor_cartao_debito ?? p.valor_cartao ?? 0).toFixed(2),
                     cartao_consulta: Number(p.valor_cartao_consulta ?? 0).toFixed(2),
                     cartao_desconto: Number(p.valor_cartao_desconto ?? 0).toFixed(2),
                     duracao: p.duracao_minutos,
@@ -592,7 +592,7 @@ function ProcedimentosPage() {
                     { key: "tipo", label: "Tipo" },
                     { key: "codigo", label: "Código" },
                     { key: "dinheiro", label: "Dinheiro (R$)" },
-                    { key: "pix_credito", label: "Pix/Crédito (R$)" },
+                    { key: "cartao", label: "Cartão (R$)" },
                     { key: "cartao_consulta", label: "C. Consulta (R$)" },
                     { key: "cartao_desconto", label: "C. Desconto (R$)" },
                     { key: "duracao", label: "Duração (min)" },
@@ -638,7 +638,7 @@ function ProcedimentosPage() {
                   <TableHead className="w-44">Grupo</TableHead>
                   <TableHead className="w-24">Tipo</TableHead>
                   <TableHead className="w-24 text-right">Dinheiro</TableHead>
-                  <TableHead className="w-32 text-right">Pix / Crédito / Débito</TableHead>
+                  <TableHead className="w-32 text-right">Cartão</TableHead>
                   <TableHead className="w-24 text-right">C. Consulta</TableHead>
                   <TableHead className="w-24 text-right">C. Desconto</TableHead>
                   <TableHead className="w-24">Situação</TableHead>
@@ -660,7 +660,7 @@ function ProcedimentosPage() {
                       <span className={`text-[10px] px-1.5 py-0 rounded-full ${TIPO_COR[p.tipo]}`}>{TIPO_LABEL[p.tipo]}</span>
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_dinheiro ?? p.valor_dinheiro_pix))}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_pix ?? p.valor_cartao_credito ?? p.valor_cartao))}</TableCell>
+                    <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_cartao_credito ?? p.valor_cartao_debito ?? p.valor_cartao))}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_cartao_consulta))}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_cartao_desconto))}</TableCell>
                     <TableCell>
