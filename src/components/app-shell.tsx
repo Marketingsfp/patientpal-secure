@@ -1,6 +1,6 @@
 import { Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect } from "react";
-import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart } from "lucide-react";
+import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
@@ -48,6 +48,8 @@ const nav = [
   { to: "/app/disponibilidades", label: "Horários médicos", icon: Clock, iconColor: "#a78bfa" },
   { to: "/app/consulta-rapida", label: "Consulta rápida", icon: BookOpen, iconColor: "#fcd34d" },
   { to: "/app/atendimento-ia", label: "Atendimento IA", icon: Brain, iconColor: "#a78bfa" },
+  { to: "/app/exames-resultados", label: "Resultados de Exames", icon: FlaskConical, iconColor: "#fde047" },
+  { to: "/app/alertas-enfermagem", label: "Enfermeira IA — Alertas", icon: BellRing, iconColor: "#ef4444" },
   { to: "/app/prontuario-modelos", label: "Modelos de Prontuário", icon: FileHeart, iconColor: "#f9a8d4" },
   { to: "/app/equipe", label: "Equipe", icon: Users, iconColor: "#93c5fd" },
 ] as const;
