@@ -12,6 +12,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
@@ -364,13 +365,16 @@ function AgendaPage() {
               </div>
               <div className="space-y-1">
                 <Label>Médico</Label>
-                <Select value={form.medico_id || "none"} onValueChange={(v) => setForm(f => ({ ...f, medico_id: v === "none" ? "" : v }))}>
-                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">— Sem médico —</SelectItem>
-                    {medicos.map(m => <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  value={form.medico_id || "none"}
+                  onChange={(v) => setForm(f => ({ ...f, medico_id: v === "none" ? "" : v }))}
+                  placeholder="Selecione"
+                  searchPlaceholder="Buscar médico..."
+                  options={[
+                    { value: "none", label: "— Sem médico —" },
+                    ...medicos.map(m => ({ value: m.id, label: m.nome })),
+                  ]}
+                />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
@@ -440,13 +444,16 @@ function AgendaPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="space-y-1">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Profissional</Label>
-            <Select value={filtroMedico} onValueChange={setFiltroMedico}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">TODOS</SelectItem>
-                {medicos.map(m => <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={filtroMedico}
+              onChange={setFiltroMedico}
+              placeholder="TODOS"
+              searchPlaceholder="Buscar médico..."
+              options={[
+                { value: "todos", label: "TODOS" },
+                ...medicos.map(m => ({ value: m.id, label: m.nome })),
+              ]}
+            />
           </div>
           <div className="space-y-1">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Data Ref.</Label>
