@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { FileSignature, Plus, Printer, Search, Trash2, Link2, Check, ChevronRight, CreditCard } from "lucide-react";
+import { FileSignature, Plus, Printer, Search, Trash2, Link2, Check, ChevronRight, CreditCard, Camera } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { printContrato } from "@/lib/print-contrato";
 import { printCartoes } from "@/lib/print-cartao";
+import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
 
 export const Route = createFileRoute("/_authenticated/app/contratos")({
   component: ContratosPage,
@@ -25,7 +26,7 @@ const BRL = (v: number) => Number(v || 0).toLocaleString("pt-BR", { style: "curr
 const fmtD = (s?: string | null) => (s ? new Date(s + (s.length === 10 ? "T00:00:00" : "")).toLocaleDateString("pt-BR") : "—");
 
 type Plano = { id: string; nome: string; tipo: string; valor_mensal: number; taxa_adesao: number; max_dependentes: number; max_agregados: number; num_parcelas: number; vigencia_meses: number };
-type Paciente = { id: string; nome: string; cpf: string | null; telefone: string | null; email: string | null };
+type Paciente = { id: string; nome: string; cpf: string | null; telefone: string | null; email: string | null; face_descriptor?: number[] | null };
 type Contrato = { id: string; numero: number; paciente_nome: string; plano_id: string; valor_mensal: number; status: string; data_inicio: string; data_fim: string | null; assinado_em: string | null; token_publico: string; forma_pagamento: string | null };
 type Mens = { id: string; numero_parcela: number; vencimento: string; valor: number; status: string; pago_em: string | null; forma_pagamento: string | null };
 type Dep = { id: string; paciente_nome: string; parentesco: string | null; tipo: string };
@@ -122,6 +123,7 @@ function NovoContratoDialog({ open, onClose, planos, clinicaId, userId, onCreate
   const [depResults, setDepResults] = useState<Paciente[]>([]);
   const [deps, setDeps] = useState<Array<Paciente & { parentesco: string; tipo: string }>>([]);
   const [saving, setSaving] = useState(false);
+  const [faceOpen, setFaceOpen] = useState<null | { tipo: "titular" } | { tipo: "dep"; idx: number }>(null);
 
   useEffect(() => {
     if (plano) { setValor(Number(plano.valor_mensal)); setTaxa(Number(plano.taxa_adesao)); }
@@ -130,7 +132,7 @@ function NovoContratoDialog({ open, onClose, planos, clinicaId, userId, onCreate
   const buscarPac = async (term: string, setRes: (r: Paciente[]) => void) => {
     if (term.trim().length < 2) return setRes([]);
     const { data } = await supabase.from("pacientes")
-      .select("id, nome, cpf, telefone, email").eq("clinica_id", clinicaId).eq("ativo", true)
+      .select("id, nome, cpf, telefone, email, face_descriptor").eq("clinica_id", clinicaId).eq("ativo", true)
       .ilike("nome", `%${term}%`).limit(8);
     setRes((data ?? []) as Paciente[]);
   };
@@ -147,8 +149,11 @@ function NovoContratoDialog({ open, onClose, planos, clinicaId, userId, onCreate
   const salvar = async () => {
     if (!titular || !plano) return toast.error("Selecione paciente e plano");
     if (!titular.email) return toast.error("Titular precisa ter e-mail para acessar o app. Cadastre o e-mail no paciente antes de gerar o contrato.");
+    if (!titular.face_descriptor || titular.face_descriptor.length === 0) return toast.error("Capture a foto do titular antes de gerar o contrato.");
     const semEmailDeps = deps.filter((d) => !d.email);
     if (semEmailDeps.length > 0 && !confirm(`${semEmailDeps.length} dependente(s) sem e-mail não conseguirão acessar o app. Continuar mesmo assim?`)) return;
+    const semFotoDeps = deps.filter((d) => !d.face_descriptor || d.face_descriptor.length === 0);
+    if (semFotoDeps.length > 0 && !confirm(`${semFotoDeps.length} dependente(s) sem foto facial. Continuar mesmo assim?`)) return;
     setSaving(true);
     const { data: contrato, error } = await supabase.from("contratos_assinatura").insert({
       clinica_id: clinicaId, plano_id: plano.id, paciente_id: titular.id, paciente_nome: titular.nome,
@@ -195,8 +200,18 @@ function NovoContratoDialog({ open, onClose, planos, clinicaId, userId, onCreate
           <div className="col-span-2"><Label>Paciente titular</Label>
             {titular ? (
               <div className="flex items-center justify-between rounded-md border p-2 bg-muted/30">
-                <span className="font-medium">{titular.nome} {titular.cpf ? `— ${titular.cpf}` : ""}</span>
-                <Button size="sm" variant="ghost" onClick={() => setTitular(null)}>Trocar</Button>
+                <span className="font-medium flex items-center gap-2">
+                  {titular.nome} {titular.cpf ? `— ${titular.cpf}` : ""}
+                  {titular.face_descriptor && titular.face_descriptor.length > 0
+                    ? <Badge variant="default" className="gap-1"><Check className="h-3 w-3"/>Foto</Badge>
+                    : <Badge variant="outline" className="gap-1 text-amber-600 border-amber-400">Sem foto</Badge>}
+                </span>
+                <div className="flex gap-1">
+                  <Button size="sm" variant="outline" onClick={() => setFaceOpen({ tipo: "titular" })}>
+                    <Camera className="h-3 w-3 mr-1"/>{titular.face_descriptor?.length ? "Refazer foto" : "Tirar foto"}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setTitular(null)}>Trocar</Button>
+                </div>
               </div>
             ) : (
               <>
@@ -245,13 +260,19 @@ function NovoContratoDialog({ open, onClose, planos, clinicaId, userId, onCreate
               <div className="mt-2 space-y-1">
                 {deps.map((d, i) => (
                   <div key={d.id} className="grid grid-cols-12 gap-2 items-center">
-                    <span className="col-span-4 text-sm truncate">{d.nome}</span>
+                    <span className="col-span-3 text-sm truncate flex items-center gap-1">
+                      {d.nome}
+                      {d.face_descriptor && d.face_descriptor.length > 0 ? <Check className="h-3 w-3 text-green-600"/> : null}
+                    </span>
                     <Input className="col-span-3 h-8" placeholder="Parentesco" value={d.parentesco} onChange={(e) => setDeps(deps.map((x, j) => j === i ? { ...x, parentesco: e.target.value } : x))}/>
                     <Select value={d.tipo} onValueChange={(v) => setDeps(deps.map((x, j) => j === i ? { ...x, tipo: v } : x))}>
-                      <SelectTrigger className="col-span-3 h-8"><SelectValue/></SelectTrigger>
+                      <SelectTrigger className="col-span-2 h-8"><SelectValue/></SelectTrigger>
                       <SelectContent><SelectItem value="dependente">Dependente</SelectItem><SelectItem value="agregado">Agregado</SelectItem></SelectContent>
                     </Select>
-                    <Button size="sm" variant="ghost" className="col-span-2" onClick={() => setDeps(deps.filter((_, j) => j !== i))}><Trash2 className="h-3 w-3 text-destructive"/></Button>
+                    <Button size="sm" variant="outline" className="col-span-3 h-8" onClick={() => setFaceOpen({ tipo: "dep", idx: i })}>
+                      <Camera className="h-3 w-3 mr-1"/>{d.face_descriptor?.length ? "Refazer" : "Foto"}
+                    </Button>
+                    <Button size="sm" variant="ghost" className="col-span-1" onClick={() => setDeps(deps.filter((_, j) => j !== i))}><Trash2 className="h-3 w-3 text-destructive"/></Button>
                   </div>
                 ))}
               </div>
@@ -263,6 +284,21 @@ function NovoContratoDialog({ open, onClose, planos, clinicaId, userId, onCreate
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
           <Button onClick={salvar} disabled={saving || !titular || !plano}>Gerar contrato + {plano?.num_parcelas ?? 12} parcelas</Button>
         </DialogFooter>
+        {faceOpen ? (
+          <FaceCaptureDialog
+            open={!!faceOpen}
+            onClose={() => setFaceOpen(null)}
+            titulo={faceOpen.tipo === "titular" ? `Foto — ${titular?.nome ?? "Titular"}` : `Foto — ${deps[faceOpen.idx]?.nome ?? "Dependente"}`}
+            onCaptured={async (descriptor) => {
+              const alvoId = faceOpen.tipo === "titular" ? titular!.id : deps[faceOpen.idx].id;
+              const { error } = await supabase.from("pacientes").update({ face_descriptor: descriptor }).eq("id", alvoId);
+              if (error) throw error;
+              if (faceOpen.tipo === "titular") setTitular({ ...titular!, face_descriptor: descriptor });
+              else setDeps(deps.map((x, j) => j === faceOpen.idx ? { ...x, face_descriptor: descriptor } : x));
+              toast.success("Foto registrada");
+            }}
+          />
+        ) : null}
       </DialogContent>
     </Dialog>
   );
