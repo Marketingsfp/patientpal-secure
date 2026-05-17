@@ -26,6 +26,7 @@ import { Route as AuthenticatedAppNinaRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedAppNfseRouteImport } from './routes/_authenticated/app.nfse'
 import { Route as AuthenticatedAppModelosDocumentosRouteImport } from './routes/_authenticated/app.modelos-documentos'
 import { Route as AuthenticatedAppMedicosRouteImport } from './routes/_authenticated/app.medicos'
+import { Route as AuthenticatedAppFluxoRouteImport } from './routes/_authenticated/app.fluxo'
 import { Route as AuthenticatedAppFinanceiroRouteImport } from './routes/_authenticated/app.financeiro'
 import { Route as AuthenticatedAppEstoqueRouteImport } from './routes/_authenticated/app.estoque'
 import { Route as AuthenticatedAppEspecialidadesRouteImport } from './routes/_authenticated/app.especialidades'
@@ -141,6 +142,11 @@ const AuthenticatedAppModelosDocumentosRoute =
 const AuthenticatedAppMedicosRoute = AuthenticatedAppMedicosRouteImport.update({
   id: '/medicos',
   path: '/medicos',
+  getParentRoute: () => AuthenticatedAppRoute,
+} as any)
+const AuthenticatedAppFluxoRoute = AuthenticatedAppFluxoRouteImport.update({
+  id: '/fluxo',
+  path: '/fluxo',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
 const AuthenticatedAppFinanceiroRoute =
@@ -330,6 +336,7 @@ export interface FileRoutesByFullPath {
   '/app/especialidades': typeof AuthenticatedAppEspecialidadesRoute
   '/app/estoque': typeof AuthenticatedAppEstoqueRoute
   '/app/financeiro': typeof AuthenticatedAppFinanceiroRouteWithChildren
+  '/app/fluxo': typeof AuthenticatedAppFluxoRoute
   '/app/medicos': typeof AuthenticatedAppMedicosRoute
   '/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
   '/app/nfse': typeof AuthenticatedAppNfseRoute
@@ -374,6 +381,7 @@ export interface FileRoutesByTo {
   '/app/equipe': typeof AuthenticatedAppEquipeRoute
   '/app/especialidades': typeof AuthenticatedAppEspecialidadesRoute
   '/app/estoque': typeof AuthenticatedAppEstoqueRoute
+  '/app/fluxo': typeof AuthenticatedAppFluxoRoute
   '/app/medicos': typeof AuthenticatedAppMedicosRoute
   '/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
   '/app/nfse': typeof AuthenticatedAppNfseRoute
@@ -422,6 +430,7 @@ export interface FileRoutesById {
   '/_authenticated/app/especialidades': typeof AuthenticatedAppEspecialidadesRoute
   '/_authenticated/app/estoque': typeof AuthenticatedAppEstoqueRoute
   '/_authenticated/app/financeiro': typeof AuthenticatedAppFinanceiroRouteWithChildren
+  '/_authenticated/app/fluxo': typeof AuthenticatedAppFluxoRoute
   '/_authenticated/app/medicos': typeof AuthenticatedAppMedicosRoute
   '/_authenticated/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
   '/_authenticated/app/nfse': typeof AuthenticatedAppNfseRoute
@@ -470,6 +479,7 @@ export interface FileRouteTypes {
     | '/app/especialidades'
     | '/app/estoque'
     | '/app/financeiro'
+    | '/app/fluxo'
     | '/app/medicos'
     | '/app/modelos-documentos'
     | '/app/nfse'
@@ -514,6 +524,7 @@ export interface FileRouteTypes {
     | '/app/equipe'
     | '/app/especialidades'
     | '/app/estoque'
+    | '/app/fluxo'
     | '/app/medicos'
     | '/app/modelos-documentos'
     | '/app/nfse'
@@ -561,6 +572,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/especialidades'
     | '/_authenticated/app/estoque'
     | '/_authenticated/app/financeiro'
+    | '/_authenticated/app/fluxo'
     | '/_authenticated/app/medicos'
     | '/_authenticated/app/modelos-documentos'
     | '/_authenticated/app/nfse'
@@ -715,6 +727,13 @@ declare module '@tanstack/react-router' {
       path: '/medicos'
       fullPath: '/app/medicos'
       preLoaderRoute: typeof AuthenticatedAppMedicosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/fluxo': {
+      id: '/_authenticated/app/fluxo'
+      path: '/fluxo'
+      fullPath: '/app/fluxo'
+      preLoaderRoute: typeof AuthenticatedAppFluxoRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/financeiro': {
@@ -982,6 +1001,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppEspecialidadesRoute: typeof AuthenticatedAppEspecialidadesRoute
   AuthenticatedAppEstoqueRoute: typeof AuthenticatedAppEstoqueRoute
   AuthenticatedAppFinanceiroRoute: typeof AuthenticatedAppFinanceiroRouteWithChildren
+  AuthenticatedAppFluxoRoute: typeof AuthenticatedAppFluxoRoute
   AuthenticatedAppMedicosRoute: typeof AuthenticatedAppMedicosRoute
   AuthenticatedAppModelosDocumentosRoute: typeof AuthenticatedAppModelosDocumentosRoute
   AuthenticatedAppNfseRoute: typeof AuthenticatedAppNfseRoute
@@ -1007,6 +1027,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppEspecialidadesRoute: AuthenticatedAppEspecialidadesRoute,
   AuthenticatedAppEstoqueRoute: AuthenticatedAppEstoqueRoute,
   AuthenticatedAppFinanceiroRoute: AuthenticatedAppFinanceiroRouteWithChildren,
+  AuthenticatedAppFluxoRoute: AuthenticatedAppFluxoRoute,
   AuthenticatedAppMedicosRoute: AuthenticatedAppMedicosRoute,
   AuthenticatedAppModelosDocumentosRoute:
     AuthenticatedAppModelosDocumentosRoute,
