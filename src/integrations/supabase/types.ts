@@ -77,6 +77,81 @@ export type Database = {
         }
         Relationships: []
       }
+      alertas_enfermagem: {
+        Row: {
+          clinica_id: string
+          contatado_em: string | null
+          created_at: string
+          descricao: string | null
+          id: string
+          mensagem_sugerida: string | null
+          observacao_contato: string | null
+          origem: string
+          origem_id: string | null
+          paciente_id: string | null
+          paciente_nome: string | null
+          resolvido_em: string | null
+          responsavel_id: string | null
+          severidade: Database["public"]["Enums"]["resultado_status"]
+          status: Database["public"]["Enums"]["alerta_enf_status"]
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          clinica_id: string
+          contatado_em?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          mensagem_sugerida?: string | null
+          observacao_contato?: string | null
+          origem?: string
+          origem_id?: string | null
+          paciente_id?: string | null
+          paciente_nome?: string | null
+          resolvido_em?: string | null
+          responsavel_id?: string | null
+          severidade?: Database["public"]["Enums"]["resultado_status"]
+          status?: Database["public"]["Enums"]["alerta_enf_status"]
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          clinica_id?: string
+          contatado_em?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          mensagem_sugerida?: string | null
+          observacao_contato?: string | null
+          origem?: string
+          origem_id?: string | null
+          paciente_id?: string | null
+          paciente_nome?: string | null
+          resolvido_em?: string | null
+          responsavel_id?: string | null
+          severidade?: Database["public"]["Enums"]["resultado_status"]
+          status?: Database["public"]["Enums"]["alerta_enf_status"]
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alertas_enfermagem_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alertas_enfermagem_paciente_id_fkey"
+            columns: ["paciente_id"]
+            isOneToOne: false
+            referencedRelation: "pacientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       anamnese_modelos: {
         Row: {
           ativo: boolean
@@ -791,6 +866,84 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      exame_resultados: {
+        Row: {
+          classificado_em: string | null
+          classificado_por: string | null
+          clinica_id: string
+          created_at: string
+          created_by: string | null
+          data_coleta: string | null
+          ia_classificacao: Json | null
+          ia_mensagem_paciente: string | null
+          ia_recomendacao: string | null
+          ia_resumo: string | null
+          id: string
+          origem: string | null
+          paciente_id: string
+          paciente_nome: string | null
+          resultado_texto: string
+          status: Database["public"]["Enums"]["resultado_status"]
+          tipo_exame: string
+          updated_at: string
+        }
+        Insert: {
+          classificado_em?: string | null
+          classificado_por?: string | null
+          clinica_id: string
+          created_at?: string
+          created_by?: string | null
+          data_coleta?: string | null
+          ia_classificacao?: Json | null
+          ia_mensagem_paciente?: string | null
+          ia_recomendacao?: string | null
+          ia_resumo?: string | null
+          id?: string
+          origem?: string | null
+          paciente_id: string
+          paciente_nome?: string | null
+          resultado_texto: string
+          status?: Database["public"]["Enums"]["resultado_status"]
+          tipo_exame: string
+          updated_at?: string
+        }
+        Update: {
+          classificado_em?: string | null
+          classificado_por?: string | null
+          clinica_id?: string
+          created_at?: string
+          created_by?: string | null
+          data_coleta?: string | null
+          ia_classificacao?: Json | null
+          ia_mensagem_paciente?: string | null
+          ia_recomendacao?: string | null
+          ia_resumo?: string | null
+          id?: string
+          origem?: string | null
+          paciente_id?: string
+          paciente_nome?: string | null
+          resultado_texto?: string
+          status?: Database["public"]["Enums"]["resultado_status"]
+          tipo_exame?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exame_resultados_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exame_resultados_paciente_id_fkey"
+            columns: ["paciente_id"]
+            isOneToOne: false
+            referencedRelation: "pacientes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       fin_alertas: {
         Row: {
@@ -2688,6 +2841,7 @@ export type Database = {
         | "realizado"
         | "cancelado"
         | "faltou"
+      alerta_enf_status: "aberto" | "em_contato" | "resolvido" | "sem_contato"
       app_role:
         | "admin"
         | "gestor"
@@ -2741,6 +2895,7 @@ export type Database = {
         | "parceiro_pj"
         | "outro"
       procedimento_tipo: "consulta" | "exame" | "procedimento"
+      resultado_status: "pendente" | "normal" | "alterado" | "critico"
       split_beneficiario_tipo: "clinica" | "medico" | "prestador" | "outro"
       status_senha: "emitida" | "chamada" | "atendida" | "cancelada"
       tipo_documento:
@@ -2885,6 +3040,7 @@ export const Constants = {
         "cancelado",
         "faltou",
       ],
+      alerta_enf_status: ["aberto", "em_contato", "resolvido", "sem_contato"],
       app_role: [
         "admin",
         "gestor",
@@ -2944,6 +3100,7 @@ export const Constants = {
         "outro",
       ],
       procedimento_tipo: ["consulta", "exame", "procedimento"],
+      resultado_status: ["pendente", "normal", "alterado", "critico"],
       split_beneficiario_tipo: ["clinica", "medico", "prestador", "outro"],
       status_senha: ["emitida", "chamada", "atendida", "cancelada"],
       tipo_documento: [
