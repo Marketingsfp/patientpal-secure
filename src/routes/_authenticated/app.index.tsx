@@ -48,12 +48,14 @@ function DashboardPage() {
     const ini = new Date(`${periodo.de}T00:00:00`).toISOString();
     const fim = new Date(`${periodo.ate}T23:59:59`).toISOString();
 
-    const [alertasR, agendR, lancR, atendR, medicosR] = await Promise.all([
+    const [alertasR, agendR, lancR, atendR, medicosR, espR, medEspR] = await Promise.all([
       supabase.from("fin_alertas").select("id,mensagem").eq("clinica_id", cid).eq("lido", false).order("created_at", { ascending: false }).limit(5),
-      supabase.from("agendamentos").select("id,status,medico_id,paciente_id,procedimento").eq("clinica_id", cid).gte("inicio", ini).lte("inicio", fim),
+      supabase.from("agendamentos").select("id,status,medico_id,paciente_id,procedimento,inicio").eq("clinica_id", cid).gte("inicio", ini).lte("inicio", fim),
       supabase.from("fin_lancamentos").select("id,tipo,status,valor,medico_id").eq("clinica_id", cid).gte("data", periodo.de).lte("data", periodo.ate),
       supabase.from("fin_atendimentos").select("id,valor_total,valor_medico,medico_id,status").eq("clinica_id", cid).gte("data", periodo.de).lte("data", periodo.ate),
       supabase.from("medicos").select("id,nome").eq("clinica_id", cid).eq("ativo", true),
+      supabase.from("especialidades").select("id,nome"),
+      supabase.from("medico_especialidades").select("medico_id,especialidade_id"),
     ]);
 
     const ags = agendR.data ?? [];
@@ -61,11 +63,34 @@ function DashboardPage() {
     const atends = atendR.data ?? [];
     const meds = medicosR.data ?? [];
 
-    // Agendamentos
-    const total = ags.length;
-    const atendidos = ags.filter(a => a.status === "realizado").length;
-    const faltas = ags.filter(a => a.status === "faltou").length;
-    const retornos = ags.filter(a => (a.procedimento ?? "").toLowerCase().includes("retorno")).length;
+    // Identifica médicos cuja especialidade é "Laboratório"
+    // Regra de contagem: 1 paciente por GR/procedimento, exceto laboratório
+    // (vários exames do mesmo paciente no mesmo dia contam como 1).
+    const espLabIds = new Set(
+      (espR.data ?? [])
+        .filter(e => (e.nome ?? "").toLowerCase().includes("laborat"))
+        .map(e => e.id),
+    );
+    const labMedicoIds = new Set<string>();
+    for (const me of (medEspR.data ?? []) as Array<{ medico_id: string; especialidade_id: string }>) {
+      if (espLabIds.has(me.especialidade_id)) labMedicoIds.add(me.medico_id);
+    }
+    const isLab = (a: { medico_id: string | null }) => !!a.medico_id && labMedicoIds.has(a.medico_id);
+    const contarGRs = <T extends { medico_id: string | null; paciente_id?: string | null; inicio?: string | null; id: string }>(arr: T[]) => {
+      const naoLab = arr.filter(x => !isLab(x)).length;
+      const grupos = new Set<string>();
+      for (const x of arr.filter(isLab)) {
+        const dia = (x.inicio ?? "").slice(0, 10);
+        grupos.add(`${x.paciente_id ?? x.id}|${dia}`);
+      }
+      return naoLab + grupos.size;
+    };
+
+    // Agendamentos (contagem por GR/procedimento, com regra de laboratório)
+    const total = contarGRs(ags);
+    const atendidos = contarGRs(ags.filter(a => a.status === "realizado"));
+    const faltas = contarGRs(ags.filter(a => a.status === "faltou"));
+    const retornos = contarGRs(ags.filter(a => (a.procedimento ?? "").toLowerCase().includes("retorno")));
     const semAgenda = ags.filter(a => !a.medico_id).length;
 
     // Novos x regulares (a partir de paciente_id em agendamentos do período vs histórico)
@@ -102,7 +127,7 @@ function DashboardPage() {
       const agendados = ags.filter(a => a.medico_id === m.id);
       return {
         nome: m.nome,
-        total: agendados.length,
+        total: contarGRs(agendados),
         pagos: atends.filter(a => a.medico_id === m.id).length,
         novos: agendados.filter(a => a.paciente_id && pacIds.includes(a.paciente_id)).length,
       };
