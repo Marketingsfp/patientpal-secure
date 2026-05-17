@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { Trash2, Plus } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Trash2, Plus, CalendarRange } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -25,6 +25,8 @@ function Page() {
   const [disps, setDisps] = useState<Disp[]>([]);
   const [filtro, setFiltro] = useState("");
   const [novo, setNovo] = useState({ medico_id: "", dia_semana: "1", hora_inicio: "08:00", hora_fim: "12:00" });
+  const [gerar, setGerar] = useState({ medico_id: "all", duracao: "30", dias: "30" });
+  const [gerando, setGerando] = useState(false);
 
   const load = async () => {
     if (!clinicaAtual) return;
@@ -62,6 +64,70 @@ function Page() {
 
   const medicosFiltrados = medicos.filter((m) => !filtro || m.nome.toLowerCase().includes(filtro.toLowerCase()));
 
+  // Pré-visualização dos slots gerados
+  const slotsPreview = useMemo(() => {
+    const dias = parseInt(gerar.dias);
+    const dur = parseInt(gerar.duracao);
+    if (!dias || !dur) return [] as { data: string; medico: string; inicio: string; fim: string }[];
+    const alvo = gerar.medico_id === "all" ? medicos : medicos.filter((m) => m.id === gerar.medico_id);
+    const out: { data: string; medico: string; inicio: string; fim: string }[] = [];
+    const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+    for (let i = 0; i < dias; i++) {
+      const d = new Date(hoje); d.setDate(d.getDate() + i);
+      const dow = d.getDay();
+      for (const m of alvo) {
+        const ds = disps.filter((x) => x.medico_id === m.id && x.dia_semana === dow);
+        for (const disp of ds) {
+          const [hi, mi] = disp.hora_inicio.split(":").map(Number);
+          const [hf, mf] = disp.hora_fim.split(":").map(Number);
+          let cur = hi * 60 + mi;
+          const end = hf * 60 + mf;
+          while (cur + dur <= end) {
+            const inicio = `${String(Math.floor(cur / 60)).padStart(2, "0")}:${String(cur % 60).padStart(2, "0")}`;
+            const fimMin = cur + dur;
+            const fim = `${String(Math.floor(fimMin / 60)).padStart(2, "0")}:${String(fimMin % 60).padStart(2, "0")}`;
+            out.push({ data: d.toISOString().slice(0, 10), medico: m.nome, inicio, fim });
+            cur += dur;
+          }
+        }
+      }
+    }
+    return out;
+  }, [gerar, medicos, disps]);
+
+  const gerarAgenda = async () => {
+    if (!clinicaAtual) return;
+    if (slotsPreview.length === 0) { toast.error("Sem horários para gerar"); return; }
+    if (!confirm(`Confirmar criação de ${slotsPreview.length} horários disponíveis?`)) return;
+    setGerando(true);
+    try {
+      const medicoIdByNome = new Map(medicos.map((m) => [m.nome, m.id]));
+      const rows = slotsPreview.map((s) => {
+        const inicio = new Date(`${s.data}T${s.inicio}:00`);
+        const fim = new Date(`${s.data}T${s.fim}:00`);
+        return {
+          clinica_id: clinicaAtual.clinica_id,
+          medico_id: medicoIdByNome.get(s.medico)!,
+          paciente_nome: "DISPONÍVEL",
+          inicio: inicio.toISOString(),
+          fim: fim.toISOString(),
+          status: "agendado" as const,
+          observacoes: "Slot gerado automaticamente",
+        };
+      });
+      // Inserir em lotes de 500
+      for (let i = 0; i < rows.length; i += 500) {
+        const { error } = await supabase.from("agendamentos").insert(rows.slice(i, i + 500));
+        if (error) throw error;
+      }
+      toast.success(`${rows.length} horários criados`);
+    } catch (e: any) {
+      toast.error(e.message ?? "Erro ao gerar agenda");
+    } finally {
+      setGerando(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -96,6 +162,58 @@ function Page() {
             <Input type="time" className="w-28" value={novo.hora_fim} onChange={(e) => setNovo({ ...novo, hora_fim: e.target.value })} />
           </div>
           <Button onClick={adicionar}><Plus className="h-4 w-4 mr-1" /> Adicionar</Button>
+        </CardContent>
+      </Card>
+
+      <Card className="border-primary/30">
+        <CardContent className="py-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <CalendarRange className="h-5 w-5 text-primary" />
+            <h2 className="font-semibold">Gerar agenda</h2>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Cria automaticamente slots de horários disponíveis com base na disponibilidade semanal dos médicos.
+          </p>
+          <div className="flex flex-wrap gap-2 items-end">
+            <div className="flex-1 min-w-48">
+              <label className="text-xs text-muted-foreground">Médico</label>
+              <Select value={gerar.medico_id} onValueChange={(v) => setGerar({ ...gerar, medico_id: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os médicos</SelectItem>
+                  {medicos.map((m) => <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Duração (min)</label>
+              <Select value={gerar.duracao} onValueChange={(v) => setGerar({ ...gerar, duracao: v })}>
+                <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {["15", "20", "30", "45", "60"].map((v) => <SelectItem key={v} value={v}>{v} min</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Período (dias)</label>
+              <Select value={gerar.dias} onValueChange={(v) => setGerar({ ...gerar, dias: v })}>
+                <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {["7", "15", "30", "60", "90"].map((v) => <SelectItem key={v} value={v}>{v} dias</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={gerarAgenda} disabled={gerando || slotsPreview.length === 0}>
+              <CalendarRange className="h-4 w-4 mr-1" />
+              {gerando ? "Gerando..." : `Gerar ${slotsPreview.length} slots`}
+            </Button>
+          </div>
+          {slotsPreview.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Serão criados <strong>{slotsPreview.length}</strong> horários disponíveis na agenda
+              {gerar.medico_id === "all" ? ` (${medicos.length} médicos)` : ""}.
+            </p>
+          )}
         </CardContent>
       </Card>
 
