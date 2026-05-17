@@ -293,6 +293,7 @@ function ProcedimentosPage() {
   // ----- Procedimentos -----
   const [items, setItems] = useState<Procedimento[]>([]);
   const [busca, setBusca] = useState("");
+  const [buscaDebounced, setBuscaDebounced] = useState("");
   const [filtroGrupo, setFiltroGrupo] = useState<string>("todos");
   const [filtroTipo, setFiltroTipo] = useState<"todos" | Tipo>("todos");
   const [loading, setLoading] = useState(false);
@@ -356,14 +357,19 @@ function ProcedimentosPage() {
 
   const filtrados = useMemo(() => {
     const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-    const q = norm(busca.trim());
+    const q = norm(buscaDebounced.trim());
     return items.filter(p => {
       if (filtroTipo !== "todos" && p.tipo !== filtroTipo) return false;
       if (filtroGrupo !== "todos" && (p.grupo ?? "") !== filtroGrupo) return false;
       if (q && !norm(p.nome).includes(q) && !norm(p.codigo ?? "").includes(q) && !norm(p.grupo ?? "").includes(q)) return false;
       return true;
     });
-  }, [items, busca, filtroTipo, filtroGrupo]);
+  }, [items, buscaDebounced, filtroTipo, filtroGrupo]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setBuscaDebounced(busca), 200);
+    return () => clearTimeout(t);
+  }, [busca]);
 
   // Performance: limita a renderização. O DOM trava com 2000+ linhas de tabela.
   const LIMITE_RENDER = 200;
