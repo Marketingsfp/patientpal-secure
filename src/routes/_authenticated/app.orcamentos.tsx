@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { FileText, Plus, Printer, Trash2, Search } from "lucide-react";
+import { FileText, Plus, Printer, Trash2, Search, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -40,6 +40,7 @@ type Procedimento = {
   valor_cartao_credito: number | null;
   valor_cartao_debito: number | null;
   valor_padrao: number | null;
+  preparo: string | null;
 };
 
 type Item = {
@@ -47,6 +48,7 @@ type Item = {
   quantidade: number;
   valor_unitario: number;
   procedimento_id: string | null;
+  preparo: string | null;
 };
 
 const FORMAS = ["Dinheiro", "PIX", "Cartão de Crédito", "Cartão de Débito", "Boleto", "Outro"];
@@ -207,7 +209,7 @@ function NovoOrcamentoDialog({
       const norm = procQuery.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
       const { data } = await supabase
         .from("procedimentos")
-        .select("id, nome, valor_dinheiro_pix, valor_cartao, valor_dinheiro, valor_pix, valor_cartao_credito, valor_cartao_debito, valor_padrao")
+        .select("id, nome, valor_dinheiro_pix, valor_cartao, valor_dinheiro, valor_pix, valor_cartao_credito, valor_cartao_debito, valor_padrao, preparo")
         .eq("clinica_id", clinicaId)
         .eq("ativo", true)
         .or(`nome.ilike.%${procQuery}%,nome.ilike.%${norm}%`)
@@ -238,13 +240,16 @@ function NovoOrcamentoDialog({
   };
 
   const adicionarProc = (p: Procedimento) => {
-    setItens((arr) => [...arr, { descricao: p.nome, quantidade: 1, valor_unitario: valorDoProc(p), procedimento_id: p.id }]);
+    setItens((arr) => [...arr, { descricao: p.nome, quantidade: 1, valor_unitario: valorDoProc(p), procedimento_id: p.id, preparo: p.preparo ?? null }]);
+    if (p.preparo && p.preparo.trim()) {
+      toast.warning(`⚠ ${p.nome} exige preparo`, { description: p.preparo, duration: 6000 });
+    }
     setProcQuery("");
     setProcResults([]);
   };
 
   const adicionarManual = () => {
-    setItens((arr) => [...arr, { descricao: "", quantidade: 1, valor_unitario: 0, procedimento_id: null }]);
+    setItens((arr) => [...arr, { descricao: "", quantidade: 1, valor_unitario: 0, procedimento_id: null, preparo: null }]);
   };
 
   const subtotal = itens.reduce((s, i) => s + Number(i.quantidade || 0) * Number(i.valor_unitario || 0), 0);
@@ -340,7 +345,14 @@ function NovoOrcamentoDialog({
                   {procResults.map((p) => (
                     <button key={p.id} type="button" onClick={() => adicionarProc(p)}
                       className="w-full text-left px-3 py-2 hover:bg-muted flex justify-between items-center gap-2 border-b last:border-0">
-                      <span className="text-sm">{p.nome}</span>
+                      <span className="text-sm flex items-center gap-2">
+                        {p.nome}
+                        {p.preparo && p.preparo.trim() && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300">
+                            <AlertTriangle className="h-3 w-3" /> PREPARO
+                          </span>
+                        )}
+                      </span>
                       <span className="text-sm font-semibold text-primary whitespace-nowrap">{BRL(valorDoProc(p))}</span>
                     </button>
                   ))}
@@ -353,6 +365,18 @@ function NovoOrcamentoDialog({
 
           {itens.length > 0 && (
             <div className="border rounded-md overflow-hidden">
+              {itens.some((i) => i.preparo && i.preparo.trim()) && (
+                <div className="bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-900 px-3 py-2 space-y-1">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-200">
+                    <AlertTriangle className="h-4 w-4" /> Atenção: este orçamento contém exame(s) com preparo
+                  </div>
+                  <ul className="text-xs text-amber-900 dark:text-amber-100 space-y-0.5 pl-6 list-disc">
+                    {itens.filter((i) => i.preparo && i.preparo.trim()).map((i, idx) => (
+                      <li key={idx}><b>{i.descricao}:</b> {i.preparo}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               <table className="w-full text-sm">
                 <thead className="bg-muted/50">
                   <tr className="text-left">
