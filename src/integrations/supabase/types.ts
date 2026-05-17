@@ -1396,6 +1396,113 @@ export type Database = {
         }
         Relationships: []
       }
+      orcamento_itens: {
+        Row: {
+          created_at: string
+          descricao: string
+          id: string
+          orcamento_id: string
+          ordem: number
+          procedimento_id: string | null
+          quantidade: number
+          valor_total: number
+          valor_unitario: number
+        }
+        Insert: {
+          created_at?: string
+          descricao: string
+          id?: string
+          orcamento_id: string
+          ordem?: number
+          procedimento_id?: string | null
+          quantidade?: number
+          valor_total?: number
+          valor_unitario?: number
+        }
+        Update: {
+          created_at?: string
+          descricao?: string
+          id?: string
+          orcamento_id?: string
+          ordem?: number
+          procedimento_id?: string | null
+          quantidade?: number
+          valor_total?: number
+          valor_unitario?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orcamento_itens_orcamento_id_fkey"
+            columns: ["orcamento_id"]
+            isOneToOne: false
+            referencedRelation: "orcamentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orcamentos: {
+        Row: {
+          clinica_id: string
+          created_at: string
+          criado_por: string | null
+          desconto: number
+          forma_pagamento: string | null
+          id: string
+          medico_id: string | null
+          medico_nome: string | null
+          numero: number
+          observacoes: string | null
+          paciente_cpf: string | null
+          paciente_id: string | null
+          paciente_nome: string
+          paciente_telefone: string | null
+          status: string
+          updated_at: string
+          validade_dias: number
+          valor_total: number
+        }
+        Insert: {
+          clinica_id: string
+          created_at?: string
+          criado_por?: string | null
+          desconto?: number
+          forma_pagamento?: string | null
+          id?: string
+          medico_id?: string | null
+          medico_nome?: string | null
+          numero: number
+          observacoes?: string | null
+          paciente_cpf?: string | null
+          paciente_id?: string | null
+          paciente_nome: string
+          paciente_telefone?: string | null
+          status?: string
+          updated_at?: string
+          validade_dias?: number
+          valor_total?: number
+        }
+        Update: {
+          clinica_id?: string
+          created_at?: string
+          criado_por?: string | null
+          desconto?: number
+          forma_pagamento?: string | null
+          id?: string
+          medico_id?: string | null
+          medico_nome?: string | null
+          numero?: number
+          observacoes?: string | null
+          paciente_cpf?: string | null
+          paciente_id?: string | null
+          paciente_nome?: string
+          paciente_telefone?: string | null
+          status?: string
+          updated_at?: string
+          validade_dias?: number
+          valor_total?: number
+        }
+        Relationships: []
+      }
       paciente_biometria: {
         Row: {
           clinica_id: string

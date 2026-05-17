@@ -1,6 +1,6 @@
 import { Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect } from "react";
-import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow } from "lucide-react";
+import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
@@ -37,6 +37,7 @@ const nav = [
   { to: "/app/agenda", label: "Agenda", icon: CalendarDays, iconColor: "#60a5fa" },
   { to: "/app/clientes", label: "Clientes", icon: Users, iconColor: "#c084fc" },
   { to: "/app/procedimentos", label: "Procedimentos", icon: ClipboardList, iconColor: "#fb923c" },
+  { to: "/app/orcamentos", label: "Orçamentos", icon: FileText, iconColor: "#34d399" },
   { to: "/app/crm", label: "CRM", icon: Target, iconColor: "#f472b6" },
   { to: "/app/nina", label: "Nina — WhatsApp", icon: MessageCircle, iconColor: "#4ade80" },
   { to: "/app/financeiro", label: "Financeiro", icon: DollarSign, iconColor: "#facc15" },
@@ -66,6 +67,7 @@ export function AppShell() {
       /recep|fila/.test(t) ? "/app/recepcao" :
       /cliente|paciente/.test(t) ? "/app/clientes" :
       /procediment|exame/.test(t) ? "/app/procedimentos" :
+      /or[çc]amento/.test(t) ? "/app/orcamentos" :
       /financ|caixa|conta|boleto/.test(t) ? "/app/financeiro" :
       /cl[ií]nica/.test(t) ? "/app/clinicas" :
       /m[eé]dico|profissional|rateio|repasse/.test(t) ? "/app/medicos" :
