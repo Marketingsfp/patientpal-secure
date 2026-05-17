@@ -25,7 +25,7 @@ import {
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import {
   CalendarDays, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X,
-  MoreHorizontal, Star, Flag, Printer, Download, Video,
+  MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus,
 } from "lucide-react";
 import { printGuiaAtendimento } from "@/lib/print-gr";
 import { VoiceInput } from "@/components/voice-input";
@@ -103,6 +103,35 @@ function AgendaPage() {
   const [saving, setSaving] = useState(false);
   const [pagamentoOpen, setPagamentoOpen] = useState(false);
   const [pagamentoDesc, setPagamentoDesc] = useState("");
+  const [novoPacOpen, setNovoPacOpen] = useState(false);
+  const [novoPac, setNovoPac] = useState({ nome: "", cpf: "", telefone: "", data_nascimento: "", email: "" });
+  const [savingPac, setSavingPac] = useState(false);
+
+  const cadastrarPacienteRapido = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!clinicaAtual) return;
+    if (!novoPac.nome.trim()) { toast.error("Informe o nome"); return; }
+    setSavingPac(true);
+    const { data, error } = await supabase
+      .from("pacientes")
+      .insert({
+        clinica_id: clinicaAtual.clinica_id,
+        nome: novoPac.nome.trim(),
+        cpf: novoPac.cpf.trim() || null,
+        telefone: novoPac.telefone.trim() || null,
+        data_nascimento: novoPac.data_nascimento || null,
+        email: novoPac.email.trim() || null,
+      })
+      .select("id,nome")
+      .single();
+    setSavingPac(false);
+    if (error) { toast.error(error.message); return; }
+    setPacientes(prev => [...prev, { id: data.id, nome: data.nome }].sort((a, b) => a.nome.localeCompare(b.nome)));
+    setForm(f => ({ ...f, paciente_nome: data.nome, paciente_id: data.id }));
+    setNovoPac({ nome: "", cpf: "", telefone: "", data_nascimento: "", email: "" });
+    setNovoPacOpen(false);
+    toast.success("Paciente cadastrado");
+  };
 
   const load = async () => {
     if (!clinicaAtual) return;
