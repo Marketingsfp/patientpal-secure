@@ -25,7 +25,7 @@ import {
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import {
   CalendarDays, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X,
-  MoreHorizontal, Star, Flag, Printer, Download, Video,
+  MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus,
 } from "lucide-react";
 import { printGuiaAtendimento } from "@/lib/print-gr";
 import { VoiceInput } from "@/components/voice-input";
@@ -103,6 +103,35 @@ function AgendaPage() {
   const [saving, setSaving] = useState(false);
   const [pagamentoOpen, setPagamentoOpen] = useState(false);
   const [pagamentoDesc, setPagamentoDesc] = useState("");
+  const [novoPacOpen, setNovoPacOpen] = useState(false);
+  const [novoPac, setNovoPac] = useState({ nome: "", cpf: "", telefone: "", data_nascimento: "", email: "" });
+  const [savingPac, setSavingPac] = useState(false);
+
+  const cadastrarPacienteRapido = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!clinicaAtual) return;
+    if (!novoPac.nome.trim()) { toast.error("Informe o nome"); return; }
+    setSavingPac(true);
+    const { data, error } = await supabase
+      .from("pacientes")
+      .insert({
+        clinica_id: clinicaAtual.clinica_id,
+        nome: novoPac.nome.trim(),
+        cpf: novoPac.cpf.trim() || null,
+        telefone: novoPac.telefone.trim() || null,
+        data_nascimento: novoPac.data_nascimento || null,
+        email: novoPac.email.trim() || null,
+      })
+      .select("id,nome")
+      .single();
+    setSavingPac(false);
+    if (error) { toast.error(error.message); return; }
+    setPacientes(prev => [...prev, { id: data.id, nome: data.nome }].sort((a, b) => a.nome.localeCompare(b.nome)));
+    setForm(f => ({ ...f, paciente_nome: data.nome, paciente_id: data.id }));
+    setNovoPac({ nome: "", cpf: "", telefone: "", data_nascimento: "", email: "" });
+    setNovoPacOpen(false);
+    toast.success("Paciente cadastrado");
+  };
 
   const load = async () => {
     if (!clinicaAtual) return;
@@ -352,16 +381,31 @@ function AgendaPage() {
             <form onSubmit={submit} className="space-y-3">
               <div className="space-y-1">
                 <Label>Paciente</Label>
-                <Input list="lista-pacientes" value={form.paciente_nome}
-                  onChange={(e) => {
-                    const nome = e.target.value;
-                    const match = pacientes.find(p => p.nome === nome);
-                    setForm(f => ({ ...f, paciente_nome: nome, paciente_id: match?.id ?? "" }));
-                  }}
-                  placeholder="Nome do paciente" required />
+                <div className="flex gap-2">
+                  <Input list="lista-pacientes" value={form.paciente_nome}
+                    onChange={(e) => {
+                      const nome = e.target.value;
+                      const match = pacientes.find(p => p.nome === nome);
+                      setForm(f => ({ ...f, paciente_nome: nome, paciente_id: match?.id ?? "" }));
+                    }}
+                    placeholder="Nome do paciente" required />
+                  <Button type="button" variant="outline" size="icon" title="Cadastrar novo paciente"
+                    onClick={() => { setNovoPac(p => ({ ...p, nome: form.paciente_nome })); setNovoPacOpen(true); }}>
+                    <UserPlus className="h-4 w-4" />
+                  </Button>
+                </div>
                 <datalist id="lista-pacientes">
                   {pacientes.map(p => <option key={p.id} value={p.nome} />)}
                 </datalist>
+                {form.paciente_nome && !form.paciente_id && (
+                  <p className="text-xs text-muted-foreground">
+                    Paciente não cadastrado.{" "}
+                    <button type="button" className="underline text-primary"
+                      onClick={() => { setNovoPac(p => ({ ...p, nome: form.paciente_nome })); setNovoPacOpen(true); }}>
+                      Cadastrar agora
+                    </button>
+                  </p>
+                )}
               </div>
               <div className="space-y-1">
                 <Label>Médico</Label>
@@ -438,6 +482,44 @@ function AgendaPage() {
         tipo="receita"
         initialDescricao={pagamentoDesc}
       />
+
+      <Dialog open={novoPacOpen} onOpenChange={setNovoPacOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cadastro rápido de paciente</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={cadastrarPacienteRapido} className="space-y-3">
+            <div className="space-y-1">
+              <Label>Nome *</Label>
+              <Input value={novoPac.nome} onChange={(e) => setNovoPac(p => ({ ...p, nome: e.target.value }))} required autoFocus />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label>CPF</Label>
+                <Input value={novoPac.cpf} onChange={(e) => setNovoPac(p => ({ ...p, cpf: e.target.value }))} placeholder="000.000.000-00" />
+              </div>
+              <div className="space-y-1">
+                <Label>Nascimento</Label>
+                <Input type="date" value={novoPac.data_nascimento} onChange={(e) => setNovoPac(p => ({ ...p, data_nascimento: e.target.value }))} />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Telefone</Label>
+              <Input value={novoPac.telefone} onChange={(e) => setNovoPac(p => ({ ...p, telefone: e.target.value }))} placeholder="(00) 00000-0000" />
+            </div>
+            <div className="space-y-1">
+              <Label>E-mail</Label>
+              <Input type="email" value={novoPac.email} onChange={(e) => setNovoPac(p => ({ ...p, email: e.target.value }))} />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setNovoPacOpen(false)}>Cancelar</Button>
+              <Button type="submit" disabled={savingPac} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                {savingPac ? "Salvando..." : "Cadastrar"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Filtros */}
       <div className="rounded-lg border border-border bg-card p-4 space-y-4">
