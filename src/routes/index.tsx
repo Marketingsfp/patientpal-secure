@@ -47,12 +47,12 @@ function LandingPage() {
     <div className="min-h-screen bg-background">
       {/* HEADER */}
       <header className="sticky top-0 z-20 border-b border-border bg-background/90 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <Link to="/" className="flex items-center gap-2">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-4 py-3 sm:px-6 sm:py-4">
+          <Link to="/" className="flex items-center gap-2 min-w-0">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground">
               <Activity className="h-5 w-5" />
             </div>
-            <span className="text-xl font-bold tracking-tight text-primary">
+            <span className="text-lg sm:text-xl font-bold tracking-tight text-primary truncate">
               ClinicaOS
             </span>
           </Link>
@@ -69,13 +69,15 @@ function LandingPage() {
             ))}
           </nav>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <Button asChild variant="outline" size="lg" className="rounded-full hidden sm:inline-flex">
               <Link to="/paciente/consultas">Sou Paciente</Link>
             </Button>
-            <Button asChild size="lg" className="rounded-full bg-[oklch(0.45_0.18_260)] text-white hover:bg-[oklch(0.40_0.18_260)]">
+            <Button asChild size="sm" className="rounded-full bg-[oklch(0.45_0.18_260)] text-white hover:bg-[oklch(0.40_0.18_260)] sm:h-11 sm:px-8 sm:text-base">
               <Link to="/login">
-                Sou Cliente (Entrar) <ArrowRight className="ml-1 h-4 w-4" />
+                <span className="sm:hidden">Entrar</span>
+                <span className="hidden sm:inline">Sou Cliente (Entrar)</span>
+                <ArrowRight className="ml-1 h-4 w-4" />
               </Link>
             </Button>
           </div>
