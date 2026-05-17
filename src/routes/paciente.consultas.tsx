@@ -61,6 +61,10 @@ function MinhasConsultasPage() {
             <LogOut className="h-4 w-4 mr-1" /> Sair
           </Button>
         </div>
+        <nav className="mx-auto max-w-2xl px-4 pb-2 flex gap-2 text-sm">
+          <Link to="/paciente/consultas" className="px-3 py-1.5 rounded-md bg-primary text-primary-foreground">Consultas</Link>
+          <Link to="/paciente/cartoes" className="px-3 py-1.5 rounded-md hover:bg-muted">Meus cartões</Link>
+        </nav>
       </header>
 
       <main className="mx-auto max-w-2xl px-4 py-4">
