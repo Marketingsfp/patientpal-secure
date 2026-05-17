@@ -381,16 +381,31 @@ function AgendaPage() {
             <form onSubmit={submit} className="space-y-3">
               <div className="space-y-1">
                 <Label>Paciente</Label>
-                <Input list="lista-pacientes" value={form.paciente_nome}
-                  onChange={(e) => {
-                    const nome = e.target.value;
-                    const match = pacientes.find(p => p.nome === nome);
-                    setForm(f => ({ ...f, paciente_nome: nome, paciente_id: match?.id ?? "" }));
-                  }}
-                  placeholder="Nome do paciente" required />
+                <div className="flex gap-2">
+                  <Input list="lista-pacientes" value={form.paciente_nome}
+                    onChange={(e) => {
+                      const nome = e.target.value;
+                      const match = pacientes.find(p => p.nome === nome);
+                      setForm(f => ({ ...f, paciente_nome: nome, paciente_id: match?.id ?? "" }));
+                    }}
+                    placeholder="Nome do paciente" required />
+                  <Button type="button" variant="outline" size="icon" title="Cadastrar novo paciente"
+                    onClick={() => { setNovoPac(p => ({ ...p, nome: form.paciente_nome })); setNovoPacOpen(true); }}>
+                    <UserPlus className="h-4 w-4" />
+                  </Button>
+                </div>
                 <datalist id="lista-pacientes">
                   {pacientes.map(p => <option key={p.id} value={p.nome} />)}
                 </datalist>
+                {form.paciente_nome && !form.paciente_id && (
+                  <p className="text-xs text-muted-foreground">
+                    Paciente não cadastrado.{" "}
+                    <button type="button" className="underline text-primary"
+                      onClick={() => { setNovoPac(p => ({ ...p, nome: form.paciente_nome })); setNovoPacOpen(true); }}>
+                      Cadastrar agora
+                    </button>
+                  </p>
+                )}
               </div>
               <div className="space-y-1">
                 <Label>Médico</Label>
