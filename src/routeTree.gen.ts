@@ -23,6 +23,7 @@ import { Route as AuthenticatedAppIndexRouteImport } from './routes/_authenticat
 import { Route as PContratoTokenRouteImport } from './routes/p.contrato.$token'
 import { Route as AuthenticatedAppRecepcaoRouteImport } from './routes/_authenticated/app.recepcao'
 import { Route as AuthenticatedAppProntuariosRouteImport } from './routes/_authenticated/app.prontuarios'
+import { Route as AuthenticatedAppProntuarioModelosRouteImport } from './routes/_authenticated/app.prontuario-modelos'
 import { Route as AuthenticatedAppProcedimentosRouteImport } from './routes/_authenticated/app.procedimentos'
 import { Route as AuthenticatedAppPlanosRouteImport } from './routes/_authenticated/app.planos'
 import { Route as AuthenticatedAppOrcamentosRouteImport } from './routes/_authenticated/app.orcamentos'
@@ -135,6 +136,12 @@ const AuthenticatedAppProntuariosRoute =
   AuthenticatedAppProntuariosRouteImport.update({
     id: '/prontuarios',
     path: '/prontuarios',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppProntuarioModelosRoute =
+  AuthenticatedAppProntuarioModelosRouteImport.update({
+    id: '/prontuario-modelos',
+    path: '/prontuario-modelos',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppProcedimentosRoute =
@@ -415,6 +422,7 @@ export interface FileRoutesByFullPath {
   '/app/orcamentos': typeof AuthenticatedAppOrcamentosRoute
   '/app/planos': typeof AuthenticatedAppPlanosRoute
   '/app/procedimentos': typeof AuthenticatedAppProcedimentosRoute
+  '/app/prontuario-modelos': typeof AuthenticatedAppProntuarioModelosRoute
   '/app/prontuarios': typeof AuthenticatedAppProntuariosRoute
   '/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
@@ -470,6 +478,7 @@ export interface FileRoutesByTo {
   '/app/orcamentos': typeof AuthenticatedAppOrcamentosRoute
   '/app/planos': typeof AuthenticatedAppPlanosRoute
   '/app/procedimentos': typeof AuthenticatedAppProcedimentosRoute
+  '/app/prontuario-modelos': typeof AuthenticatedAppProntuarioModelosRoute
   '/app/prontuarios': typeof AuthenticatedAppProntuariosRoute
   '/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
@@ -529,6 +538,7 @@ export interface FileRoutesById {
   '/_authenticated/app/orcamentos': typeof AuthenticatedAppOrcamentosRoute
   '/_authenticated/app/planos': typeof AuthenticatedAppPlanosRoute
   '/_authenticated/app/procedimentos': typeof AuthenticatedAppProcedimentosRoute
+  '/_authenticated/app/prontuario-modelos': typeof AuthenticatedAppProntuarioModelosRoute
   '/_authenticated/app/prontuarios': typeof AuthenticatedAppProntuariosRoute
   '/_authenticated/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
@@ -588,6 +598,7 @@ export interface FileRouteTypes {
     | '/app/orcamentos'
     | '/app/planos'
     | '/app/procedimentos'
+    | '/app/prontuario-modelos'
     | '/app/prontuarios'
     | '/app/recepcao'
     | '/p/contrato/$token'
@@ -643,6 +654,7 @@ export interface FileRouteTypes {
     | '/app/orcamentos'
     | '/app/planos'
     | '/app/procedimentos'
+    | '/app/prontuario-modelos'
     | '/app/prontuarios'
     | '/app/recepcao'
     | '/p/contrato/$token'
@@ -701,6 +713,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/orcamentos'
     | '/_authenticated/app/planos'
     | '/_authenticated/app/procedimentos'
+    | '/_authenticated/app/prontuario-modelos'
     | '/_authenticated/app/prontuarios'
     | '/_authenticated/app/recepcao'
     | '/p/contrato/$token'
@@ -835,6 +848,13 @@ declare module '@tanstack/react-router' {
       path: '/prontuarios'
       fullPath: '/app/prontuarios'
       preLoaderRoute: typeof AuthenticatedAppProntuariosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/prontuario-modelos': {
+      id: '/_authenticated/app/prontuario-modelos'
+      path: '/prontuario-modelos'
+      fullPath: '/app/prontuario-modelos'
+      preLoaderRoute: typeof AuthenticatedAppProntuarioModelosRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/procedimentos': {
@@ -1232,6 +1252,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppOrcamentosRoute: typeof AuthenticatedAppOrcamentosRoute
   AuthenticatedAppPlanosRoute: typeof AuthenticatedAppPlanosRoute
   AuthenticatedAppProcedimentosRoute: typeof AuthenticatedAppProcedimentosRoute
+  AuthenticatedAppProntuarioModelosRoute: typeof AuthenticatedAppProntuarioModelosRoute
   AuthenticatedAppProntuariosRoute: typeof AuthenticatedAppProntuariosRoute
   AuthenticatedAppRecepcaoRoute: typeof AuthenticatedAppRecepcaoRoute
   AuthenticatedAppIndexRoute: typeof AuthenticatedAppIndexRoute
@@ -1265,6 +1286,8 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppOrcamentosRoute: AuthenticatedAppOrcamentosRoute,
   AuthenticatedAppPlanosRoute: AuthenticatedAppPlanosRoute,
   AuthenticatedAppProcedimentosRoute: AuthenticatedAppProcedimentosRoute,
+  AuthenticatedAppProntuarioModelosRoute:
+    AuthenticatedAppProntuarioModelosRoute,
   AuthenticatedAppProntuariosRoute: AuthenticatedAppProntuariosRoute,
   AuthenticatedAppRecepcaoRoute: AuthenticatedAppRecepcaoRoute,
   AuthenticatedAppIndexRoute: AuthenticatedAppIndexRoute,
