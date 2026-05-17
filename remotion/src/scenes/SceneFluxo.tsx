@@ -4,7 +4,7 @@ import { C, dm } from "../theme";
 
 const cols = [
   { id: "rec", l: "Recepção", c: "#fee2e2", t: "#9f1239" },
-  { id: "cax", l: "Caixa", c: "#fef3c7", t: "#92400e" },
+  { id: "cax", l: "Caixa (pago)", c: "#fef3c7", t: "#92400e" },
   { id: "tri", l: "Triagem", c: "#d1fae5", t: "#065f46" },
   { id: "ate", l: "Atendimento", c: "#dbeafe", t: "#1e3a8a" },
 ];
@@ -14,15 +14,15 @@ export const SceneFluxo: React.FC = () => {
   const { fps } = useVideoConfig();
   const intro = spring({ frame: f, fps, config: { damping: 18 } });
 
-  // ticket position: 0..3 → cols 0..3, animated
-  const pos = interpolate(f, [20, 50, 70, 95, 115], [0, 0, 1, 1, 2], { extrapolateRight: "clamp" });
+  // ticket position: 0..3 → cols 0..3, animated (passa por todas até Atendimento)
+  const pos = interpolate(f, [15, 35, 55, 75, 95, 115], [0, 1, 1.5, 2, 2.5, 3], { extrapolateRight: "clamp" });
   const colX = (i: number) => 60 + i * 360;
   const x = colX(0) + (pos % 1) * 360 + Math.floor(pos) * 360 - colX(0);
   const ticketX = colX(0) + pos * 360;
   const lift = Math.sin(pos * Math.PI) * 20;
 
   return (
-    <Frame title="Fluxo do paciente" step="Etapa 3 — Recepção → Caixa">
+    <Frame title="Fluxo do paciente" step="Etapa 4 — Após o pagamento: Triagem → Atendimento">
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20, opacity: intro, transform: `translateY(${(1 - intro) * 12}px)` }}>
         {cols.map((c) => (
           <div key={c.id} style={{ background: "#fff", border: `1px solid ${C.line}`, borderRadius: 16, padding: 18, minHeight: 480 }}>
@@ -50,7 +50,7 @@ export const SceneFluxo: React.FC = () => {
         <div style={{ color: C.sub, fontSize: 16, marginTop: 4 }}>Consulta Cardio · Dr. Roberto</div>
         <div style={{ marginTop: 10, display: "flex", justifyContent: "flex-end" }}>
           <div style={{ background: C.primary, color: "#fff", fontSize: 14, padding: "6px 12px", borderRadius: 8, fontWeight: 600 }}>
-            {pos < 1 ? "Recepção" : pos < 2 ? "→ Caixa" : "Caixa"}
+            {pos < 1 ? "Recepção" : pos < 2 ? "Caixa ✓ pago" : pos < 3 ? "Triagem" : "Atendimento"}
           </div>
         </div>
       </div>
