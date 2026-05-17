@@ -1,4 +1,4 @@
-import { AbsoluteFill, useCurrentFrame, interpolate } from "remotion";
+import { AbsoluteFill, useCurrentFrame, interpolate, Sequence, Audio, staticFile } from "remotion";
 import { TransitionSeries, springTiming } from "@remotion/transitions";
 import { fade } from "@remotion/transitions/fade";
 import { slide } from "@remotion/transitions/slide";
@@ -11,9 +11,19 @@ import { ScenePagamento } from "./scenes/ScenePagamento";
 import { SceneFinal } from "./scenes/SceneFinal";
 
 export const FPS = 30;
-const D = { intro: 75, busca: 150, agendar: 135, fluxo: 135, pagto: 165, final: 105 };
+const D = { intro: 315, busca: 330, agendar: 375, pagto: 294, fluxo: 300, final: 240 };
 const T = 18;
 export const DURATION = D.intro + D.busca + D.agendar + D.fluxo + D.pagto + D.final - T * 5;
+
+// scene start frames (accounting for overlapping transitions)
+const START = {
+  intro: 0,
+  busca: D.intro - T,
+  agendar: D.intro + D.busca - T * 2,
+  pagto: D.intro + D.busca + D.agendar - T * 3,
+  fluxo: D.intro + D.busca + D.agendar + D.pagto - T * 4,
+  final: D.intro + D.busca + D.agendar + D.pagto + D.fluxo - T * 5,
+};
 
 function Background() {
   const f = useCurrentFrame();
@@ -56,6 +66,12 @@ export const MainVideo: React.FC = () => {
           <SceneFinal />
         </TransitionSeries.Sequence>
       </TransitionSeries>
+      <Sequence from={START.intro + 8}><Audio src={staticFile("audio/intro.mp3")} volume={0.95} /></Sequence>
+      <Sequence from={START.busca + 8}><Audio src={staticFile("audio/busca.mp3")} volume={0.95} /></Sequence>
+      <Sequence from={START.agendar + 8}><Audio src={staticFile("audio/agendar.mp3")} volume={0.95} /></Sequence>
+      <Sequence from={START.pagto + 8}><Audio src={staticFile("audio/pagto.mp3")} volume={0.95} /></Sequence>
+      <Sequence from={START.fluxo + 8}><Audio src={staticFile("audio/fluxo.mp3")} volume={0.95} /></Sequence>
+      <Sequence from={START.final + 8}><Audio src={staticFile("audio/final.mp3")} volume={0.95} /></Sequence>
     </AbsoluteFill>
   );
 };
