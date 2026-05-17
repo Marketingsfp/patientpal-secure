@@ -24,6 +24,22 @@ export async function printOrcamento(orcamentoId: string, clinicaId: string) {
   const its = (itens.data ?? []) as any[];
   const c = cli.data as any;
 
+  // Busca preparos dos procedimentos para destacar no cupom
+  const procIds = Array.from(new Set(its.map((i) => i.procedimento_id).filter(Boolean))) as string[];
+  const preparoMap = new Map<string, string>();
+  if (procIds.length > 0) {
+    const { data: procs } = await supabase
+      .from("procedimentos")
+      .select("id, preparo")
+      .in("id", procIds);
+    for (const p of procs ?? []) {
+      if (p.preparo && String(p.preparo).trim()) preparoMap.set(p.id, String(p.preparo));
+    }
+  }
+  const preparos = its
+    .filter((i) => i.procedimento_id && preparoMap.has(i.procedimento_id))
+    .map((i) => ({ nome: i.descricao as string, preparo: preparoMap.get(i.procedimento_id)! }));
+
   const subtotal = its.reduce((s, i) => s + Number(i.valor_total || 0), 0);
   const desconto = Number(o.desconto || 0);
   const total = Number(o.valor_total || subtotal - desconto);
@@ -101,6 +117,17 @@ export async function printOrcamento(orcamentoId: string, clinicaId: string) {
 
     ${o.forma_pagamento ? `<div class="sm" style="margin-top:6px">PAGAMENTO: <span class="bold">${esc(o.forma_pagamento)}</span></div>` : ""}
     ${o.observacoes ? `<div class="sep"></div><div class="sm"><div class="bold">OBSERVAÇÕES</div>${esc(o.observacoes)}</div>` : ""}
+
+    ${preparos.length > 0 ? `
+    <div class="sep"></div>
+    <div class="bold" style="text-align:center">** ATENÇÃO: PREPARO **</div>
+    ${preparos.map((p) => `
+      <div style="margin-top:4px">
+        <div class="bold sm">${esc(p.nome)}</div>
+        <div class="sm" style="white-space:pre-wrap">${esc(p.preparo)}</div>
+      </div>
+    `).join("")}
+    ` : ""}
 
     <div class="sep"></div>
     <div class="center sm">VÁLIDO ATÉ ${validadeStr}</div>
