@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { printOrcamento } from "@/lib/print-orcamento";
 
 export const Route = createFileRoute("/_authenticated/app/orcamentos")({
@@ -187,7 +187,7 @@ function NovoOrcamentoDialog({
   const [pacienteTelefone, setPacienteTelefone] = useState("");
   const [pacienteCpf, setPacienteCpf] = useState("");
   const [medicoNome, setMedicoNome] = useState("");
-  const [formaPagamento, setFormaPagamento] = useState("Dinheiro");
+  const [formasPagamento, setFormasPagamento] = useState<string[]>(["Dinheiro"]);
   const [desconto, setDesconto] = useState(0);
   const [validade, setValidade] = useState(30);
   const [observacoes, setObservacoes] = useState("");
@@ -218,12 +218,23 @@ function NovoOrcamentoDialog({
   }, [procQuery, clinicaId]);
 
   const valorDoProc = (p: Procedimento) => {
-    const f = formaPagamento;
+    const f = formasPagamento[0] ?? "Dinheiro";
     if (f === "Dinheiro") return Number(p.valor_dinheiro ?? p.valor_dinheiro_pix ?? p.valor_padrao ?? 0);
     if (f === "PIX") return Number(p.valor_pix ?? p.valor_dinheiro_pix ?? p.valor_padrao ?? 0);
     if (f === "Cartão de Crédito") return Number(p.valor_cartao_credito ?? p.valor_cartao ?? p.valor_padrao ?? 0);
     if (f === "Cartão de Débito") return Number(p.valor_cartao_debito ?? p.valor_cartao ?? p.valor_padrao ?? 0);
     return Number(p.valor_padrao ?? p.valor_dinheiro_pix ?? 0);
+  };
+
+  const toggleForma = (f: string) => {
+    setFormasPagamento((cur) => {
+      if (cur.includes(f)) return cur.filter((x) => x !== f);
+      if (cur.length >= 2) {
+        toast.info("Máximo de 2 formas de pagamento");
+        return cur;
+      }
+      return [...cur, f];
+    });
   };
 
   const adicionarProc = (p: Procedimento) => {
@@ -242,6 +253,7 @@ function NovoOrcamentoDialog({
   const salvar = async () => {
     if (!pacienteNome.trim()) return toast.error("Informe o nome do paciente");
     if (itens.length === 0) return toast.error("Adicione ao menos um procedimento");
+    if (formasPagamento.length === 0) return toast.error("Selecione ao menos uma forma de pagamento");
     setSaving(true);
 
     const { data: orc, error } = await supabase
@@ -253,7 +265,7 @@ function NovoOrcamentoDialog({
         paciente_telefone: pacienteTelefone.trim() || null,
         paciente_cpf: pacienteCpf.trim() || null,
         medico_nome: medicoNome.trim() || null,
-        forma_pagamento: formaPagamento,
+        forma_pagamento: formasPagamento.join(" + "),
         validade_dias: validade,
         desconto: Number(desconto) || 0,
         valor_total: total,
@@ -292,12 +304,28 @@ function NovoOrcamentoDialog({
             <div className="space-y-1"><Label>Telefone</Label><Input value={pacienteTelefone} onChange={(e) => setPacienteTelefone(e.target.value)} /></div>
             <div className="space-y-1"><Label>CPF</Label><Input value={pacienteCpf} onChange={(e) => setPacienteCpf(e.target.value)} /></div>
             <div className="space-y-1"><Label>Médico/Profissional</Label><Input value={medicoNome} onChange={(e) => setMedicoNome(e.target.value)} /></div>
-            <div className="space-y-1">
-              <Label>Forma de pagamento</Label>
-              <Select value={formaPagamento} onValueChange={setFormaPagamento}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{FORMAS.map((f) => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent>
-              </Select>
+            <div className="space-y-1 md:col-span-2">
+              <Label>Formas de pagamento <span className="text-xs text-muted-foreground font-normal">(selecione até 2)</span></Label>
+              <div className="flex flex-wrap gap-2 rounded-md border p-2">
+                {FORMAS.map((f) => {
+                  const checked = formasPagamento.includes(f);
+                  return (
+                    <label key={f}
+                      className={`flex items-center gap-2 px-2 py-1 rounded-md text-sm cursor-pointer border ${
+                        checked ? "bg-primary/10 border-primary/40" : "border-border hover:bg-muted/40"
+                      }`}
+                    >
+                      <Checkbox checked={checked} onCheckedChange={() => toggleForma(f)} />
+                      {f}
+                    </label>
+                  );
+                })}
+              </div>
+              {formasPagamento.length > 1 && (
+                <p className="text-xs text-muted-foreground">
+                  Os valores na tabela usam a 1ª forma selecionada (<b>{formasPagamento[0]}</b>).
+                </p>
+              )}
             </div>
             <div className="space-y-1"><Label>Validade (dias)</Label><Input type="number" min={1} value={validade} onChange={(e) => setValidade(Number(e.target.value) || 30)} /></div>
           </div>
