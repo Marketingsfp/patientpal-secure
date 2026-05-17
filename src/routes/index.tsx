@@ -69,11 +69,16 @@ function LandingPage() {
             ))}
           </nav>
 
-          <Button asChild size="lg" className="rounded-full bg-[oklch(0.45_0.18_260)] text-white hover:bg-[oklch(0.40_0.18_260)]">
-            <Link to="/login">
-              Sou Cliente (Entrar) <ArrowRight className="ml-1 h-4 w-4" />
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="outline" size="lg" className="rounded-full hidden sm:inline-flex">
+              <Link to="/paciente/consultas">Sou Paciente</Link>
+            </Button>
+            <Button asChild size="lg" className="rounded-full bg-[oklch(0.45_0.18_260)] text-white hover:bg-[oklch(0.40_0.18_260)]">
+              <Link to="/login">
+                Sou Cliente (Entrar) <ArrowRight className="ml-1 h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
         </div>
       </header>
 

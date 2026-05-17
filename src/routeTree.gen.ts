@@ -15,6 +15,8 @@ import { Route as PainelRouteImport } from './routes/painel'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PacienteConsultasRouteImport } from './routes/paciente.consultas'
+import { Route as PTokenRouteImport } from './routes/p.$token'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
 import { Route as AuthenticatedAppIndexRouteImport } from './routes/_authenticated/app.index'
 import { Route as AuthenticatedAppRecepcaoRouteImport } from './routes/_authenticated/app.recepcao'
@@ -80,6 +82,16 @@ const AuthenticatedRoute = AuthenticatedRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PacienteConsultasRoute = PacienteConsultasRouteImport.update({
+  id: '/paciente/consultas',
+  path: '/paciente/consultas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PTokenRoute = PTokenRouteImport.update({
+  id: '/p/$token',
+  path: '/p/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAppRoute = AuthenticatedAppRouteImport.update({
@@ -301,6 +313,8 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/totem': typeof TotemRoute
   '/app': typeof AuthenticatedAppRouteWithChildren
+  '/p/$token': typeof PTokenRoute
+  '/paciente/consultas': typeof PacienteConsultasRoute
   '/app/agenda': typeof AuthenticatedAppAgendaRoute
   '/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
   '/app/boletos': typeof AuthenticatedAppBoletosRoute
@@ -344,6 +358,8 @@ export interface FileRoutesByTo {
   '/painel': typeof PainelRoute
   '/signup': typeof SignupRoute
   '/totem': typeof TotemRoute
+  '/p/$token': typeof PTokenRoute
+  '/paciente/consultas': typeof PacienteConsultasRoute
   '/app/agenda': typeof AuthenticatedAppAgendaRoute
   '/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
   '/app/boletos': typeof AuthenticatedAppBoletosRoute
@@ -389,6 +405,8 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/totem': typeof TotemRoute
   '/_authenticated/app': typeof AuthenticatedAppRouteWithChildren
+  '/p/$token': typeof PTokenRoute
+  '/paciente/consultas': typeof PacienteConsultasRoute
   '/_authenticated/app/agenda': typeof AuthenticatedAppAgendaRoute
   '/_authenticated/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
   '/_authenticated/app/boletos': typeof AuthenticatedAppBoletosRoute
@@ -435,6 +453,8 @@ export interface FileRouteTypes {
     | '/signup'
     | '/totem'
     | '/app'
+    | '/p/$token'
+    | '/paciente/consultas'
     | '/app/agenda'
     | '/app/anamneses'
     | '/app/boletos'
@@ -478,6 +498,8 @@ export interface FileRouteTypes {
     | '/painel'
     | '/signup'
     | '/totem'
+    | '/p/$token'
+    | '/paciente/consultas'
     | '/app/agenda'
     | '/app/anamneses'
     | '/app/boletos'
@@ -522,6 +544,8 @@ export interface FileRouteTypes {
     | '/signup'
     | '/totem'
     | '/_authenticated/app'
+    | '/p/$token'
+    | '/paciente/consultas'
     | '/_authenticated/app/agenda'
     | '/_authenticated/app/anamneses'
     | '/_authenticated/app/boletos'
@@ -567,6 +591,8 @@ export interface RootRouteChildren {
   PainelRoute: typeof PainelRoute
   SignupRoute: typeof SignupRoute
   TotemRoute: typeof TotemRoute
+  PTokenRoute: typeof PTokenRoute
+  PacienteConsultasRoute: typeof PacienteConsultasRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -611,6 +637,20 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/paciente/consultas': {
+      id: '/paciente/consultas'
+      path: '/paciente/consultas'
+      fullPath: '/paciente/consultas'
+      preLoaderRoute: typeof PacienteConsultasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/p/$token': {
+      id: '/p/$token'
+      path: '/p/$token'
+      fullPath: '/p/$token'
+      preLoaderRoute: typeof PTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/app': {
@@ -999,6 +1039,8 @@ const rootRouteChildren: RootRouteChildren = {
   PainelRoute: PainelRoute,
   SignupRoute: SignupRoute,
   TotemRoute: TotemRoute,
+  PTokenRoute: PTokenRoute,
+  PacienteConsultasRoute: PacienteConsultasRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

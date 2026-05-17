@@ -30,6 +30,7 @@ export type Database = {
           procedimento: string | null
           status: Database["public"]["Enums"]["agendamento_status"]
           teleconsulta: boolean
+          token_publico: string | null
           updated_at: string
         }
         Insert: {
@@ -47,6 +48,7 @@ export type Database = {
           procedimento?: string | null
           status?: Database["public"]["Enums"]["agendamento_status"]
           teleconsulta?: boolean
+          token_publico?: string | null
           updated_at?: string
         }
         Update: {
@@ -64,6 +66,7 @@ export type Database = {
           procedimento?: string | null
           status?: Database["public"]["Enums"]["agendamento_status"]
           teleconsulta?: boolean
+          token_publico?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -103,6 +106,7 @@ export type Database = {
       }
       anamnese_respostas: {
         Row: {
+          agendamento_id: string | null
           clinica_id: string
           created_at: string
           id: string
@@ -113,6 +117,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          agendamento_id?: string | null
           clinica_id: string
           created_at?: string
           id?: string
@@ -123,6 +128,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          agendamento_id?: string | null
           clinica_id?: string
           created_at?: string
           id?: string
@@ -132,7 +138,15 @@ export type Database = {
           respostas?: Json
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "anamnese_respostas_agendamento_id_fkey"
+            columns: ["agendamento_id"]
+            isOneToOne: false
+            referencedRelation: "agendamentos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       boletos: {
         Row: {
@@ -2116,6 +2130,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      consulta_publica: { Args: { _token: string }; Returns: Json }
       criar_clinica_com_admin: {
         Args: {
           _cidade?: string
@@ -2168,6 +2183,26 @@ export type Database = {
       is_member: {
         Args: { _clinica_id: string; _user_id: string }
         Returns: boolean
+      }
+      minhas_consultas: {
+        Args: never
+        Returns: {
+          clinica_nome: string
+          fim: string
+          id: string
+          inicio: string
+          medico_especialidade: string
+          medico_nome: string
+          paciente_nome: string
+          procedimento: string
+          status: Database["public"]["Enums"]["agendamento_status"]
+          teleconsulta: boolean
+          token_publico: string
+        }[]
+      }
+      salvar_anamnese_publica: {
+        Args: { _modelo_id: string; _respostas: Json; _token: string }
+        Returns: string
       }
       user_is_any_manager: { Args: { _user_id: string }; Returns: boolean }
     }
