@@ -29,7 +29,7 @@ await renderMedia({
   outputLocation: "/mnt/documents/clinicaos-agendamento-pagamento.mp4",
   puppeteerInstance: browser,
   muted: false,
-  audioCodec: "aac",
+  audioCodec: "mp3",
   concurrency: 2,
 });
 
