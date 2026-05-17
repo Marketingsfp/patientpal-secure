@@ -44,7 +44,6 @@ const nav = [
   { to: "/app/especialidades", label: "Especialidades", icon: Stethoscope, iconColor: "#f0abfc" },
   { to: "/app/disponibilidades", label: "Horários médicos", icon: Clock, iconColor: "#a78bfa" },
   { to: "/app/consulta-rapida", label: "Consulta rápida", icon: BookOpen, iconColor: "#fcd34d" },
-  { to: "/app/rateio", label: "Regras de rateio", icon: Wallet, iconColor: "#34d399" },
   { to: "/app/equipe", label: "Equipe", icon: Users, iconColor: "#93c5fd" },
 ] as const;
 
@@ -67,8 +66,7 @@ export function AppShell() {
       /procediment|exame/.test(t) ? "/app/procedimentos" :
       /financ|caixa|conta|boleto/.test(t) ? "/app/financeiro" :
       /cl[ií]nica/.test(t) ? "/app/clinicas" :
-      /m[eé]dico|profissional/.test(t) ? "/app/medicos" :
-      /rateio|repasse/.test(t) ? "/app/rateio" :
+      /m[eé]dico|profissional|rateio|repasse/.test(t) ? "/app/medicos" :
       /equipe|usu[áa]rio/.test(t) ? "/app/equipe" :
       /prontu[áa]rio/.test(t) ? "/app/prontuarios" :
       /crm|lead|oportunidade/.test(t) ? "/app/crm" :
