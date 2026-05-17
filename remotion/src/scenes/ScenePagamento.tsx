@@ -16,7 +16,7 @@ export const ScenePagamento: React.FC = () => {
   const cy = interpolate(f, [0, 25, 55, 95], [800, 480, 480, 760], { extrapolateRight: "clamp" });
 
   return (
-    <Frame title="Caixa" step="Etapa 4 — Pagamento">
+    <Frame title="Caixa" step="Etapa 3 — Pagamento (antes do atendimento)">
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1.1fr", gap: 28, opacity: s, transform: `translateY(${(1 - s) * 12}px)` }}>
         <div style={{ background: "#fff", borderRadius: 16, padding: 26, border: `1px solid ${C.line}` }}>
           <div style={{ fontSize: 20, color: C.sub, fontFamily: dm, marginBottom: 8 }}>Resumo do atendimento</div>
