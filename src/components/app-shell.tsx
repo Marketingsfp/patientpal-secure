@@ -31,20 +31,20 @@ import { Button } from "@/components/ui/button";
 const VoiceInput = lazy(() => import("@/components/voice-input").then((m) => ({ default: m.VoiceInput })));
 
 const nav = [
-  { to: "/app", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/app/recepcao", label: "Recepção / Filas", icon: Bell },
-  { to: "/app/agenda", label: "Agenda", icon: CalendarDays },
-  { to: "/app/clientes", label: "Clientes", icon: Users },
-  { to: "/app/procedimentos", label: "Procedimentos", icon: ClipboardList },
-  { to: "/app/crm", label: "CRM", icon: Target },
-  { to: "/app/nina", label: "Nina — WhatsApp", icon: MessageCircle },
-  { to: "/app/financeiro", label: "Financeiro", icon: DollarSign },
-  { to: "/app/clinicas", label: "Clínicas", icon: Building2 },
-  { to: "/app/medicos", label: "Médicos", icon: Stethoscope },
-  { to: "/app/disponibilidades", label: "Horários médicos", icon: Clock },
-  { to: "/app/consulta-rapida", label: "Consulta rápida", icon: BookOpen },
-  { to: "/app/rateio", label: "Regras de rateio", icon: Wallet },
-  { to: "/app/equipe", label: "Equipe", icon: Users },
+  { to: "/app", label: "Dashboard", icon: LayoutDashboard, iconColor: "#fbbf24" },
+  { to: "/app/recepcao", label: "Recepção / Filas", icon: Bell, iconColor: "#f87171" },
+  { to: "/app/agenda", label: "Agenda", icon: CalendarDays, iconColor: "#60a5fa" },
+  { to: "/app/clientes", label: "Clientes", icon: Users, iconColor: "#c084fc" },
+  { to: "/app/procedimentos", label: "Procedimentos", icon: ClipboardList, iconColor: "#fb923c" },
+  { to: "/app/crm", label: "CRM", icon: Target, iconColor: "#f472b6" },
+  { to: "/app/nina", label: "Nina — WhatsApp", icon: MessageCircle, iconColor: "#4ade80" },
+  { to: "/app/financeiro", label: "Financeiro", icon: DollarSign, iconColor: "#facc15" },
+  { to: "/app/clinicas", label: "Clínicas", icon: Building2, iconColor: "#22d3ee" },
+  { to: "/app/medicos", label: "Médicos", icon: Stethoscope, iconColor: "#fda4af" },
+  { to: "/app/disponibilidades", label: "Horários médicos", icon: Clock, iconColor: "#a78bfa" },
+  { to: "/app/consulta-rapida", label: "Consulta rápida", icon: BookOpen, iconColor: "#fcd34d" },
+  { to: "/app/rateio", label: "Regras de rateio", icon: Wallet, iconColor: "#34d399" },
+  { to: "/app/equipe", label: "Equipe", icon: Users, iconColor: "#93c5fd" },
 ] as const;
 
 export function AppShell() {
@@ -121,7 +121,7 @@ export function AppShell() {
                     : "text-white hover:bg-[#14532d] hover:text-white"
                 }`}
               >
-                <item.icon className="h-4 w-4" />
+                <item.icon className="h-4 w-4" style={{ color: item.iconColor }} />
                 {item.label}
               </Link>
             );
