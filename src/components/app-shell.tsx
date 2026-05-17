@@ -11,9 +11,17 @@ import logoConsultaHoje from "@/assets/logo-consulta-hoje.png";
 function corDaClinica(nome?: string): string {
   const n = (nome ?? "").toLowerCase();
   if (n.includes("são francisco") || n.includes("sao francisco")) return "#16a34a"; // verde
-  if (n.includes("menino jesus")) return "#1d4ed8"; // azul royal
+  if (n.includes("menino jesus")) return "#1e3a8a"; // azul royal mais escuro
   if (n.includes("consulta hoje")) return "#8b5cf6"; // roxinho
   return "hsl(var(--muted-foreground))";
+}
+
+function corHoverDaClinica(nome?: string): string {
+  const n = (nome ?? "").toLowerCase();
+  if (n.includes("são francisco") || n.includes("sao francisco")) return "#14532d"; // verde escuro
+  if (n.includes("menino jesus")) return "#172554"; // azul ainda mais escuro
+  if (n.includes("consulta hoje")) return "#5b21b6"; // roxo escuro
+  return "rgba(0,0,0,0.25)";
 }
 
 function logoDaClinica(nome?: string): string | null {
@@ -110,7 +118,10 @@ export function AppShell() {
     <div className="min-h-screen flex bg-muted/30">
       <aside
         className="w-64 text-white flex flex-col shrink-0"
-        style={{ backgroundColor: clinicaAtual ? corDaClinica(clinicaAtual.clinica.nome) : undefined }}
+        style={{
+          backgroundColor: clinicaAtual ? corDaClinica(clinicaAtual.clinica.nome) : undefined,
+          ["--nav-hover" as never]: clinicaAtual ? corHoverDaClinica(clinicaAtual.clinica.nome) : "rgba(0,0,0,0.25)",
+        }}
       >
         <div className="px-4 py-4 flex items-center justify-center gap-2 border-b border-white/20 min-h-[88px] text-white">
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/15 backdrop-blur">
@@ -128,11 +139,11 @@ export function AppShell() {
                 to={item.to}
                 className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold tracking-wide transition-colors ${
                   active
-                    ? "bg-[#14532d] text-white"
-                    : "text-white hover:bg-[#14532d] hover:text-white"
+                    ? "bg-[var(--nav-hover)] text-white"
+                    : "text-white hover:bg-[var(--nav-hover)] hover:text-white"
                 }`}
               >
-                <item.icon className="h-4 w-4" style={{ color: item.iconColor }} />
+                <item.icon className="h-4 w-4 text-white" />
                 {item.label}
               </Link>
             );
