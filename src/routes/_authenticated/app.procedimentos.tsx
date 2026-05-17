@@ -625,7 +625,7 @@ function ProcedimentosPage() {
           </div>
 
           <div className="rounded-lg border border-border bg-card overflow-x-auto">
-            <Table>
+            <Table className="[&_td]:py-1 [&_td]:px-2 [&_th]:py-1.5 [&_th]:px-2 text-sm">
               <TableHeader>
                 <TableRow className="bg-muted/40">
                   <TableHead>Nome</TableHead>
@@ -647,24 +647,24 @@ function ProcedimentosPage() {
                 ) : filtrados.length === 0 ? (
                   <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Nenhum procedimento.</TableCell></TableRow>
                 ) : visiveis.map(p => (
-                  <TableRow key={p.id}>
+                  <TableRow key={p.id} className="h-8">
                     <TableCell className="font-medium">{p.nome}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{p.grupo ?? "—"}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{p.grupo ?? "—"}</TableCell>
                     <TableCell>
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${TIPO_COR[p.tipo]}`}>{TIPO_LABEL[p.tipo]}</span>
+                      <span className={`text-[10px] px-1.5 py-0 rounded-full ${TIPO_COR[p.tipo]}`}>{TIPO_LABEL[p.tipo]}</span>
                     </TableCell>
-                    <TableCell className="text-right text-sm">{fmtBRL(Number(p.valor_dinheiro ?? p.valor_dinheiro_pix))}</TableCell>
-                    <TableCell className="text-right text-sm">{fmtBRL(Number(p.valor_pix ?? p.valor_cartao_credito ?? p.valor_cartao))}</TableCell>
-                    <TableCell className="text-right text-sm">{fmtBRL(Number(p.valor_cartao_consulta))}</TableCell>
-                    <TableCell className="text-right text-sm">{fmtBRL(Number(p.valor_cartao_desconto))}</TableCell>
+                    <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_dinheiro ?? p.valor_dinheiro_pix))}</TableCell>
+                    <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_pix ?? p.valor_cartao_credito ?? p.valor_cartao))}</TableCell>
+                    <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_cartao_consulta))}</TableCell>
+                    <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_cartao_desconto))}</TableCell>
                     <TableCell>
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${p.ativo ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}>
+                      <span className={`text-[10px] px-1.5 py-0 rounded-full ${p.ativo ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}>
                         {p.ativo ? "Ativo" : "Inativo"}
                       </span>
                     </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Pencil className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => onDelete(p)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                    <TableCell className="text-right whitespace-nowrap">
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEdit(p)}><Pencil className="h-3.5 w-3.5" /></Button>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onDelete(p)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
                     </TableCell>
                   </TableRow>
                 ))}
