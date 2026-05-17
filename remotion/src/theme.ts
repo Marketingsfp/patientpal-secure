@@ -1,21 +1,13 @@
-import { loadFont as loadInter } from "@remotion/google-fonts/Inter";
-import { loadFont as loadDM } from "@remotion/google-fonts/DMSans";
-
-export const inter = loadInter("normal", { weights: ["400", "500", "600", "700"], subsets: ["latin"] }).fontFamily;
-export const dm = loadDM("normal", { weights: ["500", "700"], subsets: ["latin"] }).fontFamily;
-
-export const C = {
-  bg: "#0B1220",
-  bg2: "#101a30",
-  card: "#FFFFFF",
-  ink: "#0B1220",
-  sub: "#5b6b86",
-  line: "#E6EAF2",
-  primary: "#1D4ED8",
-  primarySoft: "#DBE7FF",
-  accent: "#10B981",
-  accentSoft: "#D1FADF",
-  warn: "#F59E0B",
-  danger: "#EF4444",
-  cream: "#F6F7FB",
+export const theme = {
+  bg: "#0b3b2e",        // deep emerald
+  bgSoft: "#0f4d3a",
+  cream: "#fdf8ef",
+  ink: "#0a1f17",
+  primary: "#16a34a",   // emerald-600
+  primaryGlow: "#4ade80",
+  accent: "#f59e0b",    // amber
+  accentSoft: "#fde68a",
+  pink: "#fb7185",
+  blue: "#60a5fa",
+  red: "#ef4444",
 };
