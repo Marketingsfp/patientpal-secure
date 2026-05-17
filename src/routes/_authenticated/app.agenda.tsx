@@ -236,6 +236,36 @@ function AgendaPage() {
     else setSelecionados(new Set(paginados.map(p => p.id)));
   };
 
+  const cobrarSelecionados = async () => {
+    if (!clinicaAtual) return;
+    const ids = Array.from(selecionados);
+    const itens = items.filter(a => ids.includes(a.id));
+    if (itens.length === 0) { toast.info("Selecione ao menos um atendimento."); return; }
+    const pacientes = new Set(itens.map(i => i.paciente_nome));
+    if (pacientes.size > 1) {
+      toast.error("Selecione atendimentos do mesmo paciente para cobrar em uma única vez.");
+      return;
+    }
+    // busca valores dos procedimentos pelo nome (valor_dinheiro como base, fallback valor_padrao)
+    const nomes = Array.from(new Set(itens.map(i => (i.procedimento ?? "CONSULTA").trim().toUpperCase())));
+    const { data: procs } = await supabase
+      .from("procedimentos")
+      .select("nome,valor_dinheiro,valor_padrao")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .in("nome", nomes);
+    const valorPorNome = new Map<string, number>();
+    for (const p of (procs ?? []) as Array<{ nome: string; valor_dinheiro: number | null; valor_padrao: number | null }>) {
+      valorPorNome.set(p.nome.toUpperCase(), Number(p.valor_dinheiro ?? p.valor_padrao ?? 0));
+    }
+    const total = itens.reduce((s, i) => s + (valorPorNome.get((i.procedimento ?? "CONSULTA").trim().toUpperCase()) ?? 0), 0);
+    const paciente = itens[0].paciente_nome;
+    const desc = `${paciente} — ${itens.map(i => (i.procedimento ?? "CONSULTA")).join(" + ")} (${itens.length} itens)`;
+    setPagamentoDesc(desc);
+    setPagamentoValor(total > 0 ? total.toFixed(2) : "");
+    setPagamentoOpen(true);
+  };
+  const [pagamentoValor, setPagamentoValor] = useState("");
+
   const openNew = () => {
     setEditing(null);
     const base = new Date(`${dataRef}T09:00:00`);
