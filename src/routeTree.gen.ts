@@ -60,6 +60,7 @@ import { Route as AuthenticatedAppFinanceiroBiRouteImport } from './routes/_auth
 import { Route as AuthenticatedAppFinanceiroAtendimentosRouteImport } from './routes/_authenticated/app.financeiro.atendimentos'
 import { Route as AuthenticatedAppFinanceiroAnaliticoRouteImport } from './routes/_authenticated/app.financeiro.analitico'
 import { Route as AuthenticatedAppFinanceiroAlertasRouteImport } from './routes/_authenticated/app.financeiro.alertas'
+import { Route as AuthenticatedAppCartaoBeneficiosRelatoriosRouteImport } from './routes/_authenticated/app.cartao-beneficios.relatorios'
 import { Route as AuthenticatedAppCartaoBeneficiosModelosRouteImport } from './routes/_authenticated/app.cartao-beneficios.modelos'
 import { Route as AuthenticatedAppCartaoBeneficiosContratosRouteImport } from './routes/_authenticated/app.cartao-beneficios.contratos'
 
@@ -347,6 +348,12 @@ const AuthenticatedAppFinanceiroAlertasRoute =
     path: '/alertas',
     getParentRoute: () => AuthenticatedAppFinanceiroRoute,
   } as any)
+const AuthenticatedAppCartaoBeneficiosRelatoriosRoute =
+  AuthenticatedAppCartaoBeneficiosRelatoriosRouteImport.update({
+    id: '/relatorios',
+    path: '/relatorios',
+    getParentRoute: () => AuthenticatedAppCartaoBeneficiosRoute,
+  } as any)
 const AuthenticatedAppCartaoBeneficiosModelosRoute =
   AuthenticatedAppCartaoBeneficiosModelosRouteImport.update({
     id: '/modelos',
@@ -399,6 +406,7 @@ export interface FileRoutesByFullPath {
   '/app/': typeof AuthenticatedAppIndexRoute
   '/app/cartao-beneficios/contratos': typeof AuthenticatedAppCartaoBeneficiosContratosRoute
   '/app/cartao-beneficios/modelos': typeof AuthenticatedAppCartaoBeneficiosModelosRoute
+  '/app/cartao-beneficios/relatorios': typeof AuthenticatedAppCartaoBeneficiosRelatoriosRoute
   '/app/financeiro/alertas': typeof AuthenticatedAppFinanceiroAlertasRoute
   '/app/financeiro/analitico': typeof AuthenticatedAppFinanceiroAnaliticoRoute
   '/app/financeiro/atendimentos': typeof AuthenticatedAppFinanceiroAtendimentosRoute
@@ -451,6 +459,7 @@ export interface FileRoutesByTo {
   '/app': typeof AuthenticatedAppIndexRoute
   '/app/cartao-beneficios/contratos': typeof AuthenticatedAppCartaoBeneficiosContratosRoute
   '/app/cartao-beneficios/modelos': typeof AuthenticatedAppCartaoBeneficiosModelosRoute
+  '/app/cartao-beneficios/relatorios': typeof AuthenticatedAppCartaoBeneficiosRelatoriosRoute
   '/app/financeiro/alertas': typeof AuthenticatedAppFinanceiroAlertasRoute
   '/app/financeiro/analitico': typeof AuthenticatedAppFinanceiroAnaliticoRoute
   '/app/financeiro/atendimentos': typeof AuthenticatedAppFinanceiroAtendimentosRoute
@@ -507,6 +516,7 @@ export interface FileRoutesById {
   '/_authenticated/app/': typeof AuthenticatedAppIndexRoute
   '/_authenticated/app/cartao-beneficios/contratos': typeof AuthenticatedAppCartaoBeneficiosContratosRoute
   '/_authenticated/app/cartao-beneficios/modelos': typeof AuthenticatedAppCartaoBeneficiosModelosRoute
+  '/_authenticated/app/cartao-beneficios/relatorios': typeof AuthenticatedAppCartaoBeneficiosRelatoriosRoute
   '/_authenticated/app/financeiro/alertas': typeof AuthenticatedAppFinanceiroAlertasRoute
   '/_authenticated/app/financeiro/analitico': typeof AuthenticatedAppFinanceiroAnaliticoRoute
   '/_authenticated/app/financeiro/atendimentos': typeof AuthenticatedAppFinanceiroAtendimentosRoute
@@ -563,6 +573,7 @@ export interface FileRouteTypes {
     | '/app/'
     | '/app/cartao-beneficios/contratos'
     | '/app/cartao-beneficios/modelos'
+    | '/app/cartao-beneficios/relatorios'
     | '/app/financeiro/alertas'
     | '/app/financeiro/analitico'
     | '/app/financeiro/atendimentos'
@@ -615,6 +626,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/app/cartao-beneficios/contratos'
     | '/app/cartao-beneficios/modelos'
+    | '/app/cartao-beneficios/relatorios'
     | '/app/financeiro/alertas'
     | '/app/financeiro/analitico'
     | '/app/financeiro/atendimentos'
@@ -670,6 +682,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/'
     | '/_authenticated/app/cartao-beneficios/contratos'
     | '/_authenticated/app/cartao-beneficios/modelos'
+    | '/_authenticated/app/cartao-beneficios/relatorios'
     | '/_authenticated/app/financeiro/alertas'
     | '/_authenticated/app/financeiro/analitico'
     | '/_authenticated/app/financeiro/atendimentos'
@@ -1057,6 +1070,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppFinanceiroAlertasRouteImport
       parentRoute: typeof AuthenticatedAppFinanceiroRoute
     }
+    '/_authenticated/app/cartao-beneficios/relatorios': {
+      id: '/_authenticated/app/cartao-beneficios/relatorios'
+      path: '/relatorios'
+      fullPath: '/app/cartao-beneficios/relatorios'
+      preLoaderRoute: typeof AuthenticatedAppCartaoBeneficiosRelatoriosRouteImport
+      parentRoute: typeof AuthenticatedAppCartaoBeneficiosRoute
+    }
     '/_authenticated/app/cartao-beneficios/modelos': {
       id: '/_authenticated/app/cartao-beneficios/modelos'
       path: '/modelos'
@@ -1077,6 +1097,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedAppCartaoBeneficiosRouteChildren {
   AuthenticatedAppCartaoBeneficiosContratosRoute: typeof AuthenticatedAppCartaoBeneficiosContratosRoute
   AuthenticatedAppCartaoBeneficiosModelosRoute: typeof AuthenticatedAppCartaoBeneficiosModelosRoute
+  AuthenticatedAppCartaoBeneficiosRelatoriosRoute: typeof AuthenticatedAppCartaoBeneficiosRelatoriosRoute
 }
 
 const AuthenticatedAppCartaoBeneficiosRouteChildren: AuthenticatedAppCartaoBeneficiosRouteChildren =
@@ -1085,6 +1106,8 @@ const AuthenticatedAppCartaoBeneficiosRouteChildren: AuthenticatedAppCartaoBenef
       AuthenticatedAppCartaoBeneficiosContratosRoute,
     AuthenticatedAppCartaoBeneficiosModelosRoute:
       AuthenticatedAppCartaoBeneficiosModelosRoute,
+    AuthenticatedAppCartaoBeneficiosRelatoriosRoute:
+      AuthenticatedAppCartaoBeneficiosRelatoriosRoute,
   }
 
 const AuthenticatedAppCartaoBeneficiosRouteWithChildren =

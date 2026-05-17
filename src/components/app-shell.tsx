@@ -1,6 +1,6 @@
 import { Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect } from "react";
-import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, FileSignature } from "lucide-react";
+import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
@@ -38,8 +38,7 @@ const nav = [
   { to: "/app/clientes", label: "Clientes", icon: Users, iconColor: "#c084fc" },
   { to: "/app/procedimentos", label: "Procedimentos", icon: ClipboardList, iconColor: "#fb923c" },
   { to: "/app/orcamentos", label: "Orçamentos", icon: FileText, iconColor: "#34d399" },
-  { to: "/app/planos", label: "Planos", icon: CreditCard, iconColor: "#22d3ee" },
-  { to: "/app/contratos", label: "Contratos", icon: FileSignature, iconColor: "#a3e635" },
+  { to: "/app/cartao-beneficios", label: "Cartão Benefícios", icon: CreditCard, iconColor: "#22d3ee" },
   { to: "/app/crm", label: "CRM", icon: Target, iconColor: "#f472b6" },
   { to: "/app/nina", label: "Nina — WhatsApp", icon: MessageCircle, iconColor: "#4ade80" },
   { to: "/app/financeiro", label: "Financeiro", icon: DollarSign, iconColor: "#facc15" },
@@ -70,8 +69,9 @@ export function AppShell() {
       /cliente|paciente/.test(t) ? "/app/clientes" :
       /procediment|exame/.test(t) ? "/app/procedimentos" :
       /or[çc]amento/.test(t) ? "/app/orcamentos" :
-      /plano|assinatura|cart[ãa]o/.test(t) ? "/app/planos" :
-      /contrato/.test(t) ? "/app/contratos" :
+      /plano|assinatura|cart[ãa]o|benef[ií]cio|contrato/.test(t) ? "/app/cartao-beneficios/contratos" :
+      /modelo|template/.test(t) ? "/app/cartao-beneficios/modelos" :
+      /relat[óo]rio.*cart[ãa]o|cart[ãa]o.*relat[óo]rio/.test(t) ? "/app/cartao-beneficios/relatorios" :
       /financ|caixa|conta|boleto/.test(t) ? "/app/financeiro" :
       /cl[ií]nica/.test(t) ? "/app/clinicas" :
       /m[eé]dico|profissional|rateio|repasse/.test(t) ? "/app/medicos" :
