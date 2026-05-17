@@ -646,7 +646,7 @@ function ProcedimentosPage() {
                   <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
                 ) : filtrados.length === 0 ? (
                   <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Nenhum procedimento.</TableCell></TableRow>
-                ) : filtrados.map(p => (
+                ) : visiveis.map(p => (
                   <TableRow key={p.id}>
                     <TableCell className="font-medium">{p.nome}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{p.grupo ?? "—"}</TableCell>
@@ -668,6 +668,13 @@ function ProcedimentosPage() {
                     </TableCell>
                   </TableRow>
                 ))}
+                {filtrados.length > visiveis.length && (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-4 text-xs text-muted-foreground bg-muted/20">
+                      Mostrando {visiveis.length} de {filtrados.length}. Use a busca ou filtros para refinar.
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </div>
