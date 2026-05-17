@@ -365,9 +365,18 @@ function AgendaPage() {
           <p className="text-sm text-muted-foreground">Filtre e gerencie os agendamentos da clínica.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" disabled={selecionados.size === 0}>
-            Opções ({selecionados.size})
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" disabled={selecionados.size === 0}>
+                Opções ({selecionados.size})
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={cobrarSelecionados}>
+                💳 Cobrar selecionados (1 pagamento)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button
             variant="outline"
             onClick={() => {
@@ -522,6 +531,7 @@ function AgendaPage() {
         onOpenChange={setPagamentoOpen}
         tipo="receita"
         initialDescricao={pagamentoDesc}
+        initialValor={pagamentoValor}
       />
 
       <Dialog open={novoPacOpen} onOpenChange={setNovoPacOpen}>
