@@ -1,12 +1,28 @@
-import * as faceapi from "face-api.js";
+// face-api.js bundles @tensorflow/tfjs which calls bare `require("util")`
+// at module init — that throws ReferenceError in the Cloudflare Worker SSR
+// runtime and crashes every page. We MUST load it lazily, only in the browser.
 
 const MODEL_URL = "https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights";
 
+type FaceApi = typeof import("face-api.js");
+
+let faceapiPromise: Promise<FaceApi> | null = null;
 let loadingPromise: Promise<void> | null = null;
+
+async function getFaceApi(): Promise<FaceApi> {
+  if (typeof window === "undefined") {
+    throw new Error("face-api.js is browser-only");
+  }
+  if (!faceapiPromise) {
+    faceapiPromise = import("face-api.js");
+  }
+  return faceapiPromise;
+}
 
 export async function ensureFaceModels(): Promise<void> {
   if (loadingPromise) return loadingPromise;
   loadingPromise = (async () => {
+    const faceapi = await getFaceApi();
     await Promise.all([
       faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
       faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODEL_URL),
@@ -20,6 +36,7 @@ export async function detectDescriptor(
   input: HTMLVideoElement | HTMLImageElement | HTMLCanvasElement,
 ): Promise<Float32Array | null> {
   await ensureFaceModels();
+  const faceapi = await getFaceApi();
   const result = await faceapi
     .detectSingleFace(input, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 }))
     .withFaceLandmarks(true)
