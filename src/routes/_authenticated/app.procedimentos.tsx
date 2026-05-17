@@ -346,11 +346,12 @@ function ProcedimentosPage() {
   }, [items]);
 
   const filtrados = useMemo(() => {
-    const q = busca.trim().toLowerCase();
+    const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const q = norm(busca.trim());
     return items.filter(p => {
       if (filtroTipo !== "todos" && p.tipo !== filtroTipo) return false;
       if (filtroGrupo !== "todos" && (p.grupo ?? "") !== filtroGrupo) return false;
-      if (q && !p.nome.toLowerCase().includes(q) && !(p.codigo ?? "").toLowerCase().includes(q) && !(p.grupo ?? "").toLowerCase().includes(q)) return false;
+      if (q && !norm(p.nome).includes(q) && !norm(p.codigo ?? "").includes(q) && !norm(p.grupo ?? "").includes(q)) return false;
       return true;
     });
   }, [items, busca, filtroTipo, filtroGrupo]);
