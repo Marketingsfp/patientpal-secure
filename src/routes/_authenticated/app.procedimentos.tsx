@@ -305,15 +305,24 @@ function ProcedimentosPage() {
   const load = async () => {
     if (!clinicaAtual) return;
     setLoading(true);
-    const { data, error } = await supabase
-      .from("procedimentos")
-      .select("*")
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .order("grupo", { ascending: true, nullsFirst: false })
-      .order("nome");
+    const pageSize = 1000;
+    let from = 0;
+    const all: any[] = [];
+    while (true) {
+      const { data, error } = await supabase
+        .from("procedimentos")
+        .select("*")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .order("grupo", { ascending: true, nullsFirst: false })
+        .order("nome")
+        .range(from, from + pageSize - 1);
+      if (error) { setLoading(false); toast.error(error.message); return; }
+      all.push(...(data ?? []));
+      if (!data || data.length < pageSize) break;
+      from += pageSize;
+    }
     setLoading(false);
-    if (error) { toast.error(error.message); return; }
-    setItems((data ?? []) as any);
+    setItems(all as any);
   };
 
   // ----- Cartões -----
