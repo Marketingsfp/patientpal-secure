@@ -365,6 +365,18 @@ function NovoOrcamentoDialog({
 
           {itens.length > 0 && (
             <div className="border rounded-md overflow-hidden">
+              {itens.some((i) => i.preparo && i.preparo.trim()) && (
+                <div className="bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-900 px-3 py-2 space-y-1">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-200">
+                    <AlertTriangle className="h-4 w-4" /> Atenção: este orçamento contém exame(s) com preparo
+                  </div>
+                  <ul className="text-xs text-amber-900 dark:text-amber-100 space-y-0.5 pl-6 list-disc">
+                    {itens.filter((i) => i.preparo && i.preparo.trim()).map((i, idx) => (
+                      <li key={idx}><b>{i.descricao}:</b> {i.preparo}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               <table className="w-full text-sm">
                 <thead className="bg-muted/50">
                   <tr className="text-left">
