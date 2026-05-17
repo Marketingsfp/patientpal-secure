@@ -44,12 +44,12 @@ export const MainVideo: React.FC = () => {
           <SceneAgendar />
         </TransitionSeries.Sequence>
         <TransitionSeries.Transition presentation={slide({ direction: "from-right" })} timing={springTiming({ config: { damping: 200 }, durationInFrames: T })} />
-        <TransitionSeries.Sequence durationInFrames={D.fluxo}>
-          <SceneFluxo />
-        </TransitionSeries.Sequence>
-        <TransitionSeries.Transition presentation={slide({ direction: "from-right" })} timing={springTiming({ config: { damping: 200 }, durationInFrames: T })} />
         <TransitionSeries.Sequence durationInFrames={D.pagto}>
           <ScenePagamento />
+        </TransitionSeries.Sequence>
+        <TransitionSeries.Transition presentation={slide({ direction: "from-right" })} timing={springTiming({ config: { damping: 200 }, durationInFrames: T })} />
+        <TransitionSeries.Sequence durationInFrames={D.fluxo}>
+          <SceneFluxo />
         </TransitionSeries.Sequence>
         <TransitionSeries.Transition presentation={fade()} timing={springTiming({ config: { damping: 200 }, durationInFrames: T })} />
         <TransitionSeries.Sequence durationInFrames={D.final}>
