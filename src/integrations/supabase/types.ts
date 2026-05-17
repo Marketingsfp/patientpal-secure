@@ -366,6 +366,201 @@ export type Database = {
         }
         Relationships: []
       }
+      contrato_dependentes: {
+        Row: {
+          ativo: boolean
+          contrato_id: string
+          created_at: string
+          excluido_em: string | null
+          id: string
+          incluido_em: string
+          paciente_id: string
+          paciente_nome: string
+          parentesco: string | null
+          tipo: string
+        }
+        Insert: {
+          ativo?: boolean
+          contrato_id: string
+          created_at?: string
+          excluido_em?: string | null
+          id?: string
+          incluido_em?: string
+          paciente_id: string
+          paciente_nome: string
+          parentesco?: string | null
+          tipo?: string
+        }
+        Update: {
+          ativo?: boolean
+          contrato_id?: string
+          created_at?: string
+          excluido_em?: string | null
+          id?: string
+          incluido_em?: string
+          paciente_id?: string
+          paciente_nome?: string
+          parentesco?: string | null
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contrato_dependentes_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos_assinatura"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contrato_mensalidades: {
+        Row: {
+          clinica_id: string
+          contrato_id: string
+          created_at: string
+          forma_pagamento: string | null
+          id: string
+          juros: number | null
+          lancamento_id: string | null
+          multa: number | null
+          numero_parcela: number
+          observacoes: string | null
+          pago_em: string | null
+          status: string
+          updated_at: string
+          valor: number
+          valor_pago: number | null
+          vencimento: string
+        }
+        Insert: {
+          clinica_id: string
+          contrato_id: string
+          created_at?: string
+          forma_pagamento?: string | null
+          id?: string
+          juros?: number | null
+          lancamento_id?: string | null
+          multa?: number | null
+          numero_parcela: number
+          observacoes?: string | null
+          pago_em?: string | null
+          status?: string
+          updated_at?: string
+          valor?: number
+          valor_pago?: number | null
+          vencimento: string
+        }
+        Update: {
+          clinica_id?: string
+          contrato_id?: string
+          created_at?: string
+          forma_pagamento?: string | null
+          id?: string
+          juros?: number | null
+          lancamento_id?: string | null
+          multa?: number | null
+          numero_parcela?: number
+          observacoes?: string | null
+          pago_em?: string | null
+          status?: string
+          updated_at?: string
+          valor?: number
+          valor_pago?: number | null
+          vencimento?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contrato_mensalidades_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos_assinatura"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contratos_assinatura: {
+        Row: {
+          assinado_em: string | null
+          assinatura_ip: string | null
+          assinatura_svg: string | null
+          clinica_id: string
+          created_at: string
+          criado_por: string | null
+          data_fim: string | null
+          data_inicio: string
+          dia_vencimento: number
+          forma_pagamento: string | null
+          id: string
+          num_parcelas: number
+          numero: number
+          observacoes: string | null
+          paciente_id: string
+          paciente_nome: string
+          plano_id: string
+          status: string
+          taxa_adesao: number
+          token_publico: string | null
+          updated_at: string
+          valor_mensal: number
+        }
+        Insert: {
+          assinado_em?: string | null
+          assinatura_ip?: string | null
+          assinatura_svg?: string | null
+          clinica_id: string
+          created_at?: string
+          criado_por?: string | null
+          data_fim?: string | null
+          data_inicio?: string
+          dia_vencimento?: number
+          forma_pagamento?: string | null
+          id?: string
+          num_parcelas?: number
+          numero?: number
+          observacoes?: string | null
+          paciente_id: string
+          paciente_nome: string
+          plano_id: string
+          status?: string
+          taxa_adesao?: number
+          token_publico?: string | null
+          updated_at?: string
+          valor_mensal?: number
+        }
+        Update: {
+          assinado_em?: string | null
+          assinatura_ip?: string | null
+          assinatura_svg?: string | null
+          clinica_id?: string
+          created_at?: string
+          criado_por?: string | null
+          data_fim?: string | null
+          data_inicio?: string
+          dia_vencimento?: number
+          forma_pagamento?: string | null
+          id?: string
+          num_parcelas?: number
+          numero?: number
+          observacoes?: string | null
+          paciente_id?: string
+          paciente_nome?: string
+          plano_id?: string
+          status?: string
+          taxa_adesao?: number
+          token_publico?: string | null
+          updated_at?: string
+          valor_mensal?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contratos_assinatura_plano_id_fkey"
+            columns: ["plano_id"]
+            isOneToOne: false
+            referencedRelation: "planos_assinatura"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crm_etapas: {
         Row: {
           ativo: boolean
@@ -1762,6 +1957,63 @@ export type Database = {
         }
         Relationships: []
       }
+      planos_assinatura: {
+        Row: {
+          ativo: boolean
+          clinica_id: string
+          created_at: string
+          descricao_beneficios: string | null
+          fidelidade_meses: number
+          id: string
+          max_agregados: number
+          max_dependentes: number
+          nome: string
+          num_parcelas: number
+          taxa_adesao: number
+          template_contrato: string | null
+          tipo: string
+          updated_at: string
+          valor_mensal: number
+          vigencia_meses: number
+        }
+        Insert: {
+          ativo?: boolean
+          clinica_id: string
+          created_at?: string
+          descricao_beneficios?: string | null
+          fidelidade_meses?: number
+          id?: string
+          max_agregados?: number
+          max_dependentes?: number
+          nome: string
+          num_parcelas?: number
+          taxa_adesao?: number
+          template_contrato?: string | null
+          tipo?: string
+          updated_at?: string
+          valor_mensal?: number
+          vigencia_meses?: number
+        }
+        Update: {
+          ativo?: boolean
+          clinica_id?: string
+          created_at?: string
+          descricao_beneficios?: string | null
+          fidelidade_meses?: number
+          id?: string
+          max_agregados?: number
+          max_dependentes?: number
+          nome?: string
+          num_parcelas?: number
+          taxa_adesao?: number
+          template_contrato?: string | null
+          tipo?: string
+          updated_at?: string
+          valor_mensal?: number
+          vigencia_meses?: number
+        }
+        Relationships: []
+      }
       prestadores: {
         Row: {
           agencia: string | null
@@ -2213,6 +2465,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      assinar_contrato_publico: {
+        Args: { _assinatura_svg: string; _ip: string; _token: string }
+        Returns: string
+      }
       can_manage_clinica: {
         Args: { _clinica_id: string; _user_id: string }
         Returns: boolean
@@ -2244,6 +2500,7 @@ export type Database = {
         }
       }
       consulta_publica: { Args: { _token: string }; Returns: Json }
+      contrato_publico: { Args: { _token: string }; Returns: Json }
       criar_clinica_com_admin: {
         Args: {
           _cidade?: string
