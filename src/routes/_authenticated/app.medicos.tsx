@@ -38,6 +38,7 @@ interface Medico {
   medico_especialidades: { especialidade: { id: string; nome: string } | null }[];
 }
 interface Especialidade { id: string; nome: string }
+interface Procedimento { id: string; nome: string; grupo: string | null; tipo: string; valor_padrao: number }
 interface ConvenioRow {
   id?: string;
   nome: string;
@@ -56,6 +57,9 @@ function MedicosPage() {
   const { clinicaAtual } = useClinica();
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [esps, setEsps] = useState<Especialidade[]>([]);
+  const [procs, setProcs] = useState<Procedimento[]>([]);
+  const [procFilter, setProcFilter] = useState("");
+  const [procGrupo, setProcGrupo] = useState<string>("__todos__");
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -88,6 +92,17 @@ function MedicosPage() {
     void load();
     supabase.from("especialidades").select("id, nome").order("nome").then(({ data }) => setEsps(data ?? []));
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [clinicaAtual?.clinica_id]);
+
+  useEffect(() => {
+    if (!clinicaAtual) return;
+    supabase
+      .from("procedimentos")
+      .select("id, nome, grupo, tipo, valor_padrao")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("ativo", true)
+      .order("nome")
+      .then(({ data }) => setProcs((data as Procedimento[]) ?? []));
   }, [clinicaAtual?.clinica_id]);
 
   const resetForm = () => {
