@@ -49,6 +49,7 @@ type Item = {
   valor_unitario: number;
   procedimento_id: string | null;
   preparo: string | null;
+  valores_formas?: Record<string, number> | null;
 };
 
 const FORMAS = ["Dinheiro", "PIX", "Cartão de Crédito", "Cartão de Débito", "Boleto", "Outro"];
@@ -244,7 +245,17 @@ function NovoOrcamentoDialog({
   };
 
   const adicionarProc = (p: Procedimento) => {
-    setItens((arr) => [...arr, { descricao: p.nome, quantidade: 1, valor_unitario: valorDoProc(p), procedimento_id: p.id, preparo: p.preparo ?? null }]);
+    const formas = formasPagamento.length ? formasPagamento : ["Dinheiro"];
+    const valores: Record<string, number> = {};
+    for (const f of formas) valores[f] = valorPorForma(p, f);
+    setItens((arr) => [...arr, {
+      descricao: p.nome,
+      quantidade: 1,
+      valor_unitario: valorDoProc(p),
+      procedimento_id: p.id,
+      preparo: p.preparo ?? null,
+      valores_formas: valores,
+    }]);
     if (p.preparo && p.preparo.trim()) {
       toast.warning(`⚠ ${p.nome} exige preparo`, { description: p.preparo, duration: 6000 });
     }
