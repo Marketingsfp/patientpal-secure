@@ -285,13 +285,12 @@ function MedicosPage() {
             <DialogHeader><DialogTitle>{editId ? "Editar médico" : "Novo médico"}</DialogTitle></DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <Tabs defaultValue="dados">
-                <TabsList className="grid grid-cols-7 w-full">
+                <TabsList className="grid grid-cols-6 w-full">
                   <TabsTrigger value="dados">Dados</TabsTrigger>
                   <TabsTrigger value="especialidades">Especialidades</TabsTrigger>
                   <TabsTrigger value="contato">Contato</TabsTrigger>
                   <TabsTrigger value="endereco">Endereço</TabsTrigger>
                   <TabsTrigger value="banco">Banco</TabsTrigger>
-                  <TabsTrigger value="convenios">Convênios</TabsTrigger>
                   <TabsTrigger value="repasse">Repasse</TabsTrigger>
                 </TabsList>
 
@@ -429,54 +428,6 @@ function MedicosPage() {
                   </div>
                 </TabsContent>
 
-                <TabsContent value="convenios" className="space-y-3 pt-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label>Convênios / Procedimentos</Label>
-                      <p className="text-xs text-muted-foreground">Cartão Consulta, Cartão Desconto, fimose e outros procedimentos.</p>
-                    </div>
-                    <Button type="button" size="sm" variant="outline"
-                      onClick={() => setConvenios((cs) => [...cs, { nome: "", tipo_repasse: "percentual", percentual: "50", valor: "", ativo: true }])}>
-                      <Plus className="h-4 w-4 mr-1" /> Adicionar
-                    </Button>
-                  </div>
-                  <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-                    {convenios.map((c, i) => (
-                      <div key={i} className="grid grid-cols-12 gap-2 items-end border rounded-md p-2">
-                        <div className="col-span-5 space-y-1">
-                          <Label className="text-xs">Nome</Label>
-                          <Input value={c.nome} placeholder="Ex: Fimose"
-                            onChange={(e) => setConvenios((cs) => cs.map((x, j) => j === i ? { ...x, nome: e.target.value } : x))} />
-                        </div>
-                        <div className="col-span-3 space-y-1">
-                          <Label className="text-xs">Tipo</Label>
-                          <select className="h-9 w-full rounded-md border bg-background px-2 text-sm"
-                            value={c.tipo_repasse}
-                            onChange={(e) => setConvenios((cs) => cs.map((x, j) => j === i ? { ...x, tipo_repasse: e.target.value as "percentual" | "valor" } : x))}>
-                            <option value="percentual">% Percentual</option>
-                            <option value="valor">R$ Valor</option>
-                          </select>
-                        </div>
-                        <div className="col-span-3 space-y-1">
-                          <Label className="text-xs">{c.tipo_repasse === "percentual" ? "%" : "R$"}</Label>
-                          <Input type="number" step="0.01" min={0}
-                            value={c.tipo_repasse === "percentual" ? c.percentual : c.valor}
-                            onChange={(e) => setConvenios((cs) => cs.map((x, j) => j === i ? (c.tipo_repasse === "percentual" ? { ...x, percentual: e.target.value } : { ...x, valor: e.target.value }) : x))} />
-                        </div>
-                        <div className="col-span-1">
-                          <Button type="button" size="icon" variant="ghost"
-                            onClick={() => setConvenios((cs) => cs.filter((_, j) => j !== i))} aria-label="Remover">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                    {convenios.length === 0 && (
-                      <p className="text-sm text-muted-foreground text-center py-4">Nenhum convênio. Clique em "Adicionar".</p>
-                    )}
-                  </div>
-                </TabsContent>
-
                 <TabsContent value="repasse" className="space-y-4 pt-4">
                   <div className="space-y-2">
                 <Label>Tipo de repasse</Label>
@@ -506,6 +457,53 @@ function MedicosPage() {
                     onChange={(e) => setForm({ ...form, valor: e.target.value })} />
                 </div>
               )}
+                  <div className="pt-4 border-t space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label>Convênios / Procedimentos</Label>
+                        <p className="text-xs text-muted-foreground">Cartão Consulta, Cartão Desconto, fimose e outros procedimentos.</p>
+                      </div>
+                      <Button type="button" size="sm" variant="outline"
+                        onClick={() => setConvenios((cs) => [...cs, { nome: "", tipo_repasse: "percentual", percentual: "50", valor: "", ativo: true }])}>
+                        <Plus className="h-4 w-4 mr-1" /> Adicionar
+                      </Button>
+                    </div>
+                    <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                      {convenios.map((c, i) => (
+                        <div key={i} className="grid grid-cols-12 gap-2 items-end border rounded-md p-2">
+                          <div className="col-span-5 space-y-1">
+                            <Label className="text-xs">Nome</Label>
+                            <Input value={c.nome} placeholder="Ex: Fimose"
+                              onChange={(e) => setConvenios((cs) => cs.map((x, j) => j === i ? { ...x, nome: e.target.value } : x))} />
+                          </div>
+                          <div className="col-span-3 space-y-1">
+                            <Label className="text-xs">Tipo</Label>
+                            <select className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+                              value={c.tipo_repasse}
+                              onChange={(e) => setConvenios((cs) => cs.map((x, j) => j === i ? { ...x, tipo_repasse: e.target.value as "percentual" | "valor" } : x))}>
+                              <option value="percentual">% Percentual</option>
+                              <option value="valor">R$ Valor</option>
+                            </select>
+                          </div>
+                          <div className="col-span-3 space-y-1">
+                            <Label className="text-xs">{c.tipo_repasse === "percentual" ? "%" : "R$"}</Label>
+                            <Input type="number" step="0.01" min={0}
+                              value={c.tipo_repasse === "percentual" ? c.percentual : c.valor}
+                              onChange={(e) => setConvenios((cs) => cs.map((x, j) => j === i ? (c.tipo_repasse === "percentual" ? { ...x, percentual: e.target.value } : { ...x, valor: e.target.value }) : x))} />
+                          </div>
+                          <div className="col-span-1">
+                            <Button type="button" size="icon" variant="ghost"
+                              onClick={() => setConvenios((cs) => cs.filter((_, j) => j !== i))} aria-label="Remover">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                      {convenios.length === 0 && (
+                        <p className="text-sm text-muted-foreground text-center py-4">Nenhum convênio. Clique em "Adicionar".</p>
+                      )}
+                    </div>
+                  </div>
                 </TabsContent>
               </Tabs>
               <DialogFooter><Button type="submit" disabled={loading}>{loading ? "Salvando..." : "Salvar"}</Button></DialogFooter>
