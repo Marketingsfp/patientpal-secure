@@ -41,6 +41,7 @@ const nav = [
   { to: "/app/financeiro", label: "Financeiro", icon: DollarSign, iconColor: "#facc15" },
   { to: "/app/clinicas", label: "Clínicas", icon: Building2, iconColor: "#22d3ee" },
   { to: "/app/medicos", label: "Médicos", icon: Stethoscope, iconColor: "#fda4af" },
+  { to: "/app/especialidades", label: "Especialidades", icon: Stethoscope, iconColor: "#f0abfc" },
   { to: "/app/disponibilidades", label: "Horários médicos", icon: Clock, iconColor: "#a78bfa" },
   { to: "/app/consulta-rapida", label: "Consulta rápida", icon: BookOpen, iconColor: "#fcd34d" },
   { to: "/app/rateio", label: "Regras de rateio", icon: Wallet, iconColor: "#34d399" },
