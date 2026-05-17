@@ -483,6 +483,44 @@ function AgendaPage() {
         initialDescricao={pagamentoDesc}
       />
 
+      <Dialog open={novoPacOpen} onOpenChange={setNovoPacOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cadastro rápido de paciente</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={cadastrarPacienteRapido} className="space-y-3">
+            <div className="space-y-1">
+              <Label>Nome *</Label>
+              <Input value={novoPac.nome} onChange={(e) => setNovoPac(p => ({ ...p, nome: e.target.value }))} required autoFocus />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label>CPF</Label>
+                <Input value={novoPac.cpf} onChange={(e) => setNovoPac(p => ({ ...p, cpf: e.target.value }))} placeholder="000.000.000-00" />
+              </div>
+              <div className="space-y-1">
+                <Label>Nascimento</Label>
+                <Input type="date" value={novoPac.data_nascimento} onChange={(e) => setNovoPac(p => ({ ...p, data_nascimento: e.target.value }))} />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Telefone</Label>
+              <Input value={novoPac.telefone} onChange={(e) => setNovoPac(p => ({ ...p, telefone: e.target.value }))} placeholder="(00) 00000-0000" />
+            </div>
+            <div className="space-y-1">
+              <Label>E-mail</Label>
+              <Input type="email" value={novoPac.email} onChange={(e) => setNovoPac(p => ({ ...p, email: e.target.value }))} />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setNovoPacOpen(false)}>Cancelar</Button>
+              <Button type="submit" disabled={savingPac} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                {savingPac ? "Salvando..." : "Cadastrar"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       {/* Filtros */}
       <div className="rounded-lg border border-border bg-card p-4 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
