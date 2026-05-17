@@ -1,6 +1,6 @@
 import { Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect } from "react";
-import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen } from "lucide-react";
+import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
@@ -33,6 +33,7 @@ const VoiceInput = lazy(() => import("@/components/voice-input").then((m) => ({ 
 const nav = [
   { to: "/app", label: "Dashboard", icon: LayoutDashboard, iconColor: "#fbbf24" },
   { to: "/app/recepcao", label: "Recepção / Filas", icon: Bell, iconColor: "#f87171" },
+  { to: "/app/fluxo", label: "Fluxo do paciente", icon: Workflow, iconColor: "#fb7185" },
   { to: "/app/agenda", label: "Agenda", icon: CalendarDays, iconColor: "#60a5fa" },
   { to: "/app/clientes", label: "Clientes", icon: Users, iconColor: "#c084fc" },
   { to: "/app/procedimentos", label: "Procedimentos", icon: ClipboardList, iconColor: "#fb923c" },
