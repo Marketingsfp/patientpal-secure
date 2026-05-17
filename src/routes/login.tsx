@@ -38,7 +38,7 @@ function LoginPage() {
   return (
     <div className="min-h-screen grid lg:grid-cols-2 bg-background">
       {/* Brand panel */}
-      <div className="hidden lg:flex flex-col justify-between p-12 text-white relative overflow-hidden bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600">
+      <div className="hidden lg:flex flex-col justify-between p-12 text-white relative overflow-hidden bg-gradient-to-br from-[#16a34a] via-[#15803d] to-[#166534]">
         <div className="flex items-center gap-2">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/15 backdrop-blur">
             <Activity className="h-5 w-5" />
