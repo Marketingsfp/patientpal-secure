@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
-import { Activity, Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { Activity, Mail, Lock, Eye, EyeOff, CalendarDays, Users, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -36,7 +36,48 @@ function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="min-h-screen grid lg:grid-cols-2 bg-background">
+      {/* Brand panel */}
+      <div className="hidden lg:flex flex-col justify-between p-12 text-white relative overflow-hidden bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600">
+        <div className="flex items-center gap-2">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/15 backdrop-blur">
+            <Activity className="h-5 w-5" />
+          </div>
+          <span className="text-xl font-semibold tracking-tight">ClinicaOS</span>
+        </div>
+
+        <div className="space-y-6 max-w-md">
+          <h2 className="text-5xl font-bold leading-tight tracking-tight">
+            Gerencie sua clínica com leveza.
+          </h2>
+          <p className="text-white/85 text-lg leading-relaxed">
+            Agenda, prontuário, financeiro e equipe em um só lugar — pensado para o dia a dia da sua operação.
+          </p>
+          <ul className="space-y-3 pt-4">
+            <li className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 backdrop-blur">
+                <CalendarDays className="h-4 w-4" />
+              </span>
+              <span className="text-white/90">Agenda inteligente com confirmação automática</span>
+            </li>
+            <li className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 backdrop-blur">
+                <Users className="h-4 w-4" />
+              </span>
+              <span className="text-white/90">Cadastro de pacientes, procedimentos e equipe</span>
+            </li>
+            <li className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 backdrop-blur">
+                <ShieldCheck className="h-4 w-4" />
+              </span>
+              <span className="text-white/90">Dados protegidos com isolamento por clínica</span>
+            </li>
+          </ul>
+        </div>
+
+        <p className="text-xs text-white/70">© {new Date().getFullYear()} ClinicaOS — todos os direitos reservados.</p>
+      </div>
+
       {/* Form panel */}
       <div className="flex items-center justify-center px-6 py-12 sm:px-10 w-full">
         <div className="w-full max-w-md">
