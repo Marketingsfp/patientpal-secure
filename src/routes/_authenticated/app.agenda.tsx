@@ -109,7 +109,7 @@ function AgendaPage() {
     setLoading(true);
     let q = supabase
       .from("agendamentos")
-      .select("id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes")
+      .select("id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("inicio");
     if (apenasData) {
@@ -589,6 +589,13 @@ function AgendaPage() {
                         <DropdownMenuItem onClick={() => openEdit(a)}><Pencil className="h-4 w-4 mr-2" /> Editar</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => imprimirGR(a)}>
                           <Printer className="h-4 w-4 mr-2" /> Imprimir GR
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => {
+                          const url = `${window.location.origin}/p/${(a as any).token_publico}`;
+                          navigator.clipboard.writeText(url);
+                          toast.success("Link do paciente copiado");
+                        }}>
+                          <Video className="h-4 w-4 mr-2" /> Copiar link do paciente
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         {(Object.keys(STATUS_LABEL) as Status[]).map(s => (
