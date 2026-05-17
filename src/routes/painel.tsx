@@ -61,8 +61,12 @@ function PainelPage() {
         { event: "*", schema: "public", table: "senhas", filter: `clinica_id=eq.${clinicaId}` },
         (payload) => {
           void carregar();
-          if (payload.eventType === "UPDATE" && (payload.new as any)?.status === "chamada") {
-            falar(payload.new as Senha);
+          const novo = payload.new as Senha | undefined;
+          if (
+            (payload.eventType === "UPDATE" || payload.eventType === "INSERT") &&
+            novo?.status === "chamada"
+          ) {
+            falar(novo);
           }
         },
       )
@@ -73,8 +77,15 @@ function PainelPage() {
 
   function falar(s: Senha) {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-    const tipoNome = { N: "Comum", P: "Preferencial", E: "Prioridade", R: "Retorno" }[s.tipo];
-    const texto = `Senha ${tipoNome} ${s.codigo.replace("-", " ")}${s.guiche ? `, guichê ${s.guiche}` : ""}`;
+    const ehNome = /[a-zA-Z]{3,}/.test(s.codigo) && /\s/.test(s.codigo.trim());
+    let texto: string;
+    if (ehNome) {
+      texto = `${s.codigo}${s.guiche ? `, ${s.guiche}` : ""}`;
+    } else {
+      const tipoNome = { N: "Comum", P: "Preferencial", E: "Prioridade", R: "Retorno" }[s.tipo];
+      texto = `Senha ${tipoNome} ${s.codigo.replace("-", " ")}${s.guiche ? `, guichê ${s.guiche}` : ""}`;
+    }
+    window.speechSynthesis.cancel();
     const utter = new SpeechSynthesisUtterance(texto);
     utter.lang = "pt-BR";
     utter.rate = 0.9;
@@ -98,10 +109,26 @@ function PainelPage() {
           <div className="text-white/60 uppercase tracking-widest text-sm mb-4">Chamando agora</div>
           {atual ? (
             <>
-              <div className="text-[14rem] font-black leading-none tabular-nums text-primary">{atual.codigo}</div>
-              <div className="text-4xl mt-6">
-                Guichê <span className="font-bold">{atual.guiche ?? "—"}</span>
-              </div>
+              {(() => {
+                const ehNome = /[a-zA-Z]{3,}/.test(atual.codigo) && /\s/.test(atual.codigo.trim());
+                const fonte = ehNome
+                  ? (atual.codigo.length > 16 ? "text-7xl" : atual.codigo.length > 10 ? "text-8xl" : "text-9xl")
+                  : "text-[14rem] tabular-nums";
+                return (
+                  <>
+                    <div className={`${fonte} font-black leading-none text-primary text-center break-words max-w-full`}>
+                      {atual.codigo}
+                    </div>
+                    <div className="text-4xl mt-6 text-center">
+                      {ehNome ? (
+                        <span className="font-bold">{atual.guiche ?? "—"}</span>
+                      ) : (
+                        <>Guichê <span className="font-bold">{atual.guiche ?? "—"}</span></>
+                      )}
+                    </div>
+                  </>
+                );
+              })()}
             </>
           ) : (
             <div className="text-3xl text-white/40">Aguardando chamada…</div>

@@ -6,7 +6,10 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, CheckCircle2, Workflow } from "lucide-react";
+import { ChevronLeft, ChevronRight, CheckCircle2, Workflow, Bell, Settings2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { PendenciasAlert } from "@/components/PendenciasAlert";
 
 export const Route = createFileRoute("/_authenticated/app/fluxo")({
@@ -62,6 +65,14 @@ function FluxoPage() {
   const { clinicaAtual } = useClinica();
   const [ags, setAgs] = useState<Ag[]>([]);
   const [loading, setLoading] = useState(false);
+  const [consultorio, setConsultorio] = useState<string>(() =>
+    typeof window !== "undefined" ? localStorage.getItem("fluxo_consultorio") ?? "1" : "1",
+  );
+  const [medicoChamada, setMedicoChamada] = useState<string>(() =>
+    typeof window !== "undefined" ? localStorage.getItem("fluxo_medico_chamada") ?? "" : "",
+  );
+  useEffect(() => { localStorage.setItem("fluxo_consultorio", consultorio); }, [consultorio]);
+  useEffect(() => { localStorage.setItem("fluxo_medico_chamada", medicoChamada); }, [medicoChamada]);
 
   const carregar = useCallback(async () => {
     if (!clinicaAtual) return;
@@ -108,6 +119,45 @@ function FluxoPage() {
     if (error) toast.error(error.message);
   }
 
+  async function chamarPaciente(a: Ag) {
+    if (!clinicaAtual) return;
+    if (!consultorio.trim()) { toast.error("Defina o consultório (botão de configuração no topo)"); return; }
+    const hoje = new Date().toISOString().slice(0, 10);
+    // Próximo número para tipo N hoje
+    const { data: ult } = await supabase
+      .from("senhas")
+      .select("numero")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("data_dia", hoje)
+      .eq("tipo", "N")
+      .order("numero", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const proximoNum = Math.min(9999, (ult?.numero ?? 0) + 1);
+    const nomeCurto = a.paciente_nome
+      .split(/\s+/)
+      .slice(0, 2)
+      .join(" ")
+      .toUpperCase()
+      .slice(0, 24);
+    const medicoStr = (medicoChamada || a.medicos?.nome || "").trim();
+    const guicheStr = `Consultório ${consultorio.trim()}${medicoStr ? ` · ${medicoStr}` : ""}`;
+    const now = new Date().toISOString();
+    const { error: insErr } = await supabase.from("senhas").insert({
+      clinica_id: clinicaAtual.clinica_id,
+      tipo: "N",
+      numero: proximoNum,
+      codigo: nomeCurto,
+      status: "chamada",
+      paciente_id: a.paciente_id,
+      guiche: guicheStr,
+      chamada_em: now,
+    } as never);
+    if (insErr) { toast.error(insErr.message); return; }
+    await setEtapa(a.id, "atendimento");
+    toast.success(`Chamando ${nomeCurto} · ${guicheStr}`);
+  }
+
   const colunas = useMemo(() => {
     const m = new Map<Etapa, Ag[]>();
     ETAPAS.forEach((e) => m.set(e.id, []));
@@ -126,7 +176,29 @@ function FluxoPage() {
             Recepção → Caixa → Triagem (enfermagem) → Atendimento médico ou Exame. Avance o paciente em cada etapa.
           </p>
         </div>
-        <Button variant="outline" onClick={carregar} disabled={loading}>{loading ? "Atualizando…" : "Atualizar"}</Button>
+        <div className="flex items-center gap-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Settings2 className="h-4 w-4" /> Consultório {consultorio || "?"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-72 space-y-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Meu consultório</Label>
+                <Input value={consultorio} onChange={(e) => setConsultorio(e.target.value.slice(0, 10))} placeholder="Ex.: 1, 2, A…" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Nome para a chamada (opcional)</Label>
+                <Input value={medicoChamada} onChange={(e) => setMedicoChamada(e.target.value.slice(0, 60))} placeholder="Ex.: Dr. João" />
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Usado no botão <b>Chamar paciente</b> para exibir no painel/TV.
+              </p>
+            </PopoverContent>
+          </Popover>
+          <Button variant="outline" onClick={carregar} disabled={loading}>{loading ? "Atualizando…" : "Atualizar"}</Button>
+        </div>
       </div>
 
       <div className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-7">
@@ -169,8 +241,8 @@ function FluxoPage() {
                         </Button>
                         {col.id === "triagem" && (
                           <>
-                            <Button size="sm" variant="outline" className="h-7 px-2 text-xs flex-1" onClick={() => setEtapa(a.id, "atendimento")}>
-                              <ChevronRight className="h-3 w-3 mr-1" /> Atendimento
+                            <Button size="sm" className="h-7 px-2 text-xs flex-1" onClick={() => chamarPaciente(a)} title="Chamar no painel e mover para Atendimento">
+                              <Bell className="h-3 w-3 mr-1" /> Chamar
                             </Button>
                             <Button size="sm" variant="outline" className="h-7 px-2 text-xs flex-1" onClick={() => setEtapa(a.id, "exame")}>
                               <ChevronRight className="h-3 w-3 mr-1" /> Exame
@@ -178,18 +250,25 @@ function FluxoPage() {
                           </>
                         )}
                         {col.id !== "triagem" && (
-                          <Button
-                            size="sm"
-                            className="h-7 px-2 text-xs flex-1"
-                            disabled={!next}
-                            onClick={() => next && setEtapa(a.id, next)}
-                          >
-                            {col.id === "atendimento" || col.id === "exame" ? (
-                              <><CheckCircle2 className="h-3 w-3 mr-1" /> Finalizar</>
-                            ) : (
-                              <>Avançar <ChevronRight className="h-3 w-3 ml-1" /></>
+                          <>
+                            {col.id === "atendimento" && (
+                              <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => chamarPaciente(a)} title="Rechamar no painel">
+                                <Bell className="h-3 w-3" />
+                              </Button>
                             )}
-                          </Button>
+                            <Button
+                              size="sm"
+                              className="h-7 px-2 text-xs flex-1"
+                              disabled={!next}
+                              onClick={() => next && setEtapa(a.id, next)}
+                            >
+                              {col.id === "atendimento" || col.id === "exame" ? (
+                                <><CheckCircle2 className="h-3 w-3 mr-1" /> Finalizar</>
+                              ) : (
+                                <>Avançar <ChevronRight className="h-3 w-3 ml-1" /></>
+                              )}
+                            </Button>
+                          </>
                         )}
                       </div>
                     </Card>
