@@ -19,9 +19,6 @@ export const Route = createFileRoute("/")({
 
 const NAV = [
   { label: "Home", to: "/" as const },
-  { label: "Recursos", to: "/" as const, hash: "recursos" },
-  { label: "Preço", to: "/" as const, hash: "preco" },
-  { label: "Contato", to: "/" as const, hash: "contato" },
 ];
 
 const FEATURES = [
@@ -62,13 +59,13 @@ function LandingPage() {
 
           <nav className="hidden items-center gap-8 md:flex">
             {NAV.map((n) => (
-              <a
+              <Link
                 key={n.label}
-                href={n.hash ? `#${n.hash}` : "/"}
+                to={n.to}
                 className="text-sm font-medium text-foreground/80 transition-colors hover:text-primary"
               >
                 {n.label}
-              </a>
+              </Link>
             ))}
           </nav>
 
@@ -109,27 +106,6 @@ function LandingPage() {
               ))}
             </ul>
 
-            <div className="mt-10 flex flex-wrap gap-4">
-              <Button
-                asChild
-                size="lg"
-                className="rounded-full bg-[oklch(0.45_0.18_260)] px-8 text-white hover:bg-[oklch(0.40_0.18_260)]"
-              >
-                <Link to="/signup">
-                  Quero testar agora <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-              <Button
-                asChild
-                size="lg"
-                variant="outline"
-                className="rounded-full border-primary px-8 text-primary hover:bg-primary/5"
-              >
-                <a href="#preco">
-                  Conheça os planos <ArrowRight className="ml-2 h-4 w-4" />
-                </a>
-              </Button>
-            </div>
           </div>
 
           <div className="relative">
