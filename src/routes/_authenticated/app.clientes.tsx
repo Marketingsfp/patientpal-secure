@@ -154,6 +154,55 @@ function ClientesPage() {
   const [hasBiometria, setHasBiometria] = useState<Record<string, boolean>>({});
   const [fotoSigned, setFotoSigned] = useState<Record<string, string>>({});
 
+  // Câmera (webcam) para capturar foto
+  const [camOpen, setCamOpen] = useState(false);
+  const camVideoRef = useRef<HTMLVideoElement | null>(null);
+  const camStreamRef = useRef<MediaStream | null>(null);
+
+  const abrirCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 640 } },
+        audio: false,
+      });
+      camStreamRef.current = stream;
+      setCamOpen(true);
+      setTimeout(() => {
+        if (camVideoRef.current) {
+          camVideoRef.current.srcObject = stream;
+          void camVideoRef.current.play();
+        }
+      }, 50);
+    } catch {
+      toast.error("Não foi possível acessar a câmera. Verifique a permissão do navegador.");
+    }
+  };
+  const fecharCamera = () => {
+    camStreamRef.current?.getTracks().forEach(t => t.stop());
+    camStreamRef.current = null;
+    setCamOpen(false);
+  };
+  const capturarFoto = () => {
+    const v = camVideoRef.current;
+    if (!v) return;
+    const w = v.videoWidth, h = v.videoHeight;
+    if (!w || !h) { toast.error("Câmera ainda não está pronta."); return; }
+    const side = Math.min(w, h);
+    const sx = (w - side) / 2, sy = (h - side) / 2;
+    const canvas = document.createElement("canvas");
+    canvas.width = 480; canvas.height = 480;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(v, sx, sy, side, side, 0, 0, 480, 480);
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const file = new File([blob], `foto-${Date.now()}.jpg`, { type: "image/jpeg" });
+      setFotoFile(file);
+      setFotoPreview(URL.createObjectURL(blob));
+      fecharCamera();
+    }, "image/jpeg", 0.9);
+  };
+
   // Voz
   const [recording, setRecording] = useState(false);
   const [voiceField, setVoiceField] = useState<keyof FormState | null>(null);
