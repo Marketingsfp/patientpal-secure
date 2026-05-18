@@ -46,6 +46,11 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
   const [categorias, setCategorias] = useState<{ id: string; nome: string }[]>([]);
   const [contas, setContas] = useState<{ id: string; nome: string }[]>([]);
   const [saving, setSaving] = useState(false);
+  const [valorRecebido, setValorRecebido] = useState("");
+  const [pagamentoMisto, setPagamentoMisto] = useState(false);
+  const [pagamentos, setPagamentos] = useState<Array<{ forma: string; valor: string; valorRecebido?: string }>>([
+    { forma: "dinheiro", valor: "" },
+  ]);
 
   useEffect(() => {
     if (!open || !clinicaAtual) return;
@@ -61,6 +66,31 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     })();
   }, [open, clinicaAtual, tipo]);
 
+  const formatBRL = (n: number) =>
+    n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const valorNum = Number(valor || 0);
+  const recebidoNum = Number(valorRecebido || 0);
+  const trocoDinheiro = formaPagamento === "dinheiro" && recebidoNum > valorNum
+    ? recebidoNum - valorNum
+    : 0;
+  const totalPagoMisto = pagamentos.reduce((s, p) => s + Number(p.valor || 0), 0);
+  const restanteMisto = Math.max(0, valorNum - totalPagoMisto);
+  const trocoMisto = pagamentos.reduce((s, p) => {
+    if (p.forma !== "dinheiro") return s;
+    const rec = Number(p.valorRecebido || 0);
+    const pago = Number(p.valor || 0);
+    return s + (rec > pago ? rec - pago : 0);
+  }, 0);
+  const FORMAS_LABEL: Record<string, string> = {
+    dinheiro: "Dinheiro",
+    pix: "Pix",
+    cartao_credito: "Cartão Crédito",
+    cartao_debito: "Cartão Débito",
+    boleto: "Boleto",
+    convenio: "Convênio",
+    transferencia: "Transferência",
+  };
+
   const handleSave = async () => {
     if (!clinicaAtual) return;
     if (!descricao.trim() || !valor) {
@@ -74,6 +104,32 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       setSaving(false);
       return;
     }
+    let formaFinal: string | null = formaPagamento || null;
+    let obsExtra = "";
+    if (pagamentoMisto) {
+      const valid = pagamentos.filter((p) => p.forma && Number(p.valor || 0) > 0);
+      if (valid.length === 0) {
+        toast.error("Adicione ao menos uma forma de pagamento");
+        setSaving(false); return;
+      }
+      const total = valid.reduce((s, p) => s + Number(p.valor), 0);
+      if (Math.abs(total - valorNum) > 0.01) {
+        toast.error(`Soma das formas (${formatBRL(total)}) difere do valor (${formatBRL(valorNum)})`);
+        setSaving(false); return;
+      }
+      formaFinal = "misto";
+      obsExtra = "Pagamento misto: " + valid.map((p) => {
+        const base = `${FORMAS_LABEL[p.forma] ?? p.forma} ${formatBRL(Number(p.valor))}`;
+        if (p.forma === "dinheiro" && Number(p.valorRecebido || 0) > Number(p.valor)) {
+          const tr = Number(p.valorRecebido) - Number(p.valor);
+          return `${base} (recebido ${formatBRL(Number(p.valorRecebido))}, troco ${formatBRL(tr)})`;
+        }
+        return base;
+      }).join("; ");
+    } else if (formaPagamento === "dinheiro" && recebidoNum > 0) {
+      obsExtra = `Recebido ${formatBRL(recebidoNum)}, troco ${formatBRL(trocoDinheiro)}`;
+    }
+    const obsFinal = [observacoes.trim(), obsExtra].filter(Boolean).join(" | ") || null;
     const { error } = await supabase.from("fin_lancamentos").insert({
       clinica_id: clinicaAtual.clinica_id,
       tipo,
@@ -82,11 +138,11 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       data,
       categoria_id: categoriaId || null,
       conta_id: contaId || null,
-      forma_pagamento: formaPagamento || null,
+      forma_pagamento: formaFinal,
       bandeira_cartao: isCredito ? bandeiraCartao : null,
       parcelas: isCredito ? Number(parcelas) || 1 : null,
       emitir_nfse: emitirNfse,
-      observacoes: observacoes || null,
+      observacoes: obsFinal,
       status: "confirmado",
     });
     setSaving(false);
@@ -94,13 +150,15 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     toast.success(`${tipo === "receita" ? "Receita" : "Despesa"} registrada`);
     onSavedWithData?.({
       valor: Number(valor),
-      forma_pagamento: formaPagamento || null,
+      forma_pagamento: formaFinal,
       parcelas: isCredito ? (Number(parcelas) || 1) : null,
       bandeira_cartao: isCredito ? bandeiraCartao : null,
       emitir_nfse: emitirNfse,
     });
     setDescricao(""); setValor(""); setObservacoes(""); setCategoriaId(""); setContaId(""); setFormaPagamento("");
     setBandeiraCartao(""); setParcelas("1"); setEmitirNfse(false);
+    setValorRecebido(""); setPagamentoMisto(false);
+    setPagamentos([{ forma: "dinheiro", valor: "" }]);
     onSaved?.();
     onOpenChange(false);
   };
@@ -149,7 +207,15 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
             </div>
             <div className="space-y-1.5">
               <Label>Forma pgto</Label>
-              <Select value={formaPagamento} onValueChange={(v) => { setFormaPagamento(v); if (v !== "cartao_credito") { setBandeiraCartao(""); setParcelas("1"); } }}>
+              <Select
+                value={formaPagamento}
+                onValueChange={(v) => {
+                  setFormaPagamento(v);
+                  if (v !== "cartao_credito") { setBandeiraCartao(""); setParcelas("1"); }
+                  if (v !== "dinheiro") setValorRecebido("");
+                }}
+                disabled={pagamentoMisto}
+              >
                 <SelectTrigger><SelectValue placeholder="Forma" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="dinheiro">Dinheiro</SelectItem>
@@ -163,6 +229,118 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
               </Select>
             </div>
           </div>
+          {!pagamentoMisto && formaPagamento === "dinheiro" && (
+            <div className="grid grid-cols-2 gap-3 rounded-md border bg-muted/30 p-3">
+              <div className="space-y-1.5">
+                <Label>Valor recebido</Label>
+                <CurrencyInput value={valorRecebido} onChange={setValorRecebido} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Troco</Label>
+                <Input value={formatBRL(trocoDinheiro)} disabled readOnly className="font-medium" />
+              </div>
+              {recebidoNum > 0 && recebidoNum < valorNum && (
+                <p className="col-span-2 text-xs text-destructive">
+                  Valor recebido é menor que o total. Faltam {formatBRL(valorNum - recebidoNum)}.
+                </p>
+              )}
+            </div>
+          )}
+          <div className="flex items-center gap-2 rounded-md border p-3">
+            <Checkbox
+              id="pgto-misto"
+              checked={pagamentoMisto}
+              onCheckedChange={(v) => {
+                const on = !!v;
+                setPagamentoMisto(on);
+                if (on) {
+                  setFormaPagamento("");
+                  setBandeiraCartao(""); setParcelas("1"); setValorRecebido("");
+                }
+              }}
+            />
+            <Label htmlFor="pgto-misto" className="cursor-pointer">Dividir em mais de uma forma de pagamento</Label>
+          </div>
+          {pagamentoMisto && (
+            <div className="space-y-2 rounded-md border bg-muted/30 p-3">
+              {pagamentos.map((p, idx) => {
+                const sugerido = Math.max(0, valorNum - pagamentos.reduce((s, q, i) => i === idx ? s : s + Number(q.valor || 0), 0));
+                const recP = Number(p.valorRecebido || 0);
+                const valP = Number(p.valor || 0);
+                const trocoP = p.forma === "dinheiro" && recP > valP ? recP - valP : 0;
+                return (
+                  <div key={idx} className="space-y-2 rounded border bg-background p-2">
+                    <div className="grid grid-cols-[1fr_1fr_auto] gap-2 items-end">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Forma</Label>
+                        <Select
+                          value={p.forma}
+                          onValueChange={(v) => setPagamentos((xs) => xs.map((q, i) => i === idx ? { ...q, forma: v, valorRecebido: v === "dinheiro" ? q.valorRecebido : "" } : q))}
+                        >
+                          <SelectTrigger><SelectValue placeholder="Forma" /></SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(FORMAS_LABEL).map(([k, v]) => (
+                              <SelectItem key={k} value={k}>{v}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Valor</Label>
+                        <CurrencyInput
+                          value={p.valor}
+                          onChange={(v) => setPagamentos((xs) => xs.map((q, i) => i === idx ? { ...q, valor: v } : q))}
+                          placeholder={sugerido > 0 ? sugerido.toFixed(2) : "0,00"}
+                        />
+                      </div>
+                      <div className="flex gap-1">
+                        {sugerido > 0 && (
+                          <Button type="button" variant="outline" size="sm" onClick={() => setPagamentos((xs) => xs.map((q, i) => i === idx ? { ...q, valor: sugerido.toFixed(2) } : q))}>
+                            Restante
+                          </Button>
+                        )}
+                        {pagamentos.length > 1 && (
+                          <Button type="button" variant="ghost" size="sm" onClick={() => setPagamentos((xs) => xs.filter((_, i) => i !== idx))}>×</Button>
+                        )}
+                      </div>
+                    </div>
+                    {p.forma === "dinheiro" && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Recebido</Label>
+                          <CurrencyInput
+                            value={p.valorRecebido ?? ""}
+                            onChange={(v) => setPagamentos((xs) => xs.map((q, i) => i === idx ? { ...q, valorRecebido: v } : q))}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Troco</Label>
+                          <Input value={formatBRL(trocoP)} disabled readOnly />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setPagamentos((xs) => [...xs, { forma: "", valor: restanteMisto > 0 ? restanteMisto.toFixed(2) : "" }])}
+              >
+                + Adicionar forma
+              </Button>
+              <div className="flex justify-between text-sm pt-2 border-t">
+                <span>Total pago: <strong>{formatBRL(totalPagoMisto)}</strong></span>
+                <span className={restanteMisto > 0 ? "text-destructive font-medium" : "text-success font-medium"}>
+                  {restanteMisto > 0 ? `Falta: ${formatBRL(restanteMisto)}` : (totalPagoMisto > valorNum ? `Excedente: ${formatBRL(totalPagoMisto - valorNum)}` : "Quitado")}
+                </span>
+              </div>
+              {trocoMisto > 0 && (
+                <p className="text-xs text-muted-foreground">Troco total: {formatBRL(trocoMisto)}</p>
+              )}
+            </div>
+          )}
           {formaPagamento === "cartao_credito" && (
             <div className="grid grid-cols-2 gap-3 rounded-md border bg-muted/30 p-3">
               <div className="space-y-1.5">
