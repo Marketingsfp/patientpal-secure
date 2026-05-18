@@ -120,14 +120,20 @@ export async function printOrcamento(orcamentoId: string, clinicaId: string) {
       if (formas.length <= 1) {
         return `<div class="sm" style="margin-top:6px">PAGAMENTO: <span class="bold">${esc(o.forma_pagamento)}</span></div>`;
       }
-      const cols = formas.map((f: string) => `
+      const vals = (o.valores_pagamento ?? {}) as Record<string, number>;
+      const headerCols = formas.map((f: string) => `
         <td class="center bold" style="border:1px solid #000; padding:3px 2px; width:${(100 / formas.length).toFixed(2)}%">
           ${esc(f)}
         </td>`).join("");
+      const valueCols = formas.map((f: string) => {
+        const v = Number(vals[f] ?? 0);
+        return `<td class="center bold" style="border:1px solid #000; padding:3px 2px">${fmtBRL(v)}</td>`;
+      }).join("");
       return `
         <div class="sm bold" style="margin-top:6px">PAGAMENTO</div>
         <table style="margin-top:2px; border-collapse:collapse; width:100%">
-          <tr>${cols}</tr>
+          <tr>${headerCols}</tr>
+          <tr>${valueCols}</tr>
           <tr><td colspan="${formas.length}" class="right bold" style="border:1px solid #000; padding:3px 4px">TOTAL: ${fmtBRL(total)}</td></tr>
         </table>`;
     })() : ""}
