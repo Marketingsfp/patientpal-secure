@@ -364,9 +364,40 @@ function ClientesPage() {
     };
     const { error } = editing
       ? await supabase.from("pacientes").update(payload).eq("id", editing.id)
-      : await supabase.from("pacientes").insert(payload);
+      : await supabase.from("pacientes").insert(payload).select("id").single().then(r => ({ error: r.error, data: r.data })) as any;
+    if (error) { setSaving(false); toast.error(error.message); return; }
+
+    // Determina o id do paciente (novo ou existente) para upload de foto
+    let pacienteId = editing?.id as string | undefined;
+    if (!pacienteId) {
+      const { data: novo } = await supabase
+        .from("pacientes")
+        .select("id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("nome", payload.nome)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      pacienteId = novo?.id;
+    }
+
+    if (fotoFile && pacienteId) {
+      const ext = (fotoFile.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+      const path = `${clinicaAtual.clinica_id}/${pacienteId}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("pacientes-fotos")
+        .upload(path, fotoFile, { upsert: true, contentType: fotoFile.type || "image/jpeg" });
+      if (upErr) {
+        setSaving(false);
+        toast.error("Cliente salvo, mas a foto falhou: " + upErr.message);
+        setOpen(false); void load(); return;
+      }
+      await supabase.from("pacientes")
+        .update({ foto_url: path, foto_atualizado_em: new Date().toISOString() })
+        .eq("id", pacienteId);
+    }
+
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
     toast.success(editing ? "Cliente atualizado." : "Cliente cadastrado.");
     setOpen(false);
     void load();
