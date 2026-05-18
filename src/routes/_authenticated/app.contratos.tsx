@@ -280,7 +280,7 @@ function NovoContratoDialog({ open, onClose, planos, clinicaId, userId, onCreate
           </div>
           <div className="col-span-2"><Label>Observações</Label><Textarea rows={2} value={obs} onChange={(e) => setObs(e.target.value)}/></div>
         </div>
-        <DialogFooter>
+        <DialogFooter className="sticky bottom-0 bg-background border-t -mx-6 -mb-6 px-6 py-3 z-10">
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
           <Button onClick={salvar} disabled={saving || !titular || !plano}>Gerar contrato + {plano?.num_parcelas ?? 12} parcelas</Button>
         </DialogFooter>

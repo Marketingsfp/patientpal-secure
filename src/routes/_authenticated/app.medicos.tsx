@@ -580,7 +580,7 @@ function MedicosPage() {
                   </div>
                 </TabsContent>
               </Tabs>
-              <DialogFooter><Button type="submit" disabled={loading}>{loading ? "Salvando..." : "Salvar"}</Button></DialogFooter>
+              <DialogFooter className="sticky bottom-0 bg-background border-t -mx-6 -mb-6 px-6 py-3 z-10"><Button type="submit" disabled={loading}>{loading ? "Salvando..." : "Salvar"}</Button></DialogFooter>
             </form>
           </DialogContent>
           </Dialog>

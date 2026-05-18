@@ -828,7 +828,7 @@ function ProcedimentosPage() {
                 Aparece nas Informações rápidas e a Nina responde quando perguntarem sobre o preparo.
               </p>
             </div>
-            <DialogFooter>
+            <DialogFooter className="sticky bottom-0 bg-background border-t -mx-6 -mb-6 px-6 py-3 z-10">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
               <Button type="submit" disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
             </DialogFooter>
@@ -861,7 +861,7 @@ function ProcedimentosPage() {
               <Checkbox checked={formCartao.ativo} onCheckedChange={(v) => setFormCartao({ ...formCartao, ativo: !!v })} />
               Ativo
             </label>
-            <DialogFooter>
+            <DialogFooter className="sticky bottom-0 bg-background border-t -mx-6 -mb-6 px-6 py-3 z-10">
               <Button type="button" variant="outline" onClick={() => setOpenCartao(false)}>Cancelar</Button>
               <Button type="submit">Salvar</Button>
             </DialogFooter>
