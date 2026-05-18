@@ -192,11 +192,11 @@ export function AppShell() {
                   <Link
                     key={item.to}
                     to={item.to}
-                    className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors whitespace-nowrap ${
-                      active ? "bg-white/20 text-white" : "text-white/85 hover:bg-white/10 hover:text-white"
+                    className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
+                      active ? "bg-white/25 text-white" : "text-white hover:bg-white/10 hover:text-white"
                     }`}
                   >
-                    <item.icon className="h-3.5 w-3.5 shrink-0" />
+                    <item.icon className="h-4 w-4 shrink-0" />
                     {item.label}
                   </Link>
                 );
