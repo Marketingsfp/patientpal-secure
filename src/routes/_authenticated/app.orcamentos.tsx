@@ -370,19 +370,38 @@ function NovoOrcamentoDialog({
   const subtotal = itens.reduce((s, i) => s + Number(i.quantidade || 0) * Number(i.valor_unitario || 0), 0);
   const total = Math.max(0, subtotal - Number(desconto || 0));
 
+  // Total por forma de pagamento (calculado automaticamente a partir dos itens).
+  // Aplica o desconto proporcionalmente ao subtotal de cada forma.
+  const totaisPorForma = (() => {
+    const out: Record<string, number> = {};
+    if (formasPagamento.length === 0) return out;
+    const subtotalForma = (f: string) =>
+      itens.reduce((s, i) => {
+        const v = Number(i.valores_formas?.[f] ?? i.valor_unitario ?? 0);
+        return s + Number(i.quantidade || 0) * v;
+      }, 0);
+    const subs = formasPagamento.map((f) => ({ f, sub: subtotalForma(f) }));
+    const somaSub = subs.reduce((s, x) => s + x.sub, 0);
+    for (const { f, sub } of subs) {
+      const proporcional = somaSub > 0 ? (sub / somaSub) * total : total / formasPagamento.length;
+      out[f] = Math.round(proporcional * 100) / 100;
+    }
+    // ajusta arredondamento na última forma para bater com o total
+    const soma = Object.values(out).reduce((s, v) => s + v, 0);
+    const diff = Math.round((total - soma) * 100) / 100;
+    if (Math.abs(diff) >= 0.01 && formasPagamento.length > 0) {
+      const last = formasPagamento[formasPagamento.length - 1];
+      out[last] = Math.round((out[last] + diff) * 100) / 100;
+    }
+    return out;
+  })();
+
   const salvar = async () => {
     if (!pacienteNome.trim()) return toast.error("Informe o nome do paciente");
     if (itens.length === 0) return toast.error("Adicione ao menos um procedimento");
     if (formasPagamento.length === 0) return toast.error("Selecione ao menos uma forma de pagamento");
-    let valoresPag: Record<string, number> | null = null;
-    if (formasPagamento.length > 1) {
-      valoresPag = {};
-      for (const f of formasPagamento) valoresPag[f] = Math.round((Number(valoresPagamento[f]) || 0) * 100) / 100;
-      const soma = Object.values(valoresPag).reduce((s, v) => s + v, 0);
-      if (Math.abs(soma - total) > 0.01) {
-        return toast.error(`A soma das formas (${BRL(soma)}) deve ser igual ao total (${BRL(total)})`);
-      }
-    }
+    const valoresPag: Record<string, number> | null =
+      formasPagamento.length > 1 ? { ...totaisPorForma } : null;
     setSaving(true);
 
     const { data: orc, error } = await supabase
@@ -507,42 +526,8 @@ function NovoOrcamentoDialog({
               </div>
               {formasPagamento.length > 1 && (
                 <p className="text-xs text-muted-foreground">
-                  Os valores na tabela usam a 1ª forma selecionada (<b>{formasPagamento[0]}</b>).
+                  Cada item mostra o valor por forma; o total por forma é calculado automaticamente.
                 </p>
-              )}
-              {formasPagamento.length > 1 && (
-                <div className="mt-2 rounded-md border p-2 space-y-2">
-                  <div className="text-xs font-medium text-muted-foreground">Valor por forma (total: <b>{BRL(total)}</b>)</div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {formasPagamento.map((f) => (
-                      <div key={f} className="space-y-1">
-                        <Label className="text-xs">{f}</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min={0}
-                          value={valoresPagamento[f] ?? ""}
-                          placeholder="0,00"
-                          onChange={(e) =>
-                            setValoresPagamento((cur) => ({ ...cur, [f]: Number(e.target.value) || 0 }))
-                          }
-                        />
-                      </div>
-                    ))}
-                  </div>
-                  {(() => {
-                    const soma = formasPagamento.reduce((s, f) => s + (Number(valoresPagamento[f]) || 0), 0);
-                    const diff = Math.round((soma - total) * 100) / 100;
-                    if (Math.abs(diff) < 0.01) {
-                      return <div className="text-xs text-emerald-600">Soma confere com o total.</div>;
-                    }
-                    return (
-                      <div className="text-xs text-amber-600">
-                        Soma: {BRL(soma)} · {diff > 0 ? `Excede em ${BRL(diff)}` : `Faltam ${BRL(-diff)}`}
-                      </div>
-                    );
-                  })()}
-                </div>
               )}
             </div>
             <div className="space-y-1"><Label>Validade (dias)</Label><Input type="number" min={1} value={validade} onChange={(e) => setValidade(Number(e.target.value) || 30)} /></div>
@@ -612,19 +597,24 @@ function NovoOrcamentoDialog({
                     <tr key={idx} className="border-t">
                       <td className="px-2 py-1">
                         <Input value={it.descricao} onChange={(e) => setItens((a) => a.map((x, i) => i === idx ? { ...x, descricao: e.target.value } : x))} />
-                        {formasPagamento.length > 1 && it.valores_formas && (
-                          <div className="flex gap-3 mt-1 text-[11px] text-muted-foreground">
-                            {formasPagamento.map((f) => (
-                              <span key={f}>
-                                <b className="uppercase">{abreviar(f)}:</b> {BRL(Number(it.valores_formas?.[f] ?? 0))}
-                              </span>
-                            ))}
-                          </div>
-                        )}
                       </td>
                       <td className="px-2 py-1"><Input type="number" min={1} step="1" value={it.quantidade} onChange={(e) => setItens((a) => a.map((x, i) => i === idx ? { ...x, quantidade: Number(e.target.value) || 0 } : x))} /></td>
                       <td className="px-2 py-1"><Input type="number" step="0.01" value={it.valor_unitario} onChange={(e) => setItens((a) => a.map((x, i) => i === idx ? { ...x, valor_unitario: Number(e.target.value) || 0 } : x))} /></td>
-                      <td className="px-2 py-1 text-right font-medium">{BRL(it.quantidade * it.valor_unitario)}</td>
+                      <td className="px-2 py-1 text-right font-medium">
+                        {BRL(it.quantidade * it.valor_unitario)}
+                        {formasPagamento.length > 1 && (
+                          <div className="mt-1 text-[11px] font-normal text-muted-foreground space-y-0.5">
+                            {formasPagamento.map((f) => {
+                              const v = Number(it.valores_formas?.[f] ?? it.valor_unitario ?? 0);
+                              return (
+                                <div key={f}>
+                                  <b className="uppercase">{abreviar(f)}:</b> {BRL(it.quantidade * v)}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </td>
                       <td className="px-2 py-1"><Button size="sm" variant="ghost" onClick={() => setItens((a) => a.filter((_, i) => i !== idx))}><Trash2 className="h-3 w-3 text-destructive" /></Button></td>
                     </tr>
                   ))}
@@ -642,6 +632,16 @@ function NovoOrcamentoDialog({
                 <Input type="number" step="0.01" className="w-32 text-right" value={desconto} onChange={(e) => setDesconto(Number(e.target.value) || 0)} />
               </div>
               <div className="flex justify-between text-lg font-bold border-t pt-2"><span>Total</span><span className="text-primary">{BRL(total)}</span></div>
+              {formasPagamento.length > 1 && (
+                <div className="space-y-1 border-t pt-2">
+                  {formasPagamento.map((f) => (
+                    <div key={f} className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Total {abreviar(f)}</span>
+                      <span className="font-semibold">{BRL(totaisPorForma[f] ?? 0)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
