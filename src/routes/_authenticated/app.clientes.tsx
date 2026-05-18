@@ -362,22 +362,14 @@ function ClientesPage() {
       responsavel_parentesco: form.responsavel_parentesco.trim() || null,
       clinica_id: clinicaAtual.clinica_id,
     };
-    const { error } = editing
-      ? await supabase.from("pacientes").update(payload).eq("id", editing.id)
-      : await supabase.from("pacientes").insert(payload).select("id").single().then(r => ({ error: r.error, data: r.data })) as any;
-    if (error) { setSaving(false); toast.error(error.message); return; }
-
-    // Determina o id do paciente (novo ou existente) para upload de foto
-    let pacienteId = editing?.id as string | undefined;
-    if (!pacienteId) {
-      const { data: novo } = await supabase
-        .from("pacientes")
-        .select("id")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("nome", payload.nome)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+    let pacienteId: string | undefined = editing?.id;
+    if (editing) {
+      const { error } = await supabase.from("pacientes").update(payload).eq("id", editing.id);
+      if (error) { setSaving(false); toast.error(error.message); return; }
+    } else {
+      const { data: novo, error } = await supabase
+        .from("pacientes").insert(payload).select("id").single();
+      if (error) { setSaving(false); toast.error(error.message); return; }
       pacienteId = novo?.id;
     }
 
