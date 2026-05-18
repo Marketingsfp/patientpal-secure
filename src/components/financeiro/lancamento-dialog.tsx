@@ -30,9 +30,10 @@ interface Props {
   onSavedWithData?: (data: LancamentoSavedData) => void;
   initialDescricao?: string;
   initialValor?: string;
+  agendamentoId?: string | null;
 }
 
-export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWithData, initialDescricao, initialValor }: Props) {
+export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWithData, initialDescricao, initialValor, agendamentoId }: Props) {
   const { clinicaAtual } = useClinica();
   const [descricao, setDescricao] = useState("");
   const [valor, setValor] = useState("");
@@ -164,6 +165,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       emitir_nfse: emitirNfse,
       observacoes: obsFinal,
       status: "confirmado",
+      agendamento_id: agendamentoId ?? null,
     });
     setSaving(false);
     if (error) { toast.error(error.message); return; }
