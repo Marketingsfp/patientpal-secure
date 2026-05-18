@@ -258,7 +258,13 @@ function AgendaPage() {
     return items.filter((a) => {
       if (!mostrarLivres && normalizar(a.paciente_nome) === "disponivel") return false;
       if (filtroMedico !== "todos" && a.medico_id !== filtroMedico) return false;
-      if (filtroStatus !== "todos" && a.status !== filtroStatus) return false;
+      const ehLivre = normalizar(a.paciente_nome) === "disponivel";
+      if (filtroStatus === "livres") {
+        if (!ehLivre) return false;
+      } else if (filtroStatus !== "todos") {
+        if (ehLivre) return false;
+        if (a.status !== filtroStatus) return false;
+      }
       if (filtroCliente && !normalizar(a.paciente_nome).includes(normalizar(filtroCliente))) return false;
       if (filtroFicha) {
         const f = fichaPorId.get(a.id) ?? "";
@@ -829,6 +835,7 @@ function AgendaPage() {
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">TODOS</SelectItem>
+                <SelectItem value="livres">Livres</SelectItem>
                 {(Object.keys(STATUS_LABEL) as Status[]).map(s => (
                   <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>
                 ))}
