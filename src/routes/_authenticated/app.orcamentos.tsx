@@ -27,6 +27,7 @@ type Orc = {
   medico_nome: string | null;
   forma_pagamento: string | null;
   valor_total: number;
+  valores_pagamento: Record<string, number> | null;
   status: string;
   created_at: string;
 };
@@ -85,7 +86,7 @@ function OrcamentosPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from("orcamentos")
-      .select("id, numero, paciente_nome, paciente_telefone, medico_nome, forma_pagamento, valor_total, status, created_at")
+      .select("id, numero, paciente_nome, paciente_telefone, medico_nome, forma_pagamento, valor_total, valores_pagamento, status, created_at")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("created_at", { ascending: false })
       .limit(200);
@@ -163,7 +164,18 @@ function OrcamentosPage() {
                 <td className="px-3 py-2 font-medium">{o.paciente_nome}</td>
                 <td className="px-3 py-2 text-muted-foreground">{o.medico_nome ?? "—"}</td>
                 <td className="px-3 py-2 text-muted-foreground">{o.forma_pagamento ?? "—"}</td>
-                <td className="px-3 py-2 text-right font-semibold">{BRL(Number(o.valor_total))}</td>
+                <td className="px-3 py-2 text-right font-semibold">
+                  {BRL(Number(o.valor_total))}
+                  {o.valores_pagamento && Object.keys(o.valores_pagamento).length > 1 && (
+                    <div className="mt-1 text-[11px] font-normal text-muted-foreground space-y-0.5">
+                      {Object.entries(o.valores_pagamento).map(([f, v]) => (
+                        <div key={f}>
+                          <span className="uppercase">{f.replace("Cartão de ", "")}:</span> {BRL(Number(v))}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </td>
                 <td className="px-3 py-2">
                   <div className="flex justify-end gap-1">
                     <Button size="sm" variant="ghost" onClick={() => imprimir(o.id)} title="Imprimir"><Printer className="h-4 w-4" /></Button>
