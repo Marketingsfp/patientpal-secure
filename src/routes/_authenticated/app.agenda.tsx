@@ -338,13 +338,13 @@ function AgendaPage() {
 
   const cobrarAgendamento = async (a: Agendamento) => {
     if (!clinicaAtual) return;
-    const nome = (a.procedimento ?? "CONSULTA").trim().toUpperCase();
-    const { data: proc } = await supabase
+    const nomeBusca = normalizar((a.procedimento ?? "CONSULTA").trim());
+    const { data: lista } = await supabase
       .from("procedimentos")
-      .select("valor_dinheiro,valor_padrao")
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .ilike("nome", nome)
-      .maybeSingle();
+      .select("nome,valor_dinheiro,valor_padrao")
+      .eq("clinica_id", clinicaAtual.clinica_id);
+    const proc = (lista ?? []).find((p) => normalizar(p.nome ?? "") === nomeBusca)
+      ?? (lista ?? []).find((p) => normalizar(p.nome ?? "").includes(nomeBusca));
     const valor = Number(proc?.valor_dinheiro ?? proc?.valor_padrao ?? 0);
     setPagamentoDesc(`${a.paciente_nome} — ${a.procedimento ?? "CONSULTA"}`);
     setPagamentoValor(valor > 0 ? valor.toFixed(2) : "");
