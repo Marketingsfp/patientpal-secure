@@ -62,6 +62,13 @@ type PacienteOpt = {
   telefone: string | null;
 };
 
+type MedicoOpt = {
+  id: string;
+  nome: string;
+  crm: string | null;
+  crm_uf: string | null;
+};
+
 const FORMAS = ["Dinheiro", "PIX", "Cartão de Crédito", "Cartão de Débito", "Boleto", "Outro"];
 const BRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -202,6 +209,10 @@ function NovoOrcamentoDialog({
   const [medicoNome, setMedicoNome] = useState("");
   const [pacienteId, setPacienteId] = useState<string>("");
   const [pacientes, setPacientes] = useState<PacienteOpt[]>([]);
+  const [medicoId, setMedicoId] = useState<string>("");
+  const [medicoExterno, setMedicoExterno] = useState(false);
+  const [clinicaSolicitante, setClinicaSolicitante] = useState("");
+  const [medicos, setMedicos] = useState<MedicoOpt[]>([]);
   const [formasPagamento, setFormasPagamento] = useState<string[]>(["Dinheiro"]);
   const [desconto, setDesconto] = useState(0);
   const [validade, setValidade] = useState(30);
@@ -226,6 +237,18 @@ function NovoOrcamentoDialog({
     })();
   }, [clinicaId]);
 
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from("medicos")
+        .select("id,nome,crm,crm_uf")
+        .eq("clinica_id", clinicaId)
+        .order("nome")
+        .limit(500);
+      setMedicos((data ?? []) as MedicoOpt[]);
+    })();
+  }, [clinicaId]);
+
   const pacienteOptions = useMemo(
     () =>
       pacientes.map((p) => ({
@@ -240,6 +263,32 @@ function NovoOrcamentoDialog({
       })),
     [pacientes],
   );
+
+  const medicoOptions = useMemo(
+    () =>
+      medicos.map((m) => ({
+        value: m.id,
+        label: [m.nome, m.crm ? `CRM ${m.crm}${m.crm_uf ? `/${m.crm_uf}` : ""}` : null]
+          .filter(Boolean)
+          .join(" · "),
+      })),
+    [medicos],
+  );
+
+  const selecionarMedico = (id: string) => {
+    setMedicoId(id);
+    const m = medicos.find((x) => x.id === id);
+    if (m) setMedicoNome(m.nome ?? "");
+  };
+
+  const alternarMedicoExterno = (externo: boolean) => {
+    setMedicoExterno(externo);
+    if (externo) {
+      setMedicoId("");
+    } else {
+      setClinicaSolicitante("");
+    }
+  };
 
   const selecionarPaciente = (id: string) => {
     setPacienteId(id);
@@ -334,6 +383,8 @@ function NovoOrcamentoDialog({
         paciente_telefone: pacienteTelefone.trim() || null,
         paciente_cpf: pacienteCpf.trim() || null,
         medico_nome: medicoNome.trim() || null,
+        medico_externo: medicoExterno,
+        clinica_solicitante: medicoExterno ? (clinicaSolicitante.trim() || null) : null,
         forma_pagamento: formasPagamento.join(" + "),
         validade_dias: validade,
         desconto: Number(desconto) || 0,
@@ -385,7 +436,46 @@ function NovoOrcamentoDialog({
             <div className="space-y-1"><Label>Paciente *</Label><Input value={pacienteNome} onChange={(e) => setPacienteNome(e.target.value)} /></div>
             <div className="space-y-1"><Label>Telefone</Label><Input value={pacienteTelefone} onChange={(e) => setPacienteTelefone(e.target.value)} /></div>
             <div className="space-y-1"><Label>CPF</Label><Input value={pacienteCpf} onChange={(e) => setPacienteCpf(e.target.value)} /></div>
-            <div className="space-y-1"><Label>Médico/Profissional</Label><Input value={medicoNome} onChange={(e) => setMedicoNome(e.target.value)} /></div>
+            <div className="space-y-1 md:col-span-2">
+              <Label>Médico solicitante</Label>
+              <div className="flex gap-1 rounded-md border p-1 w-fit">
+                <button
+                  type="button"
+                  onClick={() => alternarMedicoExterno(false)}
+                  className={`px-3 py-1 text-sm rounded ${!medicoExterno ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                >
+                  Da nossa clínica
+                </button>
+                <button
+                  type="button"
+                  onClick={() => alternarMedicoExterno(true)}
+                  className={`px-3 py-1 text-sm rounded ${medicoExterno ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                >
+                  De outro local
+                </button>
+              </div>
+              {!medicoExterno ? (
+                <SearchableSelect
+                  options={medicoOptions}
+                  value={medicoId}
+                  onChange={selecionarMedico}
+                  placeholder="Selecione o médico..."
+                  searchPlaceholder="Buscar por nome ou CRM..."
+                  emptyText="Nenhum médico cadastrado."
+                />
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Nome do médico</Label>
+                    <Input value={medicoNome} onChange={(e) => setMedicoNome(e.target.value)} placeholder="Dr(a). ..." />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Clínica solicitante *</Label>
+                    <Input value={clinicaSolicitante} onChange={(e) => setClinicaSolicitante(e.target.value)} placeholder="Nome da clínica/local de origem" />
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="space-y-1 md:col-span-2">
               <Label>Formas de pagamento <span className="text-xs text-muted-foreground font-normal">(selecione até 2)</span></Label>
               <div className="flex flex-wrap gap-2 rounded-md border p-2">
