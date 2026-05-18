@@ -31,9 +31,10 @@ interface Props {
   initialDescricao?: string;
   initialValor?: string;
   agendamentoId?: string | null;
+  initialFormaPagamento?: string;
 }
 
-export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWithData, initialDescricao, initialValor, agendamentoId }: Props) {
+export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWithData, initialDescricao, initialValor, agendamentoId, initialFormaPagamento }: Props) {
   const { clinicaAtual } = useClinica();
   const [descricao, setDescricao] = useState("");
   const [valor, setValor] = useState("");
@@ -58,6 +59,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     if (!open || !clinicaAtual) return;
     if (initialDescricao !== undefined) setDescricao(initialDescricao);
     if (initialValor !== undefined) setValor(initialValor);
+    if (initialFormaPagamento !== undefined) setFormaPagamento(initialFormaPagamento);
     (async () => {
       const [{ data: cats }, { data: cs }] = await Promise.all([
         supabase.from("fin_categorias").select("id, nome").eq("clinica_id", clinicaAtual.clinica_id).eq("tipo", tipo).eq("ativo", true).order("nome"),
