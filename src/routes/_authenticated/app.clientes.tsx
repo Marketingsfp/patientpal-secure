@@ -618,7 +618,7 @@ function ClientesPage() {
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="dados" className="space-y-4 pt-4">
+              <TabsContent value="dados" className="space-y-4 pt-4 pb-16">
                 <div className="flex items-center gap-4">
                   <div className="relative h-20 w-20 rounded-full overflow-hidden border bg-muted flex items-center justify-center shrink-0">
                     {fotoPreview ? (
@@ -702,7 +702,7 @@ function ClientesPage() {
                 </label>
               </TabsContent>
 
-              <TabsContent value="endereco" className="space-y-4 pt-4">
+              <TabsContent value="endereco" className="space-y-4 pt-4 pb-16">
                 <div className="space-y-1">
                   <Label className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> CEP</Label>
                   <div className="flex gap-2">
@@ -750,7 +750,7 @@ function ClientesPage() {
                 </div>
               </TabsContent>
 
-              <TabsContent value="responsavel" className="space-y-4 pt-4">
+              <TabsContent value="responsavel" className="space-y-4 pt-4 pb-16">
                 <p className="text-sm text-muted-foreground">
                   Para menores de idade ou pacientes que precisam de acompanhante.
                 </p>
