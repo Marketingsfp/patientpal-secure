@@ -61,7 +61,11 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         supabase.from("fin_categorias").select("id, nome").eq("clinica_id", clinicaAtual.clinica_id).eq("tipo", tipo).eq("ativo", true).order("nome"),
         supabase.from("fin_contas").select("id, nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       ]);
-      setCategorias(cats ?? []);
+      const lista = cats ?? [];
+      setCategorias(lista);
+      const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+      const particular = lista.find((c) => norm(c.nome) === "particular");
+      if (particular) setCategoriaId((cur) => cur || particular.id);
       setContas(cs ?? []);
     })();
   }, [open, clinicaAtual, tipo]);
@@ -179,7 +183,15 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Valor *</Label>
-              <CurrencyInput value={valor} onChange={setValor} />
+              <CurrencyInput
+                value={valor}
+                onChange={setValor}
+                disabled={!!initialValor}
+                readOnly={!!initialValor}
+              />
+              {!!initialValor && (
+                <p className="text-xs text-muted-foreground">Definido pelo procedimento</p>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label>Data</Label>

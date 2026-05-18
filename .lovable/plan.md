@@ -1,14 +1,31 @@
-## Diagnóstico
+## Objetivo
 
-Os horários **não foram perdidos** — estão no banco (109 disponibilidades na clínica atual, ex.: Dr. ALEX LOUZA com 4 horários, Dr. CARLOS ALBERTO com 3, etc.).
+Na tela **Nova Receita** (aberta após confirmar atendimento na Agenda), ajustar dois pontos no diálogo `src/components/financeiro/lancamento-dialog.tsx`:
 
-O que está acontecendo: a tela de Horários médicos faz um `SELECT` pedindo a coluna `limite_pacientes`, **mas essa coluna não existe na tabela** `medico_disponibilidades`. O Supabase devolve erro, o código ignora o erro e mostra `0 horário(s)` para todos os médicos.
+1. **Valor não editável** quando vier preenchido automaticamente pelo procedimento.
+2. **Categoria padrão "Particular"** já pré-selecionada (atendente pode trocar).
 
-A coluna `limite_pacientes` foi referenciada no código (no formulário "Pacientes/dia" e na geração de agenda) mas a migração que cria a coluna nunca foi aplicada.
+## Mudanças
 
-## Correção
+### 1. Travar o campo Valor quando vier do procedimento
 
-1. **Criar migração** adicionando `limite_pacientes integer` (nullable, sem default) à tabela `public.medico_disponibilidades`.
-2. Depois disso, a página `/app/disponibilidades` volta a listar todos os horários já cadastrados, e o campo "Pacientes/dia" passa a salvar normalmente.
+- O diálogo já recebe `initialValor` quando aberto pelo fluxo da Agenda (`app.agenda.tsx` linha 675). Quando lançado manualmente em Financeiro › Movimento, esse prop não é passado.
+- Tratar `initialValor` como sinal de "valor vem do sistema":
+  - Renderizar `<CurrencyInput value={valor} disabled readOnly />` quando `initialValor` estiver definido e não vazio.
+  - Manter editável quando `initialValor` for `undefined`/vazio (caso de lançamento manual em outros pontos do app).
+- Adicionar um texto auxiliar discreto abaixo do campo: "Definido pelo procedimento" quando travado.
 
-Nenhuma outra mudança de código é necessária — o problema é só a coluna faltando no banco.
+### 2. Categoria padrão "Particular"
+
+- Após o `useEffect` carregar `categorias` da clínica, se ainda não houver `categoriaId` selecionado, procurar uma categoria cujo `nome` (normalizado, sem acento, lowercase) seja `"particular"` e setá-la como padrão.
+- Se a categoria não existir na base, não falhar — apenas deixar vazio (placeholder atual).
+- A atendente continua livre para trocar pelo `<Select>` existente.
+
+## Arquivos afetados
+
+- `src/components/financeiro/lancamento-dialog.tsx` — única alteração.
+
+## Fora do escopo
+
+- Não alterar `app.agenda.tsx`, fluxo de pagamento misto, troco, NFS-e, nem o lançamento manual de receitas/despesas em Financeiro › Movimento.
+- Não criar/seedar a categoria "Particular" no banco — apenas pré-selecionar se já existir.
