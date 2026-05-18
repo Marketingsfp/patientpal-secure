@@ -341,6 +341,7 @@ function NovoOrcamentoDialog({
       }
       return [...cur, f];
     });
+    setValoresPagamento({});
   };
 
   const adicionarProc = (p: Procedimento) => {
