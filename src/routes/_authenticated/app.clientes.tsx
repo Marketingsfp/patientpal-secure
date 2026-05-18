@@ -679,27 +679,27 @@ function ClientesPage() {
                   <Label>E-mail <span className="text-xs text-muted-foreground">(usado em nota fiscal)</span></Label>
                   <InputVoz {...fieldProps("email")} type="email" />
                 </div>
-                <div className="grid grid-cols-2 gap-3 items-end">
+                <div className="grid grid-cols-[1fr_auto] gap-3 items-end">
                   <div className="space-y-1">
                     <Label>Data de nascimento</Label>
                     <Input type="date" value={form.data_nascimento}
                       onChange={(e) => setForm({ ...form, data_nascimento: e.target.value })} />
                   </div>
-                  {idade !== null && (
-                    <div className="text-sm text-muted-foreground pb-2">
-                      Idade: <span className="font-medium text-foreground">{idade} anos</span>
-                      {sugerirResponsavel && (
-                        <span className="block text-xs text-amber-600 dark:text-amber-400">
-                          Recomendado cadastrar responsável.
-                        </span>
-                      )}
-                    </div>
-                  )}
+                  <label className="flex items-center gap-2 text-sm cursor-pointer pb-2 whitespace-nowrap">
+                    <Checkbox checked={form.ativo} onCheckedChange={(v) => setForm({ ...form, ativo: !!v })} />
+                    Cliente ativo
+                  </label>
                 </div>
-                <label className="flex items-center gap-2 text-sm cursor-pointer">
-                  <Checkbox checked={form.ativo} onCheckedChange={(v) => setForm({ ...form, ativo: !!v })} />
-                  Cliente ativo
-                </label>
+                {idade !== null && (
+                  <div className="text-sm text-muted-foreground">
+                    Idade: <span className="font-medium text-foreground">{idade} anos</span>
+                    {sugerirResponsavel && (
+                      <span className="block text-xs text-amber-600 dark:text-amber-400">
+                        Recomendado cadastrar responsável.
+                      </span>
+                    )}
+                  </div>
+                )}
               </TabsContent>
 
               <TabsContent value="endereco" className="space-y-4 pt-4">
