@@ -205,7 +205,15 @@ function AgendaPage() {
 
   const fichaPorId = useMemo(() => {
     const m = new Map<string, string>();
-    items.forEach((a, i) => m.set(a.id, String(i + 1).padStart(3, "0")));
+    // Numeração sequencial por dia (reinicia a cada data) na ordem do horário
+    const contadores = new Map<string, number>();
+    const ordenados = [...items].sort((a, b) => a.inicio.localeCompare(b.inicio));
+    ordenados.forEach((a) => {
+      const dia = a.inicio.slice(0, 10);
+      const n = (contadores.get(dia) ?? 0) + 1;
+      contadores.set(dia, n);
+      m.set(a.id, String(n).padStart(3, "0"));
+    });
     return m;
   }, [items]);
 
@@ -293,6 +301,20 @@ function AgendaPage() {
     setForm({ ...EMPTY, inicio: toLocalInput(base.toISOString()), fim: toLocalInput(end.toISOString()) });
     setOpen(true);
   };
+  const openSlot = (a: Agendamento) => {
+    setEditing(a);
+    setForm({
+      paciente_nome: "",
+      paciente_id: "",
+      medico_id: a.medico_id ?? "",
+      inicio: toLocalInput(a.inicio), fim: toLocalInput(a.fim),
+      procedimento: a.procedimento ?? "CONSULTA",
+      status: "agendado",
+      observacoes: a.observacoes ?? "",
+    });
+    setOpen(true);
+  };
+
   const openEdit = (a: Agendamento) => {
     setEditing(a);
     setForm({
@@ -825,10 +847,23 @@ function AgendaPage() {
                   </TableCell>
                   <TableCell className="truncate max-w-[200px]">{medicoNome(a.medico_id)}</TableCell>
                    <TableCell className="truncate max-w-[220px] uppercase">
-                     <span className="inline-flex items-center gap-1">
-                      {a.status === "confirmado" && <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />}
-                      {a.paciente_nome}
-                    </span>
+                     {normalizar(a.paciente_nome) === "disponivel" ? (
+                       <Button
+                         variant="ghost"
+                         size="sm"
+                         onClick={() => openSlot(a)}
+                         title="Agendar paciente neste horário"
+                         className="h-7 px-2 text-muted-foreground hover:text-primary"
+                       >
+                         <UserPlus className="h-4 w-4 mr-1" />
+                         Agendar
+                       </Button>
+                     ) : (
+                       <span className="inline-flex items-center gap-1">
+                         {a.status === "confirmado" && <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />}
+                         {a.paciente_nome}
+                       </span>
+                     )}
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="text-xs">{a.procedimento || "CONSULTA"}</Badge>
