@@ -188,7 +188,7 @@ function NovoContratoDialog({ open, onClose, planos, clinicaId, userId, onCreate
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[95vh] overflow-y-auto">
         <DialogHeader><DialogTitle>Novo contrato</DialogTitle></DialogHeader>
         <div className="grid grid-cols-2 gap-3">
           <div className="col-span-2"><Label>Plano</Label>
@@ -344,7 +344,7 @@ function DetalheContrato({ contrato, onClose }: { contrato: Contrato; onClose: (
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto">
         <DialogHeader><DialogTitle>Contrato #{contrato.numero} — {contrato.paciente_nome}</DialogTitle></DialogHeader>
         <div className="grid grid-cols-3 gap-3 text-sm">
           <div className="rounded-md border p-3"><div className="text-muted-foreground text-xs">Pagas</div><div className="font-bold text-lg">{pagas}/{mens.length}</div></div>

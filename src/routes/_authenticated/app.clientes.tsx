@@ -598,7 +598,7 @@ function ClientesPage() {
       </div>
 
       <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) stopVoice(); }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[95vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? "Editar cliente" : "Novo cliente"}</DialogTitle>
             <DialogDescription>

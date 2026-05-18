@@ -736,7 +736,7 @@ function ProcedimentosPage() {
 
       {/* ============ DIALOG PROCEDIMENTO ============ */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[95vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? "Editar procedimento" : "Novo procedimento"}</DialogTitle>
             <DialogDescription>Preencha valores para cada forma de pagamento.</DialogDescription>

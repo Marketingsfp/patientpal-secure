@@ -296,7 +296,7 @@ function MedicosPage() {
             <DialogTrigger asChild>
               <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" /> Novo médico</Button>
             </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-2xl max-h-[95vh] overflow-y-auto">
             <DialogHeader><DialogTitle>{editId ? "Editar médico" : "Novo médico"}</DialogTitle></DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <Tabs defaultValue="dados">

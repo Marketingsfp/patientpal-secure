@@ -315,7 +315,7 @@ function NovoOrcamentoDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[95vh] overflow-y-auto">
         <DialogHeader><DialogTitle>Novo orçamento</DialogTitle></DialogHeader>
 
         <div className="space-y-4">
