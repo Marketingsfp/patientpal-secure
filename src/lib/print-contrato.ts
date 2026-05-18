@@ -60,8 +60,14 @@ export async function printContrato(contratoId: string) {
     DEPENDENTES: dependentes || "(nenhum)",
   });
 
-  const assinatura = (c as any).assinatura_svg
-    ? `<img src="${(c as any).assinatura_svg}" style="height:80px;max-width:300px"/>`
+  const rawSig = (c as any).assinatura_svg as string | null | undefined;
+  // Apenas aceitamos data URLs de imagem PNG/JPEG (base64). Qualquer outra coisa é descartada
+  // para evitar XSS no preview de impressão (origem compartilhada com o app).
+  const sigOk = typeof rawSig === "string"
+    && /^data:image\/(png|jpe?g);base64,[A-Za-z0-9+/=]+$/.test(rawSig)
+    && rawSig.length < 2_000_000;
+  const assinatura = sigOk
+    ? `<img src="${esc(rawSig!)}" style="height:80px;max-width:300px" alt="assinatura"/>`
     : `<div style="height:80px;border-bottom:1px solid #000;width:300px"></div>`;
 
   const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/>
