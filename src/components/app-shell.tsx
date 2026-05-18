@@ -128,9 +128,9 @@ export function AppShell() {
   }
 
   return (
-    <div className="min-h-screen flex bg-muted/30">
+    <div className="min-h-screen flex bg-muted/30 items-start">
       <aside
-        className={`${collapsed ? "w-14" : "w-64"} text-white flex flex-col shrink-0 transition-[width] duration-200`}
+        className={`${collapsed ? "w-14" : "w-64"} text-white flex flex-col shrink-0 self-start sticky top-0 max-h-screen transition-[width] duration-200`}
         style={{
           backgroundColor: clinicaAtual ? corDaClinica(clinicaAtual.clinica.nome) : undefined,
           ["--nav-hover" as never]: clinicaAtual ? corHoverDaClinica(clinicaAtual.clinica.nome) : "rgba(0,0,0,0.25)",
@@ -142,7 +142,7 @@ export function AppShell() {
           </span>
           {!collapsed && <span className="text-lg font-semibold tracking-tight">ClinicaOS</span>}
         </div>
-        <nav className="flex-1 p-3 space-y-1 font-sans">
+        <nav className="p-3 space-y-1 font-sans overflow-y-auto min-h-0">
           {nav.map((item) => {
             const active = location.pathname === item.to ||
               (item.to !== "/app" && location.pathname.startsWith(item.to));
@@ -163,7 +163,15 @@ export function AppShell() {
             );
           })}
         </nav>
-        <div className="p-3 border-t border-sidebar-border">
+        <div className="p-3 border-t border-white/20 mt-auto">
+          <Button
+            variant="ghost"
+            title={collapsed ? "Expandir menu" : "Recolher menu"}
+            className={`w-full mb-1 ${collapsed ? "justify-center px-0" : "justify-start"} text-white hover:bg-[var(--nav-hover)] hover:text-white`}
+            onClick={toggleCollapsed}
+          >
+            {collapsed ? <PanelLeftOpen className={`h-4 w-4`} /> : <><PanelLeftClose className="h-4 w-4 mr-2" /> Recolher</>}
+          </Button>
           {!collapsed && (
             <div className="px-3 py-2 text-xs text-white/70 truncate">{user?.email}</div>
           )}
