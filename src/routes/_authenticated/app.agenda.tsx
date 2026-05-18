@@ -85,7 +85,8 @@ function AgendaPage() {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
   const [dataRef, setDataRef] = useState(() => new Date().toISOString().slice(0, 10));
-  const [apenasData, setApenasData] = useState(true);
+  const [apenasData, setApenasData] = useState(false);
+  const [mostrarLivres, setMostrarLivres] = useState(false);
   const [filtroMedico, setFiltroMedico] = useState<string>("todos");
   const [filtroEspecialidade, setFiltroEspecialidade] = useState<string>("todos");
   const [filtroDiaSemana, setFiltroDiaSemana] = useState<string>("todos");
@@ -199,6 +200,7 @@ function AgendaPage() {
 
   const filtrados = useMemo(() => {
     return items.filter((a) => {
+      if (!mostrarLivres && normalizar(a.paciente_nome) === "disponivel") return false;
       if (filtroMedico !== "todos" && a.medico_id !== filtroMedico) return false;
       if (filtroStatus !== "todos" && a.status !== filtroStatus) return false;
       if (filtroCliente && !normalizar(a.paciente_nome).includes(normalizar(filtroCliente))) return false;
