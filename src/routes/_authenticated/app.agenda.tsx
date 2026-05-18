@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -25,7 +25,7 @@ import {
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import {
   CalendarDays, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X,
-  MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus,
+  MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, Clock,
 } from "lucide-react";
 import { printGuiaAtendimento } from "@/lib/print-gr";
 import { VoiceInput } from "@/components/voice-input";
@@ -365,6 +365,11 @@ function AgendaPage() {
           <p className="text-sm text-muted-foreground">Filtre e gerencie os agendamentos da clínica.</p>
         </div>
         <div className="flex gap-2">
+          <Button asChild variant="outline" title="Cadastrar horários semanais e gerar slots da agenda">
+            <Link to="/app/disponibilidades">
+              <Clock className="h-4 w-4 mr-2" /> Criar/gerar horários
+            </Link>
+          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" disabled={selecionados.size === 0}>
