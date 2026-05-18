@@ -720,6 +720,7 @@ function AgendaPage() {
         tipo="receita"
         initialDescricao={pagamentoDesc}
         initialValor={pagamentoValor}
+        initialFormaPagamento={pagamentoForma}
         agendamentoId={pagamentoAgId}
         onSavedWithData={async (dados) => {
           if (!pagamentoAgId || !clinicaAtual) return;
