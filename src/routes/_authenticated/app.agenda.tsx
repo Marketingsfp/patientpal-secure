@@ -714,6 +714,30 @@ function AgendaPage() {
         </div>
       </div>
 
+      <Dialog open={formaPagOpen} onOpenChange={setFormaPagOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Forma de pagamento</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground -mt-2">{formaPagCtx?.desc}</p>
+          <div className="grid gap-2 mt-2">
+            {formaPagOpcoes.map((op) => (
+              <Button
+                key={op.forma}
+                variant="outline"
+                className="justify-between h-12"
+                onClick={() => escolherForma(op)}
+              >
+                <span>{op.label}</span>
+                <span className="font-semibold">
+                  {op.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                </span>
+              </Button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <LancamentoDialog
         open={pagamentoOpen}
         onOpenChange={(v) => { setPagamentoOpen(v); if (!v) setPagamentoAgId(null); }}
