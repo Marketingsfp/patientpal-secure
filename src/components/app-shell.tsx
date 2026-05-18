@@ -134,20 +134,13 @@ export function AppShell() {
   return (
     <div className="min-h-screen flex flex-col bg-muted/30">
       <header
-        className="sticky top-0 z-30 text-white shadow-md"
-        style={{ backgroundColor: clinicaAtual ? corDaClinica(clinicaAtual.clinica.nome) : "#1e3a8a" }}
+        className="text-white sticky top-0 z-30 shadow-sm bg-slate-800"
+        style={{ backgroundColor: clinicaAtual ? corDaClinica(clinicaAtual.clinica.nome) : undefined }}
       >
-
-        {/* topo: logo, clínica, voz, sair */}
-        <div className="flex items-center justify-between gap-3 px-5 py-2.5 text-white">
-          <Link to="/app" className="flex items-center gap-2.5 min-w-0">
-            <span
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-white shrink-0"
-              style={{ backgroundColor: clinicaAtual ? corDaClinica(clinicaAtual.clinica.nome) : "hsl(var(--muted-foreground))" }}
-            >
-              <Activity className="h-5 w-5" />
-            </span>
-            <span className="text-base font-semibold tracking-tight hidden sm:inline text-white">ClinicaOS</span>
+        <div className="flex items-center justify-between gap-3 px-4 py-2">
+          <Link to="/app" className="flex items-center gap-2 min-w-0">
+            <Activity className="h-5 w-5 shrink-0" />
+            <span className="font-semibold tracking-tight hidden sm:inline">ClinicaOS</span>
             {clinicaAtual && logoDaClinica(clinicaAtual.clinica.nome) && (
               <img
                 src={logoDaClinica(clinicaAtual.clinica.nome)!}
@@ -167,14 +160,14 @@ export function AppShell() {
             </Suspense>
             {memberships.length > 0 && (
               <Select value={clinicaAtual?.clinica_id} onValueChange={setClinicaAtual}>
-                <SelectTrigger className="w-56 font-semibold" style={{ color: corDaClinica(clinicaAtual?.clinica.nome) }}>
+                <SelectTrigger className="w-56 bg-white/10 border-white/20 text-white">
                   <SelectValue placeholder="Selecione a clínica" />
                 </SelectTrigger>
                 <SelectContent>
                   {memberships.map((m) => (
                     <SelectItem key={m.clinica_id} value={m.clinica_id}>
-                      <span className="flex items-center gap-2 font-semibold" style={{ color: corDaClinica(m.clinica.nome) }}>
-                        <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: corDaClinica(m.clinica.nome) }} />
+                      <span className="flex items-center gap-2">
+                        <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: corDaClinica(m.clinica.nome) }} />
                         {m.clinica.nome} {m.clinica.cidade ? `— ${m.clinica.cidade}` : ""}
                       </span>
                     </SelectItem>
@@ -182,45 +175,31 @@ export function AppShell() {
                 </SelectContent>
               </Select>
             )}
-            <span className="text-xs text-white/70 hidden lg:inline max-w-[180px] truncate">{user?.email}</span>
-            <Button variant="ghost" size="sm" className="h-8 text-white hover:bg-white/10 hover:text-white" onClick={handleSignOut} title="Sair">
+            <span className="text-xs opacity-80 hidden lg:inline max-w-[180px] truncate">{user?.email}</span>
+            <Button variant="ghost" size="sm" className="text-white hover:bg-white/10 hover:text-white" onClick={handleSignOut} title="Sair">
               <LogOut className="h-4 w-4 mr-1" /> Sair
             </Button>
           </div>
         </div>
-
-        {/* navegação em 3 linhas com rótulo de seção */}
-        <nav className="px-5 pb-3 pt-1 space-y-1.5 font-sans">
-          {navRows.map((row) => (
-            <div key={row.label} className="flex items-center gap-3">
-              <span className="hidden md:inline-block w-20 shrink-0 text-[10px] uppercase tracking-[0.12em] text-white/50 font-semibold">
-                {row.label}
-              </span>
-              <div className="flex flex-wrap items-center gap-1">
-                {row.items.map((item) => {
-                  const active = location.pathname === item.to ||
-                    (item.to !== "/app" && location.pathname.startsWith(item.to));
-                  const corAtivo = clinicaAtual ? corHoverDaClinica(clinicaAtual.clinica.nome) : "#172554";
-                  return (
-                    <Link
-                      key={item.to}
-                      to={item.to}
-                      className={`group flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all whitespace-nowrap ${
-                        active
-                          ? "text-white shadow-sm"
-                          : "text-white/80 hover:text-white hover:bg-white/10"
-                      }`}
-                      style={active ? { backgroundColor: corAtivo } : undefined}
-                    >
-                      <item.icon
-                        className="h-3.5 w-3.5 shrink-0"
-                        style={!active ? { color: "rgba(255,255,255,0.85)" } : undefined}
-                      />
-                      {item.label}
-                    </Link>
-                  );
-                })}
-              </div>
+        <nav className="px-4 pb-2 space-y-1">
+          {navRows.map((row, idx) => (
+            <div key={idx} className="flex flex-wrap items-center gap-1">
+              {row.items.map((item) => {
+                const active = location.pathname === item.to ||
+                  (item.to !== "/app" && location.pathname.startsWith(item.to));
+                return (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors whitespace-nowrap ${
+                      active ? "bg-white/20 text-white" : "text-white/85 hover:bg-white/10 hover:text-white"
+                    }`}
+                  >
+                    <item.icon className="h-3.5 w-3.5 shrink-0" />
+                    {item.label}
+                  </Link>
+                );
+              })}
             </div>
           ))}
         </nav>
