@@ -436,7 +436,46 @@ function NovoOrcamentoDialog({
             <div className="space-y-1"><Label>Paciente *</Label><Input value={pacienteNome} onChange={(e) => setPacienteNome(e.target.value)} /></div>
             <div className="space-y-1"><Label>Telefone</Label><Input value={pacienteTelefone} onChange={(e) => setPacienteTelefone(e.target.value)} /></div>
             <div className="space-y-1"><Label>CPF</Label><Input value={pacienteCpf} onChange={(e) => setPacienteCpf(e.target.value)} /></div>
-            <div className="space-y-1"><Label>Médico/Profissional</Label><Input value={medicoNome} onChange={(e) => setMedicoNome(e.target.value)} /></div>
+            <div className="space-y-1 md:col-span-2">
+              <Label>Médico solicitante</Label>
+              <div className="flex gap-1 rounded-md border p-1 w-fit">
+                <button
+                  type="button"
+                  onClick={() => alternarMedicoExterno(false)}
+                  className={`px-3 py-1 text-sm rounded ${!medicoExterno ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                >
+                  Da nossa clínica
+                </button>
+                <button
+                  type="button"
+                  onClick={() => alternarMedicoExterno(true)}
+                  className={`px-3 py-1 text-sm rounded ${medicoExterno ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                >
+                  De outro local
+                </button>
+              </div>
+              {!medicoExterno ? (
+                <SearchableSelect
+                  options={medicoOptions}
+                  value={medicoId}
+                  onChange={selecionarMedico}
+                  placeholder="Selecione o médico..."
+                  searchPlaceholder="Buscar por nome ou CRM..."
+                  emptyText="Nenhum médico cadastrado."
+                />
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Nome do médico</Label>
+                    <Input value={medicoNome} onChange={(e) => setMedicoNome(e.target.value)} placeholder="Dr(a). ..." />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Clínica solicitante *</Label>
+                    <Input value={clinicaSolicitante} onChange={(e) => setClinicaSolicitante(e.target.value)} placeholder="Nome da clínica/local de origem" />
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="space-y-1 md:col-span-2">
               <Label>Formas de pagamento <span className="text-xs text-muted-foreground font-normal">(selecione até 2)</span></Label>
               <div className="flex flex-wrap gap-2 rounded-md border p-2">
