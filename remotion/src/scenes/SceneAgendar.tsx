@@ -75,7 +75,7 @@ export const SceneAgendar: React.FC = () => {
           display: "flex", alignItems: "center", gap: 14, boxShadow: "0 30px 80px rgba(16,185,129,.5)",
         }}>
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3"><path d="M5 12l5 5L20 7"/></svg>
-          Agendamento criado
+          Agendamento criado · abrindo pagamento…
         </div>
       )}
 
