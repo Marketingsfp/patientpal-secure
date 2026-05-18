@@ -237,6 +237,45 @@ export type Database = {
           },
         ]
       }
+      audit_log: {
+        Row: {
+          action: string
+          clinica_id: string | null
+          created_at: string
+          dados_antes: Json | null
+          dados_depois: Json | null
+          id: string
+          record_id: string | null
+          table_name: string
+          user_email: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          clinica_id?: string | null
+          created_at?: string
+          dados_antes?: Json | null
+          dados_depois?: Json | null
+          id?: string
+          record_id?: string | null
+          table_name: string
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          clinica_id?: string | null
+          created_at?: string
+          dados_antes?: Json | null
+          dados_depois?: Json | null
+          id?: string
+          record_id?: string | null
+          table_name?: string
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       boletos: {
         Row: {
           clinica_id: string
