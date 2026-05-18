@@ -888,6 +888,31 @@ function AgendaPage() {
       <div className="flex justify-center">
         <Paginacao page={page} totalPages={totalPages} onChange={setPage} />
       </div>
+
+      <div className="rounded-lg border bg-muted/30 p-4">
+        <h3 className="text-center font-semibold mb-3">Legenda</h3>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            { cor: "#cfe3fb", borda: "#9fc3f3", label: "Confirmado pelo cliente" },
+            { cor: "#a8c8ed", borda: "#7aa9d8", label: "Presente na clínica" },
+            { cor: "#7fbfc2", borda: "#5a9ea1", label: "Em atendimento" },
+            { cor: "#d1f0d6", borda: "#8fd49a", label: "Atendido com sucesso" },
+            { cor: "#fde2c4", borda: "#f5c890", label: "Agenda de telemedicina" },
+            { cor: "#f8d2d6", borda: "#eea1a8", label: "Cancelado pelo cliente" },
+            { cor: "#fef3b6", borda: "#f0dc7a", label: "Atrasado para consulta" },
+            { cor: "#e0cdf0", borda: "#bea4d8", label: "Agendamento on-line" },
+            { cor: "#f7b6c0", borda: "#e88594", label: "Não comparecimento" },
+          ].map((s) => (
+            <div key={s.label} className="flex items-center gap-2 text-sm">
+              <span
+                className="inline-block h-6 w-10 rounded border"
+                style={{ background: s.cor, borderColor: s.borda }}
+              />
+              <span>{s.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
