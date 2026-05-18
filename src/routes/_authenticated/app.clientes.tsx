@@ -645,9 +645,6 @@ function ClientesPage() {
                       <Button type="button" variant="outline" size="sm" onClick={() => fotoInputRef.current?.click()}>
                         <Upload className="h-4 w-4 mr-2" /> {fotoPreview ? "Trocar foto" : "Enviar foto"}
                       </Button>
-                      <Button type="button" variant="outline" size="sm" onClick={abrirCamera}>
-                        <Camera className="h-4 w-4 mr-2" /> Tirar foto
-                      </Button>
                       {fotoPreview && (
                         <Button type="button" variant="ghost" size="sm" onClick={() => { setFotoFile(null); setFotoPreview(null); }}>
                           <X className="h-4 w-4 mr-1" /> Remover
