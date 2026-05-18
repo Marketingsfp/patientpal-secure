@@ -197,7 +197,7 @@ function AgendaPage() {
     return items.filter((a) => {
       if (filtroMedico !== "todos" && a.medico_id !== filtroMedico) return false;
       if (filtroStatus !== "todos" && a.status !== filtroStatus) return false;
-      if (filtroCliente && !a.paciente_nome.toLowerCase().includes(filtroCliente.toLowerCase())) return false;
+      if (filtroCliente && !normalizar(a.paciente_nome).includes(normalizar(filtroCliente))) return false;
       if (filtroFicha) {
         const f = fichaPorId.get(a.id) ?? "";
         if (!f.includes(filtroFicha.padStart(Math.min(filtroFicha.length, 3), "0"))) return false;
