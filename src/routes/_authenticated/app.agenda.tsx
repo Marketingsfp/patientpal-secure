@@ -356,7 +356,8 @@ function AgendaPage() {
     const { data: lista } = await supabase
       .from("procedimentos")
       .select("nome,valor_dinheiro,valor_padrao")
-      .eq("clinica_id", clinicaAtual.clinica_id);
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .limit(5000);
     const proc = (lista ?? []).find((p) => normalizar(p.nome ?? "") === nomeBusca)
       ?? (lista ?? []).find((p) => normalizar(p.nome ?? "").includes(nomeBusca));
     const valor = Number(proc?.valor_dinheiro ?? proc?.valor_padrao ?? 0);
