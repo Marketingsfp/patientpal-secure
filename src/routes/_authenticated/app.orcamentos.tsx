@@ -370,28 +370,17 @@ function NovoOrcamentoDialog({
   const subtotal = itens.reduce((s, i) => s + Number(i.quantidade || 0) * Number(i.valor_unitario || 0), 0);
   const total = Math.max(0, subtotal - Number(desconto || 0));
 
-  // Total por forma de pagamento (calculado automaticamente a partir dos itens).
-  // Aplica o desconto proporcionalmente ao subtotal de cada forma.
+  // Total por forma de pagamento: cada forma é uma alternativa de pagamento integral.
+  // Ex.: "Se pagar tudo em Dinheiro = R$ X; se pagar tudo no Cartão = R$ Y".
   const totaisPorForma = (() => {
     const out: Record<string, number> = {};
-    if (formasPagamento.length === 0) return out;
-    const subtotalForma = (f: string) =>
-      itens.reduce((s, i) => {
+    const desc = Number(desconto) || 0;
+    for (const f of formasPagamento) {
+      const sub = itens.reduce((s, i) => {
         const v = Number(i.valores_formas?.[f] ?? i.valor_unitario ?? 0);
         return s + Number(i.quantidade || 0) * v;
       }, 0);
-    const subs = formasPagamento.map((f) => ({ f, sub: subtotalForma(f) }));
-    const somaSub = subs.reduce((s, x) => s + x.sub, 0);
-    for (const { f, sub } of subs) {
-      const proporcional = somaSub > 0 ? (sub / somaSub) * total : total / formasPagamento.length;
-      out[f] = Math.round(proporcional * 100) / 100;
-    }
-    // ajusta arredondamento na última forma para bater com o total
-    const soma = Object.values(out).reduce((s, v) => s + v, 0);
-    const diff = Math.round((total - soma) * 100) / 100;
-    if (Math.abs(diff) >= 0.01 && formasPagamento.length > 0) {
-      const last = formasPagamento[formasPagamento.length - 1];
-      out[last] = Math.round((out[last] + diff) * 100) / 100;
+      out[f] = Math.max(0, Math.round((sub - desc) * 100) / 100);
     }
     return out;
   })();
