@@ -125,7 +125,7 @@ export function AppShell() {
   return (
     <div className="min-h-screen flex flex-col bg-muted/30">
       <header
-        className="text-white sticky top-0 z-30 shadow-sm"
+        className="text-white sticky top-0 z-30 shadow-sm bg-slate-800"
         style={{
           backgroundColor: clinicaAtual ? corDaClinica(clinicaAtual.clinica.nome) : undefined,
           ["--nav-hover" as never]: clinicaAtual ? corHoverDaClinica(clinicaAtual.clinica.nome) : "rgba(0,0,0,0.25)",
