@@ -469,8 +469,8 @@ function MedicosPage() {
               ) : (
                 <div className="space-y-2">
                   <Label>Valor repasse padrão (R$)</Label>
-                  <Input type="number" min={0} step={0.01} value={form.valor}
-                    onChange={(e) => setForm({ ...form, valor: e.target.value })} />
+                  <CurrencyInput value={form.valor}
+                    onChange={(v) => setForm({ ...form, valor: v })} />
                 </div>
               )}
                   <div className="pt-4 border-t space-y-3">
