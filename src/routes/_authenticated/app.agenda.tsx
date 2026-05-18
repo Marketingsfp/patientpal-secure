@@ -98,6 +98,7 @@ function AgendaPage() {
   const [page, setPage] = useState(1);
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [items, setItems] = useState<Agendamento[]>([]);
+  const [pagosSet, setPagosSet] = useState<Set<string>>(new Set());
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [exames, setExames] = useState<{ id: string; nome: string }[]>([]);
   const [procedimentosList, setProcedimentosList] = useState<{ id: string; nome: string }[]>([]);
@@ -176,6 +177,21 @@ function AgendaPage() {
     setItems((data ?? []) as Agendamento[]);
     setPage(1);
     setSelecionados(new Set());
+    // Marca agendamentos pagos (receita vinculada em fin_lancamentos)
+    const ids = (data ?? []).map((a) => a.id);
+    if (ids.length) {
+      const { data: pg } = await supabase
+        .from("fin_lancamentos")
+        .select("agendamento_id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("tipo", "receita")
+        .in("agendamento_id", ids);
+      setPagosSet(new Set(((pg ?? []) as Array<{ agendamento_id: string | null }>)
+        .map((r) => r.agendamento_id)
+        .filter((x): x is string => !!x)));
+    } else {
+      setPagosSet(new Set());
+    }
   };
 
   const loadRef = async () => {
@@ -679,8 +695,15 @@ function AgendaPage() {
         tipo="receita"
         initialDescricao={pagamentoDesc}
         initialValor={pagamentoValor}
+        agendamentoId={pagamentoAgId}
         onSavedWithData={async (dados) => {
           if (!pagamentoAgId || !clinicaAtual) return;
+          const agId = pagamentoAgId;
+          setPagosSet((prev) => {
+            const next = new Set(prev);
+            next.add(agId);
+            return next;
+          });
           if (confirm("Pagamento registrado. Imprimir Guia de Atendimento (GR) agora?")) {
             try {
               await printGuiaAtendimento({
@@ -932,7 +955,14 @@ function AgendaPage() {
                     <Badge variant="outline" className="text-xs">{a.procedimento || "CONSULTA"}</Badge>
                   </TableCell>
                   <TableCell className="text-center">
-                    <Badge className={STATUS_COR[a.status]}>{STATUS_LABEL[a.status]}</Badge>
+                    <div className="inline-flex items-center gap-1 flex-wrap justify-center">
+                      <Badge className={STATUS_COR[a.status]}>{STATUS_LABEL[a.status]}</Badge>
+                      {pagosSet.has(a.id) && (
+                        <Badge className="bg-emerald-600 text-white border border-emerald-700 hover:bg-emerald-600">
+                          Pago
+                        </Badge>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-right">
                     <Button

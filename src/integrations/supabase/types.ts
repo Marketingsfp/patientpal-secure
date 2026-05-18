@@ -1225,6 +1225,7 @@ export type Database = {
       }
       fin_lancamentos: {
         Row: {
+          agendamento_id: string | null
           bandeira_cartao: string | null
           categoria_id: string | null
           clinica_id: string
@@ -1248,6 +1249,7 @@ export type Database = {
           valor: number
         }
         Insert: {
+          agendamento_id?: string | null
           bandeira_cartao?: string | null
           categoria_id?: string | null
           clinica_id: string
@@ -1271,6 +1273,7 @@ export type Database = {
           valor: number
         }
         Update: {
+          agendamento_id?: string | null
           bandeira_cartao?: string | null
           categoria_id?: string | null
           clinica_id?: string
@@ -1294,6 +1297,13 @@ export type Database = {
           valor?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "fin_lancamentos_agendamento_id_fkey"
+            columns: ["agendamento_id"]
+            isOneToOne: false
+            referencedRelation: "agendamentos"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "fin_lancamentos_categoria_id_fkey"
             columns: ["categoria_id"]
