@@ -212,6 +212,34 @@ function AgendaPage() {
   useEffect(() => { loadRef(); }, [clinicaAtual?.clinica_id]);
   useEffect(() => { load(); }, [clinicaAtual?.clinica_id, dataRef, apenasData]);
 
+  // Duração padrão (minutos) inferida dos slots existentes por médico
+  const duracaoPorMedico = useMemo(() => {
+    const buckets = new Map<string, number[]>();
+    for (const a of items) {
+      if (!a.medico_id || !a.inicio || !a.fim) continue;
+      const d = Math.round((new Date(a.fim).getTime() - new Date(a.inicio).getTime()) / 60000);
+      if (d > 0 && d <= 480) {
+        if (!buckets.has(a.medico_id)) buckets.set(a.medico_id, []);
+        buckets.get(a.medico_id)!.push(d);
+      }
+    }
+    const out = new Map<string, number>();
+    for (const [mid, arr] of buckets) {
+      arr.sort((x, y) => x - y);
+      out.set(mid, arr[Math.floor(arr.length / 2)]);
+    }
+    return out;
+  }, [items]);
+
+  const calcFimAuto = (inicio: string, medicoId: string) => {
+    if (!inicio) return "";
+    const dur = (medicoId && duracaoPorMedico.get(medicoId)) || 30;
+    const d = new Date(inicio);
+    if (isNaN(d.getTime())) return "";
+    d.setMinutes(d.getMinutes() + dur);
+    return toLocalInput(d.toISOString());
+  };
+
   const fichaPorId = useMemo(() => {
     const m = new Map<string, string>();
     // Numeração sequencial por dia (reinicia a cada data) na ordem do horário
@@ -542,7 +570,11 @@ function AgendaPage() {
                       const nome = v.slice(6);
                       setForm(f => ({ ...f, medico_id: "", procedimento: nome }));
                     } else {
-                      setForm(f => ({ ...f, medico_id: v === "none" ? "" : v }));
+                       setForm(f => {
+                         const medico_id = v === "none" ? "" : v;
+                         const fim = f.inicio ? calcFimAuto(f.inicio, medico_id) : f.fim;
+                         return { ...f, medico_id, fim };
+                       });
                     }
                   }}
                   placeholder="Selecione médico ou exame"
@@ -557,7 +589,7 @@ function AgendaPage() {
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
                   <Label>Início</Label>
-                  <Input type="datetime-local" value={form.inicio} onChange={(e) => setForm(f => ({ ...f, inicio: e.target.value }))} required />
+                  <Input type="datetime-local" value={form.inicio} onChange={(e) => setForm(f => ({ ...f, inicio: e.target.value, fim: calcFimAuto(e.target.value, f.medico_id) }))} required />
                 </div>
                 <div className="space-y-1">
                   <Label>Fim</Label>
