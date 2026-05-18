@@ -122,6 +122,7 @@ function AgendaPage() {
   const [pagamentoOpen, setPagamentoOpen] = useState(false);
   const [pagamentoDesc, setPagamentoDesc] = useState("");
   const [pagamentoAgId, setPagamentoAgId] = useState<string | null>(null);
+  const [pagamentoExtraIds, setPagamentoExtraIds] = useState<string[]>([]);
   const [pagamentoForma, setPagamentoForma] = useState<string>("");
   type FormaOpcao = { forma: string; label: string; valor: number };
   const [formaPagOpen, setFormaPagOpen] = useState(false);
@@ -502,10 +503,14 @@ function AgendaPage() {
 
   const escolherForma = (op: FormaOpcao) => {
     if (!formaPagCtx) return;
+    const ids = formaPagCtx.agId.split(",").filter(Boolean);
+    const principal = ids[0] ?? null;
+    const extras = ids.slice(1);
     setPagamentoDesc(formaPagCtx.desc);
     setPagamentoValor(op.valor > 0 ? op.valor.toFixed(2) : "");
     setPagamentoForma(op.forma);
-    setPagamentoAgId(formaPagCtx.agId);
+    setPagamentoAgId(principal);
+    setPagamentoExtraIds(extras);
     setFormaPagOpen(false);
     setPagamentoOpen(true);
   };
