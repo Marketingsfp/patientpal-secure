@@ -1,6 +1,6 @@
 import { Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect } from "react";
-import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck } from "lucide-react";
+import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
@@ -61,6 +61,7 @@ const nav = [
   { to: "/app/prontuario-modelos", label: "Modelos de Prontuário", icon: FileHeart, iconColor: "#f9a8d4" },
   { to: "/app/equipe", label: "Equipe", icon: Users, iconColor: "#93c5fd" },
   { to: "/app/auditoria", label: "Auditoria", icon: ShieldCheck, iconColor: "#f87171" },
+  { to: "/app/relatorios", label: "Relatórios", icon: BarChart3, iconColor: "#10b981" },
 ] as const;
 
 export function AppShell() {
