@@ -19,6 +19,7 @@ export interface LancamentoSavedData {
   parcelas: number | null;
   bandeira_cartao: string | null;
   emitir_nfse: boolean;
+  pagamentos_detalhe?: Array<{ forma: string; pago: number; troco: number; recebido: number }>;
 }
 
 interface Props {
