@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { toast } from "sonner";
 import { Loader2, Sparkles, Save, Stethoscope, AlertTriangle, CheckCircle2, Bell, Upload } from "lucide-react";
 import { classificarResultadoExame, extrairTextoExameDeArquivo, type ClassificacaoExame } from "@/lib/exames-ia.functions";
@@ -21,7 +22,14 @@ export const Route = createFileRoute("/_authenticated/app/exames-resultados")({
   head: () => ({ meta: [{ title: "Resultados de Exames — ClinicaOS" }] }),
 });
 
-type Paciente = { id: string; nome: string };
+type Paciente = {
+  id: string;
+  nome: string;
+  cpf: string | null;
+  numero_pasta: string | null;
+  data_nascimento: string | null;
+  telefone: string | null;
+};
 type Row = {
   id: string;
   paciente_nome: string | null;
@@ -64,11 +72,17 @@ function ExamesResultadosPage() {
     if (!clinicaId) return;
     (async () => {
       const [p, r] = await Promise.all([
-        supabase.from("pacientes").select("id,nome").eq("clinica_id", clinicaId).eq("ativo", true).order("nome").limit(500),
+        supabase
+          .from("pacientes")
+          .select("id,nome,cpf,numero_pasta,data_nascimento,telefone")
+          .eq("clinica_id", clinicaId)
+          .eq("ativo", true)
+          .order("nome")
+          .limit(2000),
         supabase.from("exame_resultados").select("id,paciente_nome,tipo_exame,resultado_texto,status,ia_resumo,ia_recomendacao,ia_mensagem_paciente,created_at")
           .eq("clinica_id", clinicaId).order("created_at", { ascending: false }).limit(50),
       ]);
-      if (p.data) setPacientes(p.data);
+      if (p.data) setPacientes(p.data as Paciente[]);
       if (r.data) setRows(r.data as Row[]);
     })();
   }, [clinicaId]);
@@ -77,6 +91,20 @@ function ExamesResultadosPage() {
     () => pacientes.find((p) => p.id === pacienteId)?.nome ?? "",
     [pacienteId, pacientes],
   );
+
+  const pacienteOptions = useMemo(() => {
+    return pacientes.map((p) => {
+      const partes: string[] = [p.nome];
+      if (p.numero_pasta) partes.push(`Pasta ${p.numero_pasta}`);
+      if (p.cpf) partes.push(`CPF ${p.cpf}`);
+      if (p.data_nascimento) {
+        const d = new Date(p.data_nascimento + "T00:00:00");
+        partes.push(`Nasc. ${d.toLocaleDateString("pt-BR")}`);
+      }
+      if (p.telefone) partes.push(p.telefone);
+      return { value: p.id, label: partes.join(" · ") };
+    });
+  }, [pacientes]);
 
   const handleClassificar = async () => {
     if (!tipo.trim() || texto.trim().length < 3) {
@@ -216,12 +244,14 @@ function ExamesResultadosPage() {
         <div className="grid md:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label>Paciente</Label>
-            <Select value={pacienteId} onValueChange={setPacienteId}>
-              <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-              <SelectContent>
-                {pacientes.map((p) => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              options={pacienteOptions}
+              value={pacienteId}
+              onChange={setPacienteId}
+              placeholder="Selecione o paciente..."
+              searchPlaceholder="Buscar por nome, CPF, pasta, nascimento ou telefone..."
+              emptyText="Nenhum paciente encontrado."
+            />
           </div>
           <div className="space-y-1.5">
             <Label>Tipo de exame</Label>
