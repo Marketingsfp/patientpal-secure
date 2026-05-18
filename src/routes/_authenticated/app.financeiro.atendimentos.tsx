@@ -7,6 +7,7 @@ import { useClinica } from "@/hooks/use-clinica";
 import { exportToExcel } from "@/lib/export-csv";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
@@ -188,7 +189,7 @@ function Page() {
                 <Input value={form.procedimento} onChange={(e) => setForm({ ...form, procedimento: e.target.value })} /></div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2"><Label>Valor total *</Label>
-                  <Input type="number" step="0.01" required value={form.valor_total} onChange={(e) => setForm({ ...form, valor_total: e.target.value })} /></div>
+                  <CurrencyInput value={form.valor_total} onChange={(v) => setForm({ ...form, valor_total: v })} /></div>
                 <div className="space-y-2"><Label>Forma de pagamento</Label>
                   <Input value={form.forma_pagamento} onChange={(e) => setForm({ ...form, forma_pagamento: e.target.value })} /></div>
               </div>
