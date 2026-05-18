@@ -122,6 +122,7 @@ function AgendaPage() {
   const [pagamentoOpen, setPagamentoOpen] = useState(false);
   const [pagamentoDesc, setPagamentoDesc] = useState("");
   const [pagamentoAgId, setPagamentoAgId] = useState<string | null>(null);
+  const [pagamentoExtraIds, setPagamentoExtraIds] = useState<string[]>([]);
   const [pagamentoForma, setPagamentoForma] = useState<string>("");
   type FormaOpcao = { forma: string; label: string; valor: number };
   const [formaPagOpen, setFormaPagOpen] = useState(false);
@@ -346,23 +347,41 @@ function AgendaPage() {
       toast.error("Selecione atendimentos do mesmo paciente para cobrar em uma única vez.");
       return;
     }
-    // busca valores dos procedimentos pelo nome (valor_dinheiro como base, fallback valor_padrao)
-    const nomes = Array.from(new Set(itens.map(i => (i.procedimento ?? "CONSULTA").trim().toUpperCase())));
+    const algumPago = itens.some(i => pagosSet.has(i.id));
+    if (algumPago) {
+      toast.info("Há atendimentos já pagos na seleção. Desmarque-os antes de cobrar.");
+      return;
+    }
+    // busca valores dos procedimentos pelo nome (todas as formas de pagamento)
     const { data: procs } = await supabase
       .from("procedimentos")
-      .select("nome,valor_dinheiro,valor_padrao")
+      .select("nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix")
       .eq("clinica_id", clinicaAtual.clinica_id)
-      .in("nome", nomes);
-    const valorPorNome = new Map<string, number>();
-    for (const p of (procs ?? []) as Array<{ nome: string; valor_dinheiro: number | null; valor_padrao: number | null }>) {
-      valorPorNome.set(p.nome.toUpperCase(), Number(p.valor_dinheiro ?? p.valor_padrao ?? 0));
+      .limit(5000);
+    const acharProc = (nomeProc: string) => {
+      const alvo = normalizar(nomeProc);
+      return (procs ?? []).find(p => normalizar(p.nome ?? "") === alvo)
+        ?? (procs ?? []).find(p => normalizar(p.nome ?? "").includes(alvo));
+    };
+    let totalDinheiro = 0, totalPix = 0, totalDebito = 0, totalCredito = 0;
+    for (const it of itens) {
+      const p: any = acharProc(it.procedimento ?? "CONSULTA");
+      totalDinheiro += Number(p?.valor_dinheiro ?? p?.valor_dinheiro_pix ?? p?.valor_padrao ?? 0);
+      totalPix      += Number(p?.valor_pix ?? p?.valor_dinheiro_pix ?? p?.valor_padrao ?? p?.valor_dinheiro ?? 0);
+      totalDebito   += Number(p?.valor_cartao_debito ?? p?.valor_cartao ?? p?.valor_padrao ?? 0);
+      totalCredito  += Number(p?.valor_cartao_credito ?? p?.valor_cartao ?? p?.valor_padrao ?? 0);
     }
-    const total = itens.reduce((s, i) => s + (valorPorNome.get((i.procedimento ?? "CONSULTA").trim().toUpperCase()) ?? 0), 0);
     const paciente = itens[0].paciente_nome;
     const desc = `${paciente} — ${itens.map(i => (i.procedimento ?? "CONSULTA")).join(" + ")} (${itens.length} itens)`;
-    setPagamentoDesc(desc);
-    setPagamentoValor(total > 0 ? total.toFixed(2) : "");
-    setPagamentoOpen(true);
+    const opcoes: FormaOpcao[] = [
+      { forma: "dinheiro", label: "Dinheiro", valor: totalDinheiro },
+      { forma: "pix", label: "Pix", valor: totalPix },
+      { forma: "cartao_debito", label: "Cartão de Débito", valor: totalDebito },
+      { forma: "cartao_credito", label: "Cartão de Crédito", valor: totalCredito },
+    ];
+    setFormaPagOpcoes(opcoes);
+    setFormaPagCtx({ agId: itens.map(i => i.id).join(","), desc });
+    setFormaPagOpen(true);
   };
   const [pagamentoValor, setPagamentoValor] = useState("");
 
@@ -484,10 +503,14 @@ function AgendaPage() {
 
   const escolherForma = (op: FormaOpcao) => {
     if (!formaPagCtx) return;
+    const ids = formaPagCtx.agId.split(",").filter(Boolean);
+    const principal = ids[0] ?? null;
+    const extras = ids.slice(1);
     setPagamentoDesc(formaPagCtx.desc);
     setPagamentoValor(op.valor > 0 ? op.valor.toFixed(2) : "");
     setPagamentoForma(op.forma);
-    setPagamentoAgId(formaPagCtx.agId);
+    setPagamentoAgId(principal);
+    setPagamentoExtraIds(extras);
     setFormaPagOpen(false);
     setPagamentoOpen(true);
   };
@@ -750,7 +773,7 @@ function AgendaPage() {
 
       <LancamentoDialog
         open={pagamentoOpen}
-        onOpenChange={(v) => { setPagamentoOpen(v); if (!v) setPagamentoAgId(null); }}
+        onOpenChange={(v) => { setPagamentoOpen(v); if (!v) { setPagamentoAgId(null); setPagamentoExtraIds([]); } }}
         tipo="receita"
         initialDescricao={pagamentoDesc}
         initialValor={pagamentoValor}
@@ -759,11 +782,36 @@ function AgendaPage() {
         onSavedWithData={async (dados) => {
           if (!pagamentoAgId || !clinicaAtual) return;
           const agId = pagamentoAgId;
+          // marca todos os agendamentos da cobrança agrupada como pagos
+          if (pagamentoExtraIds.length > 0) {
+            // insere linhas-sombra (valor 0) para que os demais agendamentos
+            // apareçam como "pagos" sem duplicar receita financeira
+            const sombras = pagamentoExtraIds.map((extraId) => ({
+              clinica_id: clinicaAtual.clinica_id,
+              tipo: "receita" as const,
+              descricao: `${pagamentoDesc} — vinculado ao pagamento agrupado`,
+              valor: 0,
+              data: new Date().toISOString().slice(0, 10),
+              forma_pagamento: dados.forma_pagamento,
+              status: "confirmado" as const,
+              agendamento_id: extraId,
+              observacoes: `Pagamento agrupado com agendamento ${agId}`,
+            }));
+            const { error: errSombras } = await supabase.from("fin_lancamentos").insert(sombras);
+            if (errSombras) {
+              toast.error("Pagamento salvo, mas falhou ao vincular itens extras: " + errSombras.message);
+            }
+          }
           setPagosSet((prev) => {
             const next = new Set(prev);
             next.add(agId);
+            for (const id of pagamentoExtraIds) next.add(id);
             return next;
           });
+          // limpa seleção após cobrança agrupada
+          if (pagamentoExtraIds.length > 0) {
+            setSelecionados(new Set());
+          }
           if (confirm("Pagamento registrado. Imprimir Guia de Atendimento (GR) agora?")) {
             try {
               await printGuiaAtendimento({
@@ -783,6 +831,7 @@ function AgendaPage() {
             }
           }
           setPagamentoAgId(null);
+          setPagamentoExtraIds([]);
         }}
       />
 
