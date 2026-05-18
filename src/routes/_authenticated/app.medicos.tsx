@@ -18,6 +18,9 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useServerFn } from "@tanstack/react-start";
+import { cadastrarUsuario } from "@/lib/equipe.functions";
 
 export const Route = createFileRoute("/_authenticated/app/medicos")({
   component: MedicosPage,
@@ -77,7 +80,11 @@ function MedicosPage() {
     nacionalidade: "Brasileira", estado_civil: "",
     cep: "", logradouro: "", numero: "", complemento: "", bairro: "", cidade: "", estado: "",
     banco: "", agencia: "", conta: "", pix_chave: "",
+    criarUsuario: false,
+    senhaUsuario: "",
+    roleUsuario: "medico" as "admin" | "gestor" | "medico" | "enfermeiro" | "recepcao" | "financeiro",
   });
+  const cadastrarUsuarioFn = useServerFn(cadastrarUsuario);
 
   const load = async () => {
     if (!clinicaAtual) return;
@@ -116,6 +123,7 @@ function MedicosPage() {
       nacionalidade: "Brasileira", estado_civil: "",
       cep: "", logradouro: "", numero: "", complemento: "", bairro: "", cidade: "", estado: "",
       banco: "", agencia: "", conta: "", pix_chave: "",
+      criarUsuario: false, senhaUsuario: "", roleUsuario: "medico",
     });
   };
 
@@ -157,6 +165,7 @@ function MedicosPage() {
       cep: m.cep ?? "", logradouro: m.logradouro ?? "", numero: m.numero ?? "",
       complemento: m.complemento ?? "", bairro: m.bairro ?? "", cidade: m.cidade ?? "", estado: m.estado ?? "",
       banco: m.banco ?? "", agencia: m.agencia ?? "", conta: m.conta ?? "", pix_chave: m.pix_chave ?? "",
+      criarUsuario: false, senhaUsuario: "", roleUsuario: "medico",
     });
     setOpen(true);
   };
