@@ -219,7 +219,7 @@ function AgendaPage() {
       }
       return true;
     });
-  }, [items, filtroMedico, filtroStatus, filtroCliente, filtroFicha, filtroDiaSemana, filtroEspecialidade, medicoEspec, fichaPorId]);
+  }, [items, mostrarLivres, filtroMedico, filtroStatus, filtroCliente, filtroFicha, filtroDiaSemana, filtroEspecialidade, medicoEspec, fichaPorId]);
 
   const totais = useMemo(() => ({
     total: filtrados.length,
@@ -721,10 +721,16 @@ function AgendaPage() {
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <Checkbox checked={apenasData} onCheckedChange={(v) => setApenasData(!!v)} />
-            Exibir apenas a data selecionada
-          </label>
+          <div className="flex flex-wrap items-center gap-4">
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <Checkbox checked={apenasData} onCheckedChange={(v) => setApenasData(!!v)} />
+              Exibir apenas a data selecionada
+            </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <Checkbox checked={mostrarLivres} onCheckedChange={(v) => setMostrarLivres(!!v)} />
+              Mostrar horários livres
+            </label>
+          </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={limparFiltros}><X className="h-4 w-4 mr-2" /> Limpar</Button>
             <Button onClick={load}><Search className="h-4 w-4 mr-2" /> Exibir</Button>
