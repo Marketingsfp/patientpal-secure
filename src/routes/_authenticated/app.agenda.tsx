@@ -346,23 +346,41 @@ function AgendaPage() {
       toast.error("Selecione atendimentos do mesmo paciente para cobrar em uma única vez.");
       return;
     }
-    // busca valores dos procedimentos pelo nome (valor_dinheiro como base, fallback valor_padrao)
-    const nomes = Array.from(new Set(itens.map(i => (i.procedimento ?? "CONSULTA").trim().toUpperCase())));
+    const algumPago = itens.some(i => pagosSet.has(i.id));
+    if (algumPago) {
+      toast.info("Há atendimentos já pagos na seleção. Desmarque-os antes de cobrar.");
+      return;
+    }
+    // busca valores dos procedimentos pelo nome (todas as formas de pagamento)
     const { data: procs } = await supabase
       .from("procedimentos")
-      .select("nome,valor_dinheiro,valor_padrao")
+      .select("nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix")
       .eq("clinica_id", clinicaAtual.clinica_id)
-      .in("nome", nomes);
-    const valorPorNome = new Map<string, number>();
-    for (const p of (procs ?? []) as Array<{ nome: string; valor_dinheiro: number | null; valor_padrao: number | null }>) {
-      valorPorNome.set(p.nome.toUpperCase(), Number(p.valor_dinheiro ?? p.valor_padrao ?? 0));
+      .limit(5000);
+    const acharProc = (nomeProc: string) => {
+      const alvo = normalizar(nomeProc);
+      return (procs ?? []).find(p => normalizar(p.nome ?? "") === alvo)
+        ?? (procs ?? []).find(p => normalizar(p.nome ?? "").includes(alvo));
+    };
+    let totalDinheiro = 0, totalPix = 0, totalDebito = 0, totalCredito = 0;
+    for (const it of itens) {
+      const p: any = acharProc(it.procedimento ?? "CONSULTA");
+      totalDinheiro += Number(p?.valor_dinheiro ?? p?.valor_dinheiro_pix ?? p?.valor_padrao ?? 0);
+      totalPix      += Number(p?.valor_pix ?? p?.valor_dinheiro_pix ?? p?.valor_padrao ?? p?.valor_dinheiro ?? 0);
+      totalDebito   += Number(p?.valor_cartao_debito ?? p?.valor_cartao ?? p?.valor_padrao ?? 0);
+      totalCredito  += Number(p?.valor_cartao_credito ?? p?.valor_cartao ?? p?.valor_padrao ?? 0);
     }
-    const total = itens.reduce((s, i) => s + (valorPorNome.get((i.procedimento ?? "CONSULTA").trim().toUpperCase()) ?? 0), 0);
     const paciente = itens[0].paciente_nome;
     const desc = `${paciente} — ${itens.map(i => (i.procedimento ?? "CONSULTA")).join(" + ")} (${itens.length} itens)`;
-    setPagamentoDesc(desc);
-    setPagamentoValor(total > 0 ? total.toFixed(2) : "");
-    setPagamentoOpen(true);
+    const opcoes: FormaOpcao[] = [
+      { forma: "dinheiro", label: "Dinheiro", valor: totalDinheiro },
+      { forma: "pix", label: "Pix", valor: totalPix },
+      { forma: "cartao_debito", label: "Cartão de Débito", valor: totalDebito },
+      { forma: "cartao_credito", label: "Cartão de Crédito", valor: totalCredito },
+    ];
+    setFormaPagOpcoes(opcoes);
+    setFormaPagCtx({ agId: itens.map(i => i.id).join(","), desc });
+    setFormaPagOpen(true);
   };
   const [pagamentoValor, setPagamentoValor] = useState("");
 
