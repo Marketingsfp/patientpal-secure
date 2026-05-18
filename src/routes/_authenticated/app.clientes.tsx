@@ -193,6 +193,22 @@ function ClientesPage() {
     })();
   }, [items, clinicaAtual?.clinica_id]);
 
+  // Gera signed URLs em lote para as fotos dos pacientes da página
+  useEffect(() => {
+    const paths = items.filter(p => p.foto_url).map(p => p.foto_url as string);
+    if (paths.length === 0) { setFotoSigned({}); return; }
+    (async () => {
+      const { data } = await supabase.storage.from("pacientes-fotos").createSignedUrls(paths, 3600);
+      const map: Record<string, string> = {};
+      items.forEach((p) => {
+        if (!p.foto_url) return;
+        const found = data?.find(d => d.path === p.foto_url);
+        if (found?.signedUrl) map[p.id] = found.signedUrl;
+      });
+      setFotoSigned(map);
+    })();
+  }, [items]);
+
   async function salvarBiometria(descriptor: number[]) {
     if (!faceFor || !clinicaAtual) return;
     // Revoga biometria anterior (se houver) e insere nova
