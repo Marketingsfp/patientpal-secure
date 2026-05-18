@@ -17,6 +17,7 @@ export interface PrintGRInput {
     forma_pagamento: string | null;
     parcelas: number | null;
     bandeira_cartao: string | null;
+    detalhe?: Array<{ forma: string; pago: number; troco: number; recebido: number }>;
   };
 }
 
@@ -113,6 +114,16 @@ export async function printGuiaAtendimento({ agendamentoId, clinicaId, usuarioNo
     ? `${pagamento.parcelas}x DE ${fmtBRL(valor / pagamento.parcelas)}`
     : "À VISTA";
   const bandeiraTxt = pagamento?.bandeira_cartao ? pagamento.bandeira_cartao.toUpperCase() : "";
+  const isMisto = pagamento?.forma_pagamento === "misto" && (pagamento.detalhe?.length ?? 0) > 0;
+  const detalheRows = isMisto
+    ? pagamento!.detalhe!
+        .map((d) => {
+          const lbl = FORMA_LABEL[d.forma] ?? d.forma.toUpperCase();
+          const trocoTxt = d.troco > 0 ? ` (RECEB. ${fmtBRL(d.recebido)} / TROCO ${fmtBRL(d.troco)})` : "";
+          return `<tr><td class="label">${esc(lbl)}:</td><td class="v right">${fmtBRL(d.pago)}${esc(trocoTxt)}</td></tr>`;
+        })
+        .join("")
+    : "";
 
   const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado].filter(Boolean).join("<br/>");
 
@@ -185,9 +196,15 @@ export async function printGuiaAtendimento({ agendamentoId, clinicaId, usuarioNo
 
     ${valor > 0 ? `
     <div class="row" style="margin-top:8px">
-      <div class="bold">VALOR RECEBIDO<br/><span class="sm">(${esc(formaLbl)})</span></div>
+      <div class="bold">VALOR RECEBIDO<br/><span class="sm">(${esc(isMisto ? "MISTO" : formaLbl)})</span></div>
       <div class="bold lg">${fmtBRL(valor)}</div>
     </div>
+
+    ${isMisto ? `
+    <table style="margin-top:4px">
+      ${detalheRows}
+    </table>
+    ` : ""}
 
     ${pagamento?.forma_pagamento === "cartao_credito" ? `
     <table>
