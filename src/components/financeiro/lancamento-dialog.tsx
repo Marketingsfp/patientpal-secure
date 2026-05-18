@@ -48,8 +48,8 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
   const [saving, setSaving] = useState(false);
   const [valorRecebido, setValorRecebido] = useState("");
   const [pagamentoMisto, setPagamentoMisto] = useState(false);
-  const [pagamentos, setPagamentos] = useState<Array<{ forma: string; valor: string; valorRecebido?: string }>>([
-    { forma: "dinheiro", valor: "" },
+  const [pagamentos, setPagamentos] = useState<Array<{ forma: string; recebido: string }>>([
+    { forma: "dinheiro", recebido: "" },
   ]);
 
   useEffect(() => {
@@ -77,14 +77,27 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
   const trocoDinheiro = formaPagamento === "dinheiro" && recebidoNum > valorNum
     ? recebidoNum - valorNum
     : 0;
-  const totalPagoMisto = pagamentos.reduce((s, p) => s + Number(p.valor || 0), 0);
+  // Compute "pago" (effective amount applied to total) and "troco" per row.
+  // Cash: pago = min(recebido, remaining-before-this-row); excess = troco.
+  // Other forms: pago = recebido, troco = 0.
+  const linhasCalc = (() => {
+    let restante = valorNum;
+    return pagamentos.map((p) => {
+      const rec = Number(p.recebido || 0);
+      let pago = 0, troco = 0;
+      if (p.forma === "dinheiro") {
+        pago = Math.min(rec, Math.max(0, restante));
+        troco = Math.max(0, rec - pago);
+      } else {
+        pago = rec;
+      }
+      restante = Math.max(0, restante - pago);
+      return { pago, troco };
+    });
+  })();
+  const totalPagoMisto = linhasCalc.reduce((s, l) => s + l.pago, 0);
   const restanteMisto = Math.max(0, valorNum - totalPagoMisto);
-  const trocoMisto = pagamentos.reduce((s, p) => {
-    if (p.forma !== "dinheiro") return s;
-    const rec = Number(p.valorRecebido || 0);
-    const pago = Number(p.valor || 0);
-    return s + (rec > pago ? rec - pago : 0);
-  }, 0);
+  const trocoMisto = linhasCalc.reduce((s, l) => s + l.troco, 0);
   const FORMAS_LABEL: Record<string, string> = {
     dinheiro: "Dinheiro",
     pix: "Pix",
@@ -111,22 +124,24 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     let formaFinal: string | null = formaPagamento || null;
     let obsExtra = "";
     if (pagamentoMisto) {
-      const valid = pagamentos.filter((p) => p.forma && Number(p.valor || 0) > 0);
-      if (valid.length === 0) {
+      const validIdx = pagamentos
+        .map((p, i) => ({ p, i }))
+        .filter(({ p, i }) => p.forma && linhasCalc[i].pago > 0);
+      if (validIdx.length === 0) {
         toast.error("Adicione ao menos uma forma de pagamento");
         setSaving(false); return;
       }
-      const total = valid.reduce((s, p) => s + Number(p.valor), 0);
+      const total = validIdx.reduce((s, { i }) => s + linhasCalc[i].pago, 0);
       if (Math.abs(total - valorNum) > 0.01) {
         toast.error(`Soma das formas (${formatBRL(total)}) difere do valor (${formatBRL(valorNum)})`);
         setSaving(false); return;
       }
       formaFinal = "misto";
-      obsExtra = "Pagamento misto: " + valid.map((p) => {
-        const base = `${FORMAS_LABEL[p.forma] ?? p.forma} ${formatBRL(Number(p.valor))}`;
-        if (p.forma === "dinheiro" && Number(p.valorRecebido || 0) > Number(p.valor)) {
-          const tr = Number(p.valorRecebido) - Number(p.valor);
-          return `${base} (recebido ${formatBRL(Number(p.valorRecebido))}, troco ${formatBRL(tr)})`;
+      obsExtra = "Pagamento misto: " + validIdx.map(({ p, i }) => {
+        const { pago, troco } = linhasCalc[i];
+        const base = `${FORMAS_LABEL[p.forma] ?? p.forma} ${formatBRL(pago)}`;
+        if (p.forma === "dinheiro" && troco > 0) {
+          return `${base} (recebido ${formatBRL(Number(p.recebido))}, troco ${formatBRL(troco)})`;
         }
         return base;
       }).join("; ");
@@ -162,7 +177,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     setDescricao(""); setValor(""); setObservacoes(""); setCategoriaId(""); setContaId(""); setFormaPagamento("");
     setBandeiraCartao(""); setParcelas("1"); setEmitirNfse(false);
     setValorRecebido(""); setPagamentoMisto(false);
-    setPagamentos([{ forma: "dinheiro", valor: "" }]);
+    setPagamentos([{ forma: "dinheiro", recebido: "" }]);
     onSaved?.();
     onOpenChange(false);
   };
@@ -276,10 +291,8 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
           {pagamentoMisto && (
             <div className="space-y-2 rounded-md border bg-muted/30 p-3">
               {pagamentos.map((p, idx) => {
-                const sugerido = Math.max(0, valorNum - pagamentos.reduce((s, q, i) => i === idx ? s : s + Number(q.valor || 0), 0));
-                const recP = Number(p.valorRecebido || 0);
-                const valP = Number(p.valor || 0);
-                const trocoP = p.forma === "dinheiro" && recP > valP ? recP - valP : 0;
+                const restanteAntes = Math.max(0, valorNum - linhasCalc.slice(0, idx).reduce((s, l) => s + l.pago, 0));
+                const trocoP = linhasCalc[idx].troco;
                 return (
                   <div key={idx} className="space-y-2 rounded border bg-background p-2">
                     <div className="grid grid-cols-[1fr_1fr_auto] gap-2 items-end">
@@ -287,7 +300,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
                         <Label className="text-xs">Forma</Label>
                         <Select
                           value={p.forma}
-                          onValueChange={(v) => setPagamentos((xs) => xs.map((q, i) => i === idx ? { ...q, forma: v, valorRecebido: v === "dinheiro" ? q.valorRecebido : "" } : q))}
+                          onValueChange={(v) => setPagamentos((xs) => xs.map((q, i) => i === idx ? { ...q, forma: v } : q))}
                         >
                           <SelectTrigger><SelectValue placeholder="Forma" /></SelectTrigger>
                           <SelectContent>
@@ -298,16 +311,16 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
                         </Select>
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-xs">Valor</Label>
+                        <Label className="text-xs">Recebido</Label>
                         <CurrencyInput
-                          value={p.valor}
-                          onChange={(v) => setPagamentos((xs) => xs.map((q, i) => i === idx ? { ...q, valor: v } : q))}
+                          value={p.recebido}
+                          onChange={(v) => setPagamentos((xs) => xs.map((q, i) => i === idx ? { ...q, recebido: v } : q))}
                           placeholder="0,00"
                         />
                       </div>
                       <div className="flex gap-1">
-                        {sugerido > 0 && (
-                          <Button type="button" variant="outline" size="sm" onClick={() => setPagamentos((xs) => xs.map((q, i) => i === idx ? { ...q, valor: sugerido.toFixed(2) } : q))}>
+                        {restanteAntes > 0 && (
+                          <Button type="button" variant="outline" size="sm" onClick={() => setPagamentos((xs) => xs.map((q, i) => i === idx ? { ...q, recebido: restanteAntes.toFixed(2) } : q))}>
                             Restante
                           </Button>
                         )}
@@ -316,19 +329,9 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
                         )}
                       </div>
                     </div>
-                    {p.forma === "dinheiro" && (
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-1">
-                          <Label className="text-xs">Recebido</Label>
-                          <CurrencyInput
-                            value={p.valorRecebido ?? ""}
-                            onChange={(v) => setPagamentos((xs) => xs.map((q, i) => i === idx ? { ...q, valorRecebido: v } : q))}
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs">Troco</Label>
-                          <Input value={formatBRL(trocoP)} disabled readOnly />
-                        </div>
+                    {p.forma === "dinheiro" && trocoP > 0 && (
+                      <div className="text-xs text-muted-foreground">
+                        Troco: <strong>{formatBRL(trocoP)}</strong>
                       </div>
                     )}
                   </div>
@@ -338,7 +341,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setPagamentos((xs) => [...xs, { forma: "", valor: "" }])}
+                onClick={() => setPagamentos((xs) => [...xs, { forma: "", recebido: "" }])}
               >
                 + Adicionar forma
               </Button>
