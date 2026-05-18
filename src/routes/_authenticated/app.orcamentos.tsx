@@ -425,6 +425,7 @@ function NovoOrcamentoDialog({
       valor_unitario: Number(i.valor_unitario) || 0,
       valor_total: (Number(i.quantidade) || 0) * (Number(i.valor_unitario) || 0),
       ordem: idx,
+      valores_formas: i.valores_formas ?? null,
     }));
     const { error: e2 } = await supabase.from("orcamento_itens").insert(itensPayload);
     setSaving(false);
