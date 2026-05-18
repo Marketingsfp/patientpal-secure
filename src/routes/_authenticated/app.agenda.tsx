@@ -31,6 +31,8 @@ import { printGuiaAtendimento } from "@/lib/print-gr";
 import { VoiceInput } from "@/components/voice-input";
 import { exportToExcel } from "@/lib/export-csv";
 import { useAuth } from "@/hooks/use-auth";
+import { useServerFn } from "@tanstack/react-start";
+import { listarEquipe } from "@/lib/equipe.functions";
 
 export const Route = createFileRoute("/_authenticated/app/agenda")({
   component: AgendaPage,
@@ -113,6 +115,15 @@ function AgendaPage() {
   const [novoPacOpen, setNovoPacOpen] = useState(false);
   const [novoPac, setNovoPac] = useState({ nome: "", cpf: "", telefone: "", data_nascimento: "", email: "" });
   const [savingPac, setSavingPac] = useState(false);
+  const [equipeList, setEquipeList] = useState<Array<{ nome: string | null; email: string | null }>>([]);
+  const fnListarEquipe = useServerFn(listarEquipe);
+  const carregarEquipe = async () => {
+    if (!clinicaAtual || equipeList.length > 0) return;
+    try {
+      const data = await fnListarEquipe({ data: { clinicaId: clinicaAtual.clinica_id } });
+      setEquipeList((data as any[]).map((m) => ({ nome: m.nome, email: m.email })));
+    } catch (_) { /* silencioso */ }
+  };
 
   const cadastrarPacienteRapido = async (e: FormEvent) => {
     e.preventDefault();
