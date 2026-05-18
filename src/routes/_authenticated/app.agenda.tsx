@@ -842,10 +842,6 @@ function AgendaPage() {
               <Checkbox checked={apenasData} onCheckedChange={(v) => setApenasData(!!v)} />
               Exibir apenas a data selecionada
             </label>
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <Checkbox checked={mostrarLivres} onCheckedChange={(v) => setMostrarLivres(!!v)} />
-              Mostrar horários livres
-            </label>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={limparFiltros}><X className="h-4 w-4 mr-2" /> Limpar</Button>
