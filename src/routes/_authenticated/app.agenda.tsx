@@ -454,18 +454,20 @@ function AgendaPage() {
     const nomeBusca = normalizar((a.procedimento ?? "CONSULTA").trim());
     const { data: lista } = await supabase
       .from("procedimentos")
-      .select("nome,valor_dinheiro,valor_pix,valor_padrao")
+      .select("nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .limit(5000);
     const proc = (lista ?? []).find((p) => normalizar(p.nome ?? "") === nomeBusca)
       ?? (lista ?? []).find((p) => normalizar(p.nome ?? "").includes(nomeBusca));
-    const vDinheiro = Number(proc?.valor_dinheiro ?? proc?.valor_padrao ?? 0);
-    const vOutros = Number(proc?.valor_padrao ?? proc?.valor_pix ?? proc?.valor_dinheiro ?? 0);
+    const vDinheiro = Number(proc?.valor_dinheiro ?? proc?.valor_dinheiro_pix ?? proc?.valor_padrao ?? 0);
+    const vPix = Number(proc?.valor_pix ?? proc?.valor_dinheiro_pix ?? proc?.valor_padrao ?? proc?.valor_dinheiro ?? 0);
+    const vDebito = Number(proc?.valor_cartao_debito ?? proc?.valor_cartao ?? proc?.valor_padrao ?? 0);
+    const vCredito = Number(proc?.valor_cartao_credito ?? proc?.valor_cartao ?? proc?.valor_padrao ?? 0);
     const opcoes: FormaOpcao[] = [
       { forma: "dinheiro", label: "Dinheiro", valor: vDinheiro },
-      { forma: "pix", label: "Pix", valor: vOutros },
-      { forma: "cartao_debito", label: "Cartão de Débito", valor: vOutros },
-      { forma: "cartao_credito", label: "Cartão de Crédito", valor: vOutros },
+      { forma: "pix", label: "Pix", valor: vPix },
+      { forma: "cartao_debito", label: "Cartão de Débito", valor: vDebito },
+      { forma: "cartao_credito", label: "Cartão de Crédito", valor: vCredito },
     ];
     setFormaPagOpcoes(opcoes);
     setFormaPagCtx({ agId: a.id, desc: `${a.paciente_nome} — ${a.procedimento ?? "CONSULTA"}` });
