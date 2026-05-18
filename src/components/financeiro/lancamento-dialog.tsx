@@ -302,7 +302,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
                         <CurrencyInput
                           value={p.valor}
                           onChange={(v) => setPagamentos((xs) => xs.map((q, i) => i === idx ? { ...q, valor: v } : q))}
-                          placeholder={sugerido > 0 ? sugerido.toFixed(2) : "0,00"}
+                          placeholder="0,00"
                         />
                       </div>
                       <div className="flex gap-1">
@@ -338,7 +338,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setPagamentos((xs) => [...xs, { forma: "", valor: restanteMisto > 0 ? restanteMisto.toFixed(2) : "" }])}
+                onClick={() => setPagamentos((xs) => [...xs, { forma: "", valor: "" }])}
               >
                 + Adicionar forma
               </Button>
