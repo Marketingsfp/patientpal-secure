@@ -13,16 +13,25 @@ import { toast } from "sonner";
 
 type Tipo = "receita" | "despesa";
 
+export interface LancamentoSavedData {
+  valor: number;
+  forma_pagamento: string | null;
+  parcelas: number | null;
+  bandeira_cartao: string | null;
+  emitir_nfse: boolean;
+}
+
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   tipo: Tipo;
   onSaved?: () => void;
+  onSavedWithData?: (data: LancamentoSavedData) => void;
   initialDescricao?: string;
   initialValor?: string;
 }
 
-export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, initialDescricao, initialValor }: Props) {
+export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWithData, initialDescricao, initialValor }: Props) {
   const { clinicaAtual } = useClinica();
   const [descricao, setDescricao] = useState("");
   const [valor, setValor] = useState("");
@@ -83,6 +92,13 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, initialDes
     setSaving(false);
     if (error) { toast.error(error.message); return; }
     toast.success(`${tipo === "receita" ? "Receita" : "Despesa"} registrada`);
+    onSavedWithData?.({
+      valor: Number(valor),
+      forma_pagamento: formaPagamento || null,
+      parcelas: isCredito ? (Number(parcelas) || 1) : null,
+      bandeira_cartao: isCredito ? bandeiraCartao : null,
+      emitir_nfse: emitirNfse,
+    });
     setDescricao(""); setValor(""); setObservacoes(""); setCategoriaId(""); setContaId(""); setFormaPagamento("");
     setBandeiraCartao(""); setParcelas("1"); setEmitirNfse(false);
     onSaved?.();

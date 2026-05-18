@@ -108,6 +108,7 @@ function AgendaPage() {
   const [saving, setSaving] = useState(false);
   const [pagamentoOpen, setPagamentoOpen] = useState(false);
   const [pagamentoDesc, setPagamentoDesc] = useState("");
+  const [pagamentoAgId, setPagamentoAgId] = useState<string | null>(null);
   const [novoPacOpen, setNovoPacOpen] = useState(false);
   const [novoPac, setNovoPac] = useState({ nome: "", cpf: "", telefone: "", data_nascimento: "", email: "" });
   const [savingPac, setSavingPac] = useState(false);
@@ -348,6 +349,7 @@ function AgendaPage() {
     const valor = Number(proc?.valor_dinheiro ?? proc?.valor_padrao ?? 0);
     setPagamentoDesc(`${a.paciente_nome} — ${a.procedimento ?? "CONSULTA"}`);
     setPagamentoValor(valor > 0 ? valor.toFixed(2) : "");
+    setPagamentoAgId(a.id);
     setPagamentoOpen(true);
   };
 
@@ -572,10 +574,31 @@ function AgendaPage() {
 
       <LancamentoDialog
         open={pagamentoOpen}
-        onOpenChange={setPagamentoOpen}
+        onOpenChange={(v) => { setPagamentoOpen(v); if (!v) setPagamentoAgId(null); }}
         tipo="receita"
         initialDescricao={pagamentoDesc}
         initialValor={pagamentoValor}
+        onSavedWithData={async (dados) => {
+          if (!pagamentoAgId || !clinicaAtual) return;
+          if (confirm("Pagamento registrado. Imprimir Guia de Atendimento (GR) agora?")) {
+            try {
+              await printGuiaAtendimento({
+                agendamentoId: pagamentoAgId,
+                clinicaId: clinicaAtual.clinica_id,
+                usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
+                pagamento: {
+                  valor: dados.valor,
+                  forma_pagamento: dados.forma_pagamento,
+                  parcelas: dados.parcelas,
+                  bandeira_cartao: dados.bandeira_cartao,
+                },
+              });
+            } catch (err) {
+              toast.error(err instanceof Error ? err.message : "Falha ao imprimir GR");
+            }
+          }
+          setPagamentoAgId(null);
+        }}
       />
 
       <Dialog open={novoPacOpen} onOpenChange={setNovoPacOpen}>
