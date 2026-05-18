@@ -12,6 +12,12 @@ export interface PrintGRInput {
   agendamentoId: string;
   clinicaId: string;
   usuarioNome?: string;
+  pagamento?: {
+    valor: number;
+    forma_pagamento: string | null;
+    parcelas: number | null;
+    bandeira_cartao: string | null;
+  };
 }
 
 const fmtBRL = (v: number) =>
@@ -34,7 +40,17 @@ const fmtDataSimples = (iso: string | null) => {
 const esc = (s: string | null | undefined) =>
   (s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]!));
 
-export async function printGuiaAtendimento({ agendamentoId, clinicaId, usuarioNome }: PrintGRInput) {
+const FORMA_LABEL: Record<string, string> = {
+  dinheiro: "DINHEIRO",
+  pix: "PIX",
+  cartao_credito: "CARTÃO CRÉDITO",
+  cartao_debito: "CARTÃO DÉBITO",
+  boleto: "BOLETO",
+  convenio: "CONVÊNIO",
+  transferencia: "TRANSFERÊNCIA",
+};
+
+export async function printGuiaAtendimento({ agendamentoId, clinicaId, usuarioNome, pagamento }: PrintGRInput) {
   // Busca dados em paralelo
   const [ag, cli] = await Promise.all([
     supabase
@@ -80,7 +96,8 @@ export async function printGuiaAtendimento({ agendamentoId, clinicaId, usuarioNo
   const medicoNome = (med.data as { nome: string } | null)?.nome ?? "—";
   const procData = proc.data as { nome: string; valor_dinheiro_pix: number | null; valor_cartao: number | null } | null;
 
-  const valor = Number(procData?.valor_dinheiro_pix ?? 0);
+  // Se já temos pagamento informado, usa ele; senão tenta tabela de procedimentos
+  const valor = pagamento ? Number(pagamento.valor) : Number(procData?.valor_dinheiro_pix ?? 0);
   const procNome = (a.procedimento || procData?.nome || "CONSULTA").toUpperCase();
 
   // Ficha = sequência do dia (placeholder simples baseado nos minutos)
@@ -90,6 +107,12 @@ export async function printGuiaAtendimento({ agendamentoId, clinicaId, usuarioNo
   // Repasse padrão 50/50 — pode ser ajustado depois pelas regras de split
   const clinica = valor / 2;
   const prestador = valor / 2;
+
+  const formaLbl = pagamento?.forma_pagamento ? (FORMA_LABEL[pagamento.forma_pagamento] ?? pagamento.forma_pagamento.toUpperCase()) : "DINHEIRO";
+  const parcelasTxt = pagamento && pagamento.forma_pagamento === "cartao_credito" && pagamento.parcelas && pagamento.parcelas > 1
+    ? `${pagamento.parcelas}x DE ${fmtBRL(valor / pagamento.parcelas)}`
+    : "À VISTA";
+  const bandeiraTxt = pagamento?.bandeira_cartao ? pagamento.bandeira_cartao.toUpperCase() : "";
 
   const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado].filter(Boolean).join("<br/>");
 
@@ -162,9 +185,16 @@ export async function printGuiaAtendimento({ agendamentoId, clinicaId, usuarioNo
 
     ${valor > 0 ? `
     <div class="row" style="margin-top:8px">
-      <div class="bold">VALOR RECEBIDO<br/><span class="sm">(DINHEIRO)</span></div>
+      <div class="bold">VALOR RECEBIDO<br/><span class="sm">(${esc(formaLbl)})</span></div>
       <div class="bold lg">${fmtBRL(valor)}</div>
     </div>
+
+    ${pagamento?.forma_pagamento === "cartao_credito" ? `
+    <table>
+      ${bandeiraTxt ? `<tr><td class="label">BANDEIRA:</td><td class="v right">${esc(bandeiraTxt)}</td></tr>` : ""}
+      <tr><td class="label">PARCELAMENTO:</td><td class="v right">${parcelasTxt}</td></tr>
+    </table>
+    ` : ""}
 
     <div class="sep"></div>
     <table>
