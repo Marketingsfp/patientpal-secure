@@ -688,7 +688,7 @@ function AgendaPage() {
               </div>
               <div className="space-y-1">
                 <Label>Procedimento</Label>
-                {form.medico_id && procPorMedico.get(form.medico_id)?.size ? (
+                {form.medico_id && (procPorMedico.get(form.medico_id)?.size || procNomesPorMedico.get(form.medico_id)?.size) ? (
                   <p className="text-xs text-muted-foreground">Mostrando apenas procedimentos configurados para este médico.</p>
                 ) : null}
                 <SearchableSelect
@@ -700,8 +700,13 @@ function AgendaPage() {
                     { value: "none", label: "— Selecione —" },
                     ...(() => {
                       const idsDoMedico = form.medico_id ? procPorMedico.get(form.medico_id) : undefined;
-                      const filtrados = (idsDoMedico && idsDoMedico.size > 0)
-                        ? procedimentosList.filter((p) => idsDoMedico.has(p.id))
+                      const nomesDoMedico = form.medico_id ? procNomesPorMedico.get(form.medico_id) : undefined;
+                      const temConfig = (idsDoMedico && idsDoMedico.size > 0) || (nomesDoMedico && nomesDoMedico.size > 0);
+                      const filtrados = temConfig
+                        ? procedimentosList.filter((p) =>
+                            (idsDoMedico?.has(p.id) ?? false) ||
+                            (nomesDoMedico?.has(normalizar(p.nome)) ?? false)
+                          )
                         : procedimentosList;
                       return filtrados.map((p) => ({ value: p.nome, label: p.nome }));
                     })(),
