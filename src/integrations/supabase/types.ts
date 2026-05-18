@@ -1857,6 +1857,7 @@ export type Database = {
           updated_at: string
           validade_dias: number
           valor_total: number
+          valores_pagamento: Json | null
         }
         Insert: {
           clinica_id: string
@@ -1879,6 +1880,7 @@ export type Database = {
           updated_at?: string
           validade_dias?: number
           valor_total?: number
+          valores_pagamento?: Json | null
         }
         Update: {
           clinica_id?: string
@@ -1901,6 +1903,7 @@ export type Database = {
           updated_at?: string
           validade_dias?: number
           valor_total?: number
+          valores_pagamento?: Json | null
         }
         Relationships: []
       }

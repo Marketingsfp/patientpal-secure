@@ -214,6 +214,7 @@ function NovoOrcamentoDialog({
   const [clinicaSolicitante, setClinicaSolicitante] = useState("");
   const [medicos, setMedicos] = useState<MedicoOpt[]>([]);
   const [formasPagamento, setFormasPagamento] = useState<string[]>(["Dinheiro"]);
+  const [valoresPagamento, setValoresPagamento] = useState<Record<string, number>>({});
   const [desconto, setDesconto] = useState(0);
   const [validade, setValidade] = useState(30);
   const [observacoes, setObservacoes] = useState("");
@@ -340,6 +341,7 @@ function NovoOrcamentoDialog({
       }
       return [...cur, f];
     });
+    setValoresPagamento({});
   };
 
   const adicionarProc = (p: Procedimento) => {
@@ -372,6 +374,15 @@ function NovoOrcamentoDialog({
     if (!pacienteNome.trim()) return toast.error("Informe o nome do paciente");
     if (itens.length === 0) return toast.error("Adicione ao menos um procedimento");
     if (formasPagamento.length === 0) return toast.error("Selecione ao menos uma forma de pagamento");
+    let valoresPag: Record<string, number> | null = null;
+    if (formasPagamento.length > 1) {
+      valoresPag = {};
+      for (const f of formasPagamento) valoresPag[f] = Math.round((Number(valoresPagamento[f]) || 0) * 100) / 100;
+      const soma = Object.values(valoresPag).reduce((s, v) => s + v, 0);
+      if (Math.abs(soma - total) > 0.01) {
+        return toast.error(`A soma das formas (${BRL(soma)}) deve ser igual ao total (${BRL(total)})`);
+      }
+    }
     setSaving(true);
 
     const { data: orc, error } = await supabase
@@ -386,6 +397,7 @@ function NovoOrcamentoDialog({
         medico_externo: medicoExterno,
         clinica_solicitante: medicoExterno ? (clinicaSolicitante.trim() || null) : null,
         forma_pagamento: formasPagamento.join(" + "),
+        valores_pagamento: valoresPag,
         validade_dias: validade,
         desconto: Number(desconto) || 0,
         valor_total: total,
@@ -497,6 +509,40 @@ function NovoOrcamentoDialog({
                 <p className="text-xs text-muted-foreground">
                   Os valores na tabela usam a 1ª forma selecionada (<b>{formasPagamento[0]}</b>).
                 </p>
+              )}
+              {formasPagamento.length > 1 && (
+                <div className="mt-2 rounded-md border p-2 space-y-2">
+                  <div className="text-xs font-medium text-muted-foreground">Valor por forma (total: <b>{BRL(total)}</b>)</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {formasPagamento.map((f) => (
+                      <div key={f} className="space-y-1">
+                        <Label className="text-xs">{f}</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min={0}
+                          value={valoresPagamento[f] ?? ""}
+                          placeholder="0,00"
+                          onChange={(e) =>
+                            setValoresPagamento((cur) => ({ ...cur, [f]: Number(e.target.value) || 0 }))
+                          }
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  {(() => {
+                    const soma = formasPagamento.reduce((s, f) => s + (Number(valoresPagamento[f]) || 0), 0);
+                    const diff = Math.round((soma - total) * 100) / 100;
+                    if (Math.abs(diff) < 0.01) {
+                      return <div className="text-xs text-emerald-600">Soma confere com o total.</div>;
+                    }
+                    return (
+                      <div className="text-xs text-amber-600">
+                        Soma: {BRL(soma)} · {diff > 0 ? `Excede em ${BRL(diff)}` : `Faltam ${BRL(-diff)}`}
+                      </div>
+                    );
+                  })()}
+                </div>
               )}
             </div>
             <div className="space-y-1"><Label>Validade (dias)</Label><Input type="number" min={1} value={validade} onChange={(e) => setValidade(Number(e.target.value) || 30)} /></div>
