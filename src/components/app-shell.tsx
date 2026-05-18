@@ -38,8 +38,10 @@ import { Button } from "@/components/ui/button";
 
 const VoiceInput = lazy(() => import("@/components/voice-input").then((m) => ({ default: m.VoiceInput })));
 
-const navRows = [
-  [
+const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<{ to: string; label: string; icon: typeof LayoutDashboard }> }> = [
+  {
+    label: "Operação",
+    items: [
     { to: "/app", label: "Dashboard", icon: LayoutDashboard },
     { to: "/app/recepcao", label: "Recepção / Filas", icon: Bell },
     { to: "/app/fluxo", label: "Fluxo do paciente", icon: Workflow },
@@ -48,8 +50,11 @@ const navRows = [
     { to: "/app/procedimentos", label: "Procedimentos", icon: ClipboardList },
     { to: "/app/orcamentos", label: "Orçamentos", icon: FileText },
     { to: "/app/cartao-beneficios", label: "Cartão Benefícios", icon: CreditCard },
-  ],
-  [
+    ],
+  },
+  {
+    label: "Inteligência",
+    items: [
     { to: "/app/crm", label: "CRM", icon: Target },
     { to: "/app/nina", label: "Nina — WhatsApp", icon: MessageCircle },
     { to: "/app/atendimento-ia", label: "Atendimento IA", icon: Brain },
@@ -57,8 +62,11 @@ const navRows = [
     { to: "/app/alertas-enfermagem", label: "Enfermeira IA — Alertas", icon: BellRing },
     { to: "/app/prontuario-modelos", label: "Modelos de Prontuário", icon: FileHeart },
     { to: "/app/consulta-rapida", label: "Informações rápidas", icon: BookOpen },
-  ],
-  [
+    ],
+  },
+  {
+    label: "Gestão",
+    items: [
     { to: "/app/financeiro", label: "Financeiro", icon: DollarSign },
     { to: "/app/clinicas", label: "Clínicas", icon: Building2 },
     { to: "/app/medicos", label: "Médicos", icon: Stethoscope },
@@ -67,8 +75,9 @@ const navRows = [
     { to: "/app/equipe", label: "Equipe", icon: Users },
     { to: "/app/auditoria", label: "Auditoria", icon: ShieldCheck },
     { to: "/app/relatorios", label: "Relatórios", icon: BarChart3 },
-  ],
-] as const;
+    ],
+  },
+];
 
 export function AppShell() {
   const { user, signOut, loading } = useAuth();
@@ -124,24 +133,28 @@ export function AppShell() {
 
   return (
     <div className="min-h-screen flex flex-col bg-muted/30">
-      <header
-        className="text-white sticky top-0 z-30 shadow-sm bg-slate-800"
-        style={{
-          backgroundColor: clinicaAtual ? corDaClinica(clinicaAtual.clinica.nome) : undefined,
-          ["--nav-hover" as never]: clinicaAtual ? corHoverDaClinica(clinicaAtual.clinica.nome) : "rgba(0,0,0,0.25)",
-        }}
-      >
-        <div className="flex items-center justify-between gap-3 px-4 py-2 border-b border-white/15">
-          <Link to="/app" className="flex items-center gap-2 min-w-0">
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/15 backdrop-blur shrink-0">
+      <header className="sticky top-0 z-30 bg-card border-b border-border shadow-sm">
+        {/* faixa colorida indicando a clínica ativa */}
+        <div
+          className="h-1 w-full"
+          style={{ backgroundColor: clinicaAtual ? corDaClinica(clinicaAtual.clinica.nome) : "hsl(var(--border))" }}
+        />
+
+        {/* topo: logo, clínica, voz, sair */}
+        <div className="flex items-center justify-between gap-3 px-5 py-2.5">
+          <Link to="/app" className="flex items-center gap-2.5 min-w-0">
+            <span
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-white shrink-0"
+              style={{ backgroundColor: clinicaAtual ? corDaClinica(clinicaAtual.clinica.nome) : "hsl(var(--muted-foreground))" }}
+            >
               <Activity className="h-5 w-5" />
             </span>
-            <span className="text-lg font-semibold tracking-tight hidden sm:inline">ClinicaOS</span>
+            <span className="text-base font-semibold tracking-tight hidden sm:inline text-foreground">ClinicaOS</span>
             {clinicaAtual && logoDaClinica(clinicaAtual.clinica.nome) && (
               <img
                 src={logoDaClinica(clinicaAtual.clinica.nome)!}
                 alt={clinicaAtual.clinica.nome}
-                className="h-9 w-auto object-contain bg-white/95 rounded-md px-1 ml-2 hidden md:block"
+                className="h-8 w-auto object-contain ml-2 hidden md:block"
               />
             )}
           </Link>
@@ -156,7 +169,7 @@ export function AppShell() {
             </Suspense>
             {memberships.length > 0 && (
               <Select value={clinicaAtual?.clinica_id} onValueChange={setClinicaAtual}>
-                <SelectTrigger className="w-56 font-semibold bg-white/95 text-foreground border-0" style={{ color: corDaClinica(clinicaAtual?.clinica.nome) }}>
+                <SelectTrigger className="w-56 font-semibold" style={{ color: corDaClinica(clinicaAtual?.clinica.nome) }}>
                   <SelectValue placeholder="Selecione a clínica" />
                 </SelectTrigger>
                 <SelectContent>
@@ -171,40 +184,45 @@ export function AppShell() {
                 </SelectContent>
               </Select>
             )}
-            <span className="text-[11px] text-white/80 hidden lg:inline max-w-[180px] truncate">{user?.email}</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 text-white hover:bg-[var(--nav-hover)] hover:text-white"
-              onClick={handleSignOut}
-              title="Sair"
-            >
+            <span className="text-xs text-muted-foreground hidden lg:inline max-w-[180px] truncate">{user?.email}</span>
+            <Button variant="ghost" size="sm" className="h-8" onClick={handleSignOut} title="Sair">
               <LogOut className="h-4 w-4 mr-1" /> Sair
             </Button>
           </div>
         </div>
 
-        <nav className="px-3 py-2 space-y-1.5 font-sans">
-          {navRows.map((row, rowIdx) => (
-            <div key={rowIdx} className="flex flex-wrap gap-1.5">
-              {row.map((item) => {
-                const active = location.pathname === item.to ||
-                  (item.to !== "/app" && location.pathname.startsWith(item.to));
-                return (
-                  <Link
-                    key={item.to}
-                    to={item.to}
-                    className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-semibold tracking-wide transition-colors whitespace-nowrap ${
-                      active
-                        ? "bg-[var(--nav-hover)] text-white"
-                        : "text-white/90 hover:bg-[var(--nav-hover)] hover:text-white"
-                    }`}
-                  >
-                    <item.icon className="h-3.5 w-3.5" />
-                    {item.label}
-                  </Link>
-                );
-              })}
+        {/* navegação em 3 linhas com rótulo de seção */}
+        <nav className="px-5 pb-3 pt-1 space-y-1.5 font-sans">
+          {navRows.map((row) => (
+            <div key={row.label} className="flex items-center gap-3">
+              <span className="hidden md:inline-block w-20 shrink-0 text-[10px] uppercase tracking-[0.12em] text-muted-foreground/70 font-semibold">
+                {row.label}
+              </span>
+              <div className="flex flex-wrap items-center gap-1">
+                {row.items.map((item) => {
+                  const active = location.pathname === item.to ||
+                    (item.to !== "/app" && location.pathname.startsWith(item.to));
+                  const cor = clinicaAtual ? corDaClinica(clinicaAtual.clinica.nome) : "hsl(var(--primary))";
+                  return (
+                    <Link
+                      key={item.to}
+                      to={item.to}
+                      className={`group flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all whitespace-nowrap ${
+                        active
+                          ? "text-white shadow-sm"
+                          : "text-foreground/70 hover:text-foreground hover:bg-muted"
+                      }`}
+                      style={active ? { backgroundColor: cor } : undefined}
+                    >
+                      <item.icon
+                        className="h-3.5 w-3.5 shrink-0"
+                        style={!active ? { color: cor } : undefined}
+                      />
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
           ))}
         </nav>
