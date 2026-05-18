@@ -19,6 +19,7 @@ export interface LancamentoSavedData {
   parcelas: number | null;
   bandeira_cartao: string | null;
   emitir_nfse: boolean;
+  pagamentos_detalhe?: Array<{ forma: string; pago: number; troco: number; recebido: number }>;
 }
 
 interface Props {
@@ -173,6 +174,16 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       parcelas: isCredito ? (Number(parcelas) || 1) : null,
       bandeira_cartao: isCredito ? bandeiraCartao : null,
       emitir_nfse: emitirNfse,
+      pagamentos_detalhe: pagamentoMisto
+        ? pagamentos
+            .map((p, i) => ({
+              forma: p.forma,
+              pago: linhasCalc[i].pago,
+              troco: linhasCalc[i].troco,
+              recebido: Number(p.recebido || 0),
+            }))
+            .filter((x) => x.forma && x.pago > 0)
+        : undefined,
     });
     setDescricao(""); setValor(""); setObservacoes(""); setCategoriaId(""); setContaId(""); setFormaPagamento("");
     setBandeiraCartao(""); setParcelas("1"); setEmitirNfse(false);
