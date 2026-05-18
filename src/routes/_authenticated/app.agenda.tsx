@@ -620,7 +620,7 @@ function AgendaPage() {
               </div>
               <div className="space-y-1">
                 <Label>Status</Label>
-                {editing ? (
+                {editing && normalizar(editing.paciente_nome) !== "disponivel" ? (
                   <Select value={form.status} onValueChange={(v) => setForm(f => ({ ...f, status: v as Status }))}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -632,7 +632,7 @@ function AgendaPage() {
                 ) : (
                   <Input value={STATUS_LABEL[form.status]} disabled readOnly />
                 )}
-                {!editing && (
+                {(!editing || normalizar(editing.paciente_nome) === "disponivel") && (
                   <p className="text-xs text-muted-foreground">Status definido automaticamente. Pode ser alterado depois pelo menu de ações.</p>
                 )}
               </div>
