@@ -1,8 +1,37 @@
-Em `src/components/app-shell.tsx`, reduzir o espaço do rodapé da sidebar (área com Recolher / e-mail / Sair):
+## Correção do filtro de Situação
 
-- Container do rodapé: trocar `p-3` por `px-2 py-1` para diminuir o padding.
-- Botão "Recolher": usar `size="sm"`, altura compacta (`h-8`), remover `mb-1`.
-- Linha do e-mail: reduzir para `px-2 py-1 text-[11px]` (em vez de `px-3 py-2 text-xs`).
-- Botão "Sair": usar `size="sm"` e `h-8`.
+Em `src/routes/_authenticated/app.agenda.tsx`:
 
-Resultado: rodapé fica visualmente colado e ocupa cerca de metade da altura atual, sem alterar o restante do menu.
+### 1. Adicionar opção "Livres" no Select de Situação
+No `SelectContent` (linhas 830-836), inserir um novo item logo após "TODOS":
+
+```tsx
+<SelectItem value="todos">TODOS</SelectItem>
+<SelectItem value="livres">Livres</SelectItem>
+{(Object.keys(STATUS_LABEL) as Status[]).map(s => (
+  <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>
+))}
+```
+
+### 2. Ajustar a lógica de filtro (linha 261)
+Substituir:
+```ts
+if (filtroStatus !== "todos" && a.status !== filtroStatus) return false;
+```
+por:
+```ts
+const ehLivre = normalizar(a.paciente_nome) === "disponivel";
+if (filtroStatus === "livres") {
+  if (!ehLivre) return false;
+} else if (filtroStatus !== "todos") {
+  if (ehLivre) return false;            // status reais não incluem horários livres
+  if (a.status !== filtroStatus) return false;
+}
+```
+
+### Comportamento resultante
+- **TODOS** → mostra livres + agendados/confirmados/realizados/cancelados/faltou.
+- **Livres** → somente horários livres ("Disponível").
+- **Agendado / Confirmado / Realizado / Cancelado / Faltou** → somente compromissos reais com aquele status (sem os livres).
+
+Nenhuma outra parte da página é alterada.
