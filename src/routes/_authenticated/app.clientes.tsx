@@ -629,6 +629,39 @@ function ClientesPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Consentimento LGPD para biometria facial */}
+      <Dialog open={!!consentFor} onOpenChange={(o) => { if (!o) setConsentFor(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Consentimento — Biometria facial</DialogTitle>
+            <DialogDescription>
+              Termo obrigatório (LGPD — Lei 13.709/2018, art. 11).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="text-sm space-y-2 max-h-72 overflow-auto rounded-md border bg-muted/30 p-3">
+            <p><strong>Paciente:</strong> {consentFor?.nome}</p>
+            <p><strong>Finalidade:</strong> identificação na recepção, totem de auto-atendimento e confirmação de identidade em atendimentos, evitando troca de prontuários.</p>
+            <p><strong>O que é armazenado:</strong> apenas um vetor matemático (descritor) do seu rosto — <em>não</em> guardamos a foto. O vetor não permite reconstruir a imagem original.</p>
+            <p><strong>Compartilhamento:</strong> os dados ficam restritos à clínica e não são compartilhados com terceiros.</p>
+            <p><strong>Direitos do titular:</strong> você pode revogar o consentimento e solicitar a exclusão da biometria a qualquer momento, pela equipe da recepção.</p>
+            <p><strong>Base legal:</strong> consentimento específico e destacado (art. 11, I).</p>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setConsentFor(null)}>Não concordo</Button>
+            <Button onClick={() => { setFaceFor(consentFor); setConsentFor(null); }}>
+              Concordo e autorizo a captura
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <FaceCaptureDialog
+        open={!!faceFor}
+        onClose={() => setFaceFor(null)}
+        onCaptured={salvarBiometria}
+        titulo={`Biometria — ${faceFor?.nome ?? ""}`}
+      />
     </div>
   );
 }
