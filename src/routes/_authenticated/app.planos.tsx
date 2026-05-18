@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -119,8 +120,8 @@ export function PlanosPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div><Label>Valor mensal (R$)</Label><Input type="number" step="0.01" value={p.valor_mensal} onChange={(e) => upd(p.id, { valor_mensal: Number(e.target.value) })}/></div>
-              <div><Label>Taxa de adesão (R$)</Label><Input type="number" step="0.01" value={p.taxa_adesao} onChange={(e) => upd(p.id, { taxa_adesao: Number(e.target.value) })}/></div>
+              <div><Label>Valor mensal (R$)</Label><CurrencyInput value={String(p.valor_mensal ?? "")} onChange={(v) => upd(p.id, { valor_mensal: Number(v) || 0 })}/></div>
+              <div><Label>Taxa de adesão (R$)</Label><CurrencyInput value={String(p.taxa_adesao ?? "")} onChange={(v) => upd(p.id, { taxa_adesao: Number(v) || 0 })}/></div>
               <div><Label>Nº parcelas</Label><Input type="number" value={p.num_parcelas} onChange={(e) => upd(p.id, { num_parcelas: Number(e.target.value) })}/></div>
               <div><Label>Máx. dependentes</Label><Input type="number" value={p.max_dependentes} onChange={(e) => upd(p.id, { max_dependentes: Number(e.target.value) })}/></div>
               <div><Label>Máx. agregados</Label><Input type="number" value={p.max_agregados} onChange={(e) => upd(p.id, { max_agregados: Number(e.target.value) })}/></div>
