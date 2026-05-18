@@ -1838,11 +1838,13 @@ export type Database = {
       orcamentos: {
         Row: {
           clinica_id: string
+          clinica_solicitante: string | null
           created_at: string
           criado_por: string | null
           desconto: number
           forma_pagamento: string | null
           id: string
+          medico_externo: boolean
           medico_id: string | null
           medico_nome: string | null
           numero: number
@@ -1858,11 +1860,13 @@ export type Database = {
         }
         Insert: {
           clinica_id: string
+          clinica_solicitante?: string | null
           created_at?: string
           criado_por?: string | null
           desconto?: number
           forma_pagamento?: string | null
           id?: string
+          medico_externo?: boolean
           medico_id?: string | null
           medico_nome?: string | null
           numero: number
@@ -1878,11 +1882,13 @@ export type Database = {
         }
         Update: {
           clinica_id?: string
+          clinica_solicitante?: string | null
           created_at?: string
           criado_por?: string | null
           desconto?: number
           forma_pagamento?: string | null
           id?: string
+          medico_externo?: boolean
           medico_id?: string | null
           medico_nome?: string | null
           numero?: number
