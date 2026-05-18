@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Barcode } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SimpleCrud } from "@/components/simple-crud/SimpleCrud";
@@ -36,7 +37,7 @@ function BoletosPage() {
       renderForm={(f, set) => (
         <div className="space-y-3">
           <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1"><Label>Valor *</Label><Input type="number" step="0.01" required value={f.valor} onChange={e => set({ ...f, valor: e.target.value })} /></div>
+            <div className="space-y-1"><Label>Valor *</Label><CurrencyInput value={f.valor} onChange={(v) => set({ ...f, valor: v })} /></div>
             <div className="space-y-1"><Label>Vencimento *</Label><Input type="date" required value={f.vencimento} onChange={e => set({ ...f, vencimento: e.target.value })} /></div>
             <div className="space-y-1"><Label>Status</Label>
               <Select value={f.status} onValueChange={v => set({ ...f, status: v })}>

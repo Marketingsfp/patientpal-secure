@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Package } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SimpleCrud } from "@/components/simple-crud/SimpleCrud";
@@ -44,7 +45,7 @@ function EstoquePage() {
             <div className="space-y-1"><Label>Unidade</Label><Input value={f.unidade} onChange={e => set({ ...f, unidade: e.target.value })} /></div>
             <div className="space-y-1"><Label>Estoque atual</Label><Input type="number" value={f.estoque_atual} onChange={e => set({ ...f, estoque_atual: e.target.value })} /></div>
             <div className="space-y-1"><Label>Mínimo</Label><Input type="number" value={f.estoque_minimo} onChange={e => set({ ...f, estoque_minimo: e.target.value })} /></div>
-            <div className="space-y-1"><Label>Custo (R$)</Label><Input type="number" step="0.01" value={f.custo_unitario} onChange={e => set({ ...f, custo_unitario: e.target.value })} /></div>
+            <div className="space-y-1"><Label>Custo (R$)</Label><CurrencyInput value={f.custo_unitario} onChange={(v) => set({ ...f, custo_unitario: v })} /></div>
           </div>
           <div className="space-y-1"><Label>Observações</Label><Textarea rows={2} value={f.observacoes} onChange={e => set({ ...f, observacoes: e.target.value })} /></div>
           <label className="flex items-center gap-2 text-sm"><Checkbox checked={f.ativo} onCheckedChange={v => set({ ...f, ativo: !!v })} /> Ativo</label>

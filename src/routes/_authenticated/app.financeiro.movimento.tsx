@@ -7,6 +7,7 @@ import { useClinica } from "@/hooks/use-clinica";
 import { exportToExcel } from "@/lib/export-csv";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
@@ -172,7 +173,7 @@ function Page() {
                 <Input required value={form.descricao} onChange={(e) => setForm({ ...form, descricao: e.target.value })} /></div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2"><Label>Valor (R$) *</Label>
-                  <Input type="number" step="0.01" required value={form.valor} onChange={(e) => setForm({ ...form, valor: e.target.value })} /></div>
+                  <CurrencyInput value={form.valor} onChange={(v) => setForm({ ...form, valor: v })} /></div>
                 <div className="space-y-2"><Label>Status</Label>
                   <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>

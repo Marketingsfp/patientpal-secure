@@ -7,6 +7,7 @@ import { useClinica } from "@/hooks/use-clinica";
 import { exportToExcel } from "@/lib/export-csv";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -780,23 +781,23 @@ function ProcedimentosPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label>Dinheiro (R$)</Label>
-                  <Input type="number" step="0.01" min="0" value={form.valor_dinheiro}
-                    onChange={(e) => setForm({ ...form, valor_dinheiro: e.target.value })} />
+                  <CurrencyInput value={form.valor_dinheiro}
+                    onChange={(v) => setForm({ ...form, valor_dinheiro: v })} />
                 </div>
                 <div className="space-y-1">
                   <Label>Cartão (R$)</Label>
-                  <Input type="number" step="0.01" min="0" value={form.valor_pix_cartao}
-                    onChange={(e) => setForm({ ...form, valor_pix_cartao: e.target.value })} />
+                  <CurrencyInput value={form.valor_pix_cartao}
+                    onChange={(v) => setForm({ ...form, valor_pix_cartao: v })} />
                 </div>
                 <div className="space-y-1">
                   <Label>Cartão Consulta (R$)</Label>
-                  <Input type="number" step="0.01" min="0" value={form.valor_cartao_consulta}
-                    onChange={(e) => setForm({ ...form, valor_cartao_consulta: e.target.value })} />
+                  <CurrencyInput value={form.valor_cartao_consulta}
+                    onChange={(v) => setForm({ ...form, valor_cartao_consulta: v })} />
                 </div>
                 <div className="space-y-1">
                   <Label>Cartão Desconto (R$)</Label>
-                  <Input type="number" step="0.01" min="0" value={form.valor_cartao_desconto}
-                    onChange={(e) => setForm({ ...form, valor_cartao_desconto: e.target.value })} />
+                  <CurrencyInput value={form.valor_cartao_desconto}
+                    onChange={(v) => setForm({ ...form, valor_cartao_desconto: v })} />
                 </div>
               </div>
             </div>

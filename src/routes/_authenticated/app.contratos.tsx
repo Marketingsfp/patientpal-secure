@@ -7,6 +7,7 @@ import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -230,8 +231,8 @@ function NovoContratoDialog({ open, onClose, planos, clinicaId, userId, onCreate
           </div>
           <div><Label>Data início</Label><Input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)}/></div>
           <div><Label>Dia de vencimento</Label><Input type="number" min={1} max={28} value={diaVenc} onChange={(e) => setDiaVenc(Number(e.target.value))}/></div>
-          <div><Label>Valor mensal (R$)</Label><Input type="number" step="0.01" value={valor} onChange={(e) => setValor(Number(e.target.value))}/></div>
-          <div><Label>Taxa de adesão (R$)</Label><Input type="number" step="0.01" value={taxa} onChange={(e) => setTaxa(Number(e.target.value))}/></div>
+          <div><Label>Valor mensal (R$)</Label><CurrencyInput value={String(valor ?? "")} onChange={(v) => setValor(Number(v) || 0)}/></div>
+          <div><Label>Taxa de adesão (R$)</Label><CurrencyInput value={String(taxa ?? "")} onChange={(v) => setTaxa(Number(v) || 0)}/></div>
           <div className="col-span-2"><Label>Forma de pagamento</Label>
             <Select value={forma} onValueChange={setForma}>
               <SelectTrigger><SelectValue/></SelectTrigger>

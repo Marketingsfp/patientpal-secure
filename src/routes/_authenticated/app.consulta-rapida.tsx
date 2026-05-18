@@ -6,6 +6,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -391,11 +392,11 @@ function ConsultaRapidaPage() {
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1.5">
                 <Label>Dinheiro (R$)</Label>
-                <Input type="number" step="0.01" value={procForm.valor_dinheiro} onChange={(e) => setProcForm({ ...procForm, valor_dinheiro: e.target.value })} />
+                <CurrencyInput value={procForm.valor_dinheiro} onChange={(v) => setProcForm({ ...procForm, valor_dinheiro: v })} />
               </div>
               <div className="space-y-1.5">
                 <Label>PIX / Cartão (R$)</Label>
-                <Input type="number" step="0.01" value={procForm.valor_pix_cartao} onChange={(e) => setProcForm({ ...procForm, valor_pix_cartao: e.target.value })} />
+                <CurrencyInput value={procForm.valor_pix_cartao} onChange={(v) => setProcForm({ ...procForm, valor_pix_cartao: v })} />
               </div>
               <div className="space-y-1.5">
                 <Label>Duração (min)</Label>

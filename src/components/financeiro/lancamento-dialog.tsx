@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -90,7 +91,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, initialDes
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Valor *</Label>
-              <Input type="number" step="0.01" min="0" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="0,00" />
+              <CurrencyInput value={valor} onChange={setValor} />
             </div>
             <div className="space-y-1.5">
               <Label>Data</Label>

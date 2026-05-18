@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -99,7 +100,7 @@ function Page() {
                     </SelectContent>
                   </Select></div>
                 <div className="space-y-2"><Label>Saldo inicial</Label>
-                  <Input type="number" step="0.01" value={form.saldo_inicial} onChange={(e) => setForm({ ...form, saldo_inicial: e.target.value })} /></div>
+                  <CurrencyInput value={form.saldo_inicial} onChange={(v) => setForm({ ...form, saldo_inicial: v })} /></div>
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-2"><Label>Banco</Label>

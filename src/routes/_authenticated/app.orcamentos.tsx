@@ -7,6 +7,7 @@ import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -636,7 +637,7 @@ function NovoOrcamentoDialog({
                         <Input value={it.descricao} onChange={(e) => setItens((a) => a.map((x, i) => i === idx ? { ...x, descricao: e.target.value } : x))} />
                       </td>
                       <td className="px-2 py-1"><Input type="number" min={1} step="1" value={it.quantidade} onChange={(e) => setItens((a) => a.map((x, i) => i === idx ? { ...x, quantidade: Number(e.target.value) || 0 } : x))} /></td>
-                      <td className="px-2 py-1"><Input type="number" step="0.01" value={it.valor_unitario} onChange={(e) => setItens((a) => a.map((x, i) => i === idx ? { ...x, valor_unitario: Number(e.target.value) || 0 } : x))} /></td>
+                      <td className="px-2 py-1"><CurrencyInput value={String(it.valor_unitario ?? "")} onChange={(v) => setItens((a) => a.map((x, i) => i === idx ? { ...x, valor_unitario: Number(v) || 0 } : x))} /></td>
                       <td className="px-2 py-1 text-right font-medium">
                         {BRL(it.quantidade * it.valor_unitario)}
                         {formasPagamento.length > 1 && (
@@ -666,7 +667,7 @@ function NovoOrcamentoDialog({
               <div className="flex justify-between text-sm"><span>Subtotal</span><span className="font-medium">{BRL(subtotal)}</span></div>
               <div className="flex justify-between items-center gap-2 text-sm">
                 <span>Desconto</span>
-                <Input type="number" step="0.01" className="w-32 text-right" value={desconto} onChange={(e) => setDesconto(Number(e.target.value) || 0)} />
+                <CurrencyInput className="w-32 text-right" value={String(desconto ?? "")} onChange={(v) => setDesconto(Number(v) || 0)} />
               </div>
               <div className="flex justify-between text-lg font-bold border-t pt-2"><span>Total</span><span className="text-primary">{BRL(total)}</span></div>
               {formasPagamento.length > 1 && (

@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Target } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SimpleCrud } from "@/components/simple-crud/SimpleCrud";
@@ -41,7 +42,7 @@ function CrmPage() {
             <div className="space-y-1"><Label>Email</Label><Input type="email" value={f.email} onChange={e => set({ ...f, email: e.target.value })} /></div>
           </div>
           <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1"><Label>Valor (R$)</Label><Input type="number" step="0.01" value={f.valor_estimado} onChange={e => set({ ...f, valor_estimado: e.target.value })} /></div>
+            <div className="space-y-1"><Label>Valor (R$)</Label><CurrencyInput value={f.valor_estimado} onChange={(v) => set({ ...f, valor_estimado: v })} /></div>
             <div className="space-y-1"><Label>Origem</Label><Input value={f.origem} onChange={e => set({ ...f, origem: e.target.value })} placeholder="Ex: Instagram" /></div>
             <div className="space-y-1"><Label>Status</Label>
               <Select value={f.status} onValueChange={v => set({ ...f, status: v as Status })}>
