@@ -211,13 +211,14 @@ function AgendaPage() {
 
   const loadRef = async () => {
     if (!clinicaAtual) return;
-    const [m, p, e, me, pr, sr] = await Promise.all([
+    const [m, p, e, me, pr, sr, mc] = await Promise.all([
       supabase.from("medicos").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("pacientes").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome").limit(500),
       supabase.from("especialidades").select("id,nome").order("nome"),
       supabase.from("medico_especialidades").select("medico_id,especialidade_id"),
       supabase.from("procedimentos").select("id,nome,tipo").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome").limit(5000),
       supabase.from("procedimento_split_regras").select("medico_id,procedimento_id").eq("clinica_id", clinicaAtual.clinica_id).not("medico_id", "is", null),
+      supabase.from("medico_convenios").select("medico_id,nome,ativo").eq("ativo", true),
     ]);
     setMedicos((m.data ?? []) as Medico[]);
     setPacientes((p.data ?? []) as Paciente[]);
@@ -238,6 +239,14 @@ function AgendaPage() {
       pm.get(r.medico_id)!.add(r.procedimento_id);
     }
     setProcPorMedico(pm);
+    const medicosIds = new Set(((m.data ?? []) as Medico[]).map((x) => x.id));
+    const nm = new Map<string, Set<string>>();
+    for (const r of (mc.data ?? []) as Array<{ medico_id: string; nome: string }>) {
+      if (!r.medico_id || !medicosIds.has(r.medico_id)) continue;
+      if (!nm.has(r.medico_id)) nm.set(r.medico_id, new Set());
+      nm.get(r.medico_id)!.add(normalizar(r.nome));
+    }
+    setProcNomesPorMedico(nm);
   };
 
   useEffect(() => { loadRef(); }, [clinicaAtual?.clinica_id]);
