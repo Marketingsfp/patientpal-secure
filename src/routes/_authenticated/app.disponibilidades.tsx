@@ -148,7 +148,7 @@ function Page() {
             <Select value={novo.medico_id} onValueChange={(v) => setNovo({ ...novo, medico_id: v })}>
               <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
               <SelectContent>
-                {medicos.map((m) => <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>)}
+                {medicos.map((m) => <SelectItem key={m.id} value={m.id} className="uppercase">{m.nome}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -191,7 +191,7 @@ function Page() {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos os médicos</SelectItem>
-                  {medicos.map((m) => <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>)}
+                  {medicos.map((m) => <SelectItem key={m.id} value={m.id} className="uppercase">{m.nome}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -237,7 +237,7 @@ function Page() {
             <Card key={m.id}>
               <CardContent className="py-3">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-medium">{m.nome}</h3>
+                  <h3 className="font-medium uppercase">{m.nome}</h3>
                   <span className="text-xs text-muted-foreground">{ds.length} horário(s)</span>
                 </div>
                 {ds.length === 0 ? (
