@@ -32,10 +32,10 @@ function Page() {
     if (!clinicaAtual) return;
     const [m, d] = await Promise.all([
       supabase.from("medicos").select("id, nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
-      supabase.from("medico_disponibilidades").select("id, medico_id, dia_semana, hora_inicio, hora_fim, observacoes, limite_pacientes").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("dia_semana").order("hora_inicio"),
+      supabase.from("medico_disponibilidades").select("id, medico_id, dia_semana, hora_inicio, hora_fim, observacoes, limite_pacientes" as never).eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("dia_semana").order("hora_inicio"),
     ]);
     setMedicos(m.data ?? []);
-    setDisps((d.data as Disp[]) ?? []);
+    setDisps(((d.data as unknown) as Disp[]) ?? []);
   };
 
   useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clinicaAtual?.clinica_id]);
@@ -49,7 +49,7 @@ function Page() {
       hora_inicio: novo.hora_inicio,
       hora_fim: novo.hora_fim,
       limite_pacientes: novo.limite_pacientes ? parseInt(novo.limite_pacientes) : null,
-    });
+    } as never);
     if (error) { toast.error(error.message); return; }
     toast.success("Horário adicionado");
     void load();
