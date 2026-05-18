@@ -117,6 +117,21 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       return;
     }
     setSaving(true);
+    if (agendamentoId && tipo === "receita") {
+      const { data: jaPago } = await supabase
+        .from("fin_lancamentos")
+        .select("id")
+        .eq("agendamento_id", agendamentoId)
+        .eq("tipo", "receita")
+        .limit(1)
+        .maybeSingle();
+      if (jaPago) {
+        toast.error("Este agendamento já possui um pagamento registrado.");
+        setSaving(false);
+        onOpenChange(false);
+        return;
+      }
+    }
     const isCredito = formaPagamento === "cartao_credito";
     if (isCredito && !bandeiraCartao) {
       toast.error("Selecione a bandeira do cartão");
