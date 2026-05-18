@@ -133,12 +133,10 @@ export function AppShell() {
 
   return (
     <div className="min-h-screen flex flex-col bg-muted/30">
-      <header className="sticky top-0 z-30 bg-slate-800 text-white shadow-md">
-        {/* faixa colorida indicando a clínica ativa */}
-        <div
-          className="h-1 w-full"
-          style={{ backgroundColor: clinicaAtual ? corDaClinica(clinicaAtual.clinica.nome) : "hsl(var(--border))" }}
-        />
+      <header
+        className="sticky top-0 z-30 text-white shadow-md"
+        style={{ backgroundColor: clinicaAtual ? corDaClinica(clinicaAtual.clinica.nome) : "#1e3a8a" }}
+      >
 
         {/* topo: logo, clínica, voz, sair */}
         <div className="flex items-center justify-between gap-3 px-5 py-2.5 text-white">
@@ -202,7 +200,7 @@ export function AppShell() {
                 {row.items.map((item) => {
                   const active = location.pathname === item.to ||
                     (item.to !== "/app" && location.pathname.startsWith(item.to));
-                  const cor = clinicaAtual ? corDaClinica(clinicaAtual.clinica.nome) : "hsl(var(--primary))";
+                  const corAtivo = clinicaAtual ? corHoverDaClinica(clinicaAtual.clinica.nome) : "#172554";
                   return (
                     <Link
                       key={item.to}
@@ -212,7 +210,7 @@ export function AppShell() {
                           ? "text-white shadow-sm"
                           : "text-white/80 hover:text-white hover:bg-white/10"
                       }`}
-                      style={active ? { backgroundColor: cor } : undefined}
+                      style={active ? { backgroundColor: corAtivo } : undefined}
                     >
                       <item.icon
                         className="h-3.5 w-3.5 shrink-0"
