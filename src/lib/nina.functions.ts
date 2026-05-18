@@ -44,7 +44,7 @@ export const getContextoClinica = createServerFn({ method: "POST" })
         .order("hora_inicio"),
       supabase
         .from("procedimentos")
-        .select("id, nome, tipo, grupo, valor_dinheiro_pix, valor_cartao, duracao_minutos, preparo")
+        .select("id, nome, tipo, grupo, valor_padrao, valor_dinheiro, valor_dinheiro_pix, valor_pix, valor_cartao, valor_cartao_credito, valor_cartao_debito, duracao_minutos, preparo")
         .eq("clinica_id", data.clinicaId)
         .eq("ativo", true)
         .order("nome"),
@@ -62,7 +62,32 @@ export const getContextoClinica = createServerFn({ method: "POST" })
         })),
     }));
 
-    return { medicos, procedimentos: procR.data ?? [] };
+    const procedimentos = (procR.data ?? []).map((p: any) => {
+      const dinheiro =
+        Number(p.valor_dinheiro_pix) ||
+        Number(p.valor_dinheiro) ||
+        Number(p.valor_pix) ||
+        Number(p.valor_padrao) ||
+        0;
+      const cartao =
+        Number(p.valor_cartao) ||
+        Number(p.valor_cartao_credito) ||
+        Number(p.valor_cartao_debito) ||
+        Number(p.valor_padrao) ||
+        dinheiro ||
+        0;
+      return {
+        id: p.id,
+        nome: p.nome,
+        tipo: p.tipo,
+        grupo: p.grupo,
+        duracao_minutos: p.duracao_minutos,
+        preparo: p.preparo,
+        valor_dinheiro_pix: dinheiro,
+        valor_cartao: cartao,
+      };
+    });
+    return { medicos, procedimentos };
   });
 
 function montarContextoTexto(ctx: {
