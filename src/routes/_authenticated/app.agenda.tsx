@@ -557,6 +557,9 @@ function AgendaPage() {
               </div>
               <div className="space-y-1">
                 <Label>Procedimento</Label>
+                {form.medico_id && procPorMedico.get(form.medico_id)?.size ? (
+                  <p className="text-xs text-muted-foreground">Mostrando apenas procedimentos configurados para este médico.</p>
+                ) : null}
                 <SearchableSelect
                   value={form.procedimento || "none"}
                   onChange={(v) => setForm(f => ({ ...f, procedimento: v === "none" ? "" : v }))}
@@ -564,7 +567,13 @@ function AgendaPage() {
                   searchPlaceholder="Buscar procedimento..."
                   options={[
                     { value: "none", label: "— Selecione —" },
-                    ...procedimentosList.map(p => ({ value: p.nome, label: p.nome })),
+                    ...(() => {
+                      const idsDoMedico = form.medico_id ? procPorMedico.get(form.medico_id) : undefined;
+                      const filtrados = (idsDoMedico && idsDoMedico.size > 0)
+                        ? procedimentosList.filter((p) => idsDoMedico.has(p.id))
+                        : procedimentosList;
+                      return filtrados.map((p) => ({ value: p.nome, label: p.nome }));
+                    })(),
                   ]}
                 />
               </div>
