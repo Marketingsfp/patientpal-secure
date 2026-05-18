@@ -454,15 +454,31 @@ function AgendaPage() {
     const nomeBusca = normalizar((a.procedimento ?? "CONSULTA").trim());
     const { data: lista } = await supabase
       .from("procedimentos")
-      .select("nome,valor_dinheiro,valor_padrao")
+      .select("nome,valor_dinheiro,valor_pix,valor_padrao")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .limit(5000);
     const proc = (lista ?? []).find((p) => normalizar(p.nome ?? "") === nomeBusca)
       ?? (lista ?? []).find((p) => normalizar(p.nome ?? "").includes(nomeBusca));
-    const valor = Number(proc?.valor_dinheiro ?? proc?.valor_padrao ?? 0);
-    setPagamentoDesc(`${a.paciente_nome} — ${a.procedimento ?? "CONSULTA"}`);
-    setPagamentoValor(valor > 0 ? valor.toFixed(2) : "");
-    setPagamentoAgId(a.id);
+    const vDinheiro = Number(proc?.valor_dinheiro ?? proc?.valor_padrao ?? 0);
+    const vOutros = Number(proc?.valor_padrao ?? proc?.valor_pix ?? proc?.valor_dinheiro ?? 0);
+    const opcoes: FormaOpcao[] = [
+      { forma: "dinheiro", label: "Dinheiro", valor: vDinheiro },
+      { forma: "pix", label: "Pix", valor: vOutros },
+      { forma: "cartao_debito", label: "Cartão de Débito", valor: vOutros },
+      { forma: "cartao_credito", label: "Cartão de Crédito", valor: vOutros },
+    ];
+    setFormaPagOpcoes(opcoes);
+    setFormaPagCtx({ agId: a.id, desc: `${a.paciente_nome} — ${a.procedimento ?? "CONSULTA"}` });
+    setFormaPagOpen(true);
+  };
+
+  const escolherForma = (op: FormaOpcao) => {
+    if (!formaPagCtx) return;
+    setPagamentoDesc(formaPagCtx.desc);
+    setPagamentoValor(op.valor > 0 ? op.valor.toFixed(2) : "");
+    setPagamentoForma(op.forma);
+    setPagamentoAgId(formaPagCtx.agId);
+    setFormaPagOpen(false);
     setPagamentoOpen(true);
   };
 
