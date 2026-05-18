@@ -507,7 +507,18 @@ function ClientesPage() {
               <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum cliente encontrado.</TableCell></TableRow>
             ) : filtrados.map(p => (
               <TableRow key={p.id}>
-                <TableCell className="font-medium">{p.nome}</TableCell>
+                <TableCell className="font-medium">
+                  <div className="flex items-center gap-2">
+                    <div className="h-8 w-8 rounded-full overflow-hidden border bg-muted flex items-center justify-center shrink-0">
+                      {fotoSigned[p.id] ? (
+                        <img src={fotoSigned[p.id]} alt={p.nome} className="h-full w-full object-cover" />
+                      ) : (
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </div>
+                    <span>{p.nome}</span>
+                  </div>
+                </TableCell>
                 <TableCell className="text-sm text-muted-foreground truncate max-w-[12rem]">{p.email ?? "—"}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">{p.telefone ?? "—"}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">
