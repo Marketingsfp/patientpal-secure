@@ -115,7 +115,22 @@ export async function printOrcamento(orcamentoId: string, clinicaId: string) {
       <tr class="bold lg"><td>TOTAL</td><td class="right">${fmtBRL(total)}</td></tr>
     </table>
 
-    ${o.forma_pagamento ? `<div class="sm" style="margin-top:6px">PAGAMENTO: <span class="bold">${esc(o.forma_pagamento)}</span></div>` : ""}
+    ${o.forma_pagamento ? (() => {
+      const formas = String(o.forma_pagamento).split("+").map((s: string) => s.trim()).filter(Boolean);
+      if (formas.length <= 1) {
+        return `<div class="sm" style="margin-top:6px">PAGAMENTO: <span class="bold">${esc(o.forma_pagamento)}</span></div>`;
+      }
+      const cols = formas.map((f: string) => `
+        <td class="center bold" style="border:1px solid #000; padding:3px 2px; width:${(100 / formas.length).toFixed(2)}%">
+          ${esc(f)}
+        </td>`).join("");
+      return `
+        <div class="sm bold" style="margin-top:6px">PAGAMENTO</div>
+        <table style="margin-top:2px; border-collapse:collapse; width:100%">
+          <tr>${cols}</tr>
+          <tr><td colspan="${formas.length}" class="right bold" style="border:1px solid #000; padding:3px 4px">TOTAL: ${fmtBRL(total)}</td></tr>
+        </table>`;
+    })() : ""}
     ${o.observacoes ? `<div class="sep"></div><div class="sm"><div class="bold">OBSERVAÇÕES</div>${esc(o.observacoes)}</div>` : ""}
 
     ${preparos.length > 0 ? `
