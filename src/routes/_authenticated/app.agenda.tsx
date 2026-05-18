@@ -847,10 +847,23 @@ function AgendaPage() {
                   </TableCell>
                   <TableCell className="truncate max-w-[200px]">{medicoNome(a.medico_id)}</TableCell>
                    <TableCell className="truncate max-w-[220px] uppercase">
-                     <span className="inline-flex items-center gap-1">
-                      {a.status === "confirmado" && <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />}
-                      {a.paciente_nome}
-                    </span>
+                     {normalizar(a.paciente_nome) === "disponivel" ? (
+                       <Button
+                         variant="ghost"
+                         size="sm"
+                         onClick={() => openSlot(a)}
+                         title="Agendar paciente neste horário"
+                         className="h-7 px-2 text-muted-foreground hover:text-primary"
+                       >
+                         <UserPlus className="h-4 w-4 mr-1" />
+                         Agendar
+                       </Button>
+                     ) : (
+                       <span className="inline-flex items-center gap-1">
+                         {a.status === "confirmado" && <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />}
+                         {a.paciente_nome}
+                       </span>
+                     )}
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="text-xs">{a.procedimento || "CONSULTA"}</Badge>
