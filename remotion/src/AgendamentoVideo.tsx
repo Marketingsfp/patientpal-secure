@@ -1,20 +1,17 @@
 import { AbsoluteFill, useCurrentFrame, interpolate, Sequence, Audio, staticFile } from "remotion";
 import { TransitionSeries, springTiming } from "@remotion/transitions";
-import { fade } from "@remotion/transitions/fade";
 import { slide } from "@remotion/transitions/slide";
 import { C, inter } from "./theme";
 import { SceneBusca } from "./scenes/SceneBusca";
-import { SceneAgendar } from "./scenes/SceneAgendar";
-import { ScenePagamento } from "./scenes/ScenePagamento";
+import { SceneAgendarPagar } from "./scenes/SceneAgendarPagar";
 
-const D = { busca: 330, agendar: 375, pagto: 294 };
+const D = { busca: 330, agendarPagar: 360 };
 const T = 18;
-export const AGENDAMENTO_DURATION = D.busca + D.agendar + D.pagto - T * 2;
+export const AGENDAMENTO_DURATION = D.busca + D.agendarPagar - T;
 
 const START = {
   busca: 0,
-  agendar: D.busca - T,
-  pagto: D.busca + D.agendar - T * 2,
+  agendarPagar: D.busca - T,
 };
 
 function Background() {
@@ -38,17 +35,13 @@ export const AgendamentoVideo: React.FC = () => {
           <SceneBusca />
         </TransitionSeries.Sequence>
         <TransitionSeries.Transition presentation={slide({ direction: "from-right" })} timing={springTiming({ config: { damping: 200 }, durationInFrames: T })} />
-        <TransitionSeries.Sequence durationInFrames={D.agendar}>
-          <SceneAgendar />
-        </TransitionSeries.Sequence>
-        <TransitionSeries.Transition presentation={fade()} timing={springTiming({ config: { damping: 200 }, durationInFrames: T })} />
-        <TransitionSeries.Sequence durationInFrames={D.pagto}>
-          <ScenePagamento />
+        <TransitionSeries.Sequence durationInFrames={D.agendarPagar}>
+          <SceneAgendarPagar />
         </TransitionSeries.Sequence>
       </TransitionSeries>
       <Sequence from={START.busca + 8}><Audio src={staticFile("audio/busca.mp3")} volume={0.95} /></Sequence>
-      <Sequence from={START.agendar + 8}><Audio src={staticFile("audio/agendar.mp3")} volume={0.95} /></Sequence>
-      <Sequence from={START.pagto + 8}><Audio src={staticFile("audio/pagto.mp3")} volume={0.95} /></Sequence>
+      <Sequence from={START.agendarPagar + 8}><Audio src={staticFile("audio/agendar.mp3")} volume={0.95} /></Sequence>
+      <Sequence from={START.agendarPagar + 160}><Audio src={staticFile("audio/pagto.mp3")} volume={0.95} /></Sequence>
     </AbsoluteFill>
   );
 };
