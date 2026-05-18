@@ -114,6 +114,11 @@ function AgendaPage() {
   const [pagamentoOpen, setPagamentoOpen] = useState(false);
   const [pagamentoDesc, setPagamentoDesc] = useState("");
   const [pagamentoAgId, setPagamentoAgId] = useState<string | null>(null);
+  const [pagamentoForma, setPagamentoForma] = useState<string>("");
+  type FormaOpcao = { forma: string; label: string; valor: number };
+  const [formaPagOpen, setFormaPagOpen] = useState(false);
+  const [formaPagOpcoes, setFormaPagOpcoes] = useState<FormaOpcao[]>([]);
+  const [formaPagCtx, setFormaPagCtx] = useState<{ agId: string; desc: string } | null>(null);
   const [novoPacOpen, setNovoPacOpen] = useState(false);
   const [novoPac, setNovoPac] = useState({ nome: "", cpf: "", telefone: "", data_nascimento: "", email: "" });
   const [savingPac, setSavingPac] = useState(false);
@@ -449,15 +454,31 @@ function AgendaPage() {
     const nomeBusca = normalizar((a.procedimento ?? "CONSULTA").trim());
     const { data: lista } = await supabase
       .from("procedimentos")
-      .select("nome,valor_dinheiro,valor_padrao")
+      .select("nome,valor_dinheiro,valor_pix,valor_padrao")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .limit(5000);
     const proc = (lista ?? []).find((p) => normalizar(p.nome ?? "") === nomeBusca)
       ?? (lista ?? []).find((p) => normalizar(p.nome ?? "").includes(nomeBusca));
-    const valor = Number(proc?.valor_dinheiro ?? proc?.valor_padrao ?? 0);
-    setPagamentoDesc(`${a.paciente_nome} — ${a.procedimento ?? "CONSULTA"}`);
-    setPagamentoValor(valor > 0 ? valor.toFixed(2) : "");
-    setPagamentoAgId(a.id);
+    const vDinheiro = Number(proc?.valor_dinheiro ?? proc?.valor_padrao ?? 0);
+    const vOutros = Number(proc?.valor_padrao ?? proc?.valor_pix ?? proc?.valor_dinheiro ?? 0);
+    const opcoes: FormaOpcao[] = [
+      { forma: "dinheiro", label: "Dinheiro", valor: vDinheiro },
+      { forma: "pix", label: "Pix", valor: vOutros },
+      { forma: "cartao_debito", label: "Cartão de Débito", valor: vOutros },
+      { forma: "cartao_credito", label: "Cartão de Crédito", valor: vOutros },
+    ];
+    setFormaPagOpcoes(opcoes);
+    setFormaPagCtx({ agId: a.id, desc: `${a.paciente_nome} — ${a.procedimento ?? "CONSULTA"}` });
+    setFormaPagOpen(true);
+  };
+
+  const escolherForma = (op: FormaOpcao) => {
+    if (!formaPagCtx) return;
+    setPagamentoDesc(formaPagCtx.desc);
+    setPagamentoValor(op.valor > 0 ? op.valor.toFixed(2) : "");
+    setPagamentoForma(op.forma);
+    setPagamentoAgId(formaPagCtx.agId);
+    setFormaPagOpen(false);
     setPagamentoOpen(true);
   };
 
@@ -693,12 +714,37 @@ function AgendaPage() {
         </div>
       </div>
 
+      <Dialog open={formaPagOpen} onOpenChange={setFormaPagOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Forma de pagamento</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground -mt-2">{formaPagCtx?.desc}</p>
+          <div className="grid gap-2 mt-2">
+            {formaPagOpcoes.map((op) => (
+              <Button
+                key={op.forma}
+                variant="outline"
+                className="justify-between h-12"
+                onClick={() => escolherForma(op)}
+              >
+                <span>{op.label}</span>
+                <span className="font-semibold">
+                  {op.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                </span>
+              </Button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <LancamentoDialog
         open={pagamentoOpen}
         onOpenChange={(v) => { setPagamentoOpen(v); if (!v) setPagamentoAgId(null); }}
         tipo="receita"
         initialDescricao={pagamentoDesc}
         initialValor={pagamentoValor}
+        initialFormaPagamento={pagamentoForma}
         agendamentoId={pagamentoAgId}
         onSavedWithData={async (dados) => {
           if (!pagamentoAgId || !clinicaAtual) return;
