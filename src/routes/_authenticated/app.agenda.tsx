@@ -296,7 +296,6 @@ function AgendaPage() {
     if (!form.paciente_nome.trim()) { toast.error("Informe o paciente"); return; }
     if (!form.inicio || !form.fim) { toast.error("Defina início e fim"); return; }
     if (new Date(form.fim) <= new Date(form.inicio)) { toast.error("O horário final deve ser após o inicial"); return; }
-    if (!form.medico_id) { toast.error("Selecione o médico ou exame"); return; }
     if (!form.procedimento.trim()) { toast.error("Selecione o procedimento"); return; }
     setSaving(true);
     const payload = {
