@@ -1,65 +1,30 @@
-## Identificar agendamentos pagos na coluna "Alertas"
+## Problema
+Hoje é possível clicar em "Cobrar" no mesmo agendamento mais de uma vez e gerar dois lançamentos de receita, mesmo já estando marcado como "Pago" na Agenda.
 
-Hoje, ao registrar um pagamento via `cobrarAgendamento`, o `LancamentoDialog` insere em `fin_lancamentos` sem amarrar o lançamento ao agendamento. Sem esse vínculo é impossível saber, no carregamento da Agenda, quais agendamentos já foram pagos. A solução tem 3 partes: schema, gravação e UI.
+## Solução (frontend + checagem no banco)
 
-### 1. Banco (migration)
-Adicionar a coluna `agendamento_id` em `fin_lancamentos`:
+### 1. `src/routes/_authenticated/app.agenda.tsx`
+- Em `cobrarAgendamento(a)`, antes de abrir o diálogo, verificar `pagosSet.has(a.id)`. Se já estiver pago, exibir `toast.info("Este agendamento já foi pago.")` e **não** abrir o `LancamentoDialog`.
+- Aplicar a mesma checagem nos dois pontos que chamam `cobrarAgendamento` (botão direto e item do DropdownMenu) — basta centralizar na função.
 
-```sql
-alter table public.fin_lancamentos
-  add column if not exists agendamento_id uuid
-    references public.agendamentos(id) on delete set null;
-
-create index if not exists fin_lancamentos_agendamento_id_idx
-  on public.fin_lancamentos(agendamento_id);
-```
-
-### 2. Gravação (`lancamento-dialog.tsx`)
-- Adicionar prop opcional `agendamentoId?: string | null` em `LancamentoDialogProps`.
-- Incluir `agendamento_id: agendamentoId ?? null` no objeto passado ao `supabase.from("fin_lancamentos").insert(...)` (linha ~153).
-
-Em `app.agenda.tsx`, no `<LancamentoDialog ... />` (após o `pagamentoAgId` ser definido por `cobrarAgendamento`), passar:
-```tsx
-agendamentoId={pagamentoAgId}
-```
-
-### 3. UI da Agenda (`src/routes/_authenticated/app.agenda.tsx`)
-- Após `load()` dos agendamentos, fazer um segundo fetch para descobrir quais foram pagos:
-
-```ts
-const ids = (data ?? []).map(a => a.id);
-let pagos = new Set<string>();
-if (ids.length) {
-  const { data: pg } = await supabase
+### 2. `src/components/financeiro/lancamento-dialog.tsx`
+Defesa adicional para evitar corrida (duplo clique antes do `pagosSet` ser atualizado, ou pagamento iniciado por outra aba):
+- No handler de salvar, quando `agendamentoId` estiver definido e `tipo === "receita"`, consultar antes do `insert`:
+  ```ts
+  const { data: jaPago } = await supabase
     .from("fin_lancamentos")
-    .select("agendamento_id")
-    .eq("clinica_id", clinicaAtual.clinica_id)
+    .select("id")
+    .eq("agendamento_id", agendamentoId)
     .eq("tipo", "receita")
-    .in("agendamento_id", ids);
-  pagos = new Set((pg ?? []).map(r => r.agendamento_id).filter(Boolean) as string[]);
-}
-setPagosSet(pagos);
-```
+    .limit(1)
+    .maybeSingle();
+  if (jaPago) {
+    toast.error("Este agendamento já possui um pagamento registrado.");
+    onOpenChange(false);
+    return;
+  }
+  ```
+- Também desabilitar o botão "Salvar" enquanto a requisição estiver em andamento (se ainda não estiver), para evitar duplo clique.
 
-- Novo estado: `const [pagosSet, setPagosSet] = useState<Set<string>>(new Set());`
-
-- Na célula da coluna "Alertas" (hoje renderiza apenas o badge de situação, linhas 934-936), exibir, quando `pagosSet.has(a.id)`, um badge "Pago" ao lado, com cor diferenciada (verde forte) usando os tokens do design system:
-
-```tsx
-<TableCell className="text-center">
-  <div className="inline-flex items-center gap-1 flex-wrap justify-center">
-    <Badge className={STATUS_COR[a.status]}>{STATUS_LABEL[a.status]}</Badge>
-    {pagosSet.has(a.id) && (
-      <Badge className="bg-emerald-600 text-white border border-emerald-700 hover:bg-emerald-600">
-        Pago
-      </Badge>
-    )}
-  </div>
-</TableCell>
-```
-
-- Após salvar um novo pagamento (callback `onSavedWithData` do dialog), atualizar localmente: `setPagosSet(prev => new Set(prev).add(pagamentoAgId))`, para o badge aparecer imediatamente sem precisar recarregar.
-
-### Resultado
-- Cada agendamento que tiver pelo menos um lançamento de receita vinculado aparece com um badge **Pago** verde na coluna Alertas, ao lado do badge de situação atual.
-- Lançamentos antigos sem vínculo continuam não marcados (não há como inferir retroativamente); a partir desta mudança, todo novo pagamento feito pela Agenda fica devidamente marcado.
+### Fora do escopo
+- Não vou criar constraint única no banco agora (poderia quebrar casos legítimos de estorno + novo pagamento). Se quiser, posso adicionar um índice único parcial em `fin_lancamentos(agendamento_id) WHERE tipo='receita'` num passo seguinte.

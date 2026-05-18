@@ -442,6 +442,10 @@ function AgendaPage() {
 
   const cobrarAgendamento = async (a: Agendamento) => {
     if (!clinicaAtual) return;
+    if (pagosSet.has(a.id)) {
+      toast.info("Este agendamento já foi pago.");
+      return;
+    }
     const nomeBusca = normalizar((a.procedimento ?? "CONSULTA").trim());
     const { data: lista } = await supabase
       .from("procedimentos")
