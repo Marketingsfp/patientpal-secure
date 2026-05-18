@@ -518,14 +518,21 @@ function AgendaPage() {
               </div>
               <div className="space-y-1">
                 <Label>Status</Label>
-                <Select value={form.status} onValueChange={(v) => setForm(f => ({ ...f, status: v as Status }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {(Object.keys(STATUS_LABEL) as Status[]).map(s => (
-                      <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {editing ? (
+                  <Select value={form.status} onValueChange={(v) => setForm(f => ({ ...f, status: v as Status }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(STATUS_LABEL) as Status[]).map(s => (
+                        <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input value={STATUS_LABEL[form.status]} disabled readOnly />
+                )}
+                {!editing && (
+                  <p className="text-xs text-muted-foreground">Status definido automaticamente. Pode ser alterado depois pelo menu de ações.</p>
+                )}
               </div>
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
