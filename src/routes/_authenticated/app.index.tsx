@@ -187,12 +187,12 @@ function DashboardPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {/* Consulta rápida — lembrete para a equipe */}
+        {/* Informações rápidas — lembrete para a equipe */}
         <Card className="border-primary/30 bg-primary/5">
           <CardContent className="p-4 space-y-3">
             <div className="flex items-center gap-2">
               <BookOpen className="h-5 w-5 text-primary" />
-              <h3 className="font-semibold">Consulta rápida</h3>
+              <h3 className="font-semibold">Informações rápidas</h3>
             </div>
             <p className="text-xs text-muted-foreground">
               Tire dúvidas sobre médicos, horários e valores de exames sem precisar lembrar de cor.
