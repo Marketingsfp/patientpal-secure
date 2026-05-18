@@ -161,7 +161,8 @@ const RELATORIOS: Relatorio[] = [
     icon: Stethoscope, cor: "#f0abfc",
     carregar: async ({ clinicaId }) => {
       const { data } = await supabase.from("especialidades")
-        .select("nome, descricao, ativo").eq("clinica_id", clinicaId).order("nome");
+        .select("nome, descricao, ativo").order("nome");
+      void clinicaId;
       return (data ?? []) as any;
     },
   },
@@ -349,7 +350,7 @@ function RelatoriosPage() {
             <Card key={r.id}>
               <CardHeader className="pb-3">
                 <div className="flex items-center gap-2">
-                  <Icon className="h-5 w-5" style={{ color: r.cor }} />
+                  <Icon className="h-5 w-5" color={r.cor} />
                   <CardTitle className="text-base">{r.titulo}</CardTitle>
                 </div>
               </CardHeader>
