@@ -236,6 +236,27 @@ function MedicosPage() {
     }
     setLoading(false);
     toast.success(editId ? "Médico atualizado!" : "Médico cadastrado!");
+
+    // Optionally create system user / add to clinic team
+    if (form.criarUsuario && form.email && form.senhaUsuario.length >= 6) {
+      try {
+        await cadastrarUsuarioFn({
+          data: {
+            clinicaId: clinicaAtual.clinica_id,
+            email: form.email,
+            password: form.senhaUsuario,
+            nome: form.nome,
+            role: form.roleUsuario,
+          },
+        });
+        toast.success("Usuário do sistema criado e vinculado à equipe!");
+      } catch (err: any) {
+        toast.error(`Médico salvo, mas erro ao criar usuário: ${err?.message ?? err}`);
+      }
+    } else if (form.criarUsuario) {
+      toast.warning("Informe e-mail e senha (mín. 6 caracteres) para criar o usuário.");
+    }
+
     setOpen(false);
     resetForm();
     void load();
