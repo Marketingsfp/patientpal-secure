@@ -686,6 +686,7 @@ function AgendaPage() {
                   forma_pagamento: dados.forma_pagamento,
                   parcelas: dados.parcelas,
                   bandeira_cartao: dados.bandeira_cartao,
+                  detalhe: dados.pagamentos_detalhe,
                 },
               });
             } catch (err) {
