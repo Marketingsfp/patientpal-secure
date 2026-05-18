@@ -205,7 +205,15 @@ function AgendaPage() {
 
   const fichaPorId = useMemo(() => {
     const m = new Map<string, string>();
-    items.forEach((a, i) => m.set(a.id, String(i + 1).padStart(3, "0")));
+    // Numeração sequencial por dia (reinicia a cada data) na ordem do horário
+    const contadores = new Map<string, number>();
+    const ordenados = [...items].sort((a, b) => a.inicio.localeCompare(b.inicio));
+    ordenados.forEach((a) => {
+      const dia = a.inicio.slice(0, 10);
+      const n = (contadores.get(dia) ?? 0) + 1;
+      contadores.set(dia, n);
+      m.set(a.id, String(n).padStart(3, "0"));
+    });
     return m;
   }, [items]);
 
@@ -293,6 +301,20 @@ function AgendaPage() {
     setForm({ ...EMPTY, inicio: toLocalInput(base.toISOString()), fim: toLocalInput(end.toISOString()) });
     setOpen(true);
   };
+  const openSlot = (a: Agendamento) => {
+    setEditing(a);
+    setForm({
+      paciente_nome: "",
+      paciente_id: "",
+      medico_id: a.medico_id ?? "",
+      inicio: toLocalInput(a.inicio), fim: toLocalInput(a.fim),
+      procedimento: a.procedimento ?? "CONSULTA",
+      status: "agendado",
+      observacoes: a.observacoes ?? "",
+    });
+    setOpen(true);
+  };
+
   const openEdit = (a: Agendamento) => {
     setEditing(a);
     setForm({
