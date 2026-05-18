@@ -59,11 +59,11 @@ const STATUS_LABEL: Record<Status, string> = {
   cancelado: "Cancelado", faltou: "Faltou",
 };
 const STATUS_COR: Record<Status, string> = {
-  agendado: "bg-primary/10 text-primary",
-  confirmado: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
-  realizado: "bg-blue-500/15 text-blue-700 dark:text-blue-400",
-  cancelado: "bg-muted text-muted-foreground",
-  faltou: "bg-rose-500/15 text-rose-700 dark:text-rose-400",
+  agendado: "bg-[#dbe7fb] text-slate-800 border border-[#b6cdf5]",
+  confirmado: "bg-[#cfe3fb] text-slate-800 border border-[#9fc3f3]",
+  realizado: "bg-[#d1f0d6] text-slate-800 border border-[#8fd49a]",
+  cancelado: "bg-[#f8d2d6] text-slate-800 border border-[#eea1a8]",
+  faltou: "bg-[#f7b6c0] text-slate-800 border border-[#e88594]",
 };
 const DIAS_SEMANA = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"];
 const PAGE_SIZE = 15;
