@@ -1,16 +1,8 @@
-Em `src/components/financeiro/lancamento-dialog.tsx`, refatorar o bloco de pagamento misto:
+Em `src/components/app-shell.tsx`, reduzir o espaço do rodapé da sidebar (área com Recolher / e-mail / Sair):
 
-**Estrutura das linhas**
-- `pagamentos: Array<{ forma, recebido }>` (sem campo `valor`).
-- Cada linha mostra: Forma + Recebido + botão Restante + remover. Se Dinheiro, mostra Troco abaixo.
+- Container do rodapé: trocar `p-3` por `px-2 py-1` para diminuir o padding.
+- Botão "Recolher": usar `size="sm"`, altura compacta (`h-8`), remover `mb-1`.
+- Linha do e-mail: reduzir para `px-2 py-1 text-[11px]` (em vez de `px-3 py-2 text-xs`).
+- Botão "Sair": usar `size="sm"` e `h-8`.
 
-**Cálculo derivado por linha**
-- Dinheiro: `pago = min(recebido, restanteAntesDessaLinha)`, `troco = max(0, recebido - pago)`.
-- Outras formas: `pago = recebido`, `troco = 0`.
-- `totalPagoMisto = Σ pago`, `restanteMisto = max(0, valor - totalPagoMisto)`.
-
-**Botão Restante**: preenche `recebido` com o que falta para zerar naquela linha.
-
-**Validação no salvar**: soma dos `pago` deve igualar o valor total (tol. 0,01). Observação registrada usa `pago` por linha, citando troco quando houver.
-
-**Escopo**: apenas esse arquivo. Não mexer no modo single, cartão de crédito, NFS-e ou fluxo da Agenda.
+Resultado: rodapé fica visualmente colado e ocupa cerca de metade da altura atual, sem alterar o restante do menu.

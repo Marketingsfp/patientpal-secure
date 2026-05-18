@@ -163,22 +163,24 @@ export function AppShell() {
             );
           })}
         </nav>
-        <div className="p-3 border-t border-white/20 mt-auto">
+        <div className="px-2 py-1 border-t border-white/20 mt-auto">
           <Button
             variant="ghost"
+            size="sm"
             title={collapsed ? "Expandir menu" : "Recolher menu"}
-            className={`w-full mb-1 ${collapsed ? "justify-center px-0" : "justify-start"} text-white hover:bg-[var(--nav-hover)] hover:text-white`}
+            className={`w-full h-8 ${collapsed ? "justify-center px-0" : "justify-start"} text-white hover:bg-[var(--nav-hover)] hover:text-white`}
             onClick={toggleCollapsed}
           >
             {collapsed ? <PanelLeftOpen className={`h-4 w-4`} /> : <><PanelLeftClose className="h-4 w-4 mr-2" /> Recolher</>}
           </Button>
           {!collapsed && (
-            <div className="px-3 py-2 text-xs text-white/70 truncate">{user?.email}</div>
+            <div className="px-2 py-1 text-[11px] text-white/70 truncate">{user?.email}</div>
           )}
           <Button
             variant="ghost"
+            size="sm"
             title={collapsed ? "Sair" : undefined}
-            className={`w-full ${collapsed ? "justify-center px-0" : "justify-start"} text-white hover:bg-[var(--nav-hover)] hover:text-white`}
+            className={`w-full h-8 ${collapsed ? "justify-center px-0" : "justify-start"} text-white hover:bg-[var(--nav-hover)] hover:text-white`}
             onClick={handleSignOut}
           >
             <LogOut className={`h-4 w-4 ${collapsed ? "" : "mr-2"}`} /> {!collapsed && "Sair"}
