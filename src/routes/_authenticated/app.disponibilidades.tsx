@@ -16,7 +16,7 @@ export const Route = createFileRoute("/_authenticated/app/disponibilidades")({
 
 const DIAS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
-interface Disp { id: string; medico_id: string; dia_semana: number; hora_inicio: string; hora_fim: string; observacoes: string | null }
+interface Disp { id: string; medico_id: string; dia_semana: number; hora_inicio: string; hora_fim: string; observacoes: string | null; limite_pacientes: number | null }
 interface Medico { id: string; nome: string }
 
 function Page() {
@@ -24,7 +24,7 @@ function Page() {
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [disps, setDisps] = useState<Disp[]>([]);
   const [filtro, setFiltro] = useState("");
-  const [novo, setNovo] = useState({ medico_id: "", dia_semana: "1", hora_inicio: "08:00", hora_fim: "12:00" });
+  const [novo, setNovo] = useState({ medico_id: "", dia_semana: "1", hora_inicio: "08:00", hora_fim: "12:00", limite_pacientes: "" });
   const [gerar, setGerar] = useState({ medico_id: "all", duracao: "5", dias: "30" });
   const [gerando, setGerando] = useState(false);
 
@@ -32,10 +32,10 @@ function Page() {
     if (!clinicaAtual) return;
     const [m, d] = await Promise.all([
       supabase.from("medicos").select("id, nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
-      supabase.from("medico_disponibilidades").select("id, medico_id, dia_semana, hora_inicio, hora_fim, observacoes").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("dia_semana").order("hora_inicio"),
+      supabase.from("medico_disponibilidades").select("id, medico_id, dia_semana, hora_inicio, hora_fim, observacoes, limite_pacientes" as never).eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("dia_semana").order("hora_inicio"),
     ]);
     setMedicos(m.data ?? []);
-    setDisps((d.data as Disp[]) ?? []);
+    setDisps(((d.data as unknown) as Disp[]) ?? []);
   };
 
   useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clinicaAtual?.clinica_id]);
@@ -48,7 +48,8 @@ function Page() {
       dia_semana: parseInt(novo.dia_semana),
       hora_inicio: novo.hora_inicio,
       hora_fim: novo.hora_fim,
-    });
+      limite_pacientes: novo.limite_pacientes ? parseInt(novo.limite_pacientes) : null,
+    } as never);
     if (error) { toast.error(error.message); return; }
     toast.success("Horário adicionado");
     void load();
@@ -77,17 +78,22 @@ function Page() {
       const dow = d.getDay();
       for (const m of alvo) {
         const ds = disps.filter((x) => x.medico_id === m.id && x.dia_semana === dow);
+        // Limite di rio: soma os limites das janelas do dia (se algum estiver definido)
+        const limitesDoDia = ds.map((x) => x.limite_pacientes).filter((n): n is number => typeof n === "number" && n > 0);
+        const limiteDia = limitesDoDia.length > 0 ? limitesDoDia.reduce((a, b) => a + b, 0) : Infinity;
+        let criadosNoDia = 0;
         for (const disp of ds) {
           const [hi, mi] = disp.hora_inicio.split(":").map(Number);
           const [hf, mf] = disp.hora_fim.split(":").map(Number);
           let cur = hi * 60 + mi;
           const end = hf * 60 + mf;
-          while (cur + dur <= end) {
+          while (cur + dur <= end && criadosNoDia < limiteDia) {
             const inicio = `${String(Math.floor(cur / 60)).padStart(2, "0")}:${String(cur % 60).padStart(2, "0")}`;
             const fimMin = cur + dur;
             const fim = `${String(Math.floor(fimMin / 60)).padStart(2, "0")}:${String(fimMin % 60).padStart(2, "0")}`;
             out.push({ data: d.toISOString().slice(0, 10), medico: m.nome, inicio, fim });
             cur += dur;
+            criadosNoDia += 1;
           }
         }
       }
@@ -160,6 +166,10 @@ function Page() {
           <div>
             <label className="text-xs text-muted-foreground">Fim</label>
             <Input type="time" className="w-28" value={novo.hora_fim} onChange={(e) => setNovo({ ...novo, hora_fim: e.target.value })} />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Pacientes/dia</label>
+            <Input type="number" min={1} placeholder="sem limite" className="w-32" value={novo.limite_pacientes} onChange={(e) => setNovo({ ...novo, limite_pacientes: e.target.value })} />
           </div>
           <Button onClick={adicionar}><Plus className="h-4 w-4 mr-1" /> Adicionar</Button>
         </CardContent>
@@ -238,6 +248,9 @@ function Page() {
                       <div key={d.id} className="flex items-center gap-2 border rounded-md px-2 py-1 text-sm bg-muted/40">
                         <span className="font-medium">{DIAS[d.dia_semana]}</span>
                         <span>{d.hora_inicio.slice(0, 5)}–{d.hora_fim.slice(0, 5)}</span>
+                        {d.limite_pacientes ? (
+                          <span className="text-xs text-primary font-medium">· {d.limite_pacientes} pac/dia</span>
+                        ) : null}
                         <button onClick={() => remover(d.id)} className="text-destructive hover:opacity-70" aria-label="Remover">
                           <Trash2 className="h-3 w-3" />
                         </button>
