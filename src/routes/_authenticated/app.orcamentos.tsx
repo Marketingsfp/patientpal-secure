@@ -214,6 +214,7 @@ function NovoOrcamentoDialog({
   const [clinicaSolicitante, setClinicaSolicitante] = useState("");
   const [medicos, setMedicos] = useState<MedicoOpt[]>([]);
   const [formasPagamento, setFormasPagamento] = useState<string[]>(["Dinheiro"]);
+  const [valoresPagamento, setValoresPagamento] = useState<Record<string, number>>({});
   const [desconto, setDesconto] = useState(0);
   const [validade, setValidade] = useState(30);
   const [observacoes, setObservacoes] = useState("");
