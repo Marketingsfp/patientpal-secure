@@ -184,13 +184,13 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className={tipo === "receita" ? "text-success" : "text-destructive"}>
             Nova {tipo === "receita" ? "Receita" : "Despesa"}
           </DialogTitle>
         </DialogHeader>
-        <div className="space-y-3">
+        <div className="space-y-3 overflow-y-auto pr-1 -mr-1 flex-1 min-h-0">
           <div className="space-y-1.5">
             <Label>Descrição *</Label>
             <Input value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Ex: Consulta João Silva" />
