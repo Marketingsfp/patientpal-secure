@@ -1959,6 +1959,8 @@ export type Database = {
           estado: string | null
           face_atualizado_em: string | null
           face_descriptor: number[] | null
+          foto_atualizado_em: string | null
+          foto_url: string | null
           id: string
           logradouro: string | null
           nome: string
@@ -1986,6 +1988,8 @@ export type Database = {
           estado?: string | null
           face_atualizado_em?: string | null
           face_descriptor?: number[] | null
+          foto_atualizado_em?: string | null
+          foto_url?: string | null
           id?: string
           logradouro?: string | null
           nome: string
@@ -2013,6 +2017,8 @@ export type Database = {
           estado?: string | null
           face_atualizado_em?: string | null
           face_descriptor?: number[] | null
+          foto_atualizado_em?: string | null
+          foto_url?: string | null
           id?: string
           logradouro?: string | null
           nome?: string

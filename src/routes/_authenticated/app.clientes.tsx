@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Plus, Search, Pencil, Trash2, Users, Mic, MicOff, Loader2, MapPin, Download, ScanFace } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Users, Mic, MicOff, Loader2, MapPin, Download, ScanFace, Camera, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -44,6 +44,7 @@ interface Paciente {
   responsavel_telefone: string | null;
   responsavel_parentesco: string | null;
   created_at: string;
+  foto_url?: string | null;
 }
 
 type FormState = {
@@ -142,10 +143,16 @@ function ClientesPage() {
   const [cepLoading, setCepLoading] = useState(false);
   const [tab, setTab] = useState("dados");
 
+  // Foto
+  const [fotoFile, setFotoFile] = useState<File | null>(null);
+  const [fotoPreview, setFotoPreview] = useState<string | null>(null);
+  const fotoInputRef = useRef<HTMLInputElement | null>(null);
+
   // Biometria facial
   const [faceFor, setFaceFor] = useState<Paciente | null>(null);
   const [consentFor, setConsentFor] = useState<Paciente | null>(null);
   const [hasBiometria, setHasBiometria] = useState<Record<string, boolean>>({});
+  const [fotoSigned, setFotoSigned] = useState<Record<string, string>>({});
 
   // Voz
   const [recording, setRecording] = useState(false);
@@ -159,7 +166,7 @@ function ClientesPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from("pacientes")
-      .select("id,nome,cpf,telefone,email,ativo,cidade,estado,created_at")
+      .select("id,nome,cpf,telefone,email,ativo,cidade,estado,created_at,foto_url")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("nome")
       .limit(100);
@@ -185,6 +192,22 @@ function ClientesPage() {
       setHasBiometria(map);
     })();
   }, [items, clinicaAtual?.clinica_id]);
+
+  // Gera signed URLs em lote para as fotos dos pacientes da página
+  useEffect(() => {
+    const paths = items.filter(p => p.foto_url).map(p => p.foto_url as string);
+    if (paths.length === 0) { setFotoSigned({}); return; }
+    (async () => {
+      const { data } = await supabase.storage.from("pacientes-fotos").createSignedUrls(paths, 3600);
+      const map: Record<string, string> = {};
+      items.forEach((p) => {
+        if (!p.foto_url) return;
+        const found = data?.find(d => d.path === p.foto_url);
+        if (found?.signedUrl) map[p.id] = found.signedUrl;
+      });
+      setFotoSigned(map);
+    })();
+  }, [items]);
 
   async function salvarBiometria(descriptor: number[]) {
     if (!faceFor || !clinicaAtual) return;
@@ -232,7 +255,10 @@ function ClientesPage() {
     );
   }, [items, busca]);
 
-  const openNew = () => { setEditing(null); setForm(EMPTY); setTab("dados"); setOpen(true); };
+  const openNew = () => {
+    setEditing(null); setForm(EMPTY); setTab("dados"); setOpen(true);
+    setFotoFile(null); setFotoPreview(null);
+  };
   const openEdit = async (p: Paciente) => {
     const { data, error } = await supabase.from("pacientes").select("*").eq("id", p.id).single();
     if (error) { toast.error(error.message); return; }
@@ -253,6 +279,14 @@ function ClientesPage() {
     });
     setTab("dados");
     setOpen(true);
+    setFotoFile(null);
+    if (paciente.foto_url) {
+      const { data: s } = await supabase.storage.from("pacientes-fotos")
+        .createSignedUrl(paciente.foto_url, 3600);
+      setFotoPreview(s?.signedUrl ?? null);
+    } else {
+      setFotoPreview(null);
+    }
   };
 
   const buscarCep = async (cepRaw: string) => {
@@ -328,11 +362,34 @@ function ClientesPage() {
       responsavel_parentesco: form.responsavel_parentesco.trim() || null,
       clinica_id: clinicaAtual.clinica_id,
     };
-    const { error } = editing
-      ? await supabase.from("pacientes").update(payload).eq("id", editing.id)
-      : await supabase.from("pacientes").insert(payload);
+    let pacienteId: string | undefined = editing?.id;
+    if (editing) {
+      const { error } = await supabase.from("pacientes").update(payload).eq("id", editing.id);
+      if (error) { setSaving(false); toast.error(error.message); return; }
+    } else {
+      const { data: novo, error } = await supabase
+        .from("pacientes").insert(payload).select("id").single();
+      if (error) { setSaving(false); toast.error(error.message); return; }
+      pacienteId = novo?.id;
+    }
+
+    if (fotoFile && pacienteId) {
+      const ext = (fotoFile.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+      const path = `${clinicaAtual.clinica_id}/${pacienteId}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("pacientes-fotos")
+        .upload(path, fotoFile, { upsert: true, contentType: fotoFile.type || "image/jpeg" });
+      if (upErr) {
+        setSaving(false);
+        toast.error("Cliente salvo, mas a foto falhou: " + upErr.message);
+        setOpen(false); void load(); return;
+      }
+      await supabase.from("pacientes")
+        .update({ foto_url: path, foto_atualizado_em: new Date().toISOString() })
+        .eq("id", pacienteId);
+    }
+
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
     toast.success(editing ? "Cliente atualizado." : "Cliente cadastrado.");
     setOpen(false);
     void load();
@@ -450,7 +507,18 @@ function ClientesPage() {
               <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum cliente encontrado.</TableCell></TableRow>
             ) : filtrados.map(p => (
               <TableRow key={p.id}>
-                <TableCell className="font-medium">{p.nome}</TableCell>
+                <TableCell className="font-medium">
+                  <div className="flex items-center gap-2">
+                    <div className="h-8 w-8 rounded-full overflow-hidden border bg-muted flex items-center justify-center shrink-0">
+                      {fotoSigned[p.id] ? (
+                        <img src={fotoSigned[p.id]} alt={p.nome} className="h-full w-full object-cover" />
+                      ) : (
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </div>
+                    <span>{p.nome}</span>
+                  </div>
+                </TableCell>
                 <TableCell className="text-sm text-muted-foreground truncate max-w-[12rem]">{p.email ?? "—"}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">{p.telefone ?? "—"}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">
@@ -502,6 +570,41 @@ function ClientesPage() {
               </TabsList>
 
               <TabsContent value="dados" className="space-y-4 pt-4">
+                <div className="flex items-center gap-4">
+                  <div className="relative h-20 w-20 rounded-full overflow-hidden border bg-muted flex items-center justify-center shrink-0">
+                    {fotoPreview ? (
+                      <img src={fotoPreview} alt="Foto do paciente" className="h-full w-full object-cover" />
+                    ) : (
+                      <Camera className="h-7 w-7 text-muted-foreground" />
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <input
+                      ref={fotoInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0] ?? null;
+                        if (!f) return;
+                        if (f.size > 5 * 1024 * 1024) { toast.error("Imagem acima de 5 MB."); return; }
+                        setFotoFile(f);
+                        setFotoPreview(URL.createObjectURL(f));
+                      }}
+                    />
+                    <div className="flex gap-2">
+                      <Button type="button" variant="outline" size="sm" onClick={() => fotoInputRef.current?.click()}>
+                        <Upload className="h-4 w-4 mr-2" /> {fotoPreview ? "Trocar foto" : "Enviar foto"}
+                      </Button>
+                      {fotoPreview && (
+                        <Button type="button" variant="ghost" size="sm" onClick={() => { setFotoFile(null); setFotoPreview(null); }}>
+                          <X className="h-4 w-4 mr-1" /> Remover
+                        </Button>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">JPG, PNG ou WebP até 5 MB. Acesso restrito à clínica.</p>
+                  </div>
+                </div>
                 <div className="space-y-1">
                   <Label>Nome *</Label>
                   <InputVoz {...fieldProps("nome")} required />
