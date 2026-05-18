@@ -570,7 +570,11 @@ function AgendaPage() {
                       const nome = v.slice(6);
                       setForm(f => ({ ...f, medico_id: "", procedimento: nome }));
                     } else {
-                      setForm(f => ({ ...f, medico_id: v === "none" ? "" : v }));
+                       setForm(f => {
+                         const medico_id = v === "none" ? "" : v;
+                         const fim = f.inicio ? calcFimAuto(f.inicio, medico_id) : f.fim;
+                         return { ...f, medico_id, fim };
+                       });
                     }
                   }}
                   placeholder="Selecione médico ou exame"
@@ -585,7 +589,7 @@ function AgendaPage() {
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
                   <Label>Início</Label>
-                  <Input type="datetime-local" value={form.inicio} onChange={(e) => setForm(f => ({ ...f, inicio: e.target.value }))} required />
+                  <Input type="datetime-local" value={form.inicio} onChange={(e) => setForm(f => ({ ...f, inicio: e.target.value, fim: calcFimAuto(e.target.value, f.medico_id) }))} required />
                 </div>
                 <div className="space-y-1">
                   <Label>Fim</Label>
