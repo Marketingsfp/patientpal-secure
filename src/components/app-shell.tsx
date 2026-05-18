@@ -54,7 +54,7 @@ const nav = [
   { to: "/app/medicos", label: "Médicos", icon: Stethoscope, iconColor: "#fda4af" },
   { to: "/app/especialidades", label: "Especialidades", icon: Stethoscope, iconColor: "#f0abfc" },
   { to: "/app/disponibilidades", label: "Horários médicos", icon: Clock, iconColor: "#a78bfa" },
-  { to: "/app/consulta-rapida", label: "Consulta rápida", icon: BookOpen, iconColor: "#fcd34d" },
+  { to: "/app/consulta-rapida", label: "Informações rápidas", icon: BookOpen, iconColor: "#fcd34d" },
   { to: "/app/atendimento-ia", label: "Atendimento IA", icon: Brain, iconColor: "#a78bfa" },
   { to: "/app/exames-resultados", label: "Resultados de Exames", icon: FlaskConical, iconColor: "#fde047" },
   { to: "/app/alertas-enfermagem", label: "Enfermeira IA — Alertas", icon: BellRing, iconColor: "#ef4444" },

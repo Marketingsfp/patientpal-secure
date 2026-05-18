@@ -22,7 +22,7 @@ import { getContextoClinica } from "@/lib/nina.functions";
 
 export const Route = createFileRoute("/_authenticated/app/consulta-rapida")({
   component: ConsultaRapidaPage,
-  head: () => ({ meta: [{ title: "Consulta rápida — ClinicaOS" }] }),
+  head: () => ({ meta: [{ title: "Informações rápidas — ClinicaOS" }] }),
 });
 
 type Medico = {
@@ -208,7 +208,7 @@ function ConsultaRapidaPage() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
-            <BookOpen className="h-6 w-6 text-primary" /> Consulta rápida
+            <BookOpen className="h-6 w-6 text-primary" /> Informações rápidas
           </h1>
           <p className="text-sm text-muted-foreground">
             Lembretes para a equipe: médicos, horários e valores de exames sempre à mão.

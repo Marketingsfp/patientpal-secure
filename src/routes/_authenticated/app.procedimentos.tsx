@@ -825,7 +825,7 @@ function ProcedimentosPage() {
                 onChange={(e) => setForm({ ...form, preparo: e.target.value })}
               />
               <p className="text-xs text-muted-foreground">
-                Aparece na Consulta Rápida e a Nina responde quando perguntarem sobre o preparo.
+                Aparece nas Informações rápidas e a Nina responde quando perguntarem sobre o preparo.
               </p>
             </div>
             <DialogFooter>
