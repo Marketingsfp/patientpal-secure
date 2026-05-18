@@ -110,6 +110,7 @@ function MedicosPage() {
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("ativo", true)
       .order("nome")
+      .limit(5000)
       .then(({ data }) => setProcs((data as Procedimento[]) ?? []));
   }, [clinicaAtual?.clinica_id]);
 

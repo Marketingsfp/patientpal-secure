@@ -184,8 +184,8 @@ function AgendaPage() {
       supabase.from("pacientes").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome").limit(500),
       supabase.from("especialidades").select("id,nome").order("nome"),
       supabase.from("medico_especialidades").select("medico_id,especialidade_id"),
-      supabase.from("procedimentos").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("tipo", "exame").eq("ativo", true).order("nome"),
-      supabase.from("procedimentos").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
+      supabase.from("procedimentos").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("tipo", "exame").eq("ativo", true).order("nome").limit(5000),
+      supabase.from("procedimentos").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome").limit(5000),
     ]);
     setMedicos((m.data ?? []) as Medico[]);
     setPacientes((p.data ?? []) as Paciente[]);
@@ -356,7 +356,8 @@ function AgendaPage() {
     const { data: lista } = await supabase
       .from("procedimentos")
       .select("nome,valor_dinheiro,valor_padrao")
-      .eq("clinica_id", clinicaAtual.clinica_id);
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .limit(5000);
     const proc = (lista ?? []).find((p) => normalizar(p.nome ?? "") === nomeBusca)
       ?? (lista ?? []).find((p) => normalizar(p.nome ?? "").includes(nomeBusca));
     const valor = Number(proc?.valor_dinheiro ?? proc?.valor_padrao ?? 0);
