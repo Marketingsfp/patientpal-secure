@@ -955,7 +955,14 @@ function AgendaPage() {
                     <Badge variant="outline" className="text-xs">{a.procedimento || "CONSULTA"}</Badge>
                   </TableCell>
                   <TableCell className="text-center">
-                    <Badge className={STATUS_COR[a.status]}>{STATUS_LABEL[a.status]}</Badge>
+                    <div className="inline-flex items-center gap-1 flex-wrap justify-center">
+                      <Badge className={STATUS_COR[a.status]}>{STATUS_LABEL[a.status]}</Badge>
+                      {pagosSet.has(a.id) && (
+                        <Badge className="bg-emerald-600 text-white border border-emerald-700 hover:bg-emerald-600">
+                          Pago
+                        </Badge>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-right">
                     <Button
