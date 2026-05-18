@@ -40,6 +40,47 @@ const Schema = z.object({
   contexto: z.string().max(2000).optional(),
 });
 
+const ExtrairSchema = z.object({
+  arquivo_base64: z.string().min(20).max(15_000_000), // data URL ou base64 puro
+  mime: z.string().min(3).max(100),
+  nome_arquivo: z.string().max(200).optional(),
+});
+
+export const extrairTextoExameDeArquivo = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => ExtrairSchema.parse(i))
+  .handler(async ({ data }): Promise<{ texto: string; tipo_sugerido: string }> => {
+    const dataUrl = data.arquivo_base64.startsWith("data:")
+      ? data.arquivo_base64
+      : `data:${data.mime};base64,${data.arquivo_base64}`;
+
+    const sys = `Você extrai o conteúdo textual de laudos de exames laboratoriais ou de imagem em português do Brasil.
+Devolva APENAS um JSON: {"tipo_sugerido": "nome curto do exame", "texto": "transcrição fiel do laudo, preservando valores, unidades e faixas de referência"}.
+Não invente valores. Se não conseguir ler, devolva "texto" vazio.`;
+
+    const isPdf = data.mime.includes("pdf");
+    const userContent: Array<Record<string, unknown>> = [
+      { type: "text", text: `Extraia o texto do laudo a seguir${data.nome_arquivo ? ` (arquivo: ${data.nome_arquivo})` : ""}.` },
+      isPdf
+        ? { type: "file", file: { filename: data.nome_arquivo ?? "laudo.pdf", file_data: dataUrl } }
+        : { type: "image_url", image_url: { url: dataUrl } },
+    ];
+
+    const json = await callAI({
+      messages: [
+        { role: "system", content: sys },
+        { role: "user", content: userContent },
+      ],
+      response_format: { type: "json_object" },
+    });
+    const content = json.choices?.[0]?.message?.content ?? "{}";
+    const parsed = extractJson(content) as { texto?: unknown; tipo_sugerido?: unknown };
+    return {
+      texto: typeof parsed.texto === "string" ? parsed.texto : "",
+      tipo_sugerido: typeof parsed.tipo_sugerido === "string" ? parsed.tipo_sugerido : "",
+    };
+  });
+
 export type ClassificacaoExame = {
   status: "normal" | "alterado" | "critico";
   severidade: "baixa" | "media" | "alta";
