@@ -44,6 +44,14 @@ export async function printOrcamento(orcamentoId: string, clinicaId: string) {
   const desconto = Number(o.desconto || 0);
   const total = Number(o.valor_total || subtotal - desconto);
 
+  const formasList: string[] = o.forma_pagamento
+    ? String(o.forma_pagamento).split("+").map((s: string) => s.trim()).filter(Boolean)
+    : [];
+  const abreviar = (f: string) =>
+    f === "Cartão de Crédito" ? "CRÉDITO"
+    : f === "Cartão de Débito" ? "DÉBITO"
+    : f.toUpperCase();
+
   const validade = new Date(new Date(o.created_at).getTime() + (o.validade_dias || 30) * 86400000);
   const validadeStr = `${String(validade.getDate()).padStart(2, "0")}/${String(validade.getMonth() + 1).padStart(2, "0")}/${validade.getFullYear()}`;
 
@@ -105,6 +113,18 @@ export async function printOrcamento(orcamentoId: string, clinicaId: string) {
           <div>${Number(i.quantidade)} x ${fmtBRL(Number(i.valor_unitario))}</div>
           <div class="bold">${fmtBRL(Number(i.valor_total))}</div>
         </div>
+        ${formasList.length > 1 && i.valores_formas ? `
+          <div class="sm" style="margin-top:2px; padding-left:4px">
+            ${formasList.map((f: string) => {
+              const vu = Number((i.valores_formas as Record<string, number>)?.[f] ?? i.valor_unitario ?? 0);
+              const vt = Number(i.quantidade) * vu;
+              return `<div style="display:flex; justify-content:space-between">
+                <span>${esc(abreviar(f))}</span>
+                <span>${fmtBRL(vt)}</span>
+              </div>`;
+            }).join("")}
+          </div>
+        ` : ""}
       </div>
     `).join("")}
 
@@ -116,7 +136,7 @@ export async function printOrcamento(orcamentoId: string, clinicaId: string) {
     </table>
 
     ${o.forma_pagamento ? (() => {
-      const formas = String(o.forma_pagamento).split("+").map((s: string) => s.trim()).filter(Boolean);
+      const formas = formasList;
       if (formas.length <= 1) {
         return `<div class="sm" style="margin-top:6px">PAGAMENTO: <span class="bold">${esc(o.forma_pagamento)}</span></div>`;
       }
@@ -130,11 +150,10 @@ export async function printOrcamento(orcamentoId: string, clinicaId: string) {
         return `<td class="center bold" style="border:1px solid #000; padding:3px 2px">${fmtBRL(v)}</td>`;
       }).join("");
       return `
-        <div class="sm bold" style="margin-top:6px">PAGAMENTO</div>
+        <div class="sm bold" style="margin-top:6px">PAGAMENTO (escolha uma forma)</div>
         <table style="margin-top:2px; border-collapse:collapse; width:100%">
           <tr>${headerCols}</tr>
           <tr>${valueCols}</tr>
-          <tr><td colspan="${formas.length}" class="right bold" style="border:1px solid #000; padding:3px 4px">TOTAL: ${fmtBRL(total)}</td></tr>
         </table>`;
     })() : ""}
     ${o.observacoes ? `<div class="sep"></div><div class="sm"><div class="bold">OBSERVAÇÕES</div>${esc(o.observacoes)}</div>` : ""}
