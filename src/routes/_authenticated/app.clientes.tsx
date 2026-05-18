@@ -598,7 +598,7 @@ function ClientesPage() {
       </div>
 
       <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) stopVoice(); }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[95vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? "Editar cliente" : "Novo cliente"}</DialogTitle>
             <DialogDescription>
@@ -777,7 +777,7 @@ function ClientesPage() {
               </TabsContent>
             </Tabs>
 
-            <DialogFooter>
+            <DialogFooter className="sticky bottom-0 bg-background border-t -mx-6 -mb-6 px-6 py-3 z-10">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
               <Button type="submit" disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
             </DialogFooter>
@@ -802,7 +802,7 @@ function ClientesPage() {
             <p><strong>Direitos do titular:</strong> você pode revogar o consentimento e solicitar a exclusão da biometria a qualquer momento, pela equipe da recepção.</p>
             <p><strong>Base legal:</strong> consentimento específico e destacado (art. 11, I).</p>
           </div>
-          <DialogFooter>
+          <DialogFooter className="sticky bottom-0 bg-background border-t -mx-6 -mb-6 px-6 py-3 z-10">
             <Button variant="ghost" onClick={() => setConsentFor(null)}>Não concordo</Button>
             <Button onClick={() => { setFaceFor(consentFor); setConsentFor(null); }}>
               Concordo e autorizo a captura
@@ -828,7 +828,7 @@ function ClientesPage() {
           <div className="rounded-md overflow-hidden bg-black aspect-square flex items-center justify-center">
             <video ref={camVideoRef} className="h-full w-full object-cover" playsInline muted />
           </div>
-          <DialogFooter>
+          <DialogFooter className="sticky bottom-0 bg-background border-t -mx-6 -mb-6 px-6 py-3 z-10">
             <Button variant="outline" onClick={fecharCamera}>Cancelar</Button>
             <Button onClick={capturarFoto}><Camera className="h-4 w-4 mr-2" /> Capturar</Button>
           </DialogFooter>

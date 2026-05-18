@@ -736,7 +736,7 @@ function ProcedimentosPage() {
 
       {/* ============ DIALOG PROCEDIMENTO ============ */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[95vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? "Editar procedimento" : "Novo procedimento"}</DialogTitle>
             <DialogDescription>Preencha valores para cada forma de pagamento.</DialogDescription>
@@ -828,7 +828,7 @@ function ProcedimentosPage() {
                 Aparece nas Informações rápidas e a Nina responde quando perguntarem sobre o preparo.
               </p>
             </div>
-            <DialogFooter>
+            <DialogFooter className="sticky bottom-0 bg-background border-t -mx-6 -mb-6 px-6 py-3 z-10">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
               <Button type="submit" disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
             </DialogFooter>
@@ -861,7 +861,7 @@ function ProcedimentosPage() {
               <Checkbox checked={formCartao.ativo} onCheckedChange={(v) => setFormCartao({ ...formCartao, ativo: !!v })} />
               Ativo
             </label>
-            <DialogFooter>
+            <DialogFooter className="sticky bottom-0 bg-background border-t -mx-6 -mb-6 px-6 py-3 z-10">
               <Button type="button" variant="outline" onClick={() => setOpenCartao(false)}>Cancelar</Button>
               <Button type="submit">Salvar</Button>
             </DialogFooter>

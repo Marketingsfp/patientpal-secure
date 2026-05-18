@@ -188,7 +188,7 @@ function NovoContratoDialog({ open, onClose, planos, clinicaId, userId, onCreate
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[95vh] overflow-y-auto">
         <DialogHeader><DialogTitle>Novo contrato</DialogTitle></DialogHeader>
         <div className="grid grid-cols-2 gap-3">
           <div className="col-span-2"><Label>Plano</Label>
@@ -280,7 +280,7 @@ function NovoContratoDialog({ open, onClose, planos, clinicaId, userId, onCreate
           </div>
           <div className="col-span-2"><Label>Observações</Label><Textarea rows={2} value={obs} onChange={(e) => setObs(e.target.value)}/></div>
         </div>
-        <DialogFooter>
+        <DialogFooter className="sticky bottom-0 bg-background border-t -mx-6 -mb-6 px-6 py-3 z-10">
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
           <Button onClick={salvar} disabled={saving || !titular || !plano}>Gerar contrato + {plano?.num_parcelas ?? 12} parcelas</Button>
         </DialogFooter>
@@ -344,7 +344,7 @@ function DetalheContrato({ contrato, onClose }: { contrato: Contrato; onClose: (
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto">
         <DialogHeader><DialogTitle>Contrato #{contrato.numero} — {contrato.paciente_nome}</DialogTitle></DialogHeader>
         <div className="grid grid-cols-3 gap-3 text-sm">
           <div className="rounded-md border p-3"><div className="text-muted-foreground text-xs">Pagas</div><div className="font-bold text-lg">{pagas}/{mens.length}</div></div>
