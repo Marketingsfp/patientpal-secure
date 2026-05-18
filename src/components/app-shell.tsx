@@ -133,7 +133,7 @@ export function AppShell() {
 
   return (
     <div className="min-h-screen flex flex-col bg-muted/30">
-      <header className="sticky top-0 z-30 bg-card border-b border-border shadow-sm">
+      <header className="sticky top-0 z-30 bg-slate-800 text-white shadow-md">
         {/* faixa colorida indicando a clínica ativa */}
         <div
           className="h-1 w-full"
@@ -141,7 +141,7 @@ export function AppShell() {
         />
 
         {/* topo: logo, clínica, voz, sair */}
-        <div className="flex items-center justify-between gap-3 px-5 py-2.5">
+        <div className="flex items-center justify-between gap-3 px-5 py-2.5 text-white">
           <Link to="/app" className="flex items-center gap-2.5 min-w-0">
             <span
               className="flex h-9 w-9 items-center justify-center rounded-lg text-white shrink-0"
@@ -149,7 +149,7 @@ export function AppShell() {
             >
               <Activity className="h-5 w-5" />
             </span>
-            <span className="text-base font-semibold tracking-tight hidden sm:inline text-foreground">ClinicaOS</span>
+            <span className="text-base font-semibold tracking-tight hidden sm:inline text-white">ClinicaOS</span>
             {clinicaAtual && logoDaClinica(clinicaAtual.clinica.nome) && (
               <img
                 src={logoDaClinica(clinicaAtual.clinica.nome)!}
@@ -184,8 +184,8 @@ export function AppShell() {
                 </SelectContent>
               </Select>
             )}
-            <span className="text-xs text-muted-foreground hidden lg:inline max-w-[180px] truncate">{user?.email}</span>
-            <Button variant="ghost" size="sm" className="h-8" onClick={handleSignOut} title="Sair">
+            <span className="text-xs text-white/70 hidden lg:inline max-w-[180px] truncate">{user?.email}</span>
+            <Button variant="ghost" size="sm" className="h-8 text-white hover:bg-white/10 hover:text-white" onClick={handleSignOut} title="Sair">
               <LogOut className="h-4 w-4 mr-1" /> Sair
             </Button>
           </div>
@@ -195,7 +195,7 @@ export function AppShell() {
         <nav className="px-5 pb-3 pt-1 space-y-1.5 font-sans">
           {navRows.map((row) => (
             <div key={row.label} className="flex items-center gap-3">
-              <span className="hidden md:inline-block w-20 shrink-0 text-[10px] uppercase tracking-[0.12em] text-muted-foreground/70 font-semibold">
+              <span className="hidden md:inline-block w-20 shrink-0 text-[10px] uppercase tracking-[0.12em] text-white/50 font-semibold">
                 {row.label}
               </span>
               <div className="flex flex-wrap items-center gap-1">
@@ -210,13 +210,13 @@ export function AppShell() {
                       className={`group flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all whitespace-nowrap ${
                         active
                           ? "text-white shadow-sm"
-                          : "text-foreground/70 hover:text-foreground hover:bg-muted"
+                          : "text-white/80 hover:text-white hover:bg-white/10"
                       }`}
                       style={active ? { backgroundColor: cor } : undefined}
                     >
                       <item.icon
                         className="h-3.5 w-3.5 shrink-0"
-                        style={!active ? { color: cor } : undefined}
+                        style={!active ? { color: "rgba(255,255,255,0.85)" } : undefined}
                       />
                       {item.label}
                     </Link>
