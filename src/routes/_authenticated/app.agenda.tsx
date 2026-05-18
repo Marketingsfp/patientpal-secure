@@ -772,6 +772,15 @@ function AgendaPage() {
                     <Badge className={STATUS_COR[a.status]}>{STATUS_LABEL[a.status]}</Badge>
                   </TableCell>
                   <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      title="Pagamento"
+                      onClick={() => cobrarAgendamento(a)}
+                      className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                    >
+                      <DollarSign className="h-4 w-4" />
+                    </Button>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
