@@ -505,7 +505,16 @@ function AgendaPage() {
               </div>
               <div className="space-y-1">
                 <Label>Procedimento</Label>
-                <Input value={form.procedimento} onChange={(e) => setForm(f => ({ ...f, procedimento: e.target.value }))} placeholder="Consulta, retorno…" />
+                <SearchableSelect
+                  value={form.procedimento || "none"}
+                  onChange={(v) => setForm(f => ({ ...f, procedimento: v === "none" ? "" : v }))}
+                  placeholder="Selecione o procedimento"
+                  searchPlaceholder="Buscar procedimento..."
+                  options={[
+                    { value: "none", label: "— Selecione —" },
+                    ...procedimentosList.map(p => ({ value: p.nome, label: p.nome })),
+                  ]}
+                />
               </div>
               <div className="space-y-1">
                 <Label>Status</Label>
