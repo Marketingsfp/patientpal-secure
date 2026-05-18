@@ -138,14 +138,14 @@ export function AppShell() {
         style={{ backgroundColor: clinicaAtual ? corDaClinica(clinicaAtual.clinica.nome) : undefined }}
       >
         <div className="flex items-center justify-between gap-3 px-4 py-2">
-          <Link to="/app" className="flex items-center gap-2 min-w-0">
+          <Link to="/app" className="flex items-center gap-2 shrink-0">
             <Activity className="h-5 w-5 shrink-0" />
             <span className="font-semibold tracking-tight hidden sm:inline">ClinicaOS</span>
             {clinicaAtual && logoDaClinica(clinicaAtual.clinica.nome) && (
               <img
                 src={logoDaClinica(clinicaAtual.clinica.nome)!}
                 alt={clinicaAtual.clinica.nome}
-                className="h-8 w-auto object-contain ml-2 hidden md:block"
+                className="h-10 w-auto object-contain ml-2 bg-white rounded p-0.5 shrink-0"
               />
             )}
           </Link>
