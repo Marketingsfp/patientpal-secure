@@ -152,6 +152,7 @@ function ClientesPage() {
   const [faceFor, setFaceFor] = useState<Paciente | null>(null);
   const [consentFor, setConsentFor] = useState<Paciente | null>(null);
   const [hasBiometria, setHasBiometria] = useState<Record<string, boolean>>({});
+  const [fotoSigned, setFotoSigned] = useState<Record<string, string>>({});
 
   // Voz
   const [recording, setRecording] = useState(false);
@@ -165,7 +166,7 @@ function ClientesPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from("pacientes")
-      .select("id,nome,cpf,telefone,email,ativo,cidade,estado,created_at")
+      .select("id,nome,cpf,telefone,email,ativo,cidade,estado,created_at,foto_url")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("nome")
       .limit(100);
