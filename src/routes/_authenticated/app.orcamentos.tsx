@@ -507,42 +507,8 @@ function NovoOrcamentoDialog({
               </div>
               {formasPagamento.length > 1 && (
                 <p className="text-xs text-muted-foreground">
-                  Os valores na tabela usam a 1ª forma selecionada (<b>{formasPagamento[0]}</b>).
+                  Cada item mostra o valor por forma; o total por forma é calculado automaticamente.
                 </p>
-              )}
-              {formasPagamento.length > 1 && (
-                <div className="mt-2 rounded-md border p-2 space-y-2">
-                  <div className="text-xs font-medium text-muted-foreground">Valor por forma (total: <b>{BRL(total)}</b>)</div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {formasPagamento.map((f) => (
-                      <div key={f} className="space-y-1">
-                        <Label className="text-xs">{f}</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min={0}
-                          value={valoresPagamento[f] ?? ""}
-                          placeholder="0,00"
-                          onChange={(e) =>
-                            setValoresPagamento((cur) => ({ ...cur, [f]: Number(e.target.value) || 0 }))
-                          }
-                        />
-                      </div>
-                    ))}
-                  </div>
-                  {(() => {
-                    const soma = formasPagamento.reduce((s, f) => s + (Number(valoresPagamento[f]) || 0), 0);
-                    const diff = Math.round((soma - total) * 100) / 100;
-                    if (Math.abs(diff) < 0.01) {
-                      return <div className="text-xs text-emerald-600">Soma confere com o total.</div>;
-                    }
-                    return (
-                      <div className="text-xs text-amber-600">
-                        Soma: {BRL(soma)} · {diff > 0 ? `Excede em ${BRL(diff)}` : `Faltam ${BRL(-diff)}`}
-                      </div>
-                    );
-                  })()}
-                </div>
               )}
             </div>
             <div className="space-y-1"><Label>Validade (dias)</Label><Input type="number" min={1} value={validade} onChange={(e) => setValidade(Number(e.target.value) || 30)} /></div>
