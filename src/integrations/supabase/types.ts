@@ -1186,6 +1186,7 @@ export type Database = {
       }
       fin_lancamentos: {
         Row: {
+          bandeira_cartao: string | null
           categoria_id: string | null
           clinica_id: string
           conta_id: string | null
@@ -1194,18 +1195,21 @@ export type Database = {
           data: string
           data_vencimento: string | null
           descricao: string
+          emitir_nfse: boolean
           empresa_id: string | null
           forma_pagamento: string | null
           id: string
           medico_id: string | null
           observacoes: string | null
           paciente_id: string | null
+          parcelas: number | null
           status: Database["public"]["Enums"]["fin_status_lancamento"]
           tipo: Database["public"]["Enums"]["fin_tipo_lancamento"]
           updated_at: string
           valor: number
         }
         Insert: {
+          bandeira_cartao?: string | null
           categoria_id?: string | null
           clinica_id: string
           conta_id?: string | null
@@ -1214,18 +1218,21 @@ export type Database = {
           data?: string
           data_vencimento?: string | null
           descricao: string
+          emitir_nfse?: boolean
           empresa_id?: string | null
           forma_pagamento?: string | null
           id?: string
           medico_id?: string | null
           observacoes?: string | null
           paciente_id?: string | null
+          parcelas?: number | null
           status?: Database["public"]["Enums"]["fin_status_lancamento"]
           tipo: Database["public"]["Enums"]["fin_tipo_lancamento"]
           updated_at?: string
           valor: number
         }
         Update: {
+          bandeira_cartao?: string | null
           categoria_id?: string | null
           clinica_id?: string
           conta_id?: string | null
@@ -1234,12 +1241,14 @@ export type Database = {
           data?: string
           data_vencimento?: string | null
           descricao?: string
+          emitir_nfse?: boolean
           empresa_id?: string | null
           forma_pagamento?: string | null
           id?: string
           medico_id?: string | null
           observacoes?: string | null
           paciente_id?: string | null
+          parcelas?: number | null
           status?: Database["public"]["Enums"]["fin_status_lancamento"]
           tipo?: Database["public"]["Enums"]["fin_tipo_lancamento"]
           updated_at?: string
