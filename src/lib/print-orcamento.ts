@@ -113,7 +113,7 @@ export async function printOrcamento(orcamentoId: string, clinicaId: string) {
           <div>${Number(i.quantidade)} x ${fmtBRL(Number(i.valor_unitario))}</div>
           <div class="bold">${fmtBRL(Number(i.valor_total))}</div>
         </div>
-        ${formasList.length > 1 && i.valores_formas ? `
+        ${formasList.length > 1 ? `
           <div class="sm" style="margin-top:2px; padding-left:4px">
             ${formasList.map((f: string) => {
               const vu = Number((i.valores_formas as Record<string, number>)?.[f] ?? i.valor_unitario ?? 0);
