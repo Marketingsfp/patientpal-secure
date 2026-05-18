@@ -156,6 +156,7 @@ export function AppShell() {
                 onTranscript={handleVoiceCommand}
                 title="Busca por voz (diga: agenda, clientes, financeiro…)"
                 prompt="Transcreva o comando de voz curto em português do Brasil. Retorne apenas as palavras ditas."
+                className="bg-white/10 border-white/30 text-white hover:bg-white/20 hover:text-white"
               />
             </Suspense>
             {memberships.length > 0 && (
