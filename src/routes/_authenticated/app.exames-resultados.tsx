@@ -13,8 +13,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, Sparkles, Save, Stethoscope, AlertTriangle, CheckCircle2, Bell } from "lucide-react";
-import { classificarResultadoExame, type ClassificacaoExame } from "@/lib/exames-ia.functions";
+import { Loader2, Sparkles, Save, Stethoscope, AlertTriangle, CheckCircle2, Bell, Upload } from "lucide-react";
+import { classificarResultadoExame, extrairTextoExameDeArquivo, type ClassificacaoExame } from "@/lib/exames-ia.functions";
+import { useRef } from "react";
 
 export const Route = createFileRoute("/_authenticated/app/exames-resultados")({
   component: ExamesResultadosPage,
@@ -44,6 +45,8 @@ const STATUS_COR: Record<Row["status"], string> = {
 function ExamesResultadosPage() {
   const { clinicaAtual } = useClinica();
   const classificar = useServerFn(classificarResultadoExame);
+  const extrair = useServerFn(extrairTextoExameDeArquivo);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [rows, setRows] = useState<Row[]>([]);
@@ -52,6 +55,7 @@ function ExamesResultadosPage() {
   const [texto, setTexto] = useState("");
   const [contexto, setContexto] = useState("");
   const [classificando, setClassificando] = useState(false);
+  const [extraindo, setExtraindo] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [analise, setAnalise] = useState<ClassificacaoExame | null>(null);
 
@@ -92,6 +96,59 @@ function ExamesResultadosPage() {
       toast.error(e instanceof Error ? e.message : "Falha ao classificar");
     } finally {
       setClassificando(false);
+    }
+  };
+
+  const handleArquivo = async (file: File) => {
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Arquivo muito grande (máx. 10 MB).");
+      return;
+    }
+    const ok = file.type.startsWith("image/") || file.type === "application/pdf";
+    if (!ok) {
+      toast.error("Envie uma imagem (JPG/PNG) ou PDF do laudo.");
+      return;
+    }
+    setExtraindo(true);
+    setAnalise(null);
+    try {
+      const dataUrl: string = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result as string);
+        r.onerror = () => rej(r.error);
+        r.readAsDataURL(file);
+      });
+      const { texto: extraido, tipo_sugerido } = await extrair({
+        data: { arquivo_base64: dataUrl, mime: file.type, nome_arquivo: file.name },
+      });
+      if (!extraido) {
+        toast.error("Não foi possível ler o laudo. Tente outra imagem ou cole o texto.");
+        return;
+      }
+      setTexto(extraido);
+      if (!tipo.trim() && tipo_sugerido) setTipo(tipo_sugerido);
+      toast.success("Laudo lido. Classificando com IA…");
+      // classifica automaticamente
+      setClassificando(true);
+      try {
+        const result = await classificar({
+          data: {
+            tipo_exame: (tipo || tipo_sugerido || "Exame").trim(),
+            resultado_texto: extraido,
+            paciente_nome: pacienteNome || undefined,
+            contexto: contexto.trim() || undefined,
+          },
+        });
+        setAnalise(result);
+        toast.success("Classificação concluída.");
+      } finally {
+        setClassificando(false);
+      }
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Falha ao processar arquivo");
+    } finally {
+      setExtraindo(false);
+      if (fileRef.current) fileRef.current.value = "";
     }
   };
 
@@ -175,6 +232,23 @@ function ExamesResultadosPage() {
         <div className="space-y-1.5">
           <Label>Resultado (cole o texto do laudo)</Label>
           <Textarea rows={8} value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Cole aqui o resultado completo do exame…" />
+          <div className="flex items-center gap-2 pt-1">
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*,application/pdf"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void handleArquivo(f);
+              }}
+            />
+            <Button type="button" variant="outline" size="sm" disabled={extraindo} onClick={() => fileRef.current?.click()}>
+              {extraindo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              Anexar laudo (imagem/PDF) — IA lê e classifica
+            </Button>
+            <span className="text-xs text-muted-foreground">Suporta JPG, PNG ou PDF até 10 MB.</span>
+          </div>
         </div>
         <div className="space-y-1.5">
           <Label>Contexto clínico (opcional)</Label>
