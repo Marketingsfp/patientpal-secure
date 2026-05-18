@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Plus, Search, Pencil, Trash2, Users, Mic, MicOff, Loader2, MapPin, Download, ScanFace } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Users, Mic, MicOff, Loader2, MapPin, Download, ScanFace, Camera, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -44,6 +44,7 @@ interface Paciente {
   responsavel_telefone: string | null;
   responsavel_parentesco: string | null;
   created_at: string;
+  foto_url?: string | null;
 }
 
 type FormState = {
@@ -141,6 +142,11 @@ function ClientesPage() {
   const [saving, setSaving] = useState(false);
   const [cepLoading, setCepLoading] = useState(false);
   const [tab, setTab] = useState("dados");
+
+  // Foto
+  const [fotoFile, setFotoFile] = useState<File | null>(null);
+  const [fotoPreview, setFotoPreview] = useState<string | null>(null);
+  const fotoInputRef = useRef<HTMLInputElement | null>(null);
 
   // Biometria facial
   const [faceFor, setFaceFor] = useState<Paciente | null>(null);
