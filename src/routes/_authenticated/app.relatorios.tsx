@@ -22,7 +22,7 @@ type Relatorio = {
   id: string;
   titulo: string;
   descricao: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: React.ComponentType<any>;
   cor: string;
   usaPeriodo?: boolean;
   carregar: (ctx: { clinicaId: string; ini?: string; fim?: string }) => Promise<Record<string, unknown>[]>;
