@@ -25,7 +25,7 @@ import {
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import {
   CalendarDays, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X,
-  MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, Clock,
+  MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, Clock, DollarSign,
 } from "lucide-react";
 import { printGuiaAtendimento } from "@/lib/print-gr";
 import { VoiceInput } from "@/components/voice-input";
@@ -326,6 +326,21 @@ function AgendaPage() {
   const mudarStatus = async (a: Agendamento, status: Status) => {
     const { error } = await supabase.from("agendamentos").update({ status }).eq("id", a.id);
     if (error) toast.error(error.message); else await load();
+  };
+
+  const cobrarAgendamento = async (a: Agendamento) => {
+    if (!clinicaAtual) return;
+    const nome = (a.procedimento ?? "CONSULTA").trim().toUpperCase();
+    const { data: proc } = await supabase
+      .from("procedimentos")
+      .select("valor_dinheiro,valor_padrao")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .ilike("nome", nome)
+      .maybeSingle();
+    const valor = Number(proc?.valor_dinheiro ?? proc?.valor_padrao ?? 0);
+    setPagamentoDesc(`${a.paciente_nome} — ${a.procedimento ?? "CONSULTA"}`);
+    setPagamentoValor(valor > 0 ? valor.toFixed(2) : "");
+    setPagamentoOpen(true);
   };
 
   const imprimirGR = async (a: Agendamento) => {
@@ -739,6 +754,9 @@ function AgendaPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => openEdit(a)}><Pencil className="h-4 w-4 mr-2" /> Editar</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => cobrarAgendamento(a)}>
+                          <DollarSign className="h-4 w-4 mr-2" /> Pagamento
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => imprimirGR(a)}>
                           <Printer className="h-4 w-4 mr-2" /> Imprimir GR
                         </DropdownMenuItem>
