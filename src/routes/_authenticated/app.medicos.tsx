@@ -309,7 +309,7 @@ function MedicosPage() {
                   <TabsTrigger value="repasse">Repasse</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="dados" className="space-y-4 pt-4">
+                <TabsContent value="dados" className="space-y-4 pt-4 pb-16">
                   <div className="space-y-2">
                     <Label>Nome completo *</Label>
                     <Input required value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} />
@@ -374,7 +374,7 @@ function MedicosPage() {
                   </div>
                 </TabsContent>
 
-                <TabsContent value="contato" className="space-y-4 pt-4">
+                <TabsContent value="contato" className="space-y-4 pt-4 pb-16">
                   <div className="space-y-2">
                     <Label>E-mail</Label>
                     <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
@@ -385,7 +385,7 @@ function MedicosPage() {
                   </div>
                 </TabsContent>
 
-                <TabsContent value="endereco" className="space-y-4 pt-4">
+                <TabsContent value="endereco" className="space-y-4 pt-4 pb-16">
                   <div className="grid grid-cols-3 gap-3">
                     <div className="space-y-2">
                       <Label>CEP</Label>
@@ -422,7 +422,7 @@ function MedicosPage() {
                   </div>
                 </TabsContent>
 
-                <TabsContent value="banco" className="space-y-4 pt-4">
+                <TabsContent value="banco" className="space-y-4 pt-4 pb-16">
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
                       <Label>Banco</Label>
@@ -443,7 +443,7 @@ function MedicosPage() {
                   </div>
                 </TabsContent>
 
-                <TabsContent value="repasse" className="space-y-4 pt-4">
+                <TabsContent value="repasse" className="space-y-4 pt-4 pb-16">
                   <div className="space-y-2">
                 <Label>Tipo de repasse</Label>
                 <div className="flex gap-4 text-sm">

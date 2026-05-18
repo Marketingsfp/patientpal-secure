@@ -542,7 +542,7 @@ function ProcedimentosPage() {
         </TabsList>
 
         {/* ============ PROCEDIMENTOS ============ */}
-        <TabsContent value="procedimentos" className="space-y-4 pt-4">
+        <TabsContent value="procedimentos" className="space-y-4 pt-4 pb-16">
           <div className="flex flex-wrap gap-2 justify-end">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -687,7 +687,7 @@ function ProcedimentosPage() {
         </TabsContent>
 
         {/* ============ CARTÕES ============ */}
-        <TabsContent value="cartoes" className="space-y-4 pt-4">
+        <TabsContent value="cartoes" className="space-y-4 pt-4 pb-16">
           <div className="flex flex-wrap gap-2 justify-end">
             <Button variant="outline" onClick={seedCartoesPadrao}>
               <Sparkles className="h-4 w-4 mr-2" />Cadastrar Cartão Consulta e Desconto
