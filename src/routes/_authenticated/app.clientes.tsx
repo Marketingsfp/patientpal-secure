@@ -817,6 +817,23 @@ function ClientesPage() {
         onCaptured={salvarBiometria}
         titulo={`Biometria — ${faceFor?.nome ?? ""}`}
       />
+
+      {/* Captura de foto pela webcam */}
+      <Dialog open={camOpen} onOpenChange={(o) => { if (!o) fecharCamera(); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Tirar foto</DialogTitle>
+            <DialogDescription>Enquadre o rosto do paciente e clique em Capturar.</DialogDescription>
+          </DialogHeader>
+          <div className="rounded-md overflow-hidden bg-black aspect-square flex items-center justify-center">
+            <video ref={camVideoRef} className="h-full w-full object-cover" playsInline muted />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={fecharCamera}>Cancelar</Button>
+            <Button onClick={capturarFoto}><Camera className="h-4 w-4 mr-2" /> Capturar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
