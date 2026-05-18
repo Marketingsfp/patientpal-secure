@@ -114,6 +114,11 @@ function AgendaPage() {
   const [pagamentoOpen, setPagamentoOpen] = useState(false);
   const [pagamentoDesc, setPagamentoDesc] = useState("");
   const [pagamentoAgId, setPagamentoAgId] = useState<string | null>(null);
+  const [pagamentoForma, setPagamentoForma] = useState<string>("");
+  type FormaOpcao = { forma: string; label: string; valor: number };
+  const [formaPagOpen, setFormaPagOpen] = useState(false);
+  const [formaPagOpcoes, setFormaPagOpcoes] = useState<FormaOpcao[]>([]);
+  const [formaPagCtx, setFormaPagCtx] = useState<{ agId: string; desc: string } | null>(null);
   const [novoPacOpen, setNovoPacOpen] = useState(false);
   const [novoPac, setNovoPac] = useState({ nome: "", cpf: "", telefone: "", data_nascimento: "", email: "" });
   const [savingPac, setSavingPac] = useState(false);
