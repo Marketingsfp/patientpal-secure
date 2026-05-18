@@ -18,6 +18,9 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useServerFn } from "@tanstack/react-start";
+import { cadastrarUsuario } from "@/lib/equipe.functions";
 
 export const Route = createFileRoute("/_authenticated/app/medicos")({
   component: MedicosPage,
@@ -77,7 +80,11 @@ function MedicosPage() {
     nacionalidade: "Brasileira", estado_civil: "",
     cep: "", logradouro: "", numero: "", complemento: "", bairro: "", cidade: "", estado: "",
     banco: "", agencia: "", conta: "", pix_chave: "",
+    criarUsuario: false,
+    senhaUsuario: "",
+    roleUsuario: "medico" as "admin" | "gestor" | "medico" | "enfermeiro" | "recepcao" | "financeiro",
   });
+  const cadastrarUsuarioFn = useServerFn(cadastrarUsuario);
 
   const load = async () => {
     if (!clinicaAtual) return;
@@ -116,6 +123,7 @@ function MedicosPage() {
       nacionalidade: "Brasileira", estado_civil: "",
       cep: "", logradouro: "", numero: "", complemento: "", bairro: "", cidade: "", estado: "",
       banco: "", agencia: "", conta: "", pix_chave: "",
+      criarUsuario: false, senhaUsuario: "", roleUsuario: "medico",
     });
   };
 
@@ -157,6 +165,7 @@ function MedicosPage() {
       cep: m.cep ?? "", logradouro: m.logradouro ?? "", numero: m.numero ?? "",
       complemento: m.complemento ?? "", bairro: m.bairro ?? "", cidade: m.cidade ?? "", estado: m.estado ?? "",
       banco: m.banco ?? "", agencia: m.agencia ?? "", conta: m.conta ?? "", pix_chave: m.pix_chave ?? "",
+      criarUsuario: false, senhaUsuario: "", roleUsuario: "medico",
     });
     setOpen(true);
   };
@@ -227,6 +236,27 @@ function MedicosPage() {
     }
     setLoading(false);
     toast.success(editId ? "Médico atualizado!" : "Médico cadastrado!");
+
+    // Optionally create system user / add to clinic team
+    if (form.criarUsuario && form.email && form.senhaUsuario.length >= 6) {
+      try {
+        await cadastrarUsuarioFn({
+          data: {
+            clinicaId: clinicaAtual.clinica_id,
+            email: form.email,
+            password: form.senhaUsuario,
+            nome: form.nome,
+            role: form.roleUsuario,
+          },
+        });
+        toast.success("Usuário do sistema criado e vinculado à equipe!");
+      } catch (err: any) {
+        toast.error(`Médico salvo, mas erro ao criar usuário: ${err?.message ?? err}`);
+      }
+    } else if (form.criarUsuario) {
+      toast.warning("Informe e-mail e senha (mín. 6 caracteres) para criar o usuário.");
+    }
+
     setOpen(false);
     resetForm();
     void load();
@@ -383,6 +413,51 @@ function MedicosPage() {
                   <div className="space-y-2">
                     <Label>Telefone</Label>
                     <Input value={form.telefone} onChange={(e) => setForm({ ...form, telefone: e.target.value })} />
+                  </div>
+                  <div className="rounded-md border p-3 space-y-3 mt-2">
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="criar-usuario"
+                        checked={form.criarUsuario}
+                        onCheckedChange={(c) => setForm({ ...form, criarUsuario: c === true })}
+                      />
+                      <Label htmlFor="criar-usuario" className="cursor-pointer">
+                        Criar usuário do sistema e adicionar à equipe
+                      </Label>
+                    </div>
+                    {form.criarUsuario && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <Label>Senha inicial *</Label>
+                          <Input
+                            type="text"
+                            placeholder="mín. 6 caracteres"
+                            value={form.senhaUsuario}
+                            onChange={(e) => setForm({ ...form, senhaUsuario: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Perfil de acesso</Label>
+                          <Select
+                            value={form.roleUsuario}
+                            onValueChange={(v) => setForm({ ...form, roleUsuario: v as typeof form.roleUsuario })}
+                          >
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="medico">Médico</SelectItem>
+                              <SelectItem value="enfermeiro">Enfermeiro</SelectItem>
+                              <SelectItem value="recepcao">Recepção</SelectItem>
+                              <SelectItem value="financeiro">Financeiro</SelectItem>
+                              <SelectItem value="gestor">Gestor</SelectItem>
+                              <SelectItem value="admin">Admin</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <p className="col-span-2 text-xs text-muted-foreground">
+                          O e-mail acima será usado para login. Se já existir um usuário com este e-mail, ele será adicionado à equipe desta clínica.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </TabsContent>
 
