@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Plus, Search, Pencil, Trash2, Users, Mic, MicOff, Loader2, MapPin, Download } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Users, Mic, MicOff, Loader2, MapPin, Download, ScanFace } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -16,6 +16,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
 
 export const Route = createFileRoute("/_authenticated/app/clientes")({
   component: ClientesPage,
@@ -141,6 +142,11 @@ function ClientesPage() {
   const [cepLoading, setCepLoading] = useState(false);
   const [tab, setTab] = useState("dados");
 
+  // Biometria facial
+  const [faceFor, setFaceFor] = useState<Paciente | null>(null);
+  const [consentFor, setConsentFor] = useState<Paciente | null>(null);
+  const [hasBiometria, setHasBiometria] = useState<Record<string, boolean>>({});
+
   // Voz
   const [recording, setRecording] = useState(false);
   const [voiceField, setVoiceField] = useState<keyof FormState | null>(null);
@@ -163,6 +169,54 @@ function ClientesPage() {
   };
 
   useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clinicaAtual?.clinica_id]);
+
+  // Carrega quais pacientes já possuem biometria cadastrada (apenas ids da página atual)
+  useEffect(() => {
+    if (!clinicaAtual || items.length === 0) { setHasBiometria({}); return; }
+    (async () => {
+      const { data } = await supabase
+        .from("paciente_biometria")
+        .select("paciente_id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .is("revogado_em", null)
+        .in("paciente_id", items.map(p => p.id));
+      const map: Record<string, boolean> = {};
+      (data ?? []).forEach((b: any) => { map[b.paciente_id] = true; });
+      setHasBiometria(map);
+    })();
+  }, [items, clinicaAtual?.clinica_id]);
+
+  async function salvarBiometria(descriptor: number[]) {
+    if (!faceFor || !clinicaAtual) return;
+    // Revoga biometria anterior (se houver) e insere nova
+    await supabase.from("paciente_biometria")
+      .update({ revogado_em: new Date().toISOString() })
+      .eq("paciente_id", faceFor.id)
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .is("revogado_em", null);
+    const { error } = await supabase.from("paciente_biometria").insert({
+      paciente_id: faceFor.id,
+      clinica_id: clinicaAtual.clinica_id,
+      descriptor: descriptor as any,
+      consentimento_em: new Date().toISOString(),
+    });
+    if (error) throw error;
+    setHasBiometria(prev => ({ ...prev, [faceFor.id]: true }));
+    toast.success("Biometria facial cadastrada");
+  }
+
+  async function revogarBiometria(p: Paciente) {
+    if (!clinicaAtual) return;
+    if (!confirm(`Remover a biometria facial de ${p.nome}? (direito de exclusão — LGPD)`)) return;
+    const { error } = await supabase.from("paciente_biometria")
+      .update({ revogado_em: new Date().toISOString() })
+      .eq("paciente_id", p.id)
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .is("revogado_em", null);
+    if (error) { toast.error(error.message); return; }
+    setHasBiometria(prev => { const c = { ...prev }; delete c[p.id]; return c; });
+    toast.success("Biometria removida");
+  }
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase();
@@ -408,6 +462,15 @@ function ClientesPage() {
                   </span>
                 </TableCell>
                 <TableCell className="text-right">
+                  {hasBiometria[p.id] ? (
+                    <Button variant="ghost" size="icon" onClick={() => revogarBiometria(p)} title="Biometria cadastrada — clique para remover">
+                      <ScanFace className="h-4 w-4 text-emerald-600" />
+                    </Button>
+                  ) : (
+                    <Button variant="ghost" size="icon" onClick={() => setConsentFor(p)} title="Cadastrar biometria facial">
+                      <ScanFace className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  )}
                   <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Pencil className="h-4 w-4" /></Button>
                   <Button variant="ghost" size="icon" onClick={() => onDelete(p)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                 </TableCell>
@@ -566,6 +629,39 @@ function ClientesPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Consentimento LGPD para biometria facial */}
+      <Dialog open={!!consentFor} onOpenChange={(o) => { if (!o) setConsentFor(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Consentimento — Biometria facial</DialogTitle>
+            <DialogDescription>
+              Termo obrigatório (LGPD — Lei 13.709/2018, art. 11).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="text-sm space-y-2 max-h-72 overflow-auto rounded-md border bg-muted/30 p-3">
+            <p><strong>Paciente:</strong> {consentFor?.nome}</p>
+            <p><strong>Finalidade:</strong> identificação na recepção, totem de auto-atendimento e confirmação de identidade em atendimentos, evitando troca de prontuários.</p>
+            <p><strong>O que é armazenado:</strong> apenas um vetor matemático (descritor) do seu rosto — <em>não</em> guardamos a foto. O vetor não permite reconstruir a imagem original.</p>
+            <p><strong>Compartilhamento:</strong> os dados ficam restritos à clínica e não são compartilhados com terceiros.</p>
+            <p><strong>Direitos do titular:</strong> você pode revogar o consentimento e solicitar a exclusão da biometria a qualquer momento, pela equipe da recepção.</p>
+            <p><strong>Base legal:</strong> consentimento específico e destacado (art. 11, I).</p>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setConsentFor(null)}>Não concordo</Button>
+            <Button onClick={() => { setFaceFor(consentFor); setConsentFor(null); }}>
+              Concordo e autorizo a captura
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <FaceCaptureDialog
+        open={!!faceFor}
+        onClose={() => setFaceFor(null)}
+        onCaptured={salvarBiometria}
+        titulo={`Biometria — ${faceFor?.nome ?? ""}`}
+      />
     </div>
   );
 }
