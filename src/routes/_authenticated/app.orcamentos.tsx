@@ -370,19 +370,38 @@ function NovoOrcamentoDialog({
   const subtotal = itens.reduce((s, i) => s + Number(i.quantidade || 0) * Number(i.valor_unitario || 0), 0);
   const total = Math.max(0, subtotal - Number(desconto || 0));
 
+  // Total por forma de pagamento (calculado automaticamente a partir dos itens).
+  // Aplica o desconto proporcionalmente ao subtotal de cada forma.
+  const totaisPorForma = (() => {
+    const out: Record<string, number> = {};
+    if (formasPagamento.length === 0) return out;
+    const subtotalForma = (f: string) =>
+      itens.reduce((s, i) => {
+        const v = Number(i.valores_formas?.[f] ?? i.valor_unitario ?? 0);
+        return s + Number(i.quantidade || 0) * v;
+      }, 0);
+    const subs = formasPagamento.map((f) => ({ f, sub: subtotalForma(f) }));
+    const somaSub = subs.reduce((s, x) => s + x.sub, 0);
+    for (const { f, sub } of subs) {
+      const proporcional = somaSub > 0 ? (sub / somaSub) * total : total / formasPagamento.length;
+      out[f] = Math.round(proporcional * 100) / 100;
+    }
+    // ajusta arredondamento na última forma para bater com o total
+    const soma = Object.values(out).reduce((s, v) => s + v, 0);
+    const diff = Math.round((total - soma) * 100) / 100;
+    if (Math.abs(diff) >= 0.01 && formasPagamento.length > 0) {
+      const last = formasPagamento[formasPagamento.length - 1];
+      out[last] = Math.round((out[last] + diff) * 100) / 100;
+    }
+    return out;
+  })();
+
   const salvar = async () => {
     if (!pacienteNome.trim()) return toast.error("Informe o nome do paciente");
     if (itens.length === 0) return toast.error("Adicione ao menos um procedimento");
     if (formasPagamento.length === 0) return toast.error("Selecione ao menos uma forma de pagamento");
-    let valoresPag: Record<string, number> | null = null;
-    if (formasPagamento.length > 1) {
-      valoresPag = {};
-      for (const f of formasPagamento) valoresPag[f] = Math.round((Number(valoresPagamento[f]) || 0) * 100) / 100;
-      const soma = Object.values(valoresPag).reduce((s, v) => s + v, 0);
-      if (Math.abs(soma - total) > 0.01) {
-        return toast.error(`A soma das formas (${BRL(soma)}) deve ser igual ao total (${BRL(total)})`);
-      }
-    }
+    const valoresPag: Record<string, number> | null =
+      formasPagamento.length > 1 ? { ...totaisPorForma } : null;
     setSaving(true);
 
     const { data: orc, error } = await supabase
