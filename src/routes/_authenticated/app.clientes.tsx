@@ -559,6 +559,41 @@ function ClientesPage() {
               </TabsList>
 
               <TabsContent value="dados" className="space-y-4 pt-4">
+                <div className="flex items-center gap-4">
+                  <div className="relative h-20 w-20 rounded-full overflow-hidden border bg-muted flex items-center justify-center shrink-0">
+                    {fotoPreview ? (
+                      <img src={fotoPreview} alt="Foto do paciente" className="h-full w-full object-cover" />
+                    ) : (
+                      <Camera className="h-7 w-7 text-muted-foreground" />
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <input
+                      ref={fotoInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0] ?? null;
+                        if (!f) return;
+                        if (f.size > 5 * 1024 * 1024) { toast.error("Imagem acima de 5 MB."); return; }
+                        setFotoFile(f);
+                        setFotoPreview(URL.createObjectURL(f));
+                      }}
+                    />
+                    <div className="flex gap-2">
+                      <Button type="button" variant="outline" size="sm" onClick={() => fotoInputRef.current?.click()}>
+                        <Upload className="h-4 w-4 mr-2" /> {fotoPreview ? "Trocar foto" : "Enviar foto"}
+                      </Button>
+                      {fotoPreview && (
+                        <Button type="button" variant="ghost" size="sm" onClick={() => { setFotoFile(null); setFotoPreview(null); }}>
+                          <X className="h-4 w-4 mr-1" /> Remover
+                        </Button>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">JPG, PNG ou WebP até 5 MB. Acesso restrito à clínica.</p>
+                  </div>
+                </div>
                 <div className="space-y-1">
                   <Label>Nome *</Label>
                   <InputVoz {...fieldProps("nome")} required />
