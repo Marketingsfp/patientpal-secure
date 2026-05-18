@@ -597,19 +597,24 @@ function NovoOrcamentoDialog({
                     <tr key={idx} className="border-t">
                       <td className="px-2 py-1">
                         <Input value={it.descricao} onChange={(e) => setItens((a) => a.map((x, i) => i === idx ? { ...x, descricao: e.target.value } : x))} />
-                        {formasPagamento.length > 1 && it.valores_formas && (
-                          <div className="flex gap-3 mt-1 text-[11px] text-muted-foreground">
-                            {formasPagamento.map((f) => (
-                              <span key={f}>
-                                <b className="uppercase">{abreviar(f)}:</b> {BRL(Number(it.valores_formas?.[f] ?? 0))}
-                              </span>
-                            ))}
-                          </div>
-                        )}
                       </td>
                       <td className="px-2 py-1"><Input type="number" min={1} step="1" value={it.quantidade} onChange={(e) => setItens((a) => a.map((x, i) => i === idx ? { ...x, quantidade: Number(e.target.value) || 0 } : x))} /></td>
                       <td className="px-2 py-1"><Input type="number" step="0.01" value={it.valor_unitario} onChange={(e) => setItens((a) => a.map((x, i) => i === idx ? { ...x, valor_unitario: Number(e.target.value) || 0 } : x))} /></td>
-                      <td className="px-2 py-1 text-right font-medium">{BRL(it.quantidade * it.valor_unitario)}</td>
+                      <td className="px-2 py-1 text-right font-medium">
+                        {BRL(it.quantidade * it.valor_unitario)}
+                        {formasPagamento.length > 1 && (
+                          <div className="mt-1 text-[11px] font-normal text-muted-foreground space-y-0.5">
+                            {formasPagamento.map((f) => {
+                              const v = Number(it.valores_formas?.[f] ?? it.valor_unitario ?? 0);
+                              return (
+                                <div key={f}>
+                                  <b className="uppercase">{abreviar(f)}:</b> {BRL(it.quantidade * v)}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </td>
                       <td className="px-2 py-1"><Button size="sm" variant="ghost" onClick={() => setItens((a) => a.filter((_, i) => i !== idx))}><Trash2 className="h-3 w-3 text-destructive" /></Button></td>
                     </tr>
                   ))}
@@ -627,6 +632,16 @@ function NovoOrcamentoDialog({
                 <Input type="number" step="0.01" className="w-32 text-right" value={desconto} onChange={(e) => setDesconto(Number(e.target.value) || 0)} />
               </div>
               <div className="flex justify-between text-lg font-bold border-t pt-2"><span>Total</span><span className="text-primary">{BRL(total)}</span></div>
+              {formasPagamento.length > 1 && (
+                <div className="space-y-1 border-t pt-2">
+                  {formasPagamento.map((f) => (
+                    <div key={f} className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Total {abreviar(f)}</span>
+                      <span className="font-semibold">{BRL(totaisPorForma[f] ?? 0)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
