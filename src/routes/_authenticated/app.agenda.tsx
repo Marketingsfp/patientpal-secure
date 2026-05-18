@@ -66,6 +66,9 @@ const STATUS_COR: Record<Status, string> = {
 const DIAS_SEMANA = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"];
 const PAGE_SIZE = 15;
 
+const normalizar = (s: string) =>
+  (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
 const toLocalInput = (iso: string) => {
   const d = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -197,7 +200,7 @@ function AgendaPage() {
     return items.filter((a) => {
       if (filtroMedico !== "todos" && a.medico_id !== filtroMedico) return false;
       if (filtroStatus !== "todos" && a.status !== filtroStatus) return false;
-      if (filtroCliente && !a.paciente_nome.toLowerCase().includes(filtroCliente.toLowerCase())) return false;
+      if (filtroCliente && !normalizar(a.paciente_nome).includes(normalizar(filtroCliente))) return false;
       if (filtroFicha) {
         const f = fichaPorId.get(a.id) ?? "";
         if (!f.includes(filtroFicha.padStart(Math.min(filtroFicha.length, 3), "0"))) return false;
@@ -296,7 +299,6 @@ function AgendaPage() {
     if (!form.paciente_nome.trim()) { toast.error("Informe o paciente"); return; }
     if (!form.inicio || !form.fim) { toast.error("Defina início e fim"); return; }
     if (new Date(form.fim) <= new Date(form.inicio)) { toast.error("O horário final deve ser após o inicial"); return; }
-    if (!form.medico_id) { toast.error("Selecione o médico ou exame"); return; }
     if (!form.procedimento.trim()) { toast.error("Selecione o procedimento"); return; }
     setSaving(true);
     const payload = {
