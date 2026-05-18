@@ -89,7 +89,7 @@ function DocumentosPage() {
             <div className="space-y-1"><Label>Profissional</Label>
               <Select value={f.medico_id ?? ""} onValueChange={v => set({ ...f, medico_id: v || null })}>
                 <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
-                <SelectContent>{medicos.map(m => <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>)}</SelectContent>
+                <SelectContent>{medicos.map((m) => <SelectItem key={m.id} value={m.id} className="uppercase">{m.nome}</SelectItem>)}</SelectContent>
               </Select>
             </div>
           </div>

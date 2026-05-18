@@ -170,7 +170,7 @@ function AtendimentoIaPage() {
             <Label>Profissional</Label>
             <Select value={medicoId} onValueChange={setMedicoId}>
               <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
-              <SelectContent>{medicos.map((m) => <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>)}</SelectContent>
+              <SelectContent>{medicos.map((m) => <SelectItem key={m.id} value={m.id} className="uppercase">{m.nome}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="space-y-1">
