@@ -587,7 +587,7 @@ function NovoOrcamentoDialog({
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 border-t pt-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 border-t pt-3 pb-8">
             <div className="space-y-1"><Label>Observações</Label><Textarea rows={3} value={observacoes} onChange={(e) => setObservacoes(e.target.value)} /></div>
             <div className="space-y-2">
               <div className="flex justify-between text-sm"><span>Subtotal</span><span className="font-medium">{BRL(subtotal)}</span></div>
@@ -600,7 +600,7 @@ function NovoOrcamentoDialog({
           </div>
         </div>
 
-        <DialogFooter className="sticky bottom-0 bg-background border-t -mx-6 -mb-6 px-6 py-3 z-10">
+        <DialogFooter className="sticky bottom-0 bg-background border-t -mx-6 -mb-6 px-6 py-5 z-10">
           <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
           <Button onClick={salvar} disabled={saving} className="gap-2"><Printer className="h-4 w-4" /> Salvar e imprimir</Button>
         </DialogFooter>
