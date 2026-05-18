@@ -364,8 +364,17 @@ function AgendaPage() {
     if (error) { toast.error(error.message); return; }
     toast.success("Salvo"); setOpen(false); await load();
     if (irParaPagamento) {
-      const desc = `${payload.procedimento ?? "Atendimento"} — ${payload.paciente_nome}`;
-      setPagamentoDesc(desc);
+      const nomeBusca = normalizar((payload.procedimento ?? "CONSULTA").trim());
+      const { data: lista } = await supabase
+        .from("procedimentos")
+        .select("nome,valor_dinheiro,valor_padrao")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .limit(5000);
+      const proc = (lista ?? []).find((p) => normalizar(p.nome ?? "") === nomeBusca)
+        ?? (lista ?? []).find((p) => normalizar(p.nome ?? "").includes(nomeBusca));
+      const valor = Number(proc?.valor_dinheiro ?? proc?.valor_padrao ?? 0);
+      setPagamentoDesc(`${payload.paciente_nome} — ${payload.procedimento ?? "CONSULTA"}`);
+      setPagamentoValor(valor > 0 ? valor.toFixed(2) : "");
       setPagamentoOpen(true);
     }
   };
