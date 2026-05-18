@@ -101,6 +101,7 @@ function AgendaPage() {
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [exames, setExames] = useState<{ id: string; nome: string }[]>([]);
   const [procedimentosList, setProcedimentosList] = useState<{ id: string; nome: string }[]>([]);
+  const [procPorMedico, setProcPorMedico] = useState<Map<string, Set<string>>>(new Map());
   const [especialidades, setEspecialidades] = useState<Especialidade[]>([]);
   const [medicoEspec, setMedicoEspec] = useState<Map<string, Set<string>>>(new Map());
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
@@ -179,12 +180,13 @@ function AgendaPage() {
 
   const loadRef = async () => {
     if (!clinicaAtual) return;
-    const [m, p, e, me, pr] = await Promise.all([
+    const [m, p, e, me, pr, sr] = await Promise.all([
       supabase.from("medicos").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("pacientes").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome").limit(500),
       supabase.from("especialidades").select("id,nome").order("nome"),
       supabase.from("medico_especialidades").select("medico_id,especialidade_id"),
       supabase.from("procedimentos").select("id,nome,tipo").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome").limit(5000),
+      supabase.from("procedimento_split_regras").select("medico_id,procedimento_id").eq("clinica_id", clinicaAtual.clinica_id).not("medico_id", "is", null),
     ]);
     setMedicos((m.data ?? []) as Medico[]);
     setPacientes((p.data ?? []) as Paciente[]);
@@ -198,6 +200,13 @@ function AgendaPage() {
       map.get(r.medico_id)!.add(r.especialidade_id);
     }
     setMedicoEspec(map);
+    const pm = new Map<string, Set<string>>();
+    for (const r of (sr.data ?? []) as Array<{ medico_id: string | null; procedimento_id: string }>) {
+      if (!r.medico_id) continue;
+      if (!pm.has(r.medico_id)) pm.set(r.medico_id, new Set());
+      pm.get(r.medico_id)!.add(r.procedimento_id);
+    }
+    setProcPorMedico(pm);
   };
 
   useEffect(() => { loadRef(); }, [clinicaAtual?.clinica_id]);
@@ -355,8 +364,17 @@ function AgendaPage() {
     if (error) { toast.error(error.message); return; }
     toast.success("Salvo"); setOpen(false); await load();
     if (irParaPagamento) {
-      const desc = `${payload.procedimento ?? "Atendimento"} — ${payload.paciente_nome}`;
-      setPagamentoDesc(desc);
+      const nomeBusca = normalizar((payload.procedimento ?? "CONSULTA").trim());
+      const { data: lista } = await supabase
+        .from("procedimentos")
+        .select("nome,valor_dinheiro,valor_padrao")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .limit(5000);
+      const proc = (lista ?? []).find((p) => normalizar(p.nome ?? "") === nomeBusca)
+        ?? (lista ?? []).find((p) => normalizar(p.nome ?? "").includes(nomeBusca));
+      const valor = Number(proc?.valor_dinheiro ?? proc?.valor_padrao ?? 0);
+      setPagamentoDesc(`${payload.paciente_nome} — ${payload.procedimento ?? "CONSULTA"}`);
+      setPagamentoValor(valor > 0 ? valor.toFixed(2) : "");
       setPagamentoOpen(true);
     }
   };
@@ -548,6 +566,9 @@ function AgendaPage() {
               </div>
               <div className="space-y-1">
                 <Label>Procedimento</Label>
+                {form.medico_id && procPorMedico.get(form.medico_id)?.size ? (
+                  <p className="text-xs text-muted-foreground">Mostrando apenas procedimentos configurados para este médico.</p>
+                ) : null}
                 <SearchableSelect
                   value={form.procedimento || "none"}
                   onChange={(v) => setForm(f => ({ ...f, procedimento: v === "none" ? "" : v }))}
@@ -555,7 +576,13 @@ function AgendaPage() {
                   searchPlaceholder="Buscar procedimento..."
                   options={[
                     { value: "none", label: "— Selecione —" },
-                    ...procedimentosList.map(p => ({ value: p.nome, label: p.nome })),
+                    ...(() => {
+                      const idsDoMedico = form.medico_id ? procPorMedico.get(form.medico_id) : undefined;
+                      const filtrados = (idsDoMedico && idsDoMedico.size > 0)
+                        ? procedimentosList.filter((p) => idsDoMedico.has(p.id))
+                        : procedimentosList;
+                      return filtrados.map((p) => ({ value: p.nome, label: p.nome }));
+                    })(),
                   ]}
                 />
               </div>
