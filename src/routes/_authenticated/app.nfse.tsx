@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Receipt } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SimpleCrud } from "@/components/simple-crud/SimpleCrud";
@@ -47,8 +48,8 @@ function NfsePage() {
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1"><Label>Valor serviços (R$)</Label><Input type="number" step="0.01" value={f.valor_servicos} onChange={e => set({ ...f, valor_servicos: e.target.value })} /></div>
-            <div className="space-y-1"><Label>ISS (R$)</Label><Input type="number" step="0.01" value={f.valor_iss} onChange={e => set({ ...f, valor_iss: e.target.value })} /></div>
+            <div className="space-y-1"><Label>Valor serviços (R$)</Label><CurrencyInput value={f.valor_servicos} onChange={(v) => set({ ...f, valor_servicos: v })} /></div>
+            <div className="space-y-1"><Label>ISS (R$)</Label><CurrencyInput value={f.valor_iss} onChange={(v) => set({ ...f, valor_iss: v })} /></div>
           </div>
           <div className="space-y-1"><Label>Descrição dos serviços</Label><Textarea rows={3} value={f.descricao_servicos} onChange={e => set({ ...f, descricao_servicos: e.target.value })} /></div>
         </div>
