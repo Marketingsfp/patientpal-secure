@@ -31,6 +31,8 @@ import { printGuiaAtendimento } from "@/lib/print-gr";
 import { VoiceInput } from "@/components/voice-input";
 import { exportToExcel } from "@/lib/export-csv";
 import { useAuth } from "@/hooks/use-auth";
+import { useServerFn } from "@tanstack/react-start";
+import { listarEquipe } from "@/lib/equipe.functions";
 
 export const Route = createFileRoute("/_authenticated/app/agenda")({
   component: AgendaPage,
@@ -85,7 +87,8 @@ function AgendaPage() {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
   const [dataRef, setDataRef] = useState(() => new Date().toISOString().slice(0, 10));
-  const [apenasData, setApenasData] = useState(true);
+  const [apenasData, setApenasData] = useState(false);
+  const [mostrarLivres, setMostrarLivres] = useState(false);
   const [filtroMedico, setFiltroMedico] = useState<string>("todos");
   const [filtroEspecialidade, setFiltroEspecialidade] = useState<string>("todos");
   const [filtroDiaSemana, setFiltroDiaSemana] = useState<string>("todos");
@@ -112,6 +115,15 @@ function AgendaPage() {
   const [novoPacOpen, setNovoPacOpen] = useState(false);
   const [novoPac, setNovoPac] = useState({ nome: "", cpf: "", telefone: "", data_nascimento: "", email: "" });
   const [savingPac, setSavingPac] = useState(false);
+  const [equipeList, setEquipeList] = useState<Array<{ nome: string | null; email: string | null }>>([]);
+  const fnListarEquipe = useServerFn(listarEquipe);
+  const carregarEquipe = async () => {
+    if (!clinicaAtual || equipeList.length > 0) return;
+    try {
+      const data = await fnListarEquipe({ data: { clinicaId: clinicaAtual.clinica_id } });
+      setEquipeList((data as any[]).map((m) => ({ nome: m.nome, email: m.email })));
+    } catch (_) { /* silencioso */ }
+  };
 
   const cadastrarPacienteRapido = async (e: FormEvent) => {
     e.preventDefault();
@@ -199,6 +211,7 @@ function AgendaPage() {
 
   const filtrados = useMemo(() => {
     return items.filter((a) => {
+      if (!mostrarLivres && normalizar(a.paciente_nome) === "disponivel") return false;
       if (filtroMedico !== "todos" && a.medico_id !== filtroMedico) return false;
       if (filtroStatus !== "todos" && a.status !== filtroStatus) return false;
       if (filtroCliente && !normalizar(a.paciente_nome).includes(normalizar(filtroCliente))) return false;
@@ -217,7 +230,7 @@ function AgendaPage() {
       }
       return true;
     });
-  }, [items, filtroMedico, filtroStatus, filtroCliente, filtroFicha, filtroDiaSemana, filtroEspecialidade, medicoEspec, fichaPorId]);
+  }, [items, mostrarLivres, filtroMedico, filtroStatus, filtroCliente, filtroFicha, filtroDiaSemana, filtroEspecialidade, medicoEspec, fichaPorId]);
 
   const totais = useMemo(() => ({
     total: filtrados.length,
@@ -608,6 +621,28 @@ function AgendaPage() {
           </DialogHeader>
           <form onSubmit={cadastrarPacienteRapido} className="space-y-3">
             <div className="space-y-1">
+              <Label className="text-xs">Importar de usuário do sistema</Label>
+              <Select
+                onOpenChange={(o) => o && carregarEquipe()}
+                onValueChange={(v) => {
+                  const m = equipeList.find((e) => `${e.nome}|${e.email}` === v);
+                  if (m) setNovoPac((p) => ({ ...p, nome: m.nome ?? p.nome, email: m.email ?? p.email }));
+                }}
+              >
+                <SelectTrigger><SelectValue placeholder="Selecione um membro da equipe (opcional)" /></SelectTrigger>
+                <SelectContent>
+                  {equipeList.length === 0
+                    ? <div className="px-2 py-1.5 text-sm text-muted-foreground">Carregando…</div>
+                    : equipeList.map((m, i) => (
+                        <SelectItem key={i} value={`${m.nome}|${m.email}`}>
+                          {m.nome ?? "—"} {m.email ? `(${m.email})` : ""}
+                        </SelectItem>
+                      ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">Preenche nome e e-mail. Complete CPF, telefone e nascimento abaixo.</p>
+            </div>
+            <div className="space-y-1">
               <Label>Nome *</Label>
               <Input value={novoPac.nome} onChange={(e) => setNovoPac(p => ({ ...p, nome: e.target.value }))} required autoFocus />
             </div>
@@ -719,10 +754,16 @@ function AgendaPage() {
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <Checkbox checked={apenasData} onCheckedChange={(v) => setApenasData(!!v)} />
-            Exibir apenas a data selecionada
-          </label>
+          <div className="flex flex-wrap items-center gap-4">
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <Checkbox checked={apenasData} onCheckedChange={(v) => setApenasData(!!v)} />
+              Exibir apenas a data selecionada
+            </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <Checkbox checked={mostrarLivres} onCheckedChange={(v) => setMostrarLivres(!!v)} />
+              Mostrar horários livres
+            </label>
+          </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={limparFiltros}><X className="h-4 w-4 mr-2" /> Limpar</Button>
             <Button onClick={load}><Search className="h-4 w-4 mr-2" /> Exibir</Button>
