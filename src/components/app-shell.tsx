@@ -1,6 +1,6 @@
 import { Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
-import { lazy, Suspense, useEffect } from "react";
-import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3 } from "lucide-react";
+import { lazy, Suspense, useEffect, useState } from "react";
+import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
@@ -69,6 +69,17 @@ export function AppShell() {
   const { memberships, clinicaAtual, setClinicaAtual } = useClinica();
   const location = useLocation();
   const navigate = useNavigate();
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("sidebar:collapsed") === "1";
+  });
+  const toggleCollapsed = () => {
+    setCollapsed((v) => {
+      const next = !v;
+      try { window.localStorage.setItem("sidebar:collapsed", next ? "1" : "0"); } catch { /* noop */ }
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!loading && !user) navigate({ to: "/login", replace: true });
@@ -119,17 +130,17 @@ export function AppShell() {
   return (
     <div className="min-h-screen flex bg-muted/30">
       <aside
-        className="w-64 text-white flex flex-col shrink-0"
+        className={`${collapsed ? "w-14" : "w-64"} text-white flex flex-col shrink-0 transition-[width] duration-200`}
         style={{
           backgroundColor: clinicaAtual ? corDaClinica(clinicaAtual.clinica.nome) : undefined,
           ["--nav-hover" as never]: clinicaAtual ? corHoverDaClinica(clinicaAtual.clinica.nome) : "rgba(0,0,0,0.25)",
         }}
       >
-        <div className="px-4 py-4 flex items-center justify-center gap-2 border-b border-white/20 min-h-[88px] text-white">
+        <div className={`${collapsed ? "px-2" : "px-4"} py-4 flex items-center justify-center gap-2 border-b border-white/20 min-h-[64px] text-white`}>
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/15 backdrop-blur">
             <Activity className="h-5 w-5" />
           </span>
-          <span className="text-lg font-semibold tracking-tight">ClinicaOS</span>
+          {!collapsed && <span className="text-lg font-semibold tracking-tight">ClinicaOS</span>}
         </div>
         <nav className="flex-1 p-3 space-y-1 font-sans">
           {nav.map((item) => {
@@ -139,37 +150,55 @@ export function AppShell() {
               <Link
                 key={item.to}
                 to={item.to}
-                className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold tracking-wide transition-colors ${
+                title={collapsed ? item.label : undefined}
+                className={`flex items-center gap-3 rounded-md ${collapsed ? "px-2 justify-center" : "px-3"} py-2 text-sm font-semibold tracking-wide transition-colors ${
                   active
                     ? "bg-[var(--nav-hover)] text-white"
                     : "text-white hover:bg-[var(--nav-hover)] hover:text-white"
                 }`}
               >
                 <item.icon className="h-4 w-4 text-white" />
-                {item.label}
+                {!collapsed && item.label}
               </Link>
             );
           })}
         </nav>
         <div className="p-3 border-t border-sidebar-border">
-          <div className="px-3 py-2 text-xs text-sidebar-foreground/60 truncate">{user?.email}</div>
-          <Button variant="ghost" className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground" onClick={handleSignOut}>
-            <LogOut className="h-4 w-4 mr-2" /> Sair
+          {!collapsed && (
+            <div className="px-3 py-2 text-xs text-white/70 truncate">{user?.email}</div>
+          )}
+          <Button
+            variant="ghost"
+            title={collapsed ? "Sair" : undefined}
+            className={`w-full ${collapsed ? "justify-center px-0" : "justify-start"} text-white hover:bg-[var(--nav-hover)] hover:text-white`}
+            onClick={handleSignOut}
+          >
+            <LogOut className={`h-4 w-4 ${collapsed ? "" : "mr-2"}`} /> {!collapsed && "Sair"}
           </Button>
         </div>
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 border-b border-border bg-card flex items-center justify-between px-6">
-          <Link to="/app" className="flex items-center gap-3">
-            {clinicaAtual && logoDaClinica(clinicaAtual.clinica.nome) ? (
-              <img src={logoDaClinica(clinicaAtual.clinica.nome)!} alt={clinicaAtual.clinica.nome} className="h-12 w-auto object-contain" />
-            ) : (
-              <span className="text-sm font-semibold" style={{ color: corDaClinica(clinicaAtual?.clinica.nome) }}>
-                {clinicaAtual ? clinicaAtual.clinica.nome : "Nenhuma clínica selecionada"}
-              </span>
-            )}
-          </Link>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleCollapsed}
+              title={collapsed ? "Expandir menu" : "Recolher menu"}
+            >
+              {collapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
+            </Button>
+            <Link to="/app" className="flex items-center gap-3">
+              {clinicaAtual && logoDaClinica(clinicaAtual.clinica.nome) ? (
+                <img src={logoDaClinica(clinicaAtual.clinica.nome)!} alt={clinicaAtual.clinica.nome} className="h-12 w-auto object-contain" />
+              ) : (
+                <span className="text-sm font-semibold" style={{ color: corDaClinica(clinicaAtual?.clinica.nome) }}>
+                  {clinicaAtual ? clinicaAtual.clinica.nome : "Nenhuma clínica selecionada"}
+                </span>
+              )}
+            </Link>
+          </div>
           <div className="flex items-center gap-2">
             <Suspense fallback={null}>
               <VoiceInput
