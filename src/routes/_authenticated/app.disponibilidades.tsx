@@ -209,13 +209,12 @@ function Page() {
               </Select>
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Período (dias)</label>
-              <Select value={gerar.dias} onValueChange={(v) => setGerar({ ...gerar, dias: v })}>
-                <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {["7", "15", "30", "60", "90"].map((v) => <SelectItem key={v} value={v}>{v} dias</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <label className="text-xs text-muted-foreground">De</label>
+              <Input type="date" className="w-40" value={gerar.data_inicio} onChange={(e) => setGerar({ ...gerar, data_inicio: e.target.value })} />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Até</label>
+              <Input type="date" className="w-40" value={gerar.data_fim} onChange={(e) => setGerar({ ...gerar, data_fim: e.target.value })} />
             </div>
             <Button onClick={gerarAgenda} disabled={gerando || slotsPreview.length === 0}>
               <CalendarRange className="h-4 w-4 mr-1" />
