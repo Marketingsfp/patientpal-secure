@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { Activity } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
@@ -18,13 +18,27 @@ export const Route = createFileRoute("/")({
 });
 
 function LandingPage() {
-  const navigate = useNavigate();
+  const router = useRouter();
   const { user, loading } = useAuth();
 
   useEffect(() => {
     if (loading) return;
-    void navigate({ to: user ? "/app" : "/login", replace: true });
-  }, [loading, navigate, user]);
+    const target = user ? "/app" : "/login";
+    router.navigate({ to: target, replace: true }).catch(() => {
+      if (typeof window !== "undefined") window.location.replace(target);
+    });
+  }, [loading, router, user]);
+
+  useEffect(() => {
+    // Safety net: if redirect doesn't happen within 1.5s, force it via window.location.
+    if (typeof window === "undefined") return;
+    const t = window.setTimeout(() => {
+      if (window.location.pathname === "/") {
+        window.location.replace(user ? "/app" : "/login");
+      }
+    }, 1500);
+    return () => window.clearTimeout(t);
+  }, [user]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4 text-center">
