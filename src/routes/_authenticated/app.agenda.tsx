@@ -59,11 +59,11 @@ const STATUS_LABEL: Record<Status, string> = {
   cancelado: "Cancelado", faltou: "Faltou",
 };
 const STATUS_COR: Record<Status, string> = {
-  agendado: "bg-primary/10 text-primary",
-  confirmado: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
-  realizado: "bg-blue-500/15 text-blue-700 dark:text-blue-400",
-  cancelado: "bg-muted text-muted-foreground",
-  faltou: "bg-rose-500/15 text-rose-700 dark:text-rose-400",
+  agendado: "bg-[#dbe7fb] text-slate-800 border border-[#b6cdf5]",
+  confirmado: "bg-[#cfe3fb] text-slate-800 border border-[#9fc3f3]",
+  realizado: "bg-[#d1f0d6] text-slate-800 border border-[#8fd49a]",
+  cancelado: "bg-[#f8d2d6] text-slate-800 border border-[#eea1a8]",
+  faltou: "bg-[#f7b6c0] text-slate-800 border border-[#e88594]",
 };
 const DIAS_SEMANA = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"];
 const PAGE_SIZE = 15;
@@ -887,6 +887,31 @@ function AgendaPage() {
 
       <div className="flex justify-center">
         <Paginacao page={page} totalPages={totalPages} onChange={setPage} />
+      </div>
+
+      <div className="rounded-lg border bg-muted/30 p-4">
+        <h3 className="text-center font-semibold mb-3">Legenda</h3>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            { cor: "#cfe3fb", borda: "#9fc3f3", label: "Confirmado pelo cliente" },
+            { cor: "#a8c8ed", borda: "#7aa9d8", label: "Presente na clínica" },
+            { cor: "#7fbfc2", borda: "#5a9ea1", label: "Em atendimento" },
+            { cor: "#d1f0d6", borda: "#8fd49a", label: "Atendido com sucesso" },
+            { cor: "#fde2c4", borda: "#f5c890", label: "Agenda de telemedicina" },
+            { cor: "#f8d2d6", borda: "#eea1a8", label: "Cancelado pelo cliente" },
+            { cor: "#fef3b6", borda: "#f0dc7a", label: "Atrasado para consulta" },
+            { cor: "#e0cdf0", borda: "#bea4d8", label: "Agendamento on-line" },
+            { cor: "#f7b6c0", borda: "#e88594", label: "Não comparecimento" },
+          ].map((s) => (
+            <div key={s.label} className="flex items-center gap-2 text-sm">
+              <span
+                className="inline-block h-6 w-10 rounded border"
+                style={{ background: s.cor, borderColor: s.borda }}
+              />
+              <span>{s.label}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
