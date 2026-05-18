@@ -255,7 +255,10 @@ function ClientesPage() {
     );
   }, [items, busca]);
 
-  const openNew = () => { setEditing(null); setForm(EMPTY); setTab("dados"); setOpen(true); };
+  const openNew = () => {
+    setEditing(null); setForm(EMPTY); setTab("dados"); setOpen(true);
+    setFotoFile(null); setFotoPreview(null);
+  };
   const openEdit = async (p: Paciente) => {
     const { data, error } = await supabase.from("pacientes").select("*").eq("id", p.id).single();
     if (error) { toast.error(error.message); return; }
@@ -276,6 +279,14 @@ function ClientesPage() {
     });
     setTab("dados");
     setOpen(true);
+    setFotoFile(null);
+    if (paciente.foto_url) {
+      const { data: s } = await supabase.storage.from("pacientes-fotos")
+        .createSignedUrl(paciente.foto_url, 3600);
+      setFotoPreview(s?.signedUrl ?? null);
+    } else {
+      setFotoPreview(null);
+    }
   };
 
   const buscarCep = async (cepRaw: string) => {
