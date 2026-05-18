@@ -841,23 +841,22 @@ function AgendaPage() {
           if (pagamentoExtraIds.length > 0) {
             setSelecionados(new Set());
           }
-          if (confirm("Pagamento registrado. Imprimir Guia de Atendimento (GR) agora?")) {
-            try {
-              await printGuiaAtendimento({
-                agendamentoId: pagamentoAgId,
-                clinicaId: clinicaAtual.clinica_id,
-                usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
-                pagamento: {
-                  valor: dados.valor,
-                  forma_pagamento: dados.forma_pagamento,
-                  parcelas: dados.parcelas,
-                  bandeira_cartao: dados.bandeira_cartao,
-                  detalhe: dados.pagamentos_detalhe,
-                },
-              });
-            } catch (err) {
-              toast.error(err instanceof Error ? err.message : "Falha ao imprimir GR");
-            }
+          try {
+            await printGuiaAtendimento({
+              agendamentoId: pagamentoAgId,
+              clinicaId: clinicaAtual.clinica_id,
+              usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
+              pagamento: {
+                valor: dados.valor,
+                forma_pagamento: dados.forma_pagamento,
+                parcelas: dados.parcelas,
+                bandeira_cartao: dados.bandeira_cartao,
+                detalhe: dados.pagamentos_detalhe,
+              },
+            });
+            toast.success("Pagamento registrado e GR enviado para impressão.");
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Falha ao imprimir GR");
           }
           setPagamentoAgId(null);
           setPagamentoExtraIds([]);
