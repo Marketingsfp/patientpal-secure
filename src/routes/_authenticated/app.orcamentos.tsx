@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { printOrcamento } from "@/lib/print-orcamento";
 
 export const Route = createFileRoute("/_authenticated/app/orcamentos")({
@@ -50,6 +51,15 @@ type Item = {
   procedimento_id: string | null;
   preparo: string | null;
   valores_formas?: Record<string, number> | null;
+};
+
+type PacienteOpt = {
+  id: string;
+  nome: string;
+  cpf: string | null;
+  numero_pasta: number | null;
+  data_nascimento: string | null;
+  telefone: string | null;
 };
 
 const FORMAS = ["Dinheiro", "PIX", "Cartão de Crédito", "Cartão de Débito", "Boleto", "Outro"];
@@ -190,6 +200,8 @@ function NovoOrcamentoDialog({
   const [pacienteTelefone, setPacienteTelefone] = useState("");
   const [pacienteCpf, setPacienteCpf] = useState("");
   const [medicoNome, setMedicoNome] = useState("");
+  const [pacienteId, setPacienteId] = useState<string>("");
+  const [pacientes, setPacientes] = useState<PacienteOpt[]>([]);
   const [formasPagamento, setFormasPagamento] = useState<string[]>(["Dinheiro"]);
   const [desconto, setDesconto] = useState(0);
   const [validade, setValidade] = useState(30);
@@ -201,6 +213,43 @@ function NovoOrcamentoDialog({
   const [procQuery, setProcQuery] = useState("");
   const [procResults, setProcResults] = useState<Procedimento[]>([]);
   const [searchingProc, setSearchingProc] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from("pacientes")
+        .select("id,nome,cpf,numero_pasta,data_nascimento,telefone")
+        .eq("clinica_id", clinicaId)
+        .order("nome")
+        .limit(2000);
+      setPacientes((data ?? []) as PacienteOpt[]);
+    })();
+  }, [clinicaId]);
+
+  const pacienteOptions = useMemo(
+    () =>
+      pacientes.map((p) => ({
+        value: p.id,
+        label: [
+          p.nome,
+          p.numero_pasta != null ? `Pasta ${p.numero_pasta}` : null,
+          p.cpf ? `CPF ${p.cpf}` : null,
+          p.data_nascimento ? `Nasc. ${p.data_nascimento}` : null,
+          p.telefone,
+        ].filter(Boolean).join(" · "),
+      })),
+    [pacientes],
+  );
+
+  const selecionarPaciente = (id: string) => {
+    setPacienteId(id);
+    const p = pacientes.find((x) => x.id === id);
+    if (p) {
+      setPacienteNome(p.nome ?? "");
+      setPacienteTelefone(p.telefone ?? "");
+      setPacienteCpf(p.cpf ?? "");
+    }
+  };
 
   useEffect(() => {
     let cancel = false;
