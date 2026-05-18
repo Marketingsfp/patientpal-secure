@@ -368,6 +368,19 @@ function NovoOrcamentoDialog({
         <DialogHeader><DialogTitle>Novo orçamento</DialogTitle></DialogHeader>
 
         <div className="space-y-4">
+          <div className="space-y-1">
+            <Label>Buscar paciente cadastrado</Label>
+            <SearchableSelect
+              options={pacienteOptions}
+              value={pacienteId}
+              onChange={selecionarPaciente}
+              placeholder="Buscar por nome, CPF, pasta, nascimento ou telefone..."
+              searchPlaceholder="Digite para buscar..."
+              emptyText="Nenhum paciente encontrado."
+            />
+            <p className="text-xs text-muted-foreground">Ou preencha manualmente abaixo para paciente novo.</p>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1"><Label>Paciente *</Label><Input value={pacienteNome} onChange={(e) => setPacienteNome(e.target.value)} /></div>
             <div className="space-y-1"><Label>Telefone</Label><Input value={pacienteTelefone} onChange={(e) => setPacienteTelefone(e.target.value)} /></div>
