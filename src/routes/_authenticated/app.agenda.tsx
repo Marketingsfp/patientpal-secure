@@ -773,7 +773,7 @@ function AgendaPage() {
 
       <LancamentoDialog
         open={pagamentoOpen}
-        onOpenChange={(v) => { setPagamentoOpen(v); if (!v) setPagamentoAgId(null); }}
+        onOpenChange={(v) => { setPagamentoOpen(v); if (!v) { setPagamentoAgId(null); setPagamentoExtraIds([]); } }}
         tipo="receita"
         initialDescricao={pagamentoDesc}
         initialValor={pagamentoValor}
@@ -782,11 +782,36 @@ function AgendaPage() {
         onSavedWithData={async (dados) => {
           if (!pagamentoAgId || !clinicaAtual) return;
           const agId = pagamentoAgId;
+          // marca todos os agendamentos da cobrança agrupada como pagos
+          if (pagamentoExtraIds.length > 0) {
+            // insere linhas-sombra (valor 0) para que os demais agendamentos
+            // apareçam como "pagos" sem duplicar receita financeira
+            const sombras = pagamentoExtraIds.map((extraId) => ({
+              clinica_id: clinicaAtual.clinica_id,
+              tipo: "receita" as const,
+              descricao: `${pagamentoDesc} — vinculado ao pagamento agrupado`,
+              valor: 0,
+              data: new Date().toISOString().slice(0, 10),
+              forma_pagamento: dados.forma_pagamento,
+              status: "confirmado" as const,
+              agendamento_id: extraId,
+              observacoes: `Pagamento agrupado com agendamento ${agId}`,
+            }));
+            const { error: errSombras } = await supabase.from("fin_lancamentos").insert(sombras);
+            if (errSombras) {
+              toast.error("Pagamento salvo, mas falhou ao vincular itens extras: " + errSombras.message);
+            }
+          }
           setPagosSet((prev) => {
             const next = new Set(prev);
             next.add(agId);
+            for (const id of pagamentoExtraIds) next.add(id);
             return next;
           });
+          // limpa seleção após cobrança agrupada
+          if (pagamentoExtraIds.length > 0) {
+            setSelecionados(new Set());
+          }
           if (confirm("Pagamento registrado. Imprimir Guia de Atendimento (GR) agora?")) {
             try {
               await printGuiaAtendimento({
@@ -806,6 +831,7 @@ function AgendaPage() {
             }
           }
           setPagamentoAgId(null);
+          setPagamentoExtraIds([]);
         }}
       />
 
