@@ -1802,6 +1802,7 @@ export type Database = {
           quantidade: number
           valor_total: number
           valor_unitario: number
+          valores_formas: Json | null
         }
         Insert: {
           created_at?: string
@@ -1813,6 +1814,7 @@ export type Database = {
           quantidade?: number
           valor_total?: number
           valor_unitario?: number
+          valores_formas?: Json | null
         }
         Update: {
           created_at?: string
@@ -1824,6 +1826,7 @@ export type Database = {
           quantidade?: number
           valor_total?: number
           valor_unitario?: number
+          valores_formas?: Json | null
         }
         Relationships: [
           {
