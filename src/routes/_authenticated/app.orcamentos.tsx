@@ -374,6 +374,15 @@ function NovoOrcamentoDialog({
     if (!pacienteNome.trim()) return toast.error("Informe o nome do paciente");
     if (itens.length === 0) return toast.error("Adicione ao menos um procedimento");
     if (formasPagamento.length === 0) return toast.error("Selecione ao menos uma forma de pagamento");
+    let valoresPag: Record<string, number> | null = null;
+    if (formasPagamento.length > 1) {
+      valoresPag = {};
+      for (const f of formasPagamento) valoresPag[f] = Math.round((Number(valoresPagamento[f]) || 0) * 100) / 100;
+      const soma = Object.values(valoresPag).reduce((s, v) => s + v, 0);
+      if (Math.abs(soma - total) > 0.01) {
+        return toast.error(`A soma das formas (${BRL(soma)}) deve ser igual ao total (${BRL(total)})`);
+      }
+    }
     setSaving(true);
 
     const { data: orc, error } = await supabase
@@ -388,6 +397,7 @@ function NovoOrcamentoDialog({
         medico_externo: medicoExterno,
         clinica_solicitante: medicoExterno ? (clinicaSolicitante.trim() || null) : null,
         forma_pagamento: formasPagamento.join(" + "),
+        valores_pagamento: valoresPag,
         validade_dias: validade,
         desconto: Number(desconto) || 0,
         valor_total: total,
