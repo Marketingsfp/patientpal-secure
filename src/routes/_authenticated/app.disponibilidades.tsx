@@ -25,7 +25,9 @@ function Page() {
   const [disps, setDisps] = useState<Disp[]>([]);
   const [filtro, setFiltro] = useState("");
   const [novo, setNovo] = useState({ medico_id: "", dia_semana: "1", hora_inicio: "08:00", hora_fim: "12:00", limite_pacientes: "" });
-  const [gerar, setGerar] = useState({ medico_id: "all", duracao: "5", dias: "30" });
+  const hojeIso = new Date().toISOString().slice(0, 10);
+  const em30Iso = (() => { const d = new Date(); d.setDate(d.getDate() + 29); return d.toISOString().slice(0, 10); })();
+  const [gerar, setGerar] = useState({ medico_id: "all", duracao: "5", dias: "30", data_inicio: hojeIso, data_fim: em30Iso });
   const [gerando, setGerando] = useState(false);
 
   const load = async () => {
@@ -67,14 +69,16 @@ function Page() {
 
   // Pré-visualização dos slots gerados
   const slotsPreview = useMemo(() => {
-    const dias = parseInt(gerar.dias);
     const dur = parseInt(gerar.duracao);
-    if (!dias || !dur) return [] as { data: string; medico: string; inicio: string; fim: string }[];
+    if (!dur || !gerar.data_inicio || !gerar.data_fim) return [] as { data: string; medico: string; inicio: string; fim: string }[];
+    const ini = new Date(`${gerar.data_inicio}T00:00:00`);
+    const fimD = new Date(`${gerar.data_fim}T00:00:00`);
+    if (fimD < ini) return [];
+    const dias = Math.floor((fimD.getTime() - ini.getTime()) / 86400000) + 1;
     const alvo = gerar.medico_id === "all" ? medicos : medicos.filter((m) => m.id === gerar.medico_id);
     const out: { data: string; medico: string; inicio: string; fim: string }[] = [];
-    const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
     for (let i = 0; i < dias; i++) {
-      const d = new Date(hoje); d.setDate(d.getDate() + i);
+      const d = new Date(ini); d.setDate(d.getDate() + i);
       const dow = d.getDay();
       for (const m of alvo) {
         const ds = disps.filter((x) => x.medico_id === m.id && x.dia_semana === dow);
@@ -205,13 +209,12 @@ function Page() {
               </Select>
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Período (dias)</label>
-              <Select value={gerar.dias} onValueChange={(v) => setGerar({ ...gerar, dias: v })}>
-                <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {["7", "15", "30", "60", "90"].map((v) => <SelectItem key={v} value={v}>{v} dias</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <label className="text-xs text-muted-foreground">De</label>
+              <Input type="date" className="w-40" value={gerar.data_inicio} onChange={(e) => setGerar({ ...gerar, data_inicio: e.target.value })} />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Até</label>
+              <Input type="date" className="w-40" value={gerar.data_fim} onChange={(e) => setGerar({ ...gerar, data_fim: e.target.value })} />
             </div>
             <Button onClick={gerarAgenda} disabled={gerando || slotsPreview.length === 0}>
               <CalendarRange className="h-4 w-4 mr-1" />
