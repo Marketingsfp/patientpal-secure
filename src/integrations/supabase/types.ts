@@ -1560,6 +1560,7 @@ export type Database = {
           hora_fim: string
           hora_inicio: string
           id: string
+          limite_pacientes: number | null
           medico_id: string
           observacoes: string | null
           updated_at: string
@@ -1572,6 +1573,7 @@ export type Database = {
           hora_fim: string
           hora_inicio: string
           id?: string
+          limite_pacientes?: number | null
           medico_id: string
           observacoes?: string | null
           updated_at?: string
@@ -1584,6 +1586,7 @@ export type Database = {
           hora_fim?: string
           hora_inicio?: string
           id?: string
+          limite_pacientes?: number | null
           medico_id?: string
           observacoes?: string | null
           updated_at?: string
