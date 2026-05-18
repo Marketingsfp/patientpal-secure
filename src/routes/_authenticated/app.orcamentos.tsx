@@ -356,6 +356,41 @@ function NovoOrcamentoDialog({
     setValoresPagamento({});
   };
 
+  // Quando o usuário troca/adiciona uma forma de pagamento DEPOIS de já ter
+  // incluído procedimentos, busca os valores faltantes daquela forma para
+  // cada item já adicionado — evita que o cupom mostre o valor da forma
+  // antiga (ex.: Crédito repetindo o valor de Dinheiro).
+  useEffect(() => {
+    if (formasPagamento.length === 0 || itens.length === 0) return;
+    const idsFaltando = Array.from(new Set(
+      itens
+        .filter((i) => i.procedimento_id && formasPagamento.some((f) => i.valores_formas?.[f] == null))
+        .map((i) => i.procedimento_id as string)
+    ));
+    if (idsFaltando.length === 0) return;
+    let cancel = false;
+    (async () => {
+      const { data } = await supabase
+        .from("procedimentos")
+        .select("id, valor_dinheiro_pix, valor_cartao, valor_dinheiro, valor_pix, valor_cartao_credito, valor_cartao_debito, valor_padrao, preparo")
+        .in("id", idsFaltando);
+      if (cancel || !data) return;
+      const byId = new Map(data.map((p) => [p.id, p as Procedimento]));
+      setItens((arr) => arr.map((it) => {
+        if (!it.procedimento_id) return it;
+        const p = byId.get(it.procedimento_id);
+        if (!p) return it;
+        const next = { ...(it.valores_formas ?? {}) };
+        for (const f of formasPagamento) {
+          if (next[f] == null) next[f] = valorPorForma(p, f);
+        }
+        return { ...it, valores_formas: next };
+      }));
+    })();
+    return () => { cancel = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formasPagamento.join("|"), itens.length]);
+
   const adicionarProc = (p: Procedimento) => {
     const formas = formasPagamento.length ? formasPagamento : ["Dinheiro"];
     const valores: Record<string, number> = {};
