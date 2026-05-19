@@ -814,6 +814,47 @@ function Page() {
         </DialogContent>
       </Dialog>
 
+      {/* === Modal Cobrança === */}
+      <Dialog open={!!openCobranca} onOpenChange={(o) => { if (!o) setOpenCobranca(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cobrar paciente</DialogTitle>
+            {openCobranca && (
+              <DialogDescription>
+                <span className="uppercase font-medium">{openCobranca.paciente_nome}</span>
+                {openCobranca.procedimento ? ` · ${openCobranca.procedimento}` : ""}
+              </DialogDescription>
+            )}
+          </DialogHeader>
+          <form onSubmit={cobrar} className="space-y-3">
+            <div>
+              <Label>Valor</Label>
+              <CurrencyInput value={cobrancaValor} onChange={setCobrancaValor} />
+            </div>
+            <div>
+              <Label>Forma de pagamento</Label>
+              <Select value={cobrancaForma} onValueChange={setCobrancaForma}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                  <SelectItem value="pix">PIX</SelectItem>
+                  <SelectItem value="debito">Débito</SelectItem>
+                  <SelectItem value="credito">Crédito</SelectItem>
+                  <SelectItem value="boleto">Boleto</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Será criado: movimento de caixa + lançamento financeiro (receita) + paciente avança para <b>triagem</b>.
+            </p>
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setOpenCobranca(null)}>Cancelar</Button>
+              <Button type="submit" disabled={saving}>Confirmar cobrança</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       {/* === Modal Detalhe === */}
       <Dialog open={!!openDetalhe} onOpenChange={(o) => { if (!o) { setOpenDetalhe(null); setDetalheMovs([]); } }}>
         <DialogContent className="max-w-3xl">
