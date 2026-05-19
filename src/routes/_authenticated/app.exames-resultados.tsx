@@ -11,7 +11,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { toast } from "sonner";
-import { Loader2, Sparkles, Save, Stethoscope, AlertTriangle, CheckCircle2, Bell, Upload } from "lucide-react";
+import { Loader2, Sparkles, Save, Stethoscope, AlertTriangle, CheckCircle2, Bell, Upload, UserCheck } from "lucide-react";
 import { classificarResultadoExame, extrairTextoExameDeArquivo, type ClassificacaoExame } from "@/lib/exames-ia.functions";
 
 export const Route = createFileRoute("/_authenticated/app/exames-resultados")({
@@ -54,6 +54,7 @@ function ExamesResultadosPage() {
 
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [rows, setRows] = useState<Row[]>([]);
+  const [especialidades, setEspecialidades] = useState<string[]>([]);
   const [pacienteId, setPacienteId] = useState("");
   const [tipo, setTipo] = useState("");
   const [texto, setTexto] = useState("");
@@ -68,7 +69,7 @@ function ExamesResultadosPage() {
   useEffect(() => {
     if (!clinicaId) return;
     (async () => {
-      const [p, r] = await Promise.all([
+      const [p, r, esp] = await Promise.all([
         supabase
           .from("pacientes")
           .select("id,nome,cpf,numero_pasta,data_nascimento,telefone")
@@ -78,9 +79,22 @@ function ExamesResultadosPage() {
           .limit(2000),
         supabase.from("exame_resultados").select("id,paciente_nome,tipo_exame,resultado_texto,status,ia_resumo,ia_recomendacao,ia_mensagem_paciente,created_at")
           .eq("clinica_id", clinicaId).order("created_at", { ascending: false }).limit(50),
+        supabase
+          .from("medicos")
+          .select("especialidades(nome)")
+          .eq("clinica_id", clinicaId)
+          .eq("ativo", true),
       ]);
       if (p.data) setPacientes(p.data as Paciente[]);
       if (r.data) setRows(r.data as Row[]);
+      if (esp.data) {
+        const nomes = Array.from(new Set(
+          (esp.data as Array<{ especialidades: { nome: string } | null }>)
+            .map((r) => r.especialidades?.nome)
+            .filter((n): n is string => !!n),
+        )).sort();
+        setEspecialidades(nomes);
+      }
     })();
   }, [clinicaId]);
 
@@ -112,7 +126,13 @@ function ExamesResultadosPage() {
     setAnalise(null);
     try {
       const result = await classificar({
-        data: { tipo_exame: tipo.trim(), resultado_texto: texto.trim(), paciente_nome: pacienteNome || undefined, contexto: contexto.trim() || undefined },
+        data: {
+          tipo_exame: tipo.trim(),
+          resultado_texto: texto.trim(),
+          paciente_nome: pacienteNome || undefined,
+          contexto: contexto.trim() || undefined,
+          especialidades_disponiveis: especialidades.length ? especialidades : undefined,
+        },
       });
       setAnalise(result);
       toast.success("Classificação concluída.");
@@ -161,6 +181,7 @@ function ExamesResultadosPage() {
             resultado_texto: extraido,
             paciente_nome: pacienteNome || undefined,
             contexto: contexto.trim() || undefined,
+            especialidades_disponiveis: especialidades.length ? especialidades : undefined,
           },
         });
         setAnalise(result);
@@ -309,6 +330,29 @@ function ExamesResultadosPage() {
             )}
             {analise.resumo && <p className="text-sm"><strong>Resumo:</strong> {analise.resumo}</p>}
             {analise.recomendacao && <p className="text-sm"><strong>Recomendação:</strong> {analise.recomendacao}</p>}
+            {analise.especialidade_indicada && (
+              <div className="rounded-md border bg-primary/5 p-3 space-y-1">
+                <div className="flex items-center gap-2 text-sm">
+                  <UserCheck className="h-4 w-4 text-primary" />
+                  <span className="font-semibold">Encaminhamento sugerido:</span>
+                  <Badge variant="secondary" className="uppercase">{analise.especialidade_indicada}</Badge>
+                  <Badge
+                    className={
+                      analise.urgencia_encaminhamento === "urgente"
+                        ? "bg-red-500/15 text-red-700 dark:text-red-300 uppercase"
+                        : analise.urgencia_encaminhamento === "prioritario"
+                        ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 uppercase"
+                        : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 uppercase"
+                    }
+                  >
+                    {analise.urgencia_encaminhamento}
+                  </Badge>
+                </div>
+                {analise.justificativa_especialidade && (
+                  <p className="text-xs text-muted-foreground">{analise.justificativa_especialidade}</p>
+                )}
+              </div>
+            )}
             {analise.mensagem_paciente && (
               <div className="text-sm bg-muted/50 p-3 rounded">
                 <strong>Mensagem sugerida ao paciente:</strong>
