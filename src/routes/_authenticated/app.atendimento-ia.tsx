@@ -4,6 +4,7 @@ import { Brain, Sparkles, FileHeart, Stethoscope, Save, Loader2, History, Wand2 
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,7 +28,7 @@ export const Route = createFileRoute("/_authenticated/app/atendimento-ia")({
 
 type Modelo = { id: string; nome: string; prompt_ia: string | null };
 type Paciente = { id: string; nome: string };
-type Medico = { id: string; nome: string };
+type Medico = { id: string; nome: string; user_id: string | null; especialidade_id: string | null };
 
 const SOAP_KEYS = [
   ["queixa_principal", "Queixa principal", 2],
@@ -42,6 +43,7 @@ const EMPTY: Soap = { queixa_principal: "", historia_doenca: "", exame_fisico: "
 
 function AtendimentoIaPage() {
   const { clinicaAtual } = useClinica();
+  const { user } = useAuth();
   const estruturar = useServerFn(gerarAnamneseEstruturada);
   const sugerir = useServerFn(sugerirCondutaClinica);
   const resumir = useServerFn(resumirHistoricoPaciente);
@@ -66,15 +68,28 @@ function AtendimentoIaPage() {
       const cid = clinicaAtual.clinica_id;
       const [p, m, md] = await Promise.all([
         supabase.from("pacientes").select("id, nome").eq("clinica_id", cid).eq("ativo", true).order("nome"),
-        supabase.from("medicos").select("id, nome").eq("clinica_id", cid).eq("ativo", true).order("nome"),
+        supabase.from("medicos").select("id, nome, user_id, especialidade_id, especialidades(nome)").eq("clinica_id", cid).eq("ativo", true).order("nome"),
         supabase.from("prontuario_modelos").select("id, nome, prompt_ia").eq("clinica_id", cid).eq("ativo", true).order("nome"),
       ]);
       setPacientes(p.data ?? []);
-      setMedicos(m.data ?? []);
-      setModelos((md.data ?? []) as Modelo[]);
-      if (md.data && md.data.length && !modeloId) setModeloId(md.data[0].id);
+      const meds = (m.data ?? []) as unknown as (Medico & { especialidades?: { nome: string } | null })[];
+      setMedicos(meds);
+      const mods = (md.data ?? []) as Modelo[];
+      setModelos(mods);
+      // Auto-seleciona o médico logado
+      const meu = user?.id ? meds.find((x) => x.user_id === user.id) : null;
+      if (meu) {
+        setMedicoId(meu.id);
+        // Tenta casar o modelo pela especialidade do médico
+        const espNome = meu.especialidades?.nome?.toLowerCase().trim();
+        if (espNome) {
+          const match = mods.find((x) => x.nome.toLowerCase().trim() === espNome);
+          if (match) { setModeloId(match.id); return; }
+        }
+      }
+      if (mods.length && !modeloId) setModeloId(mods[0].id);
     })();
-  }, [clinicaAtual?.clinica_id]);
+  }, [clinicaAtual?.clinica_id, user?.id]);
 
   const modelo = useMemo(() => modelos.find((x) => x.id === modeloId) ?? null, [modelos, modeloId]);
   const especialidade = modelo?.nome ?? "Clínica Geral";
