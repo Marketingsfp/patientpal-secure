@@ -59,6 +59,14 @@ const TIPO_SINAL: Record<MovTipo, 1 | -1 | 0> = {
   abertura: 1, suprimento: 1, recebimento: 1,
   sangria: -1, despesa: -1, fechamento: 0,
 };
+const TIPO_CLASS: Record<MovTipo, string> = {
+  abertura: "bg-sky-100 text-sky-700 border-sky-300 dark:bg-sky-950 dark:text-sky-300 dark:border-sky-800",
+  suprimento: "bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800",
+  recebimento: "bg-green-100 text-green-700 border-green-300 dark:bg-green-950 dark:text-green-300 dark:border-green-800",
+  sangria: "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800",
+  despesa: "bg-rose-100 text-rose-700 border-rose-300 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-800",
+  fechamento: "bg-slate-200 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700",
+};
 
 function Page() {
   const { clinicaAtual } = useClinica();
@@ -417,7 +425,7 @@ function Page() {
                       {minhasMovs.map((m) => (
                         <TableRow key={m.id}>
                           <TableCell className="whitespace-nowrap">{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</TableCell>
-                          <TableCell><Badge variant="outline">{TIPO_LABEL[m.tipo]}</Badge></TableCell>
+                          <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
                           <TableCell>{m.descricao || "—"}</TableCell>
                           <TableCell>{m.forma_pagamento || "—"}</TableCell>
                           <TableCell className={`text-right font-medium ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
@@ -668,7 +676,7 @@ function Page() {
                     {detalheMovs.map((m) => (
                       <TableRow key={m.id}>
                         <TableCell>{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</TableCell>
-                        <TableCell><Badge variant="outline">{TIPO_LABEL[m.tipo]}</Badge></TableCell>
+                        <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
                         <TableCell>{m.descricao || "—"}</TableCell>
                         <TableCell>{m.forma_pagamento || "—"}</TableCell>
                         <TableCell className={`text-right ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
