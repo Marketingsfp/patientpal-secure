@@ -327,6 +327,104 @@ export type Database = {
         }
         Relationships: []
       }
+      caixa_movimentos: {
+        Row: {
+          clinica_id: string
+          created_at: string
+          descricao: string | null
+          forma_pagamento: string | null
+          id: string
+          lancamento_id: string | null
+          sessao_id: string
+          tipo: Database["public"]["Enums"]["caixa_mov_tipo"]
+          user_id: string
+          valor: number
+        }
+        Insert: {
+          clinica_id: string
+          created_at?: string
+          descricao?: string | null
+          forma_pagamento?: string | null
+          id?: string
+          lancamento_id?: string | null
+          sessao_id: string
+          tipo: Database["public"]["Enums"]["caixa_mov_tipo"]
+          user_id: string
+          valor?: number
+        }
+        Update: {
+          clinica_id?: string
+          created_at?: string
+          descricao?: string | null
+          forma_pagamento?: string | null
+          id?: string
+          lancamento_id?: string | null
+          sessao_id?: string
+          tipo?: Database["public"]["Enums"]["caixa_mov_tipo"]
+          user_id?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "caixa_movimentos_sessao_id_fkey"
+            columns: ["sessao_id"]
+            isOneToOne: false
+            referencedRelation: "caixa_sessoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      caixa_sessoes: {
+        Row: {
+          aberto_em: string
+          clinica_id: string
+          created_at: string
+          diferenca: number | null
+          fechado_em: string | null
+          id: string
+          observacoes: string | null
+          status: Database["public"]["Enums"]["caixa_sessao_status"]
+          updated_at: string
+          user_id: string
+          user_nome: string | null
+          valor_abertura: number
+          valor_fechamento_calculado: number | null
+          valor_fechamento_informado: number | null
+        }
+        Insert: {
+          aberto_em?: string
+          clinica_id: string
+          created_at?: string
+          diferenca?: number | null
+          fechado_em?: string | null
+          id?: string
+          observacoes?: string | null
+          status?: Database["public"]["Enums"]["caixa_sessao_status"]
+          updated_at?: string
+          user_id: string
+          user_nome?: string | null
+          valor_abertura?: number
+          valor_fechamento_calculado?: number | null
+          valor_fechamento_informado?: number | null
+        }
+        Update: {
+          aberto_em?: string
+          clinica_id?: string
+          created_at?: string
+          diferenca?: number | null
+          fechado_em?: string | null
+          id?: string
+          observacoes?: string | null
+          status?: Database["public"]["Enums"]["caixa_sessao_status"]
+          updated_at?: string
+          user_id?: string
+          user_nome?: string | null
+          valor_abertura?: number
+          valor_fechamento_calculado?: number | null
+          valor_fechamento_informado?: number | null
+        }
+        Relationships: []
+      }
       campanhas_marketing: {
         Row: {
           agendada_para: string | null
@@ -2936,6 +3034,14 @@ export type Database = {
         | "enfermeiro"
         | "recepcao"
         | "financeiro"
+      caixa_mov_tipo:
+        | "abertura"
+        | "sangria"
+        | "suprimento"
+        | "recebimento"
+        | "despesa"
+        | "fechamento"
+      caixa_sessao_status: "aberto" | "fechado"
       crm_status: "aberta" | "ganha" | "perdida"
       estoque_movimento_tipo: "entrada" | "saida" | "ajuste"
       fin_status_lancamento: "pendente" | "confirmado" | "cancelado"
@@ -3136,6 +3242,15 @@ export const Constants = {
         "recepcao",
         "financeiro",
       ],
+      caixa_mov_tipo: [
+        "abertura",
+        "sangria",
+        "suprimento",
+        "recebimento",
+        "despesa",
+        "fechamento",
+      ],
+      caixa_sessao_status: ["aberto", "fechado"],
       crm_status: ["aberta", "ganha", "perdida"],
       estoque_movimento_tipo: ["entrada", "saida", "ajuste"],
       fin_status_lancamento: ["pendente", "confirmado", "cancelado"],
