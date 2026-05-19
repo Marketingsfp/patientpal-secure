@@ -12,6 +12,10 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro/atendimentos")({
@@ -306,13 +310,7 @@ function Page() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
             <div className="space-y-1">
               <Label className="text-xs flex items-center gap-1"><Filter className="h-3 w-3" />Médico</Label>
-              <Select value={fMedico} onValueChange={setFMedico}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos os médicos</SelectItem>
-                  {medicos.map((m) => <SelectItem key={m.id} value={m.id} className="uppercase">{m.nome}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <MedicoCombobox value={fMedico} onChange={setFMedico} medicos={medicos} />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">De</Label>
