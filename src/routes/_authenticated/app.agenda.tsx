@@ -837,6 +837,19 @@ function AgendaPage() {
             for (const id of pagamentoExtraIds) next.add(id);
             return next;
           });
+          // Avança o fluxo do paciente: após o pagamento no caixa, segue para triagem.
+          try {
+            const todos = [agId, ...pagamentoExtraIds];
+            const { error: errFluxo } = await supabase
+              .from("agendamentos")
+              .update({ fluxo_etapa: "triagem", fluxo_atualizado_em: new Date().toISOString() } as never)
+              .in("id", todos);
+            if (errFluxo) {
+              toast.error("Pagamento salvo, mas falhou ao avançar o fluxo: " + errFluxo.message);
+            }
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Falha ao avançar o fluxo");
+          }
           // limpa seleção após cobrança agrupada
           if (pagamentoExtraIds.length > 0) {
             setSelecionados(new Set());
