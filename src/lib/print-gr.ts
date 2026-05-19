@@ -81,7 +81,11 @@ export async function printGuiaAtendimento({ agendamentoId, clinicaId, usuarioNo
           .maybeSingle()
       : Promise.resolve({ data: null }),
     a.medico_id
-      ? supabase.from("medicos").select("nome").eq("id", a.medico_id).maybeSingle()
+      ? supabase
+          .from("medicos")
+          .select("nome, tipo_repasse, percentual_repasse_padrao, valor_repasse_padrao")
+          .eq("id", a.medico_id)
+          .maybeSingle()
       : Promise.resolve({ data: null }),
     a.procedimento
       ? supabase
@@ -94,7 +98,13 @@ export async function printGuiaAtendimento({ agendamentoId, clinicaId, usuarioNo
   ]);
 
   const paciente = pac.data as { nome: string; cpf: string | null; telefone: string | null; data_nascimento: string | null } | null;
-  const medicoNome = (med.data as { nome: string } | null)?.nome ?? "—";
+  const medicoData = med.data as {
+    nome: string;
+    tipo_repasse: string | null;
+    percentual_repasse_padrao: number | null;
+    valor_repasse_padrao: number | null;
+  } | null;
+  const medicoNome = medicoData?.nome ?? "—";
   const procData = proc.data as { nome: string; valor_dinheiro_pix: number | null; valor_cartao: number | null } | null;
 
   // Se já temos pagamento informado, usa ele; senão tenta tabela de procedimentos
@@ -105,9 +115,40 @@ export async function printGuiaAtendimento({ agendamentoId, clinicaId, usuarioNo
   const inicioDt = new Date(a.inicio);
   const ficha = String(inicioDt.getHours() * 60 + inicioDt.getMinutes()).padStart(3, "0");
 
-  // Repasse padrão 50/50 — pode ser ajustado depois pelas regras de split
-  const clinica = valor / 2;
-  const prestador = valor / 2;
+  // Repasse conforme cadastro: tenta primeiro medico_convenios pelo nome do procedimento,
+  // senão usa o padrão do médico (tipo_repasse / percentual / valor).
+  const norm = (s: string) =>
+    s
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+
+  let prestador = 0;
+  if (a.medico_id) {
+    const { data: convs } = await supabase
+      .from("medico_convenios")
+      .select("nome, tipo_repasse, percentual, valor, ativo")
+      .eq("medico_id", a.medico_id)
+      .eq("ativo", true);
+    const alvo = norm(procNome);
+    const conv = (convs ?? []).find((c) => norm(c.nome) === alvo);
+    if (conv) {
+      if (conv.tipo_repasse === "valor" && conv.valor != null) {
+        prestador = Number(conv.valor);
+      } else {
+        prestador = +(valor * Number(conv.percentual ?? 0) / 100).toFixed(2);
+      }
+    } else if (medicoData) {
+      if (medicoData.tipo_repasse === "valor" && medicoData.valor_repasse_padrao != null) {
+        prestador = Number(medicoData.valor_repasse_padrao);
+      } else {
+        prestador = +(valor * Number(medicoData.percentual_repasse_padrao ?? 0) / 100).toFixed(2);
+      }
+    }
+  }
+  prestador = Math.min(prestador, valor);
+  const clinica = +(valor - prestador).toFixed(2);
 
   const formaLbl = pagamento?.forma_pagamento ? (FORMA_LABEL[pagamento.forma_pagamento] ?? pagamento.forma_pagamento.toUpperCase()) : "DINHEIRO";
   const parcelasTxt = pagamento && pagamento.forma_pagamento === "cartao_credito" && pagamento.parcelas && pagamento.parcelas > 1
