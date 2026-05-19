@@ -16,6 +16,8 @@ type Props = {
   /** Instrução opcional ao modelo (ex.: "Transcreva como evolução médica formal") */
   prompt?: string;
   title?: string;
+  /** Inicia a gravação automaticamente ao montar / quando muda para true */
+  autoStart?: boolean;
 };
 
 function blobToBase64(blob: Blob): Promise<string> {
@@ -39,6 +41,7 @@ export function VoiceInput({
   size = "icon",
   prompt,
   title = "Gravar áudio",
+  autoStart = false,
 }: Props) {
   const transcribe = useServerFn(transcribeAudio);
   const [recording, setRecording] = useState(false);
@@ -98,6 +101,15 @@ export function VoiceInput({
       toast.error("Não foi possível acessar o microfone.");
     }
   }, [append, currentValue, onTranscript, prompt, transcribe]);
+
+  // Auto-start quando solicitado
+  const startedRef = useRef(false);
+  if (autoStart && !startedRef.current && !recording && !loading) {
+    startedRef.current = true;
+    // dispara fora do ciclo de render
+    setTimeout(() => { void start(); }, 0);
+  }
+  if (!autoStart) startedRef.current = false;
 
   return (
     <Button

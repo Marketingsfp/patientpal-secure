@@ -89,9 +89,10 @@ function AtendimentoIaPage() {
       const meds = (m.data ?? []) as unknown as Medico[];
       setMedicos(meds);
       setModelos((md.data ?? []) as Modelo[]);
-      // Auto-seleciona o médico logado
+      // Auto-seleciona: médico logado, ou primeiro da lista
       const meu = user?.id ? meds.find((x) => x.user_id === user.id) : null;
       if (meu) setMedicoId(meu.id);
+      else if (meds.length && !medicoId) setMedicoId(meds[0].id);
     })();
   }, [clinicaAtual?.clinica_id, user?.id]);
 
@@ -417,6 +418,8 @@ function AtendimentoIaPage() {
               append
               prompt="Transcreva fielmente a conversa entre médico e paciente em português do Brasil. Retorne apenas o texto, sem rótulos."
               title="Gravar conversa"
+              key={agendamentoId ?? "idle"}
+              autoStart={!!agendamentoId}
             />
           </div>
           <Textarea
