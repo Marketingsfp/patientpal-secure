@@ -554,7 +554,7 @@ function Page() {
           <form onSubmit={abrirCaixa} className="space-y-3">
             <div>
               <Label>Valor de abertura (fundo de troco)</Label>
-              <CurrencyInput value={valorAbertura} onValueChange={setValorAbertura} />
+              <CurrencyInput value={valorAbertura} onChange={setValorAbertura} />
             </div>
             <div>
               <Label>Observações</Label>
@@ -582,7 +582,7 @@ function Page() {
           <form onSubmit={lancarMov} className="space-y-3">
             <div>
               <Label>Valor</Label>
-              <CurrencyInput value={movValor} onValueChange={setMovValor} />
+              <CurrencyInput value={movValor} onChange={setMovValor} />
             </div>
             <div>
               <Label>Descrição</Label>
@@ -621,7 +621,7 @@ function Page() {
           <form onSubmit={fecharCaixa} className="space-y-3">
             <div>
               <Label>Valor conferido em caixa</Label>
-              <CurrencyInput value={valorInformado} onValueChange={setValorInformado} />
+              <CurrencyInput value={valorInformado} onChange={setValorInformado} />
             </div>
             <div>
               <Label>Observações</Label>
