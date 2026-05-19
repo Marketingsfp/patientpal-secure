@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 
 type Tipo = "receita" | "despesa";
@@ -36,6 +37,7 @@ interface Props {
 
 export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWithData, initialDescricao, initialValor, agendamentoId, initialFormaPagamento }: Props) {
   const { clinicaAtual } = useClinica();
+  const { user } = useAuth();
   const [descricao, setDescricao] = useState("");
   const [valor, setValor] = useState("");
   const [data, setData] = useState(() => new Date().toISOString().slice(0, 10));
@@ -168,7 +170,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       obsExtra = `Recebido ${formatBRL(recebidoNum)}, troco ${formatBRL(trocoDinheiro)}`;
     }
     const obsFinal = [observacoes.trim(), obsExtra].filter(Boolean).join(" | ") || null;
-    const { error } = await supabase.from("fin_lancamentos").insert({
+    const { data: lancInserido, error } = await supabase.from("fin_lancamentos").insert({
       clinica_id: clinicaAtual.clinica_id,
       tipo,
       descricao: descricao.trim(),
@@ -183,10 +185,62 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       observacoes: obsFinal,
       status: "confirmado",
       agendamento_id: agendamentoId ?? null,
-    });
+      criado_por: user?.id ?? null,
+    } as never).select("id").single();
     setSaving(false);
     if (error) { toast.error(error.message); return; }
     toast.success(`${tipo === "receita" ? "Receita" : "Despesa"} registrada`);
+    // Integração com Caixa: registra movimento na sessão aberta do usuário.
+    // Se não houver sessão aberta, abre uma automaticamente com valor 0.
+    try {
+      if (user?.id && Number(valor) > 0) {
+        let { data: sess } = await supabase
+          .from("caixa_sessoes")
+          .select("id")
+          .eq("clinica_id", clinicaAtual.clinica_id)
+          .eq("user_id", user.id)
+          .eq("status", "aberto")
+          .maybeSingle();
+        if (!sess) {
+          const nome = (user.user_metadata as { nome?: string } | null)?.nome ?? user.email ?? null;
+          const { data: novaSess, error: errSess } = await supabase
+            .from("caixa_sessoes")
+            .insert({
+              clinica_id: clinicaAtual.clinica_id,
+              user_id: user.id,
+              user_nome: nome,
+              valor_abertura: 0,
+              status: "aberto",
+              observacoes: "Aberto automaticamente pelo sistema",
+            } as never)
+            .select("id")
+            .single();
+          if (errSess) throw errSess;
+          sess = novaSess;
+          // movimento de abertura
+          await supabase.from("caixa_movimentos").insert({
+            sessao_id: sess!.id,
+            clinica_id: clinicaAtual.clinica_id,
+            user_id: user.id,
+            tipo: "abertura",
+            valor: 0,
+            descricao: "Abertura automática",
+          } as never);
+        }
+        await supabase.from("caixa_movimentos").insert({
+          sessao_id: sess!.id,
+          clinica_id: clinicaAtual.clinica_id,
+          user_id: user.id,
+          tipo: tipo === "receita" ? "recebimento" : "despesa",
+          valor: Number(valor),
+          descricao: descricao.trim(),
+          forma_pagamento: formaFinal,
+          lancamento_id: lancInserido?.id ?? null,
+        } as never);
+      }
+    } catch (e) {
+      console.error("Falha ao registrar no caixa:", e);
+    }
     onSavedWithData?.({
       valor: Number(valor),
       forma_pagamento: formaFinal,
