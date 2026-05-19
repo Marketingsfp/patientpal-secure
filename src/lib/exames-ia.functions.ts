@@ -38,6 +38,7 @@ const Schema = z.object({
   idade: z.number().min(0).max(130).optional(),
   sexo: z.enum(["M", "F", "O"]).optional(),
   contexto: z.string().max(2000).optional(),
+  especialidades_disponiveis: z.array(z.string().max(100)).max(80).optional(),
 });
 
 const ExtrairSchema = z.object({
@@ -89,6 +90,9 @@ export type ClassificacaoExame = {
   recomendacao: string;
   mensagem_paciente: string;
   precisa_contato: boolean;
+  especialidade_indicada: string;
+  justificativa_especialidade: string;
+  urgencia_encaminhamento: "rotina" | "prioritario" | "urgente";
 };
 
 export const classificarResultadoExame = createServerFn({ method: "POST" })
@@ -107,18 +111,23 @@ Responda APENAS um JSON com este formato exato:
   "resumo": "1-2 frases para o prontuário",
   "recomendacao": "conduta sugerida para a equipe (ex: solicitar retorno, exame complementar)",
   "mensagem_paciente": "mensagem curta, empática, em português coloquial, sem causar pânico, orientando o próximo passo. Não dê diagnóstico definitivo.",
-  "precisa_contato": true|false
+  "precisa_contato": true|false,
+  "especialidade_indicada": "nome da especialidade médica mais adequada para encaminhamento (ex.: Cardiologia, Endocrinologia, Nefrologia). Se possível, escolha uma da lista de especialidades disponíveis na clínica. Use 'Clínica Geral' quando não houver indicação específica.",
+  "justificativa_especialidade": "1 frase explicando por que essa especialidade",
+  "urgencia_encaminhamento": "rotina" | "prioritario" | "urgente"
 }
 
 Regras:
 - "critico" = valor com risco iminente que exige contato imediato.
 - "alterado" = fora da faixa, mas sem urgência imediata.
 - "normal" = dentro da faixa de referência.
-- "precisa_contato" deve ser true se status != "normal".`;
+- "precisa_contato" deve ser true se status != "normal".
+- "urgencia_encaminhamento": "urgente" para crítico, "prioritario" para alterado relevante, "rotina" para acompanhamento.`;
 
     const user = `Paciente: ${data.paciente_nome ?? "—"}${data.idade ? `, ${data.idade} anos` : ""}${data.sexo ? `, sexo ${data.sexo}` : ""}.
 Exame: ${data.tipo_exame}
 ${data.contexto ? `Contexto: ${data.contexto}\n` : ""}
+${data.especialidades_disponiveis?.length ? `Especialidades disponíveis na clínica: ${data.especialidades_disponiveis.join(", ")}\n` : ""}
 Resultado:
 ${data.resultado_texto}`;
 
@@ -149,5 +158,12 @@ ${data.resultado_texto}`;
       recomendacao: typeof parsed.recomendacao === "string" ? parsed.recomendacao : "",
       mensagem_paciente: typeof parsed.mensagem_paciente === "string" ? parsed.mensagem_paciente : "",
       precisa_contato: status !== "normal" || Boolean(parsed.precisa_contato),
+      especialidade_indicada: typeof parsed.especialidade_indicada === "string" && parsed.especialidade_indicada.trim()
+        ? parsed.especialidade_indicada.trim()
+        : "Clínica Geral",
+      justificativa_especialidade: typeof parsed.justificativa_especialidade === "string" ? parsed.justificativa_especialidade : "",
+      urgencia_encaminhamento: (["rotina", "prioritario", "urgente"].includes(parsed.urgencia_encaminhamento as string)
+        ? parsed.urgencia_encaminhamento
+        : status === "critico" ? "urgente" : status === "alterado" ? "prioritario" : "rotina") as ClassificacaoExame["urgencia_encaminhamento"],
     };
   });
