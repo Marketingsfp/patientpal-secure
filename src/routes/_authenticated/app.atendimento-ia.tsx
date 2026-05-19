@@ -27,7 +27,13 @@ export const Route = createFileRoute("/_authenticated/app/atendimento-ia")({
 });
 
 type Modelo = { id: string; nome: string; prompt_ia: string | null };
-type Medico = { id: string; nome: string; user_id: string | null; especialidade_id: string | null };
+type Medico = {
+  id: string;
+  nome: string;
+  user_id: string | null;
+  especialidade_id: string | null;
+  especialidades?: { nome: string } | null;
+};
 type FilaItem = {
   id: string;
   paciente_id: string | null;
@@ -80,24 +86,32 @@ function AtendimentoIaPage() {
         supabase.from("medicos").select("id, nome, user_id, especialidade_id, especialidades(nome)").eq("clinica_id", cid).eq("ativo", true).order("nome"),
         supabase.from("prontuario_modelos").select("id, nome, prompt_ia").eq("clinica_id", cid).eq("ativo", true).order("nome"),
       ]);
-      const meds = (m.data ?? []) as unknown as (Medico & { especialidades?: { nome: string } | null })[];
+      const meds = (m.data ?? []) as unknown as Medico[];
       setMedicos(meds);
-      const mods = (md.data ?? []) as Modelo[];
-      setModelos(mods);
+      setModelos((md.data ?? []) as Modelo[]);
       // Auto-seleciona o médico logado
       const meu = user?.id ? meds.find((x) => x.user_id === user.id) : null;
-      if (meu) {
-        setMedicoId(meu.id);
-        // Tenta casar o modelo pela especialidade do médico
-        const espNome = meu.especialidades?.nome?.toLowerCase().trim();
-        if (espNome) {
-          const match = mods.find((x) => x.nome.toLowerCase().trim() === espNome);
-          if (match) { setModeloId(match.id); return; }
-        }
-      }
-      if (mods.length && !modeloId) setModeloId(mods[0].id);
+      if (meu) setMedicoId(meu.id);
     })();
   }, [clinicaAtual?.clinica_id, user?.id]);
+
+  // Médico selecionado e sua especialidade (fixa, vem do cadastro)
+  const medicoSelecionado = useMemo(
+    () => medicos.find((x) => x.id === medicoId) ?? null,
+    [medicos, medicoId],
+  );
+  const especialidadeMedico = medicoSelecionado?.especialidades?.nome ?? "";
+
+  // Auto-casa o modelo de prontuário com a especialidade do médico
+  useEffect(() => {
+    if (!modelos.length) return;
+    const espNome = especialidadeMedico.toLowerCase().trim();
+    if (espNome) {
+      const match = modelos.find((x) => x.nome.toLowerCase().trim() === espNome);
+      if (match) { setModeloId(match.id); return; }
+    }
+    if (!modeloId) setModeloId(modelos[0].id);
+  }, [especialidadeMedico, modelos]);
 
   // Carrega a fila do médico (agendamentos do dia)
   const carregarFila = async (medId: string) => {
@@ -153,7 +167,7 @@ function AtendimentoIaPage() {
   }
 
   const modelo = useMemo(() => modelos.find((x) => x.id === modeloId) ?? null, [modelos, modeloId]);
-  const especialidade = modelo?.nome ?? "Clínica Geral";
+  const especialidade = especialidadeMedico || modelo?.nome || "Clínica Geral";
 
   async function handleEstruturar() {
     if (!transcricao.trim()) { toast.error("Grave ou cole a transcrição primeiro"); return; }
@@ -241,21 +255,26 @@ function AtendimentoIaPage() {
       </div>
 
       <Card className="p-4 space-y-3">
-        <div className="grid md:grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <Label>Profissional</Label>
-            <Select value={medicoId} onValueChange={setMedicoId}>
-              <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
-              <SelectContent>{medicos.map((m) => <SelectItem key={m.id} value={m.id} className="uppercase">{m.nome}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label>Modelo / Especialidade</Label>
-            <Select value={modeloId} onValueChange={setModeloId}>
-              <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
-              <SelectContent>{modelos.map((m) => <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
+        <div className="space-y-1">
+          <Label>Profissional</Label>
+          <Select value={medicoId} onValueChange={setMedicoId}>
+            <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
+            <SelectContent>
+              {medicos.map((m) => (
+                <SelectItem key={m.id} value={m.id} className="uppercase">
+                  {m.nome}{m.especialidades?.nome ? ` — ${m.especialidades.nome}` : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {medicoSelecionado && (
+            <div className="text-xs text-muted-foreground pt-1">
+              Especialidade: <b className="text-foreground">{especialidadeMedico || "—"}</b>
+              {modelo && modelo.nome.toLowerCase().trim() !== especialidadeMedico.toLowerCase().trim() && (
+                <span> · Modelo IA: <b className="text-foreground">{modelo.nome}</b></span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Fila do médico */}
