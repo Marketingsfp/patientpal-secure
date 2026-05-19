@@ -213,8 +213,10 @@ function AtendimentoIaPage() {
     if (!clinicaAtual || !pacienteId) { toast.error("Selecione o paciente"); return; }
     setLoading("salvar");
     try {
+      const cid = clinicaAtual.clinica_id;
+      // 1) Salva o prontuário
       const { error } = await supabase.from("prontuarios").insert({
-        clinica_id: clinicaAtual.clinica_id,
+        clinica_id: cid,
         paciente_id: pacienteId,
         medico_id: medicoId || null,
         data: new Date().toISOString(),
@@ -227,13 +229,68 @@ function AtendimentoIaPage() {
         observacoes: transcricao ? `Transcrição:\n${transcricao}` : null,
       });
       if (error) throw error;
-      // Finaliza o agendamento na fila
+
+      // 2) Registra atendimento financeiro + repasse do médico
+      const itemFila = fila.find((f) => f.id === agendamentoId) ?? null;
+      const procNome = itemFila?.procedimento ?? "";
+      let valorTotal = 0;
+      let lancamentoId: string | null = null;
+      if (procNome) {
+        const { data: proc } = await supabase
+          .from("procedimentos").select("valor_padrao, valor_dinheiro")
+          .eq("clinica_id", cid).ilike("nome", procNome).maybeSingle();
+        valorTotal = Number((proc?.valor_dinheiro ?? proc?.valor_padrao) ?? 0);
+      }
+      // Calcula repasse do médico (tipo_repasse percentual ou valor)
+      let valorMedico = 0;
+      if (medicoSelecionado && valorTotal > 0) {
+        const { data: med } = await supabase
+          .from("medicos")
+          .select("tipo_repasse, percentual_repasse_padrao, valor_repasse_padrao")
+          .eq("id", medicoSelecionado.id).maybeSingle();
+        if (med?.tipo_repasse === "valor") {
+          valorMedico = Number(med.valor_repasse_padrao ?? 0);
+        } else {
+          valorMedico = valorTotal * (Number(med?.percentual_repasse_padrao ?? 0) / 100);
+        }
+      }
+      const valorClinica = Math.max(0, valorTotal - valorMedico);
+
+      // Verifica se já houve recebimento (caixa) para este agendamento (link via lançamento)
+      if (agendamentoId) {
+        const { data: lancExist } = await supabase
+          .from("fin_lancamentos").select("id, valor")
+          .eq("agendamento_id", agendamentoId).maybeSingle();
+        if (lancExist) {
+          lancamentoId = lancExist.id;
+          if (!valorTotal) valorTotal = Number(lancExist.valor ?? 0);
+        }
+      }
+
+      if (valorTotal > 0) {
+        await supabase.from("fin_atendimentos").insert({
+          clinica_id: cid,
+          paciente_id: pacienteId,
+          medico_id: medicoSelecionado?.id ?? null,
+          procedimento: procNome || null,
+          data: new Date().toISOString().slice(0, 10),
+          valor_total: valorTotal,
+          valor_medico: valorMedico,
+          valor_clinica: valorClinica,
+          status: "realizado",
+          lancamento_id: lancamentoId,
+        } as never);
+      }
+
+      // 3) Finaliza o agendamento na fila
       if (agendamentoId) {
         await supabase.from("agendamentos")
-          .update({ fluxo_etapa: "finalizado", status: "atendido", fluxo_atualizado_em: new Date().toISOString() } as never)
+          .update({ fluxo_etapa: "finalizado", status: "realizado", fluxo_atualizado_em: new Date().toISOString() } as never)
           .eq("id", agendamentoId);
       }
-      toast.success("Prontuário salvo");
+      toast.success(valorMedico > 0
+        ? `Prontuário salvo · Repasse médico: R$ ${valorMedico.toFixed(2)}`
+        : "Prontuário salvo");
       setSoap(EMPTY); setTranscricao(""); setSugestoes(null); setResumo("");
       setPacienteId(""); setPacienteNome(""); setAgendamentoId(null);
     } catch (e) { toast.error(e instanceof Error ? e.message : "Falha ao salvar"); }
