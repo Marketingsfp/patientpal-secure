@@ -79,11 +79,22 @@ function ExamesResultadosPage() {
           .limit(2000),
         supabase.from("exame_resultados").select("id,paciente_nome,tipo_exame,resultado_texto,status,ia_resumo,ia_recomendacao,ia_mensagem_paciente,created_at")
           .eq("clinica_id", clinicaId).order("created_at", { ascending: false }).limit(50),
-        supabase.from("especialidades").select("nome").eq("clinica_id", clinicaId).order("nome"),
+        supabase
+          .from("medicos")
+          .select("especialidades(nome)")
+          .eq("clinica_id", clinicaId)
+          .eq("ativo", true),
       ]);
       if (p.data) setPacientes(p.data as Paciente[]);
       if (r.data) setRows(r.data as Row[]);
-      if (esp.data) setEspecialidades((esp.data as { nome: string }[]).map((e) => e.nome));
+      if (esp.data) {
+        const nomes = Array.from(new Set(
+          (esp.data as Array<{ especialidades: { nome: string } | null }>)
+            .map((r) => r.especialidades?.nome)
+            .filter((n): n is string => !!n),
+        )).sort();
+        setEspecialidades(nomes);
+      }
     })();
   }, [clinicaId]);
 
