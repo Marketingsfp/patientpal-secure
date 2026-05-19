@@ -425,7 +425,7 @@ function Page() {
                       {minhasMovs.map((m) => (
                         <TableRow key={m.id}>
                           <TableCell className="whitespace-nowrap">{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</TableCell>
-                          <TableCell><Badge variant="outline">{TIPO_LABEL[m.tipo]}</Badge></TableCell>
+                          <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
                           <TableCell>{m.descricao || "—"}</TableCell>
                           <TableCell>{m.forma_pagamento || "—"}</TableCell>
                           <TableCell className={`text-right font-medium ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
@@ -676,7 +676,7 @@ function Page() {
                     {detalheMovs.map((m) => (
                       <TableRow key={m.id}>
                         <TableCell>{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</TableCell>
-                        <TableCell><Badge variant="outline">{TIPO_LABEL[m.tipo]}</Badge></TableCell>
+                        <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
                         <TableCell>{m.descricao || "—"}</TableCell>
                         <TableCell>{m.forma_pagamento || "—"}</TableCell>
                         <TableCell className={`text-right ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
