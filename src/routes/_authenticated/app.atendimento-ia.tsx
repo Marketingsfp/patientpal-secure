@@ -22,7 +22,7 @@ import {
 
 export const Route = createFileRoute("/_authenticated/app/atendimento-ia")({
   component: AtendimentoIaPage,
-  head: () => ({ meta: [{ title: "Atendimento com IA — ClinicaOS" }] }),
+  head: () => ({ meta: [{ title: "Atendimento médico — ClinicaOS" }] }),
 });
 
 type Modelo = { id: string; nome: string; prompt_ia: string | null };
@@ -152,7 +152,7 @@ function AtendimentoIaPage() {
       <div className="flex items-center gap-3">
         <Brain className="h-6 w-6 text-primary" />
         <div>
-          <h1 className="text-xl font-semibold">Atendimento com IA</h1>
+          <h1 className="text-xl font-semibold">Atendimento médico</h1>
           <p className="text-sm text-muted-foreground">Transcreva a consulta, estruture o prontuário e receba sugestões clínicas.</p>
         </div>
       </div>
