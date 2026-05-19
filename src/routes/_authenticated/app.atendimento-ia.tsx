@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Brain, Sparkles, FileHeart, Stethoscope, Save, Loader2, History, Wand2 } from "lucide-react";
+import { Brain, Sparkles, FileHeart, Stethoscope, Save, Loader2, History, Wand2, AlertTriangle, Users } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -27,8 +27,16 @@ export const Route = createFileRoute("/_authenticated/app/atendimento-ia")({
 });
 
 type Modelo = { id: string; nome: string; prompt_ia: string | null };
-type Paciente = { id: string; nome: string };
 type Medico = { id: string; nome: string; user_id: string | null; especialidade_id: string | null };
+type FilaItem = {
+  id: string;
+  paciente_id: string | null;
+  paciente_nome: string;
+  inicio: string;
+  procedimento: string | null;
+  fluxo_etapa: string;
+  prioridade: "normal" | "prioritario" | "urgente";
+};
 
 const SOAP_KEYS = [
   ["queixa_principal", "Queixa principal", 2],
@@ -48,11 +56,13 @@ function AtendimentoIaPage() {
   const sugerir = useServerFn(sugerirCondutaClinica);
   const resumir = useServerFn(resumirHistoricoPaciente);
 
-  const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [modelos, setModelos] = useState<Modelo[]>([]);
+  const [fila, setFila] = useState<FilaItem[]>([]);
 
   const [pacienteId, setPacienteId] = useState("");
+  const [pacienteNome, setPacienteNome] = useState("");
+  const [agendamentoId, setAgendamentoId] = useState<string | null>(null);
   const [medicoId, setMedicoId] = useState("");
   const [modeloId, setModeloId] = useState("");
   const [transcricao, setTranscricao] = useState("");
@@ -66,12 +76,10 @@ function AtendimentoIaPage() {
     (async () => {
       if (!clinicaAtual) return;
       const cid = clinicaAtual.clinica_id;
-      const [p, m, md] = await Promise.all([
-        supabase.from("pacientes").select("id, nome").eq("clinica_id", cid).eq("ativo", true).order("nome"),
+      const [m, md] = await Promise.all([
         supabase.from("medicos").select("id, nome, user_id, especialidade_id, especialidades(nome)").eq("clinica_id", cid).eq("ativo", true).order("nome"),
         supabase.from("prontuario_modelos").select("id, nome, prompt_ia").eq("clinica_id", cid).eq("ativo", true).order("nome"),
       ]);
-      setPacientes(p.data ?? []);
       const meds = (m.data ?? []) as unknown as (Medico & { especialidades?: { nome: string } | null })[];
       setMedicos(meds);
       const mods = (md.data ?? []) as Modelo[];
@@ -90,6 +98,59 @@ function AtendimentoIaPage() {
       if (mods.length && !modeloId) setModeloId(mods[0].id);
     })();
   }, [clinicaAtual?.clinica_id, user?.id]);
+
+  // Carrega a fila do médico (agendamentos do dia)
+  const carregarFila = async (medId: string) => {
+    if (!clinicaAtual || !medId) { setFila([]); return; }
+    const hoje = new Date().toISOString().slice(0, 10);
+    const { data } = await supabase
+      .from("agendamentos")
+      .select("id, paciente_id, paciente_nome, inicio, procedimento, fluxo_etapa, prioridade")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("medico_id", medId)
+      .gte("inicio", `${hoje}T00:00:00`)
+      .lte("inicio", `${hoje}T23:59:59`)
+      .in("fluxo_etapa", ["aguardando_recepcao", "recepcao", "caixa", "triagem", "atendimento"])
+      .order("inicio");
+    setFila((data ?? []) as unknown as FilaItem[]);
+  };
+
+  useEffect(() => { void carregarFila(medicoId); }, [medicoId, clinicaAtual?.clinica_id]);
+
+  // Realtime: atualiza fila quando o fluxo muda
+  useEffect(() => {
+    if (!clinicaAtual || !medicoId) return;
+    const ch = supabase
+      .channel(`atend-fila-${medicoId}`)
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "agendamentos", filter: `medico_id=eq.${medicoId}` },
+        () => { void carregarFila(medicoId); })
+      .subscribe();
+    return () => { void supabase.removeChannel(ch); };
+  }, [medicoId, clinicaAtual?.clinica_id]);
+
+  // Fila ordenada: urgente → prioritário → normal, depois por horário
+  const filaOrdenada = useMemo(() => {
+    const peso = { urgente: 0, prioritario: 1, normal: 2 } as const;
+    return [...fila].sort((a, b) => {
+      const pa = peso[a.prioridade] ?? 2;
+      const pb = peso[b.prioridade] ?? 2;
+      if (pa !== pb) return pa - pb;
+      return a.inicio.localeCompare(b.inicio);
+    });
+  }, [fila]);
+
+  function selecionar(item: FilaItem) {
+    setPacienteId(item.paciente_id ?? "");
+    setPacienteNome(item.paciente_nome);
+    setAgendamentoId(item.id);
+    // move para a etapa "atendimento" se ainda não estiver
+    if (item.fluxo_etapa !== "atendimento") {
+      void supabase.from("agendamentos")
+        .update({ fluxo_etapa: "atendimento", fluxo_atualizado_em: new Date().toISOString() } as never)
+        .eq("id", item.id);
+    }
+  }
 
   const modelo = useMemo(() => modelos.find((x) => x.id === modeloId) ?? null, [modelos, modeloId]);
   const especialidade = modelo?.nome ?? "Clínica Geral";
@@ -152,8 +213,15 @@ function AtendimentoIaPage() {
         observacoes: transcricao ? `Transcrição:\n${transcricao}` : null,
       });
       if (error) throw error;
+      // Finaliza o agendamento na fila
+      if (agendamentoId) {
+        await supabase.from("agendamentos")
+          .update({ fluxo_etapa: "finalizado", status: "atendido", fluxo_atualizado_em: new Date().toISOString() } as never)
+          .eq("id", agendamentoId);
+      }
       toast.success("Prontuário salvo");
       setSoap(EMPTY); setTranscricao(""); setSugestoes(null); setResumo("");
+      setPacienteId(""); setPacienteNome(""); setAgendamentoId(null);
     } catch (e) { toast.error(e instanceof Error ? e.message : "Falha ao salvar"); }
     finally { setLoading(null); }
   }
