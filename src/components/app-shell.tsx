@@ -58,7 +58,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<{ to: string;
     items: [
     { to: "/app/crm", label: "CRM", icon: Target },
     { to: "/app/nina", label: "Nina — WhatsApp", icon: MessageCircle },
-    { to: "/app/atendimento-ia", label: "Atendimento IA", icon: Brain },
+    { to: "/app/atendimento-ia", label: "Atendimento médico", icon: Brain },
     { to: "/app/exames-resultados", label: "Resultados de Exames", icon: FlaskConical },
     { to: "/app/alertas-enfermagem", label: "Enfermeira IA — Alertas", icon: BellRing },
     { to: "/app/prontuario-modelos", label: "Modelos de Prontuário", icon: FileHeart },
