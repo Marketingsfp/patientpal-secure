@@ -374,3 +374,42 @@ function Page() {
     </div>
   );
 }
+
+function MedicoCombobox({ value, onChange, medicos }: { value: string; onChange: (v: string) => void; medicos: Array<{ id: string; nome: string }> }) {
+  const [open, setOpen] = useState(false);
+  const selected = medicos.find((m) => m.id === value);
+  const label = value === "todos" || !selected ? "Todos os médicos" : selected.nome;
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button type="button" className={cn(
+          "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm",
+          "uppercase text-left"
+        )}>
+          <span className="truncate">{label}</span>
+          <ChevronsUpDown className="h-4 w-4 opacity-50 shrink-0" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
+        <Command>
+          <CommandInput placeholder="Buscar médico..." />
+          <CommandList>
+            <CommandEmpty>Nenhum médico encontrado.</CommandEmpty>
+            <CommandGroup>
+              <CommandItem value="todos os médicos" onSelect={() => { onChange("todos"); setOpen(false); }}>
+                <Check className={cn("mr-2 h-4 w-4", value === "todos" ? "opacity-100" : "opacity-0")} />
+                Todos os médicos
+              </CommandItem>
+              {medicos.map((m) => (
+                <CommandItem key={m.id} value={m.nome} onSelect={() => { onChange(m.id); setOpen(false); }} className="uppercase">
+                  <Check className={cn("mr-2 h-4 w-4", value === m.id ? "opacity-100" : "opacity-0")} />
+                  {m.nome}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
