@@ -29,6 +29,7 @@ export type Database = {
           observacoes: string | null
           paciente_id: string | null
           paciente_nome: string
+          prioridade: Database["public"]["Enums"]["agendamento_prioridade"]
           procedimento: string | null
           status: Database["public"]["Enums"]["agendamento_status"]
           teleconsulta: boolean
@@ -49,6 +50,7 @@ export type Database = {
           observacoes?: string | null
           paciente_id?: string | null
           paciente_nome: string
+          prioridade?: Database["public"]["Enums"]["agendamento_prioridade"]
           procedimento?: string | null
           status?: Database["public"]["Enums"]["agendamento_status"]
           teleconsulta?: boolean
@@ -69,6 +71,7 @@ export type Database = {
           observacoes?: string | null
           paciente_id?: string | null
           paciente_nome?: string
+          prioridade?: Database["public"]["Enums"]["agendamento_prioridade"]
           procedimento?: string | null
           status?: Database["public"]["Enums"]["agendamento_status"]
           teleconsulta?: boolean
@@ -3020,6 +3023,7 @@ export type Database = {
       user_is_any_manager: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
+      agendamento_prioridade: "normal" | "prioritario" | "urgente"
       agendamento_status:
         | "agendado"
         | "confirmado"
@@ -3226,6 +3230,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      agendamento_prioridade: ["normal", "prioritario", "urgente"],
       agendamento_status: [
         "agendado",
         "confirmado",
