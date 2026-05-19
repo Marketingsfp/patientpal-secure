@@ -12,6 +12,10 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro/atendimentos")({
@@ -306,13 +310,7 @@ function Page() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
             <div className="space-y-1">
               <Label className="text-xs flex items-center gap-1"><Filter className="h-3 w-3" />Médico</Label>
-              <Select value={fMedico} onValueChange={setFMedico}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos os médicos</SelectItem>
-                  {medicos.map((m) => <SelectItem key={m.id} value={m.id} className="uppercase">{m.nome}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <MedicoCombobox value={fMedico} onChange={setFMedico} medicos={medicos} />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">De</Label>
@@ -374,5 +372,44 @@ function Page() {
           </Table>}
       </CardContent></Card>
     </div>
+  );
+}
+
+function MedicoCombobox({ value, onChange, medicos }: { value: string; onChange: (v: string) => void; medicos: Array<{ id: string; nome: string }> }) {
+  const [open, setOpen] = useState(false);
+  const selected = medicos.find((m) => m.id === value);
+  const label = value === "todos" || !selected ? "Todos os médicos" : selected.nome;
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button type="button" className={cn(
+          "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm",
+          "uppercase text-left"
+        )}>
+          <span className="truncate">{label}</span>
+          <ChevronsUpDown className="h-4 w-4 opacity-50 shrink-0" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
+        <Command>
+          <CommandInput placeholder="Buscar médico..." />
+          <CommandList>
+            <CommandEmpty>Nenhum médico encontrado.</CommandEmpty>
+            <CommandGroup>
+              <CommandItem value="todos os médicos" onSelect={() => { onChange("todos"); setOpen(false); }}>
+                <Check className={cn("mr-2 h-4 w-4", value === "todos" ? "opacity-100" : "opacity-0")} />
+                Todos os médicos
+              </CommandItem>
+              {medicos.map((m) => (
+                <CommandItem key={m.id} value={m.nome} onSelect={() => { onChange(m.id); setOpen(false); }} className="uppercase">
+                  <Check className={cn("mr-2 h-4 w-4", value === m.id ? "opacity-100" : "opacity-0")} />
+                  {m.nome}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
