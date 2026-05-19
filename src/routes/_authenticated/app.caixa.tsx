@@ -199,7 +199,7 @@ function Page() {
     e.preventDefault();
     if (!clinicaAtual || !user) return;
     setSaving(true);
-    const v = Number(String(valorAbertura).replace(/\./g, "").replace(",", ".")) || 0;
+    const v = Number(valorAbertura) || 0;
     const nome = user.user_metadata?.nome || user.email || null;
     const { data: sess, error } = await supabase
       .from("caixa_sessoes")
@@ -237,7 +237,7 @@ function Page() {
   const lancarMov = async (e: FormEvent) => {
     e.preventDefault();
     if (!clinicaAtual || !user || !minhaSessao || !openMov) return;
-    const v = Number(String(movValor).replace(/\./g, "").replace(",", ".")) || 0;
+    const v = Number(movValor) || 0;
     if (v <= 0) { toast.error("Informe um valor"); return; }
     setSaving(true);
     const { error } = await supabase.from("caixa_movimentos").insert({
@@ -260,7 +260,7 @@ function Page() {
   const fecharCaixa = async (e: FormEvent) => {
     e.preventDefault();
     if (!minhaSessao || !clinicaAtual || !user) return;
-    const informado = Number(String(valorInformado).replace(/\./g, "").replace(",", ".")) || 0;
+    const informado = Number(valorInformado) || 0;
     const diff = informado - saldoAtual;
     setSaving(true);
     const { error } = await supabase
@@ -392,7 +392,7 @@ function Page() {
                   <MinusCircle className="h-4 w-4 mr-2 text-rose-600" /> Despesa
                 </Button>
                 <div className="flex-1" />
-                <Button variant="destructive" onClick={() => { setValorInformado(saldoAtual.toFixed(2).replace(".", ",")); setOpenFechar(true); }}>
+                <Button variant="destructive" onClick={() => { setValorInformado(saldoAtual.toFixed(2)); setOpenFechar(true); }}>
                   <Lock className="h-4 w-4 mr-2" /> Fechar caixa
                 </Button>
               </div>
