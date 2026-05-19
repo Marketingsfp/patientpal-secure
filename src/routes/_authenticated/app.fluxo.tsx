@@ -244,9 +244,11 @@ function FluxoPage() {
                             <Button size="sm" className="h-7 px-2 text-xs flex-1" onClick={() => chamarPaciente(a)} title="Chamar no painel e mover para Atendimento">
                               <Bell className="h-3 w-3 mr-1" /> Chamar
                             </Button>
-                            <Button size="sm" variant="outline" className="h-7 px-2 text-xs flex-1" onClick={() => setEtapa(a.id, "exame")}>
-                              <ChevronRight className="h-3 w-3 mr-1" /> Exame
-                            </Button>
+                            {isExame && (
+                              <Button size="sm" variant="outline" className="h-7 px-2 text-xs flex-1" onClick={() => setEtapa(a.id, "exame")}>
+                                <ChevronRight className="h-3 w-3 mr-1" /> Exame
+                              </Button>
+                            )}
                           </>
                         )}
                         {col.id !== "triagem" && (
