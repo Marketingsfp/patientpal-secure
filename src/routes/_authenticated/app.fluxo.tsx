@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, CheckCircle2, Workflow, Bell, Settings2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, CheckCircle2, Workflow, Bell, Settings2, AlertTriangle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -43,6 +43,7 @@ type Ag = {
   procedimento: string | null;
   inicio: string;
   fluxo_etapa: Etapa;
+  prioridade?: "normal" | "prioritario" | "urgente";
   medicos?: { nome: string } | null;
 };
 
@@ -82,7 +83,7 @@ function FluxoPage() {
     const fim = `${hoje}T23:59:59`;
     const { data, error } = await supabase
       .from("agendamentos")
-      .select("id, paciente_id, paciente_nome, procedimento, inicio, fluxo_etapa, medicos(nome)")
+      .select("id, paciente_id, paciente_nome, procedimento, inicio, fluxo_etapa, prioridade, medicos(nome)")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .gte("inicio", ini)
       .lte("inicio", fim)
@@ -117,6 +118,17 @@ function FluxoPage() {
       .update({ fluxo_etapa: etapa, fluxo_atualizado_em: new Date().toISOString() } as never)
       .eq("id", id);
     if (error) toast.error(error.message);
+  }
+
+  async function ciclarPrioridade(a: Ag) {
+    const atual = a.prioridade ?? "normal";
+    const prox = atual === "normal" ? "prioritario" : atual === "prioritario" ? "urgente" : "normal";
+    const { error } = await supabase
+      .from("agendamentos")
+      .update({ prioridade: prox } as never)
+      .eq("id", a.id);
+    if (error) toast.error(error.message);
+    else toast.success(`Prioridade: ${prox}`);
   }
 
   async function chamarPaciente(a: Ag) {
@@ -225,6 +237,12 @@ function FluxoPage() {
                         <div className="font-medium leading-tight">{a.paciente_nome}</div>
                         <span className="text-xs text-muted-foreground tabular-nums">{h}</span>
                       </div>
+                      {a.prioridade && a.prioridade !== "normal" && (
+                        <Badge className={`border-0 text-[10px] gap-1 ${a.prioridade === "urgente" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}`}>
+                          <AlertTriangle className="h-3 w-3" />
+                          {a.prioridade === "urgente" ? "URGENTE" : "PRIORITÁRIO"}
+                        </Badge>
+                      )}
                       <div className="text-xs text-muted-foreground line-clamp-2">
                         {a.procedimento ?? "—"}{a.medicos?.nome ? ` · ${a.medicos.nome}` : ""}
                       </div>
@@ -238,6 +256,15 @@ function FluxoPage() {
                           title="Voltar etapa"
                         >
                           <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2"
+                          onClick={() => ciclarPrioridade(a)}
+                          title="Alternar prioridade (normal → prioritário → urgente)"
+                        >
+                          <AlertTriangle className={`h-4 w-4 ${a.prioridade === "urgente" ? "text-rose-600" : a.prioridade === "prioritario" ? "text-amber-600" : "text-muted-foreground"}`} />
                         </Button>
                         {col.id === "triagem" && (
                           <>
