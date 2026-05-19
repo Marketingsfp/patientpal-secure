@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   Wallet, PlusCircle, MinusCircle, ArrowDownToLine, ArrowUpFromLine, Lock,
-  Unlock, Eye, FileDown, Users,
+  Unlock, Eye, FileDown, Users, Receipt, ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -44,6 +44,16 @@ interface Mov {
   id: string; sessao_id: string; user_id: string; tipo: MovTipo;
   valor: number; descricao: string | null; forma_pagamento: string | null;
   created_at: string;
+}
+interface FilaCaixa {
+  id: string;
+  paciente_id: string | null;
+  paciente_nome: string;
+  procedimento: string | null;
+  inicio: string;
+  medico_nome: string | null;
+  valor: number;
+  ja_pago: boolean;
 }
 
 const fmt = (n: number | null | undefined) =>
@@ -92,6 +102,10 @@ function Page() {
   const [openFechar, setOpenFechar] = useState(false);
   const [openDetalhe, setOpenDetalhe] = useState<Sessao | null>(null);
   const [detalheMovs, setDetalheMovs] = useState<Mov[]>([]);
+  const [filaCaixa, setFilaCaixa] = useState<FilaCaixa[]>([]);
+  const [openCobranca, setOpenCobranca] = useState<FilaCaixa | null>(null);
+  const [cobrancaValor, setCobrancaValor] = useState("");
+  const [cobrancaForma, setCobrancaForma] = useState("dinheiro");
 
   // Formularios
   const [valorAbertura, setValorAbertura] = useState("0");
@@ -140,6 +154,113 @@ function Page() {
     setMinhasSessoes((hist ?? []) as Sessao[]);
     setLoading(false);
   }, [clinicaAtual, user]);
+
+  // Carrega a fila de cobrança (agendamentos hoje aguardando caixa)
+  const loadFilaCaixa = useCallback(async () => {
+    if (!clinicaAtual) return;
+    const hoje = new Date().toISOString().slice(0, 10);
+    const { data: ags } = await supabase
+      .from("agendamentos")
+      .select("id, paciente_id, paciente_nome, procedimento, inicio, fluxo_etapa, medicos(nome)")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .in("fluxo_etapa", ["aguardando_recepcao", "recepcao", "caixa"])
+      .gte("inicio", `${hoje}T00:00:00`)
+      .lte("inicio", `${hoje}T23:59:59`)
+      .order("inicio");
+    const rows = (ags ?? []) as unknown as Array<{
+      id: string; paciente_id: string | null; paciente_nome: string;
+      procedimento: string | null; inicio: string;
+      medicos: { nome: string } | null;
+    }>;
+    // Procura valores e pagamentos já realizados
+    const procNomes = Array.from(new Set(rows.map((r) => r.procedimento).filter(Boolean) as string[]));
+    const valorMap = new Map<string, number>();
+    if (procNomes.length) {
+      const { data: procs } = await supabase
+        .from("procedimentos").select("nome, valor_padrao, valor_dinheiro")
+        .eq("clinica_id", clinicaAtual.clinica_id).in("nome", procNomes);
+      (procs ?? []).forEach((p) => valorMap.set(
+        (p.nome as string).toUpperCase(),
+        Number((p as { valor_dinheiro?: number; valor_padrao?: number }).valor_dinheiro ?? (p as { valor_padrao?: number }).valor_padrao ?? 0),
+      ));
+    }
+    const ids = rows.map((r) => r.id);
+    const pagos = new Set<string>();
+    if (ids.length) {
+      const { data: lancs } = await supabase
+        .from("fin_lancamentos").select("agendamento_id")
+        .in("agendamento_id", ids);
+      (lancs ?? []).forEach((l) => { if (l.agendamento_id) pagos.add(l.agendamento_id); });
+    }
+    setFilaCaixa(rows.map((r) => ({
+      id: r.id,
+      paciente_id: r.paciente_id,
+      paciente_nome: r.paciente_nome,
+      procedimento: r.procedimento,
+      inicio: r.inicio,
+      medico_nome: r.medicos?.nome ?? null,
+      valor: valorMap.get((r.procedimento ?? "").toUpperCase()) ?? 0,
+      ja_pago: pagos.has(r.id),
+    })));
+  }, [clinicaAtual]);
+
+  useEffect(() => { if (minhaSessao) void loadFilaCaixa(); }, [minhaSessao, loadFilaCaixa]);
+  useEffect(() => {
+    if (!clinicaAtual || !minhaSessao) return;
+    const ch = supabase
+      .channel(`caixa-fila-${clinicaAtual.clinica_id}`)
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "agendamentos", filter: `clinica_id=eq.${clinicaAtual.clinica_id}` },
+        () => { void loadFilaCaixa(); })
+      .subscribe();
+    return () => { void supabase.removeChannel(ch); };
+  }, [clinicaAtual, minhaSessao, loadFilaCaixa]);
+
+  // Executa cobrança: insere movimento caixa + lançamento financeiro + avança fluxo
+  const cobrar = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!clinicaAtual || !user || !minhaSessao || !openCobranca) return;
+    const v = Number(cobrancaValor) || 0;
+    if (v <= 0) { toast.error("Informe um valor"); return; }
+    setSaving(true);
+    try {
+      // 1) Movimento de caixa
+      const { error: e1 } = await supabase.from("caixa_movimentos").insert({
+        sessao_id: minhaSessao.id,
+        clinica_id: clinicaAtual.clinica_id,
+        user_id: user.id,
+        tipo: "recebimento",
+        valor: v,
+        descricao: `${openCobranca.paciente_nome} · ${openCobranca.procedimento ?? "atendimento"}`,
+        forma_pagamento: cobrancaForma,
+      });
+      if (e1) throw e1;
+      // 2) Lançamento financeiro (receita confirmada, ligado ao agendamento)
+      const { error: e2 } = await supabase.from("fin_lancamentos").insert({
+        clinica_id: clinicaAtual.clinica_id,
+        tipo: "receita",
+        descricao: `Recebimento — ${openCobranca.paciente_nome} (${openCobranca.procedimento ?? "atendimento"})`,
+        valor: v,
+        data: new Date().toISOString().slice(0, 10),
+        status: "confirmado",
+        forma_pagamento: cobrancaForma,
+        paciente_id: openCobranca.paciente_id,
+        agendamento_id: openCobranca.id,
+        criado_por: user.id,
+      } as never);
+      if (e2) throw e2;
+      // 3) Avança o fluxo para "triagem"
+      const { error: e3 } = await supabase.from("agendamentos")
+        .update({ fluxo_etapa: "triagem", fluxo_atualizado_em: new Date().toISOString() } as never)
+        .eq("id", openCobranca.id);
+      if (e3) throw e3;
+      toast.success("Cobrança registrada · paciente enviado à triagem");
+      setOpenCobranca(null); setCobrancaValor(""); setCobrancaForma("dinheiro");
+      void load(); void loadFilaCaixa();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha na cobrança");
+    } finally { setSaving(false); }
+  };
 
   const loadTodos = useCallback(async () => {
     if (!clinicaAtual || !isManager) return;
@@ -405,6 +526,56 @@ function Page() {
                 </Button>
               </div>
 
+              {/* === FILA DE COBRANÇA === */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Receipt className="h-4 w-4 text-primary" />
+                    Cobrança de pacientes ({filaCaixa.filter((f) => !f.ja_pago).length} aguardando)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {filaCaixa.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">Nenhum paciente aguardando cobrança hoje.</p>
+                  ) : (
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-80 overflow-auto pr-1">
+                      {filaCaixa.map((f) => {
+                        const hora = new Date(f.inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+                        return (
+                          <div key={f.id} className={`rounded-md border p-2.5 text-sm space-y-1 ${f.ja_pago ? "opacity-60" : ""}`}>
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-muted-foreground tabular-nums">{hora}</span>
+                              {f.ja_pago ? (
+                                <Badge variant="secondary" className="text-[10px]">PAGO</Badge>
+                              ) : (
+                                <span className="font-semibold text-primary">{fmt(f.valor)}</span>
+                              )}
+                            </div>
+                            <div className="font-medium uppercase leading-tight line-clamp-1">{f.paciente_nome}</div>
+                            <div className="text-[11px] text-muted-foreground line-clamp-1">
+                              {f.procedimento ?? "—"}{f.medico_nome ? ` · ${f.medico_nome}` : ""}
+                            </div>
+                            {!f.ja_pago && (
+                              <Button
+                                size="sm"
+                                className="w-full h-7 text-xs"
+                                onClick={() => {
+                                  setOpenCobranca(f);
+                                  setCobrancaValor(String(f.valor || 0));
+                                  setCobrancaForma("dinheiro");
+                                }}
+                              >
+                                <Receipt className="h-3 w-3 mr-1" /> Cobrar <ChevronRight className="h-3 w-3 ml-auto" />
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
               <Card>
                 <CardHeader><CardTitle className="text-base">Movimentos da sessão</CardTitle></CardHeader>
                 <CardContent className="overflow-x-auto">
@@ -638,6 +809,47 @@ function Page() {
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => setOpenFechar(false)}>Cancelar</Button>
               <Button type="submit" variant="destructive" disabled={saving}>Confirmar fechamento</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* === Modal Cobrança === */}
+      <Dialog open={!!openCobranca} onOpenChange={(o) => { if (!o) setOpenCobranca(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cobrar paciente</DialogTitle>
+            {openCobranca && (
+              <DialogDescription>
+                <span className="uppercase font-medium">{openCobranca.paciente_nome}</span>
+                {openCobranca.procedimento ? ` · ${openCobranca.procedimento}` : ""}
+              </DialogDescription>
+            )}
+          </DialogHeader>
+          <form onSubmit={cobrar} className="space-y-3">
+            <div>
+              <Label>Valor</Label>
+              <CurrencyInput value={cobrancaValor} onChange={setCobrancaValor} />
+            </div>
+            <div>
+              <Label>Forma de pagamento</Label>
+              <Select value={cobrancaForma} onValueChange={setCobrancaForma}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                  <SelectItem value="pix">PIX</SelectItem>
+                  <SelectItem value="debito">Débito</SelectItem>
+                  <SelectItem value="credito">Crédito</SelectItem>
+                  <SelectItem value="boleto">Boleto</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Será criado: movimento de caixa + lançamento financeiro (receita) + paciente avança para <b>triagem</b>.
+            </p>
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setOpenCobranca(null)}>Cancelar</Button>
+              <Button type="submit" disabled={saving}>Confirmar cobrança</Button>
             </DialogFooter>
           </form>
         </DialogContent>
