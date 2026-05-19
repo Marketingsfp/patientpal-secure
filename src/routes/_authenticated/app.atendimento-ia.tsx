@@ -241,14 +241,7 @@ function AtendimentoIaPage() {
       </div>
 
       <Card className="p-4 space-y-3">
-        <div className="grid md:grid-cols-3 gap-3">
-          <div className="space-y-1">
-            <Label>Paciente *</Label>
-            <Select value={pacienteId} onValueChange={setPacienteId}>
-              <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
-              <SelectContent>{pacientes.map((p) => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
+        <div className="grid md:grid-cols-2 gap-3">
           <div className="space-y-1">
             <Label>Profissional</Label>
             <Select value={medicoId} onValueChange={setMedicoId}>
@@ -264,6 +257,54 @@ function AtendimentoIaPage() {
             </Select>
           </div>
         </div>
+
+        {/* Fila do médico */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="flex items-center gap-1.5"><Users className="h-4 w-4" /> Fila de atendimento ({filaOrdenada.length})</Label>
+            {pacienteNome && (
+              <span className="text-xs text-muted-foreground">Em atendimento: <b className="text-foreground uppercase">{pacienteNome}</b></span>
+            )}
+          </div>
+          {filaOrdenada.length === 0 ? (
+            <div className="text-xs text-muted-foreground border border-dashed rounded-md p-4 text-center">
+              Nenhum paciente na fila para hoje.
+            </div>
+          ) : (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-64 overflow-auto pr-1">
+              {filaOrdenada.map((it, idx) => {
+                const ativo = it.id === agendamentoId;
+                const hora = new Date(it.inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+                const prioCls = it.prioridade === "urgente"
+                  ? "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-200"
+                  : it.prioridade === "prioritario"
+                  ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200"
+                  : "";
+                return (
+                  <button
+                    key={it.id}
+                    type="button"
+                    onClick={() => selecionar(it)}
+                    className={`text-left rounded-md border p-2 text-sm transition hover:border-primary ${ativo ? "border-primary bg-primary/5" : ""}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="tabular-nums text-xs text-muted-foreground">#{idx + 1} · {hora}</span>
+                      {it.prioridade !== "normal" && (
+                        <Badge className={`${prioCls} border-0 text-[10px] gap-1`}>
+                          <AlertTriangle className="h-3 w-3" />
+                          {it.prioridade === "urgente" ? "URGENTE" : "PRIORITÁRIO"}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="font-medium uppercase leading-tight mt-0.5 line-clamp-1">{it.paciente_nome}</div>
+                    <div className="text-[11px] text-muted-foreground line-clamp-1">{it.procedimento ?? "—"} · {it.fluxo_etapa.replace("_", " ")}</div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
         <div className="flex gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={handleResumir} disabled={loading === "resumir" || !pacienteId}>
             {loading === "resumir" ? <Loader2 className="h-4 w-4 animate-spin" /> : <History className="h-4 w-4" />}
