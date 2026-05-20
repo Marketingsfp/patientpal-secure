@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Plus, Pencil, Trash2, Stethoscope, Download, Filter } from "lucide-react";
+import { Plus, Pencil, Trash2, Stethoscope, Download, Filter, Wallet, CheckCircle2, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -18,6 +18,8 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro/atendimentos")({
   component: Page,
@@ -30,10 +32,14 @@ interface Atend {
   status: string; forma_pagamento: string | null;
   medico_id: string | null; paciente_id: string | null;
   origem?: "manual" | "agenda";
+  repasse_pago?: boolean;
+  repasse_pago_em?: string | null;
+  repasse_forma_pagamento?: string | null;
 }
 interface Medico { id: string; nome: string; tipo_repasse: string; percentual_repasse_padrao: number; valor_repasse_padrao: number | null }
 interface Pac { id: string; nome: string }
 interface Convenio { medico_id: string; nome: string; tipo_repasse: string; percentual: number | null; valor: number | null }
+interface Conta { id: string; nome: string }
 
 const EMPTY = {
   data: new Date().toISOString().slice(0, 10), medico_id: "", paciente_id: "",
