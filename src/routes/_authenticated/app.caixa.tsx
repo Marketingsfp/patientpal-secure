@@ -377,6 +377,11 @@ function Page() {
     if (!clinicaAtual || !user || !minhaSessao || !openMov) return;
     const v = Number(movValor) || 0;
     if (v <= 0) { toast.error("Informe um valor"); return; }
+    const ehPagto = openMov.tipo === "recebimento" || openMov.tipo === "despesa";
+    if (ehPagto && (movForma === "credito" || movForma === "debito") && !movBandeira) {
+      toast.error("Selecione a bandeira do cartão"); return;
+    }
+    const sufixoCartao = ehPagto ? montarSufixoCartao(movForma, movBandeira, movParcelas) : "";
     setSaving(true);
     const { error } = await supabase.from("caixa_movimentos").insert({
       sessao_id: minhaSessao.id,
@@ -384,13 +389,14 @@ function Page() {
       user_id: user.id,
       tipo: openMov.tipo,
       valor: v,
-      descricao: movDesc || null,
-      forma_pagamento: openMov.tipo === "recebimento" || openMov.tipo === "despesa" ? movForma : null,
+      descricao: (movDesc || "") + sufixoCartao || null,
+      forma_pagamento: ehPagto ? movForma : null,
     });
     setSaving(false);
     if (error) { toast.error(error.message); return; }
     setOpenMov(null);
     setMovValor(""); setMovDesc(""); setMovForma("dinheiro");
+    setMovBandeira(""); setMovParcelas("1");
     toast.success(`${TIPO_LABEL[openMov.tipo]} registrada`);
     void load();
   };
