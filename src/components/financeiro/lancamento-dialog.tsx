@@ -79,7 +79,10 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
       const particular = lista.find((c) => norm(c.nome) === "particular");
       if (particular) setCategoriaId((cur) => cur || particular.id);
-      setContas(cs ?? []);
+      const listaContas = cs ?? [];
+      setContas(listaContas);
+      const caixa = listaContas.find((c) => norm(c.nome) === "caixa");
+      if (caixa) setContaId((cur) => cur || caixa.id);
     })();
   }, [open, clinicaAtual, tipo]);
 
