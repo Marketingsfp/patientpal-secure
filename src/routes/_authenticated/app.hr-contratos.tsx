@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Users, Plus, Pencil, Search } from "lucide-react";
 import { toast } from "sonner";
-import { formatDatePtBR } from "@/lib/date-utils";
+import { formatDatePura } from "@/lib/date-utils";
 
 export const Route = createFileRoute("/_authenticated/app/hr-contratos")({
   component: ContratosPage,
@@ -157,7 +157,7 @@ function ContratosPage() {
                 <TableCell className="text-sm text-muted-foreground">{cargos.find(c => c.id === r.cargo_id)?.nome ?? "-"}</TableCell>
                 <TableCell className="text-sm uppercase">{r.regime}</TableCell>
                 <TableCell className="text-right">{Number(r.salario).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</TableCell>
-                <TableCell className="text-sm">{formatDatePtBR(r.data_admissao)}</TableCell>
+                <TableCell className="text-sm">{formatDatePura(r.data_admissao)}</TableCell>
                 <TableCell><Badge variant={r.status === "ativo" ? "default" : "secondary"}>{r.status}</Badge></TableCell>
                 <TableCell className="text-right">
                   <Button size="icon" variant="ghost" onClick={() => openEdit(r)}><Pencil className="h-4 w-4" /></Button>
