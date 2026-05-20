@@ -865,6 +865,56 @@ function ClientesPage() {
         titulo={`Biometria — ${faceFor?.nome ?? ""}`}
       />
 
+      {/* Prontuário do paciente */}
+      <Dialog open={!!prontFor} onOpenChange={(o) => { if (!o) setProntFor(null); }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileHeart className="h-5 w-5 text-primary" />
+              Prontuário — {prontFor?.nome}
+            </DialogTitle>
+            <DialogDescription>
+              Histórico de atendimentos registrados para este paciente.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            {prontLoading ? (
+              <div className="py-10 text-center text-muted-foreground flex items-center justify-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
+              </div>
+            ) : prontList.length === 0 ? (
+              <div className="py-10 text-center text-muted-foreground text-sm">
+                Nenhum registro de prontuário para este paciente.
+              </div>
+            ) : prontList.map((r) => (
+              <div key={r.id} className="border rounded-lg p-4 bg-card space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-semibold">{new Date(r.data).toLocaleString("pt-BR")}</span>
+                  <span className="text-muted-foreground uppercase text-xs">{r.medico_nome ?? "—"}</span>
+                </div>
+                {([
+                  ["Queixa principal", r.queixa_principal],
+                  ["História da doença", r.historia_doenca],
+                  ["Exame físico", r.exame_fisico],
+                  ["Hipótese diagnóstica", r.hipotese_diagnostica],
+                  ["Conduta", r.conduta],
+                  ["Prescrição", r.prescricao],
+                  ["Observações", r.observacoes],
+                ] as const).filter(([, v]) => v && v.trim()).map(([label, v]) => (
+                  <div key={label} className="text-sm">
+                    <div className="text-xs font-medium text-muted-foreground">{label}</div>
+                    <div className="whitespace-pre-wrap">{v}</div>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setProntFor(null)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Captura de foto pela webcam */}
       <Dialog open={camOpen} onOpenChange={(o) => { if (!o) fecharCamera(); }}>
         <DialogContent className="max-w-md">
