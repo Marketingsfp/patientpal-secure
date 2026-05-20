@@ -16,7 +16,10 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as DiagnosticoRouteImport } from './routes/diagnostico'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PacienteIndexRouteImport } from './routes/paciente.index'
 import { Route as VerificarCodigoRouteImport } from './routes/verificar.$codigo'
+import { Route as PacientePerfilRouteImport } from './routes/paciente.perfil'
+import { Route as PacienteFinanceiroRouteImport } from './routes/paciente.financeiro'
 import { Route as PacienteConsultasRouteImport } from './routes/paciente.consultas'
 import { Route as PacienteCartoesRouteImport } from './routes/paciente.cartoes'
 import { Route as PTokenRouteImport } from './routes/p.$token'
@@ -127,9 +130,24 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PacienteIndexRoute = PacienteIndexRouteImport.update({
+  id: '/paciente/',
+  path: '/paciente/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const VerificarCodigoRoute = VerificarCodigoRouteImport.update({
   id: '/verificar/$codigo',
   path: '/verificar/$codigo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PacientePerfilRoute = PacientePerfilRouteImport.update({
+  id: '/paciente/perfil',
+  path: '/paciente/perfil',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PacienteFinanceiroRoute = PacienteFinanceiroRouteImport.update({
+  id: '/paciente/financeiro',
+  path: '/paciente/financeiro',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PacienteConsultasRoute = PacienteConsultasRouteImport.update({
@@ -572,7 +590,10 @@ export interface FileRoutesByFullPath {
   '/p/$token': typeof PTokenRoute
   '/paciente/cartoes': typeof PacienteCartoesRoute
   '/paciente/consultas': typeof PacienteConsultasRoute
+  '/paciente/financeiro': typeof PacienteFinanceiroRoute
+  '/paciente/perfil': typeof PacientePerfilRoute
   '/verificar/$codigo': typeof VerificarCodigoRoute
+  '/paciente/': typeof PacienteIndexRoute
   '/app/agenda': typeof AuthenticatedAppAgendaRoute
   '/app/alertas-enfermagem': typeof AuthenticatedAppAlertasEnfermagemRoute
   '/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
@@ -655,7 +676,10 @@ export interface FileRoutesByTo {
   '/p/$token': typeof PTokenRoute
   '/paciente/cartoes': typeof PacienteCartoesRoute
   '/paciente/consultas': typeof PacienteConsultasRoute
+  '/paciente/financeiro': typeof PacienteFinanceiroRoute
+  '/paciente/perfil': typeof PacientePerfilRoute
   '/verificar/$codigo': typeof VerificarCodigoRoute
+  '/paciente': typeof PacienteIndexRoute
   '/app/agenda': typeof AuthenticatedAppAgendaRoute
   '/app/alertas-enfermagem': typeof AuthenticatedAppAlertasEnfermagemRoute
   '/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
@@ -740,7 +764,10 @@ export interface FileRoutesById {
   '/p/$token': typeof PTokenRoute
   '/paciente/cartoes': typeof PacienteCartoesRoute
   '/paciente/consultas': typeof PacienteConsultasRoute
+  '/paciente/financeiro': typeof PacienteFinanceiroRoute
+  '/paciente/perfil': typeof PacientePerfilRoute
   '/verificar/$codigo': typeof VerificarCodigoRoute
+  '/paciente/': typeof PacienteIndexRoute
   '/_authenticated/app/agenda': typeof AuthenticatedAppAgendaRoute
   '/_authenticated/app/alertas-enfermagem': typeof AuthenticatedAppAlertasEnfermagemRoute
   '/_authenticated/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
@@ -826,7 +853,10 @@ export interface FileRouteTypes {
     | '/p/$token'
     | '/paciente/cartoes'
     | '/paciente/consultas'
+    | '/paciente/financeiro'
+    | '/paciente/perfil'
     | '/verificar/$codigo'
+    | '/paciente/'
     | '/app/agenda'
     | '/app/alertas-enfermagem'
     | '/app/anamneses'
@@ -909,7 +939,10 @@ export interface FileRouteTypes {
     | '/p/$token'
     | '/paciente/cartoes'
     | '/paciente/consultas'
+    | '/paciente/financeiro'
+    | '/paciente/perfil'
     | '/verificar/$codigo'
+    | '/paciente'
     | '/app/agenda'
     | '/app/alertas-enfermagem'
     | '/app/anamneses'
@@ -993,7 +1026,10 @@ export interface FileRouteTypes {
     | '/p/$token'
     | '/paciente/cartoes'
     | '/paciente/consultas'
+    | '/paciente/financeiro'
+    | '/paciente/perfil'
     | '/verificar/$codigo'
+    | '/paciente/'
     | '/_authenticated/app/agenda'
     | '/_authenticated/app/alertas-enfermagem'
     | '/_authenticated/app/anamneses'
@@ -1078,7 +1114,10 @@ export interface RootRouteChildren {
   PTokenRoute: typeof PTokenRoute
   PacienteCartoesRoute: typeof PacienteCartoesRoute
   PacienteConsultasRoute: typeof PacienteConsultasRoute
+  PacienteFinanceiroRoute: typeof PacienteFinanceiroRoute
+  PacientePerfilRoute: typeof PacientePerfilRoute
   VerificarCodigoRoute: typeof VerificarCodigoRoute
+  PacienteIndexRoute: typeof PacienteIndexRoute
   PContratoTokenRoute: typeof PContratoTokenRoute
 }
 
@@ -1133,11 +1172,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/paciente/': {
+      id: '/paciente/'
+      path: '/paciente'
+      fullPath: '/paciente/'
+      preLoaderRoute: typeof PacienteIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/verificar/$codigo': {
       id: '/verificar/$codigo'
       path: '/verificar/$codigo'
       fullPath: '/verificar/$codigo'
       preLoaderRoute: typeof VerificarCodigoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/paciente/perfil': {
+      id: '/paciente/perfil'
+      path: '/paciente/perfil'
+      fullPath: '/paciente/perfil'
+      preLoaderRoute: typeof PacientePerfilRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/paciente/financeiro': {
+      id: '/paciente/financeiro'
+      path: '/paciente/financeiro'
+      fullPath: '/paciente/financeiro'
+      preLoaderRoute: typeof PacienteFinanceiroRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/paciente/consultas': {
@@ -1882,7 +1942,10 @@ const rootRouteChildren: RootRouteChildren = {
   PTokenRoute: PTokenRoute,
   PacienteCartoesRoute: PacienteCartoesRoute,
   PacienteConsultasRoute: PacienteConsultasRoute,
+  PacienteFinanceiroRoute: PacienteFinanceiroRoute,
+  PacientePerfilRoute: PacientePerfilRoute,
   VerificarCodigoRoute: VerificarCodigoRoute,
+  PacienteIndexRoute: PacienteIndexRoute,
   PContratoTokenRoute: PContratoTokenRoute,
 }
 export const routeTree = rootRouteImport
