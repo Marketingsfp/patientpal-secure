@@ -430,6 +430,41 @@ function AtendimentoIaPage() {
 
         {/* Fila do médico */}
         <div className="space-y-2">
+          {triados.length > 0 && (
+            <div className="rounded-md border border-rose-200/60 dark:border-rose-900/40 bg-rose-50/50 dark:bg-rose-950/20 p-2 space-y-1.5">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-rose-700 dark:text-rose-300">
+                <HeartPulse className="h-3.5 w-3.5" /> Triados pela enfermagem hoje ({triados.length})
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {triados.map((t) => {
+                  const ehMeu = t.medico_id === medicoId;
+                  return (
+                    <button
+                      key={t.agendamento_id}
+                      type="button"
+                      onClick={async () => {
+                        if (!ehMeu) {
+                          setMedicoId(t.medico_id);
+                          await carregarFila(t.medico_id);
+                        }
+                        const it = (await supabase
+                          .from("agendamentos")
+                          .select("id, paciente_id, paciente_nome, inicio, procedimento, fluxo_etapa, prioridade")
+                          .eq("id", t.agendamento_id)
+                          .maybeSingle()).data as unknown as FilaItem | null;
+                        if (it) selecionar(it);
+                      }}
+                      className={`rounded-md border px-2 py-1 text-xs flex items-center gap-1.5 hover:border-rose-400 ${ehMeu ? "bg-background" : "bg-muted/40"}`}
+                      title={ehMeu ? "Seu paciente" : `Atribuído a ${t.medico_nome} — clique para abrir`}
+                    >
+                      <span className="font-medium uppercase">{t.paciente_nome}</span>
+                      <span className="text-muted-foreground">· {t.medico_nome}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           <div className="flex items-center justify-between">
             <Label className="flex items-center gap-1.5"><Users className="h-4 w-4" /> Fila de atendimento ({filaOrdenada.length})</Label>
             {pacienteNome && (
