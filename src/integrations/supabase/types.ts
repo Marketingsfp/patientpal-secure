@@ -2552,6 +2552,90 @@ export type Database = {
         }
         Relationships: []
       }
+      odonto_dentes: {
+        Row: {
+          clinica_id: string
+          created_at: string
+          data: string
+          dente: number
+          face: string
+          id: string
+          observacoes: string | null
+          paciente_id: string
+          procedimento: string | null
+          profissional_id: string | null
+          status: Database["public"]["Enums"]["odonto_status"]
+          updated_at: string
+        }
+        Insert: {
+          clinica_id: string
+          created_at?: string
+          data?: string
+          dente: number
+          face?: string
+          id?: string
+          observacoes?: string | null
+          paciente_id: string
+          procedimento?: string | null
+          profissional_id?: string | null
+          status?: Database["public"]["Enums"]["odonto_status"]
+          updated_at?: string
+        }
+        Update: {
+          clinica_id?: string
+          created_at?: string
+          data?: string
+          dente?: number
+          face?: string
+          id?: string
+          observacoes?: string | null
+          paciente_id?: string
+          procedimento?: string | null
+          profissional_id?: string | null
+          status?: Database["public"]["Enums"]["odonto_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      odonto_prontuarios: {
+        Row: {
+          clinica_id: string
+          created_at: string
+          historia_dental: string | null
+          id: string
+          observacoes: string | null
+          paciente_id: string
+          plano_tratamento: string | null
+          queixa_principal: string | null
+          ultima_atualizacao_por: string | null
+          updated_at: string
+        }
+        Insert: {
+          clinica_id: string
+          created_at?: string
+          historia_dental?: string | null
+          id?: string
+          observacoes?: string | null
+          paciente_id: string
+          plano_tratamento?: string | null
+          queixa_principal?: string | null
+          ultima_atualizacao_por?: string | null
+          updated_at?: string
+        }
+        Update: {
+          clinica_id?: string
+          created_at?: string
+          historia_dental?: string | null
+          id?: string
+          observacoes?: string | null
+          paciente_id?: string
+          plano_tratamento?: string | null
+          queixa_principal?: string | null
+          ultima_atualizacao_por?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       orcamento_itens: {
         Row: {
           created_at: string
@@ -3903,6 +3987,17 @@ export type Database = {
         | "cartao_proprio"
         | "boleto"
         | "transferencia"
+      odonto_status:
+        | "higido"
+        | "cariado"
+        | "restaurado"
+        | "ausente"
+        | "extracao_indicada"
+        | "tratamento_canal"
+        | "coroa"
+        | "implante"
+        | "protese"
+        | "fratura"
       pagamento_forma:
         | "paytime_credito"
         | "paytime_debito"
@@ -4123,6 +4218,18 @@ export const Constants = {
         "cartao_proprio",
         "boleto",
         "transferencia",
+      ],
+      odonto_status: [
+        "higido",
+        "cariado",
+        "restaurado",
+        "ausente",
+        "extracao_indicada",
+        "tratamento_canal",
+        "coroa",
+        "implante",
+        "protese",
+        "fratura",
       ],
       pagamento_forma: [
         "paytime_credito",

@@ -62,6 +62,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<{ to: string;
     { to: "/app/exames-resultados", label: "Resultados de Exames", icon: FlaskConical },
     { to: "/app/alertas-enfermagem", label: "Enfermeira IA — Alertas", icon: BellRing },
     { to: "/app/prontuario-modelos", label: "Modelos de Prontuário", icon: FileHeart },
+    { to: "/app/odontologia", label: "Odontologia", icon: HeartPulse },
     { to: "/app/consulta-rapida", label: "Informações rápidas", icon: BookOpen },
     ],
   },
