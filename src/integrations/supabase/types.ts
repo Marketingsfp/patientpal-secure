@@ -2905,6 +2905,237 @@ export type Database = {
           },
         ]
       }
+      mkt_envios: {
+        Row: {
+          campanha_id: string | null
+          canal: string
+          clinica_id: string
+          created_at: string
+          destinatario: string
+          enviado_em: string | null
+          erro: string | null
+          id: string
+          paciente_id: string | null
+          status: string
+        }
+        Insert: {
+          campanha_id?: string | null
+          canal: string
+          clinica_id: string
+          created_at?: string
+          destinatario: string
+          enviado_em?: string | null
+          erro?: string | null
+          id?: string
+          paciente_id?: string | null
+          status?: string
+        }
+        Update: {
+          campanha_id?: string | null
+          canal?: string
+          clinica_id?: string
+          created_at?: string
+          destinatario?: string
+          enviado_em?: string | null
+          erro?: string | null
+          id?: string
+          paciente_id?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mkt_envios_campanha_id_fkey"
+            columns: ["campanha_id"]
+            isOneToOne: false
+            referencedRelation: "campanhas_marketing"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mkt_envios_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mkt_envios_paciente_id_fkey"
+            columns: ["paciente_id"]
+            isOneToOne: false
+            referencedRelation: "pacientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mkt_landing_pages: {
+        Row: {
+          campos: Json
+          clinica_id: string
+          conteudo_html: string | null
+          cor_primaria: string | null
+          created_at: string
+          created_by: string | null
+          cta_label: string | null
+          hero_imagem_url: string | null
+          id: string
+          slug: string
+          status: string
+          subtitulo: string | null
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          campos?: Json
+          clinica_id: string
+          conteudo_html?: string | null
+          cor_primaria?: string | null
+          created_at?: string
+          created_by?: string | null
+          cta_label?: string | null
+          hero_imagem_url?: string | null
+          id?: string
+          slug: string
+          status?: string
+          subtitulo?: string | null
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          campos?: Json
+          clinica_id?: string
+          conteudo_html?: string | null
+          cor_primaria?: string | null
+          created_at?: string
+          created_by?: string | null
+          cta_label?: string | null
+          hero_imagem_url?: string | null
+          id?: string
+          slug?: string
+          status?: string
+          subtitulo?: string | null
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mkt_landing_pages_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mkt_leads: {
+        Row: {
+          clinica_id: string
+          created_at: string
+          dados: Json | null
+          email: string | null
+          id: string
+          landing_page_id: string | null
+          mensagem: string | null
+          nome: string
+          origem: string | null
+          paciente_id: string | null
+          status: string
+          telefone: string | null
+          updated_at: string
+        }
+        Insert: {
+          clinica_id: string
+          created_at?: string
+          dados?: Json | null
+          email?: string | null
+          id?: string
+          landing_page_id?: string | null
+          mensagem?: string | null
+          nome: string
+          origem?: string | null
+          paciente_id?: string | null
+          status?: string
+          telefone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          clinica_id?: string
+          created_at?: string
+          dados?: Json | null
+          email?: string | null
+          id?: string
+          landing_page_id?: string | null
+          mensagem?: string | null
+          nome?: string
+          origem?: string | null
+          paciente_id?: string | null
+          status?: string
+          telefone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mkt_leads_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mkt_leads_landing_page_id_fkey"
+            columns: ["landing_page_id"]
+            isOneToOne: false
+            referencedRelation: "mkt_landing_pages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mkt_leads_paciente_id_fkey"
+            columns: ["paciente_id"]
+            isOneToOne: false
+            referencedRelation: "pacientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mkt_segmentos: {
+        Row: {
+          clinica_id: string
+          created_at: string
+          created_by: string | null
+          descricao: string | null
+          filtros: Json
+          id: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          clinica_id: string
+          created_at?: string
+          created_by?: string | null
+          descricao?: string | null
+          filtros?: Json
+          id?: string
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          clinica_id?: string
+          created_at?: string
+          created_by?: string | null
+          descricao?: string | null
+          filtros?: Json
+          id?: string
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mkt_segmentos_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       modelos_documentos: {
         Row: {
           ativo: boolean
