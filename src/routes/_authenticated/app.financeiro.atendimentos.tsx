@@ -4,6 +4,7 @@ import { Plus, Pencil, Trash2, Stethoscope, Download, Filter } from "lucide-reac
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { useMedicoContext } from "@/hooks/use-medico-context";
 import { exportToExcel } from "@/lib/export-csv";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,6 +43,7 @@ const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", curren
 
 function Page() {
   const { clinicaAtual } = useClinica();
+  const { medicoId: medicoLogadoId, isMedicoOnly } = useMedicoContext();
   const [items, setItems] = useState<Atend[]>([]);
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [pacientes, setPacientes] = useState<Pac[]>([]);
@@ -58,6 +60,11 @@ function Page() {
   const [fMedico, setFMedico] = useState<string>("todos");
   const [fIni, setFIni] = useState<string>(primeiroDia.toISOString().slice(0, 10));
   const [fFim, setFFim] = useState<string>(hoje);
+
+  // Perfil médico: trava o filtro no próprio profissional
+  useEffect(() => {
+    if (isMedicoOnly && medicoLogadoId) setFMedico(medicoLogadoId);
+  }, [isMedicoOnly, medicoLogadoId]);
 
   const norm = (s: string) =>
     s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
