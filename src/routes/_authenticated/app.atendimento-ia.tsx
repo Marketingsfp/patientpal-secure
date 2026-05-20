@@ -105,9 +105,19 @@ function AtendimentoIaPage() {
       if (!clinicaAtual) return;
       const cid = clinicaAtual.clinica_id;
       const [m, md] = await Promise.all([
-        supabase.from("medicos").select("id, nome, email, user_id, especialidade_id, especialidades(nome)").eq("clinica_id", cid).eq("ativo", true).order("nome"),
+        supabase
+          .from("medicos")
+          .select("id, nome, email, user_id, especialidade_id, especialidades:especialidades!medicos_especialidade_id_fkey(nome)")
+          .eq("clinica_id", cid)
+          .eq("ativo", true)
+          .order("nome"),
         supabase.from("prontuario_modelos").select("id, nome, prompt_ia").eq("clinica_id", cid).eq("ativo", true).order("nome"),
       ]);
+      if (m.error) {
+        toast.error("Não foi possível carregar o profissional logado");
+        setMedicos([]);
+        return;
+      }
       const meds = (m.data ?? []) as unknown as Medico[];
       setMedicos(meds);
       setModelos((md.data ?? []) as Modelo[]);
@@ -135,7 +145,7 @@ function AtendimentoIaPage() {
         setMedicoId(escolhido);
       }
     })();
-  }, [clinicaAtual?.clinica_id, user?.id]);
+  }, [clinicaAtual?.clinica_id, user?.id, user?.email]);
 
   // Médico selecionado e sua especialidade (fixa, vem do cadastro)
   const medicoSelecionado = useMemo(
@@ -143,6 +153,12 @@ function AtendimentoIaPage() {
     [medicos, medicoId],
   );
   const especialidadeMedico = medicoSelecionado?.especialidades?.nome ?? "";
+  const medicoLogado = Boolean(
+    medicoSelecionado && user && (
+      medicoSelecionado.user_id === user.id
+      || medicoSelecionado.email?.toLowerCase() === user.email?.toLowerCase()
+    ),
+  );
 
   // Auto-casa o modelo de prontuário com a especialidade do médico
   useEffect(() => {
@@ -413,16 +429,22 @@ function AtendimentoIaPage() {
       <Card className="p-4 space-y-3">
         <div className="space-y-1">
           <Label>Profissional</Label>
-          <Select value={medicoId} onValueChange={setMedicoId}>
-            <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
-            <SelectContent>
-              {medicos.map((m) => (
-                <SelectItem key={m.id} value={m.id} className="uppercase">
-                  {m.nome}{m.especialidades?.nome ? ` — ${m.especialidades.nome}` : ""}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {medicoLogado && medicoSelecionado ? (
+            <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm font-medium uppercase">
+              {medicoSelecionado.nome}{medicoSelecionado.especialidades?.nome ? ` — ${medicoSelecionado.especialidades.nome}` : ""}
+            </div>
+          ) : (
+            <Select value={medicoId} onValueChange={setMedicoId}>
+              <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
+              <SelectContent>
+                {medicos.map((m) => (
+                  <SelectItem key={m.id} value={m.id} className="uppercase">
+                    {m.nome}{m.especialidades?.nome ? ` — ${m.especialidades.nome}` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           {medicoSelecionado && (
             <div className="text-xs text-muted-foreground pt-1">
               Especialidade: <b className="text-foreground">{especialidadeMedico || "—"}</b>
