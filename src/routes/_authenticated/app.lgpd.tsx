@@ -12,7 +12,7 @@ import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ShieldCheck, Plus } from "lucide-react";
 import { toast } from "sonner";
-import { formatDateTimePtBR } from "@/lib/date-utils";
+import { formatDateTime } from "@/lib/date-utils";
 
 export const Route = createFileRoute("/_authenticated/app/lgpd")({
   component: LgpdPage,
@@ -134,7 +134,7 @@ function LgpdPage() {
               <TableRow><TableCell colSpan={5} className="text-center py-6 text-muted-foreground">Nenhuma solicitação registrada.</TableCell></TableRow>
             ) : rows.map(r => (
               <TableRow key={r.id}>
-                <TableCell className="text-sm">{formatDateTimePtBR(r.created_at)}</TableCell>
+                <TableCell className="text-sm">{formatDateTime(r.created_at)}</TableCell>
                 <TableCell>{TIPOS[r.tipo] ?? r.tipo}</TableCell>
                 <TableCell className="text-sm text-muted-foreground line-clamp-2 max-w-md">{r.descricao}</TableCell>
                 <TableCell><Badge variant={STATUS_COLORS[r.status] ?? "secondary"}>{r.status}</Badge></TableCell>
