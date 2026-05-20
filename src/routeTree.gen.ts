@@ -20,6 +20,7 @@ import { Route as VerificarCodigoRouteImport } from './routes/verificar.$codigo'
 import { Route as PacienteConsultasRouteImport } from './routes/paciente.consultas'
 import { Route as PacienteCartoesRouteImport } from './routes/paciente.cartoes'
 import { Route as PTokenRouteImport } from './routes/p.$token'
+import { Route as LpSlugRouteImport } from './routes/lp.$slug'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
 import { Route as AuthenticatedAppIndexRouteImport } from './routes/_authenticated/app.index'
 import { Route as PContratoTokenRouteImport } from './routes/p.contrato.$token'
@@ -37,6 +38,10 @@ import { Route as AuthenticatedAppOdontologiaRouteImport } from './routes/_authe
 import { Route as AuthenticatedAppNinaRouteImport } from './routes/_authenticated/app.nina'
 import { Route as AuthenticatedAppNfseRouteImport } from './routes/_authenticated/app.nfse'
 import { Route as AuthenticatedAppModelosDocumentosRouteImport } from './routes/_authenticated/app.modelos-documentos'
+import { Route as AuthenticatedAppMktSegmentosRouteImport } from './routes/_authenticated/app.mkt-segmentos'
+import { Route as AuthenticatedAppMktLeadsRouteImport } from './routes/_authenticated/app.mkt-leads'
+import { Route as AuthenticatedAppMktLandingRouteImport } from './routes/_authenticated/app.mkt-landing'
+import { Route as AuthenticatedAppMktEnviosRouteImport } from './routes/_authenticated/app.mkt-envios'
 import { Route as AuthenticatedAppMedicosRouteImport } from './routes/_authenticated/app.medicos'
 import { Route as AuthenticatedAppLmsAdminRouteImport } from './routes/_authenticated/app.lms-admin'
 import { Route as AuthenticatedAppLgpdRouteImport } from './routes/_authenticated/app.lgpd'
@@ -142,6 +147,11 @@ const PTokenRoute = PTokenRouteImport.update({
   path: '/p/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LpSlugRoute = LpSlugRouteImport.update({
+  id: '/lp/$slug',
+  path: '/lp/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedAppRoute = AuthenticatedAppRouteImport.update({
   id: '/app',
   path: '/app',
@@ -235,6 +245,30 @@ const AuthenticatedAppModelosDocumentosRoute =
   AuthenticatedAppModelosDocumentosRouteImport.update({
     id: '/modelos-documentos',
     path: '/modelos-documentos',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppMktSegmentosRoute =
+  AuthenticatedAppMktSegmentosRouteImport.update({
+    id: '/mkt-segmentos',
+    path: '/mkt-segmentos',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppMktLeadsRoute =
+  AuthenticatedAppMktLeadsRouteImport.update({
+    id: '/mkt-leads',
+    path: '/mkt-leads',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppMktLandingRoute =
+  AuthenticatedAppMktLandingRouteImport.update({
+    id: '/mkt-landing',
+    path: '/mkt-landing',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppMktEnviosRoute =
+  AuthenticatedAppMktEnviosRouteImport.update({
+    id: '/mkt-envios',
+    path: '/mkt-envios',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppMedicosRoute = AuthenticatedAppMedicosRouteImport.update({
@@ -534,6 +568,7 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/totem': typeof TotemRoute
   '/app': typeof AuthenticatedAppRouteWithChildren
+  '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
   '/paciente/cartoes': typeof PacienteCartoesRoute
   '/paciente/consultas': typeof PacienteConsultasRoute
@@ -569,6 +604,10 @@ export interface FileRoutesByFullPath {
   '/app/lgpd': typeof AuthenticatedAppLgpdRoute
   '/app/lms-admin': typeof AuthenticatedAppLmsAdminRoute
   '/app/medicos': typeof AuthenticatedAppMedicosRoute
+  '/app/mkt-envios': typeof AuthenticatedAppMktEnviosRoute
+  '/app/mkt-landing': typeof AuthenticatedAppMktLandingRoute
+  '/app/mkt-leads': typeof AuthenticatedAppMktLeadsRoute
+  '/app/mkt-segmentos': typeof AuthenticatedAppMktSegmentosRoute
   '/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
   '/app/nfse': typeof AuthenticatedAppNfseRoute
   '/app/nina': typeof AuthenticatedAppNinaRoute
@@ -612,6 +651,7 @@ export interface FileRoutesByTo {
   '/painel': typeof PainelRoute
   '/signup': typeof SignupRoute
   '/totem': typeof TotemRoute
+  '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
   '/paciente/cartoes': typeof PacienteCartoesRoute
   '/paciente/consultas': typeof PacienteConsultasRoute
@@ -646,6 +686,10 @@ export interface FileRoutesByTo {
   '/app/lgpd': typeof AuthenticatedAppLgpdRoute
   '/app/lms-admin': typeof AuthenticatedAppLmsAdminRoute
   '/app/medicos': typeof AuthenticatedAppMedicosRoute
+  '/app/mkt-envios': typeof AuthenticatedAppMktEnviosRoute
+  '/app/mkt-landing': typeof AuthenticatedAppMktLandingRoute
+  '/app/mkt-leads': typeof AuthenticatedAppMktLeadsRoute
+  '/app/mkt-segmentos': typeof AuthenticatedAppMktSegmentosRoute
   '/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
   '/app/nfse': typeof AuthenticatedAppNfseRoute
   '/app/nina': typeof AuthenticatedAppNinaRoute
@@ -692,6 +736,7 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/totem': typeof TotemRoute
   '/_authenticated/app': typeof AuthenticatedAppRouteWithChildren
+  '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
   '/paciente/cartoes': typeof PacienteCartoesRoute
   '/paciente/consultas': typeof PacienteConsultasRoute
@@ -727,6 +772,10 @@ export interface FileRoutesById {
   '/_authenticated/app/lgpd': typeof AuthenticatedAppLgpdRoute
   '/_authenticated/app/lms-admin': typeof AuthenticatedAppLmsAdminRoute
   '/_authenticated/app/medicos': typeof AuthenticatedAppMedicosRoute
+  '/_authenticated/app/mkt-envios': typeof AuthenticatedAppMktEnviosRoute
+  '/_authenticated/app/mkt-landing': typeof AuthenticatedAppMktLandingRoute
+  '/_authenticated/app/mkt-leads': typeof AuthenticatedAppMktLeadsRoute
+  '/_authenticated/app/mkt-segmentos': typeof AuthenticatedAppMktSegmentosRoute
   '/_authenticated/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
   '/_authenticated/app/nfse': typeof AuthenticatedAppNfseRoute
   '/_authenticated/app/nina': typeof AuthenticatedAppNinaRoute
@@ -773,6 +822,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/totem'
     | '/app'
+    | '/lp/$slug'
     | '/p/$token'
     | '/paciente/cartoes'
     | '/paciente/consultas'
@@ -808,6 +858,10 @@ export interface FileRouteTypes {
     | '/app/lgpd'
     | '/app/lms-admin'
     | '/app/medicos'
+    | '/app/mkt-envios'
+    | '/app/mkt-landing'
+    | '/app/mkt-leads'
+    | '/app/mkt-segmentos'
     | '/app/modelos-documentos'
     | '/app/nfse'
     | '/app/nina'
@@ -851,6 +905,7 @@ export interface FileRouteTypes {
     | '/painel'
     | '/signup'
     | '/totem'
+    | '/lp/$slug'
     | '/p/$token'
     | '/paciente/cartoes'
     | '/paciente/consultas'
@@ -885,6 +940,10 @@ export interface FileRouteTypes {
     | '/app/lgpd'
     | '/app/lms-admin'
     | '/app/medicos'
+    | '/app/mkt-envios'
+    | '/app/mkt-landing'
+    | '/app/mkt-leads'
+    | '/app/mkt-segmentos'
     | '/app/modelos-documentos'
     | '/app/nfse'
     | '/app/nina'
@@ -930,6 +989,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/totem'
     | '/_authenticated/app'
+    | '/lp/$slug'
     | '/p/$token'
     | '/paciente/cartoes'
     | '/paciente/consultas'
@@ -965,6 +1025,10 @@ export interface FileRouteTypes {
     | '/_authenticated/app/lgpd'
     | '/_authenticated/app/lms-admin'
     | '/_authenticated/app/medicos'
+    | '/_authenticated/app/mkt-envios'
+    | '/_authenticated/app/mkt-landing'
+    | '/_authenticated/app/mkt-leads'
+    | '/_authenticated/app/mkt-segmentos'
     | '/_authenticated/app/modelos-documentos'
     | '/_authenticated/app/nfse'
     | '/_authenticated/app/nina'
@@ -1010,6 +1074,7 @@ export interface RootRouteChildren {
   PainelRoute: typeof PainelRoute
   SignupRoute: typeof SignupRoute
   TotemRoute: typeof TotemRoute
+  LpSlugRoute: typeof LpSlugRoute
   PTokenRoute: typeof PTokenRoute
   PacienteCartoesRoute: typeof PacienteCartoesRoute
   PacienteConsultasRoute: typeof PacienteConsultasRoute
@@ -1094,6 +1159,13 @@ declare module '@tanstack/react-router' {
       path: '/p/$token'
       fullPath: '/p/$token'
       preLoaderRoute: typeof PTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/lp/$slug': {
+      id: '/lp/$slug'
+      path: '/lp/$slug'
+      fullPath: '/lp/$slug'
+      preLoaderRoute: typeof LpSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/app': {
@@ -1213,6 +1285,34 @@ declare module '@tanstack/react-router' {
       path: '/modelos-documentos'
       fullPath: '/app/modelos-documentos'
       preLoaderRoute: typeof AuthenticatedAppModelosDocumentosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/mkt-segmentos': {
+      id: '/_authenticated/app/mkt-segmentos'
+      path: '/mkt-segmentos'
+      fullPath: '/app/mkt-segmentos'
+      preLoaderRoute: typeof AuthenticatedAppMktSegmentosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/mkt-leads': {
+      id: '/_authenticated/app/mkt-leads'
+      path: '/mkt-leads'
+      fullPath: '/app/mkt-leads'
+      preLoaderRoute: typeof AuthenticatedAppMktLeadsRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/mkt-landing': {
+      id: '/_authenticated/app/mkt-landing'
+      path: '/mkt-landing'
+      fullPath: '/app/mkt-landing'
+      preLoaderRoute: typeof AuthenticatedAppMktLandingRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/mkt-envios': {
+      id: '/_authenticated/app/mkt-envios'
+      path: '/mkt-envios'
+      fullPath: '/app/mkt-envios'
+      preLoaderRoute: typeof AuthenticatedAppMktEnviosRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/medicos': {
@@ -1672,6 +1772,10 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppLgpdRoute: typeof AuthenticatedAppLgpdRoute
   AuthenticatedAppLmsAdminRoute: typeof AuthenticatedAppLmsAdminRoute
   AuthenticatedAppMedicosRoute: typeof AuthenticatedAppMedicosRoute
+  AuthenticatedAppMktEnviosRoute: typeof AuthenticatedAppMktEnviosRoute
+  AuthenticatedAppMktLandingRoute: typeof AuthenticatedAppMktLandingRoute
+  AuthenticatedAppMktLeadsRoute: typeof AuthenticatedAppMktLeadsRoute
+  AuthenticatedAppMktSegmentosRoute: typeof AuthenticatedAppMktSegmentosRoute
   AuthenticatedAppModelosDocumentosRoute: typeof AuthenticatedAppModelosDocumentosRoute
   AuthenticatedAppNfseRoute: typeof AuthenticatedAppNfseRoute
   AuthenticatedAppNinaRoute: typeof AuthenticatedAppNinaRoute
@@ -1725,6 +1829,10 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppLgpdRoute: AuthenticatedAppLgpdRoute,
   AuthenticatedAppLmsAdminRoute: AuthenticatedAppLmsAdminRoute,
   AuthenticatedAppMedicosRoute: AuthenticatedAppMedicosRoute,
+  AuthenticatedAppMktEnviosRoute: AuthenticatedAppMktEnviosRoute,
+  AuthenticatedAppMktLandingRoute: AuthenticatedAppMktLandingRoute,
+  AuthenticatedAppMktLeadsRoute: AuthenticatedAppMktLeadsRoute,
+  AuthenticatedAppMktSegmentosRoute: AuthenticatedAppMktSegmentosRoute,
   AuthenticatedAppModelosDocumentosRoute:
     AuthenticatedAppModelosDocumentosRoute,
   AuthenticatedAppNfseRoute: AuthenticatedAppNfseRoute,
@@ -1770,6 +1878,7 @@ const rootRouteChildren: RootRouteChildren = {
   PainelRoute: PainelRoute,
   SignupRoute: SignupRoute,
   TotemRoute: TotemRoute,
+  LpSlugRoute: LpSlugRoute,
   PTokenRoute: PTokenRoute,
   PacienteCartoesRoute: PacienteCartoesRoute,
   PacienteConsultasRoute: PacienteConsultasRoute,
