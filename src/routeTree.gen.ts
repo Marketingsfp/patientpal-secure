@@ -22,6 +22,8 @@ import { Route as PTokenRouteImport } from './routes/p.$token'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
 import { Route as AuthenticatedAppIndexRouteImport } from './routes/_authenticated/app.index'
 import { Route as PContratoTokenRouteImport } from './routes/p.contrato.$token'
+import { Route as AuthenticatedAppUnidadesRouteImport } from './routes/_authenticated/app.unidades'
+import { Route as AuthenticatedAppSetoresRouteImport } from './routes/_authenticated/app.setores'
 import { Route as AuthenticatedAppRelatoriosRouteImport } from './routes/_authenticated/app.relatorios'
 import { Route as AuthenticatedAppRecepcaoRouteImport } from './routes/_authenticated/app.recepcao'
 import { Route as AuthenticatedAppProntuariosRouteImport } from './routes/_authenticated/app.prontuarios'
@@ -137,6 +139,17 @@ const PContratoTokenRoute = PContratoTokenRouteImport.update({
   id: '/p/contrato/$token',
   path: '/p/contrato/$token',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedAppUnidadesRoute =
+  AuthenticatedAppUnidadesRouteImport.update({
+    id: '/unidades',
+    path: '/unidades',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppSetoresRoute = AuthenticatedAppSetoresRouteImport.update({
+  id: '/setores',
+  path: '/setores',
+  getParentRoute: () => AuthenticatedAppRoute,
 } as any)
 const AuthenticatedAppRelatoriosRoute =
   AuthenticatedAppRelatoriosRouteImport.update({
@@ -478,6 +491,8 @@ export interface FileRoutesByFullPath {
   '/app/prontuarios': typeof AuthenticatedAppProntuariosRoute
   '/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
   '/app/relatorios': typeof AuthenticatedAppRelatoriosRoute
+  '/app/setores': typeof AuthenticatedAppSetoresRoute
+  '/app/unidades': typeof AuthenticatedAppUnidadesRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
   '/app/': typeof AuthenticatedAppIndexRoute
   '/app/cartao-beneficios/contratos': typeof AuthenticatedAppCartaoBeneficiosContratosRoute
@@ -541,6 +556,8 @@ export interface FileRoutesByTo {
   '/app/prontuarios': typeof AuthenticatedAppProntuariosRoute
   '/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
   '/app/relatorios': typeof AuthenticatedAppRelatoriosRoute
+  '/app/setores': typeof AuthenticatedAppSetoresRoute
+  '/app/unidades': typeof AuthenticatedAppUnidadesRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
   '/app': typeof AuthenticatedAppIndexRoute
   '/app/cartao-beneficios/contratos': typeof AuthenticatedAppCartaoBeneficiosContratosRoute
@@ -608,6 +625,8 @@ export interface FileRoutesById {
   '/_authenticated/app/prontuarios': typeof AuthenticatedAppProntuariosRoute
   '/_authenticated/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
   '/_authenticated/app/relatorios': typeof AuthenticatedAppRelatoriosRoute
+  '/_authenticated/app/setores': typeof AuthenticatedAppSetoresRoute
+  '/_authenticated/app/unidades': typeof AuthenticatedAppUnidadesRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
   '/_authenticated/app/': typeof AuthenticatedAppIndexRoute
   '/_authenticated/app/cartao-beneficios/contratos': typeof AuthenticatedAppCartaoBeneficiosContratosRoute
@@ -675,6 +694,8 @@ export interface FileRouteTypes {
     | '/app/prontuarios'
     | '/app/recepcao'
     | '/app/relatorios'
+    | '/app/setores'
+    | '/app/unidades'
     | '/p/contrato/$token'
     | '/app/'
     | '/app/cartao-beneficios/contratos'
@@ -738,6 +759,8 @@ export interface FileRouteTypes {
     | '/app/prontuarios'
     | '/app/recepcao'
     | '/app/relatorios'
+    | '/app/setores'
+    | '/app/unidades'
     | '/p/contrato/$token'
     | '/app'
     | '/app/cartao-beneficios/contratos'
@@ -804,6 +827,8 @@ export interface FileRouteTypes {
     | '/_authenticated/app/prontuarios'
     | '/_authenticated/app/recepcao'
     | '/_authenticated/app/relatorios'
+    | '/_authenticated/app/setores'
+    | '/_authenticated/app/unidades'
     | '/p/contrato/$token'
     | '/_authenticated/app/'
     | '/_authenticated/app/cartao-beneficios/contratos'
@@ -931,6 +956,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/p/contrato/$token'
       preLoaderRoute: typeof PContratoTokenRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/app/unidades': {
+      id: '/_authenticated/app/unidades'
+      path: '/unidades'
+      fullPath: '/app/unidades'
+      preLoaderRoute: typeof AuthenticatedAppUnidadesRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/setores': {
+      id: '/_authenticated/app/setores'
+      path: '/setores'
+      fullPath: '/app/setores'
+      preLoaderRoute: typeof AuthenticatedAppSetoresRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/relatorios': {
       id: '/_authenticated/app/relatorios'
@@ -1399,6 +1438,8 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppProntuariosRoute: typeof AuthenticatedAppProntuariosRoute
   AuthenticatedAppRecepcaoRoute: typeof AuthenticatedAppRecepcaoRoute
   AuthenticatedAppRelatoriosRoute: typeof AuthenticatedAppRelatoriosRoute
+  AuthenticatedAppSetoresRoute: typeof AuthenticatedAppSetoresRoute
+  AuthenticatedAppUnidadesRoute: typeof AuthenticatedAppUnidadesRoute
   AuthenticatedAppIndexRoute: typeof AuthenticatedAppIndexRoute
 }
 
@@ -1441,6 +1482,8 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppProntuariosRoute: AuthenticatedAppProntuariosRoute,
   AuthenticatedAppRecepcaoRoute: AuthenticatedAppRecepcaoRoute,
   AuthenticatedAppRelatoriosRoute: AuthenticatedAppRelatoriosRoute,
+  AuthenticatedAppSetoresRoute: AuthenticatedAppSetoresRoute,
+  AuthenticatedAppUnidadesRoute: AuthenticatedAppUnidadesRoute,
   AuthenticatedAppIndexRoute: AuthenticatedAppIndexRoute,
 }
 
@@ -1475,3 +1518,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
