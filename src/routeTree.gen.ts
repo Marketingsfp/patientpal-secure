@@ -38,6 +38,7 @@ import { Route as AuthenticatedAppMedicosRouteImport } from './routes/_authentic
 import { Route as AuthenticatedAppLgpdRouteImport } from './routes/_authenticated/app.lgpd'
 import { Route as AuthenticatedAppHrPontoRouteImport } from './routes/_authenticated/app.hr-ponto'
 import { Route as AuthenticatedAppHrHoleritesRouteImport } from './routes/_authenticated/app.hr-holerites'
+import { Route as AuthenticatedAppHrFeriasRouteImport } from './routes/_authenticated/app.hr-ferias'
 import { Route as AuthenticatedAppHrContratosRouteImport } from './routes/_authenticated/app.hr-contratos'
 import { Route as AuthenticatedAppFluxoRouteImport } from './routes/_authenticated/app.fluxo'
 import { Route as AuthenticatedAppFinanceiroRouteImport } from './routes/_authenticated/app.financeiro'
@@ -231,6 +232,12 @@ const AuthenticatedAppHrHoleritesRoute =
   AuthenticatedAppHrHoleritesRouteImport.update({
     id: '/hr-holerites',
     path: '/hr-holerites',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppHrFeriasRoute =
+  AuthenticatedAppHrFeriasRouteImport.update({
+    id: '/hr-ferias',
+    path: '/hr-ferias',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppHrContratosRoute =
@@ -507,6 +514,7 @@ export interface FileRoutesByFullPath {
   '/app/financeiro': typeof AuthenticatedAppFinanceiroRouteWithChildren
   '/app/fluxo': typeof AuthenticatedAppFluxoRoute
   '/app/hr-contratos': typeof AuthenticatedAppHrContratosRoute
+  '/app/hr-ferias': typeof AuthenticatedAppHrFeriasRoute
   '/app/hr-holerites': typeof AuthenticatedAppHrHoleritesRoute
   '/app/hr-ponto': typeof AuthenticatedAppHrPontoRoute
   '/app/lgpd': typeof AuthenticatedAppLgpdRoute
@@ -576,6 +584,7 @@ export interface FileRoutesByTo {
   '/app/exames-resultados': typeof AuthenticatedAppExamesResultadosRoute
   '/app/fluxo': typeof AuthenticatedAppFluxoRoute
   '/app/hr-contratos': typeof AuthenticatedAppHrContratosRoute
+  '/app/hr-ferias': typeof AuthenticatedAppHrFeriasRoute
   '/app/hr-holerites': typeof AuthenticatedAppHrHoleritesRoute
   '/app/hr-ponto': typeof AuthenticatedAppHrPontoRoute
   '/app/lgpd': typeof AuthenticatedAppLgpdRoute
@@ -649,6 +658,7 @@ export interface FileRoutesById {
   '/_authenticated/app/financeiro': typeof AuthenticatedAppFinanceiroRouteWithChildren
   '/_authenticated/app/fluxo': typeof AuthenticatedAppFluxoRoute
   '/_authenticated/app/hr-contratos': typeof AuthenticatedAppHrContratosRoute
+  '/_authenticated/app/hr-ferias': typeof AuthenticatedAppHrFeriasRoute
   '/_authenticated/app/hr-holerites': typeof AuthenticatedAppHrHoleritesRoute
   '/_authenticated/app/hr-ponto': typeof AuthenticatedAppHrPontoRoute
   '/_authenticated/app/lgpd': typeof AuthenticatedAppLgpdRoute
@@ -722,6 +732,7 @@ export interface FileRouteTypes {
     | '/app/financeiro'
     | '/app/fluxo'
     | '/app/hr-contratos'
+    | '/app/hr-ferias'
     | '/app/hr-holerites'
     | '/app/hr-ponto'
     | '/app/lgpd'
@@ -791,6 +802,7 @@ export interface FileRouteTypes {
     | '/app/exames-resultados'
     | '/app/fluxo'
     | '/app/hr-contratos'
+    | '/app/hr-ferias'
     | '/app/hr-holerites'
     | '/app/hr-ponto'
     | '/app/lgpd'
@@ -863,6 +875,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/financeiro'
     | '/_authenticated/app/fluxo'
     | '/_authenticated/app/hr-contratos'
+    | '/_authenticated/app/hr-ferias'
     | '/_authenticated/app/hr-holerites'
     | '/_authenticated/app/hr-ponto'
     | '/_authenticated/app/lgpd'
@@ -1117,6 +1130,13 @@ declare module '@tanstack/react-router' {
       path: '/hr-holerites'
       fullPath: '/app/hr-holerites'
       preLoaderRoute: typeof AuthenticatedAppHrHoleritesRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/hr-ferias': {
+      id: '/_authenticated/app/hr-ferias'
+      path: '/hr-ferias'
+      fullPath: '/app/hr-ferias'
+      preLoaderRoute: typeof AuthenticatedAppHrFeriasRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/hr-contratos': {
@@ -1506,6 +1526,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppFinanceiroRoute: typeof AuthenticatedAppFinanceiroRouteWithChildren
   AuthenticatedAppFluxoRoute: typeof AuthenticatedAppFluxoRoute
   AuthenticatedAppHrContratosRoute: typeof AuthenticatedAppHrContratosRoute
+  AuthenticatedAppHrFeriasRoute: typeof AuthenticatedAppHrFeriasRoute
   AuthenticatedAppHrHoleritesRoute: typeof AuthenticatedAppHrHoleritesRoute
   AuthenticatedAppHrPontoRoute: typeof AuthenticatedAppHrPontoRoute
   AuthenticatedAppLgpdRoute: typeof AuthenticatedAppLgpdRoute
@@ -1552,6 +1573,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppFinanceiroRoute: AuthenticatedAppFinanceiroRouteWithChildren,
   AuthenticatedAppFluxoRoute: AuthenticatedAppFluxoRoute,
   AuthenticatedAppHrContratosRoute: AuthenticatedAppHrContratosRoute,
+  AuthenticatedAppHrFeriasRoute: AuthenticatedAppHrFeriasRoute,
   AuthenticatedAppHrHoleritesRoute: AuthenticatedAppHrHoleritesRoute,
   AuthenticatedAppHrPontoRoute: AuthenticatedAppHrPontoRoute,
   AuthenticatedAppLgpdRoute: AuthenticatedAppLgpdRoute,
