@@ -1,47 +1,41 @@
-# Inspiração visual + nova visão da Agenda
+# Ajustes na Agenda
 
-## 1) Inspiração visual (App Health do mockup)
+## 1) Visão "Por médico" — remover controles duplicados
 
-Aplicar de forma sutil em todo o app, sem quebrar a identidade por clínica (cor da sidebar continua mudando conforme clínica selecionada — São Francisco verde, Menino Jesus azul, Consulta Hoje roxo).
+No componente `AgendaPorMedicoGrid` (em `src/routes/_authenticated/app.agenda.tsx`), o cabeçalho atual repete o seletor de médico e os botões "3 dias / 5 dias / 7 dias". Como esses dados já podem ser definidos nos filtros principais (Profissional + Data Ref.), vamos remover essa barra duplicada.
 
-Mudanças em `src/styles.css` e `src/components/app-shell.tsx`:
+- Remover do `AgendaPorMedicoGrid`:
+  - `SearchableSelect` de médico
+  - Botões "3 dias / 5 dias / 7 dias"
+  - Navegação ←/→ + label "DD/MM — DIA → DD/MM — DIA" (a navegação de data já existe nos filtros principais)
+- O médico exibido passa a ser o do filtro `filtroMedico` (quando = "todos", mostrar mensagem "Selecione um profissional nos filtros para visualizar a agenda por médico").
+- A quantidade de dias passa a ser controlada por um novo campo nos filtros principais: **"Período"** (com opções 3, 5, 7 dias, ou intervalo customizado — ver item 2).
+- Como `medicoView` e `diasView` deixam de existir como estado próprio da view, remover esses states e passar a derivar do filtro.
 
-- **Sidebar**: aumentar o arredondamento dos itens ativos/hover para um pill mais marcado (já é `rounded-full`, refinar padding e sombra).
-- **Cabeçalho da clínica**: card branco com logo continua, adicionar um título "Horário de Atendimento" / contexto no topo da sidebar quando estiver na Agenda.
-- **Header superior**: pílulas arredondadas para "Encaixes", "Salas", botões de navegação (←/→) e sino — estilo cápsula escura como na foto.
-- **Tokens**: introduzir um tom creme/off-white de fundo (`--surface-cream`) para a área principal, dando o respiro do mockup; tabelas e cards ganham cantos `rounded-2xl` e bordas mais suaves.
-- **Tipografia**: títulos um pouco maiores e mais "soft" (peso 600, tracking ligeiramente negativo).
+## 2) Filtro de data com opção "Período"
 
-Sem trocar a paleta primária por clínica — apenas refinar shape, espaçamento e o creme de fundo.
+Hoje o campo "Data Ref." é um `<Input type="date">` simples com setas ←/→. Vamos trocar por um **DatePicker (Popover + Calendar do shadcn)** com:
 
-## 2) Nova visão da Agenda: "Por médico — vários dias"
+- Botão "Limpar" (limpa a data → volta para hoje)
+- Botão "Hoje" (define para hoje)
+- **Novo botão "Período"** — alterna o calendário para modo `range` (seleção de data inicial e final). Ao confirmar, a Agenda passa a buscar/exibir agendamentos entre as duas datas.
 
-Hoje a Agenda tem visão por dia. Adicionar um seletor de modo de visualização no topo da página:
-
-- **Dia** (atual)
-- **Por médico — 3/5/7 dias** (nova)
-
-Quando o usuário selecionar "Por médico":
-
-- Mostra um seletor de **médico** (1 por vez) e um seletor de **quantidade de dias** (3, 5 ou 7).
-- Renderiza uma grade tipo planilha como na foto:
-  - Coluna fixa à esquerda: **Hora início**.
-  - Para cada dia no intervalo: duas colunas — **Hora fim** + **Coluna do dia** (`DD/MM — DIA DA SEMANA` no header).
-  - Linhas: slots de horário gerados a partir das disponibilidades do médico (`disponibilidades` por dia da semana) ou, na ausência, slots padrão de 30 min entre 07h00 e 19h00.
-  - Cada célula com agendamento mostra hora fim + nome do paciente, pintada na cor do status (mesmas cores já existentes em `STATUS_COR`).
-  - Clique na célula vazia → abre o diálogo "Novo agendamento" já com data/hora/médico preenchidos.
-  - Clique no agendamento → abre o menu já existente (editar, status, copiar link, auditoria, etc.).
-- Navegação ←/→ avança o intervalo em N dias.
-- "Mini-calendário" e "Filtros" do mockup ficam para uma iteração futura; nesta entrega o filtro de status existente continua valendo.
+Comportamento:
+- Modo **dia único** (padrão): igual hoje — `dataRef` é uma data, queries usam intervalo do dia.
+- Modo **período**: novo estado `dataFim` opcional; quando definido, `load()` busca de `dataRef` 00:00 até `dataFim` 23:59. A visão "Por médico" usa o nº de dias do período como `dias` da grade (limitado a um máximo razoável, ex.: 31).
+- Na visão "Lista" (dia), quando período estiver ativo, listar agendamentos do intervalo inteiro agrupados por data.
 
 ## 3) Arquivos afetados
 
-- `src/styles.css` — novos tokens (`--surface-cream`, raios), refinos de header.
-- `src/components/app-shell.tsx` — header em pílulas, ajustes de espaçamento.
-- `src/routes/_authenticated/app.agenda.tsx` — adicionar estado `view: "dia" | "medico"`, seletor de modo, e novo componente `AgendaPorMedico` com a grade multi-dia. Reaproveita o diálogo de criação/edição e o `DropdownMenu` já existentes.
+- `src/routes/_authenticated/app.agenda.tsx`
+  - Substituir input de data por um componente `DateRangeField` interno (Popover + Calendar com modos `single`/`range`, botões Hoje / Limpar / Período).
+  - Novo state `dataFim: string | null`; ajustar `load()` para usar intervalo `[dataRef, dataFim ?? dataRef]`.
+  - Remover `medicoView`, `diasView` e a barra superior do `AgendaPorMedicoGrid`.
+  - Derivar `medicoId` da grade a partir de `filtroMedico`; derivar `dias` a partir do período (ou default 1 / placeholder se sem médico).
+  - Adicionar guard "selecione um profissional" quando `filtroMedico === "todos"` em modo "Por médico".
 
 ## Fora do escopo
 
-- Não mexer no fluxo de auditoria, financeiro, ou outras telas.
-- Não trocar a cor primária por clínica.
-- Mini-calendário lateral e chips de filtro coloridos do mockup ficam para depois.
+- Não mexer no toggle "Lista / Por médico" do header.
+- Não alterar layout interno da grade (linhas/colunas, cores de status).
+- Não alterar auditoria, financeiro ou outras telas.
