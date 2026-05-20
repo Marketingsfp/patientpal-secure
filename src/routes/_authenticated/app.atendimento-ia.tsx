@@ -187,6 +187,23 @@ function AtendimentoIaPage() {
     }
   }
 
+  // Carrega triagem da enfermagem para o agendamento selecionado
+  useEffect(() => {
+    if (!agendamentoId) { setTriagem(null); return; }
+    let cancel = false;
+    (async () => {
+      const { data } = await supabase
+        .from("triagens_enfermagem")
+        .select("id, created_at, enfermeira_nome, peso_kg, altura_cm, imc, pa_sistolica, pa_diastolica, freq_cardiaca, temperatura, saturacao, glicemia, queixa_principal, doencas, medicamentos, alergias, observacoes")
+        .eq("agendamento_id", agendamentoId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!cancel) setTriagem((data as unknown as Triagem) ?? null);
+    })();
+    return () => { cancel = true; };
+  }, [agendamentoId]);
+
   const modelo = useMemo(() => modelos.find((x) => x.id === modeloId) ?? null, [modelos, modeloId]);
   const especialidade = especialidadeMedico || modelo?.nome || "Clínica Geral";
 
