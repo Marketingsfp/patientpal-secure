@@ -117,6 +117,15 @@ export function AppShell() {
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem("appshell:collapsed") === "1";
   });
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
+    if (typeof window === "undefined") return {};
+    try { return JSON.parse(window.localStorage.getItem("appshell:openGroups") ?? "{}"); } catch { return {}; }
+  });
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("appshell:openGroups", JSON.stringify(openGroups));
+    }
+  }, [openGroups]);
   useEffect(() => {
     if (typeof window !== "undefined") {
       window.localStorage.setItem("appshell:collapsed", collapsed ? "1" : "0");
