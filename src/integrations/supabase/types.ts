@@ -473,6 +473,50 @@ export type Database = {
         }
         Relationships: []
       }
+      cargos: {
+        Row: {
+          ativo: boolean
+          cbo: string | null
+          clinica_id: string
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+          salario_base: number | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          cbo?: string | null
+          clinica_id: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          salario_base?: number | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          cbo?: string | null
+          clinica_id?: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          salario_base?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cargos_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cartoes_convenio: {
         Row: {
           ativo: boolean
@@ -1618,6 +1662,120 @@ export type Database = {
         }
         Relationships: []
       }
+      lgpd_consentimentos: {
+        Row: {
+          aceito: boolean
+          clinica_id: string | null
+          created_at: string
+          id: string
+          ip: string | null
+          paciente_id: string | null
+          tipo: string
+          user_agent: string | null
+          user_id: string | null
+          versao: string
+        }
+        Insert: {
+          aceito?: boolean
+          clinica_id?: string | null
+          created_at?: string
+          id?: string
+          ip?: string | null
+          paciente_id?: string | null
+          tipo: string
+          user_agent?: string | null
+          user_id?: string | null
+          versao?: string
+        }
+        Update: {
+          aceito?: boolean
+          clinica_id?: string | null
+          created_at?: string
+          id?: string
+          ip?: string | null
+          paciente_id?: string | null
+          tipo?: string
+          user_agent?: string | null
+          user_id?: string | null
+          versao?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lgpd_consentimentos_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lgpd_consentimentos_paciente_id_fkey"
+            columns: ["paciente_id"]
+            isOneToOne: false
+            referencedRelation: "pacientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lgpd_solicitacoes: {
+        Row: {
+          clinica_id: string | null
+          created_at: string
+          descricao: string | null
+          id: string
+          paciente_id: string | null
+          respondido_em: string | null
+          respondido_por: string | null
+          resposta: string | null
+          status: string
+          tipo: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          clinica_id?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          paciente_id?: string | null
+          respondido_em?: string | null
+          respondido_por?: string | null
+          resposta?: string | null
+          status?: string
+          tipo: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          clinica_id?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          paciente_id?: string | null
+          respondido_em?: string | null
+          respondido_por?: string | null
+          resposta?: string | null
+          status?: string
+          tipo?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lgpd_solicitacoes_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lgpd_solicitacoes_paciente_id_fkey"
+            columns: ["paciente_id"]
+            isOneToOne: false
+            referencedRelation: "pacientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       medico_biometria: {
         Row: {
           clinica_id: string
@@ -2376,6 +2534,30 @@ export type Database = {
         }
         Relationships: []
       }
+      permissions: {
+        Row: {
+          chave: string
+          created_at: string
+          descricao: string
+          id: string
+          modulo: string
+        }
+        Insert: {
+          chave: string
+          created_at?: string
+          descricao: string
+          id?: string
+          modulo: string
+        }
+        Update: {
+          chave?: string
+          created_at?: string
+          descricao?: string
+          id?: string
+          modulo?: string
+        }
+        Relationships: []
+      }
       planos_assinatura: {
         Row: {
           ativo: boolean
@@ -2813,6 +2995,52 @@ export type Database = {
           },
         ]
       }
+      role_permissions: {
+        Row: {
+          cargo_id: string
+          clinica_id: string
+          created_at: string
+          id: string
+          permission_id: string
+        }
+        Insert: {
+          cargo_id: string
+          clinica_id: string
+          created_at?: string
+          id?: string
+          permission_id: string
+        }
+        Update: {
+          cargo_id?: string
+          clinica_id?: string
+          created_at?: string
+          id?: string
+          permission_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_permissions_cargo_id_fkey"
+            columns: ["cargo_id"]
+            isOneToOne: false
+            referencedRelation: "cargos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "role_permissions_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "role_permissions_permission_id_fkey"
+            columns: ["permission_id"]
+            isOneToOne: false
+            referencedRelation: "permissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       senhas: {
         Row: {
           atendida_em: string | null
@@ -2878,6 +3106,109 @@ export type Database = {
             columns: ["paciente_id"]
             isOneToOne: false
             referencedRelation: "pacientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      setores: {
+        Row: {
+          ativo: boolean
+          clinica_id: string
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+          responsavel_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          clinica_id: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          responsavel_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          clinica_id?: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          responsavel_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "setores_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      unidades: {
+        Row: {
+          ativo: boolean
+          cep: string | null
+          cidade: string | null
+          clinica_id: string
+          created_at: string
+          email: string | null
+          endereco: string | null
+          estado: string | null
+          id: string
+          latitude: number | null
+          longitude: number | null
+          nome: string
+          raio_metros: number | null
+          telefone: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          cep?: string | null
+          cidade?: string | null
+          clinica_id: string
+          created_at?: string
+          email?: string | null
+          endereco?: string | null
+          estado?: string | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          nome: string
+          raio_metros?: number | null
+          telefone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          cep?: string | null
+          cidade?: string | null
+          clinica_id?: string
+          created_at?: string
+          email?: string | null
+          endereco?: string | null
+          estado?: string | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          nome?: string
+          raio_metros?: number | null
+          telefone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "unidades_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
             referencedColumns: ["id"]
           },
         ]
