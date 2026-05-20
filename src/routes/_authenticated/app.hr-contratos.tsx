@@ -1,0 +1,237 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useClinica } from "@/hooks/use-clinica";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Users, Plus, Pencil, Search } from "lucide-react";
+import { toast } from "sonner";
+import { formatDatePtBR } from "@/lib/date-utils";
+
+export const Route = createFileRoute("/_authenticated/app/hr-contratos")({
+  component: ContratosPage,
+  head: () => ({ meta: [{ title: "Funcionários — ClinicaOS" }] }),
+});
+
+interface Contrato {
+  id: string; numero: number; funcionario_nome: string; cpf: string | null;
+  cargo_id: string | null; setor_id: string | null; unidade_id: string | null;
+  regime: string; carga_horaria_semanal: number; salario: number;
+  data_admissao: string; data_demissao: string | null; status: string;
+}
+interface Ref { id: string; nome: string }
+
+function ContratosPage() {
+  const { clinicaAtual } = useClinica();
+  const [rows, setRows] = useState<Contrato[]>([]);
+  const [cargos, setCargos] = useState<Ref[]>([]);
+  const [setores, setSetores] = useState<Ref[]>([]);
+  const [unidades, setUnidades] = useState<Ref[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [q, setQ] = useState("");
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<Contrato | null>(null);
+  const [form, setForm] = useState({
+    funcionario_nome: "", cpf: "", cargo_id: "", setor_id: "", unidade_id: "",
+    regime: "clt", carga_horaria_semanal: "44", salario: "0",
+    data_admissao: new Date().toISOString().slice(0, 10), data_demissao: "", status: "ativo",
+  });
+  const [saving, setSaving] = useState(false);
+
+  async function load() {
+    if (!clinicaAtual) return;
+    setLoading(true);
+    const [c, cg, st, un] = await Promise.all([
+      supabase.from("hr_contratos").select("*").eq("clinica_id", clinicaAtual.clinica_id).order("numero", { ascending: false }),
+      supabase.from("cargos").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
+      supabase.from("setores").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
+      supabase.from("unidades").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
+    ]);
+    if (c.error) toast.error(c.error.message);
+    setRows((c.data ?? []) as Contrato[]);
+    setCargos((cg.data ?? []) as Ref[]);
+    setSetores((st.data ?? []) as Ref[]);
+    setUnidades((un.data ?? []) as Ref[]);
+    setLoading(false);
+  }
+  useEffect(() => { void load(); }, [clinicaAtual?.clinica_id]);
+
+  function openNew() {
+    setEditing(null);
+    setForm({
+      funcionario_nome: "", cpf: "", cargo_id: "", setor_id: "", unidade_id: "",
+      regime: "clt", carga_horaria_semanal: "44", salario: "0",
+      data_admissao: new Date().toISOString().slice(0, 10), data_demissao: "", status: "ativo",
+    });
+    setOpen(true);
+  }
+  function openEdit(c: Contrato) {
+    setEditing(c);
+    setForm({
+      funcionario_nome: c.funcionario_nome, cpf: c.cpf ?? "",
+      cargo_id: c.cargo_id ?? "", setor_id: c.setor_id ?? "", unidade_id: c.unidade_id ?? "",
+      regime: c.regime, carga_horaria_semanal: String(c.carga_horaria_semanal),
+      salario: String(c.salario), data_admissao: c.data_admissao,
+      data_demissao: c.data_demissao ?? "", status: c.status,
+    });
+    setOpen(true);
+  }
+
+  async function salvar() {
+    if (!clinicaAtual) return;
+    if (!form.funcionario_nome.trim()) { toast.error("Informe o nome"); return; }
+    setSaving(true);
+    const payload = {
+      clinica_id: clinicaAtual.clinica_id,
+      funcionario_nome: form.funcionario_nome.trim(),
+      cpf: form.cpf.trim() || null,
+      cargo_id: form.cargo_id || null,
+      setor_id: form.setor_id || null,
+      unidade_id: form.unidade_id || null,
+      regime: form.regime,
+      carga_horaria_semanal: Number(form.carga_horaria_semanal),
+      salario: Number(form.salario),
+      data_admissao: form.data_admissao,
+      data_demissao: form.data_demissao || null,
+      status: form.status,
+    };
+    const { error } = editing
+      ? await supabase.from("hr_contratos").update(payload).eq("id", editing.id)
+      : await supabase.from("hr_contratos").insert(payload);
+    setSaving(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success(editing ? "Contrato atualizado" : "Contrato criado");
+    setOpen(false);
+    void load();
+  }
+
+  const filtered = rows.filter(r => r.funcionario_nome.toLowerCase().includes(q.toLowerCase()));
+
+  return (
+    <div className="p-6 space-y-4">
+      <div className="flex items-center gap-3">
+        <Users className="h-6 w-6 text-primary" />
+        <div className="flex-1">
+          <h1 className="text-xl font-bold">Funcionários</h1>
+          <p className="text-sm text-muted-foreground">Contratos de trabalho da clínica.</p>
+        </div>
+        <Button onClick={openNew}><Plus className="h-4 w-4 mr-1" /> Novo</Button>
+      </div>
+
+      <Card className="p-3">
+        <div className="relative">
+          <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input className="pl-9" placeholder="Buscar..." value={q} onChange={e => setQ(e.target.value)} />
+        </div>
+      </Card>
+
+      <Card>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-16">Nº</TableHead>
+              <TableHead>Funcionário</TableHead>
+              <TableHead>Cargo</TableHead>
+              <TableHead className="w-28">Regime</TableHead>
+              <TableHead className="w-32 text-right">Salário</TableHead>
+              <TableHead className="w-32">Admissão</TableHead>
+              <TableHead className="w-24">Situação</TableHead>
+              <TableHead className="w-20 text-right">Ações</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              <TableRow><TableCell colSpan={8} className="text-center py-6 text-muted-foreground">Carregando…</TableCell></TableRow>
+            ) : filtered.length === 0 ? (
+              <TableRow><TableCell colSpan={8} className="text-center py-6 text-muted-foreground">Nenhum funcionário cadastrado.</TableCell></TableRow>
+            ) : filtered.map(r => (
+              <TableRow key={r.id}>
+                <TableCell>#{r.numero}</TableCell>
+                <TableCell className="font-medium">{r.funcionario_nome}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">{cargos.find(c => c.id === r.cargo_id)?.nome ?? "-"}</TableCell>
+                <TableCell className="text-sm uppercase">{r.regime}</TableCell>
+                <TableCell className="text-right">{Number(r.salario).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</TableCell>
+                <TableCell className="text-sm">{formatDatePtBR(r.data_admissao)}</TableCell>
+                <TableCell><Badge variant={r.status === "ativo" ? "default" : "secondary"}>{r.status}</Badge></TableCell>
+                <TableCell className="text-right">
+                  <Button size="icon" variant="ghost" onClick={() => openEdit(r)}><Pencil className="h-4 w-4" /></Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Card>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader><DialogTitle>{editing ? "Editar contrato" : "Novo contrato"}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2"><Label>Nome do funcionário *</Label><Input value={form.funcionario_nome} onChange={e => setForm({ ...form, funcionario_nome: e.target.value })} /></div>
+              <div><Label>CPF</Label><Input value={form.cpf} onChange={e => setForm({ ...form, cpf: e.target.value })} /></div>
+              <div>
+                <Label>Regime</Label>
+                <Select value={form.regime} onValueChange={v => setForm({ ...form, regime: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="clt">CLT</SelectItem>
+                    <SelectItem value="pj">PJ</SelectItem>
+                    <SelectItem value="autonomo">Autônomo</SelectItem>
+                    <SelectItem value="estagio">Estágio</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Cargo</Label>
+                <Select value={form.cargo_id} onValueChange={v => setForm({ ...form, cargo_id: v })}>
+                  <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                  <SelectContent>{cargos.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Setor</Label>
+                <Select value={form.setor_id} onValueChange={v => setForm({ ...form, setor_id: v })}>
+                  <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                  <SelectContent>{setores.map(s => <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Unidade</Label>
+                <Select value={form.unidade_id} onValueChange={v => setForm({ ...form, unidade_id: v })}>
+                  <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                  <SelectContent>{unidades.map(u => <SelectItem key={u.id} value={u.id}>{u.nome}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div><Label>Carga semanal (h)</Label><Input type="number" step="0.5" value={form.carga_horaria_semanal} onChange={e => setForm({ ...form, carga_horaria_semanal: e.target.value })} /></div>
+              <div><Label>Salário (R$)</Label><Input type="number" step="0.01" value={form.salario} onChange={e => setForm({ ...form, salario: e.target.value })} /></div>
+              <div><Label>Admissão</Label><Input type="date" value={form.data_admissao} onChange={e => setForm({ ...form, data_admissao: e.target.value })} /></div>
+              <div><Label>Demissão</Label><Input type="date" value={form.data_demissao} onChange={e => setForm({ ...form, data_demissao: e.target.value })} /></div>
+              <div>
+                <Label>Status</Label>
+                <Select value={form.status} onValueChange={v => setForm({ ...form, status: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ativo">Ativo</SelectItem>
+                    <SelectItem value="afastado">Afastado</SelectItem>
+                    <SelectItem value="ferias">Em férias</SelectItem>
+                    <SelectItem value="desligado">Desligado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+            <Button onClick={salvar} disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
