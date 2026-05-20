@@ -1170,7 +1170,6 @@ function AgendaPage() {
               onChange={(v) => { if (!isMedicoOnly) setFiltroMedico(v); }}
               placeholder="TODOS"
               searchPlaceholder="Buscar médico..."
-              disabled={isMedicoOnly}
               options={[
                 ...(isMedicoOnly ? [] : [{ value: "todos", label: "TODOS" }]),
                 ...medicos
