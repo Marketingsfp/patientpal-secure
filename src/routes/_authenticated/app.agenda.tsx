@@ -22,6 +22,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import {
   CalendarDays, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X,
