@@ -133,59 +133,56 @@ export function AppShell() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-muted/30">
-      <header
-        className="text-white sticky top-0 z-30 shadow-sm bg-slate-800"
+    <div className="min-h-screen flex bg-muted/30">
+      <aside
+        className="w-64 shrink-0 text-white sticky top-0 h-screen overflow-y-auto shadow-sm bg-slate-800 flex flex-col"
         style={{ backgroundColor: clinicaAtual ? corDaClinica(clinicaAtual.clinica.nome) : undefined }}
       >
-        <div className="flex items-center justify-between gap-3 px-4 py-2">
-          <Link to="/app" className="flex items-center gap-2 shrink-0">
+        <div className="px-4 py-3 border-b border-white/10">
+          <Link to="/app" className="flex items-center gap-2">
             <Activity className="h-5 w-5 shrink-0" />
-            <span className="font-semibold tracking-tight hidden sm:inline">ClinicaOS</span>
-            {clinicaAtual && logoDaClinica(clinicaAtual.clinica.nome) && (
-              <img
-                src={logoDaClinica(clinicaAtual.clinica.nome)!}
-                alt={clinicaAtual.clinica.nome}
-                className="h-10 w-auto object-contain ml-2 bg-white rounded p-0.5 shrink-0"
-              />
-            )}
+            <span className="font-semibold tracking-tight">ClinicaOS</span>
           </Link>
-          <div className="flex items-center gap-2">
-            <Suspense fallback={null}>
-              <VoiceInput
-                append={false}
-                onTranscript={handleVoiceCommand}
-                title="Busca por voz (diga: agenda, clientes, financeiro…)"
-                prompt="Transcreva o comando de voz curto em português do Brasil. Retorne apenas as palavras ditas."
-                className="bg-white/10 border-white/30 text-white hover:bg-white/20 hover:text-white"
-              />
-            </Suspense>
-            {memberships.length > 0 && (
-              <Select value={clinicaAtual?.clinica_id} onValueChange={setClinicaAtual}>
-                <SelectTrigger className="w-56 bg-white/10 border-white/20 text-white">
-                  <SelectValue placeholder="Selecione a clínica" />
-                </SelectTrigger>
-                <SelectContent>
-                  {memberships.map((m) => (
-                    <SelectItem key={m.clinica_id} value={m.clinica_id}>
-                      <span className="flex items-center gap-2">
-                        <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: corDaClinica(m.clinica.nome) }} />
-                        {m.clinica.nome} {m.clinica.cidade ? `— ${m.clinica.cidade}` : ""}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            <span className="text-xs opacity-80 hidden lg:inline max-w-[180px] truncate">{user?.email}</span>
-            <Button variant="ghost" size="sm" className="text-white hover:bg-white/10 hover:text-white" onClick={handleSignOut} title="Sair">
-              <LogOut className="h-4 w-4 mr-1" /> Sair
-            </Button>
-          </div>
+          {clinicaAtual && logoDaClinica(clinicaAtual.clinica.nome) && (
+            <img
+              src={logoDaClinica(clinicaAtual.clinica.nome)!}
+              alt={clinicaAtual.clinica.nome}
+              className="h-12 w-auto object-contain mt-2 bg-white rounded p-1"
+            />
+          )}
         </div>
-        <nav className="px-4 pb-2 space-y-1">
+        <div className="px-3 py-2 space-y-2 border-b border-white/10">
+          {memberships.length > 0 && (
+            <Select value={clinicaAtual?.clinica_id} onValueChange={setClinicaAtual}>
+              <SelectTrigger className="w-full bg-white/10 border-white/20 text-white">
+                <SelectValue placeholder="Selecione a clínica" />
+              </SelectTrigger>
+              <SelectContent>
+                {memberships.map((m) => (
+                  <SelectItem key={m.clinica_id} value={m.clinica_id}>
+                    <span className="flex items-center gap-2">
+                      <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: corDaClinica(m.clinica.nome) }} />
+                      {m.clinica.nome} {m.clinica.cidade ? `— ${m.clinica.cidade}` : ""}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <Suspense fallback={null}>
+            <VoiceInput
+              append={false}
+              onTranscript={handleVoiceCommand}
+              title="Busca por voz (diga: agenda, clientes, financeiro…)"
+              prompt="Transcreva o comando de voz curto em português do Brasil. Retorne apenas as palavras ditas."
+              className="w-full bg-white/10 border-white/30 text-white hover:bg-white/20 hover:text-white"
+            />
+          </Suspense>
+        </div>
+        <nav className="flex-1 px-2 py-3 space-y-4 overflow-y-auto">
           {navRows.map((row, idx) => (
-            <div key={idx} className="flex flex-wrap items-center gap-1">
+            <div key={idx} className="space-y-0.5">
+              <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider opacity-60">{row.label}</p>
               {row.items.map((item) => {
                 const active = location.pathname === item.to ||
                   (item.to !== "/app" && location.pathname.startsWith(item.to));
@@ -193,8 +190,8 @@ export function AppShell() {
                   <Link
                     key={item.to}
                     to={item.to}
-                    className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
-                      active ? "bg-white/25 text-white" : "text-white hover:bg-white/10 hover:text-white"
+                    className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                      active ? "bg-white/25 text-white" : "text-white/90 hover:bg-white/10 hover:text-white"
                     }`}
                   >
                     <item.icon className="h-4 w-4 shrink-0" />
@@ -205,9 +202,15 @@ export function AppShell() {
             </div>
           ))}
         </nav>
-      </header>
+        <div className="px-3 py-2 border-t border-white/10 flex items-center justify-between gap-2">
+          <span className="text-xs opacity-80 truncate flex-1">{user?.email}</span>
+          <Button variant="ghost" size="sm" className="text-white hover:bg-white/10 hover:text-white" onClick={handleSignOut} title="Sair">
+            <LogOut className="h-4 w-4" />
+          </Button>
+        </div>
+      </aside>
 
-      <main className="flex-1 p-6 overflow-auto">
+      <main className="flex-1 p-6 overflow-auto min-w-0">
         <Outlet />
       </main>
     </div>
