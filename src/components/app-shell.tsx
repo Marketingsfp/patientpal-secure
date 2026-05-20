@@ -4,6 +4,7 @@ import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell,
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
+import { supabase } from "@/integrations/supabase/client";
 import logoSaoFrancisco from "@/assets/logo-sao-francisco.png";
 import logoMeninoJesus from "@/assets/logo-menino-jesus.png";
 import logoConsultaHoje from "@/assets/logo-consulta-hoje.png";
