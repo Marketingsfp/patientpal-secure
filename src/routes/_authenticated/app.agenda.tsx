@@ -134,6 +134,26 @@ function AgendaPage() {
   const [novoPac, setNovoPac] = useState({ nome: "", cpf: "", telefone: "", data_nascimento: "", email: "" });
   const [savingPac, setSavingPac] = useState(false);
   const [equipeList, setEquipeList] = useState<Array<{ nome: string | null; email: string | null }>>([]);
+  type AuditRow = { id: string; action: string; table_name: string; user_email: string | null; created_at: string; dados_antes: Record<string, unknown> | null; dados_depois: Record<string, unknown> | null };
+  const [auditAg, setAuditAg] = useState<Agendamento | null>(null);
+  const [auditRows, setAuditRows] = useState<AuditRow[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+
+  const abrirAuditoria = async (a: Agendamento) => {
+    setAuditAg(a);
+    setAuditLoading(true);
+    setAuditRows([]);
+    const { data, error } = await supabase
+      .from("audit_log" as never)
+      .select("id, action, table_name, user_email, created_at, dados_antes, dados_depois")
+      .eq("record_id", a.id)
+      .order("created_at", { ascending: false })
+      .limit(200);
+    setAuditLoading(false);
+    if (error) { toast.error(error.message); return; }
+    setAuditRows((data as unknown as AuditRow[]) ?? []);
+  };
+
   const fnListarEquipe = useServerFn(listarEquipe);
   const carregarEquipe = async () => {
     if (!clinicaAtual || equipeList.length > 0) return;
