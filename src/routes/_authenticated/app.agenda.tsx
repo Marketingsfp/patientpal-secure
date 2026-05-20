@@ -139,6 +139,15 @@ function AgendaPage() {
   const [auditRows, setAuditRows] = useState<AuditRow[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
 
+  const fnListarEquipe = useServerFn(listarEquipe);
+  const carregarEquipe = async () => {
+    if (!clinicaAtual || equipeList.length > 0) return;
+    try {
+      const data = await fnListarEquipe({ data: { clinicaId: clinicaAtual.clinica_id } });
+      setEquipeList((data as any[]).map((m) => ({ nome: m.nome, email: m.email })));
+    } catch (_) { /* silencioso */ }
+  };
+
   const abrirAuditoria = async (a: Agendamento) => {
     setAuditAg(a);
     setAuditLoading(true);
@@ -153,15 +162,6 @@ function AgendaPage() {
     setAuditLoading(false);
     if (error) { toast.error(error.message); return; }
     setAuditRows((data as unknown as AuditRow[]) ?? []);
-  };
-
-  const fnListarEquipe = useServerFn(listarEquipe);
-  const carregarEquipe = async () => {
-    if (!clinicaAtual || equipeList.length > 0) return;
-    try {
-      const data = await fnListarEquipe({ data: { clinicaId: clinicaAtual.clinica_id } });
-      setEquipeList((data as any[]).map((m) => ({ nome: m.nome, email: m.email })));
-    } catch (_) { /* silencioso */ }
   };
 
   const cadastrarPacienteRapido = async (e: FormEvent) => {
