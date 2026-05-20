@@ -36,6 +36,7 @@ import { Route as AuthenticatedAppNfseRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedAppModelosDocumentosRouteImport } from './routes/_authenticated/app.modelos-documentos'
 import { Route as AuthenticatedAppMedicosRouteImport } from './routes/_authenticated/app.medicos'
 import { Route as AuthenticatedAppLgpdRouteImport } from './routes/_authenticated/app.lgpd'
+import { Route as AuthenticatedAppHrPontoRouteImport } from './routes/_authenticated/app.hr-ponto'
 import { Route as AuthenticatedAppHrContratosRouteImport } from './routes/_authenticated/app.hr-contratos'
 import { Route as AuthenticatedAppFluxoRouteImport } from './routes/_authenticated/app.fluxo'
 import { Route as AuthenticatedAppFinanceiroRouteImport } from './routes/_authenticated/app.financeiro'
@@ -218,6 +219,11 @@ const AuthenticatedAppMedicosRoute = AuthenticatedAppMedicosRouteImport.update({
 const AuthenticatedAppLgpdRoute = AuthenticatedAppLgpdRouteImport.update({
   id: '/lgpd',
   path: '/lgpd',
+  getParentRoute: () => AuthenticatedAppRoute,
+} as any)
+const AuthenticatedAppHrPontoRoute = AuthenticatedAppHrPontoRouteImport.update({
+  id: '/hr-ponto',
+  path: '/hr-ponto',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
 const AuthenticatedAppHrContratosRoute =
@@ -494,6 +500,7 @@ export interface FileRoutesByFullPath {
   '/app/financeiro': typeof AuthenticatedAppFinanceiroRouteWithChildren
   '/app/fluxo': typeof AuthenticatedAppFluxoRoute
   '/app/hr-contratos': typeof AuthenticatedAppHrContratosRoute
+  '/app/hr-ponto': typeof AuthenticatedAppHrPontoRoute
   '/app/lgpd': typeof AuthenticatedAppLgpdRoute
   '/app/medicos': typeof AuthenticatedAppMedicosRoute
   '/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
@@ -561,6 +568,7 @@ export interface FileRoutesByTo {
   '/app/exames-resultados': typeof AuthenticatedAppExamesResultadosRoute
   '/app/fluxo': typeof AuthenticatedAppFluxoRoute
   '/app/hr-contratos': typeof AuthenticatedAppHrContratosRoute
+  '/app/hr-ponto': typeof AuthenticatedAppHrPontoRoute
   '/app/lgpd': typeof AuthenticatedAppLgpdRoute
   '/app/medicos': typeof AuthenticatedAppMedicosRoute
   '/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
@@ -632,6 +640,7 @@ export interface FileRoutesById {
   '/_authenticated/app/financeiro': typeof AuthenticatedAppFinanceiroRouteWithChildren
   '/_authenticated/app/fluxo': typeof AuthenticatedAppFluxoRoute
   '/_authenticated/app/hr-contratos': typeof AuthenticatedAppHrContratosRoute
+  '/_authenticated/app/hr-ponto': typeof AuthenticatedAppHrPontoRoute
   '/_authenticated/app/lgpd': typeof AuthenticatedAppLgpdRoute
   '/_authenticated/app/medicos': typeof AuthenticatedAppMedicosRoute
   '/_authenticated/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
@@ -703,6 +712,7 @@ export interface FileRouteTypes {
     | '/app/financeiro'
     | '/app/fluxo'
     | '/app/hr-contratos'
+    | '/app/hr-ponto'
     | '/app/lgpd'
     | '/app/medicos'
     | '/app/modelos-documentos'
@@ -770,6 +780,7 @@ export interface FileRouteTypes {
     | '/app/exames-resultados'
     | '/app/fluxo'
     | '/app/hr-contratos'
+    | '/app/hr-ponto'
     | '/app/lgpd'
     | '/app/medicos'
     | '/app/modelos-documentos'
@@ -840,6 +851,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/financeiro'
     | '/_authenticated/app/fluxo'
     | '/_authenticated/app/hr-contratos'
+    | '/_authenticated/app/hr-ponto'
     | '/_authenticated/app/lgpd'
     | '/_authenticated/app/medicos'
     | '/_authenticated/app/modelos-documentos'
@@ -1078,6 +1090,13 @@ declare module '@tanstack/react-router' {
       path: '/lgpd'
       fullPath: '/app/lgpd'
       preLoaderRoute: typeof AuthenticatedAppLgpdRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/hr-ponto': {
+      id: '/_authenticated/app/hr-ponto'
+      path: '/hr-ponto'
+      fullPath: '/app/hr-ponto'
+      preLoaderRoute: typeof AuthenticatedAppHrPontoRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/hr-contratos': {
@@ -1467,6 +1486,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppFinanceiroRoute: typeof AuthenticatedAppFinanceiroRouteWithChildren
   AuthenticatedAppFluxoRoute: typeof AuthenticatedAppFluxoRoute
   AuthenticatedAppHrContratosRoute: typeof AuthenticatedAppHrContratosRoute
+  AuthenticatedAppHrPontoRoute: typeof AuthenticatedAppHrPontoRoute
   AuthenticatedAppLgpdRoute: typeof AuthenticatedAppLgpdRoute
   AuthenticatedAppMedicosRoute: typeof AuthenticatedAppMedicosRoute
   AuthenticatedAppModelosDocumentosRoute: typeof AuthenticatedAppModelosDocumentosRoute
@@ -1511,6 +1531,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppFinanceiroRoute: AuthenticatedAppFinanceiroRouteWithChildren,
   AuthenticatedAppFluxoRoute: AuthenticatedAppFluxoRoute,
   AuthenticatedAppHrContratosRoute: AuthenticatedAppHrContratosRoute,
+  AuthenticatedAppHrPontoRoute: AuthenticatedAppHrPontoRoute,
   AuthenticatedAppLgpdRoute: AuthenticatedAppLgpdRoute,
   AuthenticatedAppMedicosRoute: AuthenticatedAppMedicosRoute,
   AuthenticatedAppModelosDocumentosRoute:
