@@ -223,7 +223,7 @@ function Page() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div><h1 className="text-2xl font-semibold">Atendimentos</h1>
-          <p className="text-sm text-muted-foreground">Procedimentos realizados com repasse automático (inclui pagamentos da agenda)</p></div>
+          <p className="text-sm text-muted-foreground">{isMedicoOnly ? "Seus atendimentos e o repasse devido por procedimento" : "Procedimentos realizados com repasse automático (inclui pagamentos da agenda)"}</p></div>
         <div className="flex gap-2">
         <Button
           variant="outline"
@@ -333,20 +333,27 @@ function Page() {
               <Label className="text-xs">Até</Label>
               <Input type="date" value={fFim} onChange={(e) => setFFim(e.target.value)} />
             </div>
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="rounded-md border p-2">
-                <div className="text-[10px] text-muted-foreground uppercase">Total</div>
-                <div className="text-sm font-semibold">{fmt(totais.total)}</div>
+            {isMedicoOnly ? (
+              <div className="rounded-md border p-3 bg-primary/5 text-center">
+                <div className="text-[10px] text-muted-foreground uppercase">Total a receber</div>
+                <div className="text-base font-semibold text-primary">{fmt(totais.medico)}</div>
               </div>
-              <div className="rounded-md border p-2 bg-primary/5">
-                <div className="text-[10px] text-muted-foreground uppercase">Repasse médico</div>
-                <div className="text-sm font-semibold text-primary">{fmt(totais.medico)}</div>
+            ) : (
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-md border p-2">
+                  <div className="text-[10px] text-muted-foreground uppercase">Total</div>
+                  <div className="text-sm font-semibold">{fmt(totais.total)}</div>
+                </div>
+                <div className="rounded-md border p-2 bg-primary/5">
+                  <div className="text-[10px] text-muted-foreground uppercase">Repasse médico</div>
+                  <div className="text-sm font-semibold text-primary">{fmt(totais.medico)}</div>
+                </div>
+                <div className="rounded-md border p-2">
+                  <div className="text-[10px] text-muted-foreground uppercase">Clínica</div>
+                  <div className="text-sm font-semibold">{fmt(totais.clinica)}</div>
+                </div>
               </div>
-              <div className="rounded-md border p-2">
-                <div className="text-[10px] text-muted-foreground uppercase">Clínica</div>
-                <div className="text-sm font-semibold">{fmt(totais.clinica)}</div>
-              </div>
-            </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -358,9 +365,9 @@ function Page() {
             <TableHeader><TableRow>
               <TableHead>Data</TableHead><TableHead>Médico</TableHead><TableHead>Paciente</TableHead>
               <TableHead>Procedimento</TableHead>
-              <TableHead className="text-right">Total</TableHead>
-              <TableHead className="text-right">Médico</TableHead>
-              <TableHead className="text-right">Clínica</TableHead>
+              {!isMedicoOnly && <TableHead className="text-right">Total</TableHead>}
+              <TableHead className="text-right">{isMedicoOnly ? "Repasse" : "Médico"}</TableHead>
+              {!isMedicoOnly && <TableHead className="text-right">Clínica</TableHead>}
               <TableHead className="w-24"></TableHead>
             </TableRow></TableHeader>
             <TableBody>{items.map((a) => (
@@ -369,9 +376,9 @@ function Page() {
                 <TableCell className="text-sm">{a.medico_id ? medMap.get(a.medico_id) ?? "—" : "—"}</TableCell>
                 <TableCell className="text-sm">{a.paciente_id ? pacMap.get(a.paciente_id) ?? "—" : "—"}</TableCell>
                 <TableCell className="text-sm">{a.procedimento ?? "—"}</TableCell>
-                <TableCell className="text-right font-medium">{fmt(Number(a.valor_total))}</TableCell>
+                {!isMedicoOnly && <TableCell className="text-right font-medium">{fmt(Number(a.valor_total))}</TableCell>}
                 <TableCell className="text-right font-semibold text-primary">{fmt(Number(a.valor_medico))}</TableCell>
-                <TableCell className="text-right text-muted-foreground">{fmt(Number(a.valor_clinica))}</TableCell>
+                {!isMedicoOnly && <TableCell className="text-right text-muted-foreground">{fmt(Number(a.valor_clinica))}</TableCell>}
                 <TableCell className="text-right">
                   {a.origem === "agenda" ? (
                     <span className="text-[10px] text-muted-foreground uppercase">Agenda</span>
