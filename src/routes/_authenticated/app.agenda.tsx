@@ -27,7 +27,7 @@ import {
   CalendarDays, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X,
   MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, Clock, DollarSign,
 } from "lucide-react";
-import { printGuiaAtendimento, reimprimirGuiaAtendimento } from "@/lib/print-gr";
+import { printGuiaAtendimento } from "@/lib/print-gr";
 import { VoiceInput } from "@/components/voice-input";
 import { exportToExcel } from "@/lib/export-csv";
 import { useAuth } from "@/hooks/use-auth";
@@ -591,20 +591,6 @@ function AgendaPage() {
       });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Falha ao imprimir GR");
-    }
-  };
-
-  const reimprimirGR = async (a: Agendamento) => {
-    if (!clinicaAtual) return;
-    try {
-      await reimprimirGuiaAtendimento({
-        agendamentoId: a.id,
-        clinicaId: clinicaAtual.clinica_id,
-        usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
-        usuarioId: user?.id ?? null,
-      });
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha ao reimprimir GR");
     }
   };
 
@@ -1225,9 +1211,6 @@ function AgendaPage() {
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => imprimirGR(a)}>
                           <Printer className="h-4 w-4 mr-2" /> Imprimir GR
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => reimprimirGR(a)}>
-                          <Printer className="h-4 w-4 mr-2" /> Reimprimir última via
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => {
                           const url = `${window.location.origin}/p/${(a as any).token_publico}`;

@@ -1,24 +1,8 @@
-## Ícones duplicados no menu lateral
+Remover a opção **"Reimprimir última via"** do menu de ações da agenda.
 
-Encontrei 3 conflitos:
+## Mudanças
 
-1. **`Stethoscope`** está em **Médicos** e **Especialidades**.
-2. **`Users`** está em **Clientes** e **Equipe**.
-3. **`Bell`** (Recepção) e **`BellRing`** (Alertas Enfermagem) — quase idênticos visualmente.
-
-## Substituições propostas
-
-| Item | Antes | Depois |
-|---|---|---|
-| Especialidades | `Stethoscope` | `HeartPulse` |
-| Clientes | `Users` | `Contact` |
-| Recepção / Filas | `Bell` | `ConciergeBell` |
-
-Mantenho:
-- Médicos → `Stethoscope`
-- Equipe → `Users`
-- Alertas Enfermagem → `BellRing`
-
-## Onde mexer
-
-- `src/components/app-shell.tsx` — trocar os 3 ícones em `navRows` e atualizar o `import` do `lucide-react`.
+- `src/routes/_authenticated/app.agenda.tsx`
+  - Remover o `<DropdownMenuItem>` na linha ~1229 ("Reimprimir última via").
+  - Remover a função `reimprimirGR` (linha ~597) que ficaria sem uso.
+  - Remover o import `reimprimirGuiaAtendimento` de `@/lib/print-gr`.
