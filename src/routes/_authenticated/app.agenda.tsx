@@ -867,6 +867,13 @@ function AgendaPage() {
                 </span>
               </Button>
             ))}
+            <Button
+              variant="default"
+              className="justify-center h-12 mt-1 bg-primary"
+              onClick={escolherMisto}
+            >
+              💰 Mais de uma forma de pagamento
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
