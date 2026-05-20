@@ -1228,6 +1228,8 @@ function AgendaPage() {
         </div>
       </div>
 
+      {viewMode === "dia" && (
+      <>
       {/* Totais + paginação topo */}
       <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
         <div className="flex gap-4">
@@ -1397,6 +1399,24 @@ function AgendaPage() {
           ))}
         </div>
       </div>
+      </>
+      )}
+
+      {viewMode === "medico" && (
+        <AgendaPorMedicoGrid
+          medicos={medicos}
+          medicoId={medicoView}
+          onMedicoChange={setMedicoView}
+          dias={diasView}
+          onDiasChange={setDiasView}
+          dataRef={dataRef}
+          shiftData={shiftData}
+          items={items.filter((a) => !medicoView || a.medico_id === medicoView)}
+          onSlotClick={(a) => openSlot(a)}
+          onAgClick={(a) => openEdit(a)}
+          fmtHora={fmtHora}
+        />
+      )}
     </div>
   );
 }
