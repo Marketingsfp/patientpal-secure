@@ -1021,7 +1021,11 @@ function AgendaPage() {
                   inputMode="numeric"
                   maxLength={14}
                   placeholder="000.000.000-00"
+                  className={novoPac.cpf && somenteDigitos(novoPac.cpf).length === 11 && !isCPFValido(novoPac.cpf) ? "border-rose-500 focus-visible:ring-rose-500" : ""}
                 />
+                {novoPac.cpf && somenteDigitos(novoPac.cpf).length === 11 && !isCPFValido(novoPac.cpf) && (
+                  <p className="text-[11px] text-rose-600">CPF inválido</p>
+                )}
               </div>
               <div className="space-y-1">
                 <Label>Nascimento *</Label>
