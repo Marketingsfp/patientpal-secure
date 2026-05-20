@@ -332,13 +332,14 @@ function MedicosPage() {
             <DialogHeader><DialogTitle>{editId ? "Editar médico" : "Novo médico"}</DialogTitle></DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <Tabs defaultValue="dados">
-                <TabsList className="grid grid-cols-6 w-full">
+                <TabsList className="grid grid-cols-7 w-full">
                   <TabsTrigger value="dados">Dados</TabsTrigger>
                   <TabsTrigger value="especialidades">Especialidades</TabsTrigger>
                   <TabsTrigger value="contato">Contato</TabsTrigger>
                   <TabsTrigger value="endereco">Endereço</TabsTrigger>
                   <TabsTrigger value="banco">Banco</TabsTrigger>
                   <TabsTrigger value="repasse">Repasse</TabsTrigger>
+                  <TabsTrigger value="acesso">Acesso</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="dados" className="space-y-4 pt-4 pb-16">
