@@ -215,9 +215,20 @@ function ContratosPage() {
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-2xl">
-          <DialogHeader><DialogTitle>{editing ? "Editar contrato" : "Novo contrato"}</DialogTitle></DialogHeader>
-          <div className="space-y-3">
+          <DialogHeader><DialogTitle>{editing ? "Editar funcionário" : "Novo funcionário"}</DialogTitle></DialogHeader>
+          <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
             <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2">
+                <Label>Clínica *</Label>
+                <Select value={form.clinica_id} onValueChange={v => setForm({ ...form, clinica_id: v })}>
+                  <SelectTrigger><SelectValue placeholder="Selecione a clínica" /></SelectTrigger>
+                  <SelectContent>
+                    {memberships.map(m => (
+                      <SelectItem key={m.clinica_id} value={m.clinica_id}>{m.clinica.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="col-span-2"><Label>Nome do funcionário *</Label><Input value={form.funcionario_nome} onChange={e => setForm({ ...form, funcionario_nome: e.target.value })} /></div>
               <div><Label>CPF</Label><Input value={form.cpf} onChange={e => setForm({ ...form, cpf: e.target.value })} /></div>
               <div>
@@ -270,6 +281,35 @@ function ContratosPage() {
                 </Select>
               </div>
             </div>
+
+            {!editing && (
+              <div className="border-t pt-3 mt-2 space-y-3">
+                <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-primary"
+                    checked={form.criar_login}
+                    onChange={e => setForm({ ...form, criar_login: e.target.checked })}
+                  />
+                  Criar login de acesso ao sistema para este funcionário
+                </label>
+                {form.criar_login && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="col-span-2">
+                      <Label>Perfil de acesso *</Label>
+                      <Select value={form.perfil} onValueChange={v => setForm({ ...form, perfil: v })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {PERFIS.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div><Label>E-mail (login) *</Label><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
+                    <div><Label>Senha inicial *</Label><Input type="text" value={form.senha} onChange={e => setForm({ ...form, senha: e.target.value })} placeholder="Mín. 6 caracteres" /></div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
