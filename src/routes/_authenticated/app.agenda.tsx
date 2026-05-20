@@ -1047,7 +1047,13 @@ function AgendaPage() {
               </p>
             ) : (
               <div className="space-y-3">
-                {auditRows.map((r) => {
+                {(() => {
+                  const nomePorEmail = new Map<string, string>(
+                    equipeList
+                      .filter((m) => m.email && m.nome)
+                      .map((m) => [m.email as string, m.nome as string]),
+                  );
+                  return auditRows.map((r) => {
                   const acaoLabel: Record<string, string> = { INSERT: "Criou", UPDATE: "Alterou", DELETE: "Excluiu" };
                   const acaoCor: Record<string, string> = {
                     INSERT: "bg-emerald-100 text-emerald-700",
@@ -1059,6 +1065,7 @@ function AgendaPage() {
                   const chaves = Array.from(new Set([...Object.keys(antes), ...Object.keys(depois)]))
                     .filter((k) => !["updated_at", "created_at", "fluxo_atualizado_em"].includes(k))
                     .filter((k) => JSON.stringify(antes[k]) !== JSON.stringify(depois[k]));
+                  const quem = (r.user_email && nomePorEmail.get(r.user_email)) || r.user_email || "—";
                   return (
                     <div key={r.id} className="rounded-md border p-3 bg-card">
                       <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
@@ -1067,7 +1074,7 @@ function AgendaPage() {
                           <span className="text-xs font-mono text-muted-foreground">{r.table_name}</span>
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {new Date(r.created_at).toLocaleString("pt-BR")} · {r.user_email ?? "—"}
+                          {new Date(r.created_at).toLocaleString("pt-BR")} · {quem}
                         </div>
                       </div>
                       {r.action === "UPDATE" && chaves.length > 0 && (
@@ -1092,7 +1099,8 @@ function AgendaPage() {
                       )}
                     </div>
                   );
-                })}
+                  });
+                })()}
               </div>
             )}
           </div>
