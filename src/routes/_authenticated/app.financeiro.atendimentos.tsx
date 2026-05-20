@@ -4,6 +4,7 @@ import { Plus, Pencil, Trash2, Stethoscope, Download, Filter } from "lucide-reac
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { useMedicoContext } from "@/hooks/use-medico-context";
 import { exportToExcel } from "@/lib/export-csv";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,6 +43,7 @@ const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", curren
 
 function Page() {
   const { clinicaAtual } = useClinica();
+  const { medicoId: medicoLogadoId, isMedicoOnly } = useMedicoContext();
   const [items, setItems] = useState<Atend[]>([]);
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [pacientes, setPacientes] = useState<Pac[]>([]);
@@ -58,6 +60,11 @@ function Page() {
   const [fMedico, setFMedico] = useState<string>("todos");
   const [fIni, setFIni] = useState<string>(primeiroDia.toISOString().slice(0, 10));
   const [fFim, setFFim] = useState<string>(hoje);
+
+  // Perfil médico: trava o filtro no próprio profissional
+  useEffect(() => {
+    if (isMedicoOnly && medicoLogadoId) setFMedico(medicoLogadoId);
+  }, [isMedicoOnly, medicoLogadoId]);
 
   const norm = (s: string) =>
     s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
@@ -252,7 +259,9 @@ function Page() {
           <Download className="h-4 w-4 mr-2" />Exportar Excel
         </Button>
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild><Button onClick={openNew} disabled={!clinicaAtual}><Plus className="h-4 w-4 mr-2" />Novo atendimento</Button></DialogTrigger>
+          {!isMedicoOnly && (
+            <DialogTrigger asChild><Button onClick={openNew} disabled={!clinicaAtual}><Plus className="h-4 w-4 mr-2" />Novo atendimento</Button></DialogTrigger>
+          )}
           <DialogContent className="max-w-lg">
             <DialogHeader><DialogTitle>{editing ? "Editar" : "Novo"} atendimento</DialogTitle></DialogHeader>
             <form onSubmit={submit} className="space-y-3">
@@ -310,7 +319,11 @@ function Page() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
             <div className="space-y-1">
               <Label className="text-xs flex items-center gap-1"><Filter className="h-3 w-3" />Médico</Label>
-              <MedicoCombobox value={fMedico} onChange={setFMedico} medicos={medicos} />
+              <MedicoCombobox
+                value={fMedico}
+                onChange={(v) => { if (!isMedicoOnly) setFMedico(v); }}
+                medicos={isMedicoOnly ? medicos.filter((m) => m.id === medicoLogadoId) : medicos}
+              />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">De</Label>
