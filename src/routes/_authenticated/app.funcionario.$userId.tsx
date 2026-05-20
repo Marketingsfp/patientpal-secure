@@ -22,8 +22,8 @@ interface Contrato {
   status: string | null; salario: number | null; cargo: { nome: string } | null; setor: { nome: string } | null;
 }
 interface Ponto { id: string; tipo: string; registrado_em: string; unidade: { nome: string } | null }
-interface Ferias { id: string; data_inicio: string; data_fim: string; status: string; periodo_aquisitivo: string | null }
-interface Holerite { id: string; competencia: string; valor_liquido: number | null; status: string }
+interface Ferias { id: string; inicio: string; fim: string; status: string; periodo_aquisitivo_inicio: string | null; periodo_aquisitivo_fim: string | null }
+interface Holerite { id: string; competencia: string; liquido: number | null; status: string }
 
 function fmtMoeda(v: number | null | undefined): string {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(v ?? 0));
@@ -44,21 +44,29 @@ function PerfilFuncionarioPage() {
     let cancel = false;
     async function load() {
       setLoading(true);
-      const [{ data: prof }, { data: mems }, { data: ct }, { data: pt }, { data: fr }, { data: hl }] = await Promise.all([
+      const [{ data: prof }, { data: mems }, { data: ct }, { data: pt }] = await Promise.all([
         supabase.from("profiles").select("id,nome,telefone,avatar_url").eq("id", userId).maybeSingle(),
         supabase.from("clinica_memberships").select("clinica_id,role,ativo,clinica:clinicas(nome)").eq("user_id", userId),
         supabase.from("hr_contratos").select("id,numero,regime,data_inicio,data_fim,status,salario,cargo:cargos(nome),setor:setores(nome)").eq("user_id", userId).order("data_inicio", { ascending: false }),
         supabase.from("hr_pontos").select("id,tipo,registrado_em,unidade:unidades(nome)").eq("user_id", userId).order("registrado_em", { ascending: false }).limit(30),
-        supabase.from("hr_ferias").select("id,data_inicio,data_fim,status,periodo_aquisitivo").eq("user_id", userId).order("data_inicio", { ascending: false }),
-        supabase.from("hr_holerites").select("id,competencia,valor_liquido,status").eq("user_id", userId).order("competencia", { ascending: false }).limit(24),
       ]);
       if (cancel) return;
       setProfile((prof as Profile) ?? null);
       setMemberships((mems as unknown as Membership[]) ?? []);
       setContratos((ct as unknown as Contrato[]) ?? []);
       setPontos((pt as unknown as Ponto[]) ?? []);
-      setFerias((fr as Ferias[]) ?? []);
-      setHolerites((hl as Holerite[]) ?? []);
+
+      const contratoIds = ((ct as unknown as Contrato[]) ?? []).map((c) => c.id);
+      if (contratoIds.length > 0) {
+        const [{ data: fr }, { data: hl }] = await Promise.all([
+          supabase.from("hr_ferias").select("id,inicio,fim,status,periodo_aquisitivo_inicio,periodo_aquisitivo_fim").in("contrato_id", contratoIds).order("inicio", { ascending: false }),
+          supabase.from("hr_holerites").select("id,competencia,liquido,status").in("contrato_id", contratoIds).order("competencia", { ascending: false }).limit(24),
+        ]);
+        if (!cancel) {
+          setFerias((fr as unknown as Ferias[]) ?? []);
+          setHolerites((hl as unknown as Holerite[]) ?? []);
+        }
+      }
 
       // Tenta obter email se for o próprio usuário
       const { data: auth } = await supabase.auth.getUser();
@@ -165,7 +173,12 @@ function PerfilFuncionarioPage() {
               <Table>
                 <TableHeader><TableRow><TableHead>Período aquisitivo</TableHead><TableHead>Início</TableHead><TableHead>Fim</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
                 <TableBody>{ferias.map((f) => (
-                  <TableRow key={f.id}><TableCell>{f.periodo_aquisitivo ?? "—"}</TableCell><TableCell>{formatDatePura(f.data_inicio)}</TableCell><TableCell>{formatDatePura(f.data_fim)}</TableCell><TableCell><Badge variant="outline">{f.status}</Badge></TableCell></TableRow>
+                  <TableRow key={f.id}>
+                    <TableCell>{f.periodo_aquisitivo_inicio ? `${formatDatePura(f.periodo_aquisitivo_inicio)} – ${formatDatePura(f.periodo_aquisitivo_fim)}` : "—"}</TableCell>
+                    <TableCell>{formatDatePura(f.inicio)}</TableCell>
+                    <TableCell>{formatDatePura(f.fim)}</TableCell>
+                    <TableCell><Badge variant="outline">{f.status}</Badge></TableCell>
+                  </TableRow>
                 ))}</TableBody>
               </Table>
             )}
@@ -178,7 +191,7 @@ function PerfilFuncionarioPage() {
               <Table>
                 <TableHeader><TableRow><TableHead>Competência</TableHead><TableHead>Valor líquido</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
                 <TableBody>{holerites.map((h) => (
-                  <TableRow key={h.id}><TableCell>{h.competencia}</TableCell><TableCell>{fmtMoeda(h.valor_liquido)}</TableCell><TableCell><Badge variant="outline">{h.status}</Badge></TableCell></TableRow>
+                  <TableRow key={h.id}><TableCell>{h.competencia}</TableCell><TableCell>{fmtMoeda(h.liquido)}</TableCell><TableCell><Badge variant="outline">{h.status}</Badge></TableCell></TableRow>
                 ))}</TableBody>
               </Table>
             )}
