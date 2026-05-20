@@ -550,6 +550,168 @@ export type Database = {
         }
         Relationships: []
       }
+      chat_canais: {
+        Row: {
+          clinica_id: string
+          created_at: string
+          criado_por: string
+          id: string
+          nome: string | null
+          setor_id: string | null
+          tipo: Database["public"]["Enums"]["chat_canal_tipo"]
+          updated_at: string
+        }
+        Insert: {
+          clinica_id: string
+          created_at?: string
+          criado_por: string
+          id?: string
+          nome?: string | null
+          setor_id?: string | null
+          tipo?: Database["public"]["Enums"]["chat_canal_tipo"]
+          updated_at?: string
+        }
+        Update: {
+          clinica_id?: string
+          created_at?: string
+          criado_por?: string
+          id?: string
+          nome?: string | null
+          setor_id?: string | null
+          tipo?: Database["public"]["Enums"]["chat_canal_tipo"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_canais_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_leituras: {
+        Row: {
+          canal_id: string
+          id: string
+          ultima_lida_em: string
+          user_id: string
+        }
+        Insert: {
+          canal_id: string
+          id?: string
+          ultima_lida_em?: string
+          user_id: string
+        }
+        Update: {
+          canal_id?: string
+          id?: string
+          ultima_lida_em?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_leituras_canal_id_fkey"
+            columns: ["canal_id"]
+            isOneToOne: false
+            referencedRelation: "chat_canais"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_membros: {
+        Row: {
+          canal_id: string
+          created_at: string
+          id: string
+          papel: string
+          silenciado: boolean
+          user_id: string
+        }
+        Insert: {
+          canal_id: string
+          created_at?: string
+          id?: string
+          papel?: string
+          silenciado?: boolean
+          user_id: string
+        }
+        Update: {
+          canal_id?: string
+          created_at?: string
+          id?: string
+          papel?: string
+          silenciado?: boolean
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_membros_canal_id_fkey"
+            columns: ["canal_id"]
+            isOneToOne: false
+            referencedRelation: "chat_canais"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_mensagens: {
+        Row: {
+          anexo_tipo: string | null
+          anexo_url: string | null
+          autor_id: string
+          canal_id: string
+          clinica_id: string
+          created_at: string
+          deletada_em: string | null
+          editada_em: string | null
+          id: string
+          reply_to: string | null
+          texto: string | null
+        }
+        Insert: {
+          anexo_tipo?: string | null
+          anexo_url?: string | null
+          autor_id: string
+          canal_id: string
+          clinica_id: string
+          created_at?: string
+          deletada_em?: string | null
+          editada_em?: string | null
+          id?: string
+          reply_to?: string | null
+          texto?: string | null
+        }
+        Update: {
+          anexo_tipo?: string | null
+          anexo_url?: string | null
+          autor_id?: string
+          canal_id?: string
+          clinica_id?: string
+          created_at?: string
+          deletada_em?: string | null
+          editada_em?: string | null
+          id?: string
+          reply_to?: string | null
+          texto?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_mensagens_canal_id_fkey"
+            columns: ["canal_id"]
+            isOneToOne: false
+            referencedRelation: "chat_canais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_mensagens_reply_to_fkey"
+            columns: ["reply_to"]
+            isOneToOne: false
+            referencedRelation: "chat_mensagens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clinica_memberships: {
         Row: {
           ativo: boolean
@@ -3868,6 +4030,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_chat_member: {
+        Args: { _canal_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_medico: {
         Args: { _clinica_id: string; _user_id: string }
         Returns: boolean
@@ -3965,6 +4131,7 @@ export type Database = {
         | "despesa"
         | "fechamento"
       caixa_sessao_status: "aberto" | "fechado"
+      chat_canal_tipo: "direto" | "grupo" | "setor"
       crm_status: "aberta" | "ganha" | "perdida"
       estoque_movimento_tipo: "entrada" | "saida" | "ajuste"
       fin_status_lancamento: "pendente" | "confirmado" | "cancelado"
@@ -4195,6 +4362,7 @@ export const Constants = {
         "fechamento",
       ],
       caixa_sessao_status: ["aberto", "fechado"],
+      chat_canal_tipo: ["direto", "grupo", "setor"],
       crm_status: ["aberta", "ganha", "perdida"],
       estoque_movimento_tipo: ["entrada", "saida", "ajuste"],
       fin_status_lancamento: ["pendente", "confirmado", "cancelado"],
