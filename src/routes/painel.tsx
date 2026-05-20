@@ -1,13 +1,10 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ClinicaProvider, useClinica } from "@/hooks/use-clinica";
+import { Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/painel")({
-  beforeLoad: async () => {
-    const { data } = await supabase.auth.getSession();
-    if (!data.session) throw redirect({ to: "/login" });
-  },
   component: PainelRoute,
 });
 
@@ -29,7 +26,7 @@ type Senha = {
 };
 
 function PainelPage() {
-  const { clinicaAtual } = useClinica();
+  const { clinicaAtual, loading } = useClinica();
   const [atual, setAtual] = useState<Senha | null>(null);
   const [historico, setHistorico] = useState<Senha[]>([]);
 
@@ -90,6 +87,17 @@ function PainelPage() {
     utter.lang = "pt-BR";
     utter.rate = 0.9;
     window.speechSynthesis.speak(utter);
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
+          <p className="text-muted-foreground">Carregando painel…</p>
+        </div>
+      </div>
+    );
   }
 
   if (!clinicaAtual) return <div className="min-h-screen flex items-center justify-center bg-background">Nenhuma clínica selecionada.</div>;
