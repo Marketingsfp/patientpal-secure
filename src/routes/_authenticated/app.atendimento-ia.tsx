@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Brain, Sparkles, FileHeart, Stethoscope, Save, Loader2, History, Wand2, AlertTriangle, Users } from "lucide-react";
+import { Brain, Sparkles, FileHeart, Stethoscope, Save, Loader2, History, Wand2, AlertTriangle, Users, HeartPulse } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -43,6 +43,25 @@ type FilaItem = {
   fluxo_etapa: string;
   prioridade: "normal" | "prioritario" | "urgente";
 };
+type Triagem = {
+  id: string;
+  created_at: string;
+  enfermeira_nome: string | null;
+  peso_kg: number | null;
+  altura_cm: number | null;
+  imc: number | null;
+  pa_sistolica: number | null;
+  pa_diastolica: number | null;
+  freq_cardiaca: number | null;
+  temperatura: number | null;
+  saturacao: number | null;
+  glicemia: number | null;
+  queixa_principal: string | null;
+  doencas: string[] | null;
+  medicamentos: string | null;
+  alergias: string | null;
+  observacoes: string | null;
+};
 
 const SOAP_KEYS = [
   ["queixa_principal", "Queixa principal", 2],
@@ -77,6 +96,7 @@ function AtendimentoIaPage() {
   const [resumo, setResumo] = useState<string>("");
   const [resumoOpen, setResumoOpen] = useState(false);
   const [loading, setLoading] = useState<"estruturar" | "sugerir" | "resumir" | "salvar" | null>(null);
+  const [triagem, setTriagem] = useState<Triagem | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -166,6 +186,23 @@ function AtendimentoIaPage() {
         .eq("id", item.id);
     }
   }
+
+  // Carrega triagem da enfermagem para o agendamento selecionado
+  useEffect(() => {
+    if (!agendamentoId) { setTriagem(null); return; }
+    let cancel = false;
+    (async () => {
+      const { data } = await supabase
+        .from("triagens_enfermagem")
+        .select("id, created_at, enfermeira_nome, peso_kg, altura_cm, imc, pa_sistolica, pa_diastolica, freq_cardiaca, temperatura, saturacao, glicemia, queixa_principal, doencas, medicamentos, alergias, observacoes")
+        .eq("agendamento_id", agendamentoId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!cancel) setTriagem((data as unknown as Triagem) ?? null);
+    })();
+    return () => { cancel = true; };
+  }, [agendamentoId]);
 
   const modelo = useMemo(() => modelos.find((x) => x.id === modeloId) ?? null, [modelos, modeloId]);
   const especialidade = especialidadeMedico || modelo?.nome || "Clínica Geral";
@@ -402,6 +439,89 @@ function AtendimentoIaPage() {
           </Collapsible>
         )}
       </Card>
+
+      {triagem && (
+        <Card className="p-4 space-y-3 border-rose-200/60 dark:border-rose-900/40">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <HeartPulse className="h-5 w-5 text-rose-500" />
+              <h2 className="font-semibold">Triagem da enfermagem</h2>
+              {triagem.enfermeira_nome && (
+                <Badge variant="secondary" className="text-[10px]">Por {triagem.enfermeira_nome}</Badge>
+              )}
+            </div>
+            <span className="text-xs text-muted-foreground">
+              {new Date(triagem.created_at).toLocaleString("pt-BR")}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-sm">
+            {[
+              ["Peso", triagem.peso_kg, "kg"],
+              ["Altura", triagem.altura_cm, "cm"],
+              ["IMC", triagem.imc, ""],
+              ["PA", triagem.pa_sistolica && triagem.pa_diastolica ? `${triagem.pa_sistolica}/${triagem.pa_diastolica}` : null, "mmHg"],
+              ["FC", triagem.freq_cardiaca, "bpm"],
+              ["Temp.", triagem.temperatura, "°C"],
+              ["SatO₂", triagem.saturacao, "%"],
+              ["Glicemia", triagem.glicemia, "mg/dL"],
+            ].filter(([, v]) => v !== null && v !== undefined && v !== "").map(([label, value, unit]) => (
+              <div key={String(label)} className="rounded-md border bg-muted/30 p-2">
+                <div className="text-[10px] uppercase text-muted-foreground">{label as string}</div>
+                <div className="font-semibold tabular-nums">{String(value)} <span className="text-xs font-normal text-muted-foreground">{unit as string}</span></div>
+              </div>
+            ))}
+          </div>
+          {(triagem.queixa_principal || (triagem.doencas && triagem.doencas.length) || triagem.medicamentos || triagem.alergias || triagem.observacoes) && (
+            <div className="grid sm:grid-cols-2 gap-2 text-sm">
+              {triagem.queixa_principal && (
+                <div className="rounded-md border p-2"><div className="text-[10px] uppercase text-muted-foreground">Queixa principal</div><div>{triagem.queixa_principal}</div></div>
+              )}
+              {triagem.doencas && triagem.doencas.length > 0 && (
+                <div className="rounded-md border p-2"><div className="text-[10px] uppercase text-muted-foreground">Doenças pré-existentes</div><div className="flex flex-wrap gap-1 mt-1">{triagem.doencas.map((d, i) => <Badge key={i} variant="outline" className="text-[10px]">{d}</Badge>)}</div></div>
+              )}
+              {triagem.medicamentos && (
+                <div className="rounded-md border p-2"><div className="text-[10px] uppercase text-muted-foreground">Medicamentos em uso</div><div>{triagem.medicamentos}</div></div>
+              )}
+              {triagem.alergias && (
+                <div className="rounded-md border p-2"><div className="text-[10px] uppercase text-muted-foreground">Alergias</div><div>{triagem.alergias}</div></div>
+              )}
+              {triagem.observacoes && (
+                <div className="rounded-md border p-2 sm:col-span-2"><div className="text-[10px] uppercase text-muted-foreground">Observações da enfermagem</div><div className="whitespace-pre-wrap">{triagem.observacoes}</div></div>
+              )}
+            </div>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              const linhas: string[] = [];
+              if (triagem.queixa_principal) linhas.push(`Queixa (triagem): ${triagem.queixa_principal}`);
+              const sv: string[] = [];
+              if (triagem.pa_sistolica && triagem.pa_diastolica) sv.push(`PA ${triagem.pa_sistolica}/${triagem.pa_diastolica} mmHg`);
+              if (triagem.freq_cardiaca) sv.push(`FC ${triagem.freq_cardiaca} bpm`);
+              if (triagem.temperatura) sv.push(`T ${triagem.temperatura}°C`);
+              if (triagem.saturacao) sv.push(`SatO₂ ${triagem.saturacao}%`);
+              if (triagem.glicemia) sv.push(`Glicemia ${triagem.glicemia} mg/dL`);
+              if (triagem.peso_kg) sv.push(`Peso ${triagem.peso_kg} kg`);
+              if (triagem.altura_cm) sv.push(`Altura ${triagem.altura_cm} cm`);
+              if (triagem.imc) sv.push(`IMC ${triagem.imc}`);
+              if (sv.length) linhas.push(`Sinais vitais: ${sv.join(" · ")}`);
+              if (triagem.doencas?.length) linhas.push(`Comorbidades: ${triagem.doencas.join(", ")}`);
+              if (triagem.medicamentos) linhas.push(`Medicamentos: ${triagem.medicamentos}`);
+              if (triagem.alergias) linhas.push(`Alergias: ${triagem.alergias}`);
+              const txt = linhas.join("\n");
+              setSoap((s) => ({
+                ...s,
+                queixa_principal: triagem.queixa_principal || s.queixa_principal,
+                exame_fisico: s.exame_fisico ? `${s.exame_fisico}\n${txt}` : txt,
+              }));
+              toast.success("Triagem copiada para o prontuário");
+            }}
+          >
+            <FileHeart className="h-4 w-4 mr-1" /> Copiar para prontuário
+          </Button>
+        </Card>
+      )}
 
       <div className="grid lg:grid-cols-2 gap-4">
         {/* Transcrição */}
