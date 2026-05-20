@@ -12,24 +12,12 @@ export const Route = createFileRoute("/verificar/$codigo")({
 function VerificarPage() {
   const { codigo } = Route.useParams();
   const [carregando, setCarregando] = useState(true);
-  const [info, setInfo] = useState<{ aluno: string; curso: string; emitido_em: string } | null>(null);
+  const [info, setInfo] = useState<{ aluno: string; curso: string; clinica: string | null; emitido_em: string } | null>(null);
 
   useEffect(() => {
     (async () => {
-      const { data: cert } = await supabase
-        .from("lms_certificados")
-        .select("user_id, curso_id, emitido_em")
-        .eq("codigo_verificacao", codigo).maybeSingle();
-      if (!cert) { setCarregando(false); return; }
-      const [{ data: p }, { data: c }] = await Promise.all([
-        supabase.from("profiles").select("nome").eq("id", cert.user_id).maybeSingle(),
-        supabase.from("lms_cursos").select("titulo").eq("id", cert.curso_id).maybeSingle(),
-      ]);
-      setInfo({
-        aluno: p?.nome ?? "—",
-        curso: c?.titulo ?? "—",
-        emitido_em: cert.emitido_em,
-      });
+      const { data } = await supabase.rpc("verificar_certificado", { _codigo: codigo });
+      if (data) setInfo(data as { aluno: string; curso: string; clinica: string | null; emitido_em: string });
       setCarregando(false);
     })();
   }, [codigo]);
