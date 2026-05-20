@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { isCPFValido, somenteDigitos } from "@/lib/cpf";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -176,13 +177,16 @@ function AgendaPage() {
     if (!novoPac.nome.trim()) { toast.error("Informe o nome"); return; }
     if (!novoPac.data_nascimento) { toast.error("Informe a data de nascimento"); return; }
     if (!novoPac.telefone.trim()) { toast.error("Informe o telefone"); return; }
+    if (novoPac.cpf.trim() && !isCPFValido(novoPac.cpf)) {
+      toast.error("CPF inválido"); return;
+    }
     setSavingPac(true);
     const { data, error } = await supabase
       .from("pacientes")
       .insert({
         clinica_id: clinicaAtual.clinica_id,
         nome: novoPac.nome.trim(),
-        cpf: novoPac.cpf.trim() || null,
+        cpf: novoPac.cpf.trim() ? somenteDigitos(novoPac.cpf) : null,
         telefone: novoPac.telefone.trim() || null,
         data_nascimento: novoPac.data_nascimento || null,
         email: novoPac.email.trim() || null,
@@ -1017,7 +1021,11 @@ function AgendaPage() {
                   inputMode="numeric"
                   maxLength={14}
                   placeholder="000.000.000-00"
+                  className={novoPac.cpf && somenteDigitos(novoPac.cpf).length === 11 && !isCPFValido(novoPac.cpf) ? "border-rose-500 focus-visible:ring-rose-500" : ""}
                 />
+                {novoPac.cpf && somenteDigitos(novoPac.cpf).length === 11 && !isCPFValido(novoPac.cpf) && (
+                  <p className="text-[11px] text-rose-600">CPF inválido</p>
+                )}
               </div>
               <div className="space-y-1">
                 <Label>Nascimento *</Label>
