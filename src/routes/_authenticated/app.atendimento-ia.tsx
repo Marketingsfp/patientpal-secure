@@ -208,14 +208,14 @@ function AtendimentoIaPage() {
       .select("id, paciente_nome, medico_id, fluxo_etapa, inicio")
       .in("id", agendamentoIds);
     const agMap = new Map((ags ?? []).map((a) => [a.id, a]));
-    const medicoIds = Array.from(new Set((ags ?? []).map((a) => a.medico_id).filter(Boolean)));
+    const medicoIds = Array.from(new Set((ags ?? []).map((a) => a.medico_id).filter((id): id is string => Boolean(id))));
     const { data: meds } = medicoIds.length
       ? await supabase.from("medicos").select("id, nome").in("id", medicoIds)
       : { data: [] };
     const medMap = new Map((meds ?? []).map((m) => [m.id, m.nome]));
     const lista = rows.flatMap((r) => {
       const ag = agMap.get(r.agendamento_id);
-      if (!ag || !["atendimento", "triagem"].includes(ag.fluxo_etapa)) return [];
+      if (!ag || !ag.medico_id || !["atendimento", "triagem"].includes(ag.fluxo_etapa)) return [];
       return [{
         agendamento_id: r.agendamento_id,
         paciente_nome: ag.paciente_nome,
