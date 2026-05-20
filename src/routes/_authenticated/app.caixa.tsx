@@ -892,49 +892,103 @@ function Page() {
             )}
           </DialogHeader>
           <form onSubmit={cobrar} className="space-y-3">
-            <div>
-              <Label>Valor</Label>
-              <CurrencyInput value={cobrancaValor} onChange={setCobrancaValor} />
-            </div>
-            <div>
-              <Label>Forma de pagamento</Label>
-              <Select value={cobrancaForma} onValueChange={setCobrancaForma}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="dinheiro">Dinheiro</SelectItem>
-                  <SelectItem value="pix">PIX</SelectItem>
-                  <SelectItem value="debito">Débito</SelectItem>
-                  <SelectItem value="credito">Crédito</SelectItem>
-                  <SelectItem value="boleto">Boleto</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {(cobrancaForma === "credito" || cobrancaForma === "debito") && (
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <Label>Bandeira *</Label>
-                  <Select value={cobrancaBandeira} onValueChange={setCobrancaBandeira}>
-                    <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                    <SelectContent>
-                      {BANDEIRAS_CARTAO.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+            {(() => {
+              const total = cobrancaLinhas.reduce((a, l) => a + (Number(l.valor) || 0), 0);
+              const multi = cobrancaLinhas.length > 1;
+              const sugerido = openCobranca ? (multi ? openCobranca.valor_cartao : openCobranca.valor) : 0;
+              const dif = total - sugerido;
+              return (
+                <div className="rounded-md border bg-muted/40 px-3 py-2 text-xs flex items-center justify-between">
+                  <span className="text-muted-foreground">
+                    Sugerido <b className="text-foreground">({multi ? "cartão" : "dinheiro/PIX"})</b>: <b>{fmt(sugerido)}</b>
+                  </span>
+                  <span>
+                    Soma: <b className={Math.abs(dif) < 0.01 ? "text-emerald-600" : "text-amber-600"}>{fmt(total)}</b>
+                  </span>
                 </div>
-                {cobrancaForma === "credito" && (
-                  <div>
-                    <Label>Parcelas</Label>
-                    <Select value={cobrancaParcelas} onValueChange={setCobrancaParcelas}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {Array.from({ length: 12 }, (_, i) => i + 1).map(n => (
-                          <SelectItem key={n} value={String(n)}>{n}x</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+              );
+            })()}
+            <div className="space-y-3">
+              {cobrancaLinhas.map((l, idx) => (
+                <div key={idx} className="rounded-md border p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-muted-foreground">Pagamento {idx + 1}</span>
+                    {cobrancaLinhas.length > 1 && (
+                      <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-rose-600"
+                        onClick={() => setCobrancaLinhas(prev => prev.filter((_, i) => i !== idx))}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                   </div>
-                )}
-              </div>
-            )}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label>Forma</Label>
+                      <Select value={l.forma} onValueChange={(v) => setCobrancaLinhas(prev => prev.map((x, i) => i === idx ? { ...x, forma: v, bandeira: "", parcelas: "1" } : x))}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                          <SelectItem value="pix">PIX</SelectItem>
+                          <SelectItem value="debito">Débito</SelectItem>
+                          <SelectItem value="credito">Crédito</SelectItem>
+                          <SelectItem value="boleto">Boleto</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Valor</Label>
+                      <CurrencyInput value={l.valor} onChange={(v) => setCobrancaLinhas(prev => prev.map((x, i) => i === idx ? { ...x, valor: v } : x))} />
+                    </div>
+                  </div>
+                  {(l.forma === "credito" || l.forma === "debito") && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label>Bandeira *</Label>
+                        <Select value={l.bandeira} onValueChange={(v) => setCobrancaLinhas(prev => prev.map((x, i) => i === idx ? { ...x, bandeira: v } : x))}>
+                          <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                          <SelectContent>
+                            {BANDEIRAS_CARTAO.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {l.forma === "credito" && (
+                        <div>
+                          <Label>Parcelas</Label>
+                          <Select value={l.parcelas} onValueChange={(v) => setCobrancaLinhas(prev => prev.map((x, i) => i === idx ? { ...x, parcelas: v } : x))}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {Array.from({ length: 12 }, (_, i) => i + 1).map(n => (
+                                <SelectItem key={n} value={String(n)}>{n}x</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+              <Button
+                type="button" variant="outline" size="sm" className="w-full"
+                onClick={() => {
+                  setCobrancaLinhas(prev => {
+                    // ao passar para multi-forma, ajusta a primeira linha (se ainda no valor original em dinheiro)
+                    // para usar o valor de cartão sugerido, e adiciona linha nova com valor 0
+                    if (!openCobranca) return [...prev, linhaVazia()];
+                    const next = [...prev];
+                    if (prev.length === 1) {
+                      const atual = Number(prev[0].valor) || 0;
+                      if (Math.abs(atual - openCobranca.valor) < 0.01) {
+                        next[0] = { ...prev[0], valor: String(openCobranca.valor_cartao || atual) };
+                      }
+                    }
+                    next.push(linhaVazia());
+                    return next;
+                  });
+                }}
+              >
+                <Plus className="h-3.5 w-3.5 mr-1" /> Adicionar forma de pagamento
+              </Button>
+            </div>
             <p className="text-xs text-muted-foreground">
               Será criado: movimento de caixa + lançamento financeiro (receita) + paciente avança para <b>triagem</b>.
             </p>
