@@ -242,7 +242,13 @@ function Page() {
                 status: a.status,
               })),
               `atendimentos-${new Date().toISOString().slice(0, 10)}`,
-              [
+              isMedicoOnly ? [
+                { key: "data", label: "Data" },
+                { key: "paciente", label: "Paciente" },
+                { key: "procedimento", label: "Procedimento" },
+                { key: "valor_medico", label: "Repasse (R$)" },
+                { key: "status", label: "Status" },
+              ] : [
                 { key: "data", label: "Data" },
                 { key: "medico", label: "Médico" },
                 { key: "paciente", label: "Paciente" },
