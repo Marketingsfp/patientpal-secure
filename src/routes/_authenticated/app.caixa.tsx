@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   Wallet, PlusCircle, MinusCircle, ArrowDownToLine, ArrowUpFromLine, Lock,
-  Unlock, Eye, FileDown, Users, Receipt, ChevronRight,
+  Unlock, Eye, FileDown, Users, Receipt, ChevronRight, Trash2, Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -53,6 +53,7 @@ interface FilaCaixa {
   inicio: string;
   medico_nome: string | null;
   valor: number;
+  valor_cartao: number;
   ja_pago: boolean;
 }
 
@@ -117,10 +118,9 @@ function Page() {
   const [detalheMovs, setDetalheMovs] = useState<Mov[]>([]);
   const [filaCaixa, setFilaCaixa] = useState<FilaCaixa[]>([]);
   const [openCobranca, setOpenCobranca] = useState<FilaCaixa | null>(null);
-  const [cobrancaValor, setCobrancaValor] = useState("");
-  const [cobrancaForma, setCobrancaForma] = useState("dinheiro");
-  const [cobrancaBandeira, setCobrancaBandeira] = useState("");
-  const [cobrancaParcelas, setCobrancaParcelas] = useState("1");
+  type LinhaPag = { forma: string; valor: string; bandeira: string; parcelas: string };
+  const linhaVazia = (): LinhaPag => ({ forma: "dinheiro", valor: "0", bandeira: "", parcelas: "1" });
+  const [cobrancaLinhas, setCobrancaLinhas] = useState<LinhaPag[]>([linhaVazia()]);
 
   // Formularios
   const [valorAbertura, setValorAbertura] = useState("0");
