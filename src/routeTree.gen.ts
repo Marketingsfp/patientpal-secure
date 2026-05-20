@@ -36,6 +36,7 @@ import { Route as AuthenticatedAppNfseRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedAppModelosDocumentosRouteImport } from './routes/_authenticated/app.modelos-documentos'
 import { Route as AuthenticatedAppMedicosRouteImport } from './routes/_authenticated/app.medicos'
 import { Route as AuthenticatedAppLgpdRouteImport } from './routes/_authenticated/app.lgpd'
+import { Route as AuthenticatedAppHrContratosRouteImport } from './routes/_authenticated/app.hr-contratos'
 import { Route as AuthenticatedAppFluxoRouteImport } from './routes/_authenticated/app.fluxo'
 import { Route as AuthenticatedAppFinanceiroRouteImport } from './routes/_authenticated/app.financeiro'
 import { Route as AuthenticatedAppExamesResultadosRouteImport } from './routes/_authenticated/app.exames-resultados'
@@ -219,6 +220,12 @@ const AuthenticatedAppLgpdRoute = AuthenticatedAppLgpdRouteImport.update({
   path: '/lgpd',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
+const AuthenticatedAppHrContratosRoute =
+  AuthenticatedAppHrContratosRouteImport.update({
+    id: '/hr-contratos',
+    path: '/hr-contratos',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppFluxoRoute = AuthenticatedAppFluxoRouteImport.update({
   id: '/fluxo',
   path: '/fluxo',
@@ -486,6 +493,7 @@ export interface FileRoutesByFullPath {
   '/app/exames-resultados': typeof AuthenticatedAppExamesResultadosRoute
   '/app/financeiro': typeof AuthenticatedAppFinanceiroRouteWithChildren
   '/app/fluxo': typeof AuthenticatedAppFluxoRoute
+  '/app/hr-contratos': typeof AuthenticatedAppHrContratosRoute
   '/app/lgpd': typeof AuthenticatedAppLgpdRoute
   '/app/medicos': typeof AuthenticatedAppMedicosRoute
   '/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
@@ -552,6 +560,7 @@ export interface FileRoutesByTo {
   '/app/estoque': typeof AuthenticatedAppEstoqueRoute
   '/app/exames-resultados': typeof AuthenticatedAppExamesResultadosRoute
   '/app/fluxo': typeof AuthenticatedAppFluxoRoute
+  '/app/hr-contratos': typeof AuthenticatedAppHrContratosRoute
   '/app/lgpd': typeof AuthenticatedAppLgpdRoute
   '/app/medicos': typeof AuthenticatedAppMedicosRoute
   '/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
@@ -622,6 +631,7 @@ export interface FileRoutesById {
   '/_authenticated/app/exames-resultados': typeof AuthenticatedAppExamesResultadosRoute
   '/_authenticated/app/financeiro': typeof AuthenticatedAppFinanceiroRouteWithChildren
   '/_authenticated/app/fluxo': typeof AuthenticatedAppFluxoRoute
+  '/_authenticated/app/hr-contratos': typeof AuthenticatedAppHrContratosRoute
   '/_authenticated/app/lgpd': typeof AuthenticatedAppLgpdRoute
   '/_authenticated/app/medicos': typeof AuthenticatedAppMedicosRoute
   '/_authenticated/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
@@ -692,6 +702,7 @@ export interface FileRouteTypes {
     | '/app/exames-resultados'
     | '/app/financeiro'
     | '/app/fluxo'
+    | '/app/hr-contratos'
     | '/app/lgpd'
     | '/app/medicos'
     | '/app/modelos-documentos'
@@ -758,6 +769,7 @@ export interface FileRouteTypes {
     | '/app/estoque'
     | '/app/exames-resultados'
     | '/app/fluxo'
+    | '/app/hr-contratos'
     | '/app/lgpd'
     | '/app/medicos'
     | '/app/modelos-documentos'
@@ -827,6 +839,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/exames-resultados'
     | '/_authenticated/app/financeiro'
     | '/_authenticated/app/fluxo'
+    | '/_authenticated/app/hr-contratos'
     | '/_authenticated/app/lgpd'
     | '/_authenticated/app/medicos'
     | '/_authenticated/app/modelos-documentos'
@@ -1065,6 +1078,13 @@ declare module '@tanstack/react-router' {
       path: '/lgpd'
       fullPath: '/app/lgpd'
       preLoaderRoute: typeof AuthenticatedAppLgpdRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/hr-contratos': {
+      id: '/_authenticated/app/hr-contratos'
+      path: '/hr-contratos'
+      fullPath: '/app/hr-contratos'
+      preLoaderRoute: typeof AuthenticatedAppHrContratosRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/fluxo': {
@@ -1446,6 +1466,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppExamesResultadosRoute: typeof AuthenticatedAppExamesResultadosRoute
   AuthenticatedAppFinanceiroRoute: typeof AuthenticatedAppFinanceiroRouteWithChildren
   AuthenticatedAppFluxoRoute: typeof AuthenticatedAppFluxoRoute
+  AuthenticatedAppHrContratosRoute: typeof AuthenticatedAppHrContratosRoute
   AuthenticatedAppLgpdRoute: typeof AuthenticatedAppLgpdRoute
   AuthenticatedAppMedicosRoute: typeof AuthenticatedAppMedicosRoute
   AuthenticatedAppModelosDocumentosRoute: typeof AuthenticatedAppModelosDocumentosRoute
@@ -1489,6 +1510,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppExamesResultadosRoute: AuthenticatedAppExamesResultadosRoute,
   AuthenticatedAppFinanceiroRoute: AuthenticatedAppFinanceiroRouteWithChildren,
   AuthenticatedAppFluxoRoute: AuthenticatedAppFluxoRoute,
+  AuthenticatedAppHrContratosRoute: AuthenticatedAppHrContratosRoute,
   AuthenticatedAppLgpdRoute: AuthenticatedAppLgpdRoute,
   AuthenticatedAppMedicosRoute: AuthenticatedAppMedicosRoute,
   AuthenticatedAppModelosDocumentosRoute:
