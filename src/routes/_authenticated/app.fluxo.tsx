@@ -90,7 +90,9 @@ function FluxoPage() {
       .order("inicio");
     setLoading(false);
     if (error) { toast.error(error.message); return; }
-    setAgs((data ?? []) as unknown as Ag[]);
+    const rows = (data ?? []) as unknown as Ag[];
+    // Ocultar horários disponíveis (sem paciente vinculado) — só mostra agendamentos reais
+    setAgs(rows.filter((a) => !!a.paciente_id && (a.paciente_nome ?? "").trim().toUpperCase() !== "DISPONÍVEL"));
   }, [clinicaAtual]);
 
   useEffect(() => {
