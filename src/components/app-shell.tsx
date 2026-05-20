@@ -132,9 +132,18 @@ export function AppShell() {
     }
   }, [collapsed]);
 
-  const userName = (user?.user_metadata?.full_name as string | undefined)
-    ?? (user?.user_metadata?.name as string | undefined)
-    ?? (user?.email ? user.email.split("@")[0] : "");
+  const [profileName, setProfileName] = useState<string>("");
+  useEffect(() => {
+    if (!user?.id) { setProfileName(""); return; }
+    let cancelled = false;
+    supabase.from("profiles").select("nome").eq("id", user.id).maybeSingle()
+      .then(({ data }) => { if (!cancelled && data?.nome) setProfileName(data.nome as string); });
+    return () => { cancelled = true; };
+  }, [user?.id]);
+  const userName = profileName
+    || (user?.user_metadata?.full_name as string | undefined)
+    || (user?.user_metadata?.name as string | undefined)
+    || (user?.email ? user.email.split("@")[0] : "");
 
   useEffect(() => {
     if (!loading && !user) navigate({ to: "/login", replace: true });
@@ -314,7 +323,6 @@ export function AppShell() {
           {!collapsed && (
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate" title={user?.email ?? undefined}>{userName}</p>
-              <p className="text-[11px] opacity-70 truncate">{user?.email}</p>
             </div>
           )}
           {!collapsed && (
