@@ -68,9 +68,12 @@ function MeusCartoesPage() {
             <LogOut className="h-4 w-4 mr-1" /> Sair
           </Button>
         </div>
-        <nav className="mx-auto max-w-2xl px-4 pb-2 flex gap-2 text-sm">
-          <Link to="/paciente/consultas" className="px-3 py-1.5 rounded-md hover:bg-muted">Consultas</Link>
-          <Link to="/paciente/cartoes" className="px-3 py-1.5 rounded-md bg-primary text-primary-foreground">Meus cartões</Link>
+        <nav className="mx-auto max-w-2xl px-4 pb-2 flex gap-2 text-sm overflow-x-auto">
+          <Link to="/paciente" className="px-3 py-1.5 rounded-md hover:bg-muted whitespace-nowrap">Início</Link>
+          <Link to="/paciente/consultas" className="px-3 py-1.5 rounded-md hover:bg-muted whitespace-nowrap">Consultas</Link>
+          <Link to="/paciente/cartoes" className="px-3 py-1.5 rounded-md bg-primary text-primary-foreground whitespace-nowrap">Cartões</Link>
+          <Link to="/paciente/financeiro" className="px-3 py-1.5 rounded-md hover:bg-muted whitespace-nowrap">Financeiro</Link>
+          <Link to="/paciente/perfil" className="px-3 py-1.5 rounded-md hover:bg-muted whitespace-nowrap">Perfil</Link>
         </nav>
       </header>
 
