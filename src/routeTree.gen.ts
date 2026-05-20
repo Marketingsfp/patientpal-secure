@@ -64,6 +64,8 @@ import { Route as AuthenticatedAppAnamnesesRouteImport } from './routes/_authent
 import { Route as AuthenticatedAppAlertasEnfermagemRouteImport } from './routes/_authenticated/app.alertas-enfermagem'
 import { Route as AuthenticatedAppAgendaRouteImport } from './routes/_authenticated/app.agenda'
 import { Route as AuthenticatedAppFinanceiroIndexRouteImport } from './routes/_authenticated/app.financeiro.index'
+import { Route as AuthenticatedAppMedicoMedicoIdRouteImport } from './routes/_authenticated/app.medico.$medicoId'
+import { Route as AuthenticatedAppFuncionarioUserIdRouteImport } from './routes/_authenticated/app.funcionario.$userId'
 import { Route as AuthenticatedAppFinanceiroRelatoriosRouteImport } from './routes/_authenticated/app.financeiro.relatorios'
 import { Route as AuthenticatedAppFinanceiroRegrasIaRouteImport } from './routes/_authenticated/app.financeiro.regras-ia'
 import { Route as AuthenticatedAppFinanceiroNotasRouteImport } from './routes/_authenticated/app.financeiro.notas'
@@ -382,6 +384,18 @@ const AuthenticatedAppFinanceiroIndexRoute =
     path: '/',
     getParentRoute: () => AuthenticatedAppFinanceiroRoute,
   } as any)
+const AuthenticatedAppMedicoMedicoIdRoute =
+  AuthenticatedAppMedicoMedicoIdRouteImport.update({
+    id: '/medico/$medicoId',
+    path: '/medico/$medicoId',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppFuncionarioUserIdRoute =
+  AuthenticatedAppFuncionarioUserIdRouteImport.update({
+    id: '/funcionario/$userId',
+    path: '/funcionario/$userId',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppFinanceiroRelatoriosRoute =
   AuthenticatedAppFinanceiroRelatoriosRouteImport.update({
     id: '/relatorios',
@@ -549,6 +563,8 @@ export interface FileRoutesByFullPath {
   '/app/financeiro/notas': typeof AuthenticatedAppFinanceiroNotasRoute
   '/app/financeiro/regras-ia': typeof AuthenticatedAppFinanceiroRegrasIaRoute
   '/app/financeiro/relatorios': typeof AuthenticatedAppFinanceiroRelatoriosRoute
+  '/app/funcionario/$userId': typeof AuthenticatedAppFuncionarioUserIdRoute
+  '/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
   '/app/financeiro/': typeof AuthenticatedAppFinanceiroIndexRoute
 }
 export interface FileRoutesByTo {
@@ -619,6 +635,8 @@ export interface FileRoutesByTo {
   '/app/financeiro/notas': typeof AuthenticatedAppFinanceiroNotasRoute
   '/app/financeiro/regras-ia': typeof AuthenticatedAppFinanceiroRegrasIaRoute
   '/app/financeiro/relatorios': typeof AuthenticatedAppFinanceiroRelatoriosRoute
+  '/app/funcionario/$userId': typeof AuthenticatedAppFuncionarioUserIdRoute
+  '/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
   '/app/financeiro': typeof AuthenticatedAppFinanceiroIndexRoute
 }
 export interface FileRoutesById {
@@ -693,6 +711,8 @@ export interface FileRoutesById {
   '/_authenticated/app/financeiro/notas': typeof AuthenticatedAppFinanceiroNotasRoute
   '/_authenticated/app/financeiro/regras-ia': typeof AuthenticatedAppFinanceiroRegrasIaRoute
   '/_authenticated/app/financeiro/relatorios': typeof AuthenticatedAppFinanceiroRelatoriosRoute
+  '/_authenticated/app/funcionario/$userId': typeof AuthenticatedAppFuncionarioUserIdRoute
+  '/_authenticated/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
   '/_authenticated/app/financeiro/': typeof AuthenticatedAppFinanceiroIndexRoute
 }
 export interface FileRouteTypes {
@@ -767,6 +787,8 @@ export interface FileRouteTypes {
     | '/app/financeiro/notas'
     | '/app/financeiro/regras-ia'
     | '/app/financeiro/relatorios'
+    | '/app/funcionario/$userId'
+    | '/app/medico/$medicoId'
     | '/app/financeiro/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -837,6 +859,8 @@ export interface FileRouteTypes {
     | '/app/financeiro/notas'
     | '/app/financeiro/regras-ia'
     | '/app/financeiro/relatorios'
+    | '/app/funcionario/$userId'
+    | '/app/medico/$medicoId'
     | '/app/financeiro'
   id:
     | '__root__'
@@ -910,6 +934,8 @@ export interface FileRouteTypes {
     | '/_authenticated/app/financeiro/notas'
     | '/_authenticated/app/financeiro/regras-ia'
     | '/_authenticated/app/financeiro/relatorios'
+    | '/_authenticated/app/funcionario/$userId'
+    | '/_authenticated/app/medico/$medicoId'
     | '/_authenticated/app/financeiro/'
   fileRoutesById: FileRoutesById
 }
@@ -1314,6 +1340,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppFinanceiroIndexRouteImport
       parentRoute: typeof AuthenticatedAppFinanceiroRoute
     }
+    '/_authenticated/app/medico/$medicoId': {
+      id: '/_authenticated/app/medico/$medicoId'
+      path: '/medico/$medicoId'
+      fullPath: '/app/medico/$medicoId'
+      preLoaderRoute: typeof AuthenticatedAppMedicoMedicoIdRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/funcionario/$userId': {
+      id: '/_authenticated/app/funcionario/$userId'
+      path: '/funcionario/$userId'
+      fullPath: '/app/funcionario/$userId'
+      preLoaderRoute: typeof AuthenticatedAppFuncionarioUserIdRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/app/financeiro/relatorios': {
       id: '/_authenticated/app/financeiro/relatorios'
       path: '/relatorios'
@@ -1544,6 +1584,8 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppSetoresRoute: typeof AuthenticatedAppSetoresRoute
   AuthenticatedAppUnidadesRoute: typeof AuthenticatedAppUnidadesRoute
   AuthenticatedAppIndexRoute: typeof AuthenticatedAppIndexRoute
+  AuthenticatedAppFuncionarioUserIdRoute: typeof AuthenticatedAppFuncionarioUserIdRoute
+  AuthenticatedAppMedicoMedicoIdRoute: typeof AuthenticatedAppMedicoMedicoIdRoute
 }
 
 const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
@@ -1593,6 +1635,9 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppSetoresRoute: AuthenticatedAppSetoresRoute,
   AuthenticatedAppUnidadesRoute: AuthenticatedAppUnidadesRoute,
   AuthenticatedAppIndexRoute: AuthenticatedAppIndexRoute,
+  AuthenticatedAppFuncionarioUserIdRoute:
+    AuthenticatedAppFuncionarioUserIdRoute,
+  AuthenticatedAppMedicoMedicoIdRoute: AuthenticatedAppMedicoMedicoIdRoute,
 }
 
 const AuthenticatedAppRouteWithChildren =
