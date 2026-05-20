@@ -29,6 +29,7 @@ import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/ap
 import { Route as AuthenticatedAppIndexRouteImport } from './routes/_authenticated/app.index'
 import { Route as PContratoTokenRouteImport } from './routes/p.contrato.$token'
 import { Route as AuthenticatedAppUnidadesRouteImport } from './routes/_authenticated/app.unidades'
+import { Route as AuthenticatedAppTriagemEnfermagemRouteImport } from './routes/_authenticated/app.triagem-enfermagem'
 import { Route as AuthenticatedAppTreinamentosRouteImport } from './routes/_authenticated/app.treinamentos'
 import { Route as AuthenticatedAppSetoresRouteImport } from './routes/_authenticated/app.setores'
 import { Route as AuthenticatedAppRelatoriosRouteImport } from './routes/_authenticated/app.relatorios'
@@ -197,6 +198,12 @@ const AuthenticatedAppUnidadesRoute =
   AuthenticatedAppUnidadesRouteImport.update({
     id: '/unidades',
     path: '/unidades',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppTriagemEnfermagemRoute =
+  AuthenticatedAppTriagemEnfermagemRouteImport.update({
+    id: '/triagem-enfermagem',
+    path: '/triagem-enfermagem',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppTreinamentosRoute =
@@ -664,6 +671,7 @@ export interface FileRoutesByFullPath {
   '/app/relatorios': typeof AuthenticatedAppRelatoriosRoute
   '/app/setores': typeof AuthenticatedAppSetoresRoute
   '/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
+  '/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/app/unidades': typeof AuthenticatedAppUnidadesRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
   '/app/': typeof AuthenticatedAppIndexRoute
@@ -752,6 +760,7 @@ export interface FileRoutesByTo {
   '/app/relatorios': typeof AuthenticatedAppRelatoriosRoute
   '/app/setores': typeof AuthenticatedAppSetoresRoute
   '/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
+  '/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/app/unidades': typeof AuthenticatedAppUnidadesRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
   '/app': typeof AuthenticatedAppIndexRoute
@@ -844,6 +853,7 @@ export interface FileRoutesById {
   '/_authenticated/app/relatorios': typeof AuthenticatedAppRelatoriosRoute
   '/_authenticated/app/setores': typeof AuthenticatedAppSetoresRoute
   '/_authenticated/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
+  '/_authenticated/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/_authenticated/app/unidades': typeof AuthenticatedAppUnidadesRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
   '/_authenticated/app/': typeof AuthenticatedAppIndexRoute
@@ -936,6 +946,7 @@ export interface FileRouteTypes {
     | '/app/relatorios'
     | '/app/setores'
     | '/app/treinamentos'
+    | '/app/triagem-enfermagem'
     | '/app/unidades'
     | '/p/contrato/$token'
     | '/app/'
@@ -1024,6 +1035,7 @@ export interface FileRouteTypes {
     | '/app/relatorios'
     | '/app/setores'
     | '/app/treinamentos'
+    | '/app/triagem-enfermagem'
     | '/app/unidades'
     | '/p/contrato/$token'
     | '/app'
@@ -1115,6 +1127,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/relatorios'
     | '/_authenticated/app/setores'
     | '/_authenticated/app/treinamentos'
+    | '/_authenticated/app/triagem-enfermagem'
     | '/_authenticated/app/unidades'
     | '/p/contrato/$token'
     | '/_authenticated/app/'
@@ -1300,6 +1313,13 @@ declare module '@tanstack/react-router' {
       path: '/unidades'
       fullPath: '/app/unidades'
       preLoaderRoute: typeof AuthenticatedAppUnidadesRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/triagem-enfermagem': {
+      id: '/_authenticated/app/triagem-enfermagem'
+      path: '/triagem-enfermagem'
+      fullPath: '/app/triagem-enfermagem'
+      preLoaderRoute: typeof AuthenticatedAppTriagemEnfermagemRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/treinamentos': {
@@ -1910,6 +1930,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppRelatoriosRoute: typeof AuthenticatedAppRelatoriosRoute
   AuthenticatedAppSetoresRoute: typeof AuthenticatedAppSetoresRoute
   AuthenticatedAppTreinamentosRoute: typeof AuthenticatedAppTreinamentosRoute
+  AuthenticatedAppTriagemEnfermagemRoute: typeof AuthenticatedAppTriagemEnfermagemRoute
   AuthenticatedAppUnidadesRoute: typeof AuthenticatedAppUnidadesRoute
   AuthenticatedAppIndexRoute: typeof AuthenticatedAppIndexRoute
   AuthenticatedAppFuncionarioUserIdRoute: typeof AuthenticatedAppFuncionarioUserIdRoute
@@ -1972,6 +1993,8 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppRelatoriosRoute: AuthenticatedAppRelatoriosRoute,
   AuthenticatedAppSetoresRoute: AuthenticatedAppSetoresRoute,
   AuthenticatedAppTreinamentosRoute: AuthenticatedAppTreinamentosRoute,
+  AuthenticatedAppTriagemEnfermagemRoute:
+    AuthenticatedAppTriagemEnfermagemRoute,
   AuthenticatedAppUnidadesRoute: AuthenticatedAppUnidadesRoute,
   AuthenticatedAppIndexRoute: AuthenticatedAppIndexRoute,
   AuthenticatedAppFuncionarioUserIdRoute:

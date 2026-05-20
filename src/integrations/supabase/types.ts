@@ -4355,6 +4355,81 @@ export type Database = {
           },
         ]
       }
+      triagens_enfermagem: {
+        Row: {
+          agendamento_id: string | null
+          alergias: string | null
+          altura_cm: number | null
+          clinica_id: string
+          created_at: string
+          doencas: string[] | null
+          enfermeira_id: string | null
+          enfermeira_nome: string | null
+          freq_cardiaca: number | null
+          glicemia: number | null
+          id: string
+          imc: number | null
+          medicamentos: string | null
+          observacoes: string | null
+          pa_diastolica: number | null
+          pa_sistolica: number | null
+          paciente_id: string | null
+          peso_kg: number | null
+          queixa_principal: string | null
+          saturacao: number | null
+          temperatura: number | null
+          updated_at: string
+        }
+        Insert: {
+          agendamento_id?: string | null
+          alergias?: string | null
+          altura_cm?: number | null
+          clinica_id: string
+          created_at?: string
+          doencas?: string[] | null
+          enfermeira_id?: string | null
+          enfermeira_nome?: string | null
+          freq_cardiaca?: number | null
+          glicemia?: number | null
+          id?: string
+          imc?: number | null
+          medicamentos?: string | null
+          observacoes?: string | null
+          pa_diastolica?: number | null
+          pa_sistolica?: number | null
+          paciente_id?: string | null
+          peso_kg?: number | null
+          queixa_principal?: string | null
+          saturacao?: number | null
+          temperatura?: number | null
+          updated_at?: string
+        }
+        Update: {
+          agendamento_id?: string | null
+          alergias?: string | null
+          altura_cm?: number | null
+          clinica_id?: string
+          created_at?: string
+          doencas?: string[] | null
+          enfermeira_id?: string | null
+          enfermeira_nome?: string | null
+          freq_cardiaca?: number | null
+          glicemia?: number | null
+          id?: string
+          imc?: number | null
+          medicamentos?: string | null
+          observacoes?: string | null
+          pa_diastolica?: number | null
+          pa_sistolica?: number | null
+          paciente_id?: string | null
+          peso_kg?: number | null
+          queixa_principal?: string | null
+          saturacao?: number | null
+          temperatura?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       unidades: {
         Row: {
           ativo: boolean
