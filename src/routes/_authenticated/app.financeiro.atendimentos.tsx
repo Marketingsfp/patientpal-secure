@@ -364,6 +364,11 @@ function Page() {
         >
           <Download className="h-4 w-4 mr-2" />Exportar Excel
         </Button>
+        {!isMedicoOnly && (
+          <Button onClick={openPay} disabled={!selectedItems.length}>
+            <Wallet className="h-4 w-4 mr-2" />Pagar repasse{selectedItems.length ? ` (${selectedItems.length} • ${fmt(selectedTotal)})` : ""}
+          </Button>
+        )}
         <Dialog open={open} onOpenChange={setOpen}>
           {!isMedicoOnly && (
             <DialogTrigger asChild><Button onClick={openNew} disabled={!clinicaAtual}><Plus className="h-4 w-4 mr-2" />Novo atendimento</Button></DialogTrigger>
@@ -422,7 +427,7 @@ function Page() {
       {/* Filtros */}
       <Card>
         <CardContent className="p-2">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-2 items-end">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-2 items-end">
             <div className="space-y-1">
               <Label className="text-[10px] flex items-center gap-1"><Filter className="h-3 w-3" />Médico</Label>
               <MedicoCombobox
@@ -439,24 +444,37 @@ function Page() {
               <Label className="text-[10px]">Até</Label>
               <Input type="date" className="h-8" value={fFim} onChange={(e) => setFFim(e.target.value)} />
             </div>
+            <div className="space-y-1">
+              <Label className="text-[10px]">Status repasse</Label>
+              <Select value={fStatus} onValueChange={(v) => setFStatus(v as "todos" | "aberto" | "pago")}>
+                <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="aberto">A receber</SelectItem>
+                  <SelectItem value="pago">Pagos</SelectItem>
+                  <SelectItem value="todos">Todos</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             {isMedicoOnly ? (
-              <div className="rounded-md border px-2 py-1 bg-primary/5 text-center">
-                <div className="text-[9px] text-muted-foreground uppercase leading-tight">Total a receber</div>
-                <div className="text-sm font-semibold text-primary leading-tight">{fmt(totais.medico)}</div>
+              <div className="grid grid-cols-2 gap-1">
+                <div className="rounded-md border px-2 py-1 bg-primary/5 text-center">
+                  <div className="text-[9px] text-muted-foreground uppercase leading-tight">A receber</div>
+                  <div className="text-sm font-semibold text-primary leading-tight">{fmt(totais.aReceber)}</div>
+                </div>
+                <div className="rounded-md border px-2 py-1 text-center">
+                  <div className="text-[9px] text-muted-foreground uppercase leading-tight">Recebido</div>
+                  <div className="text-sm font-semibold leading-tight">{fmt(totais.pago)}</div>
+                </div>
               </div>
             ) : (
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="rounded-md border p-2">
-                  <div className="text-[10px] text-muted-foreground uppercase">Total</div>
-                  <div className="text-sm font-semibold">{fmt(totais.total)}</div>
+              <div className="grid grid-cols-2 gap-2 text-center">
+                <div className="rounded-md border p-2 bg-amber-500/5">
+                  <div className="text-[10px] text-muted-foreground uppercase">A pagar</div>
+                  <div className="text-sm font-semibold text-amber-600">{fmt(totais.aReceber)}</div>
                 </div>
-                <div className="rounded-md border p-2 bg-primary/5">
-                  <div className="text-[10px] text-muted-foreground uppercase">Repasse médico</div>
-                  <div className="text-sm font-semibold text-primary">{fmt(totais.medico)}</div>
-                </div>
-                <div className="rounded-md border p-2">
-                  <div className="text-[10px] text-muted-foreground uppercase">Clínica</div>
-                  <div className="text-sm font-semibold">{fmt(totais.clinica)}</div>
+                <div className="rounded-md border p-2 bg-emerald-500/5">
+                  <div className="text-[10px] text-muted-foreground uppercase">Pago</div>
+                  <div className="text-sm font-semibold text-emerald-600">{fmt(totais.pago)}</div>
                 </div>
               </div>
             )}
@@ -469,15 +487,28 @@ function Page() {
           : items.length === 0 ? <div className="py-12 text-center text-muted-foreground"><Stethoscope className="h-10 w-10 mx-auto mb-2 text-muted-foreground/50" />Nenhum atendimento no período/filtro selecionado.</div>
           : <Table>
             <TableHeader><TableRow>
+              {!isMedicoOnly && (
+                <TableHead className="w-8">
+                  <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
+                </TableHead>
+              )}
               <TableHead>Data</TableHead><TableHead>Médico</TableHead><TableHead>Paciente</TableHead>
               <TableHead>Procedimento</TableHead>
               {!isMedicoOnly && <TableHead className="text-right">Total</TableHead>}
               <TableHead className="text-right">{isMedicoOnly ? "Repasse" : "Médico"}</TableHead>
               {!isMedicoOnly && <TableHead className="text-right">Clínica</TableHead>}
+              <TableHead className="text-center">Status</TableHead>
               {!isMedicoOnly && <TableHead className="w-24"></TableHead>}
             </TableRow></TableHeader>
             <TableBody>{items.map((a) => (
-              <TableRow key={a.id}>
+              <TableRow key={`${a.origem}:${a.id}`}>
+                {!isMedicoOnly && (
+                  <TableCell>
+                    {!a.repasse_pago && (a.valor_medico ?? 0) > 0 ? (
+                      <Checkbox checked={sel.has(`${a.origem}:${a.id}`)} onCheckedChange={() => toggleOne(a)} aria-label="Selecionar" />
+                    ) : null}
+                  </TableCell>
+                )}
                 <TableCell className="text-sm">{new Date(a.data).toLocaleDateString("pt-BR")}</TableCell>
                 <TableCell className="text-sm">{a.medico_id ? medMap.get(a.medico_id) ?? "—" : "—"}</TableCell>
                 <TableCell className="text-sm">{a.paciente_id ? pacMap.get(a.paciente_id) ?? "—" : "—"}</TableCell>
@@ -485,6 +516,18 @@ function Page() {
                 {!isMedicoOnly && <TableCell className="text-right font-medium">{fmt(Number(a.valor_total))}</TableCell>}
                 <TableCell className="text-right font-semibold text-primary">{fmt(Number(a.valor_medico))}</TableCell>
                 {!isMedicoOnly && <TableCell className="text-right text-muted-foreground">{fmt(Number(a.valor_clinica))}</TableCell>}
+                <TableCell className="text-center">
+                  {a.repasse_pago ? (
+                    <Badge variant="outline" className="bg-emerald-500/10 text-emerald-700 border-emerald-500/30">
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      Pago{a.repasse_pago_em ? ` ${new Date(a.repasse_pago_em).toLocaleDateString("pt-BR")}` : ""}
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="bg-amber-500/10 text-amber-700 border-amber-500/30">
+                      <Clock className="h-3 w-3 mr-1" />A receber
+                    </Badge>
+                  )}
+                </TableCell>
                 {!isMedicoOnly && (
                   <TableCell className="text-right">
                     {a.origem === "agenda" ? (
@@ -499,6 +542,43 @@ function Page() {
             </TableBody>
           </Table>}
       </CardContent></Card>
+
+      {/* Diálogo pagar repasse */}
+      <Dialog open={payOpen} onOpenChange={setPayOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Pagar repasse médico</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="rounded-md border bg-muted/40 p-3 text-sm flex justify-between">
+              <span>{selectedItems.length} atendimento(s)</span>
+              <span className="font-semibold text-primary">{fmt(selectedTotal)}</span>
+            </div>
+            <div className="space-y-2">
+              <Label>Data do pagamento</Label>
+              <Input type="date" value={payForm.data} onChange={(e) => setPayForm({ ...payForm, data: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Conta</Label>
+              <Select value={payForm.conta_id || "none"} onValueChange={(v) => setPayForm({ ...payForm, conta_id: v === "none" ? "" : v })}>
+                <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">—</SelectItem>
+                  {contas.map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Forma de pagamento</Label>
+              <Input placeholder="PIX, dinheiro, transferência..." value={payForm.forma_pagamento} onChange={(e) => setPayForm({ ...payForm, forma_pagamento: e.target.value })} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPayOpen(false)}>Cancelar</Button>
+            <Button onClick={confirmarPagamento} disabled={payingNow}>
+              {payingNow ? "Registrando..." : "Confirmar pagamento"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
