@@ -96,6 +96,7 @@ function AtendimentoIaPage() {
   const [resumo, setResumo] = useState<string>("");
   const [resumoOpen, setResumoOpen] = useState(false);
   const [loading, setLoading] = useState<"estruturar" | "sugerir" | "resumir" | "salvar" | null>(null);
+  const [triagem, setTriagem] = useState<Triagem | null>(null);
 
   useEffect(() => {
     (async () => {
