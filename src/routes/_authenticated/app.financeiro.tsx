@@ -4,6 +4,7 @@ import {
   Building, FileText, FileBarChart, PieChart, Bell, Tag, Wallet,
   Sparkles, AlertTriangle,
 } from "lucide-react";
+import { useMedicoContext } from "@/hooks/use-medico-context";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro")({
   component: FinLayout,
@@ -29,6 +30,10 @@ const subnav = [
 
 function FinLayout() {
   const location = useLocation();
+  const { isMedicoOnly } = useMedicoContext();
+  const visibleSubnav = isMedicoOnly
+    ? subnav.filter((i) => i.to === "/app/financeiro/atendimentos").map((i) => ({ ...i, label: "Repasse" }))
+    : subnav;
   return (
     <div className="flex gap-6 -m-6 min-h-[calc(100vh-4rem)]">
       <aside className="w-60 bg-card border-r border-border p-3 shrink-0 overflow-y-auto">
@@ -36,7 +41,7 @@ function FinLayout() {
           Financeiro
         </p>
         <nav className="space-y-0.5">
-          {subnav.map((item) => {
+          {visibleSubnav.map((item) => {
             const active = "exact" in item && item.exact
               ? location.pathname === item.to
               : location.pathname === item.to || location.pathname.startsWith(item.to + "/");
