@@ -277,7 +277,7 @@ export function AppShell() {
             </div>
           </div>
         </header>
-        <main className="flex-1 p-6 overflow-auto min-w-0">
+        <main className="flex-1 p-6 overflow-auto min-w-0" style={{ background: "var(--surface-cream)" }}>
           <Outlet />
         </main>
       </div>
