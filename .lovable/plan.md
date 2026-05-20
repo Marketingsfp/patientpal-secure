@@ -1,41 +1,132 @@
-# Ajustes na Agenda
 
-## 1) Visão "Por médico" — remover controles duplicados
+# Plano — Expansão para Sistema de Gestão de Clínica completo
 
-No componente `AgendaPorMedicoGrid` (em `src/routes/_authenticated/app.agenda.tsx`), o cabeçalho atual repete o seletor de médico e os botões "3 dias / 5 dias / 7 dias". Como esses dados já podem ser definidos nos filtros principais (Profissional + Data Ref.), vamos remover essa barra duplicada.
+Escopo enorme. Vamos por **fases sequenciais**, cada uma aprovada antes da próxima. Nada do que já existe (agenda, financeiro, médicos, equipe, prontuários, cartão benefícios, CRM, Nina, etc.) será removido. Apenas **adicionado e alinhado**.
 
-- Remover do `AgendaPorMedicoGrid`:
-  - `SearchableSelect` de médico
-  - Botões "3 dias / 5 dias / 7 dias"
-  - Navegação ←/→ + label "DD/MM — DIA → DD/MM — DIA" (a navegação de data já existe nos filtros principais)
-- O médico exibido passa a ser o do filtro `filtroMedico` (quando = "todos", mostrar mensagem "Selecione um profissional nos filtros para visualizar a agenda por médico").
-- A quantidade de dias passa a ser controlada por um novo campo nos filtros principais: **"Período"** (com opções 3, 5, 7 dias, ou intervalo customizado — ver item 2).
-- Como `medicoView` e `diasView` deixam de existir como estado próprio da view, remover esses states e passar a derivar do filtro.
+## Mapeamento com o que já existe
 
-## 2) Filtro de data com opção "Período"
+| Spec novo | Já existe no projeto | Decisão |
+|---|---|---|
+| `clinics`, `user_clinics` | `clinicas`, `clinica_memberships` | Reusar (manter PT-BR). |
+| `profiles` | `profiles` | Reusar. |
+| `user_roles` separado | role em `clinica_memberships` | **Criar `user_roles` novo** + manter coluna antiga para compat; migrar gradualmente. |
+| `has_role()` | já existe `has_role(user_id, clinica_id, role)` | Adicionar overload `has_role(user_id, role_global)` para roles cross-clínica. |
+| `audit_logs` | `audit_log` + `fn_audit_trigger` | Reusar tabela existente; criar hook `useCrud` que dispara via trigger. |
+| Perfil de Médico | `medicos` | Estender com CRM, CBO, %comissão, `service_class` ('consulta'/'exame'/'ambos'), vínculo `company_entities`. |
+| Perfil de Funcionário | `equipe` (provavelmente) | Estender com RG, endereço, documentos, score, feedbacks. |
+| ClinicSwitcher "Todas" | seletor atual em `app-shell.tsx` | Adicionar opção "Todas" agregada. |
+| PatientSearchInput | buscas avulsas em telas | Criar componente único e adotar nas telas novas. |
+| Branding por clínica | `corDaClinica()` hardcoded | Migrar para `ClinicContext` lendo de `clinicas.branding jsonb`. |
 
-Hoje o campo "Data Ref." é um `<Input type="date">` simples com setas ←/→. Vamos trocar por um **DatePicker (Popover + Calendar do shadcn)** com:
+## Fases
 
-- Botão "Limpar" (limpa a data → volta para hoje)
-- Botão "Hoje" (define para hoje)
-- **Novo botão "Período"** — alterna o calendário para modo `range` (seleção de data inicial e final). Ao confirmar, a Agenda passa a buscar/exibir agendamentos entre as duas datas.
+### Fase 0 — Fundação (primeira a executar)
 
-Comportamento:
-- Modo **dia único** (padrão): igual hoje — `dataRef` é uma data, queries usam intervalo do dia.
-- Modo **período**: novo estado `dataFim` opcional; quando definido, `load()` busca de `dataRef` 00:00 até `dataFim` 23:59. A visão "Por médico" usa o nº de dias do período como `dias` da grade (limitado a um máximo razoável, ex.: 31).
-- Na visão "Lista" (dia), quando período estiver ativo, listar agendamentos do intervalo inteiro agrupados por data.
+Sem isso, os módulos viram silos.
 
-## 3) Arquivos afetados
+1. **Migration: `user_roles`**
+   - enum `app_role_global` (`admin`, `tesouraria`, `medico`, `enfermagem`, `recepcao`, `marketing`, `rh`).
+   - tabela `user_roles (user_id, clinica_id nullable, role)`.
+   - função `has_role_global(uid, role)` SECURITY DEFINER.
+2. **Migration: `audit_logs` helpers** — view + função `log_action()` p/ uso manual nas Edge/server fns.
+3. **Migration: `clinicas.branding jsonb`** (logo_url, primary, accent).
+4. **`ClinicContext`** novo: provê branding + lista de clínicas + modo "Todas".
+5. **`ClinicSwitcher`** com "Todas" agregada (afeta queries via filtro condicional).
+6. **`PatientSearchInput`** componente reutilizável.
+7. **`date-utils.ts`** com formatters UTC para datas puras.
+8. **Hook `useCrud`** que padroniza CRUD + auditoria + toasts.
 
-- `src/routes/_authenticated/app.agenda.tsx`
-  - Substituir input de data por um componente `DateRangeField` interno (Popover + Calendar com modos `single`/`range`, botões Hoje / Limpar / Período).
-  - Novo state `dataFim: string | null`; ajustar `load()` para usar intervalo `[dataRef, dataFim ?? dataRef]`.
-  - Remover `medicoView`, `diasView` e a barra superior do `AgendaPorMedicoGrid`.
-  - Derivar `medicoId` da grade a partir de `filtroMedico`; derivar `dias` a partir do período (ou default 1 / placeholder se sem médico).
-  - Adicionar guard "selecione um profissional" quando `filtroMedico === "todos"` em modo "Por médico".
+### Fase 1 — Administração
 
-## Fora do escopo
+- Telas: Usuários, Cargos (`cargos`), Setores (`setores`), Unidades, Perfis de Permissão.
+- Sistema de permissões hierárquicas via tabela `permissions (code, parent_code)` e `role_permissions`.
+- Edge Function `admin-reset-password` (service-role).
+- Página LGPD: consentimento + "Meus Dados" (export).
+- Guard: ações admin exigem `funcionario` vinculado.
 
-- Não mexer no toggle "Lista / Por médico" do header.
-- Não alterar layout interno da grade (linhas/colunas, cores de status).
-- Não alterar auditoria, financeiro ou outras telas.
+### Fase 2 — RH / Gestão de Ponto
+
+- Tabelas `hr_contratos`, `hr_pontos`, `hr_holerites`, `hr_escalas`, `hr_banco_horas`, `hr_ferias`.
+- `getSequenceForContract()` (CLT 4 batidas, PJ 2, estagiário 2, etc.).
+- Tela bater ponto com geolocalização opcional.
+- Holerites em PDF.
+
+### Fase 3 — Perfil de Funcionário + Perfil de Médico
+
+- `funcionarios` (estender `equipe`): RG, CPF, endereço, contatos JSONB, documentos (storage bucket `funcionario-docs`).
+- `funcionario_feedbacks` (360), `funcionario_scores` (base 50, ±10).
+- Mural interno (`mural_posts`).
+- `medicos`: + `crm`, `cbo`, `comissao_pct`, `service_class`, vínculo `company_entities` (N:N).
+- Dashboard individual do médico.
+
+### Fase 4 — Odontologia
+
+- `odonto_prontuarios`, `odonto_dentes (paciente_id, dente, face, status)`.
+- Componente Odontograma SVG (32 dentes, faces V/M/D/L/O).
+- Trigger: ao concluir procedimento → agenda retorno em 30 dias.
+
+### Fase 5 — Chat Interno
+
+- `chat_conversas`, `chat_membros`, `chat_mensagens`, `chat_leituras`.
+- Realtime publication.
+- Presence via `supabase.channel().track()`.
+- UI tipo WhatsApp-lite com background customizável.
+
+### Fase 6 — Treinamentos / LMS
+
+- `lms_cursos`, `lms_modulos`, `lms_licoes (tipo: video|texto|quiz)`, `lms_quizzes`, `lms_progresso`, `lms_certificados`.
+- Geração de certificado PDF (jsPDF) com QR de verificação.
+- Trilhas por cargo (`lms_trilhas_cargo`).
+
+### Fase 7 — Marketing
+
+- Recall: cron diário (server route `/api/public/cron/recall` + pg_cron) detecta pacientes sem retorno em N dias.
+- Rádio interna: `marketing_playlists` + player.
+- Painéis digitais: rota pública `/painel-tv/:clinicaId` com RLS anon read.
+- Site Editor DnD: `website_sections` com 10 tipos de seção, drag-drop com `@dnd-kit`.
+- Google Reviews via Places API v1 (Edge Function com `X-Goog-FieldMask`).
+- DomainRouter para domínios personalizados.
+
+### Fase 8 — Transversais finais
+
+- Check-in (facial já existe parcial; QR e OCR adicionais).
+- Telemedicina LiveKit + transcrição Gemini.
+- Impressão térmica 80mm (CSS print + Inter, DOB obrigatório).
+- `integration_secrets` (tabela DB) com prioridade sobre env vars.
+- Capacitor (mobile/TV) e Electron (desktop) — config-only neste momento.
+
+## Integrações externas — secrets a provisionar
+
+Vou pedir conforme cada fase chegar (não pedir tudo de uma vez):
+
+| Fase | Secrets |
+|---|---|
+| 1 (Admin) | nenhum extra |
+| 4 (Odonto) | nenhum |
+| 5 (Chat) | nenhum (Realtime nativo) |
+| 6 (LMS) | nenhum (jsPDF local) |
+| 7 (Marketing) | `GOOGLE_PLACES_API_KEY` |
+| 8 (Telemed) | `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `LIVEKIT_URL` |
+| 8 (OCR/Facial) | já temos face local; OCR via Gemini (já temos `LOVABLE_API_KEY`) |
+
+Capacitor/Electron: builds locais, sem secret server-side.
+
+## Regras técnicas que vou seguir em tudo
+
+- Toda nova tabela: `clinica_id`, RLS via `is_member(auth.uid(), clinica_id)`, trigger de auditoria.
+- Funções DB com `SET search_path = public`.
+- Validações via trigger (não CHECK) p/ regras temporais.
+- Tokens HSL no `styles.css` — proibido cor hardcoded.
+- Server-side em `createServerFn` (não Edge Function), exceto webhooks externos e cron público.
+- IA via Lovable AI Gateway, modelo padrão `google/gemini-2.5-flash`.
+- Realtime: `ALTER PUBLICATION supabase_realtime ADD TABLE`.
+
+## Próximo passo
+
+Aprovando este plano, **executo a Fase 0 inteira** (migration + ClinicContext + ClinicSwitcher "Todas" + PatientSearchInput + useCrud + date-utils). Depois apresento a Fase 1 antes de prosseguir.
+
+## Fora do escopo deste plano
+
+- Não vou refatorar telas existentes que já funcionam (agenda, financeiro, prontuários) para o novo padrão de uma vez — só conforme cada módulo novo as tocar.
+- Não vou remover a coluna `role` de `clinica_memberships` agora — migração gradual.
+- Não vou implementar Capacitor/Electron builds neste ciclo, só preparar a estrutura.
