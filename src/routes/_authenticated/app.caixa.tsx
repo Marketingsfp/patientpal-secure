@@ -78,6 +78,19 @@ const TIPO_CLASS: Record<MovTipo, string> = {
   fechamento: "bg-slate-200 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700",
 };
 
+const BANDEIRAS_CARTAO = [
+  "Visa", "Mastercard", "Elo", "Hipercard", "American Express", "Diners", "Outra",
+];
+
+function montarSufixoCartao(forma: string, bandeira: string, parcelas: string): string {
+  if (forma === "debito" && bandeira) return ` · ${bandeira.toUpperCase()} (DÉBITO)`;
+  if (forma === "credito" && bandeira) {
+    const n = Math.max(1, Number(parcelas) || 1);
+    return ` · ${bandeira.toUpperCase()} ${n}x`;
+  }
+  return "";
+}
+
 function Page() {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
@@ -106,6 +119,8 @@ function Page() {
   const [openCobranca, setOpenCobranca] = useState<FilaCaixa | null>(null);
   const [cobrancaValor, setCobrancaValor] = useState("");
   const [cobrancaForma, setCobrancaForma] = useState("dinheiro");
+  const [cobrancaBandeira, setCobrancaBandeira] = useState("");
+  const [cobrancaParcelas, setCobrancaParcelas] = useState("1");
 
   // Formularios
   const [valorAbertura, setValorAbertura] = useState("0");
@@ -113,6 +128,8 @@ function Page() {
   const [movValor, setMovValor] = useState("");
   const [movDesc, setMovDesc] = useState("");
   const [movForma, setMovForma] = useState("dinheiro");
+  const [movBandeira, setMovBandeira] = useState("");
+  const [movParcelas, setMovParcelas] = useState("1");
   const [valorInformado, setValorInformado] = useState("");
   const [obsFechamento, setObsFechamento] = useState("");
   const [saving, setSaving] = useState(false);
@@ -222,6 +239,10 @@ function Page() {
     if (!clinicaAtual || !user || !minhaSessao || !openCobranca) return;
     const v = Number(cobrancaValor) || 0;
     if (v <= 0) { toast.error("Informe um valor"); return; }
+    if ((cobrancaForma === "credito" || cobrancaForma === "debito") && !cobrancaBandeira) {
+      toast.error("Selecione a bandeira do cartão"); return;
+    }
+    const sufixoCartao = montarSufixoCartao(cobrancaForma, cobrancaBandeira, cobrancaParcelas);
     setSaving(true);
     try {
       // 1) Movimento de caixa
@@ -231,7 +252,7 @@ function Page() {
         user_id: user.id,
         tipo: "recebimento",
         valor: v,
-        descricao: `${openCobranca.paciente_nome} · ${openCobranca.procedimento ?? "atendimento"}`,
+        descricao: `${openCobranca.paciente_nome} · ${openCobranca.procedimento ?? "atendimento"}${sufixoCartao}`,
         forma_pagamento: cobrancaForma,
       });
       if (e1) throw e1;
@@ -239,7 +260,7 @@ function Page() {
       const { error: e2 } = await supabase.from("fin_lancamentos").insert({
         clinica_id: clinicaAtual.clinica_id,
         tipo: "receita",
-        descricao: `Recebimento — ${openCobranca.paciente_nome} (${openCobranca.procedimento ?? "atendimento"})`,
+        descricao: `Recebimento — ${openCobranca.paciente_nome} (${openCobranca.procedimento ?? "atendimento"})${sufixoCartao}`,
         valor: v,
         data: new Date().toISOString().slice(0, 10),
         status: "confirmado",
@@ -256,6 +277,7 @@ function Page() {
       if (e3) throw e3;
       toast.success("Cobrança registrada · paciente enviado à triagem");
       setOpenCobranca(null); setCobrancaValor(""); setCobrancaForma("dinheiro");
+      setCobrancaBandeira(""); setCobrancaParcelas("1");
       void load(); void loadFilaCaixa();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Falha na cobrança");
@@ -368,6 +390,11 @@ function Page() {
     if (!clinicaAtual || !user || !minhaSessao || !openMov) return;
     const v = Number(movValor) || 0;
     if (v <= 0) { toast.error("Informe um valor"); return; }
+    const ehPagto = openMov.tipo === "recebimento" || openMov.tipo === "despesa";
+    if (ehPagto && (movForma === "credito" || movForma === "debito") && !movBandeira) {
+      toast.error("Selecione a bandeira do cartão"); return;
+    }
+    const sufixoCartao = ehPagto ? montarSufixoCartao(movForma, movBandeira, movParcelas) : "";
     setSaving(true);
     const { error } = await supabase.from("caixa_movimentos").insert({
       sessao_id: minhaSessao.id,
@@ -375,13 +402,14 @@ function Page() {
       user_id: user.id,
       tipo: openMov.tipo,
       valor: v,
-      descricao: movDesc || null,
-      forma_pagamento: openMov.tipo === "recebimento" || openMov.tipo === "despesa" ? movForma : null,
+      descricao: (movDesc || "") + sufixoCartao || null,
+      forma_pagamento: ehPagto ? movForma : null,
     });
     setSaving(false);
     if (error) { toast.error(error.message); return; }
     setOpenMov(null);
     setMovValor(""); setMovDesc(""); setMovForma("dinheiro");
+    setMovBandeira(""); setMovParcelas("1");
     toast.success(`${TIPO_LABEL[openMov.tipo]} registrada`);
     void load();
   };
@@ -783,6 +811,32 @@ function Page() {
                 </Select>
               </div>
             )}
+            {openMov && (openMov.tipo === "recebimento" || openMov.tipo === "despesa") && (movForma === "credito" || movForma === "debito") && (
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label>Bandeira *</Label>
+                  <Select value={movBandeira} onValueChange={setMovBandeira}>
+                    <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                    <SelectContent>
+                      {BANDEIRAS_CARTAO.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {movForma === "credito" && (
+                  <div>
+                    <Label>Parcelas</Label>
+                    <Select value={movParcelas} onValueChange={setMovParcelas}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 12 }, (_, i) => i + 1).map(n => (
+                          <SelectItem key={n} value={String(n)}>{n}x</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+            )}
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => setOpenMov(null)}>Cancelar</Button>
               <Button type="submit" disabled={saving}>Lançar</Button>
@@ -844,6 +898,32 @@ function Page() {
                 </SelectContent>
               </Select>
             </div>
+            {(cobrancaForma === "credito" || cobrancaForma === "debito") && (
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label>Bandeira *</Label>
+                  <Select value={cobrancaBandeira} onValueChange={setCobrancaBandeira}>
+                    <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                    <SelectContent>
+                      {BANDEIRAS_CARTAO.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {cobrancaForma === "credito" && (
+                  <div>
+                    <Label>Parcelas</Label>
+                    <Select value={cobrancaParcelas} onValueChange={setCobrancaParcelas}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 12 }, (_, i) => i + 1).map(n => (
+                          <SelectItem key={n} value={String(n)}>{n}x</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+            )}
             <p className="text-xs text-muted-foreground">
               Será criado: movimento de caixa + lançamento financeiro (receita) + paciente avança para <b>triagem</b>.
             </p>
