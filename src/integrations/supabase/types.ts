@@ -544,6 +544,7 @@ export type Database = {
       clinicas: {
         Row: {
           ativo: boolean
+          branding: Json
           cep: string | null
           cidade: string | null
           cnpj: string | null
@@ -559,6 +560,7 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean
+          branding?: Json
           cep?: string | null
           cidade?: string | null
           cnpj?: string | null
@@ -574,6 +576,7 @@ export type Database = {
         }
         Update: {
           ativo?: boolean
+          branding?: Json
           cep?: string | null
           cidade?: string | null
           cnpj?: string | null
@@ -2879,6 +2882,38 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          clinica_id: string | null
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role_global"]
+          user_id: string
+        }
+        Insert: {
+          clinica_id?: string | null
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role_global"]
+          user_id: string
+        }
+        Update: {
+          clinica_id?: string | null
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role_global"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_templates: {
         Row: {
           ativo: boolean
@@ -3002,6 +3037,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      has_role_global: {
+        Args: {
+          _clinica_id?: string
+          _role: Database["public"]["Enums"]["app_role_global"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       is_medico: {
         Args: { _clinica_id: string; _user_id: string }
         Returns: boolean
@@ -3009,6 +3052,17 @@ export type Database = {
       is_member: {
         Args: { _clinica_id: string; _user_id: string }
         Returns: boolean
+      }
+      log_action: {
+        Args: {
+          _action: string
+          _clinica_id?: string
+          _dados_antes?: Json
+          _dados_depois?: Json
+          _record_id: string
+          _table_name: string
+        }
+        Returns: undefined
       }
       medicos_face_lista: {
         Args: { _clinica_id: string }
@@ -3072,6 +3126,14 @@ export type Database = {
         | "enfermeiro"
         | "recepcao"
         | "financeiro"
+      app_role_global:
+        | "admin"
+        | "tesouraria"
+        | "medico"
+        | "enfermagem"
+        | "recepcao"
+        | "marketing"
+        | "rh"
       caixa_mov_tipo:
         | "abertura"
         | "sangria"
@@ -3280,6 +3342,15 @@ export const Constants = {
         "enfermeiro",
         "recepcao",
         "financeiro",
+      ],
+      app_role_global: [
+        "admin",
+        "tesouraria",
+        "medico",
+        "enfermagem",
+        "recepcao",
+        "marketing",
+        "rh",
       ],
       caixa_mov_tipo: [
         "abertura",
