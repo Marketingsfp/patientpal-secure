@@ -12,6 +12,7 @@ import {
   Download, CalendarDays, Users, ClipboardList, FileText, DollarSign,
   Stethoscope, Clock, Brain, FlaskConical, BellRing, FileHeart, Target,
   CreditCard, ShieldCheck, Building2, BookOpen, MessageCircle, Bell, Workflow,
+  HeartPulse,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/relatorios")({
