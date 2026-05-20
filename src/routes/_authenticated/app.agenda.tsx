@@ -1409,14 +1409,15 @@ function AgendaPage() {
 
       {viewMode === "medico" && (
         <AgendaPorMedicoGrid
-          medicos={medicos}
-          medicoId={medicoView}
-          onMedicoChange={setMedicoView}
-          dias={diasView}
-          onDiasChange={setDiasView}
+          medicoId={filtroMedico === "todos" ? "" : filtroMedico}
+          dias={(() => {
+            if (!dataFim) return 1;
+            const a = new Date(`${dataRef}T12:00:00`).getTime();
+            const b = new Date(`${dataFim}T12:00:00`).getTime();
+            return Math.min(31, Math.max(1, Math.round((b - a) / 86400000) + 1));
+          })()}
           dataRef={dataRef}
-          shiftData={shiftData}
-          items={items.filter((a) => !medicoView || a.medico_id === medicoView)}
+          items={items.filter((a) => filtroMedico === "todos" || a.medico_id === filtroMedico)}
           onSlotClick={(a) => openSlot(a)}
           onAgClick={(a) => openEdit(a)}
           fmtHora={fmtHora}
