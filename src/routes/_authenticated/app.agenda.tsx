@@ -25,7 +25,7 @@ import {
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import {
   CalendarDays, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X,
-  MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, Clock, DollarSign,
+  MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, Clock, DollarSign, ShieldCheck,
 } from "lucide-react";
 import { printGuiaAtendimento } from "@/lib/print-gr";
 import { VoiceInput } from "@/components/voice-input";
@@ -134,6 +134,26 @@ function AgendaPage() {
   const [novoPac, setNovoPac] = useState({ nome: "", cpf: "", telefone: "", data_nascimento: "", email: "" });
   const [savingPac, setSavingPac] = useState(false);
   const [equipeList, setEquipeList] = useState<Array<{ nome: string | null; email: string | null }>>([]);
+  type AuditRow = { id: string; action: string; table_name: string; user_email: string | null; created_at: string; dados_antes: Record<string, unknown> | null; dados_depois: Record<string, unknown> | null };
+  const [auditAg, setAuditAg] = useState<Agendamento | null>(null);
+  const [auditRows, setAuditRows] = useState<AuditRow[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+
+  const abrirAuditoria = async (a: Agendamento) => {
+    setAuditAg(a);
+    setAuditLoading(true);
+    setAuditRows([]);
+    const { data, error } = await supabase
+      .from("audit_log" as never)
+      .select("id, action, table_name, user_email, created_at, dados_antes, dados_depois")
+      .eq("record_id", a.id)
+      .order("created_at", { ascending: false })
+      .limit(200);
+    setAuditLoading(false);
+    if (error) { toast.error(error.message); return; }
+    setAuditRows((data as unknown as AuditRow[]) ?? []);
+  };
+
   const fnListarEquipe = useServerFn(listarEquipe);
   const carregarEquipe = async () => {
     if (!clinicaAtual || equipeList.length > 0) return;
@@ -1004,6 +1024,83 @@ function AgendaPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={!!auditAg} onOpenChange={(o) => { if (!o) { setAuditAg(null); setAuditRows([]); } }}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-primary" />
+              Histórico de alterações
+            </DialogTitle>
+            {auditAg && (
+              <p className="text-sm text-muted-foreground">
+                {auditAg.paciente_nome} — {new Date(auditAg.inicio).toLocaleString("pt-BR")}
+              </p>
+            )}
+          </DialogHeader>
+          <div className="overflow-auto flex-1 -mx-6 px-6">
+            {auditLoading ? (
+              <p className="text-sm text-muted-foreground py-8 text-center">Carregando...</p>
+            ) : auditRows.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-8 text-center">
+                Nenhuma alteração registrada para este agendamento.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {auditRows.map((r) => {
+                  const acaoLabel: Record<string, string> = { INSERT: "Criou", UPDATE: "Alterou", DELETE: "Excluiu" };
+                  const acaoCor: Record<string, string> = {
+                    INSERT: "bg-emerald-100 text-emerald-700",
+                    UPDATE: "bg-amber-100 text-amber-700",
+                    DELETE: "bg-rose-100 text-rose-700",
+                  };
+                  const antes = (r.dados_antes ?? {}) as Record<string, unknown>;
+                  const depois = (r.dados_depois ?? {}) as Record<string, unknown>;
+                  const chaves = Array.from(new Set([...Object.keys(antes), ...Object.keys(depois)]))
+                    .filter((k) => !["updated_at", "created_at", "fluxo_atualizado_em"].includes(k))
+                    .filter((k) => JSON.stringify(antes[k]) !== JSON.stringify(depois[k]));
+                  return (
+                    <div key={r.id} className="rounded-md border p-3 bg-card">
+                      <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+                        <div className="flex items-center gap-2">
+                          <Badge className={acaoCor[r.action] ?? ""}>{acaoLabel[r.action] ?? r.action}</Badge>
+                          <span className="text-xs font-mono text-muted-foreground">{r.table_name}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {new Date(r.created_at).toLocaleString("pt-BR")} · {r.user_email ?? "—"}
+                        </div>
+                      </div>
+                      {r.action === "UPDATE" && chaves.length > 0 && (
+                        <div className="text-xs space-y-1">
+                          {chaves.map((k) => (
+                            <div key={k} className="grid grid-cols-[120px_1fr] gap-2">
+                              <span className="font-medium text-muted-foreground">{k}:</span>
+                              <span>
+                                <span className="line-through text-rose-600">{String(antes[k] ?? "—")}</span>
+                                {" → "}
+                                <span className="text-emerald-700">{String(depois[k] ?? "—")}</span>
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {r.action === "INSERT" && (
+                        <p className="text-xs text-muted-foreground">Registro criado.</p>
+                      )}
+                      {r.action === "DELETE" && (
+                        <p className="text-xs text-muted-foreground">Registro excluído.</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setAuditAg(null); setAuditRows([]); }}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Filtros */}
       <div
         className="rounded-lg border bg-card p-4 space-y-4 [--clinic:theme(colors.border)]"
@@ -1218,6 +1315,9 @@ function AgendaPage() {
                           toast.success("Link do paciente copiado");
                         }}>
                           <Video className="h-4 w-4 mr-2" /> Copiar link do paciente
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => abrirAuditoria(a)}>
+                          <ShieldCheck className="h-4 w-4 mr-2" /> Auditoria
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         {(Object.keys(STATUS_LABEL) as Status[]).map(s => (
