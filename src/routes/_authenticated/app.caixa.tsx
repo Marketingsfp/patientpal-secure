@@ -191,15 +191,17 @@ function Page() {
     }>;
     // Procura valores e pagamentos já realizados
     const procNomes = Array.from(new Set(rows.map((r) => r.procedimento).filter(Boolean) as string[]));
-    const valorMap = new Map<string, number>();
+    const valorMap = new Map<string, { dinheiro: number; cartao: number }>();
     if (procNomes.length) {
       const { data: procs } = await supabase
-        .from("procedimentos").select("nome, valor_padrao, valor_dinheiro")
+        .from("procedimentos").select("nome, valor_padrao, valor_dinheiro, valor_cartao_credito")
         .eq("clinica_id", clinicaAtual.clinica_id).in("nome", procNomes);
-      (procs ?? []).forEach((p) => valorMap.set(
-        (p.nome as string).toUpperCase(),
-        Number((p as { valor_dinheiro?: number; valor_padrao?: number }).valor_dinheiro ?? (p as { valor_padrao?: number }).valor_padrao ?? 0),
-      ));
+      (procs ?? []).forEach((p) => {
+        const pp = p as { nome: string; valor_padrao?: number; valor_dinheiro?: number; valor_cartao_credito?: number };
+        const dinheiro = Number(pp.valor_dinheiro ?? pp.valor_padrao ?? 0);
+        const cartao = Number(pp.valor_cartao_credito ?? pp.valor_padrao ?? dinheiro);
+        valorMap.set(pp.nome.toUpperCase(), { dinheiro, cartao });
+      });
     }
     const ids = rows.map((r) => r.id);
     const pagos = new Set<string>();
@@ -209,16 +211,20 @@ function Page() {
         .in("agendamento_id", ids);
       (lancs ?? []).forEach((l) => { if (l.agendamento_id) pagos.add(l.agendamento_id); });
     }
-    setFilaCaixa(rows.map((r) => ({
+    setFilaCaixa(rows.map((r) => {
+      const v = valorMap.get((r.procedimento ?? "").toUpperCase());
+      return {
       id: r.id,
       paciente_id: r.paciente_id,
       paciente_nome: r.paciente_nome,
       procedimento: r.procedimento,
       inicio: r.inicio,
       medico_nome: r.medicos?.nome ?? null,
-      valor: valorMap.get((r.procedimento ?? "").toUpperCase()) ?? 0,
+      valor: v?.dinheiro ?? 0,
+      valor_cartao: v?.cartao ?? v?.dinheiro ?? 0,
       ja_pago: pagos.has(r.id),
-    })));
+      };
+    }));
   }, [clinicaAtual]);
 
   useEffect(() => { if (minhaSessao) void loadFilaCaixa(); }, [minhaSessao, loadFilaCaixa]);
