@@ -1,6 +1,6 @@
 import { Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useState } from "react";
-import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet, ChevronLeft, ChevronRight } from "lucide-react";
+import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
@@ -145,11 +145,14 @@ export function AppShell() {
     );
   }
 
+  const clinicColor = clinicaAtual ? corDaClinica(clinicaAtual.clinica.nome) : "#0f172a";
+  const initial = (userName || user?.email || "?").trim().charAt(0).toUpperCase();
+
   return (
-    <div className="min-h-screen flex bg-muted/30">
+    <div className="min-h-screen flex bg-background">
       <aside
-        className={`${collapsed ? "w-16" : "w-64"} transition-all duration-200 shrink-0 text-white sticky top-0 h-screen overflow-y-auto shadow-sm bg-slate-800 flex flex-col`}
-        style={{ backgroundColor: clinicaAtual ? corDaClinica(clinicaAtual.clinica.nome) : undefined }}
+        className={`${collapsed ? "w-16" : "w-64"} transition-all duration-200 shrink-0 text-white sticky top-0 h-screen overflow-y-auto flex flex-col`}
+        style={{ backgroundColor: clinicColor }}
       >
         <div className="px-3 py-3 border-b border-white/10 flex items-center justify-between gap-2">
           <Link to="/app" className="flex items-center gap-2 min-w-0">
@@ -167,12 +170,14 @@ export function AppShell() {
           </Button>
         </div>
         {!collapsed && clinicaAtual && logoDaClinica(clinicaAtual.clinica.nome) && (
-          <div className="px-4 py-2 border-b border-white/10">
-            <img
-              src={logoDaClinica(clinicaAtual.clinica.nome)!}
-              alt={clinicaAtual.clinica.nome}
-              className="h-12 w-auto object-contain bg-white rounded p-1"
-            />
+          <div className="px-3 py-3 border-b border-white/10">
+            <div className="bg-white rounded-xl shadow-sm p-2 flex items-center justify-center">
+              <img
+                src={logoDaClinica(clinicaAtual.clinica.nome)!}
+                alt={clinicaAtual.clinica.nome}
+                className="h-12 w-auto object-contain"
+              />
+            </div>
           </div>
         )}
         {!collapsed && (
@@ -205,10 +210,10 @@ export function AppShell() {
           </Suspense>
         </div>
         )}
-        <nav className="flex-1 px-2 py-3 space-y-4 overflow-y-auto">
+        <nav className="flex-1 px-2 py-3 space-y-5 overflow-y-auto">
           {navRows.map((row, idx) => (
-            <div key={idx} className="space-y-0.5">
-              {!collapsed && <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider opacity-60">{row.label}</p>}
+            <div key={idx} className="space-y-1">
+              {!collapsed && <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.12em] opacity-50">{row.label}</p>}
               {row.items.map((item) => {
                 const active = location.pathname === item.to ||
                   (item.to !== "/app" && location.pathname.startsWith(item.to));
@@ -217,29 +222,65 @@ export function AppShell() {
                     key={item.to}
                     to={item.to}
                     title={collapsed ? item.label : undefined}
-                    className={`flex items-center gap-2 rounded-md ${collapsed ? "px-2 justify-center" : "px-3"} py-2 text-sm font-medium transition-colors ${
-                      active ? "bg-white/25 text-white" : "text-white/90 hover:bg-white/10 hover:text-white"
+                    className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "px-3"} py-2 text-sm font-medium transition-all ${
+                      active
+                        ? "bg-white text-slate-900 shadow-sm"
+                        : "text-white/85 hover:bg-white/10 hover:text-white"
                     }`}
                   >
                     <item.icon className="h-4 w-4 shrink-0" />
-                    {!collapsed && item.label}
+                    {!collapsed && <span className="truncate">{item.label}</span>}
                   </Link>
                 );
               })}
             </div>
           ))}
         </nav>
-        <div className={`px-3 py-2 border-t border-white/10 flex items-center ${collapsed ? "justify-center" : "justify-between"} gap-2`}>
-          {!collapsed && <span className="text-xs opacity-90 truncate flex-1" title={user?.email ?? undefined}>{userName}</span>}
-          <Button variant="ghost" size="sm" className="text-white hover:bg-white/10 hover:text-white" onClick={handleSignOut} title="Sair">
-            <LogOut className="h-4 w-4" />
-          </Button>
+        <div className={`px-3 py-3 border-t border-white/10 flex items-center ${collapsed ? "justify-center" : "gap-2"}`}>
+          <div className="h-8 w-8 rounded-full bg-white text-slate-900 flex items-center justify-center text-sm font-semibold shrink-0 shadow-sm">
+            {initial}
+          </div>
+          {!collapsed && (
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate" title={user?.email ?? undefined}>{userName}</p>
+              <p className="text-[11px] opacity-70 truncate">{user?.email}</p>
+            </div>
+          )}
+          {!collapsed && (
+            <Button variant="ghost" size="sm" className="text-white hover:bg-white/10 hover:text-white h-8 w-8 p-0" onClick={handleSignOut} title="Sair">
+              <LogOut className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </aside>
 
-      <main className="flex-1 p-6 overflow-auto min-w-0">
-        <Outlet />
-      </main>
+      <div className="flex-1 flex flex-col min-w-0">
+        <header className="sticky top-0 z-30 h-14 bg-card/80 backdrop-blur border-b flex items-center gap-3 px-6">
+          <div className="relative flex-1 max-w-xl">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <input
+              type="search"
+              placeholder="Pesquisar pacientes, agendamentos, médicos…"
+              className="w-full h-9 pl-9 pr-3 rounded-full bg-muted/60 border border-transparent focus:bg-card focus:border-input outline-none text-sm transition-colors"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" className="h-9 w-9 p-0 rounded-full" title="Notificações">
+              <Bell className="h-4 w-4" />
+            </Button>
+            <div
+              className="h-8 w-8 rounded-full flex items-center justify-center text-sm font-semibold text-white shadow-sm"
+              style={{ backgroundColor: clinicColor }}
+              title={user?.email ?? undefined}
+            >
+              {initial}
+            </div>
+          </div>
+        </header>
+        <main className="flex-1 p-6 overflow-auto min-w-0">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }
