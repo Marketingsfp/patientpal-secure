@@ -2346,6 +2346,287 @@ export type Database = {
           },
         ]
       }
+      lms_certificados: {
+        Row: {
+          clinica_id: string
+          codigo_verificacao: string
+          curso_id: string
+          emitido_em: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          clinica_id: string
+          codigo_verificacao?: string
+          curso_id: string
+          emitido_em?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          clinica_id?: string
+          codigo_verificacao?: string
+          curso_id?: string
+          emitido_em?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lms_certificados_curso_id_fkey"
+            columns: ["curso_id"]
+            isOneToOne: false
+            referencedRelation: "lms_cursos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lms_cursos: {
+        Row: {
+          capa_url: string | null
+          carga_horaria_min: number | null
+          clinica_id: string
+          created_at: string
+          criado_por: string | null
+          descricao: string | null
+          id: string
+          publicado: boolean
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          capa_url?: string | null
+          carga_horaria_min?: number | null
+          clinica_id: string
+          created_at?: string
+          criado_por?: string | null
+          descricao?: string | null
+          id?: string
+          publicado?: boolean
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          capa_url?: string | null
+          carga_horaria_min?: number | null
+          clinica_id?: string
+          created_at?: string
+          criado_por?: string | null
+          descricao?: string | null
+          id?: string
+          publicado?: boolean
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lms_cursos_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lms_licoes: {
+        Row: {
+          conteudo: string | null
+          created_at: string
+          curso_id: string
+          duracao_min: number | null
+          id: string
+          modulo_id: string
+          ordem: number
+          tipo: Database["public"]["Enums"]["lms_licao_tipo"]
+          titulo: string
+          video_url: string | null
+        }
+        Insert: {
+          conteudo?: string | null
+          created_at?: string
+          curso_id: string
+          duracao_min?: number | null
+          id?: string
+          modulo_id: string
+          ordem?: number
+          tipo?: Database["public"]["Enums"]["lms_licao_tipo"]
+          titulo: string
+          video_url?: string | null
+        }
+        Update: {
+          conteudo?: string | null
+          created_at?: string
+          curso_id?: string
+          duracao_min?: number | null
+          id?: string
+          modulo_id?: string
+          ordem?: number
+          tipo?: Database["public"]["Enums"]["lms_licao_tipo"]
+          titulo?: string
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lms_licoes_curso_id_fkey"
+            columns: ["curso_id"]
+            isOneToOne: false
+            referencedRelation: "lms_cursos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lms_licoes_modulo_id_fkey"
+            columns: ["modulo_id"]
+            isOneToOne: false
+            referencedRelation: "lms_modulos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lms_modulos: {
+        Row: {
+          created_at: string
+          curso_id: string
+          id: string
+          ordem: number
+          titulo: string
+        }
+        Insert: {
+          created_at?: string
+          curso_id: string
+          id?: string
+          ordem?: number
+          titulo: string
+        }
+        Update: {
+          created_at?: string
+          curso_id?: string
+          id?: string
+          ordem?: number
+          titulo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lms_modulos_curso_id_fkey"
+            columns: ["curso_id"]
+            isOneToOne: false
+            referencedRelation: "lms_cursos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lms_progresso: {
+        Row: {
+          concluida_em: string
+          curso_id: string
+          id: string
+          licao_id: string
+          nota: number | null
+          user_id: string
+        }
+        Insert: {
+          concluida_em?: string
+          curso_id: string
+          id?: string
+          licao_id: string
+          nota?: number | null
+          user_id: string
+        }
+        Update: {
+          concluida_em?: string
+          curso_id?: string
+          id?: string
+          licao_id?: string
+          nota?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lms_progresso_curso_id_fkey"
+            columns: ["curso_id"]
+            isOneToOne: false
+            referencedRelation: "lms_cursos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lms_progresso_licao_id_fkey"
+            columns: ["licao_id"]
+            isOneToOne: false
+            referencedRelation: "lms_licoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lms_quizzes: {
+        Row: {
+          created_at: string
+          id: string
+          licao_id: string
+          nota_minima: number
+          perguntas: Json
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          licao_id: string
+          nota_minima?: number
+          perguntas?: Json
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          licao_id?: string
+          nota_minima?: number
+          perguntas?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lms_quizzes_licao_id_fkey"
+            columns: ["licao_id"]
+            isOneToOne: false
+            referencedRelation: "lms_licoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lms_trilhas_cargo: {
+        Row: {
+          cargo_id: string
+          clinica_id: string
+          curso_id: string
+          id: string
+          obrigatorio: boolean
+        }
+        Insert: {
+          cargo_id: string
+          clinica_id: string
+          curso_id: string
+          id?: string
+          obrigatorio?: boolean
+        }
+        Update: {
+          cargo_id?: string
+          clinica_id?: string
+          curso_id?: string
+          id?: string
+          obrigatorio?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lms_trilhas_cargo_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lms_trilhas_cargo_curso_id_fkey"
+            columns: ["curso_id"]
+            isOneToOne: false
+            referencedRelation: "lms_cursos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       medico_biometria: {
         Row: {
           clinica_id: string
@@ -4098,6 +4379,7 @@ export type Database = {
         Returns: undefined
       }
       user_is_any_manager: { Args: { _user_id: string }; Returns: boolean }
+      verificar_certificado: { Args: { _codigo: string }; Returns: Json }
     }
     Enums: {
       agendamento_prioridade: "normal" | "prioritario" | "urgente"
@@ -4154,6 +4436,7 @@ export type Database = {
         | "cartao_proprio"
         | "boleto"
         | "transferencia"
+      lms_licao_tipo: "video" | "texto" | "quiz"
       odonto_status:
         | "higido"
         | "cariado"
@@ -4387,6 +4670,7 @@ export const Constants = {
         "boleto",
         "transferencia",
       ],
+      lms_licao_tipo: ["video", "texto", "quiz"],
       odonto_status: [
         "higido",
         "cariado",

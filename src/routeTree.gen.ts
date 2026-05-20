@@ -16,6 +16,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as DiagnosticoRouteImport } from './routes/diagnostico'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as VerificarCodigoRouteImport } from './routes/verificar.$codigo'
 import { Route as PacienteConsultasRouteImport } from './routes/paciente.consultas'
 import { Route as PacienteCartoesRouteImport } from './routes/paciente.cartoes'
 import { Route as PTokenRouteImport } from './routes/p.$token'
@@ -23,6 +24,7 @@ import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/ap
 import { Route as AuthenticatedAppIndexRouteImport } from './routes/_authenticated/app.index'
 import { Route as PContratoTokenRouteImport } from './routes/p.contrato.$token'
 import { Route as AuthenticatedAppUnidadesRouteImport } from './routes/_authenticated/app.unidades'
+import { Route as AuthenticatedAppTreinamentosRouteImport } from './routes/_authenticated/app.treinamentos'
 import { Route as AuthenticatedAppSetoresRouteImport } from './routes/_authenticated/app.setores'
 import { Route as AuthenticatedAppRelatoriosRouteImport } from './routes/_authenticated/app.relatorios'
 import { Route as AuthenticatedAppRecepcaoRouteImport } from './routes/_authenticated/app.recepcao'
@@ -36,6 +38,7 @@ import { Route as AuthenticatedAppNinaRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedAppNfseRouteImport } from './routes/_authenticated/app.nfse'
 import { Route as AuthenticatedAppModelosDocumentosRouteImport } from './routes/_authenticated/app.modelos-documentos'
 import { Route as AuthenticatedAppMedicosRouteImport } from './routes/_authenticated/app.medicos'
+import { Route as AuthenticatedAppLmsAdminRouteImport } from './routes/_authenticated/app.lms-admin'
 import { Route as AuthenticatedAppLgpdRouteImport } from './routes/_authenticated/app.lgpd'
 import { Route as AuthenticatedAppHrPontoRouteImport } from './routes/_authenticated/app.hr-ponto'
 import { Route as AuthenticatedAppHrHoleritesRouteImport } from './routes/_authenticated/app.hr-holerites'
@@ -119,6 +122,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const VerificarCodigoRoute = VerificarCodigoRouteImport.update({
+  id: '/verificar/$codigo',
+  path: '/verificar/$codigo',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PacienteConsultasRoute = PacienteConsultasRouteImport.update({
   id: '/paciente/consultas',
   path: '/paciente/consultas',
@@ -153,6 +161,12 @@ const AuthenticatedAppUnidadesRoute =
   AuthenticatedAppUnidadesRouteImport.update({
     id: '/unidades',
     path: '/unidades',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppTreinamentosRoute =
+  AuthenticatedAppTreinamentosRouteImport.update({
+    id: '/treinamentos',
+    path: '/treinamentos',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppSetoresRoute = AuthenticatedAppSetoresRouteImport.update({
@@ -228,6 +242,12 @@ const AuthenticatedAppMedicosRoute = AuthenticatedAppMedicosRouteImport.update({
   path: '/medicos',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
+const AuthenticatedAppLmsAdminRoute =
+  AuthenticatedAppLmsAdminRouteImport.update({
+    id: '/lms-admin',
+    path: '/lms-admin',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppLgpdRoute = AuthenticatedAppLgpdRouteImport.update({
   id: '/lgpd',
   path: '/lgpd',
@@ -517,6 +537,7 @@ export interface FileRoutesByFullPath {
   '/p/$token': typeof PTokenRoute
   '/paciente/cartoes': typeof PacienteCartoesRoute
   '/paciente/consultas': typeof PacienteConsultasRoute
+  '/verificar/$codigo': typeof VerificarCodigoRoute
   '/app/agenda': typeof AuthenticatedAppAgendaRoute
   '/app/alertas-enfermagem': typeof AuthenticatedAppAlertasEnfermagemRoute
   '/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
@@ -546,6 +567,7 @@ export interface FileRoutesByFullPath {
   '/app/hr-holerites': typeof AuthenticatedAppHrHoleritesRoute
   '/app/hr-ponto': typeof AuthenticatedAppHrPontoRoute
   '/app/lgpd': typeof AuthenticatedAppLgpdRoute
+  '/app/lms-admin': typeof AuthenticatedAppLmsAdminRoute
   '/app/medicos': typeof AuthenticatedAppMedicosRoute
   '/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
   '/app/nfse': typeof AuthenticatedAppNfseRoute
@@ -559,6 +581,7 @@ export interface FileRoutesByFullPath {
   '/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
   '/app/relatorios': typeof AuthenticatedAppRelatoriosRoute
   '/app/setores': typeof AuthenticatedAppSetoresRoute
+  '/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
   '/app/unidades': typeof AuthenticatedAppUnidadesRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
   '/app/': typeof AuthenticatedAppIndexRoute
@@ -592,6 +615,7 @@ export interface FileRoutesByTo {
   '/p/$token': typeof PTokenRoute
   '/paciente/cartoes': typeof PacienteCartoesRoute
   '/paciente/consultas': typeof PacienteConsultasRoute
+  '/verificar/$codigo': typeof VerificarCodigoRoute
   '/app/agenda': typeof AuthenticatedAppAgendaRoute
   '/app/alertas-enfermagem': typeof AuthenticatedAppAlertasEnfermagemRoute
   '/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
@@ -620,6 +644,7 @@ export interface FileRoutesByTo {
   '/app/hr-holerites': typeof AuthenticatedAppHrHoleritesRoute
   '/app/hr-ponto': typeof AuthenticatedAppHrPontoRoute
   '/app/lgpd': typeof AuthenticatedAppLgpdRoute
+  '/app/lms-admin': typeof AuthenticatedAppLmsAdminRoute
   '/app/medicos': typeof AuthenticatedAppMedicosRoute
   '/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
   '/app/nfse': typeof AuthenticatedAppNfseRoute
@@ -633,6 +658,7 @@ export interface FileRoutesByTo {
   '/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
   '/app/relatorios': typeof AuthenticatedAppRelatoriosRoute
   '/app/setores': typeof AuthenticatedAppSetoresRoute
+  '/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
   '/app/unidades': typeof AuthenticatedAppUnidadesRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
   '/app': typeof AuthenticatedAppIndexRoute
@@ -669,6 +695,7 @@ export interface FileRoutesById {
   '/p/$token': typeof PTokenRoute
   '/paciente/cartoes': typeof PacienteCartoesRoute
   '/paciente/consultas': typeof PacienteConsultasRoute
+  '/verificar/$codigo': typeof VerificarCodigoRoute
   '/_authenticated/app/agenda': typeof AuthenticatedAppAgendaRoute
   '/_authenticated/app/alertas-enfermagem': typeof AuthenticatedAppAlertasEnfermagemRoute
   '/_authenticated/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
@@ -698,6 +725,7 @@ export interface FileRoutesById {
   '/_authenticated/app/hr-holerites': typeof AuthenticatedAppHrHoleritesRoute
   '/_authenticated/app/hr-ponto': typeof AuthenticatedAppHrPontoRoute
   '/_authenticated/app/lgpd': typeof AuthenticatedAppLgpdRoute
+  '/_authenticated/app/lms-admin': typeof AuthenticatedAppLmsAdminRoute
   '/_authenticated/app/medicos': typeof AuthenticatedAppMedicosRoute
   '/_authenticated/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
   '/_authenticated/app/nfse': typeof AuthenticatedAppNfseRoute
@@ -711,6 +739,7 @@ export interface FileRoutesById {
   '/_authenticated/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
   '/_authenticated/app/relatorios': typeof AuthenticatedAppRelatoriosRoute
   '/_authenticated/app/setores': typeof AuthenticatedAppSetoresRoute
+  '/_authenticated/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
   '/_authenticated/app/unidades': typeof AuthenticatedAppUnidadesRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
   '/_authenticated/app/': typeof AuthenticatedAppIndexRoute
@@ -747,6 +776,7 @@ export interface FileRouteTypes {
     | '/p/$token'
     | '/paciente/cartoes'
     | '/paciente/consultas'
+    | '/verificar/$codigo'
     | '/app/agenda'
     | '/app/alertas-enfermagem'
     | '/app/anamneses'
@@ -776,6 +806,7 @@ export interface FileRouteTypes {
     | '/app/hr-holerites'
     | '/app/hr-ponto'
     | '/app/lgpd'
+    | '/app/lms-admin'
     | '/app/medicos'
     | '/app/modelos-documentos'
     | '/app/nfse'
@@ -789,6 +820,7 @@ export interface FileRouteTypes {
     | '/app/recepcao'
     | '/app/relatorios'
     | '/app/setores'
+    | '/app/treinamentos'
     | '/app/unidades'
     | '/p/contrato/$token'
     | '/app/'
@@ -822,6 +854,7 @@ export interface FileRouteTypes {
     | '/p/$token'
     | '/paciente/cartoes'
     | '/paciente/consultas'
+    | '/verificar/$codigo'
     | '/app/agenda'
     | '/app/alertas-enfermagem'
     | '/app/anamneses'
@@ -850,6 +883,7 @@ export interface FileRouteTypes {
     | '/app/hr-holerites'
     | '/app/hr-ponto'
     | '/app/lgpd'
+    | '/app/lms-admin'
     | '/app/medicos'
     | '/app/modelos-documentos'
     | '/app/nfse'
@@ -863,6 +897,7 @@ export interface FileRouteTypes {
     | '/app/recepcao'
     | '/app/relatorios'
     | '/app/setores'
+    | '/app/treinamentos'
     | '/app/unidades'
     | '/p/contrato/$token'
     | '/app'
@@ -898,6 +933,7 @@ export interface FileRouteTypes {
     | '/p/$token'
     | '/paciente/cartoes'
     | '/paciente/consultas'
+    | '/verificar/$codigo'
     | '/_authenticated/app/agenda'
     | '/_authenticated/app/alertas-enfermagem'
     | '/_authenticated/app/anamneses'
@@ -927,6 +963,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/hr-holerites'
     | '/_authenticated/app/hr-ponto'
     | '/_authenticated/app/lgpd'
+    | '/_authenticated/app/lms-admin'
     | '/_authenticated/app/medicos'
     | '/_authenticated/app/modelos-documentos'
     | '/_authenticated/app/nfse'
@@ -940,6 +977,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/recepcao'
     | '/_authenticated/app/relatorios'
     | '/_authenticated/app/setores'
+    | '/_authenticated/app/treinamentos'
     | '/_authenticated/app/unidades'
     | '/p/contrato/$token'
     | '/_authenticated/app/'
@@ -975,6 +1013,7 @@ export interface RootRouteChildren {
   PTokenRoute: typeof PTokenRoute
   PacienteCartoesRoute: typeof PacienteCartoesRoute
   PacienteConsultasRoute: typeof PacienteConsultasRoute
+  VerificarCodigoRoute: typeof VerificarCodigoRoute
   PContratoTokenRoute: typeof PContratoTokenRoute
 }
 
@@ -1029,6 +1068,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/verificar/$codigo': {
+      id: '/verificar/$codigo'
+      path: '/verificar/$codigo'
+      fullPath: '/verificar/$codigo'
+      preLoaderRoute: typeof VerificarCodigoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/paciente/consultas': {
       id: '/paciente/consultas'
       path: '/paciente/consultas'
@@ -1076,6 +1122,13 @@ declare module '@tanstack/react-router' {
       path: '/unidades'
       fullPath: '/app/unidades'
       preLoaderRoute: typeof AuthenticatedAppUnidadesRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/treinamentos': {
+      id: '/_authenticated/app/treinamentos'
+      path: '/treinamentos'
+      fullPath: '/app/treinamentos'
+      preLoaderRoute: typeof AuthenticatedAppTreinamentosRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/setores': {
@@ -1167,6 +1220,13 @@ declare module '@tanstack/react-router' {
       path: '/medicos'
       fullPath: '/app/medicos'
       preLoaderRoute: typeof AuthenticatedAppMedicosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/lms-admin': {
+      id: '/_authenticated/app/lms-admin'
+      path: '/lms-admin'
+      fullPath: '/app/lms-admin'
+      preLoaderRoute: typeof AuthenticatedAppLmsAdminRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/lgpd': {
@@ -1610,6 +1670,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppHrHoleritesRoute: typeof AuthenticatedAppHrHoleritesRoute
   AuthenticatedAppHrPontoRoute: typeof AuthenticatedAppHrPontoRoute
   AuthenticatedAppLgpdRoute: typeof AuthenticatedAppLgpdRoute
+  AuthenticatedAppLmsAdminRoute: typeof AuthenticatedAppLmsAdminRoute
   AuthenticatedAppMedicosRoute: typeof AuthenticatedAppMedicosRoute
   AuthenticatedAppModelosDocumentosRoute: typeof AuthenticatedAppModelosDocumentosRoute
   AuthenticatedAppNfseRoute: typeof AuthenticatedAppNfseRoute
@@ -1623,6 +1684,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppRecepcaoRoute: typeof AuthenticatedAppRecepcaoRoute
   AuthenticatedAppRelatoriosRoute: typeof AuthenticatedAppRelatoriosRoute
   AuthenticatedAppSetoresRoute: typeof AuthenticatedAppSetoresRoute
+  AuthenticatedAppTreinamentosRoute: typeof AuthenticatedAppTreinamentosRoute
   AuthenticatedAppUnidadesRoute: typeof AuthenticatedAppUnidadesRoute
   AuthenticatedAppIndexRoute: typeof AuthenticatedAppIndexRoute
   AuthenticatedAppFuncionarioUserIdRoute: typeof AuthenticatedAppFuncionarioUserIdRoute
@@ -1661,6 +1723,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppHrHoleritesRoute: AuthenticatedAppHrHoleritesRoute,
   AuthenticatedAppHrPontoRoute: AuthenticatedAppHrPontoRoute,
   AuthenticatedAppLgpdRoute: AuthenticatedAppLgpdRoute,
+  AuthenticatedAppLmsAdminRoute: AuthenticatedAppLmsAdminRoute,
   AuthenticatedAppMedicosRoute: AuthenticatedAppMedicosRoute,
   AuthenticatedAppModelosDocumentosRoute:
     AuthenticatedAppModelosDocumentosRoute,
@@ -1676,6 +1739,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppRecepcaoRoute: AuthenticatedAppRecepcaoRoute,
   AuthenticatedAppRelatoriosRoute: AuthenticatedAppRelatoriosRoute,
   AuthenticatedAppSetoresRoute: AuthenticatedAppSetoresRoute,
+  AuthenticatedAppTreinamentosRoute: AuthenticatedAppTreinamentosRoute,
   AuthenticatedAppUnidadesRoute: AuthenticatedAppUnidadesRoute,
   AuthenticatedAppIndexRoute: AuthenticatedAppIndexRoute,
   AuthenticatedAppFuncionarioUserIdRoute:
@@ -1709,6 +1773,7 @@ const rootRouteChildren: RootRouteChildren = {
   PTokenRoute: PTokenRoute,
   PacienteCartoesRoute: PacienteCartoesRoute,
   PacienteConsultasRoute: PacienteConsultasRoute,
+  VerificarCodigoRoute: VerificarCodigoRoute,
   PContratoTokenRoute: PContratoTokenRoute,
 }
 export const routeTree = rootRouteImport
