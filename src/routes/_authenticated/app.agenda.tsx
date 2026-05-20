@@ -174,6 +174,8 @@ function AgendaPage() {
     e.preventDefault();
     if (!clinicaAtual) return;
     if (!novoPac.nome.trim()) { toast.error("Informe o nome"); return; }
+    if (!novoPac.data_nascimento) { toast.error("Informe a data de nascimento"); return; }
+    if (!novoPac.telefone.trim()) { toast.error("Informe o telefone"); return; }
     setSavingPac(true);
     const { data, error } = await supabase
       .from("pacientes")
@@ -1005,13 +1007,13 @@ function AgendaPage() {
                 <Input value={novoPac.cpf} onChange={(e) => setNovoPac(p => ({ ...p, cpf: e.target.value }))} placeholder="000.000.000-00" />
               </div>
               <div className="space-y-1">
-                <Label>Nascimento</Label>
-                <Input type="date" value={novoPac.data_nascimento} onChange={(e) => setNovoPac(p => ({ ...p, data_nascimento: e.target.value }))} />
+                <Label>Nascimento *</Label>
+                <Input type="date" required value={novoPac.data_nascimento} onChange={(e) => setNovoPac(p => ({ ...p, data_nascimento: e.target.value }))} />
               </div>
             </div>
             <div className="space-y-1">
-              <Label>Telefone</Label>
-              <Input value={novoPac.telefone} onChange={(e) => setNovoPac(p => ({ ...p, telefone: e.target.value }))} placeholder="(00) 00000-0000" />
+              <Label>Telefone *</Label>
+              <Input required value={novoPac.telefone} onChange={(e) => setNovoPac(p => ({ ...p, telefone: e.target.value }))} placeholder="(00) 00000-0000" />
             </div>
             <div className="space-y-1">
               <Label>E-mail</Label>

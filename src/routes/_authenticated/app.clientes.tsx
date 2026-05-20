@@ -389,6 +389,8 @@ function ClientesPage() {
     e.preventDefault();
     if (!clinicaAtual) return;
     if (!form.nome.trim()) { toast.error("Informe o nome."); return; }
+    if (!form.telefone.trim()) { toast.error("Informe o telefone."); return; }
+    if (!form.data_nascimento) { toast.error("Informe a data de nascimento."); return; }
     setSaving(true);
     const payload = {
       nome: form.nome.trim(),
@@ -671,7 +673,7 @@ function ClientesPage() {
                     <InputVoz {...fieldProps("cpf")} />
                   </div>
                   <div className="space-y-1">
-                    <Label>Telefone</Label>
+                    <Label>Telefone *</Label>
                     <InputVoz {...fieldProps("telefone")} />
                   </div>
                 </div>
@@ -681,8 +683,8 @@ function ClientesPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-3 items-end">
                   <div className="space-y-1">
-                    <Label>Data de nascimento</Label>
-                    <Input type="date" value={form.data_nascimento}
+                    <Label>Data de nascimento *</Label>
+                    <Input type="date" required value={form.data_nascimento}
                       onChange={(e) => setForm({ ...form, data_nascimento: e.target.value })} />
                   </div>
                   {idade !== null && (
