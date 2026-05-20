@@ -1355,6 +1355,12 @@ export type Database = {
           observacoes: string | null
           paciente_id: string | null
           procedimento: string | null
+          repasse_conta_id: string | null
+          repasse_forma_pagamento: string | null
+          repasse_lancamento_id: string | null
+          repasse_pago: boolean
+          repasse_pago_em: string | null
+          repasse_pago_por: string | null
           status: string
           updated_at: string
           valor_clinica: number
@@ -1372,6 +1378,12 @@ export type Database = {
           observacoes?: string | null
           paciente_id?: string | null
           procedimento?: string | null
+          repasse_conta_id?: string | null
+          repasse_forma_pagamento?: string | null
+          repasse_lancamento_id?: string | null
+          repasse_pago?: boolean
+          repasse_pago_em?: string | null
+          repasse_pago_por?: string | null
           status?: string
           updated_at?: string
           valor_clinica?: number
@@ -1389,6 +1401,12 @@ export type Database = {
           observacoes?: string | null
           paciente_id?: string | null
           procedimento?: string | null
+          repasse_conta_id?: string | null
+          repasse_forma_pagamento?: string | null
+          repasse_lancamento_id?: string | null
+          repasse_pago?: boolean
+          repasse_pago_em?: string | null
+          repasse_pago_por?: string | null
           status?: string
           updated_at?: string
           valor_clinica?: number
@@ -1553,6 +1571,12 @@ export type Database = {
           observacoes: string | null
           paciente_id: string | null
           parcelas: number | null
+          repasse_conta_id: string | null
+          repasse_forma_pagamento: string | null
+          repasse_lancamento_id: string | null
+          repasse_pago: boolean
+          repasse_pago_em: string | null
+          repasse_pago_por: string | null
           status: Database["public"]["Enums"]["fin_status_lancamento"]
           tipo: Database["public"]["Enums"]["fin_tipo_lancamento"]
           updated_at: string
@@ -1577,6 +1601,12 @@ export type Database = {
           observacoes?: string | null
           paciente_id?: string | null
           parcelas?: number | null
+          repasse_conta_id?: string | null
+          repasse_forma_pagamento?: string | null
+          repasse_lancamento_id?: string | null
+          repasse_pago?: boolean
+          repasse_pago_em?: string | null
+          repasse_pago_por?: string | null
           status?: Database["public"]["Enums"]["fin_status_lancamento"]
           tipo: Database["public"]["Enums"]["fin_tipo_lancamento"]
           updated_at?: string
@@ -1601,6 +1631,12 @@ export type Database = {
           observacoes?: string | null
           paciente_id?: string | null
           parcelas?: number | null
+          repasse_conta_id?: string | null
+          repasse_forma_pagamento?: string | null
+          repasse_lancamento_id?: string | null
+          repasse_pago?: boolean
+          repasse_pago_em?: string | null
+          repasse_pago_por?: string | null
           status?: Database["public"]["Enums"]["fin_status_lancamento"]
           tipo?: Database["public"]["Enums"]["fin_tipo_lancamento"]
           updated_at?: string
