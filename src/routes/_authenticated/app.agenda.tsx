@@ -655,7 +655,7 @@ function AgendaPage() {
             </button>
             <button
               type="button"
-              onClick={() => { setViewMode("medico"); if (!medicoView && medicos[0]) setMedicoView(medicos[0].id); }}
+              onClick={() => setViewMode("medico")}
               className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${viewMode === "medico" ? "bg-emerald-600 text-white" : "text-muted-foreground hover:text-foreground"}`}
             >
               Por médico
