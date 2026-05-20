@@ -226,6 +226,10 @@ function Page() {
     if (!clinicaAtual || !user || !minhaSessao || !openCobranca) return;
     const v = Number(cobrancaValor) || 0;
     if (v <= 0) { toast.error("Informe um valor"); return; }
+    if ((cobrancaForma === "credito" || cobrancaForma === "debito") && !cobrancaBandeira) {
+      toast.error("Selecione a bandeira do cartão"); return;
+    }
+    const sufixoCartao = montarSufixoCartao(cobrancaForma, cobrancaBandeira, cobrancaParcelas);
     setSaving(true);
     try {
       // 1) Movimento de caixa
@@ -235,7 +239,7 @@ function Page() {
         user_id: user.id,
         tipo: "recebimento",
         valor: v,
-        descricao: `${openCobranca.paciente_nome} · ${openCobranca.procedimento ?? "atendimento"}`,
+        descricao: `${openCobranca.paciente_nome} · ${openCobranca.procedimento ?? "atendimento"}${sufixoCartao}`,
         forma_pagamento: cobrancaForma,
       });
       if (e1) throw e1;
@@ -243,7 +247,7 @@ function Page() {
       const { error: e2 } = await supabase.from("fin_lancamentos").insert({
         clinica_id: clinicaAtual.clinica_id,
         tipo: "receita",
-        descricao: `Recebimento — ${openCobranca.paciente_nome} (${openCobranca.procedimento ?? "atendimento"})`,
+        descricao: `Recebimento — ${openCobranca.paciente_nome} (${openCobranca.procedimento ?? "atendimento"})${sufixoCartao}`,
         valor: v,
         data: new Date().toISOString().slice(0, 10),
         status: "confirmado",
@@ -260,6 +264,7 @@ function Page() {
       if (e3) throw e3;
       toast.success("Cobrança registrada · paciente enviado à triagem");
       setOpenCobranca(null); setCobrancaValor(""); setCobrancaForma("dinheiro");
+      setCobrancaBandeira(""); setCobrancaParcelas("1");
       void load(); void loadFilaCaixa();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Falha na cobrança");
