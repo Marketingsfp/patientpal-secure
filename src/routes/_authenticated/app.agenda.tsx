@@ -27,7 +27,7 @@ import {
   CalendarDays, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X,
   MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, Clock, DollarSign,
 } from "lucide-react";
-import { printGuiaAtendimento } from "@/lib/print-gr";
+import { printGuiaAtendimento, reimprimirGuiaAtendimento } from "@/lib/print-gr";
 import { VoiceInput } from "@/components/voice-input";
 import { exportToExcel } from "@/lib/export-csv";
 import { useAuth } from "@/hooks/use-auth";
@@ -85,6 +85,7 @@ const EMPTY = {
 
 function AgendaPage() {
   const { clinicaAtual } = useClinica();
+  const [usuarioEhMedico, setUsuarioEhMedico] = useState(false);
   const corClinica = (() => {
     const n = (clinicaAtual?.clinica.nome ?? "").toLowerCase();
     if (n.includes("são francisco") || n.includes("sao francisco")) return "#14532d";
@@ -251,6 +252,22 @@ function AgendaPage() {
 
   useEffect(() => { loadRef(); }, [clinicaAtual?.clinica_id]);
   useEffect(() => { load(); }, [clinicaAtual?.clinica_id, dataRef, apenasData]);
+
+  // Verifica se o usuário logado é médico da clínica atual (para liberar status "Realizado")
+  useEffect(() => {
+    (async () => {
+      if (!user?.id || !clinicaAtual) { setUsuarioEhMedico(false); return; }
+      const { data } = await supabase
+        .from("medicos")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("ativo", true)
+        .limit(1)
+        .maybeSingle();
+      setUsuarioEhMedico(!!data);
+    })();
+  }, [user?.id, clinicaAtual?.clinica_id]);
 
   // Duração padrão (minutos) inferida dos slots existentes por médico
   const duracaoPorMedico = useMemo(() => {
@@ -539,6 +556,22 @@ function AgendaPage() {
     setPagamentoOpen(true);
   };
 
+  const escolherMisto = () => {
+    if (!formaPagCtx) return;
+    const ids = formaPagCtx.agId.split(",").filter(Boolean);
+    const principal = ids[0] ?? null;
+    const extras = ids.slice(1);
+    // pega o maior valor disponível como referência (geralmente todas as formas têm valor próximo)
+    const valorRef = Math.max(0, ...formaPagOpcoes.map((o) => o.valor));
+    setPagamentoDesc(formaPagCtx.desc);
+    setPagamentoValor(valorRef > 0 ? valorRef.toFixed(2) : "");
+    setPagamentoForma("__misto__");
+    setPagamentoAgId(principal);
+    setPagamentoExtraIds(extras);
+    setFormaPagOpen(false);
+    setPagamentoOpen(true);
+  };
+
   const imprimirGR = async (a: Agendamento) => {
     if (!clinicaAtual) return;
     try {
@@ -546,9 +579,24 @@ function AgendaPage() {
         agendamentoId: a.id,
         clinicaId: clinicaAtual.clinica_id,
         usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
+        usuarioId: user?.id ?? null,
       });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Falha ao imprimir GR");
+    }
+  };
+
+  const reimprimirGR = async (a: Agendamento) => {
+    if (!clinicaAtual) return;
+    try {
+      await reimprimirGuiaAtendimento({
+        agendamentoId: a.id,
+        clinicaId: clinicaAtual.clinica_id,
+        usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
+        usuarioId: user?.id ?? null,
+      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha ao reimprimir GR");
     }
   };
 
