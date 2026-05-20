@@ -116,6 +116,7 @@ export function AppShell() {
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
+    if (window.innerWidth < 1024) return true;
     return window.localStorage.getItem("appshell:collapsed") === "1";
   });
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
@@ -132,6 +133,15 @@ export function AppShell() {
       window.localStorage.setItem("appshell:collapsed", collapsed ? "1" : "0");
     }
   }, [collapsed]);
+  // Auto-collapse on small screens
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onResize = () => {
+      if (window.innerWidth < 1024) setCollapsed(true);
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   const [profileName, setProfileName] = useState<string>("");
   useEffect(() => {
@@ -337,8 +347,8 @@ export function AppShell() {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="sticky top-0 z-30 h-14 bg-card/80 backdrop-blur border-b flex items-center gap-3 px-6">
-          <div className="relative flex-1 max-w-xl">
+        <header className="sticky top-0 z-30 h-14 bg-card/80 backdrop-blur border-b flex items-center gap-3 px-3 sm:px-6">
+          <div className="relative flex-1 max-w-xl hidden sm:block">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
             <input
               type="search"
@@ -359,7 +369,7 @@ export function AppShell() {
             </div>
           </div>
         </header>
-        <main className="flex-1 p-6 overflow-auto min-w-0" style={{ background: "var(--surface-cream)" }}>
+        <main className="flex-1 p-3 sm:p-4 lg:p-6 overflow-auto min-w-0" style={{ background: "var(--surface-cream)" }}>
           <Outlet />
         </main>
       </div>

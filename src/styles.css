@@ -166,3 +166,36 @@
     color: var(--color-foreground);
   }
 }
+
+/* ============================================================
+ * Global responsive safety net
+ * Prevents horizontal page overflow on mobile/tablet without
+ * requiring per-page rewrites.
+ * ============================================================ */
+@layer base {
+  html, body, #root { max-width: 100vw; overflow-x: hidden; }
+
+  /* Any table inside main scrolls horizontally instead of pushing layout */
+  main table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+  @media (min-width: 1024px) {
+    main table {
+      display: table;
+      white-space: normal;
+    }
+  }
+
+  /* Dialogs / sheets that hardcode large widths shouldn't overflow viewport */
+  [role="dialog"] { max-width: 100vw; }
+
+  /* Common heading sizes shrink on small screens */
+  @media (max-width: 640px) {
+    main h1 { font-size: 1.25rem; line-height: 1.75rem; }
+    main h2 { font-size: 1.125rem; line-height: 1.5rem; }
+  }
+}
