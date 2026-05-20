@@ -509,6 +509,10 @@ function AgendaPage() {
   };
 
   const mudarStatus = async (a: Agendamento, status: Status) => {
+    if (status === "realizado" && !usuarioEhMedico) {
+      toast.error("Apenas o médico responsável pode marcar como 'Realizado'.");
+      return;
+    }
     const { error } = await supabase.from("agendamentos").update({ status }).eq("id", a.id);
     if (error) toast.error(error.message); else await load();
   };
