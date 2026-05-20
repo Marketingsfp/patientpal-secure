@@ -1332,7 +1332,11 @@ function AgendaPage() {
                   </TableCell>
                   <TableCell className="text-center">
                     <div className="inline-flex items-center gap-1 flex-wrap justify-center">
-                      <Badge className={STATUS_COR[a.status]}>{STATUS_LABEL[a.status]}</Badge>
+                      {normalizar(a.paciente_nome) === "disponivel" ? (
+                        <Badge className="bg-slate-100 text-slate-600 border border-slate-300">Livre</Badge>
+                      ) : (
+                        <Badge className={STATUS_COR[a.status]}>{STATUS_LABEL[a.status]}</Badge>
+                      )}
                       {pagosSet.has(a.id) && (
                         <Badge className="bg-emerald-600 text-white border border-emerald-700 hover:bg-emerald-600">
                           Pago
