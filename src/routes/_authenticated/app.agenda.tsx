@@ -996,28 +996,6 @@ function AgendaPage() {
           </DialogHeader>
           <form onSubmit={cadastrarPacienteRapido} className="space-y-3">
             <div className="space-y-1">
-              <Label className="text-xs">Importar de usuário do sistema</Label>
-              <Select
-                onOpenChange={(o) => o && carregarEquipe()}
-                onValueChange={(v) => {
-                  const m = equipeList.find((e) => `${e.nome}|${e.email}` === v);
-                  if (m) setNovoPac((p) => ({ ...p, nome: m.nome ?? p.nome, email: m.email ?? p.email }));
-                }}
-              >
-                <SelectTrigger><SelectValue placeholder="Selecione um membro da equipe (opcional)" /></SelectTrigger>
-                <SelectContent>
-                  {equipeList.length === 0
-                    ? <div className="px-2 py-1.5 text-sm text-muted-foreground">Carregando…</div>
-                    : equipeList.map((m, i) => (
-                        <SelectItem key={i} value={`${m.nome}|${m.email}`}>
-                          {m.nome ?? "—"} {m.email ? `(${m.email})` : ""}
-                        </SelectItem>
-                      ))}
-                </SelectContent>
-              </Select>
-              <p className="text-[11px] text-muted-foreground">Preenche nome e e-mail. Complete CPF, telefone e nascimento abaixo.</p>
-            </div>
-            <div className="space-y-1">
               <Label>Nome *</Label>
               <Input value={novoPac.nome} onChange={(e) => setNovoPac(p => ({ ...p, nome: e.target.value }))} required autoFocus />
             </div>
