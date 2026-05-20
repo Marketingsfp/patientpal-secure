@@ -238,6 +238,53 @@ function MedicosPage() {
     setLoading(false);
     toast.success(editId ? "Médico atualizado!" : "Médico cadastrado!");
 
+    // Cria automaticamente o cadastro de paciente correspondente (se ainda não existir)
+    if (!editId && form.nome.trim()) {
+      try {
+        let existe: { id: string } | null = null;
+        if (form.cpf) {
+          const { data } = await supabase
+            .from("pacientes")
+            .select("id")
+            .eq("clinica_id", clinicaAtual.clinica_id)
+            .eq("cpf", form.cpf)
+            .maybeSingle();
+          existe = data;
+        }
+        if (!existe && form.email) {
+          const { data } = await supabase
+            .from("pacientes")
+            .select("id")
+            .eq("clinica_id", clinicaAtual.clinica_id)
+            .ilike("email", form.email)
+            .maybeSingle();
+          existe = data;
+        }
+        if (!existe) {
+          await supabase.from("pacientes").insert({
+            clinica_id: clinicaAtual.clinica_id,
+            nome: form.nome,
+            cpf: form.cpf || null,
+            rg: form.rg || null,
+            data_nascimento: form.data_nascimento || null,
+            email: form.email || null,
+            telefone: form.telefone || null,
+            cep: form.cep || null,
+            logradouro: form.logradouro || null,
+            numero: form.numero || null,
+            complemento: form.complemento || null,
+            bairro: form.bairro || null,
+            cidade: form.cidade || null,
+            estado: form.estado ? form.estado.toUpperCase() : null,
+            ativo: true,
+          });
+          toast.success("Cadastro de paciente criado automaticamente.");
+        }
+      } catch (err: any) {
+        toast.warning(`Médico salvo, mas paciente não foi criado: ${err?.message ?? err}`);
+      }
+    }
+
     // Optionally create system user / add to clinic team
     if (form.criarUsuario && form.email && form.senhaUsuario.length >= 6) {
       try {
