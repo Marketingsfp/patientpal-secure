@@ -1,6 +1,6 @@
 import { Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
-import { lazy, Suspense, useEffect } from "react";
-import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet } from "lucide-react";
+import { lazy, Suspense, useEffect, useState } from "react";
+import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
@@ -85,6 +85,19 @@ export function AppShell() {
   const { memberships, clinicaAtual, setClinicaAtual } = useClinica();
   const location = useLocation();
   const navigate = useNavigate();
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("appshell:collapsed") === "1";
+  });
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("appshell:collapsed", collapsed ? "1" : "0");
+    }
+  }, [collapsed]);
+
+  const userName = (user?.user_metadata?.full_name as string | undefined)
+    ?? (user?.user_metadata?.name as string | undefined)
+    ?? (user?.email ? user.email.split("@")[0] : "");
 
   useEffect(() => {
     if (!loading && !user) navigate({ to: "/login", replace: true });
@@ -135,22 +148,34 @@ export function AppShell() {
   return (
     <div className="min-h-screen flex bg-muted/30">
       <aside
-        className="w-64 shrink-0 text-white sticky top-0 h-screen overflow-y-auto shadow-sm bg-slate-800 flex flex-col"
+        className={`${collapsed ? "w-16" : "w-64"} transition-all duration-200 shrink-0 text-white sticky top-0 h-screen overflow-y-auto shadow-sm bg-slate-800 flex flex-col`}
         style={{ backgroundColor: clinicaAtual ? corDaClinica(clinicaAtual.clinica.nome) : undefined }}
       >
-        <div className="px-4 py-3 border-b border-white/10">
-          <Link to="/app" className="flex items-center gap-2">
+        <div className="px-3 py-3 border-b border-white/10 flex items-center justify-between gap-2">
+          <Link to="/app" className="flex items-center gap-2 min-w-0">
             <Activity className="h-5 w-5 shrink-0" />
-            <span className="font-semibold tracking-tight">ClinicaOS</span>
+            {!collapsed && <span className="font-semibold tracking-tight truncate">ClinicaOS</span>}
           </Link>
-          {clinicaAtual && logoDaClinica(clinicaAtual.clinica.nome) && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-white hover:bg-white/10 hover:text-white h-7 w-7 p-0 shrink-0"
+            onClick={() => setCollapsed((v) => !v)}
+            title={collapsed ? "Expandir menu" : "Recolher menu"}
+          >
+            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          </Button>
+        </div>
+        {!collapsed && clinicaAtual && logoDaClinica(clinicaAtual.clinica.nome) && (
+          <div className="px-4 py-2 border-b border-white/10">
             <img
               src={logoDaClinica(clinicaAtual.clinica.nome)!}
               alt={clinicaAtual.clinica.nome}
-              className="h-12 w-auto object-contain mt-2 bg-white rounded p-1"
+              className="h-12 w-auto object-contain bg-white rounded p-1"
             />
-          )}
-        </div>
+          </div>
+        )}
+        {!collapsed && (
         <div className="px-3 py-2 space-y-2 border-b border-white/10">
           {memberships.length > 0 && (
             <Select value={clinicaAtual?.clinica_id} onValueChange={setClinicaAtual}>
@@ -179,10 +204,11 @@ export function AppShell() {
             />
           </Suspense>
         </div>
+        )}
         <nav className="flex-1 px-2 py-3 space-y-4 overflow-y-auto">
           {navRows.map((row, idx) => (
             <div key={idx} className="space-y-0.5">
-              <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider opacity-60">{row.label}</p>
+              {!collapsed && <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider opacity-60">{row.label}</p>}
               {row.items.map((item) => {
                 const active = location.pathname === item.to ||
                   (item.to !== "/app" && location.pathname.startsWith(item.to));
@@ -190,20 +216,21 @@ export function AppShell() {
                   <Link
                     key={item.to}
                     to={item.to}
-                    className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                    title={collapsed ? item.label : undefined}
+                    className={`flex items-center gap-2 rounded-md ${collapsed ? "px-2 justify-center" : "px-3"} py-2 text-sm font-medium transition-colors ${
                       active ? "bg-white/25 text-white" : "text-white/90 hover:bg-white/10 hover:text-white"
                     }`}
                   >
                     <item.icon className="h-4 w-4 shrink-0" />
-                    {item.label}
+                    {!collapsed && item.label}
                   </Link>
                 );
               })}
             </div>
           ))}
         </nav>
-        <div className="px-3 py-2 border-t border-white/10 flex items-center justify-between gap-2">
-          <span className="text-xs opacity-80 truncate flex-1">{user?.email}</span>
+        <div className={`px-3 py-2 border-t border-white/10 flex items-center ${collapsed ? "justify-center" : "justify-between"} gap-2`}>
+          {!collapsed && <span className="text-xs opacity-90 truncate flex-1" title={user?.email ?? undefined}>{userName}</span>}
           <Button variant="ghost" size="sm" className="text-white hover:bg-white/10 hover:text-white" onClick={handleSignOut} title="Sair">
             <LogOut className="h-4 w-4" />
           </Button>
