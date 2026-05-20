@@ -265,7 +265,6 @@ function MedicosPage() {
             clinica_id: clinicaAtual.clinica_id,
             nome: form.nome,
             cpf: form.cpf || null,
-            rg: form.rg || null,
             data_nascimento: form.data_nascimento || null,
             email: form.email || null,
             telefone: form.telefone || null,
@@ -277,7 +276,7 @@ function MedicosPage() {
             cidade: form.cidade || null,
             estado: form.estado ? form.estado.toUpperCase() : null,
             ativo: true,
-          });
+          } as never);
           toast.success("Cadastro de paciente criado automaticamente.");
         }
       } catch (err: any) {
