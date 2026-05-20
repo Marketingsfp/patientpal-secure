@@ -23,6 +23,8 @@ export function useCrud<T extends TableName>(table: T, options: UseCrudOptions =
   const { label, onSuccess } = options;
   const what = label ?? String(table);
   const [loading, setLoading] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tbl = () => (supabase as any).from(table as string);
 
   const insert = useCallback(
     async (
@@ -30,11 +32,7 @@ export function useCrud<T extends TableName>(table: T, options: UseCrudOptions =
     ) => {
       setLoading(true);
       try {
-        const { data, error } = await supabase
-          .from(table as string)
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .insert(values as any)
-          .select();
+        const { data, error } = await tbl().insert(values).select();
         if (error) throw error;
         toast.success(`${capitalize(what)} criado(a) com sucesso`);
         onSuccess?.();
@@ -53,12 +51,7 @@ export function useCrud<T extends TableName>(table: T, options: UseCrudOptions =
     async (id: string, values: Database["public"]["Tables"][T]["Update"]) => {
       setLoading(true);
       try {
-        const { data, error } = await supabase
-          .from(table as string)
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .update(values as any)
-          .eq("id", id)
-          .select();
+        const { data, error } = await tbl().update(values).eq("id", id).select();
         if (error) throw error;
         toast.success(`${capitalize(what)} atualizado(a)`);
         onSuccess?.();
@@ -77,7 +70,7 @@ export function useCrud<T extends TableName>(table: T, options: UseCrudOptions =
     async (id: string) => {
       setLoading(true);
       try {
-        const { error } = await supabase.from(table as string).delete().eq("id", id);
+        const { error } = await tbl().delete().eq("id", id);
         if (error) throw error;
         toast.success(`${capitalize(what)} removido(a)`);
         onSuccess?.();
