@@ -152,6 +152,14 @@ function ClientesPage() {
   // Biometria facial
   const [faceFor, setFaceFor] = useState<Paciente | null>(null);
   const [consentFor, setConsentFor] = useState<Paciente | null>(null);
+  const [prontFor, setProntFor] = useState<Paciente | null>(null);
+  const [prontList, setProntList] = useState<Array<{
+    id: string; data: string; medico_nome: string | null;
+    queixa_principal: string | null; hipotese_diagnostica: string | null;
+    conduta: string | null; prescricao: string | null;
+    historia_doenca: string | null; exame_fisico: string | null; observacoes: string | null;
+  }>>([]);
+  const [prontLoading, setProntLoading] = useState(false);
   const [hasBiometria, setHasBiometria] = useState<Record<string, boolean>>({});
   const [fotoSigned, setFotoSigned] = useState<Record<string, string>>({});
 
