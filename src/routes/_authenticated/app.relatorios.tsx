@@ -294,6 +294,44 @@ const RELATORIOS: Relatorio[] = [
       return (data ?? []) as any;
     },
   },
+  {
+    id: "triagem-enfermagem",
+    titulo: "Triagem — Enfermagem",
+    descricao: "Atendimentos iniciais da enfermagem com sinais vitais, doenças e medicamentos.",
+    icon: HeartPulse, cor: "#ef4444",
+    usaPeriodo: true,
+    carregar: async ({ clinicaId, ini, fim }) => {
+      const { data } = await supabase
+        .from("triagens_enfermagem")
+        .select("created_at, enfermeira_nome, peso_kg, altura_cm, imc, pa_sistolica, pa_diastolica, freq_cardiaca, temperatura, saturacao, glicemia, queixa_principal, doencas, medicamentos, alergias, observacoes, pacientes(nome, cpf), agendamentos(inicio, procedimento)")
+        .eq("clinica_id", clinicaId)
+        .gte("created_at", ini! + "T00:00:00")
+        .lte("created_at", fim! + "T23:59:59")
+        .order("created_at", { ascending: false });
+      return (data ?? []).map((r: any) => ({
+        Data: r.created_at,
+        Paciente: r.pacientes?.nome ?? "",
+        CPF: r.pacientes?.cpf ?? "",
+        Agendamento: r.agendamentos?.inicio ?? "",
+        Procedimento: r.agendamentos?.procedimento ?? "",
+        Enfermeira: r.enfermeira_nome ?? "",
+        "Peso (kg)": r.peso_kg ?? "",
+        "Altura (cm)": r.altura_cm ?? "",
+        IMC: r.imc ?? "",
+        "PA Sistólica": r.pa_sistolica ?? "",
+        "PA Diastólica": r.pa_diastolica ?? "",
+        "FC (bpm)": r.freq_cardiaca ?? "",
+        "Temperatura (°C)": r.temperatura ?? "",
+        "Saturação (%)": r.saturacao ?? "",
+        "Glicemia (mg/dL)": r.glicemia ?? "",
+        "Queixa principal": r.queixa_principal ?? "",
+        Doenças: Array.isArray(r.doencas) ? r.doencas.join(", ") : "",
+        Medicamentos: r.medicamentos ?? "",
+        Alergias: r.alergias ?? "",
+        Observações: r.observacoes ?? "",
+      }));
+    },
+  },
 ];
 
 function RelatoriosPage() {
