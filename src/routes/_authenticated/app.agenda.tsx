@@ -774,7 +774,17 @@ function AgendaPage() {
                             (nomesDoMedico?.has(normalizar(p.nome)) ?? false)
                           )
                         : procedimentosList;
-                      return filtrados.map((p) => ({ value: p.nome, label: p.nome }));
+                      // Deduplicar pelo nome normalizado (evita "CONSULTA" duplicada quando o
+                      // procedimento existe tanto na tabela procedimentos quanto em medico_convenios).
+                      const vistos = new Set<string>();
+                      return filtrados
+                        .filter((p) => {
+                          const k = normalizar(p.nome);
+                          if (vistos.has(k)) return false;
+                          vistos.add(k);
+                          return true;
+                        })
+                        .map((p) => ({ value: p.nome, label: p.nome }));
                     })(),
                   ]}
                 />
