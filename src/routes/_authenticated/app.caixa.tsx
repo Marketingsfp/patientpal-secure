@@ -898,6 +898,32 @@ function Page() {
                 </SelectContent>
               </Select>
             </div>
+            {(cobrancaForma === "credito" || cobrancaForma === "debito") && (
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label>Bandeira *</Label>
+                  <Select value={cobrancaBandeira} onValueChange={setCobrancaBandeira}>
+                    <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                    <SelectContent>
+                      {BANDEIRAS_CARTAO.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {cobrancaForma === "credito" && (
+                  <div>
+                    <Label>Parcelas</Label>
+                    <Select value={cobrancaParcelas} onValueChange={setCobrancaParcelas}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 12 }, (_, i) => i + 1).map(n => (
+                          <SelectItem key={n} value={String(n)}>{n}x</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+            )}
             <p className="text-xs text-muted-foreground">
               Será criado: movimento de caixa + lançamento financeiro (receita) + paciente avança para <b>triagem</b>.
             </p>
