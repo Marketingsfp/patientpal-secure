@@ -2232,6 +2232,44 @@ export type Database = {
           },
         ]
       }
+      integration_secrets: {
+        Row: {
+          chave: string
+          clinica_id: string
+          created_at: string
+          descricao: string | null
+          id: string
+          updated_at: string
+          valor: string
+        }
+        Insert: {
+          chave: string
+          clinica_id: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          updated_at?: string
+          valor: string
+        }
+        Update: {
+          chave?: string
+          clinica_id?: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          updated_at?: string
+          valor?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_secrets_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lgpd_consentimentos: {
         Row: {
           aceito: boolean
@@ -4483,6 +4521,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      checkin_agendamento: { Args: { _token: string }; Returns: Json }
       consulta_publica: { Args: { _token: string }; Returns: Json }
       contrato_publico: { Args: { _token: string }; Returns: Json }
       criar_clinica_com_admin: {
