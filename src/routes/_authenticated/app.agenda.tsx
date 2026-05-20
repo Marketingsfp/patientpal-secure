@@ -1167,12 +1167,15 @@ function AgendaPage() {
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Profissional</Label>
             <SearchableSelect
               value={filtroMedico}
-              onChange={setFiltroMedico}
+              onChange={(v) => { if (!isMedicoOnly) setFiltroMedico(v); }}
               placeholder="TODOS"
               searchPlaceholder="Buscar médico..."
+              disabled={isMedicoOnly}
               options={[
-                { value: "todos", label: "TODOS" },
-                ...medicos.map(m => ({ value: m.id, label: m.nome })),
+                ...(isMedicoOnly ? [] : [{ value: "todos", label: "TODOS" }]),
+                ...medicos
+                  .filter((m) => !isMedicoOnly || m.id === medicoLogadoId)
+                  .map((m) => ({ value: m.id, label: m.nome })),
               ]}
             />
           </div>
