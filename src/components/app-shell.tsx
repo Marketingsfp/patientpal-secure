@@ -138,7 +138,9 @@ export function AppShell() {
     if (!user?.id) { setProfileName(""); return; }
     let cancelled = false;
     supabase.from("profiles").select("nome").eq("id", user.id).maybeSingle()
-      .then(({ data }) => { if (!cancelled && data?.nome) setProfileName(data.nome as string); });
+      .then((res: { data: { nome: string | null } | null }) => {
+        if (!cancelled && res.data?.nome) setProfileName(res.data.nome);
+      });
     return () => { cancelled = true; };
   }, [user?.id]);
   const userName = profileName
