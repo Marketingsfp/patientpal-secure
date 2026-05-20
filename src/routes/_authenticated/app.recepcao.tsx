@@ -116,12 +116,12 @@ function RecepcaoPage() {
           <Button size="lg" onClick={chamarProxima} disabled={busy}>
             <Bell className="h-4 w-4 mr-2" /> Chamar próxima
           </Button>
-          <a href="/totem" target="_blank" rel="noreferrer">
-            <Button variant="outline"><ExternalLink className="h-4 w-4 mr-2" /> Totem</Button>
-          </a>
-          <a href="/painel" target="_blank" rel="noreferrer">
-            <Button variant="outline"><ExternalLink className="h-4 w-4 mr-2" /> Painel</Button>
-          </a>
+          <Button variant="outline" asChild>
+            <a href="/totem" target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4 mr-2" /> Totem</a>
+          </Button>
+          <Button variant="outline" asChild>
+            <a href="/painel" target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4 mr-2" /> Painel</a>
+          </Button>
         </div>
       </div>
 
