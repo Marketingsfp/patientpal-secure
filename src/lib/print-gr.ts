@@ -54,8 +54,8 @@ const FORMA_LABEL: Record<string, string> = {
   transferencia: "TRANSFERÊNCIA",
 };
 
-export async function printGuiaAtendimento({ agendamentoId, clinicaId, usuarioNome, pagamento }: PrintGRInput) {
-  return printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome, pagamento });
+export async function printGuiaAtendimento(input: PrintGRInput) {
+  return printGuiaAtendimentoCore(input);
 }
 
 async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome, usuarioId, reimpressao, pagamento }: PrintGRInput) {
