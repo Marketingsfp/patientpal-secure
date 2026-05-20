@@ -82,7 +82,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<{ to: string;
 
 export function AppShell() {
   const { user, signOut, loading } = useAuth();
-  const { memberships, clinicaAtual, setClinicaAtual } = useClinica();
+  const { memberships, clinicaAtual, setClinicaAtual, modoTodas, setModoTodas, branding } = useClinica();
   const location = useLocation();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState<boolean>(() => {
@@ -145,7 +145,13 @@ export function AppShell() {
     );
   }
 
-  const clinicColor = clinicaAtual ? corDaClinica(clinicaAtual.clinica.nome) : "#0f172a";
+  const clinicColor = modoTodas
+    ? "#0f172a"
+    : branding?.primary
+      ? branding.primary
+      : clinicaAtual
+        ? corDaClinica(clinicaAtual.clinica.nome)
+        : "#0f172a";
   const initial = (userName || user?.email || "?").trim().charAt(0).toUpperCase();
 
   return (
@@ -183,11 +189,25 @@ export function AppShell() {
         {!collapsed && (
         <div className="px-3 py-2 space-y-2 border-b border-white/10">
           {memberships.length > 0 && (
-            <Select value={clinicaAtual?.clinica_id} onValueChange={setClinicaAtual}>
+            <Select
+              value={modoTodas ? "__todas__" : clinicaAtual?.clinica_id}
+              onValueChange={(v) => {
+                if (v === "__todas__") setModoTodas(true);
+                else setClinicaAtual(v);
+              }}
+            >
               <SelectTrigger className="w-full bg-white/10 border-white/20 text-white">
                 <SelectValue placeholder="Selecione a clínica" />
               </SelectTrigger>
               <SelectContent>
+                {memberships.length > 1 && (
+                  <SelectItem value="__todas__">
+                    <span className="flex items-center gap-2">
+                      <span className="inline-block h-2 w-2 rounded-full bg-slate-400" />
+                      Todas as clínicas
+                    </span>
+                  </SelectItem>
+                )}
                 {memberships.map((m) => (
                   <SelectItem key={m.clinica_id} value={m.clinica_id}>
                     <span className="flex items-center gap-2">
