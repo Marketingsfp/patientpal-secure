@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Brain, Sparkles, FileHeart, Stethoscope, Save, Loader2, History, Wand2, AlertTriangle, Users } from "lucide-react";
+import { Brain, Sparkles, FileHeart, Stethoscope, Save, Loader2, History, Wand2, AlertTriangle, Users, HeartPulse } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -42,6 +42,25 @@ type FilaItem = {
   procedimento: string | null;
   fluxo_etapa: string;
   prioridade: "normal" | "prioritario" | "urgente";
+};
+type Triagem = {
+  id: string;
+  created_at: string;
+  enfermeira_nome: string | null;
+  peso_kg: number | null;
+  altura_cm: number | null;
+  imc: number | null;
+  pa_sistolica: number | null;
+  pa_diastolica: number | null;
+  freq_cardiaca: number | null;
+  temperatura: number | null;
+  saturacao: number | null;
+  glicemia: number | null;
+  queixa_principal: string | null;
+  doencas: string[] | null;
+  medicamentos: string | null;
+  alergias: string | null;
+  observacoes: string | null;
 };
 
 const SOAP_KEYS = [
