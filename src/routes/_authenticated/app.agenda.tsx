@@ -143,6 +143,7 @@ function AgendaPage() {
     setAuditAg(a);
     setAuditLoading(true);
     setAuditRows([]);
+    void carregarEquipe();
     const { data, error } = await supabase
       .from("audit_log" as never)
       .select("id, action, table_name, user_email, created_at, dados_antes, dados_depois")
