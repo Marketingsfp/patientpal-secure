@@ -30,6 +30,7 @@ type Modelo = { id: string; nome: string; prompt_ia: string | null };
 type Medico = {
   id: string;
   nome: string;
+  email: string | null;
   user_id: string | null;
   especialidade_id: string | null;
   especialidades?: { nome: string } | null;
@@ -104,14 +105,18 @@ function AtendimentoIaPage() {
       if (!clinicaAtual) return;
       const cid = clinicaAtual.clinica_id;
       const [m, md] = await Promise.all([
-        supabase.from("medicos").select("id, nome, user_id, especialidade_id, especialidades(nome)").eq("clinica_id", cid).eq("ativo", true).order("nome"),
+        supabase.from("medicos").select("id, nome, email, user_id, especialidade_id, especialidades(nome)").eq("clinica_id", cid).eq("ativo", true).order("nome"),
         supabase.from("prontuario_modelos").select("id, nome, prompt_ia").eq("clinica_id", cid).eq("ativo", true).order("nome"),
       ]);
       const meds = (m.data ?? []) as unknown as Medico[];
       setMedicos(meds);
       setModelos((md.data ?? []) as Modelo[]);
-      // Auto-seleciona: médico logado, ou primeiro da lista
-      const meu = user?.id ? meds.find((x) => x.user_id === user.id) : null;
+      // Auto-seleciona: médico logado (por user_id ou e-mail), ou primeiro da lista
+      const emailLogado = user?.email?.toLowerCase() ?? null;
+      const meu = user?.id
+        ? meds.find((x) => x.user_id === user.id)
+          ?? (emailLogado ? meds.find((x) => x.email?.toLowerCase() === emailLogado) : null)
+        : null;
       if (meu) setMedicoId(meu.id);
       else if (meds.length && !medicoId) {
         // Prefere médico com paciente na fila hoje (triagem/atendimento)
