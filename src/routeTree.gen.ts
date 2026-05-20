@@ -23,6 +23,7 @@ import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/ap
 import { Route as AuthenticatedAppIndexRouteImport } from './routes/_authenticated/app.index'
 import { Route as PContratoTokenRouteImport } from './routes/p.contrato.$token'
 import { Route as AuthenticatedAppUnidadesRouteImport } from './routes/_authenticated/app.unidades'
+import { Route as AuthenticatedAppTreinamentosRouteImport } from './routes/_authenticated/app.treinamentos'
 import { Route as AuthenticatedAppSetoresRouteImport } from './routes/_authenticated/app.setores'
 import { Route as AuthenticatedAppRelatoriosRouteImport } from './routes/_authenticated/app.relatorios'
 import { Route as AuthenticatedAppRecepcaoRouteImport } from './routes/_authenticated/app.recepcao'
@@ -153,6 +154,12 @@ const AuthenticatedAppUnidadesRoute =
   AuthenticatedAppUnidadesRouteImport.update({
     id: '/unidades',
     path: '/unidades',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppTreinamentosRoute =
+  AuthenticatedAppTreinamentosRouteImport.update({
+    id: '/treinamentos',
+    path: '/treinamentos',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppSetoresRoute = AuthenticatedAppSetoresRouteImport.update({
@@ -559,6 +566,7 @@ export interface FileRoutesByFullPath {
   '/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
   '/app/relatorios': typeof AuthenticatedAppRelatoriosRoute
   '/app/setores': typeof AuthenticatedAppSetoresRoute
+  '/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
   '/app/unidades': typeof AuthenticatedAppUnidadesRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
   '/app/': typeof AuthenticatedAppIndexRoute
@@ -633,6 +641,7 @@ export interface FileRoutesByTo {
   '/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
   '/app/relatorios': typeof AuthenticatedAppRelatoriosRoute
   '/app/setores': typeof AuthenticatedAppSetoresRoute
+  '/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
   '/app/unidades': typeof AuthenticatedAppUnidadesRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
   '/app': typeof AuthenticatedAppIndexRoute
@@ -711,6 +720,7 @@ export interface FileRoutesById {
   '/_authenticated/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
   '/_authenticated/app/relatorios': typeof AuthenticatedAppRelatoriosRoute
   '/_authenticated/app/setores': typeof AuthenticatedAppSetoresRoute
+  '/_authenticated/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
   '/_authenticated/app/unidades': typeof AuthenticatedAppUnidadesRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
   '/_authenticated/app/': typeof AuthenticatedAppIndexRoute
@@ -789,6 +799,7 @@ export interface FileRouteTypes {
     | '/app/recepcao'
     | '/app/relatorios'
     | '/app/setores'
+    | '/app/treinamentos'
     | '/app/unidades'
     | '/p/contrato/$token'
     | '/app/'
@@ -863,6 +874,7 @@ export interface FileRouteTypes {
     | '/app/recepcao'
     | '/app/relatorios'
     | '/app/setores'
+    | '/app/treinamentos'
     | '/app/unidades'
     | '/p/contrato/$token'
     | '/app'
@@ -940,6 +952,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/recepcao'
     | '/_authenticated/app/relatorios'
     | '/_authenticated/app/setores'
+    | '/_authenticated/app/treinamentos'
     | '/_authenticated/app/unidades'
     | '/p/contrato/$token'
     | '/_authenticated/app/'
@@ -1076,6 +1089,13 @@ declare module '@tanstack/react-router' {
       path: '/unidades'
       fullPath: '/app/unidades'
       preLoaderRoute: typeof AuthenticatedAppUnidadesRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/treinamentos': {
+      id: '/_authenticated/app/treinamentos'
+      path: '/treinamentos'
+      fullPath: '/app/treinamentos'
+      preLoaderRoute: typeof AuthenticatedAppTreinamentosRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/setores': {
@@ -1623,6 +1643,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppRecepcaoRoute: typeof AuthenticatedAppRecepcaoRoute
   AuthenticatedAppRelatoriosRoute: typeof AuthenticatedAppRelatoriosRoute
   AuthenticatedAppSetoresRoute: typeof AuthenticatedAppSetoresRoute
+  AuthenticatedAppTreinamentosRoute: typeof AuthenticatedAppTreinamentosRoute
   AuthenticatedAppUnidadesRoute: typeof AuthenticatedAppUnidadesRoute
   AuthenticatedAppIndexRoute: typeof AuthenticatedAppIndexRoute
   AuthenticatedAppFuncionarioUserIdRoute: typeof AuthenticatedAppFuncionarioUserIdRoute
@@ -1676,6 +1697,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppRecepcaoRoute: AuthenticatedAppRecepcaoRoute,
   AuthenticatedAppRelatoriosRoute: AuthenticatedAppRelatoriosRoute,
   AuthenticatedAppSetoresRoute: AuthenticatedAppSetoresRoute,
+  AuthenticatedAppTreinamentosRoute: AuthenticatedAppTreinamentosRoute,
   AuthenticatedAppUnidadesRoute: AuthenticatedAppUnidadesRoute,
   AuthenticatedAppIndexRoute: AuthenticatedAppIndexRoute,
   AuthenticatedAppFuncionarioUserIdRoute:
