@@ -78,6 +78,19 @@ const TIPO_CLASS: Record<MovTipo, string> = {
   fechamento: "bg-slate-200 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700",
 };
 
+const BANDEIRAS_CARTAO = [
+  "Visa", "Mastercard", "Elo", "Hipercard", "American Express", "Diners", "Outra",
+];
+
+function montarSufixoCartao(forma: string, bandeira: string, parcelas: string): string {
+  if (forma === "debito" && bandeira) return ` · ${bandeira.toUpperCase()} (DÉBITO)`;
+  if (forma === "credito" && bandeira) {
+    const n = Math.max(1, Number(parcelas) || 1);
+    return ` · ${bandeira.toUpperCase()} ${n}x`;
+  }
+  return "";
+}
+
 function Page() {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
