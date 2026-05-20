@@ -1004,7 +1004,20 @@ function AgendaPage() {
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
                 <Label>CPF</Label>
-                <Input value={novoPac.cpf} onChange={(e) => setNovoPac(p => ({ ...p, cpf: e.target.value }))} placeholder="000.000.000-00" />
+                <Input
+                  value={novoPac.cpf}
+                  onChange={(e) => {
+                    const d = e.target.value.replace(/\D/g, "").slice(0, 11);
+                    let v = d;
+                    if (d.length > 9) v = `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9)}`;
+                    else if (d.length > 6) v = `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6)}`;
+                    else if (d.length > 3) v = `${d.slice(0,3)}.${d.slice(3)}`;
+                    setNovoPac(p => ({ ...p, cpf: v }));
+                  }}
+                  inputMode="numeric"
+                  maxLength={14}
+                  placeholder="000.000.000-00"
+                />
               </div>
               <div className="space-y-1">
                 <Label>Nascimento *</Label>
@@ -1013,7 +1026,22 @@ function AgendaPage() {
             </div>
             <div className="space-y-1">
               <Label>Telefone *</Label>
-              <Input required value={novoPac.telefone} onChange={(e) => setNovoPac(p => ({ ...p, telefone: e.target.value }))} placeholder="(00) 00000-0000" />
+              <Input
+                required
+                value={novoPac.telefone}
+                onChange={(e) => {
+                  const d = e.target.value.replace(/\D/g, "").slice(0, 11);
+                  let v = d;
+                  if (d.length > 10) v = `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
+                  else if (d.length > 6) v = `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
+                  else if (d.length > 2) v = `(${d.slice(0,2)}) ${d.slice(2)}`;
+                  else if (d.length > 0) v = `(${d}`;
+                  setNovoPac(p => ({ ...p, telefone: v }));
+                }}
+                inputMode="tel"
+                maxLength={15}
+                placeholder="(00) 00000-0000"
+              />
             </div>
             <div className="space-y-1">
               <Label>E-mail</Label>
