@@ -1619,3 +1619,113 @@ function FragmentDayCell({
     </>
   );
 }
+
+function DataRefField({
+  dataRef, dataFim, setDataRef, setDataFim, shiftData,
+}: {
+  dataRef: string;
+  dataFim: string | null;
+  setDataRef: (v: string) => void;
+  setDataFim: (v: string | null) => void;
+  shiftData: (delta: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<"single" | "range">(dataFim ? "range" : "single");
+
+  const toIso = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const fmt = (s: string) => {
+    const d = new Date(`${s}T12:00:00`);
+    return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+  };
+
+  const label = dataFim ? `${fmt(dataRef)} → ${fmt(dataFim)}` : fmt(dataRef);
+
+  return (
+    <div className="flex gap-1">
+      <Button variant="outline" size="icon" onClick={() => { setDataFim(null); shiftData(-1); }}>
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button variant="outline" className="flex-1 justify-start font-normal">
+            <CalendarDays className="h-4 w-4 mr-2" /> {label}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <div className="flex items-center gap-1 p-2 border-b">
+            <Button
+              size="sm"
+              variant={mode === "single" ? "default" : "outline"}
+              onClick={() => setMode("single")}
+            >
+              Dia
+            </Button>
+            <Button
+              size="sm"
+              variant={mode === "range" ? "default" : "outline"}
+              onClick={() => setMode("range")}
+            >
+              Período
+            </Button>
+            <span className="flex-1" />
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setDataRef(toIso(new Date()));
+                setDataFim(null);
+                setMode("single");
+                setOpen(false);
+              }}
+            >
+              Hoje
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setDataRef(toIso(new Date()));
+                setDataFim(null);
+                setMode("single");
+              }}
+            >
+              Limpar
+            </Button>
+          </div>
+          {mode === "single" ? (
+            <Calendar
+              mode="single"
+              selected={new Date(`${dataRef}T12:00:00`)}
+              onSelect={(d) => {
+                if (!d) return;
+                setDataRef(toIso(d));
+                setDataFim(null);
+                setOpen(false);
+              }}
+              className="p-3 pointer-events-auto"
+            />
+          ) : (
+            <Calendar
+              mode="range"
+              selected={{
+                from: new Date(`${dataRef}T12:00:00`),
+                to: dataFim ? new Date(`${dataFim}T12:00:00`) : undefined,
+              }}
+              onSelect={(r) => {
+                if (!r?.from) return;
+                setDataRef(toIso(r.from));
+                setDataFim(r.to ? toIso(r.to) : null);
+              }}
+              numberOfMonths={2}
+              className="p-3 pointer-events-auto"
+            />
+          )}
+        </PopoverContent>
+      </Popover>
+      <Button variant="outline" size="icon" onClick={() => { setDataFim(null); shiftData(1); }}>
+        <ChevronRight className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}
