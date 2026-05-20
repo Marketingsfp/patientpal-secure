@@ -632,6 +632,9 @@ function ClientesPage() {
                       <ScanFace className="h-4 w-4 text-muted-foreground" />
                     </Button>
                   )}
+                  <Button variant="ghost" size="icon" onClick={() => abrirProntuario(p)} title="Ver prontuário">
+                    <FileHeart className="h-4 w-4 text-primary" />
+                  </Button>
                   <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Pencil className="h-4 w-4" /></Button>
                   <Button variant="ghost" size="icon" onClick={() => onDelete(p)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                 </TableCell>
