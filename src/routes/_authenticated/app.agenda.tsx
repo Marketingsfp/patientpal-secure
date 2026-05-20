@@ -454,6 +454,10 @@ function AgendaPage() {
     if (!form.inicio || !form.fim) { toast.error("Defina início e fim"); return; }
     if (new Date(form.fim) <= new Date(form.inicio)) { toast.error("O horário final deve ser após o inicial"); return; }
     if (!form.procedimento.trim()) { toast.error("Selecione o procedimento"); return; }
+    if (editing && pagosSet.has(editing.id) && form.paciente_nome.trim() !== editing.paciente_nome) {
+      toast.error("Não é permitido alterar o nome do paciente em agendamento já pago.");
+      return;
+    }
     setSaving(true);
     const payload = {
       clinica_id: clinicaAtual.clinica_id,
