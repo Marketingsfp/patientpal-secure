@@ -206,12 +206,14 @@ function AgendaPage() {
       .order("inicio");
     if (apenasData) {
       const inicio = new Date(`${dataRef}T00:00:00`).toISOString();
-      const fim = new Date(`${dataRef}T23:59:59`).toISOString();
+      const fimDia = dataFim ?? dataRef;
+      const fim = new Date(`${fimDia}T23:59:59`).toISOString();
       q = q.gte("inicio", inicio).lte("inicio", fim);
     } else {
-      // próximos 30 dias a partir da data ref
       const inicio = new Date(`${dataRef}T00:00:00`).toISOString();
-      const f = new Date(`${dataRef}T00:00:00`); f.setDate(f.getDate() + 30);
+      const f = new Date(`${(dataFim ?? dataRef)}T00:00:00`);
+      if (!dataFim) f.setDate(f.getDate() + 30);
+      else f.setHours(23, 59, 59);
       q = q.gte("inicio", inicio).lte("inicio", f.toISOString());
     }
     const { data, error } = await q;
@@ -278,7 +280,7 @@ function AgendaPage() {
   };
 
   useEffect(() => { loadRef(); }, [clinicaAtual?.clinica_id]);
-  useEffect(() => { load(); }, [clinicaAtual?.clinica_id, dataRef, apenasData]);
+  useEffect(() => { load(); }, [clinicaAtual?.clinica_id, dataRef, dataFim, apenasData]);
 
   // Verifica se o usuário logado é médico da clínica atual (para liberar status "Realizado")
   useEffect(() => {
