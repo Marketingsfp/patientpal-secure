@@ -757,11 +757,7 @@ function AgendaPage() {
                 )}
                 {form.paciente_nome && !form.paciente_id && (
                   <p className="text-xs text-amber-600 font-medium">
-                    Paciente não cadastrado — não é possível salvar o agendamento sem cadastrar.{" "}
-                    <button type="button" className="underline text-primary"
-                      onClick={() => { setNovoPac(p => ({ ...p, nome: form.paciente_nome })); setNovoPacOpen(true); }}>
-                      Cadastrar agora
-                    </button>
+                    Paciente não cadastrado — use o botão ao lado para cadastrar antes de salvar.
                   </p>
                 )}
               </div>
