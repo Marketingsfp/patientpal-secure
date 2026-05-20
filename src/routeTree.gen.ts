@@ -24,6 +24,7 @@ import { Route as PacienteConsultasRouteImport } from './routes/paciente.consult
 import { Route as PacienteCartoesRouteImport } from './routes/paciente.cartoes'
 import { Route as PTokenRouteImport } from './routes/p.$token'
 import { Route as LpSlugRouteImport } from './routes/lp.$slug'
+import { Route as CheckinTokenRouteImport } from './routes/checkin.$token'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
 import { Route as AuthenticatedAppIndexRouteImport } from './routes/_authenticated/app.index'
 import { Route as PContratoTokenRouteImport } from './routes/p.contrato.$token'
@@ -169,6 +170,11 @@ const PTokenRoute = PTokenRouteImport.update({
 const LpSlugRoute = LpSlugRouteImport.update({
   id: '/lp/$slug',
   path: '/lp/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CheckinTokenRoute = CheckinTokenRouteImport.update({
+  id: '/checkin/$token',
+  path: '/checkin/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAppRoute = AuthenticatedAppRouteImport.update({
@@ -593,6 +599,7 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/totem': typeof TotemRoute
   '/app': typeof AuthenticatedAppRouteWithChildren
+  '/checkin/$token': typeof CheckinTokenRoute
   '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
   '/paciente/cartoes': typeof PacienteCartoesRoute
@@ -680,6 +687,7 @@ export interface FileRoutesByTo {
   '/painel': typeof PainelRoute
   '/signup': typeof SignupRoute
   '/totem': typeof TotemRoute
+  '/checkin/$token': typeof CheckinTokenRoute
   '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
   '/paciente/cartoes': typeof PacienteCartoesRoute
@@ -769,6 +777,7 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/totem': typeof TotemRoute
   '/_authenticated/app': typeof AuthenticatedAppRouteWithChildren
+  '/checkin/$token': typeof CheckinTokenRoute
   '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
   '/paciente/cartoes': typeof PacienteCartoesRoute
@@ -859,6 +868,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/totem'
     | '/app'
+    | '/checkin/$token'
     | '/lp/$slug'
     | '/p/$token'
     | '/paciente/cartoes'
@@ -946,6 +956,7 @@ export interface FileRouteTypes {
     | '/painel'
     | '/signup'
     | '/totem'
+    | '/checkin/$token'
     | '/lp/$slug'
     | '/p/$token'
     | '/paciente/cartoes'
@@ -1034,6 +1045,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/totem'
     | '/_authenticated/app'
+    | '/checkin/$token'
     | '/lp/$slug'
     | '/p/$token'
     | '/paciente/cartoes'
@@ -1123,6 +1135,7 @@ export interface RootRouteChildren {
   PainelRoute: typeof PainelRoute
   SignupRoute: typeof SignupRoute
   TotemRoute: typeof TotemRoute
+  CheckinTokenRoute: typeof CheckinTokenRoute
   LpSlugRoute: typeof LpSlugRoute
   PTokenRoute: typeof PTokenRoute
   PacienteCartoesRoute: typeof PacienteCartoesRoute
@@ -1239,6 +1252,13 @@ declare module '@tanstack/react-router' {
       path: '/lp/$slug'
       fullPath: '/lp/$slug'
       preLoaderRoute: typeof LpSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/checkin/$token': {
+      id: '/checkin/$token'
+      path: '/checkin/$token'
+      fullPath: '/checkin/$token'
+      preLoaderRoute: typeof CheckinTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/app': {
@@ -1961,6 +1981,7 @@ const rootRouteChildren: RootRouteChildren = {
   PainelRoute: PainelRoute,
   SignupRoute: SignupRoute,
   TotemRoute: TotemRoute,
+  CheckinTokenRoute: CheckinTokenRoute,
   LpSlugRoute: LpSlugRoute,
   PTokenRoute: PTokenRoute,
   PacienteCartoesRoute: PacienteCartoesRoute,
