@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { useMedicoContext } from "@/hooks/use-medico-context";
 import { isCPFValido, somenteDigitos } from "@/lib/cpf";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -88,6 +89,7 @@ const EMPTY = {
 
 function AgendaPage() {
   const { clinicaAtual } = useClinica();
+  const { medicoId: medicoLogadoId, isMedicoOnly } = useMedicoContext();
   const [usuarioEhMedico, setUsuarioEhMedico] = useState(false);
   const corClinica = (() => {
     const n = (clinicaAtual?.clinica.nome ?? "").toLowerCase();
@@ -287,6 +289,11 @@ function AgendaPage() {
 
   useEffect(() => { loadRef(); }, [clinicaAtual?.clinica_id]);
   useEffect(() => { load(); }, [clinicaAtual?.clinica_id, dataRef, dataFim, apenasData]);
+
+  // Perfil de médico: trava o filtro no próprio profissional
+  useEffect(() => {
+    if (isMedicoOnly && medicoLogadoId) setFiltroMedico(medicoLogadoId);
+  }, [isMedicoOnly, medicoLogadoId]);
 
   // Verifica se o usuário logado é médico da clínica atual (para liberar status "Realizado")
   useEffect(() => {
