@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Brain, Sparkles, FileHeart, Stethoscope, Save, Loader2, History, Wand2, AlertTriangle, Users, HeartPulse } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -291,6 +291,47 @@ function AtendimentoIaPage() {
     })();
     return () => { cancel = true; };
   }, [agendamentoId]);
+
+  // Aplica os dados da triagem no SOAP (queixa + exame físico)
+  function aplicarTriagemNoSoap(t: Triagem) {
+    const linhas: string[] = [];
+    if (t.queixa_principal) linhas.push(`Queixa (triagem): ${t.queixa_principal}`);
+    const sv: string[] = [];
+    if (t.pa_sistolica && t.pa_diastolica) sv.push(`PA ${t.pa_sistolica}/${t.pa_diastolica} mmHg`);
+    if (t.freq_cardiaca) sv.push(`FC ${t.freq_cardiaca} bpm`);
+    if (t.temperatura) sv.push(`T ${t.temperatura}°C`);
+    if (t.saturacao) sv.push(`SatO₂ ${t.saturacao}%`);
+    if (t.glicemia) sv.push(`Glicemia ${t.glicemia} mg/dL`);
+    if (t.peso_kg) sv.push(`Peso ${t.peso_kg} kg`);
+    if (t.altura_cm) sv.push(`Altura ${t.altura_cm} cm`);
+    if (t.imc) sv.push(`IMC ${t.imc}`);
+    if (sv.length) linhas.push(`Sinais vitais: ${sv.join(" · ")}`);
+    if (t.doencas?.length) linhas.push(`Comorbidades: ${t.doencas.join(", ")}`);
+    if (t.medicamentos) linhas.push(`Medicamentos: ${t.medicamentos}`);
+    if (t.alergias) linhas.push(`Alergias: ${t.alergias}`);
+    const txt = linhas.join("\n");
+    setSoap((s) => {
+      const jaContem = s.exame_fisico?.includes(txt);
+      return {
+        ...s,
+        queixa_principal: s.queixa_principal || t.queixa_principal || "",
+        exame_fisico: jaContem
+          ? s.exame_fisico
+          : (s.exame_fisico ? `${s.exame_fisico}\n${txt}` : txt),
+      };
+    });
+  }
+
+  // Aplica a triagem automaticamente ao carregar (uma única vez por triagem)
+  const triagemAplicadaRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!triagem) return;
+    if (triagemAplicadaRef.current === triagem.id) return;
+    triagemAplicadaRef.current = triagem.id;
+    aplicarTriagemNoSoap(triagem);
+    toast.success("Triagem aplicada ao prontuário");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [triagem?.id]);
 
   const modelo = useMemo(() => modelos.find((x) => x.id === modeloId) ?? null, [modelos, modeloId]);
   const especialidade = especialidadeMedico || modelo?.nome || "Clínica Geral";
@@ -619,36 +660,10 @@ function AtendimentoIaPage() {
               )}
             </div>
           )}
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              const linhas: string[] = [];
-              if (triagem.queixa_principal) linhas.push(`Queixa (triagem): ${triagem.queixa_principal}`);
-              const sv: string[] = [];
-              if (triagem.pa_sistolica && triagem.pa_diastolica) sv.push(`PA ${triagem.pa_sistolica}/${triagem.pa_diastolica} mmHg`);
-              if (triagem.freq_cardiaca) sv.push(`FC ${triagem.freq_cardiaca} bpm`);
-              if (triagem.temperatura) sv.push(`T ${triagem.temperatura}°C`);
-              if (triagem.saturacao) sv.push(`SatO₂ ${triagem.saturacao}%`);
-              if (triagem.glicemia) sv.push(`Glicemia ${triagem.glicemia} mg/dL`);
-              if (triagem.peso_kg) sv.push(`Peso ${triagem.peso_kg} kg`);
-              if (triagem.altura_cm) sv.push(`Altura ${triagem.altura_cm} cm`);
-              if (triagem.imc) sv.push(`IMC ${triagem.imc}`);
-              if (sv.length) linhas.push(`Sinais vitais: ${sv.join(" · ")}`);
-              if (triagem.doencas?.length) linhas.push(`Comorbidades: ${triagem.doencas.join(", ")}`);
-              if (triagem.medicamentos) linhas.push(`Medicamentos: ${triagem.medicamentos}`);
-              if (triagem.alergias) linhas.push(`Alergias: ${triagem.alergias}`);
-              const txt = linhas.join("\n");
-              setSoap((s) => ({
-                ...s,
-                queixa_principal: triagem.queixa_principal || s.queixa_principal,
-                exame_fisico: s.exame_fisico ? `${s.exame_fisico}\n${txt}` : txt,
-              }));
-              toast.success("Triagem copiada para o prontuário");
-            }}
-          >
-            <FileHeart className="h-4 w-4 mr-1" /> Copiar para prontuário
-          </Button>
+          <div className="text-[11px] text-muted-foreground flex items-center gap-1">
+            <FileHeart className="h-3.5 w-3.5" />
+            Dados aplicados automaticamente ao prontuário
+          </div>
         </Card>
       )}
 
