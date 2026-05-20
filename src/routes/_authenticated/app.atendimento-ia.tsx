@@ -97,6 +97,7 @@ function AtendimentoIaPage() {
   const [resumoOpen, setResumoOpen] = useState(false);
   const [loading, setLoading] = useState<"estruturar" | "sugerir" | "resumir" | "salvar" | null>(null);
   const [triagem, setTriagem] = useState<Triagem | null>(null);
+  const [triados, setTriados] = useState<Array<{ agendamento_id: string; paciente_nome: string; medico_id: string; medico_nome: string; quando: string }>>([]);
 
   useEffect(() => {
     (async () => {
@@ -112,7 +113,22 @@ function AtendimentoIaPage() {
       // Auto-seleciona: médico logado, ou primeiro da lista
       const meu = user?.id ? meds.find((x) => x.user_id === user.id) : null;
       if (meu) setMedicoId(meu.id);
-      else if (meds.length && !medicoId) setMedicoId(meds[0].id);
+      else if (meds.length && !medicoId) {
+        // Prefere médico com paciente na fila hoje (triagem/atendimento)
+        const hoje = new Date().toISOString().slice(0, 10);
+        const { data: pend } = await supabase
+          .from("agendamentos")
+          .select("medico_id")
+          .eq("clinica_id", cid)
+          .in("fluxo_etapa", ["triagem", "atendimento"])
+          .gte("inicio", `${hoje}T00:00:00`)
+          .lte("inicio", `${hoje}T23:59:59`)
+          .order("inicio")
+          .limit(1);
+        const comFila = pend?.[0]?.medico_id as string | undefined;
+        const escolhido = comFila && meds.find((x) => x.id === comFila) ? comFila : meds[0].id;
+        setMedicoId(escolhido);
+      }
     })();
   }, [clinicaAtual?.clinica_id, user?.id]);
 
@@ -151,6 +167,46 @@ function AtendimentoIaPage() {
   };
 
   useEffect(() => { void carregarFila(medicoId); }, [medicoId, clinicaAtual?.clinica_id]);
+
+  // Carrega pacientes triados hoje (todos os médicos) — para o médico ver
+  // quando uma triagem foi feita e poder pular para o paciente certo.
+  const carregarTriados = async () => {
+    if (!clinicaAtual) { setTriados([]); return; }
+    const hoje = new Date().toISOString().slice(0, 10);
+    const { data } = await supabase
+      .from("triagens_enfermagem")
+      .select("agendamento_id, created_at, agendamentos!inner(id, paciente_nome, medico_id, fluxo_etapa, inicio, medicos(nome))")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .gte("created_at", `${hoje}T00:00:00`)
+      .order("created_at", { ascending: false });
+    const rows = (data ?? []) as unknown as Array<{
+      agendamento_id: string; created_at: string;
+      agendamentos: { id: string; paciente_nome: string; medico_id: string; fluxo_etapa: string; inicio: string; medicos: { nome: string } | null } | null;
+    }>;
+    const lista = rows
+      .filter(r => r.agendamentos && ["atendimento", "triagem"].includes(r.agendamentos.fluxo_etapa))
+      .map(r => ({
+        agendamento_id: r.agendamento_id,
+        paciente_nome: r.agendamentos!.paciente_nome,
+        medico_id: r.agendamentos!.medico_id,
+        medico_nome: r.agendamentos!.medicos?.nome ?? "—",
+        quando: r.created_at,
+      }));
+    setTriados(lista);
+  };
+  useEffect(() => { void carregarTriados(); }, [clinicaAtual?.clinica_id]);
+
+  // Realtime: refaz a lista de triados quando há nova triagem
+  useEffect(() => {
+    if (!clinicaAtual) return;
+    const ch = supabase
+      .channel(`triados-${clinicaAtual.clinica_id}`)
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "triagens_enfermagem", filter: `clinica_id=eq.${clinicaAtual.clinica_id}` },
+        () => { void carregarTriados(); })
+      .subscribe();
+    return () => { void supabase.removeChannel(ch); };
+  }, [clinicaAtual?.clinica_id]);
 
   // Realtime: atualiza fila quando o fluxo muda
   useEffect(() => {
@@ -374,6 +430,41 @@ function AtendimentoIaPage() {
 
         {/* Fila do médico */}
         <div className="space-y-2">
+          {triados.length > 0 && (
+            <div className="rounded-md border border-rose-200/60 dark:border-rose-900/40 bg-rose-50/50 dark:bg-rose-950/20 p-2 space-y-1.5">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-rose-700 dark:text-rose-300">
+                <HeartPulse className="h-3.5 w-3.5" /> Triados pela enfermagem hoje ({triados.length})
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {triados.map((t) => {
+                  const ehMeu = t.medico_id === medicoId;
+                  return (
+                    <button
+                      key={t.agendamento_id}
+                      type="button"
+                      onClick={async () => {
+                        if (!ehMeu) {
+                          setMedicoId(t.medico_id);
+                          await carregarFila(t.medico_id);
+                        }
+                        const it = (await supabase
+                          .from("agendamentos")
+                          .select("id, paciente_id, paciente_nome, inicio, procedimento, fluxo_etapa, prioridade")
+                          .eq("id", t.agendamento_id)
+                          .maybeSingle()).data as unknown as FilaItem | null;
+                        if (it) selecionar(it);
+                      }}
+                      className={`rounded-md border px-2 py-1 text-xs flex items-center gap-1.5 hover:border-rose-400 ${ehMeu ? "bg-background" : "bg-muted/40"}`}
+                      title={ehMeu ? "Seu paciente" : `Atribuído a ${t.medico_nome} — clique para abrir`}
+                    >
+                      <span className="font-medium uppercase">{t.paciente_nome}</span>
+                      <span className="text-muted-foreground">· {t.medico_nome}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           <div className="flex items-center justify-between">
             <Label className="flex items-center gap-1.5"><Users className="h-4 w-4" /> Fila de atendimento ({filaOrdenada.length})</Label>
             {pacienteNome && (
