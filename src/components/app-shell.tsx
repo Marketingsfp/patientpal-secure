@@ -1,6 +1,6 @@
 import { Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useState } from "react";
-import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet, ChevronLeft, ChevronRight, Search, HeartPulse, Contact, ConciergeBell } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
@@ -43,10 +43,10 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<{ to: string;
     label: "Operação",
     items: [
     { to: "/app", label: "Dashboard", icon: LayoutDashboard },
-    { to: "/app/recepcao", label: "Recepção / Filas", icon: Bell },
+    { to: "/app/recepcao", label: "Recepção / Filas", icon: ConciergeBell },
     { to: "/app/fluxo", label: "Fluxo do paciente", icon: Workflow },
     { to: "/app/agenda", label: "Agenda", icon: CalendarDays },
-    { to: "/app/clientes", label: "Clientes", icon: Users },
+    { to: "/app/clientes", label: "Clientes", icon: Contact },
     { to: "/app/procedimentos", label: "Procedimentos", icon: ClipboardList },
     { to: "/app/orcamentos", label: "Orçamentos", icon: FileText },
     { to: "/app/cartao-beneficios", label: "Cartão Benefícios", icon: CreditCard },
@@ -71,7 +71,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<{ to: string;
     { to: "/app/financeiro", label: "Financeiro", icon: DollarSign },
     { to: "/app/clinicas", label: "Clínicas", icon: Building2 },
     { to: "/app/medicos", label: "Médicos", icon: Stethoscope },
-    { to: "/app/especialidades", label: "Especialidades", icon: Stethoscope },
+    { to: "/app/especialidades", label: "Especialidades", icon: HeartPulse },
     { to: "/app/disponibilidades", label: "Horários médicos", icon: Clock },
     { to: "/app/equipe", label: "Equipe", icon: Users },
     { to: "/app/auditoria", label: "Auditoria", icon: ShieldCheck },
