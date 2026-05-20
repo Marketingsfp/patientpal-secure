@@ -374,7 +374,7 @@ function Page() {
               {!isMedicoOnly && <TableHead className="text-right">Total</TableHead>}
               <TableHead className="text-right">{isMedicoOnly ? "Repasse" : "Médico"}</TableHead>
               {!isMedicoOnly && <TableHead className="text-right">Clínica</TableHead>}
-              <TableHead className="w-24"></TableHead>
+              {!isMedicoOnly && <TableHead className="w-24"></TableHead>}
             </TableRow></TableHeader>
             <TableBody>{items.map((a) => (
               <TableRow key={a.id}>
@@ -385,16 +385,16 @@ function Page() {
                 {!isMedicoOnly && <TableCell className="text-right font-medium">{fmt(Number(a.valor_total))}</TableCell>}
                 <TableCell className="text-right font-semibold text-primary">{fmt(Number(a.valor_medico))}</TableCell>
                 {!isMedicoOnly && <TableCell className="text-right text-muted-foreground">{fmt(Number(a.valor_clinica))}</TableCell>}
-                <TableCell className="text-right">
-                  {isMedicoOnly ? (
-                    <span className="text-[10px] text-muted-foreground uppercase">—</span>
-                  ) : a.origem === "agenda" ? (
-                    <span className="text-[10px] text-muted-foreground uppercase">Agenda</span>
-                  ) : (<>
-                    <Button variant="ghost" size="icon" onClick={() => openEdit(a)}><Pencil className="h-3.5 w-3.5" /></Button>
-                    <Button variant="ghost" size="icon" onClick={() => remove(a)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
-                  </>)}
-                </TableCell>
+                {!isMedicoOnly && (
+                  <TableCell className="text-right">
+                    {a.origem === "agenda" ? (
+                      <span className="text-[10px] text-muted-foreground uppercase">Agenda</span>
+                    ) : (<>
+                      <Button variant="ghost" size="icon" onClick={() => openEdit(a)}><Pencil className="h-3.5 w-3.5" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => remove(a)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                    </>)}
+                  </TableCell>
+                )}
               </TableRow>))}
             </TableBody>
           </Table>}
