@@ -12,6 +12,9 @@ export interface PrintGRInput {
   agendamentoId: string;
   clinicaId: string;
   usuarioNome?: string;
+  usuarioId?: string | null;
+  /** Se true, NÃO grava nova via — apenas reimprime a última via existente. */
+  reimpressao?: boolean;
   pagamento?: {
     valor: number;
     forma_pagamento: string | null;
@@ -51,7 +54,30 @@ const FORMA_LABEL: Record<string, string> = {
   transferencia: "TRANSFERÊNCIA",
 };
 
-export async function printGuiaAtendimento({ agendamentoId, clinicaId, usuarioNome, pagamento }: PrintGRInput) {
+export async function printGuiaAtendimento(input: PrintGRInput) {
+  return printGuiaAtendimentoCore(input);
+}
+
+async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome, usuarioId, reimpressao, pagamento }: PrintGRInput) {
+  // Controle de vias: máximo 2 (1ª e 2ª via). Reimpressão repete a última sem incrementar.
+  const { data: visExistentes, error: errVias } = await supabase
+    .from("gr_impressoes" as never)
+    .select("via_numero")
+    .eq("agendamento_id", agendamentoId)
+    .order("via_numero", { ascending: false });
+  if (errVias) throw new Error(errVias.message);
+  const existentes = (visExistentes as Array<{ via_numero: number }> | null) ?? [];
+  const ultimaVia = existentes[0]?.via_numero ?? 0;
+  let viaNumero: number;
+  if (reimpressao) {
+    viaNumero = ultimaVia > 0 ? ultimaVia : 1;
+  } else {
+    if (ultimaVia >= 2) {
+      throw new Error("Limite de 2 vias atingido. Use 'Reimprimir última via' para uma cópia.");
+    }
+    viaNumero = ultimaVia + 1;
+  }
+
   // Busca dados em paralelo
   const [ag, cli] = await Promise.all([
     supabase
@@ -168,6 +194,8 @@ export async function printGuiaAtendimento({ agendamentoId, clinicaId, usuarioNo
 
   const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado].filter(Boolean).join("<br/>");
 
+  const viaTexto = viaNumero === 1 ? "1ª VIA" : "2ª VIA — REIMPRESSÃO";
+
   const html = `<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8" />
 <title>GR - ${esc(paciente?.nome ?? a.paciente_nome)}</title>
@@ -206,6 +234,7 @@ export async function printGuiaAtendimento({ agendamentoId, clinicaId, usuarioNo
 
     <div class="sep"></div>
     <div class="center lg">GUIA DE ATENDIMENTO</div>
+    <div class="center bold" style="margin-top:2px">${viaTexto}</div>
     <div class="sep"></div>
 
     <div class="center bold">${esc(paciente?.nome ?? a.paciente_nome)}</div>
@@ -281,4 +310,22 @@ export async function printGuiaAtendimento({ agendamentoId, clinicaId, usuarioNo
   w.document.open();
   w.document.write(html);
   w.document.close();
+
+  // Registra a impressão (se for nova via). Não bloqueia a janela já aberta em caso de erro.
+  if (!reimpressao) {
+    try {
+      await supabase.from("gr_impressoes" as never).insert({
+        clinica_id: clinicaId,
+        agendamento_id: agendamentoId,
+        via_numero: viaNumero,
+        impresso_por: usuarioId ?? null,
+        impresso_por_nome: usuarioNome ?? null,
+      } as never);
+    } catch (_) { /* falha silenciosa: registro de via não deve bloquear impressão */ }
+  }
+}
+
+/** Reimprime a última via já emitida sem gerar novo registro. */
+export async function reimprimirGuiaAtendimento(input: PrintGRInput) {
+  return printGuiaAtendimentoCore({ ...input, reimpressao: true });
 }

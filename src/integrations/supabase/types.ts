@@ -1585,6 +1585,36 @@ export type Database = {
           },
         ]
       }
+      gr_impressoes: {
+        Row: {
+          agendamento_id: string
+          clinica_id: string
+          created_at: string
+          id: string
+          impresso_por: string | null
+          impresso_por_nome: string | null
+          via_numero: number
+        }
+        Insert: {
+          agendamento_id: string
+          clinica_id: string
+          created_at?: string
+          id?: string
+          impresso_por?: string | null
+          impresso_por_nome?: string | null
+          via_numero: number
+        }
+        Update: {
+          agendamento_id?: string
+          clinica_id?: string
+          created_at?: string
+          id?: string
+          impresso_por?: string | null
+          impresso_por_nome?: string | null
+          via_numero?: number
+        }
+        Relationships: []
+      }
       medico_biometria: {
         Row: {
           clinica_id: string
@@ -2970,6 +3000,10 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      is_medico: {
+        Args: { _clinica_id: string; _user_id: string }
         Returns: boolean
       }
       is_member: {

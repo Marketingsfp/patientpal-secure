@@ -27,7 +27,7 @@ import {
   CalendarDays, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X,
   MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, Clock, DollarSign,
 } from "lucide-react";
-import { printGuiaAtendimento } from "@/lib/print-gr";
+import { printGuiaAtendimento, reimprimirGuiaAtendimento } from "@/lib/print-gr";
 import { VoiceInput } from "@/components/voice-input";
 import { exportToExcel } from "@/lib/export-csv";
 import { useAuth } from "@/hooks/use-auth";
@@ -85,6 +85,7 @@ const EMPTY = {
 
 function AgendaPage() {
   const { clinicaAtual } = useClinica();
+  const [usuarioEhMedico, setUsuarioEhMedico] = useState(false);
   const corClinica = (() => {
     const n = (clinicaAtual?.clinica.nome ?? "").toLowerCase();
     if (n.includes("são francisco") || n.includes("sao francisco")) return "#14532d";
@@ -251,6 +252,22 @@ function AgendaPage() {
 
   useEffect(() => { loadRef(); }, [clinicaAtual?.clinica_id]);
   useEffect(() => { load(); }, [clinicaAtual?.clinica_id, dataRef, apenasData]);
+
+  // Verifica se o usuário logado é médico da clínica atual (para liberar status "Realizado")
+  useEffect(() => {
+    (async () => {
+      if (!user?.id || !clinicaAtual) { setUsuarioEhMedico(false); return; }
+      const { data } = await supabase
+        .from("medicos")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("ativo", true)
+        .limit(1)
+        .maybeSingle();
+      setUsuarioEhMedico(!!data);
+    })();
+  }, [user?.id, clinicaAtual?.clinica_id]);
 
   // Duração padrão (minutos) inferida dos slots existentes por médico
   const duracaoPorMedico = useMemo(() => {
@@ -437,6 +454,10 @@ function AgendaPage() {
     if (!form.inicio || !form.fim) { toast.error("Defina início e fim"); return; }
     if (new Date(form.fim) <= new Date(form.inicio)) { toast.error("O horário final deve ser após o inicial"); return; }
     if (!form.procedimento.trim()) { toast.error("Selecione o procedimento"); return; }
+    if (editing && pagosSet.has(editing.id) && form.paciente_nome.trim() !== editing.paciente_nome) {
+      toast.error("Não é permitido alterar o nome do paciente em agendamento já pago.");
+      return;
+    }
     setSaving(true);
     const payload = {
       clinica_id: clinicaAtual.clinica_id,
@@ -492,6 +513,10 @@ function AgendaPage() {
   };
 
   const mudarStatus = async (a: Agendamento, status: Status) => {
+    if (status === "realizado" && !usuarioEhMedico) {
+      toast.error("Apenas o médico responsável pode marcar como 'Realizado'.");
+      return;
+    }
     const { error } = await supabase.from("agendamentos").update({ status }).eq("id", a.id);
     if (error) toast.error(error.message); else await load();
   };
@@ -539,6 +564,22 @@ function AgendaPage() {
     setPagamentoOpen(true);
   };
 
+  const escolherMisto = () => {
+    if (!formaPagCtx) return;
+    const ids = formaPagCtx.agId.split(",").filter(Boolean);
+    const principal = ids[0] ?? null;
+    const extras = ids.slice(1);
+    // pega o maior valor disponível como referência (geralmente todas as formas têm valor próximo)
+    const valorRef = Math.max(0, ...formaPagOpcoes.map((o) => o.valor));
+    setPagamentoDesc(formaPagCtx.desc);
+    setPagamentoValor(valorRef > 0 ? valorRef.toFixed(2) : "");
+    setPagamentoForma("__misto__");
+    setPagamentoAgId(principal);
+    setPagamentoExtraIds(extras);
+    setFormaPagOpen(false);
+    setPagamentoOpen(true);
+  };
+
   const imprimirGR = async (a: Agendamento) => {
     if (!clinicaAtual) return;
     try {
@@ -546,9 +587,24 @@ function AgendaPage() {
         agendamentoId: a.id,
         clinicaId: clinicaAtual.clinica_id,
         usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
+        usuarioId: user?.id ?? null,
       });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Falha ao imprimir GR");
+    }
+  };
+
+  const reimprimirGR = async (a: Agendamento) => {
+    if (!clinicaAtual) return;
+    try {
+      await reimprimirGuiaAtendimento({
+        agendamentoId: a.id,
+        clinicaId: clinicaAtual.clinica_id,
+        usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
+        usuarioId: user?.id ?? null,
+      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha ao reimprimir GR");
     }
   };
 
@@ -646,8 +702,12 @@ function AgendaPage() {
                       const match = pacientes.find(p => p.nome === nome);
                       setForm(f => ({ ...f, paciente_nome: nome, paciente_id: match?.id ?? "" }));
                     }}
-                    placeholder="Nome do paciente" required />
+                    placeholder="Nome do paciente" required
+                    readOnly={editing ? pagosSet.has(editing.id) : false}
+                    disabled={editing ? pagosSet.has(editing.id) : false}
+                  />
                   <Button type="button" variant="outline" size="icon" title="Cadastrar novo paciente"
+                    disabled={editing ? pagosSet.has(editing.id) : false}
                     onClick={() => { setNovoPac(p => ({ ...p, nome: form.paciente_nome })); setNovoPacOpen(true); }}>
                     <UserPlus className="h-4 w-4" />
                   </Button>
@@ -655,6 +715,11 @@ function AgendaPage() {
                 <datalist id="lista-pacientes">
                   {pacientes.map(p => <option key={p.id} value={p.nome} />)}
                 </datalist>
+                {editing && pagosSet.has(editing.id) && (
+                  <p className="text-xs text-amber-600">
+                    Este agendamento já está pago — o nome do paciente não pode ser alterado.
+                  </p>
+                )}
                 {form.paciente_nome && !form.paciente_id && (
                   <p className="text-xs text-muted-foreground">
                     Paciente não cadastrado.{" "}
@@ -722,7 +787,17 @@ function AgendaPage() {
                             (nomesDoMedico?.has(normalizar(p.nome)) ?? false)
                           )
                         : procedimentosList;
-                      return filtrados.map((p) => ({ value: p.nome, label: p.nome }));
+                      // Deduplicar pelo nome normalizado (evita "CONSULTA" duplicada quando o
+                      // procedimento existe tanto na tabela procedimentos quanto em medico_convenios).
+                      const vistos = new Set<string>();
+                      return filtrados
+                        .filter((p) => {
+                          const k = normalizar(p.nome);
+                          if (vistos.has(k)) return false;
+                          vistos.add(k);
+                          return true;
+                        })
+                        .map((p) => ({ value: p.nome, label: p.nome }));
                     })(),
                   ]}
                 />
@@ -796,6 +871,13 @@ function AgendaPage() {
                 </span>
               </Button>
             ))}
+            <Button
+              variant="default"
+              className="justify-center h-12 mt-1 bg-primary"
+              onClick={escolherMisto}
+            >
+              💰 Mais de uma forma de pagamento
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -1045,7 +1127,10 @@ function AgendaPage() {
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40">
-              <TableHead className="w-10">
+              <TableHead
+                className="w-10"
+                title="Selecione vários atendimentos do mesmo paciente para cobrar em um único pagamento (use o botão Opções acima)"
+              >
                 <Checkbox
                   checked={paginados.length > 0 && selecionados.size === paginados.length}
                   onCheckedChange={toggleAll}
@@ -1074,7 +1159,9 @@ function AgendaPage() {
               const realizado = a.status === "realizado";
               return (
                 <TableRow key={a.id} className={realizado ? "bg-emerald-50 dark:bg-emerald-950/20" : ""}>
-                  <TableCell><Checkbox checked={selecionados.has(a.id)} onCheckedChange={() => toggleSel(a.id)} /></TableCell>
+                  <TableCell title="Marque para cobrar este atendimento em um pagamento agrupado">
+                    <Checkbox checked={selecionados.has(a.id)} onCheckedChange={() => toggleSel(a.id)} />
+                  </TableCell>
                   <TableCell className="font-mono text-sm">{fichaNum}</TableCell>
                   <TableCell className="text-sm">{fmtDiaSemana(a.inicio)}</TableCell>
                   <TableCell className="text-sm">{fmtData(a.inicio)}</TableCell>
@@ -1135,6 +1222,9 @@ function AgendaPage() {
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => imprimirGR(a)}>
                           <Printer className="h-4 w-4 mr-2" /> Imprimir GR
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => reimprimirGR(a)}>
+                          <Printer className="h-4 w-4 mr-2" /> Reimprimir última via
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => {
                           const url = `${window.location.origin}/p/${(a as any).token_publico}`;
