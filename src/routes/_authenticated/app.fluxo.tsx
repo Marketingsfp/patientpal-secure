@@ -213,11 +213,11 @@ function FluxoPage() {
         </div>
       </div>
 
-      <div className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-7">
+      <div className="flex gap-3 overflow-x-auto pb-2 snap-x">
         {ETAPAS.map((col) => {
           const items = colunas.get(col.id) ?? [];
           return (
-            <div key={col.id} className="space-y-2">
+            <div key={col.id} className="space-y-2 flex-1 min-w-[220px] snap-start">
               <div className="flex items-center justify-between">
                 <Badge className={`${col.cor} border-0`}>{col.label}</Badge>
                 <span className="text-xs text-muted-foreground">{items.length}</span>
