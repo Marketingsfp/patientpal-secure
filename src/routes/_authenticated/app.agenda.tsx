@@ -644,6 +644,22 @@ function AgendaPage() {
           <p className="text-sm text-muted-foreground">Filtre e gerencie os agendamentos da clínica.</p>
         </div>
         <div className="flex gap-2">
+          <div className="inline-flex rounded-full border bg-card p-0.5">
+            <button
+              type="button"
+              onClick={() => setViewMode("dia")}
+              className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${viewMode === "dia" ? "bg-emerald-600 text-white" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              Lista
+            </button>
+            <button
+              type="button"
+              onClick={() => { setViewMode("medico"); if (!medicoView && medicos[0]) setMedicoView(medicos[0].id); }}
+              className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${viewMode === "medico" ? "bg-emerald-600 text-white" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              Por médico
+            </button>
+          </div>
           <Button asChild variant="outline" title="Cadastrar horários semanais e gerar slots da agenda">
             <Link to="/app/disponibilidades">
               <Clock className="h-4 w-4 mr-2" /> Criar/gerar horários
