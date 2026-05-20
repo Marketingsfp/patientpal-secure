@@ -66,6 +66,12 @@ function Page() {
   const [fMedico, setFMedico] = useState<string>("todos");
   const [fIni, setFIni] = useState<string>(primeiroDia.toISOString().slice(0, 10));
   const [fFim, setFFim] = useState<string>(hoje);
+  const [fStatus, setFStatus] = useState<"todos" | "aberto" | "pago">("aberto");
+  const [contas, setContas] = useState<Conta[]>([]);
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [payOpen, setPayOpen] = useState(false);
+  const [payForm, setPayForm] = useState({ data: hoje, conta_id: "", forma_pagamento: "" });
+  const [payingNow, setPayingNow] = useState(false);
 
   // Perfil médico: trava o filtro no próprio profissional
   useEffect(() => {
@@ -103,13 +109,13 @@ function Page() {
     // Une atendimentos manuais (fin_atendimentos) com pagamentos da agenda (fin_lancamentos receita).
     let qManual = supabase
       .from("fin_atendimentos")
-      .select("id, data, procedimento, valor_total, valor_medico, valor_clinica, status, forma_pagamento, medico_id, paciente_id")
+      .select("id, data, procedimento, valor_total, valor_medico, valor_clinica, status, forma_pagamento, medico_id, paciente_id, repasse_pago, repasse_pago_em, repasse_forma_pagamento")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .gte("data", fIni)
       .lte("data", fFim);
     let qAgenda = supabase
       .from("fin_lancamentos")
-      .select("id, data, descricao, valor, forma_pagamento, medico_id, paciente_id, agendamento_id")
+      .select("id, data, descricao, valor, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_forma_pagamento")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("tipo", "receita")
       .eq("status", "confirmado")
@@ -129,6 +135,7 @@ function Page() {
       valor_total: Number(r.valor_total), valor_medico: Number(r.valor_medico), valor_clinica: Number(r.valor_clinica),
       status: r.status, forma_pagamento: r.forma_pagamento, medico_id: r.medico_id, paciente_id: r.paciente_id,
       origem: "manual",
+      repasse_pago: !!r.repasse_pago, repasse_pago_em: r.repasse_pago_em, repasse_forma_pagamento: r.repasse_forma_pagamento,
     }));
     const agend: Atend[] = (ar.data ?? []).map((r) => {
       const proc = (r.descricao ?? "").split("—").slice(1).join("—").trim() || r.descricao;
@@ -140,19 +147,25 @@ function Page() {
         status: "realizado", forma_pagamento: r.forma_pagamento,
         medico_id: r.medico_id, paciente_id: r.paciente_id,
         origem: "agenda",
+        repasse_pago: !!r.repasse_pago, repasse_pago_em: r.repasse_pago_em, repasse_forma_pagamento: r.repasse_forma_pagamento,
       };
     });
-    const unif = [...manuais, ...agend].sort((a, b) => (a.data < b.data ? 1 : -1));
+    let unif = [...manuais, ...agend].sort((a, b) => (a.data < b.data ? 1 : -1));
+    if (fStatus === "aberto") unif = unif.filter((x) => !x.repasse_pago);
+    else if (fStatus === "pago") unif = unif.filter((x) => x.repasse_pago);
     setItems(unif);
+    setSel(new Set());
     setLoading(false);
   };
   const loadOpts = async () => {
     if (!clinicaAtual) return;
-    const [m, p] = await Promise.all([
+    const [m, p, c] = await Promise.all([
       supabase.from("medicos").select("id, nome, tipo_repasse, percentual_repasse_padrao, valor_repasse_padrao").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("pacientes").select("id, nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome").limit(500),
+      supabase.from("fin_contas").select("id, nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
     ]);
     setMedicos((m.data ?? []) as Medico[]); setPacientes((p.data ?? []) as Pac[]);
+    setContas((c.data ?? []) as Conta[]);
     const ids = ((m.data ?? []) as Medico[]).map((x) => x.id);
     if (ids.length) {
       const { data: cv } = await supabase
@@ -166,7 +179,7 @@ function Page() {
   useEffect(() => { void loadOpts(); }, [clinicaAtual?.clinica_id]);
   useEffect(() => { void load(); /* refaz ao mudar filtros ou opções de repasse */ },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [clinicaAtual?.clinica_id, fMedico, fIni, fFim, medicos.length, convenios.length]);
+    [clinicaAtual?.clinica_id, fMedico, fIni, fFim, fStatus, medicos.length, convenios.length]);
 
   const calc = useMemo(() => {
     const total = Number(form.valor_total || 0);
