@@ -220,10 +220,10 @@ function Page() {
   ), [items]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <div><h1 className="text-2xl font-semibold">Atendimentos</h1>
-          <p className="text-sm text-muted-foreground">{isMedicoOnly ? "Seus atendimentos e o repasse devido por procedimento" : "Procedimentos realizados com repasse automático (inclui pagamentos da agenda)"}</p></div>
+        <div><h1 className="text-lg font-semibold leading-tight">Atendimentos</h1>
+          <p className="text-xs text-muted-foreground">{isMedicoOnly ? "Seus atendimentos e o repasse devido por procedimento" : "Procedimentos realizados com repasse automático (inclui pagamentos da agenda)"}</p></div>
         <div className="flex gap-2">
         <Button
           variant="outline"
@@ -321,10 +321,10 @@ function Page() {
 
       {/* Filtros */}
       <Card>
-        <CardContent className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+        <CardContent className="p-2">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-2 items-end">
             <div className="space-y-1">
-              <Label className="text-xs flex items-center gap-1"><Filter className="h-3 w-3" />Médico</Label>
+              <Label className="text-[10px] flex items-center gap-1"><Filter className="h-3 w-3" />Médico</Label>
               <MedicoCombobox
                 value={fMedico}
                 onChange={(v) => { if (!isMedicoOnly) setFMedico(v); }}
@@ -332,17 +332,17 @@ function Page() {
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">De</Label>
-              <Input type="date" value={fIni} onChange={(e) => setFIni(e.target.value)} />
+              <Label className="text-[10px]">De</Label>
+              <Input type="date" className="h-8" value={fIni} onChange={(e) => setFIni(e.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Até</Label>
-              <Input type="date" value={fFim} onChange={(e) => setFFim(e.target.value)} />
+              <Label className="text-[10px]">Até</Label>
+              <Input type="date" className="h-8" value={fFim} onChange={(e) => setFFim(e.target.value)} />
             </div>
             {isMedicoOnly ? (
-              <div className="rounded-md border p-3 bg-primary/5 text-center">
-                <div className="text-[10px] text-muted-foreground uppercase">Total a receber</div>
-                <div className="text-base font-semibold text-primary">{fmt(totais.medico)}</div>
+              <div className="rounded-md border px-2 py-1 bg-primary/5 text-center">
+                <div className="text-[9px] text-muted-foreground uppercase leading-tight">Total a receber</div>
+                <div className="text-sm font-semibold text-primary leading-tight">{fmt(totais.medico)}</div>
               </div>
             ) : (
               <div className="grid grid-cols-3 gap-2 text-center">
