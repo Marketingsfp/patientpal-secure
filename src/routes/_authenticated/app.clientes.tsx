@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { exportToExcel } from "@/lib/export-csv";
+import { isCPFValido, somenteDigitos } from "@/lib/cpf";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -391,10 +392,16 @@ function ClientesPage() {
     if (!form.nome.trim()) { toast.error("Informe o nome."); return; }
     if (!form.telefone.trim()) { toast.error("Informe o telefone."); return; }
     if (!form.data_nascimento) { toast.error("Informe a data de nascimento."); return; }
+    if (form.cpf.trim() && !isCPFValido(form.cpf)) {
+      toast.error("CPF inválido."); return;
+    }
+    if (form.responsavel_cpf.trim() && !isCPFValido(form.responsavel_cpf)) {
+      toast.error("CPF do responsável inválido."); return;
+    }
     setSaving(true);
     const payload = {
       nome: form.nome.trim(),
-      cpf: form.cpf.trim() || null,
+      cpf: form.cpf.trim() ? somenteDigitos(form.cpf) : null,
       numero_pasta: form.numero_pasta.trim() || null,
       telefone: form.telefone.trim() || null,
       email: form.email.trim() || null,
@@ -408,7 +415,7 @@ function ClientesPage() {
       cidade: form.cidade.trim() || null,
       estado: form.estado.trim() || null,
       responsavel_nome: form.responsavel_nome.trim() || null,
-      responsavel_cpf: form.responsavel_cpf.trim() || null,
+      responsavel_cpf: form.responsavel_cpf.trim() ? somenteDigitos(form.responsavel_cpf) : null,
       responsavel_telefone: form.responsavel_telefone.trim() || null,
       responsavel_parentesco: form.responsavel_parentesco.trim() || null,
       clinica_id: clinicaAtual.clinica_id,
