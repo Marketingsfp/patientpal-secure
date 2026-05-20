@@ -22,6 +22,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import {
   CalendarDays, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X,
@@ -96,6 +98,7 @@ function AgendaPage() {
   const bordaClinica = { borderColor: corClinica, borderWidth: 2 } as const;
   const { user } = useAuth();
   const [dataRef, setDataRef] = useState(() => new Date().toISOString().slice(0, 10));
+  const [dataFim, setDataFim] = useState<string | null>(null);
   const [apenasData, setApenasData] = useState(false);
   const [mostrarLivres, setMostrarLivres] = useState(true);
   const [filtroMedico, setFiltroMedico] = useState<string>("todos");
@@ -139,10 +142,8 @@ function AgendaPage() {
   const [auditRows, setAuditRows] = useState<AuditRow[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
 
-  // Visão "Por médico — vários dias" (estilo planilha com 3/5/7 dias)
+  // Visão "Por médico — vários dias" (estilo planilha)
   const [viewMode, setViewMode] = useState<"dia" | "medico">("dia");
-  const [diasView, setDiasView] = useState<number>(5);
-  const [medicoView, setMedicoView] = useState<string>("");
 
   const fnListarEquipe = useServerFn(listarEquipe);
   const carregarEquipe = async () => {
@@ -205,12 +206,14 @@ function AgendaPage() {
       .order("inicio");
     if (apenasData) {
       const inicio = new Date(`${dataRef}T00:00:00`).toISOString();
-      const fim = new Date(`${dataRef}T23:59:59`).toISOString();
+      const fimDia = dataFim ?? dataRef;
+      const fim = new Date(`${fimDia}T23:59:59`).toISOString();
       q = q.gte("inicio", inicio).lte("inicio", fim);
     } else {
-      // próximos 30 dias a partir da data ref
       const inicio = new Date(`${dataRef}T00:00:00`).toISOString();
-      const f = new Date(`${dataRef}T00:00:00`); f.setDate(f.getDate() + 30);
+      const f = new Date(`${(dataFim ?? dataRef)}T00:00:00`);
+      if (!dataFim) f.setDate(f.getDate() + 30);
+      else f.setHours(23, 59, 59);
       q = q.gte("inicio", inicio).lte("inicio", f.toISOString());
     }
     const { data, error } = await q;
@@ -277,7 +280,7 @@ function AgendaPage() {
   };
 
   useEffect(() => { loadRef(); }, [clinicaAtual?.clinica_id]);
-  useEffect(() => { load(); }, [clinicaAtual?.clinica_id, dataRef, apenasData]);
+  useEffect(() => { load(); }, [clinicaAtual?.clinica_id, dataRef, dataFim, apenasData]);
 
   // Verifica se o usuário logado é médico da clínica atual (para liberar status "Realizado")
   useEffect(() => {
@@ -654,7 +657,7 @@ function AgendaPage() {
             </button>
             <button
               type="button"
-              onClick={() => { setViewMode("medico"); if (!medicoView && medicos[0]) setMedicoView(medicos[0].id); }}
+              onClick={() => setViewMode("medico")}
               className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${viewMode === "medico" ? "bg-emerald-600 text-white" : "text-muted-foreground hover:text-foreground"}`}
             >
               Por médico
@@ -1152,11 +1155,13 @@ function AgendaPage() {
           </div>
           <div className="space-y-1 rounded-md border-2 border-transparent hover:border-[var(--clinic)] p-2.5 bg-background transition-colors">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Data Ref.</Label>
-            <div className="flex gap-1">
-              <Button variant="outline" size="icon" onClick={() => shiftData(-1)}><ChevronLeft className="h-4 w-4" /></Button>
-              <Input type="date" value={dataRef} onChange={(e) => setDataRef(e.target.value)} />
-              <Button variant="outline" size="icon" onClick={() => shiftData(1)}><ChevronRight className="h-4 w-4" /></Button>
-            </div>
+            <DataRefField
+              dataRef={dataRef}
+              dataFim={dataFim}
+              setDataRef={setDataRef}
+              setDataFim={setDataFim}
+              shiftData={shiftData}
+            />
           </div>
           <div className="space-y-1 rounded-md border-2 border-transparent hover:border-[var(--clinic)] p-2.5 bg-background transition-colors">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Dia Semana</Label>
@@ -1404,14 +1409,15 @@ function AgendaPage() {
 
       {viewMode === "medico" && (
         <AgendaPorMedicoGrid
-          medicos={medicos}
-          medicoId={medicoView}
-          onMedicoChange={setMedicoView}
-          dias={diasView}
-          onDiasChange={setDiasView}
+          medicoId={filtroMedico === "todos" ? "" : filtroMedico}
+          dias={(() => {
+            if (!dataFim) return 1;
+            const a = new Date(`${dataRef}T12:00:00`).getTime();
+            const b = new Date(`${dataFim}T12:00:00`).getTime();
+            return Math.min(31, Math.max(1, Math.round((b - a) / 86400000) + 1));
+          })()}
           dataRef={dataRef}
-          shiftData={shiftData}
-          items={items.filter((a) => !medicoView || a.medico_id === medicoView)}
+          items={items.filter((a) => filtroMedico === "todos" || a.medico_id === filtroMedico)}
           onSlotClick={(a) => openSlot(a)}
           onAgClick={(a) => openEdit(a)}
           fmtHora={fmtHora}
@@ -1443,16 +1449,11 @@ function Paginacao({ page, totalPages, onChange }: { page: number; totalPages: n
 }
 
 function AgendaPorMedicoGrid({
-  medicos, medicoId, onMedicoChange, dias, onDiasChange,
-  dataRef, shiftData, items, onSlotClick, onAgClick, fmtHora,
+  medicoId, dias, dataRef, items, onSlotClick, onAgClick, fmtHora,
 }: {
-  medicos: Medico[];
   medicoId: string;
-  onMedicoChange: (v: string) => void;
   dias: number;
-  onDiasChange: (n: number) => void;
   dataRef: string;
-  shiftData: (delta: number) => void;
   items: Agendamento[];
   onSlotClick: (a: Agendamento) => void;
   onAgClick: (a: Agendamento) => void;
@@ -1515,49 +1516,9 @@ function AgendaPorMedicoGrid({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="min-w-[260px]">
-            <SearchableSelect
-              value={medicoId || "none"}
-              onChange={(v) => onMedicoChange(v === "none" ? "" : v)}
-              placeholder="Selecione o profissional"
-              searchPlaceholder="Buscar médico..."
-              options={[
-                { value: "none", label: "— Selecione um médico —" },
-                ...medicos.map((m) => ({ value: m.id, label: m.nome })),
-              ]}
-            />
-          </div>
-          <div className="inline-flex rounded-full border bg-background p-0.5">
-            {[3, 5, 7].map((n) => (
-              <button
-                key={n}
-                type="button"
-                onClick={() => onDiasChange(n)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${dias === n ? "bg-emerald-600 text-white" : "text-muted-foreground hover:text-foreground"}`}
-              >
-                {n} dias
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="flex items-center gap-1">
-          <Button variant="outline" size="icon" onClick={() => shiftData(-dias)} title="Período anterior">
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="px-3 text-sm text-muted-foreground">
-            {fmtCabecalho(intervaloDias[0])} → {fmtCabecalho(intervaloDias[intervaloDias.length - 1])}
-          </span>
-          <Button variant="outline" size="icon" onClick={() => shiftData(dias)} title="Próximo período">
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
       {!medicoId ? (
         <div className="rounded-2xl border bg-card p-10 text-center text-sm text-muted-foreground">
-          Selecione um médico para visualizar sua agenda em formato de planilha.
+          Selecione um profissional no filtro acima para visualizar a agenda por médico.
         </div>
       ) : (
         <div className="rounded-2xl border bg-card overflow-x-auto">
@@ -1656,5 +1617,115 @@ function FragmentDayCell({
         )}
       </td>
     </>
+  );
+}
+
+function DataRefField({
+  dataRef, dataFim, setDataRef, setDataFim, shiftData,
+}: {
+  dataRef: string;
+  dataFim: string | null;
+  setDataRef: (v: string) => void;
+  setDataFim: (v: string | null) => void;
+  shiftData: (delta: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<"single" | "range">(dataFim ? "range" : "single");
+
+  const toIso = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const fmt = (s: string) => {
+    const d = new Date(`${s}T12:00:00`);
+    return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+  };
+
+  const label = dataFim ? `${fmt(dataRef)} → ${fmt(dataFim)}` : fmt(dataRef);
+
+  return (
+    <div className="flex gap-1">
+      <Button variant="outline" size="icon" onClick={() => { setDataFim(null); shiftData(-1); }}>
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button variant="outline" className="flex-1 justify-start font-normal">
+            <CalendarDays className="h-4 w-4 mr-2" /> {label}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <div className="flex items-center gap-1 p-2 border-b">
+            <Button
+              size="sm"
+              variant={mode === "single" ? "default" : "outline"}
+              onClick={() => setMode("single")}
+            >
+              Dia
+            </Button>
+            <Button
+              size="sm"
+              variant={mode === "range" ? "default" : "outline"}
+              onClick={() => setMode("range")}
+            >
+              Período
+            </Button>
+            <span className="flex-1" />
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setDataRef(toIso(new Date()));
+                setDataFim(null);
+                setMode("single");
+                setOpen(false);
+              }}
+            >
+              Hoje
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setDataRef(toIso(new Date()));
+                setDataFim(null);
+                setMode("single");
+              }}
+            >
+              Limpar
+            </Button>
+          </div>
+          {mode === "single" ? (
+            <Calendar
+              mode="single"
+              selected={new Date(`${dataRef}T12:00:00`)}
+              onSelect={(d) => {
+                if (!d) return;
+                setDataRef(toIso(d));
+                setDataFim(null);
+                setOpen(false);
+              }}
+              className="p-3 pointer-events-auto"
+            />
+          ) : (
+            <Calendar
+              mode="range"
+              selected={{
+                from: new Date(`${dataRef}T12:00:00`),
+                to: dataFim ? new Date(`${dataFim}T12:00:00`) : undefined,
+              }}
+              onSelect={(r) => {
+                if (!r?.from) return;
+                setDataRef(toIso(r.from));
+                setDataFim(r.to ? toIso(r.to) : null);
+              }}
+              numberOfMonths={2}
+              className="p-3 pointer-events-auto"
+            />
+          )}
+        </PopoverContent>
+      </Popover>
+      <Button variant="outline" size="icon" onClick={() => { setDataFim(null); shiftData(1); }}>
+        <ChevronRight className="h-4 w-4" />
+      </Button>
+    </div>
   );
 }
