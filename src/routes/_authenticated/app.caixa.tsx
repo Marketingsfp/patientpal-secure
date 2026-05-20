@@ -811,6 +811,32 @@ function Page() {
                 </Select>
               </div>
             )}
+            {openMov && (openMov.tipo === "recebimento" || openMov.tipo === "despesa") && (movForma === "credito" || movForma === "debito") && (
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label>Bandeira *</Label>
+                  <Select value={movBandeira} onValueChange={setMovBandeira}>
+                    <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                    <SelectContent>
+                      {BANDEIRAS_CARTAO.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {movForma === "credito" && (
+                  <div>
+                    <Label>Parcelas</Label>
+                    <Select value={movParcelas} onValueChange={setMovParcelas}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 12 }, (_, i) => i + 1).map(n => (
+                          <SelectItem key={n} value={String(n)}>{n}x</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+            )}
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => setOpenMov(null)}>Cancelar</Button>
               <Button type="submit" disabled={saving}>Lançar</Button>
