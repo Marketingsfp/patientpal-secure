@@ -389,6 +389,8 @@ function ClientesPage() {
     e.preventDefault();
     if (!clinicaAtual) return;
     if (!form.nome.trim()) { toast.error("Informe o nome."); return; }
+    if (!form.telefone.trim()) { toast.error("Informe o telefone."); return; }
+    if (!form.data_nascimento) { toast.error("Informe a data de nascimento."); return; }
     setSaving(true);
     const payload = {
       nome: form.nome.trim(),
