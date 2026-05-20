@@ -106,6 +106,8 @@ function Page() {
   const [openCobranca, setOpenCobranca] = useState<FilaCaixa | null>(null);
   const [cobrancaValor, setCobrancaValor] = useState("");
   const [cobrancaForma, setCobrancaForma] = useState("dinheiro");
+  const [cobrancaBandeira, setCobrancaBandeira] = useState("");
+  const [cobrancaParcelas, setCobrancaParcelas] = useState("1");
 
   // Formularios
   const [valorAbertura, setValorAbertura] = useState("0");
@@ -113,6 +115,8 @@ function Page() {
   const [movValor, setMovValor] = useState("");
   const [movDesc, setMovDesc] = useState("");
   const [movForma, setMovForma] = useState("dinheiro");
+  const [movBandeira, setMovBandeira] = useState("");
+  const [movParcelas, setMovParcelas] = useState("1");
   const [valorInformado, setValorInformado] = useState("");
   const [obsFechamento, setObsFechamento] = useState("");
   const [saving, setSaving] = useState(false);
