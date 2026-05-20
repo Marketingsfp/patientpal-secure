@@ -4,6 +4,7 @@ import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell,
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
+import { useMedicoContext } from "@/hooks/use-medico-context";
 import { supabase } from "@/integrations/supabase/client";
 import logoSaoFrancisco from "@/assets/logo-sao-francisco.png";
 import logoMeninoJesus from "@/assets/logo-menino-jesus.png";
@@ -113,6 +114,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<{ to: string;
 export function AppShell() {
   const { user, signOut, loading } = useAuth();
   const { memberships, clinicaAtual, setClinicaAtual, modoTodas, setModoTodas, branding } = useClinica();
+  const { isMedicoOnly } = useMedicoContext();
   const location = useLocation();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState<boolean>(() => {
@@ -214,6 +216,18 @@ export function AppShell() {
         : "#0f172a";
   const initial = (userName || user?.email || "?").trim().charAt(0).toUpperCase();
 
+  const medicoNavRows: typeof navRows = [
+    {
+      label: "Médico",
+      items: [
+        { to: "/app/agenda", label: "Agenda", icon: CalendarDays },
+        { to: "/app/atendimento-ia", label: "Atendimento médico", icon: Brain },
+        { to: "/app/financeiro/atendimentos", label: "Repasse", icon: DollarSign },
+      ],
+    },
+  ];
+  const visibleNavRows = isMedicoOnly ? medicoNavRows : navRows;
+
   return (
     <div className="h-screen flex bg-background overflow-hidden">
       <aside
@@ -291,7 +305,7 @@ export function AppShell() {
         </div>
         )}
         <nav className="flex-1 px-2 py-3 space-y-5 overflow-y-auto">
-          {navRows.map((row) => {
+          {visibleNavRows.map((row) => {
             const groupHasActive = row.items.some((it) => location.pathname === it.to || (it.to !== "/app" && location.pathname.startsWith(it.to)));
             const open = collapsed ? true : (openGroups[row.label] ?? groupHasActive);
             return (
