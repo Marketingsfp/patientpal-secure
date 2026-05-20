@@ -80,15 +80,19 @@ function OdontologiaPage() {
     void carregar();
   }
 
-  async function salvarProntuario(campo: keyof ProntuarioOdonto, valor: string) {
+  type CampoProntuario = "queixa_principal" | "historia_dental" | "plano_tratamento" | "observacoes";
+  async function salvarProntuario(campo: CampoProntuario, valor: string) {
     if (!pacienteId || !clinicaAtual) return;
+    const patch: Partial<Record<CampoProntuario, string>> = { [campo]: valor };
     if (prontuario) {
-      const { error } = await supabase.from("odonto_prontuarios").update({ [campo]: valor }).eq("id", prontuario.id);
+      const { error } = await supabase.from("odonto_prontuarios").update(patch).eq("id", prontuario.id);
       if (error) { toast.error(error.message); return; }
       setProntuario({ ...prontuario, [campo]: valor });
     } else {
       const { data, error } = await supabase.from("odonto_prontuarios").insert({
-        clinica_id: clinicaAtual.clinica_id, paciente_id: pacienteId, [campo]: valor,
+        clinica_id: clinicaAtual.clinica_id,
+        paciente_id: pacienteId,
+        ...patch,
       }).select("id,queixa_principal,historia_dental,plano_tratamento,observacoes").maybeSingle();
       if (error) { toast.error(error.message); return; }
       setProntuario(data as ProntuarioOdonto);
