@@ -601,8 +601,7 @@ function Page() {
                                 className="w-full h-7 text-xs"
                                 onClick={() => {
                                   setOpenCobranca(f);
-                                  setCobrancaValor(String(f.valor || 0));
-                                  setCobrancaForma("dinheiro");
+                                  setCobrancaLinhas([{ forma: "dinheiro", valor: String(f.valor || 0), bandeira: "", parcelas: "1" }]);
                                 }}
                               >
                                 <Receipt className="h-3 w-3 mr-1" /> Cobrar <ChevronRight className="h-3 w-3 ml-auto" />
