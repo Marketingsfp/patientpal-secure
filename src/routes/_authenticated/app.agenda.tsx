@@ -1024,6 +1024,83 @@ function AgendaPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={!!auditAg} onOpenChange={(o) => { if (!o) { setAuditAg(null); setAuditRows([]); } }}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-primary" />
+              Histórico de alterações
+            </DialogTitle>
+            {auditAg && (
+              <p className="text-sm text-muted-foreground">
+                {auditAg.paciente_nome} — {new Date(auditAg.inicio).toLocaleString("pt-BR")}
+              </p>
+            )}
+          </DialogHeader>
+          <div className="overflow-auto flex-1 -mx-6 px-6">
+            {auditLoading ? (
+              <p className="text-sm text-muted-foreground py-8 text-center">Carregando...</p>
+            ) : auditRows.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-8 text-center">
+                Nenhuma alteração registrada para este agendamento.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {auditRows.map((r) => {
+                  const acaoLabel: Record<string, string> = { INSERT: "Criou", UPDATE: "Alterou", DELETE: "Excluiu" };
+                  const acaoCor: Record<string, string> = {
+                    INSERT: "bg-emerald-100 text-emerald-700",
+                    UPDATE: "bg-amber-100 text-amber-700",
+                    DELETE: "bg-rose-100 text-rose-700",
+                  };
+                  const antes = (r.dados_antes ?? {}) as Record<string, unknown>;
+                  const depois = (r.dados_depois ?? {}) as Record<string, unknown>;
+                  const chaves = Array.from(new Set([...Object.keys(antes), ...Object.keys(depois)]))
+                    .filter((k) => !["updated_at", "created_at", "fluxo_atualizado_em"].includes(k))
+                    .filter((k) => JSON.stringify(antes[k]) !== JSON.stringify(depois[k]));
+                  return (
+                    <div key={r.id} className="rounded-md border p-3 bg-card">
+                      <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+                        <div className="flex items-center gap-2">
+                          <Badge className={acaoCor[r.action] ?? ""}>{acaoLabel[r.action] ?? r.action}</Badge>
+                          <span className="text-xs font-mono text-muted-foreground">{r.table_name}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {new Date(r.created_at).toLocaleString("pt-BR")} · {r.user_email ?? "—"}
+                        </div>
+                      </div>
+                      {r.action === "UPDATE" && chaves.length > 0 && (
+                        <div className="text-xs space-y-1">
+                          {chaves.map((k) => (
+                            <div key={k} className="grid grid-cols-[120px_1fr] gap-2">
+                              <span className="font-medium text-muted-foreground">{k}:</span>
+                              <span>
+                                <span className="line-through text-rose-600">{String(antes[k] ?? "—")}</span>
+                                {" → "}
+                                <span className="text-emerald-700">{String(depois[k] ?? "—")}</span>
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {r.action === "INSERT" && (
+                        <p className="text-xs text-muted-foreground">Registro criado.</p>
+                      )}
+                      {r.action === "DELETE" && (
+                        <p className="text-xs text-muted-foreground">Registro excluído.</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setAuditAg(null); setAuditRows([]); }}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Filtros */}
       <div
         className="rounded-lg border bg-card p-4 space-y-4 [--clinic:theme(colors.border)]"
