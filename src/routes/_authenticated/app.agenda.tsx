@@ -1441,3 +1441,220 @@ function Paginacao({ page, totalPages, onChange }: { page: number; totalPages: n
     </div>
   );
 }
+
+function AgendaPorMedicoGrid({
+  medicos, medicoId, onMedicoChange, dias, onDiasChange,
+  dataRef, shiftData, items, onSlotClick, onAgClick, fmtHora,
+}: {
+  medicos: Medico[];
+  medicoId: string;
+  onMedicoChange: (v: string) => void;
+  dias: number;
+  onDiasChange: (n: number) => void;
+  dataRef: string;
+  shiftData: (delta: number) => void;
+  items: Agendamento[];
+  onSlotClick: (a: Agendamento) => void;
+  onAgClick: (a: Agendamento) => void;
+  fmtHora: (iso: string) => string;
+}) {
+  const diasSemana = ["DOMINGO", "SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO"];
+
+  // Lista de dias no intervalo (yyyy-mm-dd)
+  const intervaloDias = useMemo(() => {
+    const arr: string[] = [];
+    const base = new Date(`${dataRef}T12:00:00`);
+    for (let i = 0; i < dias; i++) {
+      const d = new Date(base);
+      d.setDate(d.getDate() + i);
+      arr.push(d.toISOString().slice(0, 10));
+    }
+    return arr;
+  }, [dataRef, dias]);
+
+  // Agrupa agendamentos por dia + horário de início
+  const porDia = useMemo(() => {
+    const map = new Map<string, Agendamento[]>();
+    for (const a of items) {
+      const dia = a.inicio.slice(0, 10);
+      if (!intervaloDias.includes(dia)) continue;
+      if (!map.has(dia)) map.set(dia, []);
+      map.get(dia)!.push(a);
+    }
+    for (const arr of map.values()) arr.sort((x, y) => x.inicio.localeCompare(y.inicio));
+    return map;
+  }, [items, intervaloDias]);
+
+  // Slots de hora de início: união dos horários existentes em todos os dias
+  // do intervalo, ou grade padrão de 30min entre 07:00 e 19:00 se vazio.
+  const horasInicio = useMemo(() => {
+    const set = new Set<string>();
+    for (const arr of porDia.values()) {
+      for (const a of arr) {
+        const d = new Date(a.inicio);
+        set.add(`${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`);
+      }
+    }
+    if (set.size === 0) {
+      for (let h = 7; h < 19; h++) {
+        set.add(`${String(h).padStart(2, "0")}:00`);
+        set.add(`${String(h).padStart(2, "0")}:30`);
+      }
+    }
+    return Array.from(set).sort();
+  }, [porDia]);
+
+  const corStatus = (s: Status) => STATUS_COR[s];
+
+  const fmtCabecalho = (yyyymmdd: string) => {
+    const d = new Date(`${yyyymmdd}T12:00:00`);
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    return `${dd}/${mm} — ${diasSemana[d.getDay()]}`;
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="min-w-[260px]">
+            <SearchableSelect
+              value={medicoId || "none"}
+              onChange={(v) => onMedicoChange(v === "none" ? "" : v)}
+              placeholder="Selecione o profissional"
+              searchPlaceholder="Buscar médico..."
+              options={[
+                { value: "none", label: "— Selecione um médico —" },
+                ...medicos.map((m) => ({ value: m.id, label: m.nome })),
+              ]}
+            />
+          </div>
+          <div className="inline-flex rounded-full border bg-background p-0.5">
+            {[3, 5, 7].map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => onDiasChange(n)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${dias === n ? "bg-emerald-600 text-white" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                {n} dias
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="flex items-center gap-1">
+          <Button variant="outline" size="icon" onClick={() => shiftData(-dias)} title="Período anterior">
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="px-3 text-sm text-muted-foreground">
+            {fmtCabecalho(intervaloDias[0])} → {fmtCabecalho(intervaloDias[intervaloDias.length - 1])}
+          </span>
+          <Button variant="outline" size="icon" onClick={() => shiftData(dias)} title="Próximo período">
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      {!medicoId ? (
+        <div className="rounded-2xl border bg-card p-10 text-center text-sm text-muted-foreground">
+          Selecione um médico para visualizar sua agenda em formato de planilha.
+        </div>
+      ) : (
+        <div className="rounded-2xl border bg-card overflow-x-auto">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="bg-muted/40">
+                <th className="sticky left-0 z-10 bg-muted/60 px-3 py-2 text-xs font-semibold text-muted-foreground border-r" style={{ minWidth: 88 }}>
+                  Hora<br />Início
+                </th>
+                {intervaloDias.map((dia) => (
+                  <FragmentDayHeader key={dia} dia={dia} fmtCabecalho={fmtCabecalho} />
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {horasInicio.map((hi) => (
+                <tr key={hi} className="border-t">
+                  <td className="sticky left-0 z-10 bg-muted/30 px-3 py-1.5 text-xs font-mono text-muted-foreground border-r">{hi}</td>
+                  {intervaloDias.map((dia) => {
+                    const ag = (porDia.get(dia) ?? []).find((a) => {
+                      const d = new Date(a.inicio);
+                      const k = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+                      return k === hi;
+                    });
+                    return (
+                      <FragmentDayCell
+                        key={dia + hi}
+                        ag={ag}
+                        dia={dia}
+                        hi={hi}
+                        onSlotClick={onSlotClick}
+                        onAgClick={onAgClick}
+                        fmtHora={fmtHora}
+                        corStatus={corStatus}
+                      />
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FragmentDayHeader({ dia, fmtCabecalho }: { dia: string; fmtCabecalho: (d: string) => string }) {
+  return (
+    <>
+      <th className="px-2 py-2 text-xs font-semibold text-muted-foreground border-r bg-muted/40" style={{ minWidth: 70 }}>
+        Hora<br />Fim
+      </th>
+      <th className="px-3 py-2 text-xs font-semibold text-foreground border-r bg-muted/40 text-left" style={{ minWidth: 180 }}>
+        {fmtCabecalho(dia)}
+      </th>
+    </>
+  );
+}
+
+function FragmentDayCell({
+  ag, dia, hi, onSlotClick, onAgClick, fmtHora, corStatus,
+}: {
+  ag: Agendamento | undefined;
+  dia: string;
+  hi: string;
+  onSlotClick: (a: Agendamento) => void;
+  onAgClick: (a: Agendamento) => void;
+  fmtHora: (iso: string) => string;
+  corStatus: (s: Status) => string;
+}) {
+  const ehLivre = ag && normalizar(ag.paciente_nome) === "disponivel";
+  return (
+    <>
+      <td className="px-2 py-1 text-xs font-mono text-muted-foreground border-r align-middle text-center" style={{ minWidth: 70 }}>
+        {ag ? fmtHora(ag.fim) : ""}
+      </td>
+      <td className="px-1 py-1 border-r align-middle" style={{ minWidth: 180 }}>
+        {!ag ? (
+          <button
+            type="button"
+            className="w-full h-8 rounded-md text-xs text-muted-foreground/60 hover:bg-emerald-50 hover:text-emerald-700 transition-colors"
+            title={`Criar agendamento ${dia} ${hi}`}
+          >
+            +
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => (ehLivre ? onSlotClick(ag) : onAgClick(ag))}
+            className={`w-full text-left rounded-md px-2 py-1.5 text-xs leading-tight truncate hover:brightness-95 transition ${corStatus(ag.status)}`}
+            title={`${ag.paciente_nome} — ${ag.procedimento ?? "CONSULTA"}`}
+          >
+            {ehLivre ? "+ Agendar" : ag.paciente_nome}
+          </button>
+        )}
+      </td>
+    </>
+  );
+}
