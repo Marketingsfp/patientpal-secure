@@ -1123,7 +1123,10 @@ function AgendaPage() {
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40">
-              <TableHead className="w-10">
+              <TableHead
+                className="w-10"
+                title="Selecione vários atendimentos do mesmo paciente para cobrar em um único pagamento (use o botão Opções acima)"
+              >
                 <Checkbox
                   checked={paginados.length > 0 && selecionados.size === paginados.length}
                   onCheckedChange={toggleAll}
@@ -1152,7 +1155,9 @@ function AgendaPage() {
               const realizado = a.status === "realizado";
               return (
                 <TableRow key={a.id} className={realizado ? "bg-emerald-50 dark:bg-emerald-950/20" : ""}>
-                  <TableCell><Checkbox checked={selecionados.has(a.id)} onCheckedChange={() => toggleSel(a.id)} /></TableCell>
+                  <TableCell title="Marque para cobrar este atendimento em um pagamento agrupado">
+                    <Checkbox checked={selecionados.has(a.id)} onCheckedChange={() => toggleSel(a.id)} />
+                  </TableCell>
                   <TableCell className="font-mono text-sm">{fichaNum}</TableCell>
                   <TableCell className="text-sm">{fmtDiaSemana(a.inicio)}</TableCell>
                   <TableCell className="text-sm">{fmtData(a.inicio)}</TableCell>
@@ -1213,6 +1218,9 @@ function AgendaPage() {
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => imprimirGR(a)}>
                           <Printer className="h-4 w-4 mr-2" /> Imprimir GR
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => reimprimirGR(a)}>
+                          <Printer className="h-4 w-4 mr-2" /> Reimprimir última via
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => {
                           const url = `${window.location.origin}/p/${(a as any).token_publico}`;
