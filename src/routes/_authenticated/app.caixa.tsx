@@ -243,47 +243,53 @@ function Page() {
   const cobrar = async (e: FormEvent) => {
     e.preventDefault();
     if (!clinicaAtual || !user || !minhaSessao || !openCobranca) return;
-    const v = Number(cobrancaValor) || 0;
-    if (v <= 0) { toast.error("Informe um valor"); return; }
-    if ((cobrancaForma === "credito" || cobrancaForma === "debito") && !cobrancaBandeira) {
-      toast.error("Selecione a bandeira do cartão"); return;
+    // Valida cada linha
+    const linhasValidadas: Array<{ forma: string; valor: number; bandeira: string; parcelas: string }> = [];
+    for (const l of cobrancaLinhas) {
+      const v = Number(l.valor) || 0;
+      if (v <= 0) { toast.error("Cada forma de pagamento precisa ter valor maior que zero"); return; }
+      if ((l.forma === "credito" || l.forma === "debito") && !l.bandeira) {
+        toast.error("Selecione a bandeira do cartão em todas as linhas"); return;
+      }
+      linhasValidadas.push({ forma: l.forma, valor: v, bandeira: l.bandeira, parcelas: l.parcelas });
     }
-    const sufixoCartao = montarSufixoCartao(cobrancaForma, cobrancaBandeira, cobrancaParcelas);
+    if (linhasValidadas.length === 0) { toast.error("Adicione ao menos uma forma de pagamento"); return; }
     setSaving(true);
     try {
-      // 1) Movimento de caixa
-      const { error: e1 } = await supabase.from("caixa_movimentos").insert({
-        sessao_id: minhaSessao.id,
-        clinica_id: clinicaAtual.clinica_id,
-        user_id: user.id,
-        tipo: "recebimento",
-        valor: v,
-        descricao: `${openCobranca.paciente_nome} · ${openCobranca.procedimento ?? "atendimento"}${sufixoCartao}`,
-        forma_pagamento: cobrancaForma,
-      });
-      if (e1) throw e1;
-      // 2) Lançamento financeiro (receita confirmada, ligado ao agendamento)
-      const { error: e2 } = await supabase.from("fin_lancamentos").insert({
-        clinica_id: clinicaAtual.clinica_id,
-        tipo: "receita",
-        descricao: `Recebimento — ${openCobranca.paciente_nome} (${openCobranca.procedimento ?? "atendimento"})${sufixoCartao}`,
-        valor: v,
-        data: new Date().toISOString().slice(0, 10),
-        status: "confirmado",
-        forma_pagamento: cobrancaForma,
-        paciente_id: openCobranca.paciente_id,
-        agendamento_id: openCobranca.id,
-        criado_por: user.id,
-      } as never);
-      if (e2) throw e2;
-      // 3) Avança o fluxo para "triagem"
+      const hoje = new Date().toISOString().slice(0, 10);
+      for (const l of linhasValidadas) {
+        const sufixoCartao = montarSufixoCartao(l.forma, l.bandeira, l.parcelas);
+        const { error: e1 } = await supabase.from("caixa_movimentos").insert({
+          sessao_id: minhaSessao.id,
+          clinica_id: clinicaAtual.clinica_id,
+          user_id: user.id,
+          tipo: "recebimento",
+          valor: l.valor,
+          descricao: `${openCobranca.paciente_nome} · ${openCobranca.procedimento ?? "atendimento"}${sufixoCartao}`,
+          forma_pagamento: l.forma,
+        });
+        if (e1) throw e1;
+        const { error: e2 } = await supabase.from("fin_lancamentos").insert({
+          clinica_id: clinicaAtual.clinica_id,
+          tipo: "receita",
+          descricao: `Recebimento — ${openCobranca.paciente_nome} (${openCobranca.procedimento ?? "atendimento"})${sufixoCartao}`,
+          valor: l.valor,
+          data: hoje,
+          status: "confirmado",
+          forma_pagamento: l.forma,
+          paciente_id: openCobranca.paciente_id,
+          agendamento_id: openCobranca.id,
+          criado_por: user.id,
+        } as never);
+        if (e2) throw e2;
+      }
       const { error: e3 } = await supabase.from("agendamentos")
         .update({ fluxo_etapa: "triagem", fluxo_atualizado_em: new Date().toISOString() } as never)
         .eq("id", openCobranca.id);
       if (e3) throw e3;
       toast.success("Cobrança registrada · paciente enviado à triagem");
-      setOpenCobranca(null); setCobrancaValor(""); setCobrancaForma("dinheiro");
-      setCobrancaBandeira(""); setCobrancaParcelas("1");
+      setOpenCobranca(null);
+      setCobrancaLinhas([linhaVazia()]);
       void load(); void loadFilaCaixa();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Falha na cobrança");
