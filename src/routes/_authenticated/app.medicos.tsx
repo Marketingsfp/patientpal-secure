@@ -612,6 +612,69 @@ function MedicosPage() {
                     </div>
                   </div>
                 </TabsContent>
+
+                <TabsContent value="acesso" className="space-y-4 pt-4 pb-16">
+                  <div className="rounded-md border p-3 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="criar-usuario"
+                        checked={form.criarUsuario}
+                        onCheckedChange={(c) => setForm({ ...form, criarUsuario: c === true })}
+                      />
+                      <Label htmlFor="criar-usuario" className="cursor-pointer">
+                        Criar login de acesso ao sistema
+                      </Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Cria um usuário com o e-mail informado na aba <b>Contato</b> e vincula este médico à equipe da clínica. Se já existir usuário com este e-mail, ele será apenas adicionado à equipe.
+                    </p>
+                    {form.criarUsuario && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2 col-span-2">
+                          <Label>E-mail (login)</Label>
+                          <Input
+                            type="email"
+                            value={form.email}
+                            onChange={(e) => setForm({ ...form, email: e.target.value })}
+                            placeholder="medico@exemplo.com"
+                          />
+                          {!form.email && (
+                            <p className="text-xs text-amber-600">Informe um e-mail (também na aba Contato).</p>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Senha inicial *</Label>
+                          <Input
+                            type="text"
+                            placeholder="mín. 6 caracteres"
+                            value={form.senhaUsuario}
+                            onChange={(e) => setForm({ ...form, senhaUsuario: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Perfil de acesso</Label>
+                          <Select
+                            value={form.roleUsuario}
+                            onValueChange={(v) => setForm({ ...form, roleUsuario: v as typeof form.roleUsuario })}
+                          >
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="medico">Médico</SelectItem>
+                              <SelectItem value="enfermeiro">Enfermeiro</SelectItem>
+                              <SelectItem value="recepcao">Recepção</SelectItem>
+                              <SelectItem value="financeiro">Financeiro</SelectItem>
+                              <SelectItem value="gestor">Gestor</SelectItem>
+                              <SelectItem value="admin">Admin</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Ao salvar, também será criado automaticamente um cadastro de <b>paciente</b> com o mesmo nome, CPF, e-mail e telefone — caso ainda não exista nesta clínica.
+                  </p>
+                </TabsContent>
               </Tabs>
               <DialogFooter className="sticky bottom-0 bg-background border-t -mx-6 -mb-6 px-6 py-3 z-10"><Button type="submit" disabled={loading}>{loading ? "Salvando..." : "Salvar"}</Button></DialogFooter>
             </form>
