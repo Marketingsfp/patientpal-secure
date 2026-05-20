@@ -588,7 +588,7 @@ function ClientesPage() {
               <TableHead className="w-36">Telefone</TableHead>
               <TableHead className="w-40">Cidade/UF</TableHead>
               <TableHead className="w-24">Situação</TableHead>
-              <TableHead className="w-28 text-right">Ações</TableHead>
+              <TableHead className="w-40 text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
