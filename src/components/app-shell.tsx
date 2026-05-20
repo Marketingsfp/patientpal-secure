@@ -1,6 +1,6 @@
 import { Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useState } from "react";
-import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet, ChevronLeft, ChevronRight, Search, HeartPulse, Contact, ConciergeBell, Briefcase, MapPin, Palmtree, GraduationCap, Sparkles, Filter, Send, Megaphone, KeyRound } from "lucide-react";
+import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet, ChevronLeft, ChevronRight, ChevronDown, Search, HeartPulse, Contact, ConciergeBell, Briefcase, MapPin, Palmtree, GraduationCap, Sparkles, Filter, Send, Megaphone, KeyRound } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
@@ -117,6 +117,15 @@ export function AppShell() {
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem("appshell:collapsed") === "1";
   });
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
+    if (typeof window === "undefined") return {};
+    try { return JSON.parse(window.localStorage.getItem("appshell:openGroups") ?? "{}"); } catch { return {}; }
+  });
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("appshell:openGroups", JSON.stringify(openGroups));
+    }
+  }, [openGroups]);
   useEffect(() => {
     if (typeof window !== "undefined") {
       window.localStorage.setItem("appshell:collapsed", collapsed ? "1" : "0");
@@ -259,30 +268,44 @@ export function AppShell() {
         </div>
         )}
         <nav className="flex-1 px-2 py-3 space-y-5 overflow-y-auto">
-          {navRows.map((row, idx) => (
-            <div key={idx} className="space-y-1">
-              {!collapsed && <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.12em] opacity-50">{row.label}</p>}
-              {row.items.map((item) => {
-                const active = location.pathname === item.to ||
-                  (item.to !== "/app" && location.pathname.startsWith(item.to));
-                return (
-                  <Link
-                    key={item.to}
-                    to={item.to}
-                    title={collapsed ? item.label : undefined}
-                    className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "px-3"} py-2 text-sm font-medium transition-all ${
-                      active
-                        ? "bg-white text-slate-900 shadow-sm"
-                        : "text-white/85 hover:bg-white/10 hover:text-white"
-                    }`}
+          {navRows.map((row) => {
+            const groupHasActive = row.items.some((it) => location.pathname === it.to || (it.to !== "/app" && location.pathname.startsWith(it.to)));
+            const open = collapsed ? true : (openGroups[row.label] ?? groupHasActive);
+            return (
+              <div key={row.label} className="space-y-1">
+                {!collapsed && (
+                  <button
+                    type="button"
+                    onClick={() => setOpenGroups((prev) => ({ ...prev, [row.label]: !(prev[row.label] ?? groupHasActive) }))}
+                    className="w-full flex items-center justify-between px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] opacity-70 hover:opacity-100 transition-opacity rounded-md"
+                    aria-expanded={open}
                   >
-                    <item.icon className="h-4 w-4 shrink-0" />
-                    {!collapsed && <span className="truncate">{item.label}</span>}
-                  </Link>
-                );
-              })}
-            </div>
-          ))}
+                    <span>{row.label}</span>
+                    <ChevronDown className={`h-3 w-3 transition-transform ${open ? "rotate-0" : "-rotate-90"}`} />
+                  </button>
+                )}
+                {open && row.items.map((item) => {
+                  const active = location.pathname === item.to ||
+                    (item.to !== "/app" && location.pathname.startsWith(item.to));
+                  return (
+                    <Link
+                      key={item.to}
+                      to={item.to}
+                      title={collapsed ? item.label : undefined}
+                      className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "px-3"} py-2 text-sm font-medium transition-all ${
+                        active
+                          ? "bg-white text-slate-900 shadow-sm"
+                          : "text-white/85 hover:bg-white/10 hover:text-white"
+                      }`}
+                    >
+                      <item.icon className="h-4 w-4 shrink-0" />
+                      {!collapsed && <span className="truncate">{item.label}</span>}
+                    </Link>
+                  );
+                })}
+              </div>
+            );
+          })}
         </nav>
         <div className={`px-3 py-3 border-t border-white/10 flex items-center ${collapsed ? "justify-center" : "gap-2"}`}>
           <div className="h-8 w-8 rounded-full bg-white text-slate-900 flex items-center justify-center text-sm font-semibold shrink-0 shadow-sm">
