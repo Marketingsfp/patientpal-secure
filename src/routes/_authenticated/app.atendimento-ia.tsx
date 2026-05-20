@@ -105,9 +105,19 @@ function AtendimentoIaPage() {
       if (!clinicaAtual) return;
       const cid = clinicaAtual.clinica_id;
       const [m, md] = await Promise.all([
-        supabase.from("medicos").select("id, nome, email, user_id, especialidade_id, especialidades(nome)").eq("clinica_id", cid).eq("ativo", true).order("nome"),
+        supabase
+          .from("medicos")
+          .select("id, nome, email, user_id, especialidade_id, especialidades:especialidades!medicos_especialidade_id_fkey(nome)")
+          .eq("clinica_id", cid)
+          .eq("ativo", true)
+          .order("nome"),
         supabase.from("prontuario_modelos").select("id, nome, prompt_ia").eq("clinica_id", cid).eq("ativo", true).order("nome"),
       ]);
+      if (m.error) {
+        toast.error("Não foi possível carregar o profissional logado");
+        setMedicos([]);
+        return;
+      }
       const meds = (m.data ?? []) as unknown as Medico[];
       setMedicos(meds);
       setModelos((md.data ?? []) as Modelo[]);
@@ -135,7 +145,7 @@ function AtendimentoIaPage() {
         setMedicoId(escolhido);
       }
     })();
-  }, [clinicaAtual?.clinica_id, user?.id]);
+  }, [clinicaAtual?.clinica_id, user?.id, user?.email]);
 
   // Médico selecionado e sua especialidade (fixa, vem do cadastro)
   const medicoSelecionado = useMemo(
@@ -143,6 +153,12 @@ function AtendimentoIaPage() {
     [medicos, medicoId],
   );
   const especialidadeMedico = medicoSelecionado?.especialidades?.nome ?? "";
+  const medicoLogado = Boolean(
+    medicoSelecionado && user && (
+      medicoSelecionado.user_id === user.id
+      || medicoSelecionado.email?.toLowerCase() === user.email?.toLowerCase()
+    ),
+  );
 
   // Auto-casa o modelo de prontuário com a especialidade do médico
   useEffect(() => {
@@ -168,7 +184,7 @@ function AtendimentoIaPage() {
       .lte("inicio", `${hoje}T23:59:59`)
       .in("fluxo_etapa", ["aguardando_recepcao", "recepcao", "caixa", "triagem", "atendimento"])
       .order("inicio");
-    setFila((data ?? []) as unknown as FilaItem[]);
+    setFila(((data ?? []) as unknown as FilaItem[]).filter((item) => item.paciente_id && item.paciente_nome !== "DISPONÍVEL"));
   };
 
   useEffect(() => { void carregarFila(medicoId); }, [medicoId, clinicaAtual?.clinica_id]);
@@ -180,23 +196,34 @@ function AtendimentoIaPage() {
     const hoje = new Date().toISOString().slice(0, 10);
     const { data } = await supabase
       .from("triagens_enfermagem")
-      .select("agendamento_id, created_at, agendamentos!inner(id, paciente_nome, medico_id, fluxo_etapa, inicio, medicos(nome))")
+      .select("agendamento_id, created_at")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .gte("created_at", `${hoje}T00:00:00`)
       .order("created_at", { ascending: false });
-    const rows = (data ?? []) as unknown as Array<{
-      agendamento_id: string; created_at: string;
-      agendamentos: { id: string; paciente_nome: string; medico_id: string; fluxo_etapa: string; inicio: string; medicos: { nome: string } | null } | null;
-    }>;
-    const lista = rows
-      .filter(r => r.agendamentos && ["atendimento", "triagem"].includes(r.agendamentos.fluxo_etapa))
-      .map(r => ({
+    const rows = (data ?? []) as Array<{ agendamento_id: string; created_at: string }>;
+    const agendamentoIds = Array.from(new Set(rows.map((r) => r.agendamento_id).filter(Boolean)));
+    if (!agendamentoIds.length) { setTriados([]); return; }
+    const { data: ags } = await supabase
+      .from("agendamentos")
+      .select("id, paciente_nome, medico_id, fluxo_etapa, inicio")
+      .in("id", agendamentoIds);
+    const agMap = new Map((ags ?? []).map((a) => [a.id, a]));
+    const medicoIds = Array.from(new Set((ags ?? []).map((a) => a.medico_id).filter((id): id is string => Boolean(id))));
+    const { data: meds } = medicoIds.length
+      ? await supabase.from("medicos").select("id, nome").in("id", medicoIds)
+      : { data: [] };
+    const medMap = new Map((meds ?? []).map((m) => [m.id, m.nome]));
+    const lista = rows.flatMap((r) => {
+      const ag = agMap.get(r.agendamento_id);
+      if (!ag || !ag.medico_id || !["atendimento", "triagem"].includes(ag.fluxo_etapa)) return [];
+      return [{
         agendamento_id: r.agendamento_id,
-        paciente_nome: r.agendamentos!.paciente_nome,
-        medico_id: r.agendamentos!.medico_id,
-        medico_nome: r.agendamentos!.medicos?.nome ?? "—",
+        paciente_nome: ag.paciente_nome,
+        medico_id: ag.medico_id,
+        medico_nome: medMap.get(ag.medico_id) ?? "—",
         quando: r.created_at,
-      }));
+      }];
+    });
     setTriados(lista);
   };
   useEffect(() => { void carregarTriados(); }, [clinicaAtual?.clinica_id]);
@@ -413,16 +440,22 @@ function AtendimentoIaPage() {
       <Card className="p-4 space-y-3">
         <div className="space-y-1">
           <Label>Profissional</Label>
-          <Select value={medicoId} onValueChange={setMedicoId}>
-            <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
-            <SelectContent>
-              {medicos.map((m) => (
-                <SelectItem key={m.id} value={m.id} className="uppercase">
-                  {m.nome}{m.especialidades?.nome ? ` — ${m.especialidades.nome}` : ""}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {medicoLogado && medicoSelecionado ? (
+            <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm font-medium uppercase">
+              {medicoSelecionado.nome}{medicoSelecionado.especialidades?.nome ? ` — ${medicoSelecionado.especialidades.nome}` : ""}
+            </div>
+          ) : (
+            <Select value={medicoId} onValueChange={setMedicoId}>
+              <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
+              <SelectContent>
+                {medicos.map((m) => (
+                  <SelectItem key={m.id} value={m.id} className="uppercase">
+                    {m.nome}{m.especialidades?.nome ? ` — ${m.especialidades.nome}` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           {medicoSelecionado && (
             <div className="text-xs text-muted-foreground pt-1">
               Especialidade: <b className="text-foreground">{especialidadeMedico || "—"}</b>
