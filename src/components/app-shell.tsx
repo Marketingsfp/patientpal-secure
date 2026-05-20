@@ -116,6 +116,7 @@ export function AppShell() {
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
+    if (window.innerWidth < 1024) return true;
     return window.localStorage.getItem("appshell:collapsed") === "1";
   });
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
@@ -132,6 +133,15 @@ export function AppShell() {
       window.localStorage.setItem("appshell:collapsed", collapsed ? "1" : "0");
     }
   }, [collapsed]);
+  // Auto-collapse on small screens
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onResize = () => {
+      if (window.innerWidth < 1024) setCollapsed(true);
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   const [profileName, setProfileName] = useState<string>("");
   useEffect(() => {
