@@ -1449,16 +1449,11 @@ function Paginacao({ page, totalPages, onChange }: { page: number; totalPages: n
 }
 
 function AgendaPorMedicoGrid({
-  medicos, medicoId, onMedicoChange, dias, onDiasChange,
-  dataRef, shiftData, items, onSlotClick, onAgClick, fmtHora,
+  medicoId, dias, dataRef, items, onSlotClick, onAgClick, fmtHora,
 }: {
-  medicos: Medico[];
   medicoId: string;
-  onMedicoChange: (v: string) => void;
   dias: number;
-  onDiasChange: (n: number) => void;
   dataRef: string;
-  shiftData: (delta: number) => void;
   items: Agendamento[];
   onSlotClick: (a: Agendamento) => void;
   onAgClick: (a: Agendamento) => void;
@@ -1521,49 +1516,9 @@ function AgendaPorMedicoGrid({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="min-w-[260px]">
-            <SearchableSelect
-              value={medicoId || "none"}
-              onChange={(v) => onMedicoChange(v === "none" ? "" : v)}
-              placeholder="Selecione o profissional"
-              searchPlaceholder="Buscar médico..."
-              options={[
-                { value: "none", label: "— Selecione um médico —" },
-                ...medicos.map((m) => ({ value: m.id, label: m.nome })),
-              ]}
-            />
-          </div>
-          <div className="inline-flex rounded-full border bg-background p-0.5">
-            {[3, 5, 7].map((n) => (
-              <button
-                key={n}
-                type="button"
-                onClick={() => onDiasChange(n)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${dias === n ? "bg-emerald-600 text-white" : "text-muted-foreground hover:text-foreground"}`}
-              >
-                {n} dias
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="flex items-center gap-1">
-          <Button variant="outline" size="icon" onClick={() => shiftData(-dias)} title="Período anterior">
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="px-3 text-sm text-muted-foreground">
-            {fmtCabecalho(intervaloDias[0])} → {fmtCabecalho(intervaloDias[intervaloDias.length - 1])}
-          </span>
-          <Button variant="outline" size="icon" onClick={() => shiftData(dias)} title="Próximo período">
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
       {!medicoId ? (
         <div className="rounded-2xl border bg-card p-10 text-center text-sm text-muted-foreground">
-          Selecione um médico para visualizar sua agenda em formato de planilha.
+          Selecione um profissional no filtro acima para visualizar a agenda por médico.
         </div>
       ) : (
         <div className="rounded-2xl border bg-card overflow-x-auto">
