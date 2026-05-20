@@ -13,7 +13,7 @@ function corDaClinica(nome?: string): string {
   const n = (nome ?? "").toLowerCase();
   if (n.includes("são francisco") || n.includes("sao francisco")) return "#16a34a"; // verde
   if (n.includes("menino jesus")) return "#1e3a8a"; // azul royal mais escuro
-  if (n.includes("consulta hoje")) return "#8b5cf6"; // roxinho
+  if (n.includes("consulta hoje")) return "#51177E"; // PMS 2607
   return "hsl(var(--muted-foreground))";
 }
 
@@ -21,7 +21,7 @@ function corHoverDaClinica(nome?: string): string {
   const n = (nome ?? "").toLowerCase();
   if (n.includes("são francisco") || n.includes("sao francisco")) return "#14532d"; // verde escuro
   if (n.includes("menino jesus")) return "#172554"; // azul ainda mais escuro
-  if (n.includes("consulta hoje")) return "#5b21b6"; // roxo escuro
+  if (n.includes("consulta hoje")) return "#3A0F5C"; // PMS 2607 escuro
   return "rgba(0,0,0,0.25)";
 }
 
