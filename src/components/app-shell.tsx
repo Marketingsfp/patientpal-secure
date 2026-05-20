@@ -348,14 +348,7 @@ export function AppShell() {
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="sticky top-0 z-30 h-14 bg-card/80 backdrop-blur border-b flex items-center gap-3 px-3 sm:px-6">
-          <div className="relative flex-1 max-w-xl hidden sm:block">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-            <input
-              type="search"
-              placeholder="Pesquisar pacientes, agendamentos, médicos…"
-              className="w-full h-9 pl-9 pr-3 rounded-full bg-muted/60 border border-transparent focus:bg-card focus:border-input outline-none text-sm transition-colors"
-            />
-          </div>
+          <div className="flex-1" />
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" className="h-9 w-9 p-0 rounded-full" title="Notificações">
               <Bell className="h-4 w-4" />
