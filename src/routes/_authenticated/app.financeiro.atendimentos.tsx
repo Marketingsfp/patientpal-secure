@@ -233,10 +233,91 @@ function Page() {
       acc.total += Number(a.valor_total) || 0;
       acc.medico += Number(a.valor_medico) || 0;
       acc.clinica += Number(a.valor_clinica) || 0;
+      if (a.repasse_pago) acc.pago += Number(a.valor_medico) || 0;
+      else acc.aReceber += Number(a.valor_medico) || 0;
       return acc;
     },
-    { total: 0, medico: 0, clinica: 0 },
+    { total: 0, medico: 0, clinica: 0, pago: 0, aReceber: 0 },
   ), [items]);
+
+  const selectables = items.filter((a) => !a.repasse_pago && (a.valor_medico ?? 0) > 0);
+  const allSelected = selectables.length > 0 && selectables.every((a) => sel.has(`${a.origem}:${a.id}`));
+  const toggleAll = () => {
+    if (allSelected) setSel(new Set());
+    else setSel(new Set(selectables.map((a) => `${a.origem}:${a.id}`)));
+  };
+  const toggleOne = (a: Atend) => {
+    const k = `${a.origem}:${a.id}`;
+    const next = new Set(sel);
+    if (next.has(k)) next.delete(k); else next.add(k);
+    setSel(next);
+  };
+  const selectedItems = items.filter((a) => sel.has(`${a.origem}:${a.id}`));
+  const selectedTotal = selectedItems.reduce((s, a) => s + (Number(a.valor_medico) || 0), 0);
+
+  const openPay = () => {
+    if (!selectedItems.length) { toast.info("Selecione ao menos um atendimento."); return; }
+    setPayForm({ data: hoje, conta_id: contas[0]?.id ?? "", forma_pagamento: "" });
+    setPayOpen(true);
+  };
+
+  const confirmarPagamento = async () => {
+    if (!clinicaAtual || !selectedItems.length) return;
+    setPayingNow(true);
+    try {
+      // Agrupa por médico para gerar um lançamento de despesa por médico
+      const byMed = new Map<string, Atend[]>();
+      for (const a of selectedItems) {
+        const k = a.medico_id ?? "sem";
+        if (!byMed.has(k)) byMed.set(k, []);
+        byMed.get(k)!.push(a);
+      }
+      for (const [medId, list] of byMed) {
+        const total = list.reduce((s, x) => s + (Number(x.valor_medico) || 0), 0);
+        if (total <= 0) continue;
+        const medNome = medId !== "sem" ? medMap.get(medId) ?? "" : "—";
+        const { data: lanc, error: eLanc } = await supabase.from("fin_lancamentos").insert({
+          clinica_id: clinicaAtual.clinica_id,
+          tipo: "despesa",
+          descricao: `Repasse médico — ${medNome} (${list.length} atend.)`,
+          valor: total,
+          data: payForm.data,
+          data_vencimento: payForm.data,
+          status: "confirmado",
+          medico_id: medId !== "sem" ? medId : null,
+          conta_id: payForm.conta_id || null,
+          forma_pagamento: payForm.forma_pagamento || null,
+        }).select("id").single();
+        if (eLanc) throw eLanc;
+        const lancId = lanc?.id ?? null;
+        const upd = {
+          repasse_pago: true,
+          repasse_pago_em: payForm.data,
+          repasse_forma_pagamento: payForm.forma_pagamento || null,
+          repasse_conta_id: payForm.conta_id || null,
+          repasse_lancamento_id: lancId,
+        };
+        const manualIds = list.filter((x) => x.origem === "manual").map((x) => x.id);
+        const agendaIds = list.filter((x) => x.origem === "agenda").map((x) => x.id);
+        if (manualIds.length) {
+          const { error } = await supabase.from("fin_atendimentos").update(upd).in("id", manualIds);
+          if (error) throw error;
+        }
+        if (agendaIds.length) {
+          const { error } = await supabase.from("fin_lancamentos").update(upd).in("id", agendaIds);
+          if (error) throw error;
+        }
+      }
+      toast.success("Repasses pagos com sucesso");
+      setPayOpen(false);
+      await load();
+    } catch (e) {
+      const err = e as { message?: string };
+      toast.error(err.message ?? "Falha ao registrar pagamento");
+    } finally {
+      setPayingNow(false);
+    }
+  };
 
   return (
     <div className="space-y-3">
