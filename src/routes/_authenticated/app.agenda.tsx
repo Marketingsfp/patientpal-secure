@@ -1155,11 +1155,13 @@ function AgendaPage() {
           </div>
           <div className="space-y-1 rounded-md border-2 border-transparent hover:border-[var(--clinic)] p-2.5 bg-background transition-colors">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Data Ref.</Label>
-            <div className="flex gap-1">
-              <Button variant="outline" size="icon" onClick={() => shiftData(-1)}><ChevronLeft className="h-4 w-4" /></Button>
-              <Input type="date" value={dataRef} onChange={(e) => setDataRef(e.target.value)} />
-              <Button variant="outline" size="icon" onClick={() => shiftData(1)}><ChevronRight className="h-4 w-4" /></Button>
-            </div>
+            <DataRefField
+              dataRef={dataRef}
+              dataFim={dataFim}
+              setDataRef={setDataRef}
+              setDataFim={setDataFim}
+              shiftData={shiftData}
+            />
           </div>
           <div className="space-y-1 rounded-md border-2 border-transparent hover:border-[var(--clinic)] p-2.5 bg-background transition-colors">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Dia Semana</Label>
