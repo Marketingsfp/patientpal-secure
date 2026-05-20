@@ -1662,6 +1662,414 @@ export type Database = {
         }
         Relationships: []
       }
+      hr_banco_horas: {
+        Row: {
+          clinica_id: string
+          competencia: string
+          contrato_id: string
+          created_at: string
+          horas_devidas: number
+          horas_trabalhadas: number
+          id: string
+          observacoes: string | null
+          saldo: number
+          updated_at: string
+        }
+        Insert: {
+          clinica_id: string
+          competencia: string
+          contrato_id: string
+          created_at?: string
+          horas_devidas?: number
+          horas_trabalhadas?: number
+          id?: string
+          observacoes?: string | null
+          saldo?: number
+          updated_at?: string
+        }
+        Update: {
+          clinica_id?: string
+          competencia?: string
+          contrato_id?: string
+          created_at?: string
+          horas_devidas?: number
+          horas_trabalhadas?: number
+          id?: string
+          observacoes?: string | null
+          saldo?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_banco_horas_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_banco_horas_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "hr_contratos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_contratos: {
+        Row: {
+          carga_horaria_semanal: number
+          cargo_id: string | null
+          clinica_id: string
+          cpf: string | null
+          created_at: string
+          data_admissao: string
+          data_demissao: string | null
+          funcionario_nome: string
+          id: string
+          numero: number
+          observacoes: string | null
+          regime: string
+          salario: number
+          setor_id: string | null
+          status: string
+          unidade_id: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          carga_horaria_semanal?: number
+          cargo_id?: string | null
+          clinica_id: string
+          cpf?: string | null
+          created_at?: string
+          data_admissao?: string
+          data_demissao?: string | null
+          funcionario_nome: string
+          id?: string
+          numero?: number
+          observacoes?: string | null
+          regime?: string
+          salario?: number
+          setor_id?: string | null
+          status?: string
+          unidade_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          carga_horaria_semanal?: number
+          cargo_id?: string | null
+          clinica_id?: string
+          cpf?: string | null
+          created_at?: string
+          data_admissao?: string
+          data_demissao?: string | null
+          funcionario_nome?: string
+          id?: string
+          numero?: number
+          observacoes?: string | null
+          regime?: string
+          salario?: number
+          setor_id?: string | null
+          status?: string
+          unidade_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_contratos_cargo_id_fkey"
+            columns: ["cargo_id"]
+            isOneToOne: false
+            referencedRelation: "cargos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_contratos_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_contratos_setor_id_fkey"
+            columns: ["setor_id"]
+            isOneToOne: false
+            referencedRelation: "setores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_contratos_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "unidades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_escalas: {
+        Row: {
+          clinica_id: string
+          contrato_id: string
+          created_at: string
+          dia_semana: number
+          hora_entrada: string | null
+          hora_saida: string | null
+          id: string
+          intervalo_fim: string | null
+          intervalo_inicio: string | null
+        }
+        Insert: {
+          clinica_id: string
+          contrato_id: string
+          created_at?: string
+          dia_semana: number
+          hora_entrada?: string | null
+          hora_saida?: string | null
+          id?: string
+          intervalo_fim?: string | null
+          intervalo_inicio?: string | null
+        }
+        Update: {
+          clinica_id?: string
+          contrato_id?: string
+          created_at?: string
+          dia_semana?: number
+          hora_entrada?: string | null
+          hora_saida?: string | null
+          id?: string
+          intervalo_fim?: string | null
+          intervalo_inicio?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_escalas_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_escalas_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "hr_contratos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_ferias: {
+        Row: {
+          abono_pecuniario: boolean
+          aprovado_em: string | null
+          aprovado_por: string | null
+          clinica_id: string
+          contrato_id: string
+          created_at: string
+          dias: number | null
+          fim: string | null
+          id: string
+          inicio: string | null
+          observacoes: string | null
+          periodo_aquisitivo_fim: string
+          periodo_aquisitivo_inicio: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          abono_pecuniario?: boolean
+          aprovado_em?: string | null
+          aprovado_por?: string | null
+          clinica_id: string
+          contrato_id: string
+          created_at?: string
+          dias?: number | null
+          fim?: string | null
+          id?: string
+          inicio?: string | null
+          observacoes?: string | null
+          periodo_aquisitivo_fim: string
+          periodo_aquisitivo_inicio: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          abono_pecuniario?: boolean
+          aprovado_em?: string | null
+          aprovado_por?: string | null
+          clinica_id?: string
+          contrato_id?: string
+          created_at?: string
+          dias?: number | null
+          fim?: string | null
+          id?: string
+          inicio?: string | null
+          observacoes?: string | null
+          periodo_aquisitivo_fim?: string
+          periodo_aquisitivo_inicio?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_ferias_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_ferias_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "hr_contratos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_holerites: {
+        Row: {
+          clinica_id: string
+          competencia: string
+          contrato_id: string
+          created_at: string
+          descontos: Json
+          id: string
+          liquido: number
+          observacoes: string | null
+          pago_em: string | null
+          proventos: Json
+          salario_base: number
+          status: string
+          total_descontos: number
+          total_proventos: number
+          updated_at: string
+        }
+        Insert: {
+          clinica_id: string
+          competencia: string
+          contrato_id: string
+          created_at?: string
+          descontos?: Json
+          id?: string
+          liquido?: number
+          observacoes?: string | null
+          pago_em?: string | null
+          proventos?: Json
+          salario_base?: number
+          status?: string
+          total_descontos?: number
+          total_proventos?: number
+          updated_at?: string
+        }
+        Update: {
+          clinica_id?: string
+          competencia?: string
+          contrato_id?: string
+          created_at?: string
+          descontos?: Json
+          id?: string
+          liquido?: number
+          observacoes?: string | null
+          pago_em?: string | null
+          proventos?: Json
+          salario_base?: number
+          status?: string
+          total_descontos?: number
+          total_proventos?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_holerites_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_holerites_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "hr_contratos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_pontos: {
+        Row: {
+          ajustado: boolean
+          ajustado_por: string | null
+          clinica_id: string
+          contrato_id: string | null
+          created_at: string
+          dentro_raio: boolean | null
+          id: string
+          latitude: number | null
+          longitude: number | null
+          marcado_em: string
+          observacao: string | null
+          tipo: string
+          unidade_id: string | null
+          user_id: string
+        }
+        Insert: {
+          ajustado?: boolean
+          ajustado_por?: string | null
+          clinica_id: string
+          contrato_id?: string | null
+          created_at?: string
+          dentro_raio?: boolean | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          marcado_em?: string
+          observacao?: string | null
+          tipo: string
+          unidade_id?: string | null
+          user_id: string
+        }
+        Update: {
+          ajustado?: boolean
+          ajustado_por?: string | null
+          clinica_id?: string
+          contrato_id?: string | null
+          created_at?: string
+          dentro_raio?: boolean | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          marcado_em?: string
+          observacao?: string | null
+          tipo?: string
+          unidade_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_pontos_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_pontos_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "hr_contratos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_pontos_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "unidades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lgpd_consentimentos: {
         Row: {
           aceito: boolean
