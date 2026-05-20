@@ -97,6 +97,7 @@ function AtendimentoIaPage() {
   const [resumoOpen, setResumoOpen] = useState(false);
   const [loading, setLoading] = useState<"estruturar" | "sugerir" | "resumir" | "salvar" | null>(null);
   const [triagem, setTriagem] = useState<Triagem | null>(null);
+  const [triados, setTriados] = useState<Array<{ agendamento_id: string; paciente_nome: string; medico_id: string; medico_nome: string; quando: string }>>([]);
 
   useEffect(() => {
     (async () => {
@@ -166,6 +167,46 @@ function AtendimentoIaPage() {
   };
 
   useEffect(() => { void carregarFila(medicoId); }, [medicoId, clinicaAtual?.clinica_id]);
+
+  // Carrega pacientes triados hoje (todos os médicos) — para o médico ver
+  // quando uma triagem foi feita e poder pular para o paciente certo.
+  const carregarTriados = async () => {
+    if (!clinicaAtual) { setTriados([]); return; }
+    const hoje = new Date().toISOString().slice(0, 10);
+    const { data } = await supabase
+      .from("triagens_enfermagem")
+      .select("agendamento_id, created_at, agendamentos!inner(id, paciente_nome, medico_id, fluxo_etapa, inicio, medicos(nome))")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .gte("created_at", `${hoje}T00:00:00`)
+      .order("created_at", { ascending: false });
+    const rows = (data ?? []) as unknown as Array<{
+      agendamento_id: string; created_at: string;
+      agendamentos: { id: string; paciente_nome: string; medico_id: string; fluxo_etapa: string; inicio: string; medicos: { nome: string } | null } | null;
+    }>;
+    const lista = rows
+      .filter(r => r.agendamentos && ["atendimento", "triagem"].includes(r.agendamentos.fluxo_etapa))
+      .map(r => ({
+        agendamento_id: r.agendamento_id,
+        paciente_nome: r.agendamentos!.paciente_nome,
+        medico_id: r.agendamentos!.medico_id,
+        medico_nome: r.agendamentos!.medicos?.nome ?? "—",
+        quando: r.created_at,
+      }));
+    setTriados(lista);
+  };
+  useEffect(() => { void carregarTriados(); }, [clinicaAtual?.clinica_id]);
+
+  // Realtime: refaz a lista de triados quando há nova triagem
+  useEffect(() => {
+    if (!clinicaAtual) return;
+    const ch = supabase
+      .channel(`triados-${clinicaAtual.clinica_id}`)
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "triagens_enfermagem", filter: `clinica_id=eq.${clinicaAtual.clinica_id}` },
+        () => { void carregarTriados(); })
+      .subscribe();
+    return () => { void supabase.removeChannel(ch); };
+  }, [clinicaAtual?.clinica_id]);
 
   // Realtime: atualiza fila quando o fluxo muda
   useEffect(() => {
