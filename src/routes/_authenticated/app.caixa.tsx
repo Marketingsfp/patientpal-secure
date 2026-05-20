@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   Wallet, PlusCircle, MinusCircle, ArrowDownToLine, ArrowUpFromLine, Lock,
-  Unlock, Eye, FileDown, Users, Receipt, ChevronRight,
+  Unlock, Eye, FileDown, Users, Receipt, ChevronRight, Trash2, Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -53,6 +53,7 @@ interface FilaCaixa {
   inicio: string;
   medico_nome: string | null;
   valor: number;
+  valor_cartao: number;
   ja_pago: boolean;
 }
 
@@ -117,10 +118,9 @@ function Page() {
   const [detalheMovs, setDetalheMovs] = useState<Mov[]>([]);
   const [filaCaixa, setFilaCaixa] = useState<FilaCaixa[]>([]);
   const [openCobranca, setOpenCobranca] = useState<FilaCaixa | null>(null);
-  const [cobrancaValor, setCobrancaValor] = useState("");
-  const [cobrancaForma, setCobrancaForma] = useState("dinheiro");
-  const [cobrancaBandeira, setCobrancaBandeira] = useState("");
-  const [cobrancaParcelas, setCobrancaParcelas] = useState("1");
+  type LinhaPag = { forma: string; valor: string; bandeira: string; parcelas: string };
+  const linhaVazia = (): LinhaPag => ({ forma: "dinheiro", valor: "0", bandeira: "", parcelas: "1" });
+  const [cobrancaLinhas, setCobrancaLinhas] = useState<LinhaPag[]>([linhaVazia()]);
 
   // Formularios
   const [valorAbertura, setValorAbertura] = useState("0");
@@ -191,15 +191,17 @@ function Page() {
     }>;
     // Procura valores e pagamentos já realizados
     const procNomes = Array.from(new Set(rows.map((r) => r.procedimento).filter(Boolean) as string[]));
-    const valorMap = new Map<string, number>();
+    const valorMap = new Map<string, { dinheiro: number; cartao: number }>();
     if (procNomes.length) {
       const { data: procs } = await supabase
-        .from("procedimentos").select("nome, valor_padrao, valor_dinheiro")
+        .from("procedimentos").select("nome, valor_padrao, valor_dinheiro, valor_cartao_credito")
         .eq("clinica_id", clinicaAtual.clinica_id).in("nome", procNomes);
-      (procs ?? []).forEach((p) => valorMap.set(
-        (p.nome as string).toUpperCase(),
-        Number((p as { valor_dinheiro?: number; valor_padrao?: number }).valor_dinheiro ?? (p as { valor_padrao?: number }).valor_padrao ?? 0),
-      ));
+      (procs ?? []).forEach((p) => {
+        const pp = p as { nome: string; valor_padrao?: number; valor_dinheiro?: number; valor_cartao_credito?: number };
+        const dinheiro = Number(pp.valor_dinheiro ?? pp.valor_padrao ?? 0);
+        const cartao = Number(pp.valor_cartao_credito ?? pp.valor_padrao ?? dinheiro);
+        valorMap.set(pp.nome.toUpperCase(), { dinheiro, cartao });
+      });
     }
     const ids = rows.map((r) => r.id);
     const pagos = new Set<string>();
@@ -209,16 +211,20 @@ function Page() {
         .in("agendamento_id", ids);
       (lancs ?? []).forEach((l) => { if (l.agendamento_id) pagos.add(l.agendamento_id); });
     }
-    setFilaCaixa(rows.map((r) => ({
+    setFilaCaixa(rows.map((r) => {
+      const v = valorMap.get((r.procedimento ?? "").toUpperCase());
+      return {
       id: r.id,
       paciente_id: r.paciente_id,
       paciente_nome: r.paciente_nome,
       procedimento: r.procedimento,
       inicio: r.inicio,
       medico_nome: r.medicos?.nome ?? null,
-      valor: valorMap.get((r.procedimento ?? "").toUpperCase()) ?? 0,
+      valor: v?.dinheiro ?? 0,
+      valor_cartao: v?.cartao ?? v?.dinheiro ?? 0,
       ja_pago: pagos.has(r.id),
-    })));
+      };
+    }));
   }, [clinicaAtual]);
 
   useEffect(() => { if (minhaSessao) void loadFilaCaixa(); }, [minhaSessao, loadFilaCaixa]);
@@ -237,47 +243,53 @@ function Page() {
   const cobrar = async (e: FormEvent) => {
     e.preventDefault();
     if (!clinicaAtual || !user || !minhaSessao || !openCobranca) return;
-    const v = Number(cobrancaValor) || 0;
-    if (v <= 0) { toast.error("Informe um valor"); return; }
-    if ((cobrancaForma === "credito" || cobrancaForma === "debito") && !cobrancaBandeira) {
-      toast.error("Selecione a bandeira do cartão"); return;
+    // Valida cada linha
+    const linhasValidadas: Array<{ forma: string; valor: number; bandeira: string; parcelas: string }> = [];
+    for (const l of cobrancaLinhas) {
+      const v = Number(l.valor) || 0;
+      if (v <= 0) { toast.error("Cada forma de pagamento precisa ter valor maior que zero"); return; }
+      if ((l.forma === "credito" || l.forma === "debito") && !l.bandeira) {
+        toast.error("Selecione a bandeira do cartão em todas as linhas"); return;
+      }
+      linhasValidadas.push({ forma: l.forma, valor: v, bandeira: l.bandeira, parcelas: l.parcelas });
     }
-    const sufixoCartao = montarSufixoCartao(cobrancaForma, cobrancaBandeira, cobrancaParcelas);
+    if (linhasValidadas.length === 0) { toast.error("Adicione ao menos uma forma de pagamento"); return; }
     setSaving(true);
     try {
-      // 1) Movimento de caixa
-      const { error: e1 } = await supabase.from("caixa_movimentos").insert({
-        sessao_id: minhaSessao.id,
-        clinica_id: clinicaAtual.clinica_id,
-        user_id: user.id,
-        tipo: "recebimento",
-        valor: v,
-        descricao: `${openCobranca.paciente_nome} · ${openCobranca.procedimento ?? "atendimento"}${sufixoCartao}`,
-        forma_pagamento: cobrancaForma,
-      });
-      if (e1) throw e1;
-      // 2) Lançamento financeiro (receita confirmada, ligado ao agendamento)
-      const { error: e2 } = await supabase.from("fin_lancamentos").insert({
-        clinica_id: clinicaAtual.clinica_id,
-        tipo: "receita",
-        descricao: `Recebimento — ${openCobranca.paciente_nome} (${openCobranca.procedimento ?? "atendimento"})${sufixoCartao}`,
-        valor: v,
-        data: new Date().toISOString().slice(0, 10),
-        status: "confirmado",
-        forma_pagamento: cobrancaForma,
-        paciente_id: openCobranca.paciente_id,
-        agendamento_id: openCobranca.id,
-        criado_por: user.id,
-      } as never);
-      if (e2) throw e2;
-      // 3) Avança o fluxo para "triagem"
+      const hoje = new Date().toISOString().slice(0, 10);
+      for (const l of linhasValidadas) {
+        const sufixoCartao = montarSufixoCartao(l.forma, l.bandeira, l.parcelas);
+        const { error: e1 } = await supabase.from("caixa_movimentos").insert({
+          sessao_id: minhaSessao.id,
+          clinica_id: clinicaAtual.clinica_id,
+          user_id: user.id,
+          tipo: "recebimento",
+          valor: l.valor,
+          descricao: `${openCobranca.paciente_nome} · ${openCobranca.procedimento ?? "atendimento"}${sufixoCartao}`,
+          forma_pagamento: l.forma,
+        });
+        if (e1) throw e1;
+        const { error: e2 } = await supabase.from("fin_lancamentos").insert({
+          clinica_id: clinicaAtual.clinica_id,
+          tipo: "receita",
+          descricao: `Recebimento — ${openCobranca.paciente_nome} (${openCobranca.procedimento ?? "atendimento"})${sufixoCartao}`,
+          valor: l.valor,
+          data: hoje,
+          status: "confirmado",
+          forma_pagamento: l.forma,
+          paciente_id: openCobranca.paciente_id,
+          agendamento_id: openCobranca.id,
+          criado_por: user.id,
+        } as never);
+        if (e2) throw e2;
+      }
       const { error: e3 } = await supabase.from("agendamentos")
         .update({ fluxo_etapa: "triagem", fluxo_atualizado_em: new Date().toISOString() } as never)
         .eq("id", openCobranca.id);
       if (e3) throw e3;
       toast.success("Cobrança registrada · paciente enviado à triagem");
-      setOpenCobranca(null); setCobrancaValor(""); setCobrancaForma("dinheiro");
-      setCobrancaBandeira(""); setCobrancaParcelas("1");
+      setOpenCobranca(null);
+      setCobrancaLinhas([linhaVazia()]);
       void load(); void loadFilaCaixa();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Falha na cobrança");
@@ -589,8 +601,7 @@ function Page() {
                                 className="w-full h-7 text-xs"
                                 onClick={() => {
                                   setOpenCobranca(f);
-                                  setCobrancaValor(String(f.valor || 0));
-                                  setCobrancaForma("dinheiro");
+                                  setCobrancaLinhas([{ forma: "dinheiro", valor: String(f.valor || 0), bandeira: "", parcelas: "1" }]);
                                 }}
                               >
                                 <Receipt className="h-3 w-3 mr-1" /> Cobrar <ChevronRight className="h-3 w-3 ml-auto" />
@@ -881,49 +892,103 @@ function Page() {
             )}
           </DialogHeader>
           <form onSubmit={cobrar} className="space-y-3">
-            <div>
-              <Label>Valor</Label>
-              <CurrencyInput value={cobrancaValor} onChange={setCobrancaValor} />
-            </div>
-            <div>
-              <Label>Forma de pagamento</Label>
-              <Select value={cobrancaForma} onValueChange={setCobrancaForma}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="dinheiro">Dinheiro</SelectItem>
-                  <SelectItem value="pix">PIX</SelectItem>
-                  <SelectItem value="debito">Débito</SelectItem>
-                  <SelectItem value="credito">Crédito</SelectItem>
-                  <SelectItem value="boleto">Boleto</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {(cobrancaForma === "credito" || cobrancaForma === "debito") && (
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <Label>Bandeira *</Label>
-                  <Select value={cobrancaBandeira} onValueChange={setCobrancaBandeira}>
-                    <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                    <SelectContent>
-                      {BANDEIRAS_CARTAO.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+            {(() => {
+              const total = cobrancaLinhas.reduce((a, l) => a + (Number(l.valor) || 0), 0);
+              const multi = cobrancaLinhas.length > 1;
+              const sugerido = openCobranca ? (multi ? openCobranca.valor_cartao : openCobranca.valor) : 0;
+              const dif = total - sugerido;
+              return (
+                <div className="rounded-md border bg-muted/40 px-3 py-2 text-xs flex items-center justify-between">
+                  <span className="text-muted-foreground">
+                    Sugerido <b className="text-foreground">({multi ? "cartão" : "dinheiro/PIX"})</b>: <b>{fmt(sugerido)}</b>
+                  </span>
+                  <span>
+                    Soma: <b className={Math.abs(dif) < 0.01 ? "text-emerald-600" : "text-amber-600"}>{fmt(total)}</b>
+                  </span>
                 </div>
-                {cobrancaForma === "credito" && (
-                  <div>
-                    <Label>Parcelas</Label>
-                    <Select value={cobrancaParcelas} onValueChange={setCobrancaParcelas}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {Array.from({ length: 12 }, (_, i) => i + 1).map(n => (
-                          <SelectItem key={n} value={String(n)}>{n}x</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+              );
+            })()}
+            <div className="space-y-3">
+              {cobrancaLinhas.map((l, idx) => (
+                <div key={idx} className="rounded-md border p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-muted-foreground">Pagamento {idx + 1}</span>
+                    {cobrancaLinhas.length > 1 && (
+                      <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-rose-600"
+                        onClick={() => setCobrancaLinhas(prev => prev.filter((_, i) => i !== idx))}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                   </div>
-                )}
-              </div>
-            )}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label>Forma</Label>
+                      <Select value={l.forma} onValueChange={(v) => setCobrancaLinhas(prev => prev.map((x, i) => i === idx ? { ...x, forma: v, bandeira: "", parcelas: "1" } : x))}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                          <SelectItem value="pix">PIX</SelectItem>
+                          <SelectItem value="debito">Débito</SelectItem>
+                          <SelectItem value="credito">Crédito</SelectItem>
+                          <SelectItem value="boleto">Boleto</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Valor</Label>
+                      <CurrencyInput value={l.valor} onChange={(v) => setCobrancaLinhas(prev => prev.map((x, i) => i === idx ? { ...x, valor: v } : x))} />
+                    </div>
+                  </div>
+                  {(l.forma === "credito" || l.forma === "debito") && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label>Bandeira *</Label>
+                        <Select value={l.bandeira} onValueChange={(v) => setCobrancaLinhas(prev => prev.map((x, i) => i === idx ? { ...x, bandeira: v } : x))}>
+                          <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                          <SelectContent>
+                            {BANDEIRAS_CARTAO.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {l.forma === "credito" && (
+                        <div>
+                          <Label>Parcelas</Label>
+                          <Select value={l.parcelas} onValueChange={(v) => setCobrancaLinhas(prev => prev.map((x, i) => i === idx ? { ...x, parcelas: v } : x))}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {Array.from({ length: 12 }, (_, i) => i + 1).map(n => (
+                                <SelectItem key={n} value={String(n)}>{n}x</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+              <Button
+                type="button" variant="outline" size="sm" className="w-full"
+                onClick={() => {
+                  setCobrancaLinhas(prev => {
+                    // ao passar para multi-forma, ajusta a primeira linha (se ainda no valor original em dinheiro)
+                    // para usar o valor de cartão sugerido, e adiciona linha nova com valor 0
+                    if (!openCobranca) return [...prev, linhaVazia()];
+                    const next = [...prev];
+                    if (prev.length === 1) {
+                      const atual = Number(prev[0].valor) || 0;
+                      if (Math.abs(atual - openCobranca.valor) < 0.01) {
+                        next[0] = { ...prev[0], valor: String(openCobranca.valor_cartao || atual) };
+                      }
+                    }
+                    next.push(linhaVazia());
+                    return next;
+                  });
+                }}
+              >
+                <Plus className="h-3.5 w-3.5 mr-1" /> Adicionar forma de pagamento
+              </Button>
+            </div>
             <p className="text-xs text-muted-foreground">
               Será criado: movimento de caixa + lançamento financeiro (receita) + paciente avança para <b>triagem</b>.
             </p>
