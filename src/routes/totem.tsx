@@ -1,4 +1,4 @@
-import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ClinicaProvider, useClinica } from "@/hooks/use-clinica";
@@ -8,10 +8,6 @@ import { Accessibility, Stethoscope, Hash, RotateCcw, Camera, ShieldCheck, X, Ar
 import { detectDescriptor, ensureFaceModels, euclidean, FACE_MATCH_THRESHOLD } from "@/lib/face-recognition";
 
 export const Route = createFileRoute("/totem")({
-  beforeLoad: async () => {
-    const { data } = await supabase.auth.getSession();
-    if (!data.session) throw redirect({ to: "/login" });
-  },
   component: TotemRoute,
 });
 
@@ -36,7 +32,7 @@ type Step = "home" | "consent" | "scan" | "manual" | "ticket";
 
 function TotemPage() {
   const navigate = useNavigate();
-  const { clinicaAtual } = useClinica();
+  const { clinicaAtual, loading } = useClinica();
   const [step, setStep] = useState<Step>("home");
   const [tipo, setTipo] = useState<TipoSenha | null>(null);
   const [busy, setBusy] = useState(false);
@@ -229,6 +225,17 @@ function TotemPage() {
 
     setBusy(false);
     await emitir(tipo, pacienteId, !!desc);
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-8">
+        <div className="text-center space-y-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
+          <p className="text-muted-foreground">Carregando totem…</p>
+        </div>
+      </div>
+    );
   }
 
   if (!clinicaAtual) {
