@@ -4,7 +4,7 @@ import { Smile, Save } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
-import { PatientSearchInput } from "@/components/patient-search-input";
+import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 import { Odontograma } from "@/components/odontograma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,7 +32,7 @@ interface ProntuarioOdonto {
 function OdontologiaPage() {
   const { clinicaAtual } = useClinica();
   const [pacienteId, setPacienteId] = useState<string | null>(null);
-  const [pacienteNome, setPacienteNome] = useState<string>("");
+  const [pacienteSel, setPacienteSel] = useState<PatientOption | null>(null);
   const [dentes, setDentes] = useState<DenteRow[]>([]);
   const [prontuario, setProntuario] = useState<ProntuarioOdonto | null>(null);
   const [selecionado, setSelecionado] = useState<number | null>(null);
@@ -110,9 +110,8 @@ function OdontologiaPage() {
         <CardContent className="pt-6 space-y-3">
           <Label>Paciente</Label>
           <PatientSearchInput
-            value={pacienteNome}
-            onChange={setPacienteNome}
-            onSelect={(p) => { setPacienteId(p.id); setPacienteNome(p.nome); }}
+            value={pacienteSel}
+            onSelect={(p) => { setPacienteSel(p); setPacienteId(p?.id ?? null); }}
           />
         </CardContent>
       </Card>
