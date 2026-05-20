@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Plus, Search, Pencil, Trash2, Users, Mic, MicOff, Loader2, MapPin, Download, ScanFace, Camera, Upload, X } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Users, Mic, MicOff, Loader2, MapPin, Download, ScanFace, Camera, Upload, X, FileHeart } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -152,8 +152,43 @@ function ClientesPage() {
   // Biometria facial
   const [faceFor, setFaceFor] = useState<Paciente | null>(null);
   const [consentFor, setConsentFor] = useState<Paciente | null>(null);
+  const [prontFor, setProntFor] = useState<Paciente | null>(null);
+  const [prontList, setProntList] = useState<Array<{
+    id: string; data: string; medico_nome: string | null;
+    queixa_principal: string | null; hipotese_diagnostica: string | null;
+    conduta: string | null; prescricao: string | null;
+    historia_doenca: string | null; exame_fisico: string | null; observacoes: string | null;
+  }>>([]);
+  const [prontLoading, setProntLoading] = useState(false);
   const [hasBiometria, setHasBiometria] = useState<Record<string, boolean>>({});
   const [fotoSigned, setFotoSigned] = useState<Record<string, string>>({});
+
+  const abrirProntuario = async (p: Paciente) => {
+    setProntFor(p);
+    setProntLoading(true);
+    setProntList([]);
+    const { data, error } = await supabase
+      .from("prontuarios")
+      .select("id, data, medico_id, queixa_principal, hipotese_diagnostica, conduta, prescricao, historia_doenca, exame_fisico, observacoes, medicos(nome)")
+      .eq("paciente_id", p.id)
+      .order("data", { ascending: false });
+    if (error) {
+      toast.error("Não foi possível carregar o prontuário.");
+      setProntLoading(false);
+      return;
+    }
+    setProntList((data ?? []).map((r: any) => ({
+      id: r.id, data: r.data,
+      medico_nome: r.medicos?.nome ?? null,
+      queixa_principal: r.queixa_principal,
+      hipotese_diagnostica: r.hipotese_diagnostica,
+      conduta: r.conduta, prescricao: r.prescricao,
+      historia_doenca: r.historia_doenca,
+      exame_fisico: r.exame_fisico,
+      observacoes: r.observacoes,
+    })));
+    setProntLoading(false);
+  };
 
   // Câmera (webcam) para capturar foto
   const [camOpen, setCamOpen] = useState(false);
@@ -553,7 +588,7 @@ function ClientesPage() {
               <TableHead className="w-36">Telefone</TableHead>
               <TableHead className="w-40">Cidade/UF</TableHead>
               <TableHead className="w-24">Situação</TableHead>
-              <TableHead className="w-28 text-right">Ações</TableHead>
+              <TableHead className="w-40 text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -597,6 +632,9 @@ function ClientesPage() {
                       <ScanFace className="h-4 w-4 text-muted-foreground" />
                     </Button>
                   )}
+                  <Button variant="ghost" size="icon" onClick={() => abrirProntuario(p)} title="Ver prontuário">
+                    <FileHeart className="h-4 w-4 text-primary" />
+                  </Button>
                   <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Pencil className="h-4 w-4" /></Button>
                   <Button variant="ghost" size="icon" onClick={() => onDelete(p)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                 </TableCell>
@@ -826,6 +864,56 @@ function ClientesPage() {
         onCaptured={salvarBiometria}
         titulo={`Biometria — ${faceFor?.nome ?? ""}`}
       />
+
+      {/* Prontuário do paciente */}
+      <Dialog open={!!prontFor} onOpenChange={(o) => { if (!o) setProntFor(null); }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileHeart className="h-5 w-5 text-primary" />
+              Prontuário — {prontFor?.nome}
+            </DialogTitle>
+            <DialogDescription>
+              Histórico de atendimentos registrados para este paciente.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            {prontLoading ? (
+              <div className="py-10 text-center text-muted-foreground flex items-center justify-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
+              </div>
+            ) : prontList.length === 0 ? (
+              <div className="py-10 text-center text-muted-foreground text-sm">
+                Nenhum registro de prontuário para este paciente.
+              </div>
+            ) : prontList.map((r) => (
+              <div key={r.id} className="border rounded-lg p-4 bg-card space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-semibold">{new Date(r.data).toLocaleString("pt-BR")}</span>
+                  <span className="text-muted-foreground uppercase text-xs">{r.medico_nome ?? "—"}</span>
+                </div>
+                {([
+                  ["Queixa principal", r.queixa_principal],
+                  ["História da doença", r.historia_doenca],
+                  ["Exame físico", r.exame_fisico],
+                  ["Hipótese diagnóstica", r.hipotese_diagnostica],
+                  ["Conduta", r.conduta],
+                  ["Prescrição", r.prescricao],
+                  ["Observações", r.observacoes],
+                ] as const).filter(([, v]) => v && v.trim()).map(([label, v]) => (
+                  <div key={label} className="text-sm">
+                    <div className="text-xs font-medium text-muted-foreground">{label}</div>
+                    <div className="whitespace-pre-wrap">{v}</div>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setProntFor(null)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Captura de foto pela webcam */}
       <Dialog open={camOpen} onOpenChange={(o) => { if (!o) fecharCamera(); }}>
