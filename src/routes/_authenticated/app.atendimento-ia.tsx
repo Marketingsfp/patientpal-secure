@@ -112,7 +112,22 @@ function AtendimentoIaPage() {
       // Auto-seleciona: médico logado, ou primeiro da lista
       const meu = user?.id ? meds.find((x) => x.user_id === user.id) : null;
       if (meu) setMedicoId(meu.id);
-      else if (meds.length && !medicoId) setMedicoId(meds[0].id);
+      else if (meds.length && !medicoId) {
+        // Prefere médico com paciente na fila hoje (triagem/atendimento)
+        const hoje = new Date().toISOString().slice(0, 10);
+        const { data: pend } = await supabase
+          .from("agendamentos")
+          .select("medico_id")
+          .eq("clinica_id", cid)
+          .in("fluxo_etapa", ["triagem", "atendimento"])
+          .gte("inicio", `${hoje}T00:00:00`)
+          .lte("inicio", `${hoje}T23:59:59`)
+          .order("inicio")
+          .limit(1);
+        const comFila = pend?.[0]?.medico_id as string | undefined;
+        const escolhido = comFila && meds.find((x) => x.id === comFila) ? comFila : meds[0].id;
+        setMedicoId(escolhido);
+      }
     })();
   }, [clinicaAtual?.clinica_id, user?.id]);
 
