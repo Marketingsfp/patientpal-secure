@@ -698,8 +698,12 @@ function AgendaPage() {
                       const match = pacientes.find(p => p.nome === nome);
                       setForm(f => ({ ...f, paciente_nome: nome, paciente_id: match?.id ?? "" }));
                     }}
-                    placeholder="Nome do paciente" required />
+                    placeholder="Nome do paciente" required
+                    readOnly={editing ? pagosSet.has(editing.id) : false}
+                    disabled={editing ? pagosSet.has(editing.id) : false}
+                  />
                   <Button type="button" variant="outline" size="icon" title="Cadastrar novo paciente"
+                    disabled={editing ? pagosSet.has(editing.id) : false}
                     onClick={() => { setNovoPac(p => ({ ...p, nome: form.paciente_nome })); setNovoPacOpen(true); }}>
                     <UserPlus className="h-4 w-4" />
                   </Button>
@@ -707,6 +711,11 @@ function AgendaPage() {
                 <datalist id="lista-pacientes">
                   {pacientes.map(p => <option key={p.id} value={p.nome} />)}
                 </datalist>
+                {editing && pagosSet.has(editing.id) && (
+                  <p className="text-xs text-amber-600">
+                    Este agendamento já está pago — o nome do paciente não pode ser alterado.
+                  </p>
+                )}
                 {form.paciente_nome && !form.paciente_id && (
                   <p className="text-xs text-muted-foreground">
                     Paciente não cadastrado.{" "}
