@@ -139,6 +139,11 @@ function AgendaPage() {
   const [auditRows, setAuditRows] = useState<AuditRow[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
 
+  // Visão "Por médico — vários dias" (estilo planilha com 3/5/7 dias)
+  const [viewMode, setViewMode] = useState<"dia" | "medico">("dia");
+  const [diasView, setDiasView] = useState<number>(5);
+  const [medicoView, setMedicoView] = useState<string>("");
+
   const fnListarEquipe = useServerFn(listarEquipe);
   const carregarEquipe = async () => {
     if (!clinicaAtual || equipeList.length > 0) return;
