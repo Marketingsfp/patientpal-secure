@@ -1261,7 +1261,7 @@ function AgendaPage() {
               </TableHead>
               <TableHead className="w-16">Ficha</TableHead>
               <TableHead className="w-14">Dia</TableHead>
-              <TableHead className="w-16">Data</TableHead>
+              <TableHead className="w-24">Data</TableHead>
               <TableHead className="w-32">Intervalo</TableHead>
               <TableHead>Profissional</TableHead>
               <TableHead>Cliente</TableHead>
