@@ -37,6 +37,7 @@ import { Route as AuthenticatedAppNinaRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedAppNfseRouteImport } from './routes/_authenticated/app.nfse'
 import { Route as AuthenticatedAppModelosDocumentosRouteImport } from './routes/_authenticated/app.modelos-documentos'
 import { Route as AuthenticatedAppMedicosRouteImport } from './routes/_authenticated/app.medicos'
+import { Route as AuthenticatedAppLmsAdminRouteImport } from './routes/_authenticated/app.lms-admin'
 import { Route as AuthenticatedAppLgpdRouteImport } from './routes/_authenticated/app.lgpd'
 import { Route as AuthenticatedAppHrPontoRouteImport } from './routes/_authenticated/app.hr-ponto'
 import { Route as AuthenticatedAppHrHoleritesRouteImport } from './routes/_authenticated/app.hr-holerites'
@@ -235,6 +236,12 @@ const AuthenticatedAppMedicosRoute = AuthenticatedAppMedicosRouteImport.update({
   path: '/medicos',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
+const AuthenticatedAppLmsAdminRoute =
+  AuthenticatedAppLmsAdminRouteImport.update({
+    id: '/lms-admin',
+    path: '/lms-admin',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppLgpdRoute = AuthenticatedAppLgpdRouteImport.update({
   id: '/lgpd',
   path: '/lgpd',
@@ -553,6 +560,7 @@ export interface FileRoutesByFullPath {
   '/app/hr-holerites': typeof AuthenticatedAppHrHoleritesRoute
   '/app/hr-ponto': typeof AuthenticatedAppHrPontoRoute
   '/app/lgpd': typeof AuthenticatedAppLgpdRoute
+  '/app/lms-admin': typeof AuthenticatedAppLmsAdminRoute
   '/app/medicos': typeof AuthenticatedAppMedicosRoute
   '/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
   '/app/nfse': typeof AuthenticatedAppNfseRoute
@@ -628,6 +636,7 @@ export interface FileRoutesByTo {
   '/app/hr-holerites': typeof AuthenticatedAppHrHoleritesRoute
   '/app/hr-ponto': typeof AuthenticatedAppHrPontoRoute
   '/app/lgpd': typeof AuthenticatedAppLgpdRoute
+  '/app/lms-admin': typeof AuthenticatedAppLmsAdminRoute
   '/app/medicos': typeof AuthenticatedAppMedicosRoute
   '/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
   '/app/nfse': typeof AuthenticatedAppNfseRoute
@@ -707,6 +716,7 @@ export interface FileRoutesById {
   '/_authenticated/app/hr-holerites': typeof AuthenticatedAppHrHoleritesRoute
   '/_authenticated/app/hr-ponto': typeof AuthenticatedAppHrPontoRoute
   '/_authenticated/app/lgpd': typeof AuthenticatedAppLgpdRoute
+  '/_authenticated/app/lms-admin': typeof AuthenticatedAppLmsAdminRoute
   '/_authenticated/app/medicos': typeof AuthenticatedAppMedicosRoute
   '/_authenticated/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
   '/_authenticated/app/nfse': typeof AuthenticatedAppNfseRoute
@@ -786,6 +796,7 @@ export interface FileRouteTypes {
     | '/app/hr-holerites'
     | '/app/hr-ponto'
     | '/app/lgpd'
+    | '/app/lms-admin'
     | '/app/medicos'
     | '/app/modelos-documentos'
     | '/app/nfse'
@@ -861,6 +872,7 @@ export interface FileRouteTypes {
     | '/app/hr-holerites'
     | '/app/hr-ponto'
     | '/app/lgpd'
+    | '/app/lms-admin'
     | '/app/medicos'
     | '/app/modelos-documentos'
     | '/app/nfse'
@@ -939,6 +951,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/hr-holerites'
     | '/_authenticated/app/hr-ponto'
     | '/_authenticated/app/lgpd'
+    | '/_authenticated/app/lms-admin'
     | '/_authenticated/app/medicos'
     | '/_authenticated/app/modelos-documentos'
     | '/_authenticated/app/nfse'
@@ -1187,6 +1200,13 @@ declare module '@tanstack/react-router' {
       path: '/medicos'
       fullPath: '/app/medicos'
       preLoaderRoute: typeof AuthenticatedAppMedicosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/lms-admin': {
+      id: '/_authenticated/app/lms-admin'
+      path: '/lms-admin'
+      fullPath: '/app/lms-admin'
+      preLoaderRoute: typeof AuthenticatedAppLmsAdminRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/lgpd': {
@@ -1630,6 +1650,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppHrHoleritesRoute: typeof AuthenticatedAppHrHoleritesRoute
   AuthenticatedAppHrPontoRoute: typeof AuthenticatedAppHrPontoRoute
   AuthenticatedAppLgpdRoute: typeof AuthenticatedAppLgpdRoute
+  AuthenticatedAppLmsAdminRoute: typeof AuthenticatedAppLmsAdminRoute
   AuthenticatedAppMedicosRoute: typeof AuthenticatedAppMedicosRoute
   AuthenticatedAppModelosDocumentosRoute: typeof AuthenticatedAppModelosDocumentosRoute
   AuthenticatedAppNfseRoute: typeof AuthenticatedAppNfseRoute
@@ -1682,6 +1703,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppHrHoleritesRoute: AuthenticatedAppHrHoleritesRoute,
   AuthenticatedAppHrPontoRoute: AuthenticatedAppHrPontoRoute,
   AuthenticatedAppLgpdRoute: AuthenticatedAppLgpdRoute,
+  AuthenticatedAppLmsAdminRoute: AuthenticatedAppLmsAdminRoute,
   AuthenticatedAppMedicosRoute: AuthenticatedAppMedicosRoute,
   AuthenticatedAppModelosDocumentosRoute:
     AuthenticatedAppModelosDocumentosRoute,
