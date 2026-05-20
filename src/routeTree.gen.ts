@@ -47,6 +47,7 @@ import { Route as AuthenticatedAppConsultaRapidaRouteImport } from './routes/_au
 import { Route as AuthenticatedAppClinicasRouteImport } from './routes/_authenticated/app.clinicas'
 import { Route as AuthenticatedAppClientesRouteImport } from './routes/_authenticated/app.clientes'
 import { Route as AuthenticatedAppCartaoBeneficiosRouteImport } from './routes/_authenticated/app.cartao-beneficios'
+import { Route as AuthenticatedAppCargosRouteImport } from './routes/_authenticated/app.cargos'
 import { Route as AuthenticatedAppCampanhasRouteImport } from './routes/_authenticated/app.campanhas'
 import { Route as AuthenticatedAppCaixaRouteImport } from './routes/_authenticated/app.caixa'
 import { Route as AuthenticatedAppBoletosRouteImport } from './routes/_authenticated/app.boletos'
@@ -279,6 +280,11 @@ const AuthenticatedAppCartaoBeneficiosRoute =
     path: '/cartao-beneficios',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
+const AuthenticatedAppCargosRoute = AuthenticatedAppCargosRouteImport.update({
+  id: '/cargos',
+  path: '/cargos',
+  getParentRoute: () => AuthenticatedAppRoute,
+} as any)
 const AuthenticatedAppCampanhasRoute =
   AuthenticatedAppCampanhasRouteImport.update({
     id: '/campanhas',
@@ -446,6 +452,7 @@ export interface FileRoutesByFullPath {
   '/app/boletos': typeof AuthenticatedAppBoletosRoute
   '/app/caixa': typeof AuthenticatedAppCaixaRoute
   '/app/campanhas': typeof AuthenticatedAppCampanhasRoute
+  '/app/cargos': typeof AuthenticatedAppCargosRoute
   '/app/cartao-beneficios': typeof AuthenticatedAppCartaoBeneficiosRouteWithChildren
   '/app/clientes': typeof AuthenticatedAppClientesRoute
   '/app/clinicas': typeof AuthenticatedAppClinicasRoute
@@ -509,6 +516,7 @@ export interface FileRoutesByTo {
   '/app/boletos': typeof AuthenticatedAppBoletosRoute
   '/app/caixa': typeof AuthenticatedAppCaixaRoute
   '/app/campanhas': typeof AuthenticatedAppCampanhasRoute
+  '/app/cargos': typeof AuthenticatedAppCargosRoute
   '/app/cartao-beneficios': typeof AuthenticatedAppCartaoBeneficiosRouteWithChildren
   '/app/clientes': typeof AuthenticatedAppClientesRoute
   '/app/clinicas': typeof AuthenticatedAppClinicasRoute
@@ -574,6 +582,7 @@ export interface FileRoutesById {
   '/_authenticated/app/boletos': typeof AuthenticatedAppBoletosRoute
   '/_authenticated/app/caixa': typeof AuthenticatedAppCaixaRoute
   '/_authenticated/app/campanhas': typeof AuthenticatedAppCampanhasRoute
+  '/_authenticated/app/cargos': typeof AuthenticatedAppCargosRoute
   '/_authenticated/app/cartao-beneficios': typeof AuthenticatedAppCartaoBeneficiosRouteWithChildren
   '/_authenticated/app/clientes': typeof AuthenticatedAppClientesRoute
   '/_authenticated/app/clinicas': typeof AuthenticatedAppClinicasRoute
@@ -640,6 +649,7 @@ export interface FileRouteTypes {
     | '/app/boletos'
     | '/app/caixa'
     | '/app/campanhas'
+    | '/app/cargos'
     | '/app/cartao-beneficios'
     | '/app/clientes'
     | '/app/clinicas'
@@ -703,6 +713,7 @@ export interface FileRouteTypes {
     | '/app/boletos'
     | '/app/caixa'
     | '/app/campanhas'
+    | '/app/cargos'
     | '/app/cartao-beneficios'
     | '/app/clientes'
     | '/app/clinicas'
@@ -767,6 +778,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/boletos'
     | '/_authenticated/app/caixa'
     | '/_authenticated/app/campanhas'
+    | '/_authenticated/app/cargos'
     | '/_authenticated/app/cartao-beneficios'
     | '/_authenticated/app/clientes'
     | '/_authenticated/app/clinicas'
@@ -1095,6 +1107,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppCartaoBeneficiosRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/app/cargos': {
+      id: '/_authenticated/app/cargos'
+      path: '/cargos'
+      fullPath: '/app/cargos'
+      preLoaderRoute: typeof AuthenticatedAppCargosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/app/campanhas': {
       id: '/_authenticated/app/campanhas'
       path: '/campanhas'
@@ -1354,6 +1373,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppBoletosRoute: typeof AuthenticatedAppBoletosRoute
   AuthenticatedAppCaixaRoute: typeof AuthenticatedAppCaixaRoute
   AuthenticatedAppCampanhasRoute: typeof AuthenticatedAppCampanhasRoute
+  AuthenticatedAppCargosRoute: typeof AuthenticatedAppCargosRoute
   AuthenticatedAppCartaoBeneficiosRoute: typeof AuthenticatedAppCartaoBeneficiosRouteWithChildren
   AuthenticatedAppClientesRoute: typeof AuthenticatedAppClientesRoute
   AuthenticatedAppClinicasRoute: typeof AuthenticatedAppClinicasRoute
@@ -1392,6 +1412,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppBoletosRoute: AuthenticatedAppBoletosRoute,
   AuthenticatedAppCaixaRoute: AuthenticatedAppCaixaRoute,
   AuthenticatedAppCampanhasRoute: AuthenticatedAppCampanhasRoute,
+  AuthenticatedAppCargosRoute: AuthenticatedAppCargosRoute,
   AuthenticatedAppCartaoBeneficiosRoute:
     AuthenticatedAppCartaoBeneficiosRouteWithChildren,
   AuthenticatedAppClientesRoute: AuthenticatedAppClientesRoute,
