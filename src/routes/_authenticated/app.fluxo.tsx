@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, CheckCircle2, Workflow, Bell, Settings2, AlertTriangle } from "lucide-react";
+import { ChevronLeft, ChevronRight, CheckCircle2, Workflow, Bell, Settings2, AlertTriangle, Siren, CircleDot } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -35,6 +35,27 @@ const ETAPAS: { id: Etapa; label: string; cor: string }[] = [
   { id: "exame", label: "Exame", cor: "bg-violet-500/15 text-violet-700 dark:text-violet-300" },
   { id: "finalizado", label: "Finalizado", cor: "bg-zinc-500/15 text-zinc-700 dark:text-zinc-300" },
 ];
+
+const PRIORIDADES = {
+  normal: {
+    label: "Normal",
+    Icon: CircleDot,
+    cor: "text-muted-foreground",
+    badge: "bg-muted text-muted-foreground",
+  },
+  prioritario: {
+    label: "PRIORITÁRIO",
+    Icon: AlertTriangle,
+    cor: "text-amber-600",
+    badge: "bg-amber-100 text-amber-700",
+  },
+  urgente: {
+    label: "URGENTE",
+    Icon: Siren,
+    cor: "text-rose-600",
+    badge: "bg-rose-100 text-rose-700",
+  },
+} as const;
 
 type Ag = {
   id: string;
@@ -240,10 +261,16 @@ function FluxoPage() {
                         <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">{h}</span>
                       </div>
                       {a.prioridade && a.prioridade !== "normal" && (
-                        <Badge className={`border-0 text-[10px] px-1.5 py-0 gap-1 ${a.prioridade === "urgente" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}`}>
-                          <AlertTriangle className="h-3 w-3" />
-                          {a.prioridade === "urgente" ? "URGENTE" : "PRIORITÁRIO"}
-                        </Badge>
+                        (() => {
+                          const p = PRIORIDADES[a.prioridade];
+                          const Ico = p.Icon;
+                          return (
+                            <Badge className={`border-0 text-[10px] px-1.5 py-0 gap-1 ${p.badge}`}>
+                              <Ico className="h-3 w-3" />
+                              {p.label}
+                            </Badge>
+                          );
+                        })()
                       )}
                       <div className="text-[11px] text-muted-foreground line-clamp-1">
                         {a.procedimento ?? "—"}{a.medicos?.nome ? ` · ${a.medicos.nome}` : ""}
@@ -259,15 +286,21 @@ function FluxoPage() {
                         >
                           <ChevronLeft className="h-3 w-3" />
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-6 px-1.5"
-                          onClick={() => ciclarPrioridade(a)}
-                          title="Alternar prioridade (normal → prioritário → urgente)"
-                        >
-                          <AlertTriangle className={`h-3 w-3 ${a.prioridade === "urgente" ? "text-rose-600" : a.prioridade === "prioritario" ? "text-amber-600" : "text-muted-foreground"}`} />
-                        </Button>
+                        {(() => {
+                          const p = PRIORIDADES[a.prioridade ?? "normal"];
+                          const Ico = p.Icon;
+                          return (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 px-1.5"
+                              onClick={() => ciclarPrioridade(a)}
+                              title={`Prioridade: ${p.label} (clique para alternar)`}
+                            >
+                              <Ico className={`h-3 w-3 ${p.cor}`} />
+                            </Button>
+                          );
+                        })()}
                         {col.id === "triagem" && (
                           <>
                             <Button size="sm" className="h-6 px-1.5 text-[11px] flex-1" onClick={() => chamarPaciente(a)} title="Chamar no painel e mover para Atendimento">
