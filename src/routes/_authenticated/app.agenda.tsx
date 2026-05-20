@@ -1239,6 +1239,9 @@ function AgendaPage() {
                         }}>
                           <Video className="h-4 w-4 mr-2" /> Copiar link do paciente
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => abrirAuditoria(a)}>
+                          <ShieldCheck className="h-4 w-4 mr-2" /> Auditoria
+                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         {(Object.keys(STATUS_LABEL) as Status[]).map(s => (
                           <DropdownMenuItem key={s} onClick={() => mudarStatus(a, s)}>
