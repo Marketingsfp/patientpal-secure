@@ -98,6 +98,7 @@ function AgendaPage() {
   const bordaClinica = { borderColor: corClinica, borderWidth: 2 } as const;
   const { user } = useAuth();
   const [dataRef, setDataRef] = useState(() => new Date().toISOString().slice(0, 10));
+  const [dataFim, setDataFim] = useState<string | null>(null);
   const [apenasData, setApenasData] = useState(false);
   const [mostrarLivres, setMostrarLivres] = useState(true);
   const [filtroMedico, setFiltroMedico] = useState<string>("todos");
@@ -141,10 +142,8 @@ function AgendaPage() {
   const [auditRows, setAuditRows] = useState<AuditRow[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
 
-  // Visão "Por médico — vários dias" (estilo planilha com 3/5/7 dias)
+  // Visão "Por médico — vários dias" (estilo planilha)
   const [viewMode, setViewMode] = useState<"dia" | "medico">("dia");
-  const [diasView, setDiasView] = useState<number>(5);
-  const [medicoView, setMedicoView] = useState<string>("");
 
   const fnListarEquipe = useServerFn(listarEquipe);
   const carregarEquipe = async () => {
