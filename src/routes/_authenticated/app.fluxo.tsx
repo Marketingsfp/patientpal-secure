@@ -180,11 +180,11 @@ function FluxoPage() {
   if (!clinicaAtual) return <p className="text-muted-foreground">Selecione uma clínica primeiro.</p>;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold flex items-center gap-2"><Workflow className="h-6 w-6" /> Fluxo do paciente</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             Recepção → Caixa → Triagem (enfermagem) → Atendimento médico ou Exame. Avance o paciente em cada etapa.
           </p>
         </div>
@@ -213,18 +213,18 @@ function FluxoPage() {
         </div>
       </div>
 
-      <div className="flex gap-3 overflow-x-auto pb-2 snap-x">
+      <div className="flex gap-2 overflow-x-auto pb-2 snap-x">
         {ETAPAS.map((col) => {
           const items = colunas.get(col.id) ?? [];
           return (
-            <div key={col.id} className="space-y-2 flex-1 min-w-[220px] snap-start">
+            <div key={col.id} className="space-y-2 flex-1 min-w-[180px] snap-start">
               <div className="flex items-center justify-between">
-                <Badge className={`${col.cor} border-0`}>{col.label}</Badge>
-                <span className="text-xs text-muted-foreground">{items.length}</span>
+                <Badge className={`${col.cor} border-0 text-[11px] px-1.5 py-0`}>{col.label}</Badge>
+                <span className="text-[11px] text-muted-foreground">{items.length}</span>
               </div>
-              <div className="space-y-2 max-h-[70vh] overflow-auto pr-1">
+              <div className="space-y-1.5 max-h-[78vh] overflow-auto pr-1">
                 {items.length === 0 && (
-                  <div className="text-xs text-muted-foreground text-center py-4 border border-dashed rounded">vazio</div>
+                  <div className="text-[11px] text-muted-foreground text-center py-2 border border-dashed rounded">vazio</div>
                 )}
                 {items.map((a) => {
                   const h = new Date(a.inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -232,47 +232,47 @@ function FluxoPage() {
                   const next = proxima(a.fluxo_etapa, isExame ? "exame" : "atendimento");
                   const prev = anterior(a.fluxo_etapa);
                   return (
-                    <Card key={a.id} className="p-2.5 text-sm space-y-1.5">
+                    <Card key={a.id} className="p-2 text-xs space-y-1">
                       <div className="flex items-start justify-between gap-2">
-                        <div className="font-medium leading-tight">{a.paciente_nome}</div>
-                        <span className="text-xs text-muted-foreground tabular-nums">{h}</span>
+                        <div className="font-medium leading-tight text-[12px] truncate">{a.paciente_nome}</div>
+                        <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">{h}</span>
                       </div>
                       {a.prioridade && a.prioridade !== "normal" && (
-                        <Badge className={`border-0 text-[10px] gap-1 ${a.prioridade === "urgente" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}`}>
+                        <Badge className={`border-0 text-[10px] px-1.5 py-0 gap-1 ${a.prioridade === "urgente" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}`}>
                           <AlertTriangle className="h-3 w-3" />
                           {a.prioridade === "urgente" ? "URGENTE" : "PRIORITÁRIO"}
                         </Badge>
                       )}
-                      <div className="text-xs text-muted-foreground line-clamp-2">
+                      <div className="text-[11px] text-muted-foreground line-clamp-1">
                         {a.procedimento ?? "—"}{a.medicos?.nome ? ` · ${a.medicos.nome}` : ""}
                       </div>
-                      <div className="flex items-center gap-1 pt-1">
+                      <div className="flex items-center gap-0.5 pt-0.5">
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="h-7 px-2"
+                          className="h-6 px-1.5"
                           disabled={!prev}
                           onClick={() => prev && setEtapa(a.id, prev)}
                           title="Voltar etapa"
                         >
-                          <ChevronLeft className="h-4 w-4" />
+                          <ChevronLeft className="h-3 w-3" />
                         </Button>
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="h-7 px-2"
+                          className="h-6 px-1.5"
                           onClick={() => ciclarPrioridade(a)}
                           title="Alternar prioridade (normal → prioritário → urgente)"
                         >
-                          <AlertTriangle className={`h-4 w-4 ${a.prioridade === "urgente" ? "text-rose-600" : a.prioridade === "prioritario" ? "text-amber-600" : "text-muted-foreground"}`} />
+                          <AlertTriangle className={`h-3 w-3 ${a.prioridade === "urgente" ? "text-rose-600" : a.prioridade === "prioritario" ? "text-amber-600" : "text-muted-foreground"}`} />
                         </Button>
                         {col.id === "triagem" && (
                           <>
-                            <Button size="sm" className="h-7 px-2 text-xs flex-1" onClick={() => chamarPaciente(a)} title="Chamar no painel e mover para Atendimento">
+                            <Button size="sm" className="h-6 px-1.5 text-[11px] flex-1" onClick={() => chamarPaciente(a)} title="Chamar no painel e mover para Atendimento">
                               <Bell className="h-3 w-3 mr-1" /> Chamar
                             </Button>
                             {isExame && (
-                              <Button size="sm" variant="outline" className="h-7 px-2 text-xs flex-1" onClick={() => setEtapa(a.id, "exame")}>
+                              <Button size="sm" variant="outline" className="h-6 px-1.5 text-[11px] flex-1" onClick={() => setEtapa(a.id, "exame")}>
                                 <ChevronRight className="h-3 w-3 mr-1" /> Exame
                               </Button>
                             )}
@@ -281,13 +281,13 @@ function FluxoPage() {
                         {col.id !== "triagem" && (
                           <>
                             {col.id === "atendimento" && (
-                              <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => chamarPaciente(a)} title="Rechamar no painel">
+                              <Button size="sm" variant="outline" className="h-6 px-1.5 text-[11px]" onClick={() => chamarPaciente(a)} title="Rechamar no painel">
                                 <Bell className="h-3 w-3" />
                               </Button>
                             )}
                             <Button
                               size="sm"
-                              className="h-7 px-2 text-xs flex-1"
+                              className="h-6 px-1.5 text-[11px] flex-1"
                               disabled={!next}
                               onClick={() => next && setEtapa(a.id, next)}
                             >
