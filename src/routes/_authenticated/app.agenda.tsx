@@ -1019,9 +1019,12 @@ function AgendaPage() {
       </Dialog>
 
       {/* Filtros */}
-      <div className="rounded-lg border-2 bg-card p-4 space-y-4" style={bordaClinica}>
+      <div
+        className="rounded-lg border bg-card p-4 space-y-4 [--clinic:theme(colors.border)]"
+        style={{ ["--clinic" as never]: corClinica }}
+      >
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-          <div className="space-y-1 rounded-md border-2 p-2.5 bg-background" style={bordaClinica}>
+          <div className="space-y-1 rounded-md border-2 border-transparent hover:border-[var(--clinic)] p-2.5 bg-background transition-colors">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Profissional</Label>
             <SearchableSelect
               value={filtroMedico}
@@ -1034,7 +1037,7 @@ function AgendaPage() {
               ]}
             />
           </div>
-          <div className="space-y-1 rounded-md border-2 p-2.5 bg-background" style={bordaClinica}>
+          <div className="space-y-1 rounded-md border-2 border-transparent hover:border-[var(--clinic)] p-2.5 bg-background transition-colors">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Data Ref.</Label>
             <div className="flex gap-1">
               <Button variant="outline" size="icon" onClick={() => shiftData(-1)}><ChevronLeft className="h-4 w-4" /></Button>
@@ -1042,7 +1045,7 @@ function AgendaPage() {
               <Button variant="outline" size="icon" onClick={() => shiftData(1)}><ChevronRight className="h-4 w-4" /></Button>
             </div>
           </div>
-          <div className="space-y-1 rounded-md border-2 p-2.5 bg-background" style={bordaClinica}>
+          <div className="space-y-1 rounded-md border-2 border-transparent hover:border-[var(--clinic)] p-2.5 bg-background transition-colors">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Dia Semana</Label>
             <Select value={filtroDiaSemana} onValueChange={setFiltroDiaSemana}>
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -1052,7 +1055,7 @@ function AgendaPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1 rounded-md border-2 p-2.5 bg-background" style={bordaClinica}>
+          <div className="space-y-1 rounded-md border-2 border-transparent hover:border-[var(--clinic)] p-2.5 bg-background transition-colors">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Cliente</Label>
             <div className="flex gap-1">
               <Input value={filtroCliente} onChange={(e) => setFiltroCliente(e.target.value)} placeholder="Buscar paciente…" />
@@ -1070,11 +1073,11 @@ function AgendaPage() {
               </Button>
             </div>
           </div>
-          <div className="space-y-1 rounded-md border-2 p-2.5 bg-background" style={bordaClinica}>
+          <div className="space-y-1 rounded-md border-2 border-transparent hover:border-[var(--clinic)] p-2.5 bg-background transition-colors">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Nº Ficha</Label>
             <Input value={filtroFicha} onChange={(e) => setFiltroFicha(e.target.value.replace(/\D/g, ""))} placeholder="Ex.: 001" inputMode="numeric" />
           </div>
-          <div className="space-y-1 rounded-md border-2 p-2.5 bg-background" style={bordaClinica}>
+          <div className="space-y-1 rounded-md border-2 border-transparent hover:border-[var(--clinic)] p-2.5 bg-background transition-colors">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Especialidade</Label>
             <Select value={filtroEspecialidade} onValueChange={setFiltroEspecialidade}>
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -1084,7 +1087,7 @@ function AgendaPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1 rounded-md border-2 p-2.5 bg-background" style={bordaClinica}>
+          <div className="space-y-1 rounded-md border-2 border-transparent hover:border-[var(--clinic)] p-2.5 bg-background transition-colors">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Situação</Label>
             <Select value={filtroStatus} onValueChange={setFiltroStatus}>
               <SelectTrigger><SelectValue /></SelectTrigger>
