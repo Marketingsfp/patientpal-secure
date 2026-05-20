@@ -4379,6 +4379,7 @@ export type Database = {
         Returns: undefined
       }
       user_is_any_manager: { Args: { _user_id: string }; Returns: boolean }
+      verificar_certificado: { Args: { _codigo: string }; Returns: Json }
     }
     Enums: {
       agendamento_prioridade: "normal" | "prioritario" | "urgente"

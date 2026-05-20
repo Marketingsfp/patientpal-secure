@@ -16,6 +16,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as DiagnosticoRouteImport } from './routes/diagnostico'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as VerificarCodigoRouteImport } from './routes/verificar.$codigo'
 import { Route as PacienteConsultasRouteImport } from './routes/paciente.consultas'
 import { Route as PacienteCartoesRouteImport } from './routes/paciente.cartoes'
 import { Route as PTokenRouteImport } from './routes/p.$token'
@@ -119,6 +120,11 @@ const AuthenticatedRoute = AuthenticatedRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VerificarCodigoRoute = VerificarCodigoRouteImport.update({
+  id: '/verificar/$codigo',
+  path: '/verificar/$codigo',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PacienteConsultasRoute = PacienteConsultasRouteImport.update({
@@ -531,6 +537,7 @@ export interface FileRoutesByFullPath {
   '/p/$token': typeof PTokenRoute
   '/paciente/cartoes': typeof PacienteCartoesRoute
   '/paciente/consultas': typeof PacienteConsultasRoute
+  '/verificar/$codigo': typeof VerificarCodigoRoute
   '/app/agenda': typeof AuthenticatedAppAgendaRoute
   '/app/alertas-enfermagem': typeof AuthenticatedAppAlertasEnfermagemRoute
   '/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
@@ -608,6 +615,7 @@ export interface FileRoutesByTo {
   '/p/$token': typeof PTokenRoute
   '/paciente/cartoes': typeof PacienteCartoesRoute
   '/paciente/consultas': typeof PacienteConsultasRoute
+  '/verificar/$codigo': typeof VerificarCodigoRoute
   '/app/agenda': typeof AuthenticatedAppAgendaRoute
   '/app/alertas-enfermagem': typeof AuthenticatedAppAlertasEnfermagemRoute
   '/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
@@ -687,6 +695,7 @@ export interface FileRoutesById {
   '/p/$token': typeof PTokenRoute
   '/paciente/cartoes': typeof PacienteCartoesRoute
   '/paciente/consultas': typeof PacienteConsultasRoute
+  '/verificar/$codigo': typeof VerificarCodigoRoute
   '/_authenticated/app/agenda': typeof AuthenticatedAppAgendaRoute
   '/_authenticated/app/alertas-enfermagem': typeof AuthenticatedAppAlertasEnfermagemRoute
   '/_authenticated/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
@@ -767,6 +776,7 @@ export interface FileRouteTypes {
     | '/p/$token'
     | '/paciente/cartoes'
     | '/paciente/consultas'
+    | '/verificar/$codigo'
     | '/app/agenda'
     | '/app/alertas-enfermagem'
     | '/app/anamneses'
@@ -844,6 +854,7 @@ export interface FileRouteTypes {
     | '/p/$token'
     | '/paciente/cartoes'
     | '/paciente/consultas'
+    | '/verificar/$codigo'
     | '/app/agenda'
     | '/app/alertas-enfermagem'
     | '/app/anamneses'
@@ -922,6 +933,7 @@ export interface FileRouteTypes {
     | '/p/$token'
     | '/paciente/cartoes'
     | '/paciente/consultas'
+    | '/verificar/$codigo'
     | '/_authenticated/app/agenda'
     | '/_authenticated/app/alertas-enfermagem'
     | '/_authenticated/app/anamneses'
@@ -1001,6 +1013,7 @@ export interface RootRouteChildren {
   PTokenRoute: typeof PTokenRoute
   PacienteCartoesRoute: typeof PacienteCartoesRoute
   PacienteConsultasRoute: typeof PacienteConsultasRoute
+  VerificarCodigoRoute: typeof VerificarCodigoRoute
   PContratoTokenRoute: typeof PContratoTokenRoute
 }
 
@@ -1053,6 +1066,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/verificar/$codigo': {
+      id: '/verificar/$codigo'
+      path: '/verificar/$codigo'
+      fullPath: '/verificar/$codigo'
+      preLoaderRoute: typeof VerificarCodigoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/paciente/consultas': {
@@ -1753,6 +1773,7 @@ const rootRouteChildren: RootRouteChildren = {
   PTokenRoute: PTokenRoute,
   PacienteCartoesRoute: PacienteCartoesRoute,
   PacienteConsultasRoute: PacienteConsultasRoute,
+  VerificarCodigoRoute: VerificarCodigoRoute,
   PContratoTokenRoute: PContratoTokenRoute,
 }
 export const routeTree = rootRouteImport
