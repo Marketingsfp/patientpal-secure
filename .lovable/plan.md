@@ -1,32 +1,32 @@
 ## Objetivo
-Reduzir tamanho de textos, cards e colunas em `/app/fluxo` para mostrar mais pacientes simultaneamente e melhorar a organização visual.
 
-## Mudanças (apenas UI em `src/routes/_authenticated/app.fluxo.tsx`)
+Reorganizar o layout do `AppShell` movendo elementos da sidebar para o header superior fixo.
 
-### Colunas
-- `min-w-[220px]` → `min-w-[180px]`
-- Gap entre colunas: `gap-3` → `gap-2`
-- Badge de título da coluna em fonte menor (`text-[11px]`), e contador também menor
-- Aumentar altura útil: `max-h-[70vh]` → `max-h-[78vh]`
+## Mudanças no header (`src/components/app-shell.tsx`)
 
-### Cards de paciente
-- Padding: `p-2.5` → `p-2`
-- Texto base do card: `text-sm` → `text-xs`
-- Espaçamento interno: `space-y-1.5` → `space-y-1`
-- Nome do paciente: `font-medium leading-tight` em `text-[12px]` com `truncate` (uma linha só)
-- Hora: `text-[10px]` ao invés de `text-xs`
-- Linha "procedimento · médico": `text-[11px]` e `line-clamp-1` (em vez de 2)
-- Badge de prioridade: já está `text-[10px]`; manter, mas reduzir padding (`px-1.5 py-0`)
-- Botões: altura `h-7` → `h-6`, ícones `h-3 w-3`, texto `text-[11px]`, gap entre botões `gap-1` → `gap-0.5`
+O header superior (`<header>`) passará a conter, da esquerda para a direita:
 
-### Cabeçalho da página
-- Reduzir respiro: `space-y-5` → `space-y-3`
-- Subtítulo `text-sm` → `text-xs`
+1. **Nome do usuário** (avatar + nome) — atualmente fica no rodapé da sidebar, será movido para o início do header. Inclui o botão de sair (LogOut) ao lado.
+2. **Logo da clínica** — atualmente exibida em um card branco no topo da sidebar, será movida para o header (tamanho reduzido, ex: `h-9`, dentro de um card branco compacto).
+3. **Seletor de clínica** (Select "Consulta Hoje / Menino Jesus / São Francisco") — atualmente abaixo da logo na sidebar, será movido para o header ao lado da logo.
+4. **Espaçador flexível** (`flex-1`).
+5. **Sino de notificações** + avatar atual (mantidos como estão).
 
-### Estado vazio
-- `py-4` → `py-2` e `text-[11px]`
+## Mudanças na sidebar
 
-## Resultado esperado
-Cards ~25% menores em altura, colunas mais estreitas (cabem 6 colunas confortáveis no viewport atual de 1075px), permitindo ver mais pacientes por coluna sem rolar.
+Remover da sidebar:
+- O bloco do card branco com a logo da clínica.
+- O `Select` de seleção de clínica (o `VoiceInput` permanece, ou também sobe? — assumindo que **permanece** na sidebar, já que o usuário não mencionou).
+- O bloco do rodapé com avatar/nome/botão de sair.
 
-Sem mudanças de lógica, banco ou comportamento — apenas refinamento visual.
+A sidebar fica mais limpa: header com logo "ClinicaOS" + toggle collapse, busca por voz, e a navegação.
+
+## Comportamento responsivo
+
+- Em telas pequenas (quando a sidebar está colapsada), o nome do usuário no header pode truncar ou esconder apenas o texto, mantendo o avatar.
+- Logo da clínica e seletor permanecem visíveis no header em todos os tamanhos.
+
+## Não muda
+
+- Cores das clínicas, lógica de `useClinica`, navegação, rotas, ou qualquer lógica de negócio.
+- Apenas reposicionamento visual de componentes existentes.
