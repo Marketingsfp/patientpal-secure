@@ -660,6 +660,16 @@ function AgendaPage() {
     setFormaPagOpen(true);
   };
 
+  const confirmarPresenca = async (a: Agendamento) => {
+    const { error } = await supabase
+      .from("agendamentos")
+      .update({ fluxo_etapa: "triagem", fluxo_atualizado_em: new Date().toISOString() } as never)
+      .eq("id", a.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Presença confirmada — paciente liberado para a triagem");
+    setEtapaMap((m) => { const n = new Map(m); n.set(a.id, "triagem"); return n; });
+  };
+
   const escolherForma = (op: FormaOpcao) => {
     if (!formaPagCtx) return;
     const ids = formaPagCtx.agId.split(",").filter(Boolean);
