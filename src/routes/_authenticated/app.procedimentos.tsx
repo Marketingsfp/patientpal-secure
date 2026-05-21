@@ -407,8 +407,8 @@ function ProcedimentosPage() {
       codigo: form.codigo.trim() || null,
       valor_padrao: vDinheiro, // mantém compatibilidade com agenda/financeiro
       valor_dinheiro: vDinheiro,
-      valor_pix: vDinheiro,
       valor_dinheiro_pix: vDinheiro, // legado
+      valor_pix: vCartao,
       valor_cartao_credito: vCartao,
       valor_cartao_debito: vCartao,
       valor_cartao: vCartao, // legado
