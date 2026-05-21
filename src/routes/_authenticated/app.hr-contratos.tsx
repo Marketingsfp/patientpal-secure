@@ -79,6 +79,14 @@ function ContratosPage() {
   }
   useEffect(() => { void load(); }, [clinicaAtual?.clinica_id]);
 
+  useEffect(() => {
+    if (autoNew === "1" && clinicaAtual) {
+      openNew();
+      void navigate({ to: "/app/hr-contratos", search: {}, replace: true });
+    }
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [autoNew, clinicaAtual?.clinica_id]);
+
   function openNew() {
     setEditing(null);
     setForm({
