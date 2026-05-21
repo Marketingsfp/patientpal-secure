@@ -959,18 +959,25 @@ function AgendaPage() {
                 </div>
                 <Textarea value={form.observacoes} onChange={(e) => setForm(f => ({ ...f, observacoes: e.target.value }))} rows={2} />
               </div>
+              </fieldset>
               <DialogFooter>
-                <Button type="button" variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={saving}
-                  onClick={(e) => submit(e as unknown as FormEvent, true)}
-                  className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
-                >
-                  Salvar e Pagar
-                </Button>
-                <Button type="submit" disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
+                {editing && pagosSet.has(editing.id) ? (
+                  <Button type="button" variant="outline" onClick={() => setOpen(false)}>Fechar</Button>
+                ) : (
+                  <>
+                    <Button type="button" variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={saving}
+                      onClick={(e) => submit(e as unknown as FormEvent, true)}
+                      className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                    >
+                      Salvar e Pagar
+                    </Button>
+                    <Button type="submit" disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
+                  </>
+                )}
               </DialogFooter>
             </form>
           </DialogContent>
