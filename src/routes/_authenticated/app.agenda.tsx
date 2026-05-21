@@ -1472,21 +1472,6 @@ function Paginacao({ page, totalPages, onChange }: { page: number; totalPages: n
   );
 }
 
-function AgendaPorMedicoGrid({
-  medicoId, dias, dataRef, items, onSlotClick, onAgClick, fmtHora,
-}: {
-  medicoId: string;
-  dias: number;
-  dataRef: string;
-  items: Agendamento[];
-  onSlotClick: (a: Agendamento) => void;
-  onAgClick: (a: Agendamento) => void;
-  fmtHora: (iso: string) => string;
-}) {
-  const diasSemana = ["DOMINGO", "SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO"];
-
-}
-
 function MedicoFiltroInput({
   medicos, value, onChange, disabled, onlyMedicoId,
 }: {
@@ -1561,7 +1546,18 @@ function MedicoFiltroInput({
   );
 }
 
-function __MedicoGridRest({ diasSemana, medicoId, dias, dataRef, items, onSlotClick, onAgClick, fmtHora }: any) {
+function AgendaPorMedicoGrid({
+  medicoId, dias, dataRef, items, onSlotClick, onAgClick, fmtHora,
+}: {
+  medicoId: string;
+  dias: number;
+  dataRef: string;
+  items: Agendamento[];
+  onSlotClick: (a: Agendamento) => void;
+  onAgClick: (a: Agendamento) => void;
+  fmtHora: (iso: string) => string;
+}) {
+  const diasSemana = ["DOMINGO", "SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO"];
 
   // Lista de dias no intervalo (yyyy-mm-dd)
   const intervaloDias = useMemo(() => {
