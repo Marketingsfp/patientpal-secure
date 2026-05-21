@@ -46,7 +46,6 @@ function ContratosPage() {
   const [rows, setRows] = useState<Contrato[]>([]);
   const [cargos, setCargos] = useState<Ref[]>([]);
   const [setores, setSetores] = useState<Ref[]>([]);
-  const [unidades, setUnidades] = useState<Ref[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
@@ -62,17 +61,15 @@ function ContratosPage() {
   async function load() {
     if (!clinicaAtual) return;
     setLoading(true);
-    const [c, cg, st, un] = await Promise.all([
+    const [c, cg, st] = await Promise.all([
       supabase.from("hr_contratos").select("*").eq("clinica_id", clinicaAtual.clinica_id).order("numero", { ascending: false }),
       supabase.from("cargos").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("setores").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
-      supabase.from("unidades").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
     ]);
     if (c.error) toast.error(c.error.message);
     setRows((c.data ?? []) as Contrato[]);
     setCargos((cg.data ?? []) as Ref[]);
     setSetores((st.data ?? []) as Ref[]);
-    setUnidades((un.data ?? []) as Ref[]);
     setLoading(false);
   }
   useEffect(() => { void load(); }, [clinicaAtual?.clinica_id]);

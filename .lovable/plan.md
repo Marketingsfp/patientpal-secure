@@ -1,39 +1,22 @@
-## Objetivo
+## Ajustes no cadastro de Funcionário (`src/routes/_authenticated/app.hr-contratos.tsx`)
 
-Unificar de vez clínica + unidade física: remover a aba **Unidades físicas** de `/app/unidades` e mover todos os campos do formulário de unidade física para o diálogo de **Nova/Editar clínica**.
+### 1. Tamanho fixo do diálogo
+- Adicionar altura mínima fixa ao conteúdo das abas (ex.: `min-h-[480px]`) e manter `max-w-2xl` no `DialogContent`, para que ao alternar entre "Dados" e "Login e perfil" o diálogo não mude de tamanho.
 
-## Mudanças
+### 2. Aba "Login e perfil" — campos sempre visíveis
+- Renderizar os campos **Perfil de acesso**, **E-mail (login)** e **Senha inicial** sempre, mesmo com o checkbox desmarcado.
+- Quando "Criar login de acesso ao sistema para este funcionário" estiver **desmarcado**, os três campos ficam `disabled` (visualmente apagados).
+- Ao marcar o checkbox, os campos passam a ser editáveis.
+- Em modo edição (`editing` definido), manter a mensagem informando que o login não pode ser alterado por aqui (sem alterar comportamento atual).
 
-### 1. `src/routes/_authenticated/app.unidades.tsx`
-- Remover `Tabs` / `TabsList` / `TabsTrigger` / `TabsContent` e o componente `UnidadesFisicasTab` inteiro (e imports não usados: `Table*`, `Search`, tipo `Unidade`).
-- A página passa a renderizar diretamente `ClinicasTab` (renomear para o componente da página), mantendo header **Unidades** + subtítulo ajustado ("Cadastre suas unidades com endereço e geolocalização para bater ponto").
-- Expandir o `Dialog` de clínica (`DialogContent` com `max-w-2xl`) para incluir os campos da foto, além dos atuais (Nome, CNPJ):
-  - **Endereço** (linha inteira)
-  - **Cidade / UF / CEP** (grid 3 colunas — UF maxLength 2, uppercase)
-  - **Telefone**
-  - Seção **Geolocalização (para bater ponto)** com botão **Usar minha localização** (usa `navigator.geolocation`)
-    - **Latitude / Longitude / Raio (m)** (grid 3 colunas, raio default 200)
-  - Checkbox **Ativa**
-- Estado `form` ganha: `endereco`, `cep`, `latitude`, `longitude`, `raio_metros` (string, default "200"), `ativo` (bool, default `true`). `cidade`/`estado`/`telefone` já existem.
+### 3. Aba "Dados" — unificar "Clínica" e "Unidade"
+Como foi feito anteriormente em `app.unidades.tsx`, "Clínica" e "Unidade" passam a representar a mesma entidade (a `clinicas` agora carrega endereço/geolocalização das unidades).
+- **Remover** o campo `Unidade` (select de `unidades`) do formulário.
+- **Renomear** o label do campo `Clínica *` para `Unidade *` (continua escrevendo em `clinica_id`, que é a coluna usada para escopo/RLS).
+- Manter `unidade_id = null` ao salvar (não enviar mais esse campo no payload).
+- Remover o estado `unidades`, a query de `unidades` em `load()` e o tipo relacionado para limpar o código.
 
-### 2. Persistência
-- **Criação:** continuar chamando RPC `criar_clinica_com_admin` (com os args atuais: `_nome`, `_cnpj`, `_telefone`, `_cidade`, `_estado`). Logo após receber o `clinicaId`, fazer um `update` em `public.clinicas` com os campos extras (`endereco`, `cep`, `latitude`, `longitude`, `raio_metros`, `ativo`) — assim não precisa alterar a RPC.
-  - Se algum desses campos não existir na tabela `clinicas`, criar migration `ALTER TABLE public.clinicas ADD COLUMN ...` (endereço text, cep text, latitude numeric, longitude numeric, raio_metros integer default 200, ativo boolean default true). Verificar via schema antes; pedir aprovação da migration se necessário.
-- **Edição:** `update` direto em `clinicas` com todos os campos (já é o padrão atual, só adicionando os novos).
-- `openEdit` carrega também os novos campos do `select`.
-
-### 3. Rota antiga `app.unidades` (página de unidades físicas separada)
-- Não existe mais rota separada — o conteúdo de unidades físicas é descartado da UI. A tabela `unidades` no banco **permanece intacta** (nenhuma migration de drop). Apenas a UI deixa de expor.
-- Se houver outros lugares no app que leem `unidades` para bater ponto (ex.: `app.hr-ponto.tsx`), eles continuam funcionando — fora do escopo desta mudança.
-
-### 4. `PendenciasAlert` / outros
-- Sem mudanças. O atalho já aponta para `/app/unidades`.
-
-## Arquivos
-
-- `src/routes/_authenticated/app.unidades.tsx` — reescrita removendo Tabs e expandindo dialog de clínica.
-- (condicional) Migration adicionando colunas em `public.clinicas` se faltarem.
-
-## Pergunta antes de implementar
-
-A tabela `public.clinicas` provavelmente **não** tem ainda as colunas `endereco`, `cep`, `latitude`, `longitude`, `raio_metros`, `ativo`. Posso confirmar via schema e, se faltarem, rodar uma migration para adicioná-las? Sem essas colunas o salvar dos novos campos vai falhar.
+### Detalhes técnicos
+- Tudo permanece no arquivo `src/routes/_authenticated/app.hr-contratos.tsx`. Sem alterações de banco e sem mudanças em outras telas.
+- A coluna `unidade_id` em `hr_contratos` continua existindo no banco; apenas deixa de ser preenchida pela UI (registros antigos permanecem intactos).
+- O grid da aba "Dados" passa a ter um espaço a menos (Cargo + Setor ocupam a linha onde antes havia Unidade), mantendo o layout `grid-cols-2`.
