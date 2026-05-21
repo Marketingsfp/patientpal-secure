@@ -159,7 +159,7 @@ function DashboardPage() {
         </div>
         <h1 className="text-2xl font-semibold">Bem-vindo ao ClinicaOS!</h1>
         <p className="mt-2 text-muted-foreground">Para começar, crie sua primeira clínica.</p>
-        <Button asChild className="mt-6" size="lg"><Link to="/app/clinicas">Criar minha primeira clínica</Link></Button>
+        <Button asChild className="mt-6" size="lg"><Link to="/app/unidades">Criar minha primeira clínica</Link></Button>
       </div>
     );
   }
