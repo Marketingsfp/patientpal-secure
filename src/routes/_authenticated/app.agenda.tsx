@@ -1485,6 +1485,84 @@ function AgendaPorMedicoGrid({
 }) {
   const diasSemana = ["DOMINGO", "SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO"];
 
+}
+
+function MedicoFiltroInput({
+  medicos, value, onChange, disabled, onlyMedicoId,
+}: {
+  medicos: Medico[];
+  value: string;
+  onChange: (v: string) => void;
+  disabled?: boolean;
+  onlyMedicoId?: string | null;
+}) {
+  const lista = useMemo(
+    () => medicos.filter((m) => !onlyMedicoId || m.id === onlyMedicoId),
+    [medicos, onlyMedicoId],
+  );
+  const selecionadoNome = useMemo(
+    () => (value === "todos" ? "" : (medicos.find((m) => m.id === value)?.nome ?? "")),
+    [medicos, value],
+  );
+  const [texto, setTexto] = useState(selecionadoNome);
+  const [aberto, setAberto] = useState(false);
+  useEffect(() => { setTexto(selecionadoNome); }, [selecionadoNome]);
+
+  const norm = (s: string) => normalizar(s);
+  const sugestoes = useMemo(() => {
+    const t = norm(texto).trim();
+    if (!t) return lista.slice(0, 30);
+    return lista.filter((m) => norm(m.nome).includes(t)).slice(0, 30);
+  }, [lista, texto]);
+
+  return (
+    <div className="relative">
+      <div className="flex gap-1">
+        <Input
+          disabled={disabled}
+          placeholder="TODOS — digite para buscar"
+          value={texto}
+          onChange={(e) => { setTexto(e.target.value); setAberto(true); }}
+          onFocus={() => setAberto(true)}
+          onBlur={() => setTimeout(() => setAberto(false), 150)}
+        />
+        {value !== "todos" && !disabled && (
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            title="Limpar"
+            onClick={() => { onChange("todos"); setTexto(""); }}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
+      {aberto && !disabled && sugestoes.length > 0 && (
+        <div className="absolute z-50 mt-1 w-full max-h-64 overflow-auto rounded-md border bg-popover shadow-md">
+          {sugestoes.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              className="block w-full text-left px-2 py-1.5 text-sm hover:bg-accent"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                onChange(m.id);
+                setTexto(m.nome);
+                setAberto(false);
+              }}
+            >
+              {m.nome}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function __MedicoGridRest({ diasSemana, medicoId, dias, dataRef, items, onSlotClick, onAgClick, fmtHora }: any) {
+
   // Lista de dias no intervalo (yyyy-mm-dd)
   const intervaloDias = useMemo(() => {
     const arr: string[] = [];
