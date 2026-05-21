@@ -1,21 +1,25 @@
-# Regra permanente — Sincronização de Permissões
+## Problema
 
-Vou salvar isto na memória do projeto (`mem://index.md` como regra Core) para ser aplicado automaticamente em **toda** nova funcionalidade, sem você precisar pedir de novo.
+A tela está lenta/travando porque `src/components/app-shell.tsx` quebra a regra dos Hooks do React:
 
-## A regra
+- Linha 237: `if (loading || !user) return <…>Entrando…</…>` (early return)
+- Linha 254: `useEffect(..., [clinicColor])` é chamado **depois** do early return
 
-Sempre que uma nova funcionalidade/módulo for adicionado ao sistema (nova rota em `src/routes/_authenticated/app.*`, novo item no menu lateral `src/components/app-shell.tsx`, ou novo recurso significativo), eu devo na mesma entrega:
+Quando `loading`/`user` mudam entre renders, a quantidade de hooks chamados muda → React lança "Rendered more hooks than during the previous render" → cai no error boundary e dá impressão de lentidão/tela travada.
 
-1. **Atualizar o catálogo de módulos** em `src/routes/_authenticated/app.perfis.tsx`
-   - Adicionar entrada em `GRUPOS` (chave, nome, descrição, grupo correto: Operação / Inteligência / Marketing / Cadastros / Gestão / RH / Sistema).
-   - Atualizar os `PRESETS` de cada perfil para incluir o novo módulo com o nível sugerido (`none` / `read` / `write`).
+## Correção (apenas 1 arquivo)
 
-2. **Atualizar o banco** (tabela `perfil_permissoes`)
-   - Inserir, para cada perfil existente em todas as clínicas, uma linha do novo módulo com o `acesso` padrão sugerido.
-   - Usar `INSERT ... ON CONFLICT DO NOTHING` para ser idempotente.
+`src/components/app-shell.tsx`:
 
-3. **Confirmar no chat** quais módulos foram adicionados e quais perfis receberam acesso padrão, para você revisar.
+1. Mover o cálculo de `clinicColor` para **antes** do `if (loading || !user) return …`, usando `useMemo` para manter referência estável.
+2. Mover o `useEffect([clinicColor])` que aplica as variáveis CSS (`--primary`, `--ring`, `--sidebar-primary`, `--primary-foreground`) para **antes** do mesmo early return.
+3. Manter `initial` onde está (não é hook).
+4. Não alterar nenhuma outra lógica, dados, estilos ou backend.
 
-## Escopo desta entrega
+Resultado: a contagem de hooks fica constante em todos os renders, o erro some e a navegação volta a ficar fluida.
 
-Apenas salvar a regra na memória. **Não vou alterar código nem rodar migration agora.** A partir da próxima funcionalidade nova, essa rotina passa a ser automática.
+## Fora de escopo
+
+- Telas de perfis/permissões
+- Banco de dados
+- Qualquer outra refatoração de performance

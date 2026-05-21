@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet, ChevronLeft, ChevronRight, ChevronDown, Search, HeartPulse, Contact, ConciergeBell, Briefcase, MapPin, Palmtree, GraduationCap, Sparkles, Filter, Send, Megaphone, KeyRound } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -234,22 +234,15 @@ export function AppShell() {
     navigate({ to: "/login", replace: true });
   };
 
-  if (loading || !user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
-        Entrando…
-      </div>
-    );
-  }
-
-  const clinicColor = modoTodas
-    ? "#0f172a"
-    : branding?.primary
-      ? branding.primary
-      : clinicaAtual
-        ? corDaClinica(clinicaAtual.clinica.nome)
-        : "#0f172a";
-  const initial = (userName || user?.email || "?").trim().charAt(0).toUpperCase();
+  const clinicColor = useMemo(() => (
+    modoTodas
+      ? "#0f172a"
+      : branding?.primary
+        ? branding.primary
+        : clinicaAtual
+          ? corDaClinica(clinicaAtual.clinica.nome)
+          : "#0f172a"
+  ), [modoTodas, branding?.primary, clinicaAtual]);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -265,6 +258,16 @@ export function AppShell() {
       root.style.removeProperty("--primary-foreground");
     };
   }, [clinicColor]);
+
+  if (loading || !user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
+        Entrando…
+      </div>
+    );
+  }
+
+  const initial = (userName || user?.email || "?").trim().charAt(0).toUpperCase();
 
   const medicoNavRows: typeof navRows = [
     {
