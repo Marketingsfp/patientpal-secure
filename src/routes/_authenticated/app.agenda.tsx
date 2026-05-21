@@ -1312,7 +1312,8 @@ function AgendaPage() {
               <TableHead className="w-14">Dia</TableHead>
               <TableHead className="w-24">Data</TableHead>
               <TableHead className="w-32">Intervalo</TableHead>
-              <TableHead className="min-w-[260px]">Cliente</TableHead>
+              <TableHead className="min-w-[200px]">Profissional</TableHead>
+              <TableHead className="min-w-[200px]">Cliente</TableHead>
               <TableHead className="w-40">Pasta</TableHead>
               <TableHead className="w-20 text-center">Alertas</TableHead>
               <TableHead className="w-20 text-right">Ações</TableHead>
@@ -1320,11 +1321,11 @@ function AgendaPage() {
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={9} className="text-center py-6 text-muted-foreground">Carregando…</TableCell></TableRow>
+              <TableRow><TableCell colSpan={10} className="text-center py-6 text-muted-foreground">Carregando…</TableCell></TableRow>
             ) : !clinicaAtual ? (
-              <TableRow><TableCell colSpan={9} className="text-center py-6 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={10} className="text-center py-6 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
             ) : paginados.length === 0 ? (
-              <TableRow><TableCell colSpan={9} className="text-center py-6 text-muted-foreground">Nenhum agendamento encontrado.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={10} className="text-center py-6 text-muted-foreground">Nenhum agendamento encontrado.</TableCell></TableRow>
             ) : paginados.map((a) => {
               const fichaNum = fichaPorId.get(a.id) ?? "";
               const realizado = a.status === "realizado";
@@ -1339,40 +1340,35 @@ function AgendaPage() {
                   <TableCell>
                      <span className="text-emerald-600 font-medium">{fmtHora(a.inicio)} - {fmtHora(a.fim)}</span>
                   </TableCell>
-                   <TableCell className="pr-1">
-                     {normalizar(a.paciente_nome) === "disponivel" ? (
-                        <div className="flex items-center gap-2 leading-none">
-                          <span className="text-[10px] uppercase tracking-wide text-muted-foreground truncate">
-                            Dr(a). {medicos.find((m) => m.id === a.medico_id)?.nome ?? "—"}
-                          </span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openSlot(a)}
-                            title="Agendar paciente neste horário"
-                            className="h-6 px-2 text-emerald-600 hover:text-emerald-700 font-medium"
-                          >
-                            <UserPlus className="h-3.5 w-3.5 mr-1" />
-                            Agendar cliente
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center flex-wrap gap-x-2 gap-y-0 leading-none">
-                          <span className="text-[10px] uppercase tracking-wide text-muted-foreground truncate">
-                            Dr(a). {medicos.find((m) => m.id === a.medico_id)?.nome ?? "—"}
-                          </span>
-                          <a
-                           href={`/app/clientes?q=${encodeURIComponent(a.paciente_nome)}`}
-                           target="_blank"
-                           rel="noopener noreferrer"
-                           title="Abrir ficha do cliente em nova aba"
-                           className="inline-flex items-center gap-1 uppercase font-medium text-foreground hover:text-primary hover:underline"
-                         >
-                           {a.status === "confirmado" && <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />}
-                           {a.paciente_nome}
-                         </a>
-                       </div>
-                     )}
+                  <TableCell className="pr-1">
+                    <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                      Dr(a). {medicos.find((m) => m.id === a.medico_id)?.nome ?? "—"}
+                    </span>
+                  </TableCell>
+                  <TableCell className="pr-1">
+                    {normalizar(a.paciente_nome) === "disponivel" ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openSlot(a)}
+                        title="Agendar paciente neste horário"
+                        className="h-6 px-2 text-emerald-600 hover:text-emerald-700 font-medium"
+                      >
+                        <UserPlus className="h-3.5 w-3.5 mr-1" />
+                        Agendar cliente
+                      </Button>
+                    ) : (
+                      <a
+                        href={`/app/clientes?q=${encodeURIComponent(a.paciente_nome)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Abrir ficha do cliente em nova aba"
+                        className="inline-flex items-center gap-1 uppercase font-medium text-foreground hover:text-primary hover:underline"
+                      >
+                        {a.status === "confirmado" && <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />}
+                        {a.paciente_nome}
+                      </a>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="text-xs">{a.procedimento || "CONSULTA"}</Badge>
