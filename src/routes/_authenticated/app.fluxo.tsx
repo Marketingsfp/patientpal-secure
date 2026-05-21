@@ -87,6 +87,8 @@ function FluxoPage() {
   const { clinicaAtual } = useClinica();
   const [ags, setAgs] = useState<Ag[]>([]);
   const [loading, setLoading] = useState(false);
+  const [dataRef, setDataRef] = useState(() => new Date().toISOString().slice(0, 10));
+  const [fallbackAplicado, setFallbackAplicado] = useState(false);
   const [consultorio, setConsultorio] = useState<string>(() =>
     typeof window !== "undefined" ? localStorage.getItem("fluxo_consultorio") ?? "1" : "1",
   );
@@ -99,9 +101,8 @@ function FluxoPage() {
   const carregar = useCallback(async () => {
     if (!clinicaAtual) return;
     setLoading(true);
-    const hoje = new Date().toISOString().slice(0, 10);
-    const ini = `${hoje}T00:00:00`;
-    const fim = `${hoje}T23:59:59`;
+    const ini = `${dataRef}T00:00:00`;
+    const fim = `${dataRef}T23:59:59`;
     const { data, error } = await supabase
       .from("agendamentos")
       .select("id, paciente_id, paciente_nome, procedimento, inicio, fluxo_etapa, prioridade, medicos(nome)")
@@ -112,9 +113,27 @@ function FluxoPage() {
     setLoading(false);
     if (error) { toast.error(error.message); return; }
     const rows = (data ?? []) as unknown as Ag[];
-    // Ocultar horários disponíveis (sem paciente vinculado) — só mostra agendamentos reais
-    setAgs(rows.filter((a) => !!a.paciente_id && (a.paciente_nome ?? "").trim().toUpperCase() !== "DISPONÍVEL"));
-  }, [clinicaAtual]);
+    const reais = rows.filter((a) => !!a.paciente_id && (a.paciente_nome ?? "").trim().toUpperCase() !== "DISPONÍVEL");
+    setAgs(reais);
+    // Fallback automático: se hoje está vazio, busca o dia mais recente (passado) com pacientes reais
+    if (reais.length === 0 && !fallbackAplicado && dataRef === new Date().toISOString().slice(0, 10)) {
+      const { data: ult } = await supabase
+        .from("agendamentos")
+        .select("inicio")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .not("paciente_id", "is", null)
+        .neq("paciente_nome", "DISPONÍVEL")
+        .lte("inicio", fim)
+        .order("inicio", { ascending: false })
+        .limit(1);
+      const ultData = (ult?.[0] as { inicio?: string } | undefined)?.inicio?.slice(0, 10);
+      if (ultData && ultData !== dataRef) {
+        setFallbackAplicado(true);
+        setDataRef(ultData);
+        toast.info(`Sem pacientes hoje — exibindo ${new Date(`${ultData}T12:00:00`).toLocaleDateString("pt-BR")}`);
+      }
+    }
+  }, [clinicaAtual, dataRef, fallbackAplicado]);
 
   useEffect(() => {
     void carregar();
