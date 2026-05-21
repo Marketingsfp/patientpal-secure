@@ -31,7 +31,7 @@ import {
   CalendarDays, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X,
   MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, Clock, DollarSign, ShieldCheck,
 } from "lucide-react";
-import { printGuiaAtendimento } from "@/lib/print-gr";
+import { printGuiaAtendimento, printGuiaAtendimentoAgrupada } from "@/lib/print-gr";
 import { VoiceInput } from "@/components/voice-input";
 import { exportToExcel } from "@/lib/export-csv";
 import { useAuth } from "@/hooks/use-auth";
