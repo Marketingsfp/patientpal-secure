@@ -48,7 +48,7 @@ function FinDashboard() {
           <p className="text-sm text-muted-foreground">Visão geral do período</p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={() => setOpen("receita")} className="bg-success text-success-foreground hover:bg-success/90">
+          <Button onClick={() => setOpen("receita")} className="bg-primary text-primary-foreground hover:bg-primary/90">
             <Plus className="h-4 w-4 mr-1" /> Receita
           </Button>
           <Button onClick={() => setOpen("despesa")} variant="destructive">

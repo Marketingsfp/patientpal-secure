@@ -705,14 +705,14 @@ function AgendaPage() {
             <button
               type="button"
               onClick={() => setViewMode("dia")}
-              className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${viewMode === "dia" ? "bg-emerald-600 text-white" : "text-muted-foreground hover:text-foreground"}`}
+              className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${viewMode === "dia" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
             >
               Lista
             </button>
             <button
               type="button"
               onClick={() => setViewMode("medico")}
-              className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${viewMode === "medico" ? "bg-emerald-600 text-white" : "text-muted-foreground hover:text-foreground"}`}
+              className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${viewMode === "medico" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
             >
               Por médico
             </button>
@@ -769,7 +769,7 @@ function AgendaPage() {
           </Button>
           <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button onClick={openNew} disabled={!clinicaAtual} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+            <Button onClick={openNew} disabled={!clinicaAtual} className="bg-primary hover:bg-primary/90 text-primary-foreground">
               <Plus className="h-4 w-4 mr-2" /> Adicionar Encaixe
             </Button>
           </DialogTrigger>
@@ -1369,7 +1369,7 @@ function AgendaPage() {
                         size="sm"
                         onClick={() => openSlot(a)}
                         title="Agendar paciente neste horário"
-                        className="h-6 px-2 text-emerald-600 hover:text-emerald-700 font-medium"
+                        className="h-6 px-2 text-primary hover:text-primary/80 font-medium"
                       >
                         <UserPlus className="h-3.5 w-3.5 mr-1" />
                         Agendar cliente
