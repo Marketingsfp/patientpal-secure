@@ -197,36 +197,7 @@ function NinaPage() {
 
         {/* ============ CONFIGURAÇÃO ============ */}
         <TabsContent value="config">
-          <Card>
-            <CardHeader>
-              <CardTitle>Conexão WhatsApp Business API</CardTitle>
-              <CardDescription>Configurações da integração oficial via Nina</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4 max-w-2xl">
-              <div className="space-y-1">
-                <Label>Número conectado</Label>
-                <Input value="+55 11 4000-0000" readOnly />
-              </div>
-              <div className="space-y-1">
-                <Label>Nome de exibição</Label>
-                <Input defaultValue="Clínica — Nina" />
-              </div>
-              <div className="space-y-1">
-                <Label>Mensagem de boas-vindas</Label>
-                <Textarea rows={3} defaultValue="Olá! Sou a Nina, assistente virtual da clínica 💚. Posso te ajudar a agendar, confirmar ou tirar dúvidas." />
-              </div>
-              <div className="space-y-1">
-                <Label>Horário de atendimento humano</Label>
-                <div className="flex items-center gap-2">
-                  <Input defaultValue="08:00" className="w-28" />
-                  <span>às</span>
-                  <Input defaultValue="18:00" className="w-28" />
-                </div>
-                <p className="text-xs text-muted-foreground">Fora do horário, apenas a Nina responde.</p>
-              </div>
-              <Button>Salvar configurações</Button>
-            </CardContent>
-          </Card>
+          <ConfiguracaoWhatsApp />
         </TabsContent>
       </Tabs>
     </div>
