@@ -197,12 +197,12 @@ function DashboardPage() {
             <p className="text-xs text-muted-foreground">
               Tire dúvidas sobre médicos, horários e valores de exames sem precisar lembrar de cor.
             </p>
-            <div className="flex gap-2">
-              <Button asChild size="sm" variant="default" className="flex-1">
-                <Link to="/app/consulta-rapida"><BookOpen className="h-4 w-4 mr-1" /> Abrir tabela</Link>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button asChild size="sm" variant="default" className="flex-1 min-w-0">
+                <Link to="/app/consulta-rapida" className="truncate"><BookOpen className="h-4 w-4 mr-1 shrink-0" /> Abrir tabela</Link>
               </Button>
-              <Button asChild size="sm" variant="outline" className="flex-1">
-                <Link to="/app/nina"><Brain className="h-4 w-4 mr-1" /> Perguntar à Nina</Link>
+              <Button asChild size="sm" variant="outline" className="flex-1 min-w-0">
+                <Link to="/app/nina" className="truncate"><Brain className="h-4 w-4 mr-1 shrink-0" /> Perguntar à Nina</Link>
               </Button>
             </div>
           </CardContent>
