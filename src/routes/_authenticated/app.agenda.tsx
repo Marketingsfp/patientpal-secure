@@ -882,14 +882,19 @@ function AgendaPage() {
                   <div className="space-y-1">
                     <Label className="text-xs">Data de pagamento</Label>
                     <Input
-                      type="date"
-                      value={form.data_pagamento}
-                      onChange={(e) => setForm(f => ({ ...f, data_pagamento: e.target.value }))}
+                      type="text"
+                      value={form.data_pagamento
+                        ? new Date(form.data_pagamento + "T00:00:00").toLocaleDateString("pt-BR")
+                        : "—"}
+                      readOnly
+                      disabled
+                      tabIndex={-1}
+                      className="bg-muted/40 cursor-not-allowed"
                     />
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Data de pagamento é preenchida automaticamente quando o pagamento for registrado. Pode ser ajustada manualmente se necessário.
+                  Preenchida automaticamente pelo sistema quando o pagamento for registrado.
                 </p>
               </div>
               <div className="space-y-1">
