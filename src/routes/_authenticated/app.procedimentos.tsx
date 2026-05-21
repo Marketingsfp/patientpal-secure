@@ -639,7 +639,9 @@ function ProcedimentosPage() {
                   <TableHead className="w-44">Grupo</TableHead>
                   <TableHead className="w-24">Tipo</TableHead>
                   <TableHead className="w-24 text-right">Dinheiro</TableHead>
-                  <TableHead className="w-40 text-right">Pix / Débito / Crédito</TableHead>
+                  <TableHead className="w-20 text-right">Pix</TableHead>
+                  <TableHead className="w-20 text-right">Débito</TableHead>
+                  <TableHead className="w-20 text-right">Crédito</TableHead>
                   <TableHead className="w-24 text-right">C. Consulta</TableHead>
                   <TableHead className="w-24 text-right">C. Desconto</TableHead>
                   <TableHead className="w-24">Situação</TableHead>
