@@ -1,40 +1,42 @@
-## 1. Novo grupo de menu "Cadastros"
+## Contexto
 
-Em `src/components/app-shell.tsx`, adicionar uma nova seção `Cadastros` em `navRows`, posicionada após `Marketing` e antes de `Gestão`. Mover para ela, em ordem alfabética, os itens hoje espalhados em **Operação**, **Inteligência**, **Gestão** e **RH**:
+Hoje existem dois cadastros parecidos no menu **Cadastros**:
 
-- Cargos (hoje em Gestão)
-- Clínicas (hoje em Gestão)
-- Equipe (hoje em Gestão)
-- Especialidades (hoje em Gestão)
-- Funcionários — `/app/hr-contratos` (hoje em RH)
-- Horários médicos (hoje em Gestão, rota `/app/disponibilidades`)
-- Médicos (hoje em Gestão)
-- Modelos de Prontuário (hoje em Inteligência)
-- Procedimentos (hoje em Operação)
-- Setores (hoje em Gestão)
-- Unidades (hoje em Gestão)
+- **Clínicas** (`/app/clinicas`) — cadastra a entidade jurídica (nome, CNPJ, cidade/UF, telefone) e cria membership de admin via RPC `criar_clinica_com_admin`. É o registro "raiz" usado pelo seletor de clínica.
+- **Unidades** (`/app/unidades`) — cadastra unidades físicas vinculadas à clínica atual (endereço completo, CEP, geolocalização e raio em metros para bater ponto, status ativa/inativa).
 
-Esses itens são **removidos** das seções de origem. As demais seções continuam intactas e na ordem alfabética atual.
+Funcionalmente são coisas diferentes (uma é a pessoa jurídica + membership, a outra são endereços operacionais), mas para o usuário aparecem como "dois cadastros de unidades". A decisão é unificar tudo sob **Unidades**.
 
-Resultado das seções após a mudança:
-- **Operação**: Agenda, Caixa, Cartão Benefícios, Chat interno, Clientes, Dashboard, Fluxo do paciente, Orçamentos, Recepção / Filas, Triagem - Enfermagem
-- **Inteligência**: Atendimento médico, CRM, Enfermeira IA — Alertas, Informações rápidas, Nina — WhatsApp, Odontologia, Resultados de Exames
-- **Marketing**: (inalterado)
-- **Cadastros**: lista acima
-- **Gestão**: Auditoria, Financeiro, Integrações, LGPD, Relatórios
-- **RH**: Bater ponto, Cursos (admin), Férias, Holerites, Treinamentos
+## Plano
 
-## 2. Cadastro de Funcionários com abas
+### 1. Página unificada em `/app/unidades`
 
-Em `src/routes/_authenticated/app.hr-contratos.tsx`, reorganizar o diálogo de novo/editar funcionário usando `Tabs` (`@/components/ui/tabs`) com duas abas:
+Reescrever `src/routes/_authenticated/app.unidades.tsx` para ter duas abas (`Tabs` do shadcn):
 
-- **Dados** — campos atuais do contrato (clínica, nome, CPF, regime, cargo, setor, unidade, carga, salário, datas, status).
-- **Login e perfil** — move para cá o bloco já existente (`criar_login`, perfil, e-mail, senha). Mantém a regra atual: só aparece para novos funcionários (`!editing`); ao editar mostra um aviso curto de que login não pode ser alterado por aqui.
+- **Aba "Clínicas"** — lista de `memberships` (igual ao que `app.clinicas.tsx` já faz hoje): cards com nome, cidade/UF, role, botões **Selecionar** e **Editar**, e botão **Nova clínica** no topo da aba. Reaproveita o mesmo `Dialog` e mesma lógica (RPC `criar_clinica_com_admin` para criar, `update` em `clinicas` para editar; chama `refresh()` e `setClinicaAtual()` do `useClinica`).
+- **Aba "Unidades físicas"** — tabela atual de unidades da clínica selecionada (endereço, geolocalização, raio, ativa/inativa), com o mesmo `Dialog` de criar/editar já existente.
 
-Lógica de salvar permanece igual (cria usuário via `cadastrarUsuario` quando `criar_login` está marcado e vincula `user_id` ao contrato).
+Header da página passa a ser **Unidades** com subtítulo explicando que ali ficam tanto as clínicas (entidade) quanto as unidades físicas de cada clínica.
+
+### 2. Remoção do item "Clínicas" do menu
+
+Em `src/components/app-shell.tsx`:
+
+- Remover a entrada `{ to: "/app/clinicas", label: "Clínicas", ... }` da seção **Cadastros**.
+- Manter apenas `{ to: "/app/unidades", label: "Unidades", ... }`.
+- Ajustar o atalho do PendenciasAlert na linha ~216 (`/cl[ií]nica/.test(t) ? "/app/clinicas"`) para apontar para `/app/unidades`.
+
+### 3. Rota antiga
+
+`src/routes/_authenticated/app.clinicas.tsx` passa a redirecionar para `/app/unidades` (via `beforeLoad` com `throw redirect({ to: "/app/unidades" })`), para não quebrar links existentes (ex.: o botão "Criar minha primeira clínica" em `app.index.tsx` e qualquer bookmark).
+
+Alternativamente o arquivo pode ser deletado; manter como redirect é mais seguro porque há referências no código a `/app/clinicas`.
 
 ## Detalhes técnicos
 
-- Sem mudanças de banco, rotas ou server functions — apenas reordenar `navRows` e refatorar o JSX do `Dialog` de Funcionários para usar `Tabs/TabsList/TabsTrigger/TabsContent`.
-- A ordem alfabética dentro de "Cadastros" usa as labels exibidas (locale pt-BR).
-- Nenhuma rota nova é criada; "Funcionários" continua apontando para `/app/hr-contratos`.
+- Sem mudanças de banco, RLS ou server functions. Apenas:
+  - `src/routes/_authenticated/app.unidades.tsx` — refatorado com `Tabs` reunindo as duas UIs.
+  - `src/routes/_authenticated/app.clinicas.tsx` — vira redirect para `/app/unidades`.
+  - `src/components/app-shell.tsx` — remove item "Clínicas" e atualiza o atalho do PendenciasAlert.
+  - `src/routes/_authenticated/app.index.tsx` — atualiza o `<Link to="/app/clinicas">` para `/app/unidades`.
+- A aba padrão ao abrir `/app/unidades` será **Clínicas** quando o usuário ainda não tiver nenhuma unidade física cadastrada (ou nenhuma clínica), e **Unidades físicas** caso contrário.
