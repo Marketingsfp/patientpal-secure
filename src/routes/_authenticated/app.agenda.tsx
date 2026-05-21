@@ -1347,7 +1347,7 @@ function AgendaPage() {
               const fichaNum = fichaPorId.get(a.id) ?? "";
               const realizado = a.status === "realizado";
               return (
-                <TableRow key={a.id} className={realizado ? "bg-emerald-50 dark:bg-emerald-950/20 [&>td]:py-0.5" : "[&>td]:py-0.5"}>
+                <TableRow key={a.id} className={realizado ? "bg-emerald-50 dark:bg-emerald-950/20 [&>td]:py-0 [&>td]:h-7 text-xs" : "[&>td]:py-0 [&>td]:h-7 text-xs"}>
                   <TableCell title="Marque para cobrar este atendimento em um pagamento agrupado">
                     <Checkbox checked={selecionados.has(a.id)} onCheckedChange={() => toggleSel(a.id)} />
                   </TableCell>
@@ -1358,7 +1358,7 @@ function AgendaPage() {
                      <span className="text-emerald-600 font-medium">{fmtHora(a.inicio)} - {fmtHora(a.fim)}</span>
                   </TableCell>
                   <TableCell className="pr-1 align-middle">
-                    <span className="text-sm uppercase font-medium text-foreground">
+                    <span className="text-xs uppercase font-medium text-foreground">
                       Dr(a). {medicos.find((m) => m.id === a.medico_id)?.nome ?? "—"}
                     </span>
                   </TableCell>
@@ -1375,16 +1375,15 @@ function AgendaPage() {
                         Agendar cliente
                       </Button>
                     ) : (
-                      <a
-                        href={`/app/clientes?q=${encodeURIComponent(a.paciente_nome)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title="Abrir ficha do cliente em nova aba"
-                        className="inline-flex items-center gap-1 text-sm uppercase font-medium text-foreground hover:text-primary hover:underline"
+                      <button
+                        type="button"
+                        onClick={() => abrirInfoPaciente(a.paciente_id, a.paciente_nome)}
+                        title="Ver informações do cliente"
+                        className="inline-flex items-center gap-1 text-xs uppercase font-medium text-foreground hover:text-primary hover:underline"
                       >
                         {a.status === "confirmado" && <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />}
                         {a.paciente_nome}
-                      </a>
+                      </button>
                     )}
                   </TableCell>
                   <TableCell>
