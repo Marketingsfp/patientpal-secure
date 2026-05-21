@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -20,6 +20,9 @@ import { formatDatePura } from "@/lib/date-utils";
 export const Route = createFileRoute("/_authenticated/app/hr-contratos")({
   component: ContratosPage,
   head: () => ({ meta: [{ title: "Funcionários — ClinicaOS" }] }),
+  validateSearch: (search: Record<string, unknown>) => ({
+    new: search.new === "1" || search.new === 1 ? "1" : undefined,
+  }),
 });
 
 interface Contrato {
@@ -42,6 +45,8 @@ const PERFIS = [
 
 function ContratosPage() {
   const { clinicaAtual, memberships } = useClinica();
+  const { new: autoNew } = Route.useSearch();
+  const navigate = useNavigate();
   const cadastrarUsuarioFn = useServerFn(cadastrarUsuario);
   const [rows, setRows] = useState<Contrato[]>([]);
   const [cargos, setCargos] = useState<Ref[]>([]);
@@ -73,6 +78,14 @@ function ContratosPage() {
     setLoading(false);
   }
   useEffect(() => { void load(); }, [clinicaAtual?.clinica_id]);
+
+  useEffect(() => {
+    if (autoNew === "1" && clinicaAtual) {
+      openNew();
+      void navigate({ to: "/app/hr-contratos", search: {}, replace: true });
+    }
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [autoNew, clinicaAtual?.clinica_id]);
 
   function openNew() {
     setEditing(null);

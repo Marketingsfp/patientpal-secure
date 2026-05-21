@@ -1,25 +1,51 @@
-## Problema
+## Situação atual
 
-A tela está lenta/travando porque `src/components/app-shell.tsx` quebra a regra dos Hooks do React:
+Há três submenus no grupo **Cadastros** que se sobrepõem:
 
-- Linha 237: `if (loading || !user) return <…>Entrando…</…>` (early return)
-- Linha 254: `useEffect(..., [clinicColor])` é chamado **depois** do early return
+| Menu | Rota | O que faz |
+|---|---|---|
+| Equipe | `/app/equipe` | Cadastra usuário do sistema (nome, email, senha, função) — só login |
+| Funcionários | `/app/hr-contratos` | Cadastra contrato (cargo, setor, salário, admissão) + opção "criar login" |
+| Médicos | `/app/medicos` | Cadastra médico (CRM, especialidades, repasses, convênios) + opção "criar login" |
 
-Quando `loading`/`user` mudam entre renders, a quantidade de hooks chamados muda → React lança "Rendered more hooks than during the previous render" → cai no error boundary e dá impressão de lentidão/tela travada.
+## Mudanças propostas
 
-## Correção (apenas 1 arquivo)
+### 1. Menu lateral (`app-shell.tsx`)
+- Manter apenas **Equipe** no grupo Cadastros.
+- Remover **Funcionários** e **Médicos** do menu.
+- As rotas `/app/medicos` e `/app/hr-contratos` continuam existindo (links internos e edição funcionam normalmente).
 
-`src/components/app-shell.tsx`:
+### 2. Tela `/app/equipe` (reformulada)
+Vira o hub único da equipe com **duas abas**:
 
-1. Mover o cálculo de `clinicColor` para **antes** do `if (loading || !user) return …`, usando `useMemo` para manter referência estável.
-2. Mover o `useEffect([clinicColor])` que aplica as variáveis CSS (`--primary`, `--ring`, `--sidebar-primary`, `--primary-foreground`) para **antes** do mesmo early return.
-3. Manter `initial` onde está (não é hook).
-4. Não alterar nenhuma outra lógica, dados, estilos ou backend.
+- **Aba "Funcionários"** — lista atual de `hr-contratos` (mesmas colunas e ações de editar).
+- **Aba "Médicos"** — lista atual de `medicos` (mesmas colunas e ações).
 
-Resultado: a contagem de hooks fica constante em todos os renders, o erro some e a navegação volta a ficar fluida.
+Um único botão **"+ Novo cadastro"** no topo abre um diálogo de escolha:
+
+```text
+┌─ O que você quer cadastrar? ─┐
+│  [ 👤 Funcionário ]          │
+│  [ 🩺 Médico       ]          │
+└──────────────────────────────┘
+```
+
+- Clicar em **Funcionário** → abre o formulário de funcionário (mesmo de hr-contratos hoje, com opção "criar login do sistema").
+- Clicar em **Médico** → abre o formulário de médico (mesmo de medicos hoje, com opção "criar login do sistema").
+
+A criação de usuário/login do sistema continua acontecendo dentro de cada formulário (já existe o checkbox "criar login" nos dois).
+
+### 3. Tela atual de Equipe (cadastro simples de login)
+- O formulário antigo "Cadastrar usuário" (só nome/email/senha/função) **será removido**, pois agora todo login nasce vinculado a um Funcionário ou Médico.
+- A aba "Funcionários" da nova Equipe permite editar função e ativar/desativar acesso, cobrindo o que a tela antiga fazia.
+
+### 4. Comando de voz e busca
+- "equipe", "usuário", "médico", "funcionário", "profissional" → todos passam a abrir `/app/equipe`.
 
 ## Fora de escopo
+- Estrutura de banco (tabelas `medicos`, `hr_contratos`, `clinica_memberships` permanecem como estão).
+- Lógica de repasse, convênios, cargos, setores.
+- Tela de Perfis/Permissões.
 
-- Telas de perfis/permissões
-- Banco de dados
-- Qualquer outra refatoração de performance
+## Confirmar antes de implementar
+- Tudo OK assim? Ou prefere alguma variação (ex.: manter o cadastro avulso de login dentro da Equipe como terceira opção "Apenas acesso ao sistema")?

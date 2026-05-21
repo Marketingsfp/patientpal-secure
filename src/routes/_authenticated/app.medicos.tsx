@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { Plus, Stethoscope, Pencil, Download, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -25,6 +25,9 @@ import { cadastrarUsuario } from "@/lib/equipe.functions";
 export const Route = createFileRoute("/_authenticated/app/medicos")({
   component: MedicosPage,
   head: () => ({ meta: [{ title: "Médicos — ClinicaOS" }] }),
+  validateSearch: (search: Record<string, unknown>) => ({
+    new: search.new === "1" || search.new === 1 ? "1" : undefined,
+  }),
 });
 
 interface Medico {
@@ -59,6 +62,8 @@ const CONVENIOS_PADRAO: ConvenioRow[] = [
 
 function MedicosPage() {
   const { clinicaAtual } = useClinica();
+  const { new: autoNew } = Route.useSearch();
+  const navigate = useNavigate();
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [esps, setEsps] = useState<Especialidade[]>([]);
   const [procs, setProcs] = useState<Procedimento[]>([]);
@@ -113,6 +118,15 @@ function MedicosPage() {
       .limit(5000)
       .then(({ data }) => setProcs((data as Procedimento[]) ?? []));
   }, [clinicaAtual?.clinica_id]);
+
+  useEffect(() => {
+    if (autoNew === "1") {
+      resetForm();
+      setOpen(true);
+      void navigate({ to: "/app/medicos", search: {}, replace: true });
+    }
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [autoNew]);
 
   const resetForm = () => {
     setEditId(null);

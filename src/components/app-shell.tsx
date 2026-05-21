@@ -88,9 +88,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<{ to: string;
     { to: "/app/cargos", label: "Cargos", icon: Briefcase },
     { to: "/app/equipe", label: "Equipe", icon: Users },
     { to: "/app/especialidades", label: "Especialidades", icon: HeartPulse },
-    { to: "/app/hr-contratos", label: "Funcionários", icon: Users },
     { to: "/app/disponibilidades", label: "Horários médicos", icon: Clock },
-    { to: "/app/medicos", label: "Médicos", icon: Stethoscope },
     { to: "/app/prontuario-modelos", label: "Modelos de Prontuário", icon: FileHeart },
     { to: "/app/perfis", label: "Perfis", icon: KeyRound },
     { to: "/app/procedimentos", label: "Procedimentos", icon: ClipboardList },
@@ -214,8 +212,8 @@ export function AppShell() {
       /relat[óo]rio.*cart[ãa]o|cart[ãa]o.*relat[óo]rio/.test(t) ? "/app/cartao-beneficios/relatorios" :
       /financ|caixa|conta|boleto/.test(t) ? "/app/financeiro" :
       /cl[ií]nica/.test(t) ? "/app/unidades" :
-      /m[eé]dico|profissional|rateio|repasse/.test(t) ? "/app/medicos" :
-      /equipe|usu[áa]rio/.test(t) ? "/app/equipe" :
+      /rateio|repasse/.test(t) ? "/app/medicos" :
+      /equipe|usu[áa]rio|m[eé]dico|profissional|funcion[áa]rio/.test(t) ? "/app/equipe" :
       /prontu[áa]rio/.test(t) ? "/app/prontuarios" :
       /crm|lead|oportunidade/.test(t) ? "/app/crm" :
       /nina|whats|whatsapp|conversa/.test(t) ? "/app/nina" :
