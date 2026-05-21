@@ -356,3 +356,261 @@ function NinaTreinada() {
     </div>
   );
 }
+
+/* ============================ WHATSAPP CONFIG ============================ */
+
+interface WppCfg {
+  clinica_id: string;
+  phone_number_id: string;
+  waba_id: string;
+  display_phone_number: string;
+  display_name: string;
+  welcome_message: string;
+  horario_inicio: string;
+  horario_fim: string;
+  verify_token: string;
+  ativo: boolean;
+  has_access_token: boolean;
+  has_app_secret: boolean;
+  ultimo_teste_em: string | null;
+  ultimo_teste_ok: boolean | null;
+  ultimo_teste_erro: string | null;
+}
+
+function ConfiguracaoWhatsApp() {
+  const { clinicaAtual } = useClinica();
+  const obter = useServerFn(obterWhatsappConfig);
+  const salvar = useServerFn(salvarWhatsappConfig);
+  const testar = useServerFn(testarConexaoWhatsapp);
+
+  const [cfg, setCfg] = useState<WppCfg | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [showToken, setShowToken] = useState(false);
+  const [showSecret, setShowSecret] = useState(false);
+  const [newAccessToken, setNewAccessToken] = useState("");
+  const [newAppSecret, setNewAppSecret] = useState("");
+
+  const carregar = useCallback(async () => {
+    if (!clinicaAtual) return;
+    setLoading(true);
+    try {
+      const data = await obter({ data: { clinicaId: clinicaAtual.clinica_id } });
+      setCfg(data as WppCfg);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Erro ao carregar configuração");
+    } finally {
+      setLoading(false);
+    }
+  }, [clinicaAtual, obter]);
+
+  useEffect(() => { void carregar(); }, [carregar]);
+
+  if (!clinicaAtual) {
+    return <p className="text-sm text-muted-foreground">Selecione uma clínica primeiro.</p>;
+  }
+  if (loading || !cfg) {
+    return (
+      <Card><CardContent className="py-12 text-center text-muted-foreground flex items-center justify-center gap-2">
+        <Loader2 className="h-4 w-4 animate-spin" /> Carregando configuração…
+      </CardContent></Card>
+    );
+  }
+
+  const webhookUrl = `https://patientpal-secure.lovable.app/api/public/whatsapp/${cfg.clinica_id}`;
+
+  const copy = async (text: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(`${label} copiado`);
+    } catch {
+      toast.error("Não foi possível copiar");
+    }
+  };
+
+  const onSalvar = async () => {
+    setSaving(true);
+    try {
+      await salvar({
+        data: {
+          clinicaId: cfg.clinica_id,
+          phone_number_id: cfg.phone_number_id,
+          waba_id: cfg.waba_id,
+          display_name: cfg.display_name,
+          welcome_message: cfg.welcome_message,
+          horario_inicio: cfg.horario_inicio,
+          horario_fim: cfg.horario_fim,
+          access_token: newAccessToken || undefined,
+          app_secret: newAppSecret || undefined,
+        },
+      });
+      toast.success("Configuração salva");
+      setNewAccessToken("");
+      setNewAppSecret("");
+      await carregar();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Erro ao salvar");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const onTestar = async () => {
+    setTesting(true);
+    try {
+      const r = await testar({ data: { clinicaId: cfg.clinica_id } });
+      if ((r as any).ok) {
+        toast.success(`Conectado a ${(r as any).display_phone_number || "WhatsApp"}`);
+      } else {
+        toast.error((r as any).error ?? "Falha ao testar conexão");
+      }
+      await carregar();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Falha ao testar conexão");
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const statusBadge = cfg.ultimo_teste_ok
+    ? <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100"><CheckCircle2 className="h-3 w-3 mr-1" /> Conectado{cfg.display_phone_number ? ` — ${cfg.display_phone_number}` : ""}</Badge>
+    : cfg.ultimo_teste_ok === false
+      ? <Badge variant="destructive"><AlertCircle className="h-3 w-3 mr-1" /> Falha no último teste</Badge>
+      : <Badge variant="outline">Não testado</Badge>;
+
+  return (
+    <div className="space-y-6 max-w-3xl">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <CardTitle>Conexão WhatsApp Business API</CardTitle>
+              <CardDescription>Integração oficial com Meta · Cloud API (v22.0)</CardDescription>
+            </div>
+            {statusBadge}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {cfg.ultimo_teste_erro && (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
+              <strong>Erro:</strong> {cfg.ultimo_teste_erro}
+            </div>
+          )}
+
+          <div className="rounded-md border bg-muted/40 p-4 space-y-3">
+            <p className="text-sm font-medium">Webhook para configurar na Meta</p>
+            <div className="space-y-1">
+              <Label className="text-xs">Callback URL</Label>
+              <div className="flex gap-2">
+                <Input value={webhookUrl} readOnly className="font-mono text-xs" />
+                <Button type="button" size="icon" variant="outline" onClick={() => copy(webhookUrl, "URL")}><Copy className="h-4 w-4" /></Button>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Verify Token</Label>
+              <div className="flex gap-2">
+                <Input value={cfg.verify_token} readOnly className="font-mono text-xs" />
+                <Button type="button" size="icon" variant="outline" onClick={() => copy(cfg.verify_token, "Verify Token")}><Copy className="h-4 w-4" /></Button>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Em <strong>Meta for Developers → Seu App → WhatsApp → Configuration → Webhooks</strong>, cole a URL e o Verify Token, depois assine o campo <code>messages</code>.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Label>Phone Number ID</Label>
+              <Input
+                value={cfg.phone_number_id}
+                onChange={(e) => setCfg({ ...cfg, phone_number_id: e.target.value })}
+                placeholder="123456789012345"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>WhatsApp Business Account ID</Label>
+              <Input
+                value={cfg.waba_id}
+                onChange={(e) => setCfg({ ...cfg, waba_id: e.target.value })}
+                placeholder="123456789012345"
+              />
+            </div>
+            <div className="space-y-1 md:col-span-2">
+              <Label>Access Token permanente</Label>
+              <div className="flex gap-2">
+                <Input
+                  type={showToken ? "text" : "password"}
+                  value={newAccessToken}
+                  onChange={(e) => setNewAccessToken(e.target.value)}
+                  placeholder={cfg.has_access_token ? "•••••••• (preenchido — deixe em branco para manter)" : "Cole o token da Meta"}
+                  autoComplete="off"
+                />
+                <Button type="button" size="icon" variant="outline" onClick={() => setShowToken((v) => !v)}>
+                  {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-1 md:col-span-2">
+              <Label>App Secret (para validar webhook)</Label>
+              <div className="flex gap-2">
+                <Input
+                  type={showSecret ? "text" : "password"}
+                  value={newAppSecret}
+                  onChange={(e) => setNewAppSecret(e.target.value)}
+                  placeholder={cfg.has_app_secret ? "•••••••• (preenchido — deixe em branco para manter)" : "App Secret do app Meta"}
+                  autoComplete="off"
+                />
+                <Button type="button" size="icon" variant="outline" onClick={() => setShowSecret((v) => !v)}>
+                  {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-1 md:col-span-2">
+              <Label>Nome de exibição</Label>
+              <Input
+                value={cfg.display_name}
+                onChange={(e) => setCfg({ ...cfg, display_name: e.target.value })}
+                placeholder="Clínica — Nina"
+              />
+            </div>
+            <div className="space-y-1 md:col-span-2">
+              <Label>Mensagem de boas-vindas</Label>
+              <Textarea
+                rows={3}
+                value={cfg.welcome_message}
+                onChange={(e) => setCfg({ ...cfg, welcome_message: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1 md:col-span-2">
+              <Label>Horário de atendimento humano</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="time"
+                  value={cfg.horario_inicio}
+                  onChange={(e) => setCfg({ ...cfg, horario_inicio: e.target.value })}
+                  className="w-32"
+                />
+                <span>às</span>
+                <Input
+                  type="time"
+                  value={cfg.horario_fim}
+                  onChange={(e) => setCfg({ ...cfg, horario_fim: e.target.value })}
+                  className="w-32"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">Dentro do horário, mensagens vão para a aba <strong>Conversas WhatsApp</strong> para resposta humana. Fora do horário, a Nina responde automaticamente.</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 pt-2">
+            <Button onClick={onSalvar} disabled={saving}>{saving ? "Salvando…" : "Salvar configurações"}</Button>
+            <Button variant="outline" onClick={onTestar} disabled={testing}>
+              {testing ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Testando…</> : "Testar conexão"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
