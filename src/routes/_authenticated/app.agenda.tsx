@@ -1327,16 +1327,21 @@ function AgendaPage() {
                   </TableCell>
                    <TableCell className="pr-1">
                      {normalizar(a.paciente_nome) === "disponivel" ? (
-                       <Button
-                         variant="ghost"
-                         size="sm"
-                         onClick={() => openSlot(a)}
-                         title="Agendar paciente neste horário"
-                         className="h-7 px-2 text-muted-foreground hover:text-primary"
-                       >
-                         <UserPlus className="h-4 w-4 mr-1" />
-                         Agendar
-                       </Button>
+                        <div className="flex flex-col leading-none gap-0">
+                          <span className="text-[10px] uppercase tracking-wide text-muted-foreground truncate">
+                            Dr(a). {medicos.find((m) => m.id === a.medico_id)?.nome ?? "—"}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openSlot(a)}
+                            title="Agendar paciente neste horário"
+                            className="h-6 px-2 -ml-2 text-muted-foreground hover:text-primary justify-start"
+                          >
+                            <UserPlus className="h-3.5 w-3.5 mr-1" />
+                            Agendar cliente
+                          </Button>
+                        </div>
                       ) : (
                         <div className="flex flex-col leading-none gap-0">
                           <span className="text-[10px] uppercase tracking-wide text-muted-foreground truncate">
