@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { Plus, Stethoscope, Pencil, Download, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -63,7 +63,7 @@ const CONVENIOS_PADRAO: ConvenioRow[] = [
 function MedicosPage() {
   const { clinicaAtual } = useClinica();
   const { new: autoNew } = Route.useSearch();
-  const navigate = Route.useNavigate();
+  const navigate = useNavigate();
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [esps, setEsps] = useState<Especialidade[]>([]);
   const [procs, setProcs] = useState<Procedimento[]>([]);
@@ -123,7 +123,7 @@ function MedicosPage() {
     if (autoNew === "1") {
       resetForm();
       setOpen(true);
-      void navigate({ search: {} as never, replace: true });
+      void navigate({ to: "/app/medicos", search: {}, replace: true });
     }
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [autoNew]);
