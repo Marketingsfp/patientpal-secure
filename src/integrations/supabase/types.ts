@@ -19,6 +19,7 @@ export type Database = {
           clinica_id: string
           created_at: string
           criado_por: string | null
+          data_pagamento: string | null
           fim: string
           fluxo_atualizado_em: string
           fluxo_etapa: Database["public"]["Enums"]["fluxo_etapa"]
@@ -40,6 +41,7 @@ export type Database = {
           clinica_id: string
           created_at?: string
           criado_por?: string | null
+          data_pagamento?: string | null
           fim: string
           fluxo_atualizado_em?: string
           fluxo_etapa?: Database["public"]["Enums"]["fluxo_etapa"]
@@ -61,6 +63,7 @@ export type Database = {
           clinica_id?: string
           created_at?: string
           criado_por?: string | null
+          data_pagamento?: string | null
           fim?: string
           fluxo_atualizado_em?: string
           fluxo_etapa?: Database["public"]["Enums"]["fluxo_etapa"]
