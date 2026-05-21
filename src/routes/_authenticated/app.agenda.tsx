@@ -1323,7 +1323,7 @@ function AgendaPage() {
                   <TableCell className="text-sm">{fmtDiaSemana(a.inicio)}</TableCell>
                   <TableCell className="text-sm">{fmtData(a.inicio)}</TableCell>
                   <TableCell>
-                    <span className="text-primary font-medium">{fmtHora(a.inicio)} - {fmtHora(a.fim)}</span>
+                     <span className="text-emerald-600 font-medium">{fmtHora(a.inicio)} - {fmtHora(a.fim)}</span>
                   </TableCell>
                    <TableCell className="pr-1">
                      {normalizar(a.paciente_nome) === "disponivel" ? (
