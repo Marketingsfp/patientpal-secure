@@ -231,6 +231,38 @@ function FluxoPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 rounded-md border bg-card px-1 py-0.5">
+            <Button
+              variant="ghost" size="icon" className="h-7 w-7"
+              onClick={() => {
+                const d = new Date(`${dataRef}T12:00:00`);
+                d.setDate(d.getDate() - 1);
+                setFallbackAplicado(true);
+                setDataRef(d.toISOString().slice(0, 10));
+              }}
+              title="Dia anterior"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Input
+              type="date"
+              value={dataRef}
+              onChange={(e) => { setFallbackAplicado(true); setDataRef(e.target.value); }}
+              className="h-7 w-[140px] border-0 px-1 text-xs"
+            />
+            <Button
+              variant="ghost" size="icon" className="h-7 w-7"
+              onClick={() => {
+                const d = new Date(`${dataRef}T12:00:00`);
+                d.setDate(d.getDate() + 1);
+                setFallbackAplicado(true);
+                setDataRef(d.toISOString().slice(0, 10));
+              }}
+              title="Próximo dia"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" className="gap-2">
