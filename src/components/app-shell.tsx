@@ -249,50 +249,8 @@ export function AppShell() {
             {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           </Button>
         </div>
-        {!collapsed && clinicaAtual && logoDaClinica(clinicaAtual.clinica.nome) && (
-          <div className="px-3 py-3 border-b border-white/10">
-            <div className="bg-white rounded-xl shadow-sm p-2 flex items-center justify-center">
-              <img
-                src={logoDaClinica(clinicaAtual.clinica.nome)!}
-                alt={clinicaAtual.clinica.nome}
-                className="h-12 w-auto object-contain"
-              />
-            </div>
-          </div>
-        )}
         {!collapsed && (
         <div className="px-3 py-2 space-y-2 border-b border-white/10">
-          {memberships.length > 0 && (
-            <Select
-              value={modoTodas ? "__todas__" : clinicaAtual?.clinica_id}
-              onValueChange={(v) => {
-                if (v === "__todas__") setModoTodas(true);
-                else setClinicaAtual(v);
-              }}
-            >
-              <SelectTrigger className="w-full bg-white/10 border-white/20 text-white">
-                <SelectValue placeholder="Selecione a clínica" />
-              </SelectTrigger>
-              <SelectContent>
-                {memberships.length > 1 && (
-                  <SelectItem value="__todas__">
-                    <span className="flex items-center gap-2">
-                      <span className="inline-block h-2 w-2 rounded-full bg-slate-400" />
-                      Todas as clínicas
-                    </span>
-                  </SelectItem>
-                )}
-                {memberships.map((m) => (
-                  <SelectItem key={m.clinica_id} value={m.clinica_id}>
-                    <span className="flex items-center gap-2">
-                      <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: corDaClinica(m.clinica.nome) }} />
-                      {m.clinica.nome} {m.clinica.cidade ? `— ${m.clinica.cidade}` : ""}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
           <Suspense fallback={null}>
             <VoiceInput
               append={false}
@@ -344,37 +302,67 @@ export function AppShell() {
             );
           })}
         </nav>
-        <div className={`px-3 py-3 border-t border-white/10 flex items-center ${collapsed ? "justify-center" : "gap-2"}`}>
-          <div className="h-8 w-8 rounded-full bg-white text-slate-900 flex items-center justify-center text-sm font-semibold shrink-0 shadow-sm">
-            {initial}
-          </div>
-          {!collapsed && (
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate" title={user?.email ?? undefined}>{userName}</p>
-            </div>
-          )}
-          {!collapsed && (
-            <Button variant="ghost" size="sm" className="text-white hover:bg-white/10 hover:text-white h-8 w-8 p-0" onClick={handleSignOut} title="Sair">
-              <LogOut className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="sticky top-0 z-30 h-14 bg-card/80 backdrop-blur border-b flex items-center gap-3 px-3 sm:px-6">
+          <div className="flex items-center gap-2 min-w-0">
+            <div
+              className="h-8 w-8 rounded-full flex items-center justify-center text-sm font-semibold text-white shadow-sm shrink-0"
+              style={{ backgroundColor: clinicColor }}
+            >
+              {initial}
+            </div>
+            <p className="text-sm font-medium truncate max-w-[160px]" title={user?.email ?? undefined}>{userName}</p>
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={handleSignOut} title="Sair">
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </div>
+          {clinicaAtual && logoDaClinica(clinicaAtual.clinica.nome) && (
+            <div className="bg-white rounded-lg shadow-sm border px-2 py-1 flex items-center justify-center shrink-0">
+              <img
+                src={logoDaClinica(clinicaAtual.clinica.nome)!}
+                alt={clinicaAtual.clinica.nome}
+                className="h-7 w-auto object-contain"
+              />
+            </div>
+          )}
+          {memberships.length > 0 && (
+            <Select
+              value={modoTodas ? "__todas__" : clinicaAtual?.clinica_id}
+              onValueChange={(v) => {
+                if (v === "__todas__") setModoTodas(true);
+                else setClinicaAtual(v);
+              }}
+            >
+              <SelectTrigger className="w-[220px] h-9">
+                <SelectValue placeholder="Selecione a clínica" />
+              </SelectTrigger>
+              <SelectContent>
+                {memberships.length > 1 && (
+                  <SelectItem value="__todas__">
+                    <span className="flex items-center gap-2">
+                      <span className="inline-block h-2 w-2 rounded-full bg-slate-400" />
+                      Todas as clínicas
+                    </span>
+                  </SelectItem>
+                )}
+                {memberships.map((m) => (
+                  <SelectItem key={m.clinica_id} value={m.clinica_id}>
+                    <span className="flex items-center gap-2">
+                      <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: corDaClinica(m.clinica.nome) }} />
+                      {m.clinica.nome} {m.clinica.cidade ? `— ${m.clinica.cidade}` : ""}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <div className="flex-1" />
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" className="h-9 w-9 p-0 rounded-full" title="Notificações">
               <Bell className="h-4 w-4" />
             </Button>
-            <div
-              className="h-8 w-8 rounded-full flex items-center justify-center text-sm font-semibold text-white shadow-sm"
-              style={{ backgroundColor: clinicColor }}
-              title={user?.email ?? undefined}
-            >
-              {initial}
-            </div>
           </div>
         </header>
         <main className="flex-1 p-3 sm:p-4 lg:p-6 overflow-auto min-w-0" style={{ background: "var(--surface-cream)" }}>
