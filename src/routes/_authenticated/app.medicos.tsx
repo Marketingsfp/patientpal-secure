@@ -62,6 +62,8 @@ const CONVENIOS_PADRAO: ConvenioRow[] = [
 
 function MedicosPage() {
   const { clinicaAtual } = useClinica();
+  const { new: autoNew } = Route.useSearch();
+  const navigate = Route.useNavigate();
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [esps, setEsps] = useState<Especialidade[]>([]);
   const [procs, setProcs] = useState<Procedimento[]>([]);
@@ -116,6 +118,15 @@ function MedicosPage() {
       .limit(5000)
       .then(({ data }) => setProcs((data as Procedimento[]) ?? []));
   }, [clinicaAtual?.clinica_id]);
+
+  useEffect(() => {
+    if (autoNew === "1") {
+      resetForm();
+      setOpen(true);
+      void navigate({ search: {} as never, replace: true });
+    }
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [autoNew]);
 
   const resetForm = () => {
     setEditId(null);
