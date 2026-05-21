@@ -440,7 +440,7 @@ function AgendaPage() {
     for (const it of itens) {
       const p: any = acharProc(it.procedimento ?? "CONSULTA");
       totalDinheiro += Number(p?.valor_dinheiro ?? p?.valor_dinheiro_pix ?? p?.valor_padrao ?? 0);
-      totalPix      += Number(p?.valor_pix ?? p?.valor_dinheiro_pix ?? p?.valor_padrao ?? p?.valor_dinheiro ?? 0);
+      totalPix      += Number(p?.valor_pix ?? p?.valor_cartao_credito ?? p?.valor_cartao_debito ?? p?.valor_cartao ?? p?.valor_padrao ?? 0);
       totalDebito   += Number(p?.valor_cartao_debito ?? p?.valor_cartao ?? p?.valor_padrao ?? 0);
       totalCredito  += Number(p?.valor_cartao_credito ?? p?.valor_cartao ?? p?.valor_padrao ?? 0);
     }
@@ -541,7 +541,7 @@ function AgendaPage() {
       const proc: any = (lista ?? []).find((p) => normalizar(p.nome ?? "") === nomeBusca)
         ?? (lista ?? []).find((p) => normalizar(p.nome ?? "").includes(nomeBusca));
       const vDinheiro = Number(proc?.valor_dinheiro ?? proc?.valor_dinheiro_pix ?? proc?.valor_padrao ?? 0);
-      const vPix = Number(proc?.valor_pix ?? proc?.valor_dinheiro_pix ?? proc?.valor_padrao ?? proc?.valor_dinheiro ?? 0);
+      const vPix = Number(proc?.valor_pix ?? proc?.valor_cartao_credito ?? proc?.valor_cartao_debito ?? proc?.valor_cartao ?? proc?.valor_padrao ?? 0);
       const vDebito = Number(proc?.valor_cartao_debito ?? proc?.valor_cartao ?? proc?.valor_padrao ?? 0);
       const vCredito = Number(proc?.valor_cartao_credito ?? proc?.valor_cartao ?? proc?.valor_padrao ?? 0);
       const opcoes: FormaOpcao[] = [
@@ -586,7 +586,7 @@ function AgendaPage() {
     const proc = (lista ?? []).find((p) => normalizar(p.nome ?? "") === nomeBusca)
       ?? (lista ?? []).find((p) => normalizar(p.nome ?? "").includes(nomeBusca));
     const vDinheiro = Number(proc?.valor_dinheiro ?? proc?.valor_dinheiro_pix ?? proc?.valor_padrao ?? 0);
-    const vPix = Number(proc?.valor_pix ?? proc?.valor_dinheiro_pix ?? proc?.valor_padrao ?? proc?.valor_dinheiro ?? 0);
+    const vPix = Number(proc?.valor_pix ?? proc?.valor_cartao_credito ?? proc?.valor_cartao_debito ?? proc?.valor_cartao ?? proc?.valor_padrao ?? 0);
     const vDebito = Number(proc?.valor_cartao_debito ?? proc?.valor_cartao ?? proc?.valor_padrao ?? 0);
     const vCredito = Number(proc?.valor_cartao_credito ?? proc?.valor_cartao ?? proc?.valor_padrao ?? 0);
     const opcoes: FormaOpcao[] = [
