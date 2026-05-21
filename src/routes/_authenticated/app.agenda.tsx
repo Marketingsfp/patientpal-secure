@@ -142,6 +142,23 @@ function AgendaPage() {
   const [pagamentoAgId, setPagamentoAgId] = useState<string | null>(null);
   const [pagamentoExtraIds, setPagamentoExtraIds] = useState<string[]>([]);
   const [pagamentoForma, setPagamentoForma] = useState<string>("");
+  const [pacInfoOpen, setPacInfoOpen] = useState(false);
+  const [pacInfoLoading, setPacInfoLoading] = useState(false);
+  const [pacInfo, setPacInfo] = useState<Record<string, any> | null>(null);
+
+  const abrirInfoPaciente = async (pacienteId: string | null | undefined, nomeFallback: string) => {
+    setPacInfoOpen(true);
+    setPacInfo({ nome: nomeFallback });
+    if (!pacienteId) return;
+    setPacInfoLoading(true);
+    const { data } = await supabase
+      .from("pacientes")
+      .select("id,nome,cpf,telefone,email,data_nascimento,numero_pasta,cidade,estado,bairro,logradouro,numero,foto_url")
+      .eq("id", pacienteId)
+      .maybeSingle();
+    if (data) setPacInfo(data as any);
+    setPacInfoLoading(false);
+  };
   type FormaOpcao = { forma: string; label: string; valor: number };
   const [formaPagOpen, setFormaPagOpen] = useState(false);
   const [formaPagOpcoes, setFormaPagOpcoes] = useState<FormaOpcao[]>([]);
