@@ -739,7 +739,21 @@ function ClientesPage() {
                     <Input type="date" required value={form.data_nascimento}
                       onChange={(e) => setForm({ ...form, data_nascimento: e.target.value })} />
                   </div>
-                  {idade !== null && (
+                  <div className="space-y-1">
+                    <Label>Sexo</Label>
+                    <Select value={form.sexo} onValueChange={(v) => setForm({ ...form, sexo: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="masculino">Masculino</SelectItem>
+                        <SelectItem value="feminino">Feminino</SelectItem>
+                        <SelectItem value="outro">Outro</SelectItem>
+                        <SelectItem value="nao_informar">Prefiro não informar</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                {idade !== null && (
+                  <div className="grid grid-cols-2 gap-3 items-end">
                     <div className="text-sm text-muted-foreground pb-2">
                       Idade: <span className="font-medium text-foreground">{idade} anos</span>
                       {sugerirResponsavel && (
@@ -748,8 +762,8 @@ function ClientesPage() {
                         </span>
                       )}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
                 <label className="flex items-center gap-2 text-sm cursor-pointer">
                   <Checkbox checked={form.ativo} onCheckedChange={(v) => setForm({ ...form, ativo: !!v })} />
                   Cliente ativo
