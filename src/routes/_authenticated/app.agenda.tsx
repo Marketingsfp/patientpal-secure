@@ -1167,7 +1167,7 @@ function AgendaPage() {
         style={{ ["--clinic" as never]: corClinica }}
       >
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
-          <div className="space-y-0.5 rounded-md border-2 border-transparent hover:border-[var(--clinic)] p-1.5 bg-background transition-colors">
+          <div className="space-y-0.5">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Profissional</Label>
             <MedicoFiltroInput
               medicos={medicos}
@@ -1177,7 +1177,7 @@ function AgendaPage() {
               onlyMedicoId={isMedicoOnly ? medicoLogadoId : null}
             />
           </div>
-          <div className="space-y-0.5 rounded-md border-2 border-transparent hover:border-[var(--clinic)] p-1.5 bg-background transition-colors">
+          <div className="space-y-0.5">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Data Ref.</Label>
             <DataRefField
               dataRef={dataRef}
@@ -1187,7 +1187,7 @@ function AgendaPage() {
               shiftData={shiftData}
             />
           </div>
-          <div className="space-y-0.5 rounded-md border-2 border-transparent hover:border-[var(--clinic)] p-1.5 bg-background transition-colors">
+          <div className="space-y-0.5">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Dia Semana</Label>
             <Select value={filtroDiaSemana} onValueChange={setFiltroDiaSemana}>
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -1197,7 +1197,7 @@ function AgendaPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-0.5 rounded-md border-2 border-transparent hover:border-[var(--clinic)] p-1.5 bg-background transition-colors">
+          <div className="space-y-0.5">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Cliente</Label>
             <div className="flex gap-1">
               <Input value={filtroCliente} onChange={(e) => setFiltroCliente(e.target.value)} placeholder="Buscar paciente…" />
@@ -1215,11 +1215,11 @@ function AgendaPage() {
               </Button>
             </div>
           </div>
-          <div className="space-y-0.5 rounded-md border-2 border-transparent hover:border-[var(--clinic)] p-1.5 bg-background transition-colors">
+          <div className="space-y-0.5">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Nº Ficha</Label>
             <Input value={filtroFicha} onChange={(e) => setFiltroFicha(e.target.value.replace(/\D/g, ""))} placeholder="Ex.: 001" inputMode="numeric" />
           </div>
-          <div className="space-y-0.5 rounded-md border-2 border-transparent hover:border-[var(--clinic)] p-1.5 bg-background transition-colors">
+          <div className="space-y-0.5">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Especialidade</Label>
             <Select value={filtroEspecialidade} onValueChange={setFiltroEspecialidade}>
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -1229,7 +1229,7 @@ function AgendaPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-0.5 rounded-md border-2 border-transparent hover:border-[var(--clinic)] p-1.5 bg-background transition-colors">
+          <div className="space-y-0.5">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Situação</Label>
             <Select value={filtroStatus} onValueChange={setFiltroStatus}>
               <SelectTrigger><SelectValue /></SelectTrigger>
