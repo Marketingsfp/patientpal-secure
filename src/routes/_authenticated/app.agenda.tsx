@@ -486,6 +486,7 @@ function AgendaPage() {
       procedimento: a.procedimento ?? "CONSULTA",
       status: "agendado",
       observacoes: a.observacoes ?? "",
+      data_pagamento: a.data_pagamento ?? "",
     });
     setOpen(true);
   };
@@ -500,6 +501,7 @@ function AgendaPage() {
       procedimento: a.procedimento ?? "",
       status: a.status,
       observacoes: a.observacoes ?? "",
+      data_pagamento: a.data_pagamento ?? "",
     });
     setOpen(true);
   };
