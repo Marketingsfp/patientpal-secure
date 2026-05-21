@@ -166,3 +166,21 @@ export const getFuncionarioLogin = createServerFn({ method: "POST" })
     const { data: u } = await supabaseAdmin.auth.admin.getUserById(data.userId);
     return { email: u?.user?.email ?? null };
   });
+
+export const definirSenhaFuncionario = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({
+      clinicaId: z.string().uuid(),
+      userId: z.string().uuid(),
+      novaSenha: z.string().min(6).max(72),
+    }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertManager(context.userId, data.clinicaId);
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(data.userId, {
+      password: data.novaSenha,
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });

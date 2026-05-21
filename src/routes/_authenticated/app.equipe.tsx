@@ -201,7 +201,7 @@ function EquipePage() {
                       <TableCell>{m.ativo ? <Badge>Ativo</Badge> : <Badge variant="outline">Inativo</Badge>}</TableCell>
                       <TableCell className="text-right">
                         <Button asChild size="icon" variant="ghost">
-                          <Link to="/app/medicos"><Pencil className="h-4 w-4" /></Link>
+                          <Link to="/app/medicos" search={{ edit: m.id }}><Pencil className="h-4 w-4" /></Link>
                         </Button>
                       </TableCell>
                     </TableRow>

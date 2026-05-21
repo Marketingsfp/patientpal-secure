@@ -27,6 +27,7 @@ export const Route = createFileRoute("/_authenticated/app/medicos")({
   head: () => ({ meta: [{ title: "Médicos — ClinicaOS" }] }),
   validateSearch: (search: Record<string, unknown>) => ({
     new: search.new === "1" || search.new === 1 ? "1" : undefined,
+    edit: typeof search.edit === "string" && search.edit.length > 0 ? search.edit : undefined,
   }),
 });
 
@@ -62,7 +63,7 @@ const CONVENIOS_PADRAO: ConvenioRow[] = [
 
 function MedicosPage() {
   const { clinicaAtual } = useClinica();
-  const { new: autoNew } = Route.useSearch();
+  const { new: autoNew, edit: autoEdit } = Route.useSearch();
   const navigate = useNavigate();
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [esps, setEsps] = useState<Especialidade[]>([]);
@@ -128,6 +129,16 @@ function MedicosPage() {
     }
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [autoNew]);
+
+  useEffect(() => {
+    if (!autoEdit || medicos.length === 0) return;
+    const m = medicos.find((x) => x.id === autoEdit);
+    if (m) {
+      void openEdit(m);
+      void navigate({ to: "/app/medicos", search: {}, replace: true });
+    }
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [autoEdit, medicos]);
 
   const resetForm = () => {
     setEditId(null);
