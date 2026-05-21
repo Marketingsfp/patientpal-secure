@@ -819,15 +819,29 @@ function AgendaPage() {
                   ]}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <Label>Início</Label>
-                  <Input type="datetime-local" value={form.inicio} onChange={(e) => setForm(f => ({ ...f, inicio: e.target.value, fim: calcFimAuto(e.target.value, f.medico_id) }))} required />
+              <div className="space-y-1">
+                <Label className="text-xs font-medium text-muted-foreground">Data e horário da consulta</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Início</Label>
+                    <Input type="datetime-local" value={form.inicio} onChange={(e) => setForm(f => ({ ...f, inicio: e.target.value, fim: calcFimAuto(e.target.value, f.medico_id) }))} required />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Fim</Label>
+                    <Input type="datetime-local" value={form.fim} onChange={(e) => setForm(f => ({ ...f, fim: e.target.value }))} required />
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <Label>Fim</Label>
-                  <Input type="datetime-local" value={form.fim} onChange={(e) => setForm(f => ({ ...f, fim: e.target.value }))} required />
-                </div>
+              </div>
+              <div className="space-y-1">
+                <Label>Data do pagamento</Label>
+                <Input
+                  type="date"
+                  value={form.data_pagamento}
+                  onChange={(e) => setForm(f => ({ ...f, data_pagamento: e.target.value }))}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Use quando o paciente pagar em data diferente da consulta. Deixe em branco se não se aplica.
+                </p>
               </div>
               <div className="space-y-1">
                 <Label>Procedimento</Label>
