@@ -820,10 +820,9 @@ function AgendaPage() {
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs font-medium text-muted-foreground">Data consulta/exame</Label>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
-                    <Label className="text-xs">Início</Label>
+                    <Label className="text-xs">Data consulta/exame</Label>
                     <Input type="datetime-local" value={form.inicio} onChange={(e) => setForm(f => ({ ...f, inicio: e.target.value, fim: calcFimAuto(e.target.value, f.medico_id) }))} required />
                   </div>
                   <div className="space-y-1">
