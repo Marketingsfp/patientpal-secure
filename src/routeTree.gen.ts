@@ -38,6 +38,7 @@ import { Route as AuthenticatedAppProntuariosRouteImport } from './routes/_authe
 import { Route as AuthenticatedAppProntuarioModelosRouteImport } from './routes/_authenticated/app.prontuario-modelos'
 import { Route as AuthenticatedAppProcedimentosRouteImport } from './routes/_authenticated/app.procedimentos'
 import { Route as AuthenticatedAppPlanosRouteImport } from './routes/_authenticated/app.planos'
+import { Route as AuthenticatedAppPerfisRouteImport } from './routes/_authenticated/app.perfis'
 import { Route as AuthenticatedAppOrcamentosRouteImport } from './routes/_authenticated/app.orcamentos'
 import { Route as AuthenticatedAppOdontologiaRouteImport } from './routes/_authenticated/app.odontologia'
 import { Route as AuthenticatedAppNinaRouteImport } from './routes/_authenticated/app.nina'
@@ -250,6 +251,11 @@ const AuthenticatedAppProcedimentosRoute =
 const AuthenticatedAppPlanosRoute = AuthenticatedAppPlanosRouteImport.update({
   id: '/planos',
   path: '/planos',
+  getParentRoute: () => AuthenticatedAppRoute,
+} as any)
+const AuthenticatedAppPerfisRoute = AuthenticatedAppPerfisRouteImport.update({
+  id: '/perfis',
+  path: '/perfis',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
 const AuthenticatedAppOrcamentosRoute =
@@ -663,6 +669,7 @@ export interface FileRoutesByFullPath {
   '/app/nina': typeof AuthenticatedAppNinaRoute
   '/app/odontologia': typeof AuthenticatedAppOdontologiaRoute
   '/app/orcamentos': typeof AuthenticatedAppOrcamentosRoute
+  '/app/perfis': typeof AuthenticatedAppPerfisRoute
   '/app/planos': typeof AuthenticatedAppPlanosRoute
   '/app/procedimentos': typeof AuthenticatedAppProcedimentosRoute
   '/app/prontuario-modelos': typeof AuthenticatedAppProntuarioModelosRoute
@@ -752,6 +759,7 @@ export interface FileRoutesByTo {
   '/app/nina': typeof AuthenticatedAppNinaRoute
   '/app/odontologia': typeof AuthenticatedAppOdontologiaRoute
   '/app/orcamentos': typeof AuthenticatedAppOrcamentosRoute
+  '/app/perfis': typeof AuthenticatedAppPerfisRoute
   '/app/planos': typeof AuthenticatedAppPlanosRoute
   '/app/procedimentos': typeof AuthenticatedAppProcedimentosRoute
   '/app/prontuario-modelos': typeof AuthenticatedAppProntuarioModelosRoute
@@ -845,6 +853,7 @@ export interface FileRoutesById {
   '/_authenticated/app/nina': typeof AuthenticatedAppNinaRoute
   '/_authenticated/app/odontologia': typeof AuthenticatedAppOdontologiaRoute
   '/_authenticated/app/orcamentos': typeof AuthenticatedAppOrcamentosRoute
+  '/_authenticated/app/perfis': typeof AuthenticatedAppPerfisRoute
   '/_authenticated/app/planos': typeof AuthenticatedAppPlanosRoute
   '/_authenticated/app/procedimentos': typeof AuthenticatedAppProcedimentosRoute
   '/_authenticated/app/prontuario-modelos': typeof AuthenticatedAppProntuarioModelosRoute
@@ -938,6 +947,7 @@ export interface FileRouteTypes {
     | '/app/nina'
     | '/app/odontologia'
     | '/app/orcamentos'
+    | '/app/perfis'
     | '/app/planos'
     | '/app/procedimentos'
     | '/app/prontuario-modelos'
@@ -1027,6 +1037,7 @@ export interface FileRouteTypes {
     | '/app/nina'
     | '/app/odontologia'
     | '/app/orcamentos'
+    | '/app/perfis'
     | '/app/planos'
     | '/app/procedimentos'
     | '/app/prontuario-modelos'
@@ -1119,6 +1130,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/nina'
     | '/_authenticated/app/odontologia'
     | '/_authenticated/app/orcamentos'
+    | '/_authenticated/app/perfis'
     | '/_authenticated/app/planos'
     | '/_authenticated/app/procedimentos'
     | '/_authenticated/app/prontuario-modelos'
@@ -1376,6 +1388,13 @@ declare module '@tanstack/react-router' {
       path: '/planos'
       fullPath: '/app/planos'
       preLoaderRoute: typeof AuthenticatedAppPlanosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/perfis': {
+      id: '/_authenticated/app/perfis'
+      path: '/perfis'
+      fullPath: '/app/perfis'
+      preLoaderRoute: typeof AuthenticatedAppPerfisRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/orcamentos': {
@@ -1922,6 +1941,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppNinaRoute: typeof AuthenticatedAppNinaRoute
   AuthenticatedAppOdontologiaRoute: typeof AuthenticatedAppOdontologiaRoute
   AuthenticatedAppOrcamentosRoute: typeof AuthenticatedAppOrcamentosRoute
+  AuthenticatedAppPerfisRoute: typeof AuthenticatedAppPerfisRoute
   AuthenticatedAppPlanosRoute: typeof AuthenticatedAppPlanosRoute
   AuthenticatedAppProcedimentosRoute: typeof AuthenticatedAppProcedimentosRoute
   AuthenticatedAppProntuarioModelosRoute: typeof AuthenticatedAppProntuarioModelosRoute
@@ -1984,6 +2004,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppNinaRoute: AuthenticatedAppNinaRoute,
   AuthenticatedAppOdontologiaRoute: AuthenticatedAppOdontologiaRoute,
   AuthenticatedAppOrcamentosRoute: AuthenticatedAppOrcamentosRoute,
+  AuthenticatedAppPerfisRoute: AuthenticatedAppPerfisRoute,
   AuthenticatedAppPlanosRoute: AuthenticatedAppPlanosRoute,
   AuthenticatedAppProcedimentosRoute: AuthenticatedAppProcedimentosRoute,
   AuthenticatedAppProntuarioModelosRoute:

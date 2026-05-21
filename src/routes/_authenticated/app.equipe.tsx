@@ -29,7 +29,7 @@ interface Membership {
   email: string | null;
 }
 
-const ROLES = ["admin", "gestor", "medico", "enfermeiro", "recepcao", "financeiro"] as const;
+const ROLES = ["admin", "gestor", "medico", "enfermeiro", "recepcao", "caixa", "financeiro"] as const;
 type RoleT = (typeof ROLES)[number];
 
 function EquipePage() {
