@@ -37,6 +37,10 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 const VoiceInput = lazy(() => import("@/components/voice-input").then((m) => ({ default: m.VoiceInput })));
 
@@ -147,6 +151,32 @@ export function AppShell() {
   }, []);
 
   const [profileName, setProfileName] = useState<string>("");
+  const [pwOpen, setPwOpen] = useState(false);
+  const [pwNew, setPwNew] = useState("");
+  const [pwConfirm, setPwConfirm] = useState("");
+  const [pwSaving, setPwSaving] = useState(false);
+
+  const handleChangePassword = async () => {
+    if (pwNew.length < 6) {
+      toast.error("A senha deve ter pelo menos 6 caracteres.");
+      return;
+    }
+    if (pwNew !== pwConfirm) {
+      toast.error("As senhas não conferem.");
+      return;
+    }
+    setPwSaving(true);
+    const { error } = await supabase.auth.updateUser({ password: pwNew });
+    setPwSaving(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("Senha alterada com sucesso.");
+    setPwOpen(false);
+    setPwNew("");
+    setPwConfirm("");
+  };
   useEffect(() => {
     if (!user?.id) { setProfileName(""); return; }
     let cancelled = false;
@@ -307,16 +337,31 @@ export function AppShell() {
       <div className="flex-1 flex flex-col min-w-0">
         <header className="sticky top-0 z-30 h-14 bg-card/80 backdrop-blur border-b flex items-center gap-3 px-3 sm:px-6">
           <div className="flex items-center gap-2 min-w-0">
-            <div
-              className="h-8 w-8 rounded-full flex items-center justify-center text-sm font-semibold text-white shadow-sm shrink-0"
-              style={{ backgroundColor: clinicColor }}
-            >
-              {initial}
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="h-8 w-8 rounded-full flex items-center justify-center text-sm font-semibold text-white shadow-sm shrink-0 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                  style={{ backgroundColor: clinicColor }}
+                  title="Conta"
+                >
+                  {initial}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                <DropdownMenuLabel className="truncate">{userName || user?.email}</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => setPwOpen(true)}>
+                  <KeyRound className="h-4 w-4 mr-2" />
+                  Alterar senha
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => void handleSignOut()}>
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Sair
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <p className="text-sm font-medium truncate max-w-[160px]" title={user?.email ?? undefined}>{userName}</p>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={handleSignOut} title="Sair">
-              <LogOut className="h-4 w-4" />
-            </Button>
           </div>
           {clinicaAtual && logoDaClinica(clinicaAtual.clinica.nome) && (
             <div className="bg-white rounded-lg shadow-sm border px-2 py-1 flex items-center justify-center shrink-0">
@@ -369,6 +414,27 @@ export function AppShell() {
           <Outlet />
         </main>
       </div>
+      <Dialog open={pwOpen} onOpenChange={(o) => { setPwOpen(o); if (!o) { setPwNew(""); setPwConfirm(""); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Alterar senha</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label htmlFor="pw-new">Nova senha</Label>
+              <Input id="pw-new" type="password" value={pwNew} onChange={(e) => setPwNew(e.target.value)} autoComplete="new-password" />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="pw-confirm">Confirmar nova senha</Label>
+              <Input id="pw-confirm" type="password" value={pwConfirm} onChange={(e) => setPwConfirm(e.target.value)} autoComplete="new-password" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPwOpen(false)} disabled={pwSaving}>Cancelar</Button>
+            <Button onClick={() => void handleChangePassword()} disabled={pwSaving}>{pwSaving ? "Salvando…" : "Salvar"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
