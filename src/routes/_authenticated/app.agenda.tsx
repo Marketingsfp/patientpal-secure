@@ -189,15 +189,35 @@ function AgendaPage() {
     setAuditLoading(true);
     setAuditRows([]);
     void carregarEquipe();
-    const { data, error } = await supabase
+    // 1) histórico do próprio agendamento
+    const { data: agAudit, error } = await supabase
       .from("audit_log" as never)
       .select("id, action, table_name, user_email, created_at, dados_antes, dados_depois")
       .eq("record_id", a.id)
       .order("created_at", { ascending: false })
       .limit(200);
+    if (error) { setAuditLoading(false); toast.error(error.message); return; }
+    // 2) lançamentos financeiros vinculados ao agendamento (para status do repasse médico)
+    const { data: lancs } = await supabase
+      .from("fin_lancamentos")
+      .select("id")
+      .eq("agendamento_id", a.id);
+    const lancIds = (lancs ?? []).map((l) => l.id);
+    let lancAudit: AuditRow[] = [];
+    if (lancIds.length > 0) {
+      const { data: la } = await supabase
+        .from("audit_log" as never)
+        .select("id, action, table_name, user_email, created_at, dados_antes, dados_depois")
+        .in("record_id", lancIds)
+        .eq("table_name", "fin_lancamentos")
+        .order("created_at", { ascending: false })
+        .limit(200);
+      lancAudit = (la as unknown as AuditRow[]) ?? [];
+    }
+    const todos = [...((agAudit as unknown as AuditRow[]) ?? []), ...lancAudit]
+      .sort((x, y) => (x.created_at < y.created_at ? 1 : -1));
     setAuditLoading(false);
-    if (error) { toast.error(error.message); return; }
-    setAuditRows((data as unknown as AuditRow[]) ?? []);
+    setAuditRows(todos);
   };
 
   const cadastrarPacienteRapido = async (e: FormEvent) => {
@@ -526,6 +546,10 @@ function AgendaPage() {
   const submit = async (e: FormEvent, irParaPagamento = false) => {
     e.preventDefault();
     if (!clinicaAtual) return;
+    if (editing && pagosSet.has(editing.id)) {
+      toast.error("Agendamento já pago — somente visualização.");
+      return;
+    }
     if (!form.paciente_nome.trim()) { toast.error("Informe o paciente"); return; }
     if (!form.paciente_id) {
       toast.error("Selecione um paciente cadastrado na lista ou clique em \"Cadastrar agora\" para criar o cadastro antes de salvar.");
@@ -775,9 +799,22 @@ function AgendaPage() {
           </DialogTrigger>
           <DialogContent className="max-w-lg">
             <DialogHeader>
-              <DialogTitle>{editing ? "Editar agendamento" : "Novo agendamento"}</DialogTitle>
+              <DialogTitle>
+                {editing
+                  ? (pagosSet.has(editing.id) ? "Visualizar agendamento (pago)" : "Editar agendamento")
+                  : "Novo agendamento"}
+              </DialogTitle>
             </DialogHeader>
             <form onSubmit={submit} className="space-y-3">
+              {editing && pagosSet.has(editing.id) && (
+                <div className="rounded-md border border-amber-300 bg-amber-50 text-amber-800 px-3 py-2 text-xs">
+                  Este agendamento já foi pago. Para alterações, estorne o pagamento no Financeiro.
+                </div>
+              )}
+              <fieldset
+                disabled={editing ? pagosSet.has(editing.id) : false}
+                className="space-y-3 contents disabled:opacity-90"
+              >
               <div className="space-y-1">
                 <Label>Paciente</Label>
                 <div className="flex gap-2">
@@ -845,14 +882,19 @@ function AgendaPage() {
                   <div className="space-y-1">
                     <Label className="text-xs">Data de pagamento</Label>
                     <Input
-                      type="date"
-                      value={form.data_pagamento}
-                      onChange={(e) => setForm(f => ({ ...f, data_pagamento: e.target.value }))}
+                      type="text"
+                      value={form.data_pagamento
+                        ? new Date(form.data_pagamento + "T00:00:00").toLocaleDateString("pt-BR")
+                        : "—"}
+                      readOnly
+                      disabled
+                      tabIndex={-1}
+                      className="bg-muted/40 cursor-not-allowed"
                     />
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Data de pagamento é preenchida automaticamente quando o pagamento for registrado. Pode ser ajustada manualmente se necessário.
+                  Preenchida automaticamente pelo sistema quando o pagamento for registrado.
                 </p>
               </div>
               <div className="space-y-1">
@@ -922,18 +964,25 @@ function AgendaPage() {
                 </div>
                 <Textarea value={form.observacoes} onChange={(e) => setForm(f => ({ ...f, observacoes: e.target.value }))} rows={2} />
               </div>
+              </fieldset>
               <DialogFooter>
-                <Button type="button" variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={saving}
-                  onClick={(e) => submit(e as unknown as FormEvent, true)}
-                  className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
-                >
-                  Salvar e Pagar
-                </Button>
-                <Button type="submit" disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
+                {editing && pagosSet.has(editing.id) ? (
+                  <Button type="button" variant="outline" onClick={() => setOpen(false)}>Fechar</Button>
+                ) : (
+                  <>
+                    <Button type="button" variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={saving}
+                      onClick={(e) => submit(e as unknown as FormEvent, true)}
+                      className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                    >
+                      Salvar e Pagar
+                    </Button>
+                    <Button type="submit" disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
+                  </>
+                )}
               </DialogFooter>
             </form>
           </DialogContent>
@@ -1155,16 +1204,35 @@ function AgendaPage() {
                   };
                   const antes = (r.dados_antes ?? {}) as Record<string, unknown>;
                   const depois = (r.dados_depois ?? {}) as Record<string, unknown>;
+                  const isLanc = r.table_name === "fin_lancamentos";
+                  const repasseLabel: Record<string, string> = {
+                    repasse_pago: "Repasse ao médico",
+                    repasse_pago_em: "Data do repasse",
+                    repasse_forma_pagamento: "Forma do repasse",
+                  };
+                  const allowedLanc = new Set(Object.keys(repasseLabel));
+                  const fmtVal = (k: string, v: unknown) => {
+                    if (k === "repasse_pago") return v ? "Pago" : "Pendente";
+                    if (k === "repasse_pago_em" && typeof v === "string" && v) {
+                      return new Date(v + "T00:00:00").toLocaleDateString("pt-BR");
+                    }
+                    return v == null || v === "" ? "—" : String(v);
+                  };
                   const chaves = Array.from(new Set([...Object.keys(antes), ...Object.keys(depois)]))
                     .filter((k) => !["updated_at", "created_at", "fluxo_atualizado_em"].includes(k))
+                    .filter((k) => (isLanc ? allowedLanc.has(k) : true))
                     .filter((k) => JSON.stringify(antes[k]) !== JSON.stringify(depois[k]));
                   const quem = (r.user_email && nomePorEmail.get(r.user_email)) || r.user_email || "—";
+                  // Para lançamentos: ignorar entradas que não envolvem campos de repasse
+                  if (isLanc && r.action === "UPDATE" && chaves.length === 0) return null;
                   return (
                     <div key={r.id} className="rounded-md border p-3 bg-card">
                       <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
                         <div className="flex items-center gap-2">
                           <Badge className={acaoCor[r.action] ?? ""}>{acaoLabel[r.action] ?? r.action}</Badge>
-                          <span className="text-xs font-mono text-muted-foreground">{r.table_name}</span>
+                          <span className="text-xs font-mono text-muted-foreground">
+                            {isLanc ? "pagamento" : r.table_name}
+                          </span>
                         </div>
                         <div className="text-xs text-muted-foreground">
                           {new Date(r.created_at).toLocaleString("pt-BR")} · {quem}
@@ -1174,21 +1242,29 @@ function AgendaPage() {
                         <div className="text-xs space-y-1">
                           {chaves.map((k) => (
                             <div key={k} className="grid grid-cols-[120px_1fr] gap-2">
-                              <span className="font-medium text-muted-foreground">{k}:</span>
+                              <span className="font-medium text-muted-foreground">
+                                {isLanc ? (repasseLabel[k] ?? k) : k}:
+                              </span>
                               <span>
-                                <span className="line-through text-rose-600">{String(antes[k] ?? "—")}</span>
+                                <span className="line-through text-rose-600">{fmtVal(k, antes[k])}</span>
                                 {" → "}
-                                <span className="text-emerald-700">{String(depois[k] ?? "—")}</span>
+                                <span className="text-emerald-700">{fmtVal(k, depois[k])}</span>
                               </span>
                             </div>
                           ))}
                         </div>
                       )}
                       {r.action === "INSERT" && (
-                        <p className="text-xs text-muted-foreground">Registro criado.</p>
+                        <p className="text-xs text-muted-foreground">
+                          {isLanc
+                            ? `Pagamento da consulta registrado${depois.repasse_pago ? " — repasse já pago" : " — repasse pendente"}.`
+                            : "Registro criado."}
+                        </p>
                       )}
                       {r.action === "DELETE" && (
-                        <p className="text-xs text-muted-foreground">Registro excluído.</p>
+                        <p className="text-xs text-muted-foreground">
+                          {isLanc ? "Pagamento removido." : "Registro excluído."}
+                        </p>
                       )}
                     </div>
                   );
