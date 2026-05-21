@@ -81,6 +81,7 @@ import { Route as AuthenticatedAppAnamnesesRouteImport } from './routes/_authent
 import { Route as AuthenticatedAppAlertasEnfermagemRouteImport } from './routes/_authenticated/app.alertas-enfermagem'
 import { Route as AuthenticatedAppAgendaRouteImport } from './routes/_authenticated/app.agenda'
 import { Route as AuthenticatedAppFinanceiroIndexRouteImport } from './routes/_authenticated/app.financeiro.index'
+import { Route as ApiPublicWhatsappClinicaIdRouteImport } from './routes/api/public/whatsapp.$clinicaId'
 import { Route as AuthenticatedAppMedicoMedicoIdRouteImport } from './routes/_authenticated/app.medico.$medicoId'
 import { Route as AuthenticatedAppImprimirAgendamentoIdRouteImport } from './routes/_authenticated/app.imprimir.$agendamentoId'
 import { Route as AuthenticatedAppFuncionarioUserIdRouteImport } from './routes/_authenticated/app.funcionario.$userId'
@@ -496,6 +497,12 @@ const AuthenticatedAppFinanceiroIndexRoute =
     path: '/',
     getParentRoute: () => AuthenticatedAppFinanceiroRoute,
   } as any)
+const ApiPublicWhatsappClinicaIdRoute =
+  ApiPublicWhatsappClinicaIdRouteImport.update({
+    id: '/api/public/whatsapp/$clinicaId',
+    path: '/api/public/whatsapp/$clinicaId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AuthenticatedAppMedicoMedicoIdRoute =
   AuthenticatedAppMedicoMedicoIdRouteImport.update({
     id: '/medico/$medicoId',
@@ -701,6 +708,7 @@ export interface FileRoutesByFullPath {
   '/app/funcionario/$userId': typeof AuthenticatedAppFuncionarioUserIdRoute
   '/app/imprimir/$agendamentoId': typeof AuthenticatedAppImprimirAgendamentoIdRoute
   '/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
+  '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/app/financeiro/': typeof AuthenticatedAppFinanceiroIndexRoute
 }
 export interface FileRoutesByTo {
@@ -791,6 +799,7 @@ export interface FileRoutesByTo {
   '/app/funcionario/$userId': typeof AuthenticatedAppFuncionarioUserIdRoute
   '/app/imprimir/$agendamentoId': typeof AuthenticatedAppImprimirAgendamentoIdRoute
   '/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
+  '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/app/financeiro': typeof AuthenticatedAppFinanceiroIndexRoute
 }
 export interface FileRoutesById {
@@ -885,6 +894,7 @@ export interface FileRoutesById {
   '/_authenticated/app/funcionario/$userId': typeof AuthenticatedAppFuncionarioUserIdRoute
   '/_authenticated/app/imprimir/$agendamentoId': typeof AuthenticatedAppImprimirAgendamentoIdRoute
   '/_authenticated/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
+  '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/_authenticated/app/financeiro/': typeof AuthenticatedAppFinanceiroIndexRoute
 }
 export interface FileRouteTypes {
@@ -979,6 +989,7 @@ export interface FileRouteTypes {
     | '/app/funcionario/$userId'
     | '/app/imprimir/$agendamentoId'
     | '/app/medico/$medicoId'
+    | '/api/public/whatsapp/$clinicaId'
     | '/app/financeiro/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -1069,6 +1080,7 @@ export interface FileRouteTypes {
     | '/app/funcionario/$userId'
     | '/app/imprimir/$agendamentoId'
     | '/app/medico/$medicoId'
+    | '/api/public/whatsapp/$clinicaId'
     | '/app/financeiro'
   id:
     | '__root__'
@@ -1162,6 +1174,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/funcionario/$userId'
     | '/_authenticated/app/imprimir/$agendamentoId'
     | '/_authenticated/app/medico/$medicoId'
+    | '/api/public/whatsapp/$clinicaId'
     | '/_authenticated/app/financeiro/'
   fileRoutesById: FileRoutesById
 }
@@ -1183,6 +1196,7 @@ export interface RootRouteChildren {
   VerificarCodigoRoute: typeof VerificarCodigoRoute
   PacienteIndexRoute: typeof PacienteIndexRoute
   PContratoTokenRoute: typeof PContratoTokenRoute
+  ApiPublicWhatsappClinicaIdRoute: typeof ApiPublicWhatsappClinicaIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1691,6 +1705,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppFinanceiroIndexRouteImport
       parentRoute: typeof AuthenticatedAppFinanceiroRoute
     }
+    '/api/public/whatsapp/$clinicaId': {
+      id: '/api/public/whatsapp/$clinicaId'
+      path: '/api/public/whatsapp/$clinicaId'
+      fullPath: '/api/public/whatsapp/$clinicaId'
+      preLoaderRoute: typeof ApiPublicWhatsappClinicaIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/app/medico/$medicoId': {
       id: '/_authenticated/app/medico/$medicoId'
       path: '/medico/$medicoId'
@@ -2058,6 +2079,7 @@ const rootRouteChildren: RootRouteChildren = {
   VerificarCodigoRoute: VerificarCodigoRoute,
   PacienteIndexRoute: PacienteIndexRoute,
   PContratoTokenRoute: PContratoTokenRoute,
+  ApiPublicWhatsappClinicaIdRoute: ApiPublicWhatsappClinicaIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
