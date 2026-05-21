@@ -1534,9 +1534,9 @@ function AgendaPage() {
               </div>
               {pacInfo.id && (
                 <div className="pt-2">
-                  <Link to="/app/clientes" search={{ q: pacInfo.nome } as any} className="text-xs text-primary hover:underline">
+                  <a href={`/app/clientes?q=${encodeURIComponent(pacInfo.nome)}`} className="text-xs text-primary hover:underline">
                     Abrir ficha completa →
-                  </Link>
+                  </a>
                 </div>
               )}
             </div>
