@@ -820,7 +820,7 @@ function AgendaPage() {
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs font-medium text-muted-foreground">Data e horário da consulta</Label>
+                <Label className="text-xs font-medium text-muted-foreground">Data consulta/exame</Label>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
                     <Label className="text-xs">Início</Label>
@@ -833,14 +833,14 @@ function AgendaPage() {
                 </div>
               </div>
               <div className="space-y-1">
-                <Label>Data do pagamento</Label>
+                <Label>Data de pagamento</Label>
                 <Input
                   type="date"
                   value={form.data_pagamento}
                   onChange={(e) => setForm(f => ({ ...f, data_pagamento: e.target.value }))}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Use quando o paciente pagar em data diferente da consulta. Deixe em branco se não se aplica.
+                  Preenchida automaticamente quando o pagamento for registrado. Pode ser ajustada manualmente se necessário.
                 </p>
               </div>
               <div className="space-y-1">
