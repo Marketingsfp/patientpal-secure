@@ -219,7 +219,7 @@ function AgendaPage() {
     setLoading(true);
     let q = supabase
       .from("agendamentos")
-      .select("id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico")
+      .select("id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("inicio", { ascending: false });
     const statusEspecifico = filtroStatus !== "todos" && filtroStatus !== "livres";
