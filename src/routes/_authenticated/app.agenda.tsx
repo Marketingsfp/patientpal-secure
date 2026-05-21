@@ -655,8 +655,8 @@ function AgendaPage() {
   const fmtDiaSemana = (iso: string) => DIAS_SEMANA[new Date(iso).getDay()];
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
             <CalendarDays className="h-6 w-6" /> Agendas
@@ -1159,11 +1159,11 @@ function AgendaPage() {
 
       {/* Filtros */}
       <div
-        className="rounded-lg border bg-card p-4 space-y-4 [--clinic:theme(colors.border)]"
+        className="rounded-lg border bg-card p-2.5 space-y-2 [--clinic:theme(colors.border)]"
         style={{ ["--clinic" as never]: corClinica }}
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-          <div className="space-y-1 rounded-md border-2 border-transparent hover:border-[var(--clinic)] p-2.5 bg-background transition-colors">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
+          <div className="space-y-0.5 rounded-md border-2 border-transparent hover:border-[var(--clinic)] p-1.5 bg-background transition-colors">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Profissional</Label>
             <SearchableSelect
               value={filtroMedico}
@@ -1178,7 +1178,7 @@ function AgendaPage() {
               ]}
             />
           </div>
-          <div className="space-y-1 rounded-md border-2 border-transparent hover:border-[var(--clinic)] p-2.5 bg-background transition-colors">
+          <div className="space-y-0.5 rounded-md border-2 border-transparent hover:border-[var(--clinic)] p-1.5 bg-background transition-colors">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Data Ref.</Label>
             <DataRefField
               dataRef={dataRef}
@@ -1188,7 +1188,7 @@ function AgendaPage() {
               shiftData={shiftData}
             />
           </div>
-          <div className="space-y-1 rounded-md border-2 border-transparent hover:border-[var(--clinic)] p-2.5 bg-background transition-colors">
+          <div className="space-y-0.5 rounded-md border-2 border-transparent hover:border-[var(--clinic)] p-1.5 bg-background transition-colors">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Dia Semana</Label>
             <Select value={filtroDiaSemana} onValueChange={setFiltroDiaSemana}>
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -1198,7 +1198,7 @@ function AgendaPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1 rounded-md border-2 border-transparent hover:border-[var(--clinic)] p-2.5 bg-background transition-colors">
+          <div className="space-y-0.5 rounded-md border-2 border-transparent hover:border-[var(--clinic)] p-1.5 bg-background transition-colors">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Cliente</Label>
             <div className="flex gap-1">
               <Input value={filtroCliente} onChange={(e) => setFiltroCliente(e.target.value)} placeholder="Buscar paciente…" />
@@ -1216,11 +1216,11 @@ function AgendaPage() {
               </Button>
             </div>
           </div>
-          <div className="space-y-1 rounded-md border-2 border-transparent hover:border-[var(--clinic)] p-2.5 bg-background transition-colors">
+          <div className="space-y-0.5 rounded-md border-2 border-transparent hover:border-[var(--clinic)] p-1.5 bg-background transition-colors">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Nº Ficha</Label>
             <Input value={filtroFicha} onChange={(e) => setFiltroFicha(e.target.value.replace(/\D/g, ""))} placeholder="Ex.: 001" inputMode="numeric" />
           </div>
-          <div className="space-y-1 rounded-md border-2 border-transparent hover:border-[var(--clinic)] p-2.5 bg-background transition-colors">
+          <div className="space-y-0.5 rounded-md border-2 border-transparent hover:border-[var(--clinic)] p-1.5 bg-background transition-colors">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Especialidade</Label>
             <Select value={filtroEspecialidade} onValueChange={setFiltroEspecialidade}>
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -1230,7 +1230,7 @@ function AgendaPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1 rounded-md border-2 border-transparent hover:border-[var(--clinic)] p-2.5 bg-background transition-colors">
+          <div className="space-y-0.5 rounded-md border-2 border-transparent hover:border-[var(--clinic)] p-1.5 bg-background transition-colors">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Situação</Label>
             <Select value={filtroStatus} onValueChange={setFiltroStatus}>
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -1244,7 +1244,7 @@ function AgendaPage() {
             </Select>
           </div>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-4">
             <label className="flex items-center gap-2 text-sm cursor-pointer">
               <Checkbox checked={apenasData} onCheckedChange={(v) => setApenasData(!!v)} />
