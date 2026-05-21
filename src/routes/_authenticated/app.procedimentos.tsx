@@ -639,7 +639,7 @@ function ProcedimentosPage() {
                   <TableHead className="w-44">Grupo</TableHead>
                   <TableHead className="w-24">Tipo</TableHead>
                   <TableHead className="w-24 text-right">Dinheiro</TableHead>
-                  <TableHead className="w-32 text-right">Cartão</TableHead>
+                  <TableHead className="w-40 text-right">Pix / Débito / Crédito</TableHead>
                   <TableHead className="w-24 text-right">C. Consulta</TableHead>
                   <TableHead className="w-24 text-right">C. Desconto</TableHead>
                   <TableHead className="w-24">Situação</TableHead>
@@ -785,9 +785,10 @@ function ProcedimentosPage() {
                     onChange={(v) => setForm({ ...form, valor_dinheiro: v })} />
                 </div>
                 <div className="space-y-1">
-                  <Label>Cartão (R$)</Label>
+                  <Label>Pix / Débito / Crédito (R$)</Label>
                   <CurrencyInput value={form.valor_pix_cartao}
                     onChange={(v) => setForm({ ...form, valor_pix_cartao: v })} />
+                  <p className="text-[10px] text-muted-foreground">Mesmo valor para Pix, Cartão de Débito e Crédito.</p>
                 </div>
                 <div className="space-y-1">
                   <Label>Cartão Consulta (R$)</Label>
