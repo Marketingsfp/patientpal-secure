@@ -1340,12 +1340,12 @@ function AgendaPage() {
                   <TableCell>
                      <span className="text-emerald-600 font-medium">{fmtHora(a.inicio)} - {fmtHora(a.fim)}</span>
                   </TableCell>
-                  <TableCell className="pr-1">
-                    <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                  <TableCell className="pr-1 align-middle">
+                    <span className="text-sm uppercase font-medium text-foreground">
                       Dr(a). {medicos.find((m) => m.id === a.medico_id)?.nome ?? "—"}
                     </span>
                   </TableCell>
-                  <TableCell className="pr-1">
+                  <TableCell className="pr-1 align-middle">
                     {normalizar(a.paciente_nome) === "disponivel" ? (
                       <Button
                         variant="ghost"
@@ -1363,7 +1363,7 @@ function AgendaPage() {
                         target="_blank"
                         rel="noopener noreferrer"
                         title="Abrir ficha do cliente em nova aba"
-                        className="inline-flex items-center gap-1 uppercase font-medium text-foreground hover:text-primary hover:underline"
+                        className="inline-flex items-center gap-1 text-sm uppercase font-medium text-foreground hover:text-primary hover:underline"
                       >
                         {a.status === "confirmado" && <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />}
                         {a.paciente_nome}
