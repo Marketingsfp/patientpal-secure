@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ShieldCheck, ConciergeBell, Wallet, DollarSign, HeartPulse } from "lucide-react";
+import { ShieldCheck, ConciergeBell, Wallet, DollarSign, HeartPulse, Stethoscope, Briefcase } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/perfis")({
   component: PerfisPage,
@@ -15,6 +15,20 @@ const PERFIS = [
     icon: ShieldCheck,
     descricao: "Acesso total ao sistema. Pode gerenciar unidades, equipe, perfis, configurações e todas as áreas operacionais e financeiras.",
     permissoes: ["Todas as funcionalidades", "Gestão de equipe e perfis", "Configurações e integrações", "Auditoria e LGPD"],
+  },
+  {
+    key: "gestor",
+    nome: "GESTOR",
+    icon: Briefcase,
+    descricao: "Gestão operacional da unidade: acompanha indicadores, equipe, agenda e financeiro, sem acesso a configurações sensíveis.",
+    permissoes: ["Dashboard e Relatórios", "Equipe (gestão)", "Agenda e Fluxo", "Financeiro (visão gerencial)"],
+  },
+  {
+    key: "medico",
+    nome: "MÉDICO",
+    icon: Stethoscope,
+    descricao: "Profissional clínico: realiza atendimentos, prontuários, prescrições e visualiza seus repasses.",
+    permissoes: ["Agenda própria", "Atendimento médico", "Prontuários", "Repasses (próprios)"],
   },
   {
     key: "recepcao",
