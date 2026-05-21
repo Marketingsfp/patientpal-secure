@@ -152,6 +152,18 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       setSaving(false);
       return;
     }
+    if (!pagamentoMisto && formaPagamento === "dinheiro") {
+      if (!valorRecebido || recebidoNum <= 0) {
+        toast.error(`Informe o valor recebido em dinheiro (≥ ${formatBRL(valorNum)})`);
+        setSaving(false);
+        return;
+      }
+      if (recebidoNum + 0.005 < valorNum) {
+        toast.error(`Valor recebido (${formatBRL(recebidoNum)}) é menor que o total (${formatBRL(valorNum)})`);
+        setSaving(false);
+        return;
+      }
+    }
     let formaFinal: string | null = formaPagamento || null;
     let obsExtra = "";
     if (pagamentoMisto) {
@@ -160,6 +172,15 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         .filter(({ p, i }) => p.forma && linhasCalc[i].pago > 0);
       if (validIdx.length === 0) {
         toast.error("Adicione ao menos uma forma de pagamento");
+        setSaving(false); return;
+      }
+      const dinheiroInvalido = validIdx.find(({ p, i }) => {
+        if (p.forma !== "dinheiro") return false;
+        const rec = Number(p.recebido || 0);
+        return rec <= 0 || rec + 0.005 < linhasCalc[i].pago;
+      });
+      if (dinheiroInvalido) {
+        toast.error("Informe o valor recebido em dinheiro em todas as linhas (deve cobrir o valor pago).");
         setSaving(false); return;
       }
       const total = validIdx.reduce((s, { i }) => s + linhasCalc[i].pago, 0);
@@ -353,7 +374,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
           {!pagamentoMisto && formaPagamento === "dinheiro" && (
             <div className="grid grid-cols-2 gap-3 rounded-md border bg-muted/30 p-3">
               <div className="space-y-1.5">
-                <Label>Valor recebido</Label>
+                <Label>Valor recebido <span className="text-destructive">*</span></Label>
                 <CurrencyInput value={valorRecebido} onChange={setValorRecebido} />
               </div>
               <div className="space-y-1.5">
