@@ -799,9 +799,18 @@ function AgendaPage() {
           </DialogTrigger>
           <DialogContent className="max-w-lg">
             <DialogHeader>
-              <DialogTitle>{editing ? "Editar agendamento" : "Novo agendamento"}</DialogTitle>
+              <DialogTitle>
+                {editing
+                  ? (pagosSet.has(editing.id) ? "Visualizar agendamento (pago)" : "Editar agendamento")
+                  : "Novo agendamento"}
+              </DialogTitle>
             </DialogHeader>
             <form onSubmit={submit} className="space-y-3">
+              {editing && pagosSet.has(editing.id) && (
+                <div className="rounded-md border border-amber-300 bg-amber-50 text-amber-800 px-3 py-2 text-xs">
+                  Este agendamento já foi pago. Para alterações, estorne o pagamento no Financeiro.
+                </div>
+              )}
               <div className="space-y-1">
                 <Label>Paciente</Label>
                 <div className="flex gap-2">
