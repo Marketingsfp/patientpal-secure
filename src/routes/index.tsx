@@ -1,9 +1,25 @@
-import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { Activity } from "lucide-react";
-import { useAuth } from "@/hooks/use-auth";
+
+function hasSupabaseSession(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith("sb-") && k.endsWith("-auth-token")) {
+        const v = localStorage.getItem(k);
+        if (v && v.length > 2) return true;
+      }
+    }
+  } catch { /* ignore */ }
+  return false;
+}
 
 export const Route = createFileRoute("/")({
+  beforeLoad: () => {
+    if (typeof window === "undefined") return;
+    throw redirect({ to: hasSupabaseSession() ? "/app" : "/login", replace: true });
+  },
   component: LandingPage,
   head: () => ({
     meta: [
@@ -18,28 +34,6 @@ export const Route = createFileRoute("/")({
 });
 
 function LandingPage() {
-  const router = useRouter();
-  const { user, loading } = useAuth();
-
-  useEffect(() => {
-    if (loading) return;
-    const target = user ? "/app" : "/login";
-    router.navigate({ to: target, replace: true }).catch(() => {
-      if (typeof window !== "undefined") window.location.replace(target);
-    });
-  }, [loading, router, user]);
-
-  useEffect(() => {
-    // Safety net: if redirect doesn't happen within 1.5s, force it via window.location.
-    if (typeof window === "undefined") return;
-    const t = window.setTimeout(() => {
-      if (window.location.pathname === "/") {
-        window.location.replace(user ? "/app" : "/login");
-      }
-    }, 1500);
-    return () => window.clearTimeout(t);
-  }, [user]);
-
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4 text-center">
       <div className="space-y-4">
