@@ -210,7 +210,7 @@ function ContratosPage() {
           <h1 className="text-xl font-bold">Funcionários</h1>
           <p className="text-sm text-muted-foreground">Contratos de trabalho da clínica.</p>
         </div>
-        <Button onClick={openNew}><Plus className="h-4 w-4 mr-1" /> Novo</Button>
+        <Button asChild variant="outline"><a href="/app/equipe"><Users className="h-4 w-4 mr-1" /> Gerenciar em Equipe</a></Button>
       </div>
 
       <Card className="p-3">
@@ -248,9 +248,7 @@ function ContratosPage() {
                 <TableCell className="text-right">{Number(r.salario).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</TableCell>
                 <TableCell className="text-sm">{formatDatePura(r.data_admissao)}</TableCell>
                 <TableCell><Badge variant={r.status === "ativo" ? "default" : "secondary"}>{r.status}</Badge></TableCell>
-                <TableCell className="text-right">
-                  <Button size="icon" variant="ghost" onClick={() => openEdit(r)}><Pencil className="h-4 w-4" /></Button>
-                </TableCell>
+                <TableCell className="text-right text-xs text-muted-foreground">—</TableCell>
               </TableRow>
             ))}
           </TableBody>
