@@ -31,7 +31,7 @@ import {
   CalendarDays, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X,
   MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, Clock, DollarSign, ShieldCheck,
 } from "lucide-react";
-import { printGuiaAtendimento } from "@/lib/print-gr";
+import { printGuiaAtendimento, printGuiaAtendimentoAgrupada } from "@/lib/print-gr";
 import { VoiceInput } from "@/components/voice-input";
 import { exportToExcel } from "@/lib/export-csv";
 import { useAuth } from "@/hooks/use-auth";
@@ -1076,10 +1076,11 @@ function AgendaPage() {
             setSelecionados(new Set());
           }
           try {
-            await printGuiaAtendimento({
-              agendamentoId: pagamentoAgId,
+            await printGuiaAtendimentoAgrupada({
+              agendamentoIds: [pagamentoAgId, ...pagamentoExtraIds],
               clinicaId: clinicaAtual.clinica_id,
               usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
+              usuarioId: user?.id ?? null,
               pagamento: {
                 valor: dados.valor,
                 forma_pagamento: dados.forma_pagamento,

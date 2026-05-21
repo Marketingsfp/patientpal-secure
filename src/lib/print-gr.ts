@@ -329,3 +329,352 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
 export async function reimprimirGuiaAtendimento(input: PrintGRInput) {
   return printGuiaAtendimentoCore({ ...input, reimpressao: true });
 }
+
+// ============================================================================
+// GR AGRUPADA — vários agendamentos do mesmo paciente em um único impresso
+// ============================================================================
+
+export interface PrintGRAgrupadaInput {
+  agendamentoIds: string[];
+  clinicaId: string;
+  usuarioNome?: string;
+  usuarioId?: string | null;
+  reimpressao?: boolean;
+  pagamento: {
+    valor: number;
+    forma_pagamento: string | null;
+    parcelas: number | null;
+    bandeira_cartao: string | null;
+    detalhe?: Array<{ forma: string; pago: number; troco: number; recebido: number }>;
+  };
+}
+
+const normalizar = (s: string) =>
+  s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+
+export async function printGuiaAtendimentoAgrupada(input: PrintGRAgrupadaInput) {
+  const ids = Array.from(new Set((input.agendamentoIds ?? []).filter(Boolean)));
+  if (ids.length === 0) throw new Error("Nenhum agendamento informado para impressão.");
+
+  // 1 agendamento → delega para a impressão simples (mesmo layout de sempre).
+  if (ids.length === 1) {
+    return printGuiaAtendimento({
+      agendamentoId: ids[0],
+      clinicaId: input.clinicaId,
+      usuarioNome: input.usuarioNome,
+      usuarioId: input.usuarioId,
+      reimpressao: input.reimpressao,
+      pagamento: input.pagamento,
+    });
+  }
+
+  return printGuiaAtendimentoAgrupadaCore(input, ids);
+}
+
+/** Reimprime a última via da GR agrupada sem gerar novo registro. */
+export async function reimprimirGuiaAtendimentoAgrupada(input: PrintGRAgrupadaInput) {
+  return printGuiaAtendimentoAgrupada({ ...input, reimpressao: true });
+}
+
+async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids: string[]) {
+  const { clinicaId, usuarioNome, usuarioId, reimpressao, pagamento } = input;
+
+  // Controle de vias: usa o primeiro id como "chave" para limite (1ª/2ª via).
+  const chaveVia = ids[0];
+  const { data: visExistentes, error: errVias } = await supabase
+    .from("gr_impressoes" as never)
+    .select("via_numero")
+    .eq("agendamento_id", chaveVia)
+    .order("via_numero", { ascending: false });
+  if (errVias) throw new Error(errVias.message);
+  const existentes = (visExistentes as Array<{ via_numero: number }> | null) ?? [];
+  const ultimaVia = existentes[0]?.via_numero ?? 0;
+  let viaNumero: number;
+  if (reimpressao) {
+    viaNumero = ultimaVia > 0 ? ultimaVia : 1;
+  } else {
+    if (ultimaVia >= 2) {
+      throw new Error("Limite de 2 vias atingido. Use 'Reimprimir última via' para uma cópia.");
+    }
+    viaNumero = ultimaVia + 1;
+  }
+
+  // Busca agendamentos + clínica + tabela de procedimentos da clínica
+  const [agsRes, cliRes, procsRes] = await Promise.all([
+    supabase
+      .from("agendamentos")
+      .select("id, paciente_nome, paciente_id, medico_id, inicio, procedimento")
+      .in("id", ids),
+    supabase
+      .from("clinicas")
+      .select("nome, endereco, cidade, estado, telefone, cnpj")
+      .eq("id", clinicaId)
+      .maybeSingle(),
+    supabase
+      .from("procedimentos")
+      .select("nome, valor_dinheiro_pix, valor_cartao")
+      .eq("clinica_id", clinicaId),
+  ]);
+
+  if (agsRes.error || !agsRes.data || agsRes.data.length === 0) {
+    throw new Error(agsRes.error?.message ?? "Agendamentos não encontrados");
+  }
+  const ags = agsRes.data;
+  const c = cliRes.data;
+  const procs = (procsRes.data ?? []) as Array<{ nome: string; valor_dinheiro_pix: number | null; valor_cartao: number | null }>;
+  const procByNome = new Map(procs.map((p) => [normalizar(p.nome ?? ""), p]));
+
+  // Paciente: pega do primeiro agendamento (mesmo paciente esperado em todos).
+  const pacIdRef = ags[0].paciente_id;
+  const pacienteRes = pacIdRef
+    ? await supabase
+        .from("pacientes")
+        .select("nome, cpf, telefone, data_nascimento")
+        .eq("id", pacIdRef)
+        .maybeSingle()
+    : { data: null };
+  const paciente = pacienteRes.data as { nome: string; cpf: string | null; telefone: string | null; data_nascimento: string | null } | null;
+  const pacienteNome = paciente?.nome ?? ags[0].paciente_nome ?? "—";
+
+  // Busca dados de todos os médicos envolvidos + seus convênios
+  const medicoIds = Array.from(new Set(ags.map((a) => a.medico_id).filter((x): x is string => !!x)));
+  const [medsRes, convsRes] = await Promise.all([
+    medicoIds.length > 0
+      ? supabase
+          .from("medicos")
+          .select("id, nome, tipo_repasse, percentual_repasse_padrao, valor_repasse_padrao")
+          .in("id", medicoIds)
+      : Promise.resolve({ data: [] as Array<{ id: string; nome: string; tipo_repasse: string | null; percentual_repasse_padrao: number | null; valor_repasse_padrao: number | null }> }),
+    medicoIds.length > 0
+      ? supabase
+          .from("medico_convenios")
+          .select("medico_id, nome, tipo_repasse, percentual, valor, ativo")
+          .in("medico_id", medicoIds)
+          .eq("ativo", true)
+      : Promise.resolve({ data: [] as Array<{ medico_id: string; nome: string; tipo_repasse: string | null; percentual: number | null; valor: number | null }> }),
+  ]);
+  const medById = new Map(((medsRes.data ?? []) as Array<{ id: string; nome: string; tipo_repasse: string | null; percentual_repasse_padrao: number | null; valor_repasse_padrao: number | null }>).map((m) => [m.id, m]));
+  const convsByMedico = new Map<string, Array<{ nome: string; tipo_repasse: string | null; percentual: number | null; valor: number | null }>>();
+  for (const cv of (convsRes.data ?? []) as Array<{ medico_id: string; nome: string; tipo_repasse: string | null; percentual: number | null; valor: number | null }>) {
+    const arr = convsByMedico.get(cv.medico_id) ?? [];
+    arr.push(cv);
+    convsByMedico.set(cv.medico_id, arr);
+  }
+
+  // Agrupa por médico
+  type Item = { procNome: string; valor: number; prestador: number; clinica: number };
+  type Grupo = { medicoId: string | null; medicoNome: string; itens: Item[]; subtotal: number; prestador: number; clinica: number };
+  const grupos = new Map<string, Grupo>();
+
+  for (const a of ags) {
+    const procNome = (a.procedimento || "CONSULTA").toUpperCase();
+    const proc = procByNome.get(normalizar(procNome));
+    const valor = Number(proc?.valor_dinheiro_pix ?? 0);
+
+    // Repasse: convenio por nome do procedimento → senão padrão do médico
+    let prestador = 0;
+    if (a.medico_id) {
+      const med = medById.get(a.medico_id);
+      const convs = convsByMedico.get(a.medico_id) ?? [];
+      const alvo = normalizar(procNome);
+      const conv = convs.find((cv) => normalizar(cv.nome) === alvo);
+      if (conv) {
+        if (conv.tipo_repasse === "valor" && conv.valor != null) {
+          prestador = Number(conv.valor);
+        } else {
+          prestador = +(valor * Number(conv.percentual ?? 0) / 100).toFixed(2);
+        }
+      } else if (med) {
+        if (med.tipo_repasse === "valor" && med.valor_repasse_padrao != null) {
+          prestador = Number(med.valor_repasse_padrao);
+        } else {
+          prestador = +(valor * Number(med.percentual_repasse_padrao ?? 0) / 100).toFixed(2);
+        }
+      }
+    }
+    prestador = Math.min(prestador, valor);
+    const clin = +(valor - prestador).toFixed(2);
+
+    const key = a.medico_id ?? "__sem_medico__";
+    const medicoNome = a.medico_id ? (medById.get(a.medico_id)?.nome ?? "—") : "SEM PROFISSIONAL";
+    const g = grupos.get(key) ?? { medicoId: a.medico_id ?? null, medicoNome, itens: [], subtotal: 0, prestador: 0, clinica: 0 };
+    g.itens.push({ procNome, valor, prestador, clinica: clin });
+    g.subtotal = +(g.subtotal + valor).toFixed(2);
+    g.prestador = +(g.prestador + prestador).toFixed(2);
+    g.clinica = +(g.clinica + clin).toFixed(2);
+    grupos.set(key, g);
+  }
+
+  const totalProcedimentos = Array.from(grupos.values()).reduce((s, g) => s + g.subtotal, 0);
+  const totalPrestadores = Array.from(grupos.values()).reduce((s, g) => s + g.prestador, 0);
+  const totalClinica = Array.from(grupos.values()).reduce((s, g) => s + g.clinica, 0);
+  const valorRecebido = Number(pagamento.valor) || totalProcedimentos;
+
+  const formaLbl = pagamento.forma_pagamento ? (FORMA_LABEL[pagamento.forma_pagamento] ?? pagamento.forma_pagamento.toUpperCase()) : "DINHEIRO";
+  const parcelasTxt = pagamento.forma_pagamento === "cartao_credito" && pagamento.parcelas && pagamento.parcelas > 1
+    ? `${pagamento.parcelas}x DE ${fmtBRL(valorRecebido / pagamento.parcelas)}`
+    : "À VISTA";
+  const bandeiraTxt = pagamento.bandeira_cartao ? pagamento.bandeira_cartao.toUpperCase() : "";
+  const isMisto = pagamento.forma_pagamento === "misto" && (pagamento.detalhe?.length ?? 0) > 0;
+  const detalheRows = isMisto
+    ? pagamento.detalhe!
+        .map((d) => {
+          const lbl = FORMA_LABEL[d.forma] ?? d.forma.toUpperCase();
+          const trocoTxt = d.troco > 0 ? ` (RECEB. ${fmtBRL(d.recebido)} / TROCO ${fmtBRL(d.troco)})` : "";
+          return `<tr><td class="label">${esc(lbl)}:</td><td class="v right">${fmtBRL(d.pago)}${esc(trocoTxt)}</td></tr>`;
+        })
+        .join("")
+    : "";
+
+  const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado].filter(Boolean).join("<br/>");
+  const viaTexto = viaNumero === 1 ? "1ª VIA" : "2ª VIA — REIMPRESSÃO";
+
+  // Data/hora de referência: do primeiro agendamento (em ordem cronológica)
+  const inicioRef = ags.map((a) => a.inicio).sort()[0];
+  const ficha = (() => {
+    const d = new Date(inicioRef);
+    return String(d.getHours() * 60 + d.getMinutes()).padStart(3, "0");
+  })();
+
+  const blocosHtml = Array.from(grupos.values()).map((g) => {
+    const linhas = g.itens
+      .map(
+        (it) => `<tr>
+          <td style="width:8mm">1</td>
+          <td>${esc(it.procNome)}</td>
+          <td class="right">${fmtBRL(it.valor)}</td>
+        </tr>`
+      )
+      .join("");
+    return `
+      <div class="sep"></div>
+      <div class="bold">PROFISSIONAL: ${esc(g.medicoNome)}</div>
+      <table style="margin-top:2px">
+        <tr class="bold">
+          <td>QTD</td><td>PROCEDIMENTO</td><td class="right">VALOR</td>
+        </tr>
+        ${linhas}
+      </table>
+      <table style="margin-top:4px">
+        <tr><td class="label">SUBTOTAL:</td><td class="v right">${fmtBRL(g.subtotal)}</td></tr>
+        <tr><td class="label">CLINICA:</td><td class="v right">${fmtBRL(g.clinica)}</td></tr>
+        <tr><td class="label">PRESTADOR:</td><td class="v right">${fmtBRL(g.prestador)}</td></tr>
+      </table>
+    `;
+  }).join("");
+
+  const html = `<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8" />
+<title>GR - ${esc(pacienteNome)}</title>
+<style>
+  @page { size: 80mm auto; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #fff; color: #000; }
+  body { font-family: "Courier New", "Consolas", monospace; font-size: 11pt; line-height: 1.25; }
+  .ticket { width: 76mm; padding: 3mm 2mm 6mm; }
+  .center { text-align: center; }
+  .right  { text-align: right; }
+  .bold   { font-weight: 700; }
+  .sm     { font-size: 9pt; }
+  .lg     { font-size: 13pt; font-weight: 700; }
+  .sep    { border-top: 1px dashed #000; margin: 6px 0; }
+  .row    { display: flex; justify-content: space-between; gap: 6px; }
+  table   { width: 100%; border-collapse: collapse; }
+  td      { padding: 1px 0; vertical-align: top; }
+  .v      { font-weight: 700; }
+  @media print { .noprint { display: none; } }
+  .noprint { position: fixed; top: 8px; right: 8px; }
+  .noprint button { padding: 6px 12px; font-size: 12px; cursor: pointer; }
+</style></head>
+<body>
+  <div class="noprint">
+    <button onclick="window.print()">Imprimir</button>
+    <button onclick="window.close()">Fechar</button>
+  </div>
+  <div class="ticket">
+    <div class="center bold">${esc(c?.nome ?? "")}</div>
+    <div class="center sm">${endereco}</div>
+    ${c?.telefone ? `<div class="center sm">FONE ${esc(c.telefone)}</div>` : ""}
+    ${c?.cnpj ? `<div class="center sm">CNPJ ${esc(c.cnpj)}</div>` : ""}
+
+    <div class="sep"></div>
+    <div class="center lg">GUIA DE ATENDIMENTO</div>
+    <div class="center bold" style="margin-top:2px">${viaTexto}</div>
+    <div class="center sm">PAGAMENTO AGRUPADO — ${grupos.size} PROFISSIONAL(IS)</div>
+    <div class="sep"></div>
+
+    <div class="center bold">${esc(pacienteNome)}</div>
+    ${paciente?.cpf ? `<div class="center sm">CPF: <span class="v">${esc(paciente.cpf)}</span></div>` : ""}
+    ${paciente?.telefone ? `<div class="center sm">FONE: <span class="v">${esc(paciente.telefone)}</span></div>` : ""}
+    ${paciente?.data_nascimento ? `<div class="center sm">NASC: <span class="v">${fmtDataSimples(paciente.data_nascimento)}</span></div>` : ""}
+
+    <div class="sep"></div>
+    <table>
+      <tr><td class="label">FICHA:</td><td class="v right">${ficha}</td></tr>
+      <tr><td class="label">HORÁRIO:</td><td class="v right">${fmtData(inicioRef)}</td></tr>
+      ${usuarioNome ? `<tr><td class="label">USUÁRIO:</td><td class="v right">${esc(usuarioNome)}</td></tr>` : ""}
+    </table>
+
+    ${blocosHtml}
+
+    <div class="sep"></div>
+    <div class="row" style="margin-top:4px">
+      <div class="bold">VALOR RECEBIDO<br/><span class="sm">(${esc(isMisto ? "MISTO" : formaLbl)})</span></div>
+      <div class="bold lg">${fmtBRL(valorRecebido)}</div>
+    </div>
+
+    ${isMisto ? `
+    <table style="margin-top:4px">
+      ${detalheRows}
+    </table>
+    ` : ""}
+
+    ${pagamento.forma_pagamento === "cartao_credito" ? `
+    <table>
+      ${bandeiraTxt ? `<tr><td class="label">BANDEIRA:</td><td class="v right">${esc(bandeiraTxt)}</td></tr>` : ""}
+      <tr><td class="label">PARCELAMENTO:</td><td class="v right">${parcelasTxt}</td></tr>
+    </table>
+    ` : ""}
+
+    <div class="sep"></div>
+    <table>
+      <tr class="bold"><td>TOTAL PROCEDIMENTOS:</td><td class="right">${fmtBRL(totalProcedimentos)}</td></tr>
+      <tr><td class="label">TOTAL CLINICA:</td><td class="v right">${fmtBRL(totalClinica)}</td></tr>
+      <tr><td class="label">TOTAL PRESTADORES:</td><td class="v right">${fmtBRL(totalPrestadores)}</td></tr>
+    </table>
+
+    <div class="sep"></div>
+    <div class="row sm">
+      <div>DATA IMPRESSAO</div>
+      <div>${fmtData(new Date().toISOString())}</div>
+    </div>
+  </div>
+  <script>
+    window.addEventListener("load", function () {
+      setTimeout(function () { window.print(); }, 150);
+    });
+  </script>
+</body></html>`;
+
+  const w = window.open("", "_blank", "width=420,height=720");
+  if (!w) {
+    throw new Error("O navegador bloqueou a janela de impressão. Permita pop-ups e tente novamente.");
+  }
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+
+  // Registra a impressão para cada agendamento (mantém limite de 2 vias por id).
+  if (!reimpressao) {
+    try {
+      const rows = ids.map((agId) => ({
+        clinica_id: clinicaId,
+        agendamento_id: agId,
+        via_numero: viaNumero,
+        impresso_por: usuarioId ?? null,
+        impresso_por_nome: usuarioNome ?? null,
+      }));
+      await supabase.from("gr_impressoes" as never).insert(rows as never);
+    } catch (_) { /* falha silenciosa */ }
+  }
+}

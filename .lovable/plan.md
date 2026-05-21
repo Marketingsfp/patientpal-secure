@@ -1,63 +1,70 @@
 ## Objetivo
 
-Aplicar três regras de negócio ao módulo Agenda:
+Quando um pagamento agrupa vários agendamentos do mesmo paciente envolvendo profissionais diferentes, imprimir **uma única Guia de Atendimento (GR)** contendo várias seções — uma por profissional — em vez de imprimir apenas a do agendamento principal.
 
-1. A **Data de pagamento** do agendamento é controlada pelo sistema — nunca editável manualmente.
-2. Após o pagamento da consulta, o agendamento entra em modo **somente visualização** (sem edição).
-3. O **Histórico de alterações** deve mostrar também se o **repasse ao médico** já foi pago (sem exibir valor).
+## Situação atual
 
----
+- `src/lib/print-gr.ts` (`printGuiaAtendimento`) gera a GR de **um único** `agendamentoId`.
+- Em `src/routes/_authenticated/app.agenda.tsx` (linha ~1079), após salvar um pagamento agrupado, é chamada `printGuiaAtendimento` apenas com `pagamentoAgId` (o principal). Os `pagamentoExtraIds` ficam de fora da impressão.
+- Resultado hoje: paciente paga 3 consultas (Dr A, Dr B, Dr C) → sai só a GR do Dr A.
 
-## 1. Data de pagamento não-editável
+## Mudanças propostas
 
-Arquivo: `src/routes/_authenticated/app.agenda.tsx` (diálogo "Editar/Novo agendamento", ~linhas 845-856).
+### 1. `src/lib/print-gr.ts` — nova função `printGuiaAtendimentoAgrupada`
 
-- Substituir o `<Input type="date">` editável por um campo somente leitura que exibe a data formatada (`dd/mm/aaaa`) quando existir, ou "—" quando ainda não houver pagamento.
-- Remover o `onChange` que altera `form.data_pagamento`.
-- Manter o campo no payload do `submit` apenas como passthrough do valor já existente (não envia `null` em update se já tinha valor).
-- Atualizar a legenda abaixo: "Preenchida automaticamente pelo sistema quando o pagamento for registrado."
+Assinatura:
+```ts
+printGuiaAtendimentoAgrupada({
+  agendamentoIds: string[],          // todos os ids (principal + extras)
+  clinicaId, usuarioNome, usuarioId,
+  pagamento: { valor, forma_pagamento, parcelas, bandeira_cartao, detalhe }
+})
+```
 
-## 2. Agendamento pago = somente visualização
+Comportamento:
+- Busca em paralelo todos os agendamentos, agrupa por `medico_id`.
+- Para cada grupo de profissional, calcula:
+  - lista de procedimentos (linhas QTD / PROCEDIMENTO)
+  - subtotal do grupo (soma dos valores dos procedimentos do médico, derivados da tabela `procedimentos` da clínica, mesma lógica de hoje)
+  - repasse clínica × prestador desse médico (usa `medico_convenios` / padrão do médico — lógica já existente reutilizada)
+- Cabeçalho único: dados da clínica, paciente, data/hora, usuário, "GUIA DE ATENDIMENTO", indicação de via.
+- Corpo: um bloco por profissional, separado por linha tracejada:
+  ```
+  PROFISSIONAL: DR. FULANO
+  QTD  PROCEDIMENTO
+   1   CONSULTA CARDIOLOGIA   R$ 150,00
+   1   ECG                     R$  80,00
+  SUBTOTAL                     R$ 230,00
+  CLINICA                      R$  46,00
+  PRESTADOR                    R$ 184,00
+  ----
+  ```
+- Rodapé único: **VALOR TOTAL RECEBIDO** (= `pagamento.valor` informado pelo caixa), forma de pagamento (com detalhe se misto, parcelas/bandeira se crédito), totais consolidados (CLINICA total / PRESTADORES total).
+- Controle de vias: registra **uma única** linha em `gr_impressoes` por id (vias separadas por agendamento permanecem por id, para manter o limite de 2 vias já existente), mas a janela de impressão é única. Reimpressão: `reimprimirGuiaAtendimentoAgrupada` repete sem incrementar.
 
-Já existe `pagosSet` indicando agendamentos pagos. Hoje só bloqueia o nome do paciente.
+A função `printGuiaAtendimento` (caso de 1 agendamento) continua existindo e é usada como atalho/fallback (a nova função pode internamente delegar para a antiga quando `agendamentoIds.length === 1`).
 
-No mesmo diálogo:
+### 2. `src/routes/_authenticated/app.agenda.tsx`
 
-- Quando `editing && pagosSet.has(editing.id)`:
-  - Trocar o título para **"Visualizar agendamento (pago)"**.
-  - Aplicar `disabled` / `readOnly` em **todos** os campos: Médico/Exame, Data consulta/exame, Procedimento, Status, Observações, botão de microfone e botão de cadastrar paciente.
-  - Esconder os botões **"Salvar"** e **"Salvar e Pagar"**; manter apenas **"Fechar"** (no lugar de Cancelar).
-  - Mostrar aviso curto no topo: "Este agendamento já foi pago. Para alterações, estorne o pagamento no Financeiro."
-- Bloquear também a função `submit` no início (early-return) caso `editing && pagosSet.has(editing.id)`, como defesa extra.
+No `onSavedWithData` (linha ~1079), substituir a chamada atual por:
 
-## 3. Histórico inclui status do repasse médico
+```ts
+const todos = [pagamentoAgId, ...pagamentoExtraIds];
+await printGuiaAtendimentoAgrupada({
+  agendamentoIds: todos,
+  clinicaId: clinicaAtual.clinica_id,
+  usuarioNome: ...,
+  usuarioId: user?.id ?? null,
+  pagamento: { valor, forma_pagamento, parcelas, bandeira_cartao, detalhe },
+});
+```
 
-Arquivo: `src/routes/_authenticated/app.agenda.tsx` (função `abrirAuditoria` ~linha 187 e diálogo ~linha 1121).
+Botão "Imprimir GR" individual (`imprimirGR`, linha 690) continua usando `printGuiaAtendimento` — sem mudança.
 
-A flag de repasse vive em `lancamentos_caixa` (campos `repasse_pago`, `repasse_pago_em`, `repasse_forma_pagamento`) e é vinculada ao agendamento via `agendamento_id`. O `audit_log` desses lançamentos é gravado pelo trigger padrão.
+## Pontos a confirmar com o usuário
 
-Mudanças em `abrirAuditoria`:
+1. Quando o pagamento agrupado é de **um único profissional** com vários procedimentos, devo mesmo assim usar o novo layout consolidado (uma seção só, com várias linhas QTD/PROCEDIMENTO)? Resposta esperada: **sim**, fica mais limpo que imprimir N guias.
+2. O **VALOR TOTAL** impresso no rodapé deve refletir exatamente o que foi cobrado no caixa (`pagamento.valor`), mesmo que difira da soma dos valores cadastrados em `procedimentos` (descontos, ajustes manuais)? Suposição: **sim**.
+3. Os blocos CLINICA / PRESTADOR por profissional devem aparecer **por médico** (como acima) **e** também um total geral no rodapé? Suposição: **sim, ambos**.
 
-- Após carregar os audits do agendamento, buscar os IDs dos `lancamentos_caixa` com `agendamento_id = a.id`.
-- Buscar no `audit_log` as linhas onde `record_id IN (ids_lancamentos)` e `table_name = 'lancamentos_caixa'`.
-- Unir os dois conjuntos numa única lista ordenada por `created_at desc`.
-
-Mudanças na renderização da lista:
-
-- Para linhas de `table_name = 'lancamentos_caixa'`, filtrar `chaves` mantendo apenas: `repasse_pago`, `repasse_pago_em`, `repasse_forma_pagamento`. **Remover explicitamente** `valor`, `valor_medico`, `valor_clinica`, `valor_total` antes de exibir.
-- Mapear rótulos amigáveis: `repasse_pago` → "Repasse ao médico", `repasse_pago_em` → "Data do repasse", `repasse_forma_pagamento` → "Forma".
-- Para `repasse_pago`, exibir "Pago" / "Pendente" em vez de `true`/`false`.
-- Se a entrada do lançamento não tem mudança em nenhum desses três campos (ex.: criou o lançamento mas ainda sem repasse), exibir uma linha resumo: "Pagamento da consulta registrado" (INSERT) ou ocultar (UPDATE sem campos relevantes).
-
-## Pontos técnicos
-
-- Nenhuma alteração de schema necessária.
-- Nenhum valor monetário será exibido no histórico (requisito explícito).
-- `pagosSet` já é populado a partir dos lançamentos pagos; reaproveitar.
-- Manter compatibilidade do payload de `submit` (campo `data_pagamento` continua sendo enviado, só não é mais editável pela UI).
-
-## Fora do escopo
-
-- Não alterar regras do Financeiro / fluxo de pagamento existente.
-- Não alterar o `Salvar e Pagar` para agendamentos novos (só fica oculto quando já pago).
-- Não mexer em outros diálogos (recepção, financeiro, etc.).
+Se as três suposições estiverem corretas, sigo direto. Caso queira ajustar algo, me avise antes da implementação.
