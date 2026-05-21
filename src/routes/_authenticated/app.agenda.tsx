@@ -811,6 +811,11 @@ function AgendaPage() {
                   Este agendamento já foi pago. Para alterações, estorne o pagamento no Financeiro.
                 </div>
               )}
+              {(() => null)()}
+              {(() => {
+                // marca de "somente leitura" reutilizada nos campos do form
+                return null;
+              })()}
               <div className="space-y-1">
                 <Label>Paciente</Label>
                 <div className="flex gap-2">
