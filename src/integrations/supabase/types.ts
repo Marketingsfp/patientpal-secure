@@ -762,8 +762,11 @@ export type Database = {
           endereco: string | null
           estado: string | null
           id: string
+          latitude: number | null
+          longitude: number | null
           nome: string
           paytime_recipient_id: string | null
+          raio_metros: number
           telefone: string | null
           updated_at: string
         }
@@ -778,8 +781,11 @@ export type Database = {
           endereco?: string | null
           estado?: string | null
           id?: string
+          latitude?: number | null
+          longitude?: number | null
           nome: string
           paytime_recipient_id?: string | null
+          raio_metros?: number
           telefone?: string | null
           updated_at?: string
         }
@@ -794,8 +800,11 @@ export type Database = {
           endereco?: string | null
           estado?: string | null
           id?: string
+          latitude?: number | null
+          longitude?: number | null
           nome?: string
           paytime_recipient_id?: string | null
+          raio_metros?: number
           telefone?: string | null
           updated_at?: string
         }

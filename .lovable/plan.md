@@ -1,42 +1,39 @@
-## Contexto
+## Objetivo
 
-Hoje existem dois cadastros parecidos no menu **Cadastros**:
+Unificar de vez clínica + unidade física: remover a aba **Unidades físicas** de `/app/unidades` e mover todos os campos do formulário de unidade física para o diálogo de **Nova/Editar clínica**.
 
-- **Clínicas** (`/app/clinicas`) — cadastra a entidade jurídica (nome, CNPJ, cidade/UF, telefone) e cria membership de admin via RPC `criar_clinica_com_admin`. É o registro "raiz" usado pelo seletor de clínica.
-- **Unidades** (`/app/unidades`) — cadastra unidades físicas vinculadas à clínica atual (endereço completo, CEP, geolocalização e raio em metros para bater ponto, status ativa/inativa).
+## Mudanças
 
-Funcionalmente são coisas diferentes (uma é a pessoa jurídica + membership, a outra são endereços operacionais), mas para o usuário aparecem como "dois cadastros de unidades". A decisão é unificar tudo sob **Unidades**.
+### 1. `src/routes/_authenticated/app.unidades.tsx`
+- Remover `Tabs` / `TabsList` / `TabsTrigger` / `TabsContent` e o componente `UnidadesFisicasTab` inteiro (e imports não usados: `Table*`, `Search`, tipo `Unidade`).
+- A página passa a renderizar diretamente `ClinicasTab` (renomear para o componente da página), mantendo header **Unidades** + subtítulo ajustado ("Cadastre suas unidades com endereço e geolocalização para bater ponto").
+- Expandir o `Dialog` de clínica (`DialogContent` com `max-w-2xl`) para incluir os campos da foto, além dos atuais (Nome, CNPJ):
+  - **Endereço** (linha inteira)
+  - **Cidade / UF / CEP** (grid 3 colunas — UF maxLength 2, uppercase)
+  - **Telefone**
+  - Seção **Geolocalização (para bater ponto)** com botão **Usar minha localização** (usa `navigator.geolocation`)
+    - **Latitude / Longitude / Raio (m)** (grid 3 colunas, raio default 200)
+  - Checkbox **Ativa**
+- Estado `form` ganha: `endereco`, `cep`, `latitude`, `longitude`, `raio_metros` (string, default "200"), `ativo` (bool, default `true`). `cidade`/`estado`/`telefone` já existem.
 
-## Plano
+### 2. Persistência
+- **Criação:** continuar chamando RPC `criar_clinica_com_admin` (com os args atuais: `_nome`, `_cnpj`, `_telefone`, `_cidade`, `_estado`). Logo após receber o `clinicaId`, fazer um `update` em `public.clinicas` com os campos extras (`endereco`, `cep`, `latitude`, `longitude`, `raio_metros`, `ativo`) — assim não precisa alterar a RPC.
+  - Se algum desses campos não existir na tabela `clinicas`, criar migration `ALTER TABLE public.clinicas ADD COLUMN ...` (endereço text, cep text, latitude numeric, longitude numeric, raio_metros integer default 200, ativo boolean default true). Verificar via schema antes; pedir aprovação da migration se necessário.
+- **Edição:** `update` direto em `clinicas` com todos os campos (já é o padrão atual, só adicionando os novos).
+- `openEdit` carrega também os novos campos do `select`.
 
-### 1. Página unificada em `/app/unidades`
+### 3. Rota antiga `app.unidades` (página de unidades físicas separada)
+- Não existe mais rota separada — o conteúdo de unidades físicas é descartado da UI. A tabela `unidades` no banco **permanece intacta** (nenhuma migration de drop). Apenas a UI deixa de expor.
+- Se houver outros lugares no app que leem `unidades` para bater ponto (ex.: `app.hr-ponto.tsx`), eles continuam funcionando — fora do escopo desta mudança.
 
-Reescrever `src/routes/_authenticated/app.unidades.tsx` para ter duas abas (`Tabs` do shadcn):
+### 4. `PendenciasAlert` / outros
+- Sem mudanças. O atalho já aponta para `/app/unidades`.
 
-- **Aba "Clínicas"** — lista de `memberships` (igual ao que `app.clinicas.tsx` já faz hoje): cards com nome, cidade/UF, role, botões **Selecionar** e **Editar**, e botão **Nova clínica** no topo da aba. Reaproveita o mesmo `Dialog` e mesma lógica (RPC `criar_clinica_com_admin` para criar, `update` em `clinicas` para editar; chama `refresh()` e `setClinicaAtual()` do `useClinica`).
-- **Aba "Unidades físicas"** — tabela atual de unidades da clínica selecionada (endereço, geolocalização, raio, ativa/inativa), com o mesmo `Dialog` de criar/editar já existente.
+## Arquivos
 
-Header da página passa a ser **Unidades** com subtítulo explicando que ali ficam tanto as clínicas (entidade) quanto as unidades físicas de cada clínica.
+- `src/routes/_authenticated/app.unidades.tsx` — reescrita removendo Tabs e expandindo dialog de clínica.
+- (condicional) Migration adicionando colunas em `public.clinicas` se faltarem.
 
-### 2. Remoção do item "Clínicas" do menu
+## Pergunta antes de implementar
 
-Em `src/components/app-shell.tsx`:
-
-- Remover a entrada `{ to: "/app/clinicas", label: "Clínicas", ... }` da seção **Cadastros**.
-- Manter apenas `{ to: "/app/unidades", label: "Unidades", ... }`.
-- Ajustar o atalho do PendenciasAlert na linha ~216 (`/cl[ií]nica/.test(t) ? "/app/clinicas"`) para apontar para `/app/unidades`.
-
-### 3. Rota antiga
-
-`src/routes/_authenticated/app.clinicas.tsx` passa a redirecionar para `/app/unidades` (via `beforeLoad` com `throw redirect({ to: "/app/unidades" })`), para não quebrar links existentes (ex.: o botão "Criar minha primeira clínica" em `app.index.tsx` e qualquer bookmark).
-
-Alternativamente o arquivo pode ser deletado; manter como redirect é mais seguro porque há referências no código a `/app/clinicas`.
-
-## Detalhes técnicos
-
-- Sem mudanças de banco, RLS ou server functions. Apenas:
-  - `src/routes/_authenticated/app.unidades.tsx` — refatorado com `Tabs` reunindo as duas UIs.
-  - `src/routes/_authenticated/app.clinicas.tsx` — vira redirect para `/app/unidades`.
-  - `src/components/app-shell.tsx` — remove item "Clínicas" e atualiza o atalho do PendenciasAlert.
-  - `src/routes/_authenticated/app.index.tsx` — atualiza o `<Link to="/app/clinicas">` para `/app/unidades`.
-- A aba padrão ao abrir `/app/unidades` será **Clínicas** quando o usuário ainda não tiver nenhuma unidade física cadastrada (ou nenhuma clínica), e **Unidades físicas** caso contrário.
+A tabela `public.clinicas` provavelmente **não** tem ainda as colunas `endereco`, `cep`, `latitude`, `longitude`, `raio_metros`, `ativo`. Posso confirmar via schema e, se faltarem, rodar uma migration para adicioná-las? Sem essas colunas o salvar dos novos campos vai falhar.
