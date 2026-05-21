@@ -50,7 +50,7 @@ function EquipePage() {
     void Promise.all([
       supabase
         .from("clinica_memberships")
-        .select("id, user_id, role, ativo, profiles:user_id(nome)")
+        .select("id, user_id, role, ativo")
         .eq("clinica_id", clinicaAtual.clinica_id)
         .neq("role", "medico"),
       supabase
@@ -58,14 +58,21 @@ function EquipePage() {
         .select("id, nome, crm, crm_uf, email, telefone, ativo")
         .eq("clinica_id", clinicaAtual.clinica_id)
         .order("nome"),
-    ]).then(([f, m]) => {
-      const rows = ((f.data ?? []) as any[]).map((r) => ({
+    ]).then(async ([f, m]) => {
+      const mems = (f.data ?? []) as Array<{ id: string; user_id: string; role: string; ativo: boolean }>;
+      const ids = Array.from(new Set(mems.map((x) => x.user_id)));
+      const nomeMap = new Map<string, string>();
+      if (ids.length) {
+        const { data: profs } = await supabase.from("profiles").select("id, nome").in("id", ids);
+        (profs ?? []).forEach((p: any) => nomeMap.set(p.id, p.nome));
+      }
+      const rows: Funcionario[] = mems.map((r) => ({
         id: r.id,
         user_id: r.user_id,
-        nome: r.profiles?.nome ?? "—",
+        nome: nomeMap.get(r.user_id) ?? "(sem nome)",
         role: r.role,
         ativo: r.ativo,
-      })) as Funcionario[];
+      }));
       rows.sort((a, b) => a.nome.localeCompare(b.nome));
       setFuncionarios(rows);
       setMedicos((m.data ?? []) as Medico[]);
