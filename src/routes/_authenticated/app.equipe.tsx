@@ -1,216 +1,237 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
-import { useServerFn } from "@tanstack/react-start";
-import { Users, Plus, Pencil } from "lucide-react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { Plus, Pencil, Users, Stethoscope } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { toast } from "sonner";
-import { listarEquipe, cadastrarUsuario, editarMembro } from "@/lib/equipe.functions";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/_authenticated/app/equipe")({
   component: EquipePage,
   head: () => ({ meta: [{ title: "Equipe — ClinicaOS" }] }),
 });
 
-interface Membership {
+interface Funcionario {
   id: string;
-  role: string;
-  user_id: string;
-  ativo: boolean;
-  nome: string | null;
-  email: string | null;
+  numero: number | null;
+  funcionario_nome: string;
+  cpf: string | null;
+  status: string | null;
+  salario: number | null;
+  data_admissao: string | null;
+  user_id: string | null;
 }
 
-const ROLES = ["admin", "gestor", "medico", "enfermeiro", "recepcao", "caixa", "financeiro"] as const;
-type RoleT = (typeof ROLES)[number];
+interface Medico {
+  id: string;
+  nome: string;
+  crm: string | null;
+  crm_uf: string | null;
+  email: string | null;
+  telefone: string | null;
+  ativo: boolean;
+}
 
 function EquipePage() {
   const { clinicaAtual } = useClinica();
-  const [team, setTeam] = useState<Membership[]>([]);
+  const navigate = useNavigate();
+  const [tab, setTab] = useState<"funcionarios" | "medicos">("funcionarios");
+  const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
+  const [medicos, setMedicos] = useState<Medico[]>([]);
   const [loading, setLoading] = useState(false);
-  const [openNovo, setOpenNovo] = useState(false);
-  const [editing, setEditing] = useState<Membership | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [openChooser, setOpenChooser] = useState(false);
+  const [busca, setBusca] = useState("");
 
-  const [novo, setNovo] = useState({ nome: "", email: "", password: "", role: "recepcao" as RoleT });
-  const [edit, setEdit] = useState({ nome: "", role: "recepcao" as RoleT, ativo: true, novaSenha: "" });
-
-  const fnList = useServerFn(listarEquipe);
-  const fnCreate = useServerFn(cadastrarUsuario);
-  const fnEdit = useServerFn(editarMembro);
-
-  const carregar = useCallback(async () => {
+  useEffect(() => {
     if (!clinicaAtual) return;
     setLoading(true);
-    try {
-      const data = await fnList({ data: { clinicaId: clinicaAtual.clinica_id } });
-      setTeam(data as Membership[]);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Erro ao carregar equipe");
-    } finally {
+    void Promise.all([
+      supabase
+        .from("hr_contratos")
+        .select("id, numero, funcionario_nome, cpf, status, salario, data_admissao, user_id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .order("funcionario_nome"),
+      supabase
+        .from("medicos")
+        .select("id, nome, crm, crm_uf, email, telefone, ativo")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .order("nome"),
+    ]).then(([f, m]) => {
+      setFuncionarios((f.data ?? []) as Funcionario[]);
+      setMedicos((m.data ?? []) as Medico[]);
       setLoading(false);
-    }
-  }, [clinicaAtual, fnList]);
+    });
+  }, [clinicaAtual?.clinica_id]);
 
-  useEffect(() => { carregar(); }, [carregar]);
-
-  const abrirNovo = () => {
-    setNovo({ nome: "", email: "", password: "", role: "recepcao" });
-    setOpenNovo(true);
+  const escolherFuncionario = () => {
+    setOpenChooser(false);
+    void navigate({ to: "/app/hr-contratos", search: { new: "1" } });
   };
-
-  const salvarNovo = async () => {
-    if (!clinicaAtual) return;
-    if (!novo.nome || !novo.email || novo.password.length < 6) {
-      toast.error("Preencha nome, email e senha (mín. 6 caracteres)");
-      return;
-    }
-    setSaving(true);
-    try {
-      await fnCreate({ data: { clinicaId: clinicaAtual.clinica_id, ...novo } });
-      toast.success("Usuário cadastrado e liberado para acessar o sistema");
-      setOpenNovo(false);
-      carregar();
-    } catch (e: any) {
-      toast.error(e?.message ?? "Erro ao cadastrar");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const abrirEdit = (m: Membership) => {
-    setEditing(m);
-    setEdit({ nome: m.nome ?? "", role: (m.role as RoleT) ?? "recepcao", ativo: m.ativo, novaSenha: "" });
-  };
-
-  const salvarEdit = async () => {
-    if (!clinicaAtual || !editing) return;
-    setSaving(true);
-    try {
-      await fnEdit({
-        data: {
-          clinicaId: clinicaAtual.clinica_id,
-          membershipId: editing.id,
-          role: edit.role,
-          ativo: edit.ativo,
-          nome: edit.nome || undefined,
-          novaSenha: edit.novaSenha || undefined,
-        },
-      });
-      toast.success("Membro atualizado");
-      setEditing(null);
-      carregar();
-    } catch (e: any) {
-      toast.error(e?.message ?? "Erro ao salvar");
-    } finally {
-      setSaving(false);
-    }
+  const escolherMedico = () => {
+    setOpenChooser(false);
+    void navigate({ to: "/app/medicos", search: { new: "1" } });
   };
 
   if (!clinicaAtual) return <p className="text-muted-foreground">Selecione uma clínica primeiro.</p>;
 
+  const q = busca.trim().toLowerCase();
+  const funcsFiltrados = q
+    ? funcionarios.filter((f) => f.funcionario_nome.toLowerCase().includes(q) || (f.cpf ?? "").includes(q))
+    : funcionarios;
+  const medicosFiltrados = q
+    ? medicos.filter((m) => m.nome.toLowerCase().includes(q) || (m.crm ?? "").includes(q))
+    : medicos;
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-semibold">Equipe</h1>
-          <p className="text-sm text-muted-foreground">Membros de {clinicaAtual.clinica.nome}. Quem for cadastrado aqui terá acesso ao sistema.</p>
+          <p className="text-sm text-muted-foreground">
+            Funcionários e médicos de {clinicaAtual.clinica.nome}. Aqui você cadastra a equipe e libera acesso ao sistema.
+          </p>
         </div>
-        <Button onClick={abrirNovo}><Plus className="h-4 w-4 mr-2" /> Novo usuário</Button>
+        <Button onClick={() => setOpenChooser(true)}>
+          <Plus className="h-4 w-4 mr-2" /> Novo cadastro
+        </Button>
       </div>
-      {loading ? (
-        <Card><CardContent className="py-12 text-center text-muted-foreground">Carregando…</CardContent></Card>
-      ) : team.length === 0 ? (
-        <Card><CardContent className="py-12 text-center text-muted-foreground">
-          <Users className="h-8 w-8 mx-auto mb-2 opacity-50" /> Nenhum membro ainda.
-        </CardContent></Card>
-      ) : (
-        <Card>
-          <Table>
-            <TableHeader><TableRow>
-              <TableHead>Nome</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Função</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="w-16 text-right">Ações</TableHead>
-            </TableRow></TableHeader>
-            <TableBody>
-              {team.map((m) => (
-                <TableRow key={m.id}>
-                  <TableCell>{m.nome ?? <span className="text-muted-foreground">—</span>}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{m.email ?? "—"}</TableCell>
-                  <TableCell><Badge variant="secondary" className="capitalize">{m.role}</Badge></TableCell>
-                  <TableCell>{m.ativo ? <Badge>Ativo</Badge> : <Badge variant="outline">Inativo</Badge>}</TableCell>
-                  <TableCell className="text-right">
-                    <Button size="icon" variant="ghost" onClick={() => abrirEdit(m)}><Pencil className="h-4 w-4" /></Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
-      )}
 
-      {/* Novo usuário */}
-      <Dialog open={openNovo} onOpenChange={setOpenNovo}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Cadastrar usuário</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div><Label>Nome</Label><Input value={novo.nome} onChange={(e) => setNovo({ ...novo, nome: e.target.value })} /></div>
-            <div><Label>Email</Label><Input type="email" value={novo.email} onChange={(e) => setNovo({ ...novo, email: e.target.value })} /></div>
-            <div><Label>Senha inicial</Label><Input type="text" value={novo.password} onChange={(e) => setNovo({ ...novo, password: e.target.value })} placeholder="Mínimo 6 caracteres" /></div>
-            <div>
-              <Label>Função</Label>
-              <Select value={novo.role} onValueChange={(v) => setNovo({ ...novo, role: v as RoleT })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{ROLES.map((r) => <SelectItem key={r} value={r} className="capitalize">{r}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpenNovo(false)}>Cancelar</Button>
-            <Button onClick={salvarNovo} disabled={saving}>{saving ? "Salvando…" : "Cadastrar"}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <Tabs value={tab} onValueChange={(v) => setTab(v as "funcionarios" | "medicos")}>
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <TabsList>
+            <TabsTrigger value="funcionarios">
+              <Users className="h-4 w-4 mr-2" /> Funcionários
+              <Badge variant="secondary" className="ml-2">{funcionarios.length}</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="medicos">
+              <Stethoscope className="h-4 w-4 mr-2" /> Médicos
+              <Badge variant="secondary" className="ml-2">{medicos.length}</Badge>
+            </TabsTrigger>
+          </TabsList>
+          <Input
+            placeholder="Buscar por nome, CPF ou CRM…"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            className="w-full sm:w-72"
+          />
+        </div>
 
-      {/* Editar */}
-      <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Editar membro</DialogTitle></DialogHeader>
-          {editing && (
-            <div className="space-y-3">
-              <div className="text-sm text-muted-foreground">{editing.email}</div>
-              <div><Label>Nome</Label><Input value={edit.nome} onChange={(e) => setEdit({ ...edit, nome: e.target.value })} /></div>
-              <div>
-                <Label>Função</Label>
-                <Select value={edit.role} onValueChange={(v) => setEdit({ ...edit, role: v as RoleT })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{ROLES.map((r) => <SelectItem key={r} value={r} className="capitalize">{r}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center justify-between rounded border p-3">
-                <div>
-                  <Label>Acesso ativo</Label>
-                  <p className="text-xs text-muted-foreground">Desative para bloquear o acesso desse usuário.</p>
-                </div>
-                <Switch checked={edit.ativo} onCheckedChange={(v) => setEdit({ ...edit, ativo: v })} />
-              </div>
-              <div><Label>Nova senha (opcional)</Label><Input type="text" value={edit.novaSenha} onChange={(e) => setEdit({ ...edit, novaSenha: e.target.value })} placeholder="Deixe em branco para manter" /></div>
-            </div>
+        <TabsContent value="funcionarios" className="mt-4">
+          {loading ? (
+            <Card><CardContent className="py-12 text-center text-muted-foreground">Carregando…</CardContent></Card>
+          ) : funcsFiltrados.length === 0 ? (
+            <Card><CardContent className="py-12 text-center text-muted-foreground">
+              <Users className="h-8 w-8 mx-auto mb-2 opacity-50" /> Nenhum funcionário cadastrado.
+            </CardContent></Card>
+          ) : (
+            <Card>
+              <Table>
+                <TableHeader><TableRow>
+                  <TableHead className="w-16">Nº</TableHead>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>CPF</TableHead>
+                  <TableHead>Admissão</TableHead>
+                  <TableHead>Acesso</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="w-16 text-right">Ações</TableHead>
+                </TableRow></TableHeader>
+                <TableBody>
+                  {funcsFiltrados.map((f) => (
+                    <TableRow key={f.id}>
+                      <TableCell className="text-muted-foreground">{f.numero ?? "—"}</TableCell>
+                      <TableCell>{f.funcionario_nome}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{f.cpf ?? "—"}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{f.data_admissao ?? "—"}</TableCell>
+                      <TableCell>{f.user_id ? <Badge>Tem login</Badge> : <Badge variant="outline">Sem login</Badge>}</TableCell>
+                      <TableCell>
+                        <Badge variant={f.status === "ativo" ? "default" : "outline"} className="capitalize">{f.status ?? "—"}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button asChild size="icon" variant="ghost">
+                          <Link to="/app/hr-contratos"><Pencil className="h-4 w-4" /></Link>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Card>
           )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditing(null)}>Cancelar</Button>
-            <Button onClick={salvarEdit} disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
-          </DialogFooter>
+        </TabsContent>
+
+        <TabsContent value="medicos" className="mt-4">
+          {loading ? (
+            <Card><CardContent className="py-12 text-center text-muted-foreground">Carregando…</CardContent></Card>
+          ) : medicosFiltrados.length === 0 ? (
+            <Card><CardContent className="py-12 text-center text-muted-foreground">
+              <Stethoscope className="h-8 w-8 mx-auto mb-2 opacity-50" /> Nenhum médico cadastrado.
+            </CardContent></Card>
+          ) : (
+            <Card>
+              <Table>
+                <TableHeader><TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>CRM</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Telefone</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="w-16 text-right">Ações</TableHead>
+                </TableRow></TableHeader>
+                <TableBody>
+                  {medicosFiltrados.map((m) => (
+                    <TableRow key={m.id}>
+                      <TableCell>{m.nome}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{m.crm ? `${m.crm}/${m.crm_uf ?? ""}` : "—"}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{m.email ?? "—"}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{m.telefone ?? "—"}</TableCell>
+                      <TableCell>{m.ativo ? <Badge>Ativo</Badge> : <Badge variant="outline">Inativo</Badge>}</TableCell>
+                      <TableCell className="text-right">
+                        <Button asChild size="icon" variant="ghost">
+                          <Link to="/app/medicos"><Pencil className="h-4 w-4" /></Link>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Card>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      <Dialog open={openChooser} onOpenChange={setOpenChooser}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>O que você quer cadastrar?</DialogTitle>
+            <DialogDescription>
+              Escolha o tipo de cadastro. Em ambos é possível liberar acesso ao sistema.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={escolherFuncionario}
+              className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-border bg-background p-6 text-center transition hover:border-primary hover:bg-accent"
+            >
+              <Users className="h-8 w-8 text-primary" />
+              <span className="font-medium">Funcionário</span>
+              <span className="text-xs text-muted-foreground">Equipe administrativa, recepção, enfermagem…</span>
+            </button>
+            <button
+              type="button"
+              onClick={escolherMedico}
+              className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-border bg-background p-6 text-center transition hover:border-primary hover:bg-accent"
+            >
+              <Stethoscope className="h-8 w-8 text-primary" />
+              <span className="font-medium">Médico</span>
+              <span className="text-xs text-muted-foreground">Profissionais com CRM, especialidades e repasse</span>
+            </button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
