@@ -1409,9 +1409,9 @@ function AgendaPage() {
                       size="icon"
                       title={pagosSet.has(a.id) ? "Pago" : "Pagamento pendente"}
                       onClick={() => cobrarAgendamento(a)}
-                      className={pagosSet.has(a.id)
-                        ? "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                        : "text-rose-600 hover:text-rose-700 hover:bg-rose-50"}
+                      className={`border-2 rounded-sm px-2 ${pagosSet.has(a.id)
+                        ? "text-emerald-600 border-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                        : "text-rose-600 border-rose-600 hover:text-rose-700 hover:bg-rose-50"}`}
                     >
                       <DollarSign className="h-4 w-4" />
                     </Button>
