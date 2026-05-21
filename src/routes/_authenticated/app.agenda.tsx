@@ -1315,7 +1315,7 @@ function AgendaPage() {
               const fichaNum = fichaPorId.get(a.id) ?? "";
               const realizado = a.status === "realizado";
               return (
-                <TableRow key={a.id} className={realizado ? "bg-emerald-50 dark:bg-emerald-950/20 [&>td]:py-1" : "[&>td]:py-1"}>
+                <TableRow key={a.id} className={realizado ? "bg-emerald-50 dark:bg-emerald-950/20 [&>td]:py-0.5" : "[&>td]:py-0.5"}>
                   <TableCell title="Marque para cobrar este atendimento em um pagamento agrupado">
                     <Checkbox checked={selecionados.has(a.id)} onCheckedChange={() => toggleSel(a.id)} />
                   </TableCell>
@@ -1337,9 +1337,12 @@ function AgendaPage() {
                          <UserPlus className="h-4 w-4 mr-1" />
                          Agendar
                        </Button>
-                     ) : (
-                       <div className="flex flex-col leading-tight">
-                         <a
+                      ) : (
+                        <div className="flex flex-col leading-none gap-0">
+                          <span className="text-[10px] uppercase tracking-wide text-muted-foreground truncate">
+                            Dr(a). {medicos.find((m) => m.id === a.medico_id)?.nome ?? "—"}
+                          </span>
+                          <a
                            href={`/app/clientes?q=${encodeURIComponent(a.paciente_nome)}`}
                            target="_blank"
                            rel="noopener noreferrer"
@@ -1349,11 +1352,6 @@ function AgendaPage() {
                            {a.status === "confirmado" && <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />}
                            {a.paciente_nome}
                          </a>
-                         {a.medico_id && (
-                           <span className="text-[11px] text-muted-foreground truncate">
-                             Dr(a). {medicos.find((m) => m.id === a.medico_id)?.nome ?? "—"}
-                           </span>
-                         )}
                        </div>
                      )}
                   </TableCell>
