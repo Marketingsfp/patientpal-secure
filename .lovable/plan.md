@@ -1,34 +1,64 @@
-## 1. Aba "Login e perfil" — mostrar e-mail real + trocar senha
+# Edição de médico em pop-up + Login/Perfil padronizado
 
-No `FuncionarioFormDialog.tsx`, ao editar um funcionário com login:
+## Problema
 
-- **Buscar o e-mail real** via `getFuncionarioLogin({ clinicaId, userId })` (server fn já existe, usa `supabaseAdmin`) em vez do atual `supabase.auth.getUser()`, que só retorna o usuário logado.
-- **Exibir o e-mail** ("E-mail de login: fulano@x.com") sempre que o funcionário tiver `user_id`.
-- **Botão "Trocar senha"** abaixo do e-mail: ao clicar, mostra dois campos (nova senha + confirmar) e um botão "Salvar nova senha" que chama uma nova server fn `definirSenhaFuncionario({ clinicaId, userId, novaSenha })`.
-  - Server fn protegida por `requireSupabaseAuth` + `assertManager` (mesmo padrão de `getFuncionarioLogin`), usa `supabaseAdmin.auth.admin.updateUserById(userId, { password })`.
-  - Validações: mínimo 6 caracteres, confirmação igual.
-  - Toast de sucesso/erro; ao concluir, limpa os campos.
-- Remover o texto "Para alterar e-mail ou senha use a tela de perfil do funcionário" (substituído pela ação inline).
+1. Na aba **Médicos** de `/app/equipe`, o lápis ainda leva o usuário para outra tela (`/app/medicos?edit=...`) que então abre o diálogo. O usuário quer que o lápis abra direto um pop-up de edição **na própria página de Equipe**, idêntico ao comportamento de Funcionário.
+2. A aba **Acesso** do médico só mostra "Criar login" — diferente do funcionário, que ao editar mostra o e-mail de login atual e um botão "Trocar senha".
 
-## 2. Lápis de médico na aba Equipe → abrir edição do médico direto
+## Solução
 
-Hoje, em `app.equipe.tsx` (linha ~204), o botão do lápis na aba Médicos é um `<Link to="/app/medicos">` sem parâmetro — leva para a listagem, sem abrir o dialog.
+Extrair o formulário gigante de médico (hoje inline em `app.medicos.tsx`, ~400 linhas) para um componente reutilizável `MedicoFormDialog`, espelhando o `FuncionarioFormDialog`. Usar esse componente tanto em `/app/medicos` quanto em `/app/equipe`. Padronizar a aba de acesso.
 
-- **Adicionar suporte a `?edit=<medicoId>`** em `app.medicos.tsx`:
-  - Estender `validateSearch` para aceitar `edit: string | undefined`.
-  - Em um `useEffect`, quando `edit` chega e os médicos já carregaram, localizar o médico pelo id e chamar `openEdit(m)`; depois limpar a URL com `navigate({ search: {}, replace: true })`.
-- **Atualizar o link na aba Médicos da Equipe** para `<Link to="/app/medicos" search={{ edit: m.id }}>`.
+## Passos
 
-Resultado: clicar no lápis na aba Médicos da Equipe leva direto ao dialog de edição do médico, sem passar pela tela de funcionários nem pela listagem.
+### 1. Criar `src/components/medicos/MedicoFormDialog.tsx`
+
+Props: `{ open, onOpenChange, clinicaId, editingMedicoId?: string | null, onSaved? }`.
+
+- Mover todo o estado e a UI das abas atuais (Dados / Especialidades / Contato / Endereço / Banco / Repasse / Acesso) do `app.medicos.tsx` para dentro deste componente.
+- Mover `openEdit`/`resetForm`/`handleSubmit`/`toggleEsp` para dentro do componente. Buscar o médico por `editingMedicoId` em um `useEffect` (similar ao que `FuncionarioFormDialog` faz com `editingUserId`).
+- Manter a criação automática de paciente e a criação de usuário do sistema exatamente como hoje.
+
+### 2. Aba **Acesso** com mesma dinâmica do funcionário
+
+Quando `editingMedicoId` está presente E o registro `medicos` tem `user_id`:
+- Buscar o e-mail via `getFuncionarioLogin({ clinicaId, userId: medico.user_id })` (função já existe e é genérica).
+- Exibir: `E-mail de login: <email>` + botão **Trocar senha** que abre os campos `Nova senha` / `Confirmar senha` e chama `definirSenhaFuncionario` (também genérica) com confirmação e toasts — mesmo layout do `FuncionarioFormDialog` (linhas 271–308).
+- Esconder o bloco "Criar login de acesso ao sistema" neste caso.
+
+Quando editando médico sem `user_id` (ou novo médico): manter o bloco atual "Criar login de acesso ao sistema" (checkbox + e-mail + senha + perfil).
+
+Nenhuma função nova de servidor é necessária — `getFuncionarioLogin` e `definirSenhaFuncionario` já operam por `userId` arbitrário e validam permissão por `assertManager(clinicaId)`.
+
+### 3. Refatorar `src/routes/_authenticated/app.medicos.tsx`
+
+- Remover toda a UI do dialog inline e o estado de formulário; apenas manter listagem, busca, exportação e o botão "Novo médico".
+- Estado local: `medicoDialog: { open: boolean; id: string | null }`.
+- "Novo médico" → `setMedicoDialog({ open: true, id: null })`.
+- Lápis da tabela → `setMedicoDialog({ open: true, id: m.id })`.
+- Renderizar `<MedicoFormDialog open={...} editingMedicoId={...} onSaved={load} />`.
+- Manter `validateSearch` com `new`/`edit` e os dois `useEffect` que sincronizam URL → estado local (continua funcionando para deep-links).
+
+### 4. Atualizar `src/routes/_authenticated/app.equipe.tsx`
+
+- Adicionar estado `medicoDialog: { open, id }` e importar `MedicoFormDialog`.
+- Substituir o link do lápis (linha 203–205) por:
+  ```tsx
+  <Button size="icon" variant="ghost" onClick={() => setMedicoDialog({ open: true, id: m.id })}>
+    <Pencil className="h-4 w-4" />
+  </Button>
+  ```
+- Alterar `escolherMedico` (linha 90) para abrir o diálogo localmente: `setMedicoDialog({ open: true, id: null })` em vez de navegar para `/app/medicos?new=1`.
+- Renderizar `<MedicoFormDialog>` ao lado do `<FuncionarioFormDialog>` no fim do JSX, com `onSaved={() => setReloadKey(k => k + 1)}`.
 
 ## Arquivos afetados
 
-- `src/lib/equipe.functions.ts` — nova server fn `definirSenhaFuncionario`.
-- `src/components/funcionarios/FuncionarioFormDialog.tsx` — aba "Login e perfil" carrega e-mail via server fn e ganha bloco de trocar senha.
-- `src/routes/_authenticated/app.medicos.tsx` — `validateSearch` aceita `edit`, novo `useEffect` abre o dialog do médico.
-- `src/routes/_authenticated/app.equipe.tsx` — link do lápis do médico passa `search={{ edit: m.id }}`.
+- **novo**: `src/components/medicos/MedicoFormDialog.tsx`
+- **edit**: `src/routes/_authenticated/app.medicos.tsx` (remove dialog inline, usa componente)
+- **edit**: `src/routes/_authenticated/app.equipe.tsx` (pop-up local em vez de navegação)
 
-## Fora do escopo
+## Fora de escopo
 
-- Trocar e-mail de login (continua sendo via tela de perfil).
-- Reset por e-mail (link "esqueci minha senha") — aqui é definição direta pelo gestor.
+- Alterar o e-mail de login do médico (continua sendo só leitura, mesmo padrão do funcionário).
+- Mexer em RLS, criação de paciente automático ou regras de repasse.
+- Criar funções de servidor novas — as do equipe.functions.ts já servem.
