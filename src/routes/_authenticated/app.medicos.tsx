@@ -38,7 +38,7 @@ interface Medico {
   ativo: boolean;
   cpf?: string | null; rg?: string | null; data_nascimento?: string | null;
   email?: string | null; telefone?: string | null;
-  nacionalidade?: string | null; estado_civil?: string | null;
+  nacionalidade?: string | null; estado_civil?: string | null; sexo?: string | null;
   cep?: string | null; logradouro?: string | null; numero?: string | null;
   complemento?: string | null; bairro?: string | null; cidade?: string | null; estado?: string | null;
   banco?: string | null; agencia?: string | null; conta?: string | null; pix_chave?: string | null;
@@ -83,6 +83,7 @@ function MedicosPage() {
     valor: "",
     cpf: "", rg: "", data_nascimento: "", email: "", telefone: "",
     nacionalidade: "Brasileira", estado_civil: "",
+    sexo: "nao_informar",
     cep: "", logradouro: "", numero: "", complemento: "", bairro: "", cidade: "", estado: "",
     banco: "", agencia: "", conta: "", pix_chave: "",
     criarUsuario: false,
@@ -136,6 +137,7 @@ function MedicosPage() {
       tipo_repasse: "percentual", percentual: "50", valor: "",
       cpf: "", rg: "", data_nascimento: "", email: "", telefone: "",
       nacionalidade: "Brasileira", estado_civil: "",
+      sexo: "nao_informar",
       cep: "", logradouro: "", numero: "", complemento: "", bairro: "", cidade: "", estado: "",
       banco: "", agencia: "", conta: "", pix_chave: "",
       criarUsuario: false, senhaUsuario: "", roleUsuario: "medico",
@@ -177,6 +179,7 @@ function MedicosPage() {
       cpf: m.cpf ?? "", rg: m.rg ?? "", data_nascimento: m.data_nascimento ?? "",
       email: m.email ?? "", telefone: m.telefone ?? "",
       nacionalidade: m.nacionalidade ?? "Brasileira", estado_civil: m.estado_civil ?? "",
+      sexo: m.sexo ?? "nao_informar",
       cep: m.cep ?? "", logradouro: m.logradouro ?? "", numero: m.numero ?? "",
       complemento: m.complemento ?? "", bairro: m.bairro ?? "", cidade: m.cidade ?? "", estado: m.estado ?? "",
       banco: m.banco ?? "", agencia: m.agencia ?? "", conta: m.conta ?? "", pix_chave: m.pix_chave ?? "",
@@ -205,6 +208,7 @@ function MedicosPage() {
       telefone: form.telefone || null,
       nacionalidade: form.nacionalidade || null,
       estado_civil: form.estado_civil || null,
+      sexo: form.sexo,
       cep: form.cep || null,
       logradouro: form.logradouro || null,
       numero: form.numero || null,
