@@ -650,11 +650,11 @@ function ProcedimentosPage() {
               </TableHeader>
               <TableBody>
                 {loading ? (
-                  <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>
                 ) : !clinicaAtual ? (
-                  <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
                 ) : filtrados.length === 0 ? (
-                  <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Nenhum procedimento.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Nenhum procedimento.</TableCell></TableRow>
                 ) : visiveis.map(p => (
                   <TableRow key={p.id} className="h-8">
                     <TableCell className="font-medium">{p.nome}</TableCell>
@@ -681,7 +681,7 @@ function ProcedimentosPage() {
                 ))}
                 {filtrados.length > visiveis.length && (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-4 text-xs text-muted-foreground bg-muted/20">
+                    <TableCell colSpan={11} className="text-center py-4 text-xs text-muted-foreground bg-muted/20">
                       Mostrando {visiveis.length} de {filtrados.length}. Use a busca ou filtros para refinar.
                     </TableCell>
                   </TableRow>
