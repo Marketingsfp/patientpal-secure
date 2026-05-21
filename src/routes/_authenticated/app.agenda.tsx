@@ -1165,26 +1165,13 @@ function AgendaPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
           <div className="space-y-0.5 rounded-md border-2 border-transparent hover:border-[var(--clinic)] p-1.5 bg-background transition-colors">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Profissional</Label>
-            <Input
-              list="medicos-filtro-list"
+            <MedicoFiltroInput
+              medicos={medicos}
+              value={filtroMedico}
+              onChange={(v) => { if (!isMedicoOnly) setFiltroMedico(v); }}
               disabled={isMedicoOnly}
-              placeholder="TODOS — digite para buscar"
-              value={filtroMedico === "todos" ? "" : (medicos.find((m) => m.id === filtroMedico)?.nome ?? "")}
-              onChange={(e) => {
-                if (isMedicoOnly) return;
-                const txt = e.target.value;
-                if (!txt.trim()) { setFiltroMedico("todos"); return; }
-                const exato = medicos.find((m) => normalizar(m.nome) === normalizar(txt));
-                if (exato) { setFiltroMedico(exato.id); return; }
-                const parcial = medicos.find((m) => normalizar(m.nome).includes(normalizar(txt)));
-                if (parcial) setFiltroMedico(parcial.id);
-              }}
+              onlyMedicoId={isMedicoOnly ? medicoLogadoId : null}
             />
-            <datalist id="medicos-filtro-list">
-              {medicos
-                .filter((m) => !isMedicoOnly || m.id === medicoLogadoId)
-                .map((m) => <option key={m.id} value={m.nome} />)}
-            </datalist>
           </div>
           <div className="space-y-0.5 rounded-md border-2 border-transparent hover:border-[var(--clinic)] p-1.5 bg-background transition-colors">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Data Ref.</Label>
