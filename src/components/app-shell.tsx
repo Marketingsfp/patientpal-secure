@@ -49,6 +49,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<{ to: string;
     label: "Operação",
     items: [
     { to: "/app/agenda", label: "Agenda", icon: CalendarDays },
+    { to: "/app/checkin", label: "Check-in", icon: KeyRound },
     { to: "/app/caixa", label: "Caixa", icon: Wallet },
     { to: "/app/cartao-beneficios", label: "Cartão Benefícios", icon: CreditCard },
     { to: "/app/chat", label: "Chat interno", icon: MessageCircle },
