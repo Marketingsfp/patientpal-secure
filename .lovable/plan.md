@@ -1,22 +1,79 @@
-## Ajustes no cadastro de Funcionário (`src/routes/_authenticated/app.hr-contratos.tsx`)
+# Página de Perfis — proposta visual (somente preview)
 
-### 1. Tamanho fixo do diálogo
-- Adicionar altura mínima fixa ao conteúdo das abas (ex.: `min-h-[480px]`) e manter `max-w-2xl` no `DialogContent`, para que ao alternar entre "Dados" e "Login e perfil" o diálogo não mude de tamanho.
+A página `/app/perfis` passa a ter **2 abas**, sem ainda persistir nada no banco. Primeiro só o layout — assim você aprova o formato antes de eu salvar permissões reais por perfil.
 
-### 2. Aba "Login e perfil" — campos sempre visíveis
-- Renderizar os campos **Perfil de acesso**, **E-mail (login)** e **Senha inicial** sempre, mesmo com o checkbox desmarcado.
-- Quando "Criar login de acesso ao sistema para este funcionário" estiver **desmarcado**, os três campos ficam `disabled` (visualmente apagados).
-- Ao marcar o checkbox, os campos passam a ser editáveis.
-- Em modo edição (`editing` definido), manter a mensagem informando que o login não pode ser alterado por aqui (sem alterar comportamento atual).
+## Aba 1 — "Perfis"
 
-### 3. Aba "Dados" — unificar "Clínica" e "Unidade"
-Como foi feito anteriormente em `app.unidades.tsx`, "Clínica" e "Unidade" passam a representar a mesma entidade (a `clinicas` agora carrega endereço/geolocalização das unidades).
-- **Remover** o campo `Unidade` (select de `unidades`) do formulário.
-- **Renomear** o label do campo `Clínica *` para `Unidade *` (continua escrevendo em `clinica_id`, que é a coluna usada para escopo/RLS).
-- Manter `unidade_id = null` ao salvar (não enviar mais esse campo no payload).
-- Remover o estado `unidades`, a query de `unidades` em `load()` e o tipo relacionado para limpar o código.
+Os 7 perfis atuais (ADMIN, GESTOR, MÉDICO, RECEPÇÃO, CAIXA, FINANCEIRO, ENFERMEIRO) deixam de ser cards e viram **uma lista (tabela) compacta** com:
 
-### Detalhes técnicos
-- Tudo permanece no arquivo `src/routes/_authenticated/app.hr-contratos.tsx`. Sem alterações de banco e sem mudanças em outras telas.
-- A coluna `unidade_id` em `hr_contratos` continua existindo no banco; apenas deixa de ser preenchida pela UI (registros antigos permanecem intactos).
-- O grid da aba "Dados" passa a ter um espaço a menos (Cargo + Setor ocupam a linha onde antes havia Unidade), mantendo o layout `grid-cols-2`.
+```text
+| Ícone | Nome do Perfil | Chave    | Descrição curta                       | Permissões (resumo) |
+|-------|----------------|----------|---------------------------------------|---------------------|
+| 🛡    | ADMIN          | admin    | Acesso total ao sistema...            | 32 módulos          |
+| 💼    | GESTOR         | gestor   | Gestão operacional da unidade...      | 18 módulos          |
+| 🩺    | MÉDICO         | medico   | Profissional clínico...               | 6 módulos           |
+| ...   |                |          |                                       |                     |
+```
+
+Clicar em uma linha **seleciona o perfil** e leva à aba "Permissões" já filtrada por ele.
+
+## Aba 2 — "Permissões"
+
+Inspirada na foto que você enviou. No topo, um **seletor de perfil** (dropdown com os 7 perfis). Abaixo, **grupos colapsáveis** espelhando a estrutura do menu lateral, e dentro de cada grupo uma tabela com os módulos.
+
+Cada linha tem 3 colunas de acesso (radio): **Sem acesso · Leitura · Edição**.
+
+```text
+▼ Operação                                                     8 / 10
+  ┌───────────────────────────┬──────────────────────────────┬────────────────────────┐
+  │ Módulo                    │ Descrição                    │ Acesso                 │
+  ├───────────────────────────┼──────────────────────────────┼────────────────────────┤
+  │ Agenda                    │ Calendário de agendamentos   │ ( ) Sem  ( ) Leit  (•) Edição │
+  │ Caixa                     │ Operação de caixa diário     │ ( ) Sem  (•) Leit  ( ) Edição │
+  │ Cartão Benefícios         │ Planos e contratos           │ (•) Sem  ( ) Leit  ( ) Edição │
+  │ Chat interno              │ Mensagens entre equipe       │ ...                          │
+  └───────────────────────────┴──────────────────────────────┴────────────────────────┘
+
+▶ Inteligência                                                 3 / 7
+▶ Marketing                                                    0 / 5
+▼ Cadastros                                                    9 / 11
+  │ Cargos               │ Cargos e funções        │ ...
+  │ Equipe               │ Usuários do sistema     │ ...
+  │ Funcionários         │ Cadastro de RH          │ ...
+  │ Perfis               │ Gestão de perfis        │ ...
+  │ ...
+▶ Gestão                                                       2 / 5
+▶ RH                                                           1 / 5
+```
+
+No topo da aba também:
+- contador global (ex.: `Acessos: 23 / 45`)
+- botões **Marcar tudo como Leitura**, **Marcar tudo como Edição**, **Limpar**
+- botão **Salvar** (desabilitado nesta etapa de preview)
+
+## Lista de módulos do sistema (que ficam atrelados ao perfil)
+
+Para popular a matriz vou usar **exatamente** o menu lateral hoje existente, agrupado por seção. Total = 45 módulos:
+
+- **Operação (10):** Agenda · Caixa · Cartão Benefícios · Chat interno · Clientes · Dashboard · Fluxo do paciente · Orçamentos · Recepção / Filas · Triagem - Enfermagem
+- **Inteligência (7):** Atendimento médico · CRM · Enfermeira IA — Alertas · Informações rápidas · Nina — WhatsApp · Odontologia · Resultados de Exames
+- **Marketing (5):** Campanhas · Envios · Landing Pages · Leads · Segmentos
+- **Cadastros (11):** Cargos · Equipe · Especialidades · Funcionários · Horários médicos · Médicos · Modelos de Prontuário · Perfis · Procedimentos · Setores · Unidades
+- **Gestão (5):** Auditoria · Financeiro · Integrações · LGPD · Relatórios
+- **RH (5):** Bater ponto · Cursos (admin) · Férias · Holerites · Treinamentos
+- **Sistema (2):** Configurações · Perfil próprio
+
+## Escopo desta entrega (preview only)
+
+- ✅ Refatorar `src/routes/_authenticated/app.perfis.tsx` com Tabs (`Perfis` / `Permissões`).
+- ✅ Lista de perfis em tabela na aba 1.
+- ✅ Matriz com grupos colapsáveis + radio (Sem / Leitura / Edição) na aba 2, com estado **local em memória** (sem banco).
+- ✅ Por padrão, ADMIN inicia tudo como "Edição" e os demais perfis com seleção sugerida visualmente (apenas mock).
+- ❌ **Não** cria tabela no banco, **não** liga ao backend, **não** aplica RLS — isso vem depois que você aprovar o formato.
+
+## Detalhes técnicos
+
+- Componentes shadcn: `Tabs`, `Table`, `RadioGroup`, `Collapsible`, `Select`, `Badge`, `Button`.
+- Constante única `MODULOS` (array agrupado) reutilizada pela aba 1 (contagem) e aba 2 (matriz).
+- Estado: `useState<Record<perfilKey, Record<moduloKey, "none" | "read" | "write">>>`.
+- Sem alteração em outros arquivos.
