@@ -75,6 +75,14 @@ const PAGE_SIZE = 15;
 const normalizar = (s: string) =>
   (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
+const primeiroValorValido = (...valores: unknown[]) => {
+  const numeros = valores.map((valor) => Number(valor)).filter((valor) => Number.isFinite(valor));
+  return numeros.find((valor) => valor > 0) ?? numeros[0] ?? 0;
+};
+
+const valorCartaoProcedimento = (proc: any) =>
+  primeiroValorValido(proc?.valor_cartao_credito, proc?.valor_cartao_debito, proc?.valor_cartao, proc?.valor_padrao);
+
 const toLocalInput = (iso: string) => {
   const d = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, "0");
