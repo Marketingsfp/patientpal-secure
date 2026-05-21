@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Plus, Pencil, Users, Stethoscope } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { FuncionarioFormDialog } from "@/components/funcionarios/FuncionarioFormDialog";
+import { MedicoFormDialog } from "@/components/medicos/MedicoFormDialog";
 
 export const Route = createFileRoute("/_authenticated/app/equipe")({
   component: EquipePage,
@@ -37,7 +38,6 @@ interface Medico {
 
 function EquipePage() {
   const { clinicaAtual } = useClinica();
-  const navigate = useNavigate();
   const [tab, setTab] = useState<"funcionarios" | "medicos">("funcionarios");
   const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
   const [medicos, setMedicos] = useState<Medico[]>([]);
@@ -45,6 +45,7 @@ function EquipePage() {
   const [openChooser, setOpenChooser] = useState(false);
   const [busca, setBusca] = useState("");
   const [funcDialog, setFuncDialog] = useState<{ open: boolean; userId?: string | null }>({ open: false, userId: null });
+  const [medicoDialog, setMedicoDialog] = useState<{ open: boolean; id: string | null }>({ open: false, id: null });
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
@@ -89,7 +90,7 @@ function EquipePage() {
   };
   const escolherMedico = () => {
     setOpenChooser(false);
-    void navigate({ to: "/app/medicos", search: { new: "1" } });
+    setMedicoDialog({ open: true, id: null });
   };
 
   if (!clinicaAtual) return <p className="text-muted-foreground">Selecione uma clínica primeiro.</p>;
@@ -200,8 +201,8 @@ function EquipePage() {
                       <TableCell className="text-sm text-muted-foreground">{m.telefone ?? "—"}</TableCell>
                       <TableCell>{m.ativo ? <Badge>Ativo</Badge> : <Badge variant="outline">Inativo</Badge>}</TableCell>
                       <TableCell className="text-right">
-                        <Button asChild size="icon" variant="ghost">
-                          <Link to="/app/medicos" search={{ edit: m.id }}><Pencil className="h-4 w-4" /></Link>
+                        <Button size="icon" variant="ghost" onClick={() => setMedicoDialog({ open: true, id: m.id })}>
+                          <Pencil className="h-4 w-4" />
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -250,6 +251,15 @@ function EquipePage() {
           onOpenChange={(o) => setFuncDialog((s) => ({ ...s, open: o }))}
           clinicaId={clinicaAtual.clinica_id}
           editingUserId={funcDialog.userId ?? null}
+          onSaved={() => setReloadKey((k) => k + 1)}
+        />
+      )}
+      {clinicaAtual && (
+        <MedicoFormDialog
+          open={medicoDialog.open}
+          onOpenChange={(o) => setMedicoDialog((s) => ({ ...s, open: o }))}
+          clinicaId={clinicaAtual.clinica_id}
+          editingMedicoId={medicoDialog.id}
           onSaved={() => setReloadKey((k) => k + 1)}
         />
       )}
