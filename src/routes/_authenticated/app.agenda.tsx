@@ -1494,6 +1494,17 @@ function AgendaPage() {
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
+                    {pagosSet.has(a.id) && ["aguardando_recepcao","recepcao"].includes(etapaMap.get(a.id) ?? "aguardando_recepcao") && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Confirmar presença (check-in)"
+                        onClick={() => confirmarPresenca(a)}
+                        className="border-2 rounded-sm px-2 mr-1 text-emerald-700 border-emerald-600 hover:bg-emerald-50"
+                      >
+                        <BadgeCheck className="h-4 w-4" />
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="icon"
