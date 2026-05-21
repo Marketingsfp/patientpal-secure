@@ -224,7 +224,7 @@ function ContratosPage() {
               <div className="col-span-2">
                 <Label>Clínica *</Label>
                 <Select value={form.clinica_id} onValueChange={v => setForm({ ...form, clinica_id: v })}>
-                  <SelectTrigger><SelectValue placeholder="Selecione a clínica" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Selecione a unidade" /></SelectTrigger>
                   <SelectContent>
                     {memberships.map(m => (
                       <SelectItem key={m.clinica_id} value={m.clinica_id}>{m.clinica.nome}</SelectItem>
@@ -258,13 +258,6 @@ function ContratosPage() {
                 <Select value={form.setor_id} onValueChange={v => setForm({ ...form, setor_id: v })}>
                   <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                   <SelectContent>{setores.map(s => <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Unidade</Label>
-                <Select value={form.unidade_id} onValueChange={v => setForm({ ...form, unidade_id: v })}>
-                  <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                  <SelectContent>{unidades.map(u => <SelectItem key={u.id} value={u.id}>{u.nome}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div><Label>Carga semanal (h)</Label><Input type="number" step="0.5" value={form.carga_horaria_semanal} onChange={e => setForm({ ...form, carga_horaria_semanal: e.target.value })} /></div>
