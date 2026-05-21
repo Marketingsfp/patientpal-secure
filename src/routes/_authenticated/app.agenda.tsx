@@ -53,6 +53,7 @@ type Agendamento = {
   procedimento: string | null;
   status: Status;
   observacoes: string | null;
+  data_pagamento?: string | null;
 };
 type Medico = { id: string; nome: string };
 type Especialidade = { id: string; nome: string };
@@ -93,6 +94,7 @@ const EMPTY = {
   paciente_nome: "", paciente_id: "", medico_id: "",
   inicio: "", fim: "", procedimento: "",
   status: "agendado" as Status, observacoes: "",
+  data_pagamento: "",
 };
 
 function AgendaPage() {
