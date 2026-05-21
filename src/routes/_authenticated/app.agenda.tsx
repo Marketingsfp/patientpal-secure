@@ -189,15 +189,35 @@ function AgendaPage() {
     setAuditLoading(true);
     setAuditRows([]);
     void carregarEquipe();
-    const { data, error } = await supabase
+    // 1) histórico do próprio agendamento
+    const { data: agAudit, error } = await supabase
       .from("audit_log" as never)
       .select("id, action, table_name, user_email, created_at, dados_antes, dados_depois")
       .eq("record_id", a.id)
       .order("created_at", { ascending: false })
       .limit(200);
+    if (error) { setAuditLoading(false); toast.error(error.message); return; }
+    // 2) lançamentos financeiros vinculados ao agendamento (para status do repasse médico)
+    const { data: lancs } = await supabase
+      .from("fin_lancamentos")
+      .select("id")
+      .eq("agendamento_id", a.id);
+    const lancIds = (lancs ?? []).map((l) => l.id);
+    let lancAudit: AuditRow[] = [];
+    if (lancIds.length > 0) {
+      const { data: la } = await supabase
+        .from("audit_log" as never)
+        .select("id, action, table_name, user_email, created_at, dados_antes, dados_depois")
+        .in("record_id", lancIds)
+        .eq("table_name", "fin_lancamentos")
+        .order("created_at", { ascending: false })
+        .limit(200);
+      lancAudit = (la as unknown as AuditRow[]) ?? [];
+    }
+    const todos = [...((agAudit as unknown as AuditRow[]) ?? []), ...lancAudit]
+      .sort((x, y) => (x.created_at < y.created_at ? 1 : -1));
     setAuditLoading(false);
-    if (error) { toast.error(error.message); return; }
-    setAuditRows((data as unknown as AuditRow[]) ?? []);
+    setAuditRows(todos);
   };
 
   const cadastrarPacienteRapido = async (e: FormEvent) => {
