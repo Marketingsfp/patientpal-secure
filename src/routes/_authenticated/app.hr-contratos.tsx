@@ -324,6 +324,18 @@ function ContratosPage() {
                   </SelectContent>
                 </Select>
               </div>
+              <div>
+                <Label>Sexo</Label>
+                <Select value={form.sexo} onValueChange={v => setForm({ ...form, sexo: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="masculino">Masculino</SelectItem>
+                    <SelectItem value="feminino">Feminino</SelectItem>
+                    <SelectItem value="outro">Outro</SelectItem>
+                    <SelectItem value="nao_informar">Prefiro não informar</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               </div>
             </TabsContent>
             <TabsContent value="login" className="space-y-3 min-h-[480px] max-h-[70vh] overflow-y-auto pr-1">
