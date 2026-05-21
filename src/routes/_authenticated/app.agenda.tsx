@@ -1336,7 +1336,7 @@ function AgendaPage() {
                             size="sm"
                             onClick={() => openSlot(a)}
                             title="Agendar paciente neste horário"
-                            className="h-6 px-2 text-muted-foreground hover:text-primary"
+                            className="h-6 px-2 text-emerald-600 hover:text-emerald-700 font-medium"
                           >
                             <UserPlus className="h-3.5 w-3.5 mr-1" />
                             Agendar cliente
