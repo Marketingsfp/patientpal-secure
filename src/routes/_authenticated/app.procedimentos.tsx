@@ -663,6 +663,8 @@ function ProcedimentosPage() {
                       <span className={`text-[10px] px-1.5 py-0 rounded-full ${TIPO_COR[p.tipo]}`}>{TIPO_LABEL[p.tipo]}</span>
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_dinheiro ?? p.valor_dinheiro_pix))}</TableCell>
+                    <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_pix ?? p.valor_cartao_credito ?? p.valor_cartao_debito ?? p.valor_cartao))}</TableCell>
+                    <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_cartao_debito ?? p.valor_cartao_credito ?? p.valor_cartao))}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_cartao_credito ?? p.valor_cartao_debito ?? p.valor_cartao))}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_cartao_consulta))}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_cartao_desconto))}</TableCell>
