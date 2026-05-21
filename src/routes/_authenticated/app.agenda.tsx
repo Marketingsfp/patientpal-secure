@@ -1076,10 +1076,11 @@ function AgendaPage() {
             setSelecionados(new Set());
           }
           try {
-            await printGuiaAtendimento({
-              agendamentoId: pagamentoAgId,
+            await printGuiaAtendimentoAgrupada({
+              agendamentoIds: [pagamentoAgId, ...pagamentoExtraIds],
               clinicaId: clinicaAtual.clinica_id,
               usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
+              usuarioId: user?.id ?? null,
               pagamento: {
                 valor: dados.valor,
                 forma_pagamento: dados.forma_pagamento,
