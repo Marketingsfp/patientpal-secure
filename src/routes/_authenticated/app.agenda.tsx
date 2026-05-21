@@ -211,8 +211,12 @@ function AgendaPage() {
       .from("agendamentos")
       .select("id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico")
       .eq("clinica_id", clinicaAtual.clinica_id)
-      .order("inicio");
-    if (apenasData) {
+      .order("inicio", { ascending: false });
+    const statusEspecifico = filtroStatus !== "todos" && filtroStatus !== "livres";
+    if (statusEspecifico) {
+      // Quando filtra por situação específica, busca em todo o histórico
+      q = q.eq("status", filtroStatus as Status).limit(1000);
+    } else if (apenasData) {
       const inicio = new Date(`${dataRef}T00:00:00`).toISOString();
       const fimDia = dataFim ?? dataRef;
       const fim = new Date(`${fimDia}T23:59:59`).toISOString();
@@ -288,7 +292,7 @@ function AgendaPage() {
   };
 
   useEffect(() => { loadRef(); }, [clinicaAtual?.clinica_id]);
-  useEffect(() => { load(); }, [clinicaAtual?.clinica_id, dataRef, dataFim, apenasData]);
+  useEffect(() => { load(); }, [clinicaAtual?.clinica_id, dataRef, dataFim, apenasData, filtroStatus]);
 
   // Perfil de médico: trava o filtro no próprio profissional
   useEffect(() => {
