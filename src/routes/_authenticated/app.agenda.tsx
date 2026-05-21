@@ -215,7 +215,7 @@ function AgendaPage() {
     const statusEspecifico = filtroStatus !== "todos" && filtroStatus !== "livres";
     if (statusEspecifico) {
       // Quando filtra por situação específica, busca em todo o histórico
-      q = q.eq("status", filtroStatus).limit(1000);
+      q = q.eq("status", filtroStatus as Status).limit(1000);
     } else if (apenasData) {
       const inicio = new Date(`${dataRef}T00:00:00`).toISOString();
       const fimDia = dataFim ?? dataRef;
