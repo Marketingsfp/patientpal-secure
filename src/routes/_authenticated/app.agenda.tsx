@@ -75,6 +75,14 @@ const PAGE_SIZE = 15;
 const normalizar = (s: string) =>
   (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
+const primeiroValorValido = (...valores: unknown[]) => {
+  const numeros = valores.map((valor) => Number(valor)).filter((valor) => Number.isFinite(valor));
+  return numeros.find((valor) => valor > 0) ?? numeros[0] ?? 0;
+};
+
+const valorCartaoProcedimento = (proc: any) =>
+  primeiroValorValido(proc?.valor_cartao_credito, proc?.valor_cartao_debito, proc?.valor_cartao, proc?.valor_padrao);
+
 const toLocalInput = (iso: string) => {
   const d = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -439,10 +447,11 @@ function AgendaPage() {
     let totalDinheiro = 0, totalPix = 0, totalDebito = 0, totalCredito = 0;
     for (const it of itens) {
       const p: any = acharProc(it.procedimento ?? "CONSULTA");
-      totalDinheiro += Number(p?.valor_dinheiro ?? p?.valor_dinheiro_pix ?? p?.valor_padrao ?? 0);
-      totalPix      += Number(p?.valor_pix ?? p?.valor_cartao_credito ?? p?.valor_cartao_debito ?? p?.valor_cartao ?? p?.valor_padrao ?? 0);
-      totalDebito   += Number(p?.valor_cartao_debito ?? p?.valor_cartao ?? p?.valor_padrao ?? 0);
-      totalCredito  += Number(p?.valor_cartao_credito ?? p?.valor_cartao ?? p?.valor_padrao ?? 0);
+      const valorCartao = valorCartaoProcedimento(p);
+      totalDinheiro += primeiroValorValido(p?.valor_dinheiro, p?.valor_dinheiro_pix, p?.valor_padrao);
+      totalPix      += valorCartao;
+      totalDebito   += valorCartao;
+      totalCredito  += valorCartao;
     }
     const paciente = itens[0].paciente_nome;
     const desc = `${paciente} — ${itens.map(i => (i.procedimento ?? "CONSULTA")).join(" + ")} (${itens.length} itens)`;
@@ -540,10 +549,11 @@ function AgendaPage() {
         .limit(5000);
       const proc: any = (lista ?? []).find((p) => normalizar(p.nome ?? "") === nomeBusca)
         ?? (lista ?? []).find((p) => normalizar(p.nome ?? "").includes(nomeBusca));
-      const vDinheiro = Number(proc?.valor_dinheiro ?? proc?.valor_dinheiro_pix ?? proc?.valor_padrao ?? 0);
-      const vPix = Number(proc?.valor_pix ?? proc?.valor_cartao_credito ?? proc?.valor_cartao_debito ?? proc?.valor_cartao ?? proc?.valor_padrao ?? 0);
-      const vDebito = Number(proc?.valor_cartao_debito ?? proc?.valor_cartao ?? proc?.valor_padrao ?? 0);
-      const vCredito = Number(proc?.valor_cartao_credito ?? proc?.valor_cartao ?? proc?.valor_padrao ?? 0);
+      const valorCartao = valorCartaoProcedimento(proc);
+      const vDinheiro = primeiroValorValido(proc?.valor_dinheiro, proc?.valor_dinheiro_pix, proc?.valor_padrao);
+      const vPix = valorCartao;
+      const vDebito = valorCartao;
+      const vCredito = valorCartao;
       const opcoes: FormaOpcao[] = [
         { forma: "dinheiro", label: "Dinheiro", valor: vDinheiro },
         { forma: "pix", label: "Pix", valor: vPix },
@@ -585,10 +595,11 @@ function AgendaPage() {
       .limit(5000);
     const proc = (lista ?? []).find((p) => normalizar(p.nome ?? "") === nomeBusca)
       ?? (lista ?? []).find((p) => normalizar(p.nome ?? "").includes(nomeBusca));
-    const vDinheiro = Number(proc?.valor_dinheiro ?? proc?.valor_dinheiro_pix ?? proc?.valor_padrao ?? 0);
-    const vPix = Number(proc?.valor_pix ?? proc?.valor_cartao_credito ?? proc?.valor_cartao_debito ?? proc?.valor_cartao ?? proc?.valor_padrao ?? 0);
-    const vDebito = Number(proc?.valor_cartao_debito ?? proc?.valor_cartao ?? proc?.valor_padrao ?? 0);
-    const vCredito = Number(proc?.valor_cartao_credito ?? proc?.valor_cartao ?? proc?.valor_padrao ?? 0);
+    const valorCartao = valorCartaoProcedimento(proc);
+    const vDinheiro = primeiroValorValido(proc?.valor_dinheiro, proc?.valor_dinheiro_pix, proc?.valor_padrao);
+    const vPix = valorCartao;
+    const vDebito = valorCartao;
+    const vCredito = valorCartao;
     const opcoes: FormaOpcao[] = [
       { forma: "dinheiro", label: "Dinheiro", valor: vDinheiro },
       { forma: "pix", label: "Pix", valor: vPix },
