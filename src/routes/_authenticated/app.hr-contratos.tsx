@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Users, Plus, Pencil, Search } from "lucide-react";
 import { toast } from "sonner";
 import { formatDatePura } from "@/lib/date-utils";
@@ -216,8 +217,13 @@ function ContratosPage() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>{editing ? "Editar funcionário" : "Novo funcionário"}</DialogTitle></DialogHeader>
-          <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
-            <div className="grid grid-cols-2 gap-3">
+          <Tabs defaultValue="dados" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="dados">Dados</TabsTrigger>
+              <TabsTrigger value="login">Login e perfil</TabsTrigger>
+            </TabsList>
+            <TabsContent value="dados" className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
+              <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2">
                 <Label>Clínica *</Label>
                 <Select value={form.clinica_id} onValueChange={v => setForm({ ...form, clinica_id: v })}>
@@ -280,10 +286,15 @@ function ContratosPage() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-
-            {!editing && (
-              <div className="border-t pt-3 mt-2 space-y-3">
+              </div>
+            </TabsContent>
+            <TabsContent value="login" className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
+              {editing ? (
+                <p className="text-sm text-muted-foreground py-4">
+                  O login não pode ser alterado por aqui após o cadastro do funcionário.
+                </p>
+              ) : (
+                <div className="space-y-3">
                 <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
                   <input
                     type="checkbox"
@@ -308,9 +319,10 @@ function ContratosPage() {
                     <div><Label>Senha inicial *</Label><Input type="text" value={form.senha} onChange={e => setForm({ ...form, senha: e.target.value })} placeholder="Mín. 6 caracteres" /></div>
                   </div>
                 )}
-              </div>
-            )}
-          </div>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
             <Button onClick={salvar} disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
