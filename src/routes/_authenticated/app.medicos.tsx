@@ -25,6 +25,9 @@ import { cadastrarUsuario } from "@/lib/equipe.functions";
 export const Route = createFileRoute("/_authenticated/app/medicos")({
   component: MedicosPage,
   head: () => ({ meta: [{ title: "Médicos — ClinicaOS" }] }),
+  validateSearch: (search: Record<string, unknown>) => ({
+    new: search.new === "1" || search.new === 1 ? "1" : undefined,
+  }),
 });
 
 interface Medico {
