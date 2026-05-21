@@ -811,11 +811,10 @@ function AgendaPage() {
                   Este agendamento já foi pago. Para alterações, estorne o pagamento no Financeiro.
                 </div>
               )}
-              {(() => null)()}
-              {(() => {
-                // marca de "somente leitura" reutilizada nos campos do form
-                return null;
-              })()}
+              <fieldset
+                disabled={editing ? pagosSet.has(editing.id) : false}
+                className="space-y-3 contents disabled:opacity-90"
+              >
               <div className="space-y-1">
                 <Label>Paciente</Label>
                 <div className="flex gap-2">
