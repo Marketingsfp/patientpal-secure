@@ -29,7 +29,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import {
   CalendarDays, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X,
-  MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, Clock, DollarSign, ShieldCheck,
+  MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, Clock, DollarSign, ShieldCheck, BadgeCheck,
 } from "lucide-react";
 import { printGuiaAtendimento, printGuiaAtendimentoAgrupada } from "@/lib/print-gr";
 import { VoiceInput } from "@/components/voice-input";
@@ -124,6 +124,7 @@ function AgendaPage() {
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [items, setItems] = useState<Agendamento[]>([]);
   const [pagosSet, setPagosSet] = useState<Set<string>>(new Set());
+  const [etapaMap, setEtapaMap] = useState<Map<string, string>>(new Map());
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [exames, setExames] = useState<{ id: string; nome: string }[]>([]);
   const [procedimentosList, setProcedimentosList] = useState<{ id: string; nome: string }[]>([]);
@@ -256,7 +257,7 @@ function AgendaPage() {
     setLoading(true);
     let q = supabase
       .from("agendamentos")
-      .select("id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento")
+      .select("id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("inicio", { ascending: false });
     const statusEspecifico = filtroStatus !== "todos" && filtroStatus !== "livres";
@@ -281,6 +282,8 @@ function AgendaPage() {
     setItems((data ?? []) as Agendamento[]);
     setPage(1);
     setSelecionados(new Set());
+    setEtapaMap(new Map(((data ?? []) as Array<{ id: string; fluxo_etapa?: string | null }>)
+      .map((r) => [r.id, r.fluxo_etapa ?? "aguardando_recepcao"] as [string, string])));
     // Marca agendamentos pagos (receita vinculada em fin_lancamentos)
     const ids = (data ?? []).map((a) => a.id);
     if (ids.length) {
@@ -655,6 +658,16 @@ function AgendaPage() {
     setFormaPagOpcoes(opcoes);
     setFormaPagCtx({ agId: a.id, desc: `${a.paciente_nome} — ${a.procedimento ?? "CONSULTA"}` });
     setFormaPagOpen(true);
+  };
+
+  const confirmarPresenca = async (a: Agendamento) => {
+    const { error } = await supabase
+      .from("agendamentos")
+      .update({ fluxo_etapa: "triagem", fluxo_atualizado_em: new Date().toISOString() } as never)
+      .eq("id", a.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Presença confirmada — paciente liberado para a triagem");
+    setEtapaMap((m) => { const n = new Map(m); n.set(a.id, "triagem"); return n; });
   };
 
   const escolherForma = (op: FormaOpcao) => {
@@ -1481,6 +1494,17 @@ function AgendaPage() {
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
+                    {pagosSet.has(a.id) && ["aguardando_recepcao","recepcao"].includes(etapaMap.get(a.id) ?? "aguardando_recepcao") && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Confirmar presença (check-in)"
+                        onClick={() => confirmarPresenca(a)}
+                        className="border-2 rounded-sm px-2 mr-1 text-emerald-700 border-emerald-600 hover:bg-emerald-50"
+                      >
+                        <BadgeCheck className="h-4 w-4" />
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="icon"

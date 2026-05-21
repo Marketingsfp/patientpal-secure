@@ -1,6 +1,6 @@
 import { Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
-import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet, ChevronLeft, ChevronRight, ChevronDown, Search, HeartPulse, Contact, ConciergeBell, Briefcase, MapPin, Palmtree, GraduationCap, Sparkles, Filter, Send, Megaphone, KeyRound } from "lucide-react";
+import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet, ChevronLeft, ChevronRight, ChevronDown, Search, HeartPulse, Contact, ConciergeBell, Briefcase, MapPin, Palmtree, GraduationCap, Sparkles, Filter, Send, Megaphone, KeyRound, BadgeCheck } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
@@ -49,6 +49,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<{ to: string;
     label: "Operação",
     items: [
     { to: "/app/agenda", label: "Agenda", icon: CalendarDays },
+    { to: "/app/checkin", label: "Check-in", icon: BadgeCheck },
     { to: "/app/caixa", label: "Caixa", icon: Wallet },
     { to: "/app/cartao-beneficios", label: "Cartão Benefícios", icon: CreditCard },
     { to: "/app/chat", label: "Chat interno", icon: MessageCircle },
