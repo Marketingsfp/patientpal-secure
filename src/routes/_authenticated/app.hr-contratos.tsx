@@ -219,10 +219,10 @@ function ContratosPage() {
               <TabsTrigger value="dados">Dados</TabsTrigger>
               <TabsTrigger value="login">Login e perfil</TabsTrigger>
             </TabsList>
-            <TabsContent value="dados" className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
+            <TabsContent value="dados" className="space-y-3 min-h-[480px] max-h-[70vh] overflow-y-auto pr-1">
               <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2">
-                <Label>Clínica *</Label>
+                <Label>Unidade *</Label>
                 <Select value={form.clinica_id} onValueChange={v => setForm({ ...form, clinica_id: v })}>
                   <SelectTrigger><SelectValue placeholder="Selecione a unidade" /></SelectTrigger>
                   <SelectContent>
@@ -278,7 +278,7 @@ function ContratosPage() {
               </div>
               </div>
             </TabsContent>
-            <TabsContent value="login" className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
+            <TabsContent value="login" className="space-y-3 min-h-[480px] max-h-[70vh] overflow-y-auto pr-1">
               {editing ? (
                 <p className="text-sm text-muted-foreground py-4">
                   O login não pode ser alterado por aqui após o cadastro do funcionário.
@@ -294,21 +294,19 @@ function ContratosPage() {
                   />
                   Criar login de acesso ao sistema para este funcionário
                 </label>
-                {form.criar_login && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="col-span-2">
-                      <Label>Perfil de acesso *</Label>
-                      <Select value={form.perfil} onValueChange={v => setForm({ ...form, perfil: v })}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {PERFIS.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div><Label>E-mail (login) *</Label><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
-                    <div><Label>Senha inicial *</Label><Input type="text" value={form.senha} onChange={e => setForm({ ...form, senha: e.target.value })} placeholder="Mín. 6 caracteres" /></div>
+                <fieldset disabled={!form.criar_login} className="grid grid-cols-2 gap-3 disabled:opacity-60">
+                  <div className="col-span-2">
+                    <Label>Perfil de acesso *</Label>
+                    <Select value={form.perfil} onValueChange={v => setForm({ ...form, perfil: v })} disabled={!form.criar_login}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {PERFIS.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   </div>
-                )}
+                  <div><Label>E-mail (login) *</Label><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} disabled={!form.criar_login} /></div>
+                  <div><Label>Senha inicial *</Label><Input type="text" value={form.senha} onChange={e => setForm({ ...form, senha: e.target.value })} placeholder="Mín. 6 caracteres" disabled={!form.criar_login} /></div>
+                </fieldset>
                 </div>
               )}
             </TabsContent>
