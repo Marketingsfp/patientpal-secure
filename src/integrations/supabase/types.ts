@@ -4790,6 +4790,7 @@ export type Database = {
         | "enfermeiro"
         | "recepcao"
         | "financeiro"
+        | "caixa"
       app_role_global:
         | "admin"
         | "tesouraria"
@@ -5019,6 +5020,7 @@ export const Constants = {
         "enfermeiro",
         "recepcao",
         "financeiro",
+        "caixa",
       ],
       app_role_global: [
         "admin",
