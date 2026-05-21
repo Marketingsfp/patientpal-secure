@@ -22,6 +22,7 @@ export const Route = createFileRoute("/_authenticated/app/hr-contratos")({
   head: () => ({ meta: [{ title: "Funcionários — ClinicaOS" }] }),
   validateSearch: (search: Record<string, unknown>) => ({
     new: search.new === "1" || search.new === 1 ? "1" : undefined,
+    edit: typeof search.edit === "string" ? search.edit : undefined,
   }),
 });
 
@@ -30,7 +31,7 @@ interface Contrato {
   cargo_id: string | null; setor_id: string | null; unidade_id: string | null;
   regime: string; carga_horaria_semanal: number; salario: number;
   data_admissao: string; data_demissao: string | null; status: string;
-  user_id: string | null;
+  user_id: string | null; sexo?: string | null;
 }
 interface Ref { id: string; nome: string }
 
@@ -45,7 +46,7 @@ const PERFIS = [
 
 function ContratosPage() {
   const { clinicaAtual, memberships } = useClinica();
-  const { new: autoNew } = Route.useSearch();
+  const { new: autoNew, edit: autoEdit } = Route.useSearch();
   const navigate = useNavigate();
   const cadastrarUsuarioFn = useServerFn(cadastrarUsuario);
   const [rows, setRows] = useState<Contrato[]>([]);
@@ -59,6 +60,7 @@ function ContratosPage() {
     clinica_id: "", funcionario_nome: "", cpf: "", cargo_id: "", setor_id: "", unidade_id: "",
     regime: "clt", carga_horaria_semanal: "44", salario: "0",
     data_admissao: new Date().toISOString().slice(0, 10), data_demissao: "", status: "ativo",
+    sexo: "nao_informar",
     criar_login: false, email: "", senha: "", perfil: "recepcao",
   });
   const [saving, setSaving] = useState(false);
@@ -87,19 +89,50 @@ function ContratosPage() {
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [autoNew, clinicaAtual?.clinica_id]);
 
+  useEffect(() => {
+    if (!autoEdit || !clinicaAtual || loading) return;
+    void (async () => {
+      const existing = rows.find(r => r.user_id === autoEdit);
+      if (existing) {
+        openEdit(existing);
+      } else {
+        // Sem contrato ainda — abrir novo já vinculado a este usuário
+        const { data: prof } = await supabase.from("profiles").select("nome").eq("id", autoEdit).maybeSingle();
+        setEditing(null);
+        setForm({
+          clinica_id: clinicaAtual.clinica_id,
+          funcionario_nome: (prof?.nome ?? "").toString(), cpf: "", cargo_id: "", setor_id: "", unidade_id: "",
+          regime: "clt", carga_horaria_semanal: "44", salario: "0",
+          data_admissao: new Date().toISOString().slice(0, 10), data_demissao: "", status: "ativo",
+          sexo: "nao_informar",
+          criar_login: false, email: "", senha: "", perfil: "recepcao",
+        });
+        setPrefillUserId(autoEdit);
+        setOpen(true);
+      }
+      void navigate({ to: "/app/hr-contratos", search: {}, replace: true });
+    })();
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [autoEdit, clinicaAtual?.clinica_id, loading]);
+
+  const [prefillUserId, setPrefillUserId] = useState<string | null>(null);
+
   function openNew() {
     setEditing(null);
+    setPrefillUserId(null);
     setForm({
       clinica_id: clinicaAtual?.clinica_id ?? "",
       funcionario_nome: "", cpf: "", cargo_id: "", setor_id: "", unidade_id: "",
       regime: "clt", carga_horaria_semanal: "44", salario: "0",
       data_admissao: new Date().toISOString().slice(0, 10), data_demissao: "", status: "ativo",
+      sexo: "nao_informar",
       criar_login: false, email: "", senha: "", perfil: "recepcao",
     });
     setOpen(true);
   }
   function openEdit(c: Contrato) {
     setEditing(c);
+    setPrefillUserId(null);
     setForm({
       clinica_id: c.clinica_id,
       funcionario_nome: c.funcionario_nome, cpf: c.cpf ?? "",
@@ -107,6 +140,7 @@ function ContratosPage() {
       regime: c.regime, carga_horaria_semanal: String(c.carga_horaria_semanal),
       salario: String(c.salario), data_admissao: c.data_admissao,
       data_demissao: c.data_demissao ?? "", status: c.status,
+      sexo: c.sexo ?? "nao_informar",
       criar_login: false, email: "", senha: "", perfil: "recepcao",
     });
     setOpen(true);
@@ -155,7 +189,8 @@ function ContratosPage() {
       data_admissao: form.data_admissao,
       data_demissao: form.data_demissao || null,
       status: form.status,
-      ...(userId ? { user_id: userId } : {}),
+      sexo: form.sexo,
+      ...(userId ? { user_id: userId } : prefillUserId ? { user_id: prefillUserId } : {}),
     };
     const { error } = editing
       ? await supabase.from("hr_contratos").update(payload).eq("id", editing.id)
