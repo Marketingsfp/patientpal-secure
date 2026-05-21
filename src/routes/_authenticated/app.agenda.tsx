@@ -827,20 +827,16 @@ function AgendaPage() {
                     <Input type="datetime-local" value={form.inicio} onChange={(e) => setForm(f => ({ ...f, inicio: e.target.value, fim: calcFimAuto(e.target.value, f.medico_id) }))} required />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs">Fim</Label>
-                    <Input type="datetime-local" value={form.fim} onChange={(e) => setForm(f => ({ ...f, fim: e.target.value }))} required />
+                    <Label className="text-xs">Data de pagamento</Label>
+                    <Input
+                      type="date"
+                      value={form.data_pagamento}
+                      onChange={(e) => setForm(f => ({ ...f, data_pagamento: e.target.value }))}
+                    />
                   </div>
                 </div>
-              </div>
-              <div className="space-y-1">
-                <Label>Data de pagamento</Label>
-                <Input
-                  type="date"
-                  value={form.data_pagamento}
-                  onChange={(e) => setForm(f => ({ ...f, data_pagamento: e.target.value }))}
-                />
                 <p className="text-xs text-muted-foreground">
-                  Preenchida automaticamente quando o pagamento for registrado. Pode ser ajustada manualmente se necessário.
+                  Data de pagamento é preenchida automaticamente quando o pagamento for registrado. Pode ser ajustada manualmente se necessário.
                 </p>
               </div>
               <div className="space-y-1">
