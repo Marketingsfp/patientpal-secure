@@ -17,6 +17,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
 
 export const Route = createFileRoute("/_authenticated/app/clientes")({
@@ -32,6 +33,7 @@ interface Paciente {
   telefone: string | null;
   email: string | null;
   data_nascimento: string | null;
+  sexo: string | null;
   ativo: boolean;
   cep: string | null;
   logradouro: string | null;
@@ -50,7 +52,7 @@ interface Paciente {
 
 type FormState = {
   nome: string; cpf: string; numero_pasta: string; telefone: string; email: string;
-  data_nascimento: string; ativo: boolean;
+  data_nascimento: string; sexo: string; ativo: boolean;
   cep: string; logradouro: string; numero: string; complemento: string;
   bairro: string; cidade: string; estado: string;
   responsavel_nome: string; responsavel_cpf: string;
@@ -59,7 +61,7 @@ type FormState = {
 
 const EMPTY: FormState = {
   nome: "", cpf: "", numero_pasta: "", telefone: "", email: "",
-  data_nascimento: "", ativo: true,
+  data_nascimento: "", sexo: "nao_informar", ativo: true,
   cep: "", logradouro: "", numero: "", complemento: "",
   bairro: "", cidade: "", estado: "",
   responsavel_nome: "", responsavel_cpf: "",
@@ -357,7 +359,7 @@ function ClientesPage() {
       nome: paciente.nome,
       cpf: paciente.cpf ?? "", numero_pasta: paciente.numero_pasta ?? "",
       telefone: paciente.telefone ?? "", email: paciente.email ?? "",
-      data_nascimento: paciente.data_nascimento ?? "", ativo: paciente.ativo,
+      data_nascimento: paciente.data_nascimento ?? "", sexo: paciente.sexo ?? "nao_informar", ativo: paciente.ativo,
       cep: paciente.cep ?? "", logradouro: paciente.logradouro ?? "", numero: paciente.numero ?? "",
       complemento: paciente.complemento ?? "", bairro: paciente.bairro ?? "",
       cidade: paciente.cidade ?? "", estado: paciente.estado ?? "",
@@ -445,6 +447,7 @@ function ClientesPage() {
       telefone: form.telefone.trim() || null,
       email: form.email.trim() || null,
       data_nascimento: form.data_nascimento || null,
+      sexo: form.sexo,
       ativo: form.ativo,
       cep: form.cep.trim() || null,
       logradouro: form.logradouro.trim() || null,
