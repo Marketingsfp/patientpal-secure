@@ -1204,16 +1204,35 @@ function AgendaPage() {
                   };
                   const antes = (r.dados_antes ?? {}) as Record<string, unknown>;
                   const depois = (r.dados_depois ?? {}) as Record<string, unknown>;
+                  const isLanc = r.table_name === "fin_lancamentos";
+                  const repasseLabel: Record<string, string> = {
+                    repasse_pago: "Repasse ao médico",
+                    repasse_pago_em: "Data do repasse",
+                    repasse_forma_pagamento: "Forma do repasse",
+                  };
+                  const allowedLanc = new Set(Object.keys(repasseLabel));
+                  const fmtVal = (k: string, v: unknown) => {
+                    if (k === "repasse_pago") return v ? "Pago" : "Pendente";
+                    if (k === "repasse_pago_em" && typeof v === "string" && v) {
+                      return new Date(v + "T00:00:00").toLocaleDateString("pt-BR");
+                    }
+                    return v == null || v === "" ? "—" : String(v);
+                  };
                   const chaves = Array.from(new Set([...Object.keys(antes), ...Object.keys(depois)]))
                     .filter((k) => !["updated_at", "created_at", "fluxo_atualizado_em"].includes(k))
+                    .filter((k) => (isLanc ? allowedLanc.has(k) : true))
                     .filter((k) => JSON.stringify(antes[k]) !== JSON.stringify(depois[k]));
                   const quem = (r.user_email && nomePorEmail.get(r.user_email)) || r.user_email || "—";
+                  // Para lançamentos: ignorar entradas que não envolvem campos de repasse
+                  if (isLanc && r.action === "UPDATE" && chaves.length === 0) return null;
                   return (
                     <div key={r.id} className="rounded-md border p-3 bg-card">
                       <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
                         <div className="flex items-center gap-2">
                           <Badge className={acaoCor[r.action] ?? ""}>{acaoLabel[r.action] ?? r.action}</Badge>
-                          <span className="text-xs font-mono text-muted-foreground">{r.table_name}</span>
+                          <span className="text-xs font-mono text-muted-foreground">
+                            {isLanc ? "pagamento" : r.table_name}
+                          </span>
                         </div>
                         <div className="text-xs text-muted-foreground">
                           {new Date(r.created_at).toLocaleString("pt-BR")} · {quem}
@@ -1223,21 +1242,29 @@ function AgendaPage() {
                         <div className="text-xs space-y-1">
                           {chaves.map((k) => (
                             <div key={k} className="grid grid-cols-[120px_1fr] gap-2">
-                              <span className="font-medium text-muted-foreground">{k}:</span>
+                              <span className="font-medium text-muted-foreground">
+                                {isLanc ? (repasseLabel[k] ?? k) : k}:
+                              </span>
                               <span>
-                                <span className="line-through text-rose-600">{String(antes[k] ?? "—")}</span>
+                                <span className="line-through text-rose-600">{fmtVal(k, antes[k])}</span>
                                 {" → "}
-                                <span className="text-emerald-700">{String(depois[k] ?? "—")}</span>
+                                <span className="text-emerald-700">{fmtVal(k, depois[k])}</span>
                               </span>
                             </div>
                           ))}
                         </div>
                       )}
                       {r.action === "INSERT" && (
-                        <p className="text-xs text-muted-foreground">Registro criado.</p>
+                        <p className="text-xs text-muted-foreground">
+                          {isLanc
+                            ? `Pagamento da consulta registrado${depois.repasse_pago ? " — repasse já pago" : " — repasse pendente"}.`
+                            : "Registro criado."}
+                        </p>
                       )}
                       {r.action === "DELETE" && (
-                        <p className="text-xs text-muted-foreground">Registro excluído.</p>
+                        <p className="text-xs text-muted-foreground">
+                          {isLanc ? "Pagamento removido." : "Registro excluído."}
+                        </p>
                       )}
                     </div>
                   );
