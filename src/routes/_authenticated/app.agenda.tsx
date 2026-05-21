@@ -1165,26 +1165,13 @@ function AgendaPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
           <div className="space-y-0.5 rounded-md border-2 border-transparent hover:border-[var(--clinic)] p-1.5 bg-background transition-colors">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Profissional</Label>
-            <Input
-              list="medicos-filtro-list"
+            <MedicoFiltroInput
+              medicos={medicos}
+              value={filtroMedico}
+              onChange={(v) => { if (!isMedicoOnly) setFiltroMedico(v); }}
               disabled={isMedicoOnly}
-              placeholder="TODOS — digite para buscar"
-              value={filtroMedico === "todos" ? "" : (medicos.find((m) => m.id === filtroMedico)?.nome ?? "")}
-              onChange={(e) => {
-                if (isMedicoOnly) return;
-                const txt = e.target.value;
-                if (!txt.trim()) { setFiltroMedico("todos"); return; }
-                const exato = medicos.find((m) => normalizar(m.nome) === normalizar(txt));
-                if (exato) { setFiltroMedico(exato.id); return; }
-                const parcial = medicos.find((m) => normalizar(m.nome).includes(normalizar(txt)));
-                if (parcial) setFiltroMedico(parcial.id);
-              }}
+              onlyMedicoId={isMedicoOnly ? medicoLogadoId : null}
             />
-            <datalist id="medicos-filtro-list">
-              {medicos
-                .filter((m) => !isMedicoOnly || m.id === medicoLogadoId)
-                .map((m) => <option key={m.id} value={m.nome} />)}
-            </datalist>
           </div>
           <div className="space-y-0.5 rounded-md border-2 border-transparent hover:border-[var(--clinic)] p-1.5 bg-background transition-colors">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Data Ref.</Label>
@@ -1481,6 +1468,80 @@ function Paginacao({ page, totalPages, onChange }: { page: number; totalPages: n
       ))}
       <Button variant="outline" size="sm" disabled={page === totalPages} onClick={() => onChange(page + 1)}>›</Button>
       <Button variant="outline" size="sm" disabled={page === totalPages} onClick={() => onChange(totalPages)}>»</Button>
+    </div>
+  );
+}
+
+function MedicoFiltroInput({
+  medicos, value, onChange, disabled, onlyMedicoId,
+}: {
+  medicos: Medico[];
+  value: string;
+  onChange: (v: string) => void;
+  disabled?: boolean;
+  onlyMedicoId?: string | null;
+}) {
+  const lista = useMemo(
+    () => medicos.filter((m) => !onlyMedicoId || m.id === onlyMedicoId),
+    [medicos, onlyMedicoId],
+  );
+  const selecionadoNome = useMemo(
+    () => (value === "todos" ? "" : (medicos.find((m) => m.id === value)?.nome ?? "")),
+    [medicos, value],
+  );
+  const [texto, setTexto] = useState(selecionadoNome);
+  const [aberto, setAberto] = useState(false);
+  useEffect(() => { setTexto(selecionadoNome); }, [selecionadoNome]);
+
+  const norm = (s: string) => normalizar(s);
+  const sugestoes = useMemo(() => {
+    const t = norm(texto).trim();
+    if (!t) return lista.slice(0, 30);
+    return lista.filter((m) => norm(m.nome).includes(t)).slice(0, 30);
+  }, [lista, texto]);
+
+  return (
+    <div className="relative">
+      <div className="flex gap-1">
+        <Input
+          disabled={disabled}
+          placeholder="TODOS — digite para buscar"
+          value={texto}
+          onChange={(e) => { setTexto(e.target.value); setAberto(true); }}
+          onFocus={() => setAberto(true)}
+          onBlur={() => setTimeout(() => setAberto(false), 150)}
+        />
+        {value !== "todos" && !disabled && (
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            title="Limpar"
+            onClick={() => { onChange("todos"); setTexto(""); }}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
+      {aberto && !disabled && sugestoes.length > 0 && (
+        <div className="absolute z-50 mt-1 w-full max-h-64 overflow-auto rounded-md border bg-popover shadow-md">
+          {sugestoes.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              className="block w-full text-left px-2 py-1.5 text-sm hover:bg-accent"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                onChange(m.id);
+                setTexto(m.nome);
+                setAberto(false);
+              }}
+            >
+              {m.nome}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
