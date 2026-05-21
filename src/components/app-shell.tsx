@@ -86,7 +86,6 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<{ to: string;
     label: "Cadastros",
     items: [
     { to: "/app/cargos", label: "Cargos", icon: Briefcase },
-    { to: "/app/clinicas", label: "Clínicas", icon: Building2 },
     { to: "/app/equipe", label: "Equipe", icon: Users },
     { to: "/app/especialidades", label: "Especialidades", icon: HeartPulse },
     { to: "/app/hr-contratos", label: "Funcionários", icon: Users },
@@ -213,7 +212,7 @@ export function AppShell() {
       /modelo|template/.test(t) ? "/app/cartao-beneficios/modelos" :
       /relat[óo]rio.*cart[ãa]o|cart[ãa]o.*relat[óo]rio/.test(t) ? "/app/cartao-beneficios/relatorios" :
       /financ|caixa|conta|boleto/.test(t) ? "/app/financeiro" :
-      /cl[ií]nica/.test(t) ? "/app/clinicas" :
+      /cl[ií]nica/.test(t) ? "/app/unidades" :
       /m[eé]dico|profissional|rateio|repasse/.test(t) ? "/app/medicos" :
       /equipe|usu[áa]rio/.test(t) ? "/app/equipe" :
       /prontu[áa]rio/.test(t) ? "/app/prontuarios" :
