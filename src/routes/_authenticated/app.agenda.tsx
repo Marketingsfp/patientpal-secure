@@ -1287,10 +1287,10 @@ function AgendaPage() {
               <TableHead className="w-14">Dia</TableHead>
               <TableHead className="w-24">Data</TableHead>
               <TableHead className="w-32">Intervalo</TableHead>
-              <TableHead>Cliente</TableHead>
-              <TableHead className="w-32">Pasta</TableHead>
+              <TableHead className="w-[220px]">Cliente</TableHead>
+              <TableHead className="w-40">Pasta</TableHead>
               <TableHead className="w-20 text-center">Alertas</TableHead>
-              <TableHead className="w-24 text-right">Ações</TableHead>
+              <TableHead className="w-20 text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -1314,7 +1314,7 @@ function AgendaPage() {
                   <TableCell>
                     <span className="text-primary font-medium">{fmtHora(a.inicio)} - {fmtHora(a.fim)}</span>
                   </TableCell>
-                   <TableCell className="truncate max-w-[220px] uppercase">
+                   <TableCell className="truncate max-w-[220px] uppercase pr-1">
                      {normalizar(a.paciente_nome) === "disponivel" ? (
                        <Button
                          variant="ghost"
