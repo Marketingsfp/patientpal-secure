@@ -532,6 +532,7 @@ function AgendaPage() {
       procedimento: form.procedimento.trim() || null,
       status: form.status,
       observacoes: form.observacoes.trim() || null,
+      data_pagamento: form.data_pagamento ? form.data_pagamento : null,
     };
     let novoId: string | null = editing?.id ?? null;
     if (editing) {
