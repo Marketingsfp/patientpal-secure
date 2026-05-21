@@ -1298,7 +1298,7 @@ function AgendaPage() {
               <TableHead className="w-14">Dia</TableHead>
               <TableHead className="w-24">Data</TableHead>
               <TableHead className="w-32">Intervalo</TableHead>
-              <TableHead className="w-[220px]">Cliente</TableHead>
+              <TableHead className="min-w-[260px]">Cliente</TableHead>
               <TableHead className="w-40">Pasta</TableHead>
               <TableHead className="w-20 text-center">Alertas</TableHead>
               <TableHead className="w-20 text-right">Ações</TableHead>
@@ -1325,7 +1325,7 @@ function AgendaPage() {
                   <TableCell>
                     <span className="text-primary font-medium">{fmtHora(a.inicio)} - {fmtHora(a.fim)}</span>
                   </TableCell>
-                   <TableCell className="truncate max-w-[220px] uppercase pr-1">
+                   <TableCell className="pr-1">
                      {normalizar(a.paciente_nome) === "disponivel" ? (
                        <Button
                          variant="ghost"
@@ -1338,10 +1338,23 @@ function AgendaPage() {
                          Agendar
                        </Button>
                      ) : (
-                       <span className="inline-flex items-center gap-1">
-                         {a.status === "confirmado" && <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />}
-                         {a.paciente_nome}
-                       </span>
+                       <div className="flex flex-col leading-tight">
+                         <a
+                           href={`/app/clientes?q=${encodeURIComponent(a.paciente_nome)}`}
+                           target="_blank"
+                           rel="noopener noreferrer"
+                           title="Abrir ficha do cliente em nova aba"
+                           className="inline-flex items-center gap-1 uppercase font-medium text-foreground hover:text-primary hover:underline"
+                         >
+                           {a.status === "confirmado" && <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />}
+                           {a.paciente_nome}
+                         </a>
+                         {a.medico_id && (
+                           <span className="text-[11px] text-muted-foreground truncate">
+                             Dr(a). {medicos.find((m) => m.id === a.medico_id)?.nome ?? "—"}
+                           </span>
+                         )}
+                       </div>
                      )}
                   </TableCell>
                   <TableCell>
