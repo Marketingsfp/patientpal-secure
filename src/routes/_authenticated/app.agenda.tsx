@@ -53,6 +53,7 @@ type Agendamento = {
   procedimento: string | null;
   status: Status;
   observacoes: string | null;
+  data_pagamento?: string | null;
 };
 type Medico = { id: string; nome: string };
 type Especialidade = { id: string; nome: string };
@@ -93,6 +94,7 @@ const EMPTY = {
   paciente_nome: "", paciente_id: "", medico_id: "",
   inicio: "", fim: "", procedimento: "",
   status: "agendado" as Status, observacoes: "",
+  data_pagamento: "",
 };
 
 function AgendaPage() {
@@ -217,7 +219,7 @@ function AgendaPage() {
     setLoading(true);
     let q = supabase
       .from("agendamentos")
-      .select("id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico")
+      .select("id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("inicio", { ascending: false });
     const statusEspecifico = filtroStatus !== "todos" && filtroStatus !== "livres";
@@ -484,6 +486,7 @@ function AgendaPage() {
       procedimento: a.procedimento ?? "CONSULTA",
       status: "agendado",
       observacoes: a.observacoes ?? "",
+      data_pagamento: a.data_pagamento ?? "",
     });
     setOpen(true);
   };
@@ -498,6 +501,7 @@ function AgendaPage() {
       procedimento: a.procedimento ?? "",
       status: a.status,
       observacoes: a.observacoes ?? "",
+      data_pagamento: a.data_pagamento ?? "",
     });
     setOpen(true);
   };
@@ -528,6 +532,7 @@ function AgendaPage() {
       procedimento: form.procedimento.trim() || null,
       status: form.status,
       observacoes: form.observacoes.trim() || null,
+      data_pagamento: form.data_pagamento ? form.data_pagamento : null,
     };
     let novoId: string | null = editing?.id ?? null;
     if (editing) {
@@ -814,15 +819,29 @@ function AgendaPage() {
                   ]}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <Label>Início</Label>
-                  <Input type="datetime-local" value={form.inicio} onChange={(e) => setForm(f => ({ ...f, inicio: e.target.value, fim: calcFimAuto(e.target.value, f.medico_id) }))} required />
+              <div className="space-y-1">
+                <Label className="text-xs font-medium text-muted-foreground">Data e horário da consulta</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Início</Label>
+                    <Input type="datetime-local" value={form.inicio} onChange={(e) => setForm(f => ({ ...f, inicio: e.target.value, fim: calcFimAuto(e.target.value, f.medico_id) }))} required />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Fim</Label>
+                    <Input type="datetime-local" value={form.fim} onChange={(e) => setForm(f => ({ ...f, fim: e.target.value }))} required />
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <Label>Fim</Label>
-                  <Input type="datetime-local" value={form.fim} onChange={(e) => setForm(f => ({ ...f, fim: e.target.value }))} required />
-                </div>
+              </div>
+              <div className="space-y-1">
+                <Label>Data do pagamento</Label>
+                <Input
+                  type="date"
+                  value={form.data_pagamento}
+                  onChange={(e) => setForm(f => ({ ...f, data_pagamento: e.target.value }))}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Use quando o paciente pagar em data diferente da consulta. Deixe em branco se não se aplica.
+                </p>
               </div>
               <div className="space-y-1">
                 <Label>Procedimento</Label>
