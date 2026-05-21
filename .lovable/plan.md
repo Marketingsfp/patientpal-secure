@@ -1,33 +1,45 @@
-## 1. Campo "Sexo" nos cadastros
+## Objetivo
 
-Adicionar a coluna `sexo` em três tabelas e exibir um seletor nos três formulários.
+Unificar o cadastro de funcionário em **um único lugar** — a aba **Equipe → Funcionários** — com login, perfil e contrato no mesmo formulário. Eliminar o "desvio" para a tela de "Funcionários — Contratos de trabalho" após salvar/editar, e expor as credenciais existentes na aba **Login e Perfil** do perfil de cada funcionário.
 
-**Banco de dados (migração):**
-- `pacientes.sexo text` (valores: `masculino`, `feminino`, `outro`, `nao_informar`)
-- `medicos.sexo text`
-- `hr_contratos.sexo text`
-- Check constraint em cada uma restringindo aos valores acima; default `nao_informar`.
+## O que muda
 
-**Formulários (UI):**
-- `src/routes/_authenticated/app.medicos.tsx` — adicionar `<Select>` "Sexo" na seção de dados pessoais.
-- `src/routes/_authenticated/app.hr-contratos.tsx` — adicionar `<Select>` "Sexo" na aba "Dados".
-- `src/routes/_authenticated/app.clientes.tsx` (pacientes) — adicionar `<Select>` "Sexo".
+### 1. Cadastro/edição vive em **Equipe → Funcionários**
 
-Opções exibidas: **Masculino, Feminino, Outro, Prefiro não informar**.
+- O botão **+ Novo** da página `Equipe` (quando "Funcionário" é escolhido) e o ícone de lápis na linha do funcionário passam a abrir o **mesmo dialog** de cadastro/edição (Dados pessoais + Contrato + Login) — sem navegar para outra rota.
+- Esse dialog é o que hoje já existe em `hr-contratos.tsx` (campos: nome, CPF, sexo, cargo, setor, regime, salário, admissão, demissão, status, e bloco "Criar login" com e-mail/senha/perfil). Vamos **extraí-lo** para um componente reutilizável `FuncionarioFormDialog` e usá-lo em `Equipe`.
+- Ao salvar (criar ou editar), o dialog fecha e a lista de **Equipe → Funcionários** é recarregada. **Não há redirecionamento** para `/app/hr-contratos`.
 
-## 2. Edição de funcionário abrindo a tela errada
+### 2. Página `/app/hr-contratos` deixa de ser ponto de cadastro
 
-Hoje, na aba **Equipe → Funcionários**, o lápis de editar leva para `/app/funcionario/$userId`, que é a página de perfil somente-leitura (foto 1). O usuário quer abrir o mesmo formulário de "Novo funcionário" (foto 2), em modo edição.
+- Removemos os botões "+ Novo" e o lápis dessa página, além do tratamento de `?new=1` / `?edit={userId}` que abre o dialog automaticamente.
+- A página continua existindo como **relatório/listagem técnica** dos contratos de trabalho da clínica (somente leitura), acessível pelo menu de RH para quem quiser ver a tabela completa. O bloco "Sexo" e a lógica de criação de login passam a viver apenas dentro do `FuncionarioFormDialog`.
+- (Opcional, se preferir, podemos remover o item de menu — me diga depois; por padrão mantenho como leitura.)
 
-**Mudanças:**
-- Em `src/routes/_authenticated/app.equipe.tsx`, trocar o link do lápis para `/app/hr-contratos` passando o `user_id` via search param (`?edit=<userId>`).
-- Em `src/routes/_authenticated/app.hr-contratos.tsx`:
-  - Ler o search param `edit`.
-  - Se houver contrato para aquele `user_id` na clínica atual → abrir o dialog em modo edição com os dados carregados.
-  - Se não houver contrato ainda → abrir o dialog em modo "novo" com o `user_id` e o `nome` (vindo de `profiles`) já pré-preenchidos, para o usuário só completar os demais campos.
+### 3. Aba **Login e Perfil** no perfil do funcionário
 
-Resultado: clicar no lápis abre o formulário completo de funcionário (Dados + Login e perfil) com os dados do membro selecionado.
+Em `/app/funcionario/{userId}` (arquivo `app.funcionario.$userId.tsx`), adicionamos uma nova aba **Login e Perfil** ao lado de Contratos / Ponto / Férias / Holerites, mostrando:
 
-## Fora do escopo
+- **Nome**, **telefone**, **sexo** (do `profiles`/`hr_contratos`)
+- **E-mail de login** (consultado via server function que lê `auth.users` com `supabaseAdmin` e cruza com `user_id`) — somente leitura, exibido como "login@dominio.com"
+- **Perfil de acesso** (papel atual em `clinica_memberships.role` para a clínica corrente: recepção, financeiro, gestor, etc.)
+- **Status** (ativo/inativo) e botão **Editar** que abre o mesmo `FuncionarioFormDialog`.
 
-- Nenhuma alteração em relatórios, filtros ou exibições que usem esses cadastros (o campo `sexo` fica disponível, mas só aparece no formulário por enquanto).
+Os funcionários já cadastrados anteriormente (com login criado) aparecem naturalmente — só estamos exibindo dados que já existem.
+
+### 4. Após salvar → volta para Equipe → Funcionários
+
+- O dialog fecha sobre a página de Equipe; a tabela de funcionários é atualizada inline. Nada mais redireciona para `hr-contratos`.
+
+## Detalhes técnicos
+
+- **Novo componente**: `src/components/funcionarios/FuncionarioFormDialog.tsx` — recebe `open`, `onOpenChange`, `clinicaId`, `editingUserId?` e `onSaved()`. Contém toda a lógica de criação de login (`supabase.auth.admin.createUser` via server fn já existente) + upsert em `profiles` + insert/update em `hr_contratos`.
+- **`app.equipe.tsx`**: substitui o `Link to="/app/hr-contratos" search={{edit: f.user_id}}` por um botão que abre o dialog; o callback "Funcionário" do chooser também abre o dialog (em vez de navegar).
+- **`app.hr-contratos.tsx`**: remove imports `Dialog`/form/state de cadastro, remove `validateSearch` de `new`/`edit`, remove botão "+ Novo" e o lápis. Mantém apenas a tabela de contratos (visualização).
+- **`app.funcionario.$userId.tsx`**: adiciona `<TabsTrigger value="login">Login e Perfil</TabsTrigger>` e o conteúdo correspondente. Para ler o e-mail de outro usuário, criamos `getFuncionarioLogin` em `src/lib/funcionarios.functions.ts` (server fn protegida que valida que o solicitante é gestor da mesma clínica, então usa `supabaseAdmin.auth.admin.getUserById`).
+- **Sem mudanças de schema** — todos os dados (sexo, perfil, login) já existem nas tabelas atuais.
+
+## Fora de escopo
+
+- Reset de senha / troca de e-mail do funcionário (podemos adicionar depois, se quiser).
+- Reorganizar o menu lateral de RH.

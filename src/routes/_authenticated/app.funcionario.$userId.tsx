@@ -1,7 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowLeft, User, Briefcase, Clock, Palmtree, Phone, Mail } from "lucide-react";
+import { ArrowLeft, User, Briefcase, Clock, Palmtree, Phone, Mail, KeyRound, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useServerFn } from "@tanstack/react-start";
+import { getFuncionarioLogin } from "@/lib/equipe.functions";
+import { useClinica } from "@/hooks/use-clinica";
+import { FuncionarioFormDialog } from "@/components/funcionarios/FuncionarioFormDialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +35,8 @@ function fmtMoeda(v: number | null | undefined): string {
 
 function PerfilFuncionarioPage() {
   const { userId } = Route.useParams();
+  const { clinicaAtual } = useClinica();
+  const getLoginFn = useServerFn(getFuncionarioLogin);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [email, setEmail] = useState<string | null>(null);
   const [memberships, setMemberships] = useState<Membership[]>([]);
@@ -39,6 +45,8 @@ function PerfilFuncionarioPage() {
   const [ferias, setFerias] = useState<Ferias[]>([]);
   const [holerites, setHolerites] = useState<Holerite[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editOpen, setEditOpen] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let cancel = false;
@@ -71,11 +79,18 @@ function PerfilFuncionarioPage() {
       // Tenta obter email se for o próprio usuário
       const { data: auth } = await supabase.auth.getUser();
       if (!cancel && auth.user && auth.user.id === userId) setEmail(auth.user.email ?? null);
+      // Caso contrário, tenta via server fn (requer gestor)
+      else if (!cancel && clinicaAtual) {
+        try {
+          const res = await getLoginFn({ data: { clinicaId: clinicaAtual.clinica_id, userId } });
+          if (!cancel) setEmail((res as { email: string | null })?.email ?? null);
+        } catch { /* sem permissão: ignora */ }
+      }
       setLoading(false);
     }
     void load();
     return () => { cancel = true; };
-  }, [userId]);
+  }, [userId, clinicaAtual?.clinica_id, reloadKey]);
 
   if (loading) {
     return <div className="p-6 space-y-4"><Skeleton className="h-32 w-full" /><Skeleton className="h-64 w-full" /></div>;
@@ -126,11 +141,48 @@ function PerfilFuncionarioPage() {
 
       <Tabs defaultValue="contratos">
         <TabsList>
+          <TabsTrigger value="login"><KeyRound className="h-4 w-4 mr-1" />Login e Perfil</TabsTrigger>
           <TabsTrigger value="contratos"><Briefcase className="h-4 w-4 mr-1" />Contratos</TabsTrigger>
           <TabsTrigger value="ponto"><Clock className="h-4 w-4 mr-1" />Ponto</TabsTrigger>
           <TabsTrigger value="ferias"><Palmtree className="h-4 w-4 mr-1" />Férias</TabsTrigger>
           <TabsTrigger value="holerites">Holerites</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="login">
+          <Card><CardContent className="pt-6 space-y-4">
+            <div className="grid sm:grid-cols-2 gap-4 text-sm">
+              <div>
+                <div className="text-muted-foreground text-xs uppercase tracking-wide">Nome</div>
+                <div className="font-medium">{profile.nome}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground text-xs uppercase tracking-wide">E-mail de login</div>
+                <div className="font-medium">{email ?? <span className="text-muted-foreground">Sem login cadastrado</span>}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground text-xs uppercase tracking-wide">Telefone</div>
+                <div className="font-medium">{profile.telefone ?? "—"}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground text-xs uppercase tracking-wide">Perfis de acesso</div>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {memberships.length === 0 ? <span className="text-muted-foreground">—</span> : memberships.map((m) => (
+                    <Badge key={m.clinica_id} variant={m.ativo ? "default" : "outline"}>
+                      {m.clinica?.nome ?? "?"} • {m.role}{m.ativo ? "" : " (inativo)"}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </div>
+            {clinicaAtual && (
+              <div className="pt-2">
+                <Button onClick={() => setEditOpen(true)} variant="outline" size="sm">
+                  <Pencil className="h-4 w-4 mr-1" /> Editar cadastro
+                </Button>
+              </div>
+            )}
+          </CardContent></Card>
+        </TabsContent>
 
         <TabsContent value="contratos">
           <Card><CardContent className="pt-6">
@@ -198,6 +250,16 @@ function PerfilFuncionarioPage() {
           </CardContent></Card>
         </TabsContent>
       </Tabs>
+
+      {clinicaAtual && (
+        <FuncionarioFormDialog
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          clinicaId={clinicaAtual.clinica_id}
+          editingUserId={userId}
+          onSaved={() => setReloadKey((k) => k + 1)}
+        />
+      )}
     </div>
   );
 }

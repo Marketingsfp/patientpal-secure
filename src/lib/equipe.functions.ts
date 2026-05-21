@@ -152,3 +152,17 @@ export const editarMembro = createServerFn({ method: "POST" })
 
     return { ok: true };
   });
+
+export const getFuncionarioLogin = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({
+      clinicaId: z.string().uuid(),
+      userId: z.string().uuid(),
+    }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertManager(context.userId, data.clinicaId);
+    const { data: u } = await supabaseAdmin.auth.admin.getUserById(data.userId);
+    return { email: u?.user?.email ?? null };
+  });
