@@ -1,36 +1,28 @@
-## 1. Cursor "maozinha" no avatar
+## Corrigir overflow no card "Informações rápidas"
 
-Em `src/components/app-shell.tsx`, adicionar `cursor-pointer` à classe do botão `DropdownMenuTrigger` do avatar (e garantir o mesmo em `<Bell>` por consistência opcional — só se o usuário quiser; por padrão só o avatar).
+Em `src/routes/_authenticated/app.index.tsx`, os botões `Abrir tabela` e `Perguntar à Nina` usam `flex-1` sem `min-w-0`. Quando a sidebar é expandida (área disponível menor) os dois botões lado a lado não cabem e estouram o card.
 
-## 2. Cores seguem a clínica selecionada
+### Mudança
 
-Hoje a cor da clínica só é usada como `backgroundColor` da sidebar e do avatar. Botões verdes (`Lista`, `Adicionar Encaixe`, `Exibir`, paginação ativa, etc.) usam tokens `--primary` definidos em `src/styles.css` — fixos.
+Trocar o container dos botões para empilhar quando estreito:
 
-Solução: ao selecionar uma clínica, **sobrescrever as CSS variables `--primary` e `--ring`** do `documentElement` para a cor da clínica. Assim tudo que usa `bg-primary`, `text-primary`, etc. passa a refletir a cor da clínica automaticamente, sem tocar em cada página.
-
-### Implementação em `src/components/app-shell.tsx`
-
-Adicionar `useEffect` que reage a `clinicColor` (já calculado no componente):
-
-```ts
-useEffect(() => {
-  const root = document.documentElement;
-  if (modoTodas || !clinicaAtual) {
-    root.style.removeProperty("--primary");
-    root.style.removeProperty("--ring");
-    root.style.removeProperty("--sidebar-primary");
-    return;
-  }
-  // converter hex -> oklch via color-mix? Mais simples: setar valor hex direto via espaço de cor sRGB.
-  root.style.setProperty("--primary", clinicColor);
-  root.style.setProperty("--ring", clinicColor);
-  root.style.setProperty("--sidebar-primary", clinicColor);
-}, [clinicColor, modoTodas, clinicaAtual]);
+```tsx
+<div className="flex flex-col sm:flex-row gap-2">
+  <Button asChild size="sm" variant="default" className="flex-1 min-w-0">
+    <Link to="/app/consulta-rapida" className="truncate">
+      <BookOpen className="h-4 w-4 mr-1 shrink-0" /> Abrir tabela
+    </Link>
+  </Button>
+  <Button asChild size="sm" variant="outline" className="flex-1 min-w-0">
+    <Link to="/app/nina" className="truncate">
+      <Brain className="h-4 w-4 mr-1 shrink-0" /> Perguntar à Nina
+    </Link>
+  </Button>
+</div>
 ```
 
-Como o template usa `oklch(...)`, mas o Tailwind/shadcn aceita qualquer valor CSS válido na variável, atribuir um hex (`#15274f`) funciona porque a variável é só substituída em `bg-[var(--primary)]` ou no token `--color-primary: var(--primary)`. Para o `primary-foreground` (texto sobre primary), manter o padrão (branco) — todas as cores das clínicas são escuras o suficiente.
+### Verificar outros pontos
 
-### Sem mudanças
+Os demais KPI cards no `app.index.tsx` (Alertas, Agendamentos, Clientes, Retornos, Mensagens, Confirmações, Vendas, Pagamentos) já usam `truncate` ou layout simples — sem overflow visível na screenshot. Não vou modificar.
 
-- Outras páginas não precisam ser modificadas.
-- Lógica de `useClinica`, rotas e dados intactos.
+Se aparecerem outros pontos com texto saindo do card, ajustaremos pontualmente quando o usuário indicar.
