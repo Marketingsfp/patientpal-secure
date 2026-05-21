@@ -1288,7 +1288,6 @@ function AgendaPage() {
               <TableHead className="w-14">Dia</TableHead>
               <TableHead className="w-24">Data</TableHead>
               <TableHead className="w-32">Intervalo</TableHead>
-              <TableHead>Profissional</TableHead>
               <TableHead>Cliente</TableHead>
               <TableHead className="w-32">Pasta</TableHead>
               <TableHead className="w-20 text-center">Alertas</TableHead>
@@ -1297,16 +1296,16 @@ function AgendaPage() {
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} className="text-center py-6 text-muted-foreground">Carregando…</TableCell></TableRow>
             ) : !clinicaAtual ? (
-              <TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} className="text-center py-6 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
             ) : paginados.length === 0 ? (
-              <TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground">Nenhum agendamento encontrado.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} className="text-center py-6 text-muted-foreground">Nenhum agendamento encontrado.</TableCell></TableRow>
             ) : paginados.map((a) => {
               const fichaNum = fichaPorId.get(a.id) ?? "";
               const realizado = a.status === "realizado";
               return (
-                <TableRow key={a.id} className={realizado ? "bg-emerald-50 dark:bg-emerald-950/20" : ""}>
+                <TableRow key={a.id} className={realizado ? "bg-emerald-50 dark:bg-emerald-950/20 [&>td]:py-1" : "[&>td]:py-1"}>
                   <TableCell title="Marque para cobrar este atendimento em um pagamento agrupado">
                     <Checkbox checked={selecionados.has(a.id)} onCheckedChange={() => toggleSel(a.id)} />
                   </TableCell>
@@ -1316,7 +1315,6 @@ function AgendaPage() {
                   <TableCell>
                     <span className="text-primary font-medium">{fmtHora(a.inicio)} - {fmtHora(a.fim)}</span>
                   </TableCell>
-                  <TableCell className="truncate max-w-[200px]">{medicoNome(a.medico_id)}</TableCell>
                    <TableCell className="truncate max-w-[220px] uppercase">
                      {normalizar(a.paciente_nome) === "disponivel" ? (
                        <Button
@@ -1357,9 +1355,11 @@ function AgendaPage() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      title="Pagamento"
+                      title={pagosSet.has(a.id) ? "Pago" : "Pagamento pendente"}
                       onClick={() => cobrarAgendamento(a)}
-                      className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                      className={pagosSet.has(a.id)
+                        ? "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                        : "text-rose-600 hover:text-rose-700 hover:bg-rose-50"}
                     >
                       <DollarSign className="h-4 w-4" />
                     </Button>
