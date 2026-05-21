@@ -4651,6 +4651,130 @@ export type Database = {
           },
         ]
       }
+      whatsapp_configs: {
+        Row: {
+          access_token: string | null
+          app_secret: string | null
+          ativo: boolean
+          clinica_id: string
+          created_at: string
+          display_name: string | null
+          display_phone_number: string | null
+          horario_fim: string | null
+          horario_inicio: string | null
+          phone_number_id: string | null
+          ultimo_teste_em: string | null
+          ultimo_teste_erro: string | null
+          ultimo_teste_ok: boolean | null
+          updated_at: string
+          verify_token: string
+          waba_id: string | null
+          welcome_message: string | null
+        }
+        Insert: {
+          access_token?: string | null
+          app_secret?: string | null
+          ativo?: boolean
+          clinica_id: string
+          created_at?: string
+          display_name?: string | null
+          display_phone_number?: string | null
+          horario_fim?: string | null
+          horario_inicio?: string | null
+          phone_number_id?: string | null
+          ultimo_teste_em?: string | null
+          ultimo_teste_erro?: string | null
+          ultimo_teste_ok?: boolean | null
+          updated_at?: string
+          verify_token?: string
+          waba_id?: string | null
+          welcome_message?: string | null
+        }
+        Update: {
+          access_token?: string | null
+          app_secret?: string | null
+          ativo?: boolean
+          clinica_id?: string
+          created_at?: string
+          display_name?: string | null
+          display_phone_number?: string | null
+          horario_fim?: string | null
+          horario_inicio?: string | null
+          phone_number_id?: string | null
+          ultimo_teste_em?: string | null
+          ultimo_teste_erro?: string | null
+          ultimo_teste_ok?: boolean | null
+          updated_at?: string
+          verify_token?: string
+          waba_id?: string | null
+          welcome_message?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_configs_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: true
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_mensagens: {
+        Row: {
+          body: string | null
+          clinica_id: string
+          created_at: string
+          direction: string
+          enviada_por: string | null
+          from_number: string | null
+          id: string
+          raw: Json | null
+          recebida_em: string
+          status: string | null
+          tipo: string
+          to_number: string | null
+          wa_message_id: string | null
+        }
+        Insert: {
+          body?: string | null
+          clinica_id: string
+          created_at?: string
+          direction: string
+          enviada_por?: string | null
+          from_number?: string | null
+          id?: string
+          raw?: Json | null
+          recebida_em?: string
+          status?: string | null
+          tipo?: string
+          to_number?: string | null
+          wa_message_id?: string | null
+        }
+        Update: {
+          body?: string | null
+          clinica_id?: string
+          created_at?: string
+          direction?: string
+          enviada_por?: string | null
+          from_number?: string | null
+          id?: string
+          raw?: Json | null
+          recebida_em?: string
+          status?: string | null
+          tipo?: string
+          to_number?: string | null
+          wa_message_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_mensagens_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_templates: {
         Row: {
           ativo: boolean
