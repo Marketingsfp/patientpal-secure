@@ -135,7 +135,11 @@ function InputVoz({
 function ClientesPage() {
   const { clinicaAtual } = useClinica();
   const [items, setItems] = useState<Paciente[]>([]);
-  const [busca, setBusca] = useState("");
+  const [busca, setBusca] = useState(() => {
+    if (typeof window === "undefined") return "";
+    const params = new URLSearchParams(window.location.search);
+    return params.get("q") ?? "";
+  });
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Paciente | null>(null);
