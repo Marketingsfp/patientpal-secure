@@ -142,6 +142,23 @@ function AgendaPage() {
   const [pagamentoAgId, setPagamentoAgId] = useState<string | null>(null);
   const [pagamentoExtraIds, setPagamentoExtraIds] = useState<string[]>([]);
   const [pagamentoForma, setPagamentoForma] = useState<string>("");
+  const [pacInfoOpen, setPacInfoOpen] = useState(false);
+  const [pacInfoLoading, setPacInfoLoading] = useState(false);
+  const [pacInfo, setPacInfo] = useState<Record<string, any> | null>(null);
+
+  const abrirInfoPaciente = async (pacienteId: string | null | undefined, nomeFallback: string) => {
+    setPacInfoOpen(true);
+    setPacInfo({ nome: nomeFallback });
+    if (!pacienteId) return;
+    setPacInfoLoading(true);
+    const { data } = await supabase
+      .from("pacientes")
+      .select("id,nome,cpf,telefone,email,data_nascimento,numero_pasta,cidade,estado,bairro,logradouro,numero,foto_url")
+      .eq("id", pacienteId)
+      .maybeSingle();
+    if (data) setPacInfo(data as any);
+    setPacInfoLoading(false);
+  };
   type FormaOpcao = { forma: string; label: string; valor: number };
   const [formaPagOpen, setFormaPagOpen] = useState(false);
   const [formaPagOpcoes, setFormaPagOpcoes] = useState<FormaOpcao[]>([]);
@@ -1330,7 +1347,7 @@ function AgendaPage() {
               const fichaNum = fichaPorId.get(a.id) ?? "";
               const realizado = a.status === "realizado";
               return (
-                <TableRow key={a.id} className={realizado ? "bg-emerald-50 dark:bg-emerald-950/20 [&>td]:py-0.5" : "[&>td]:py-0.5"}>
+                <TableRow key={a.id} className={realizado ? "bg-emerald-50 dark:bg-emerald-950/20 [&>td]:py-0 [&>td]:h-7 text-xs" : "[&>td]:py-0 [&>td]:h-7 text-xs"}>
                   <TableCell title="Marque para cobrar este atendimento em um pagamento agrupado">
                     <Checkbox checked={selecionados.has(a.id)} onCheckedChange={() => toggleSel(a.id)} />
                   </TableCell>
@@ -1341,7 +1358,7 @@ function AgendaPage() {
                      <span className="text-emerald-600 font-medium">{fmtHora(a.inicio)} - {fmtHora(a.fim)}</span>
                   </TableCell>
                   <TableCell className="pr-1 align-middle">
-                    <span className="text-sm uppercase font-medium text-foreground">
+                    <span className="text-xs uppercase font-medium text-foreground">
                       Dr(a). {medicos.find((m) => m.id === a.medico_id)?.nome ?? "—"}
                     </span>
                   </TableCell>
@@ -1358,16 +1375,15 @@ function AgendaPage() {
                         Agendar cliente
                       </Button>
                     ) : (
-                      <a
-                        href={`/app/clientes?q=${encodeURIComponent(a.paciente_nome)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title="Abrir ficha do cliente em nova aba"
-                        className="inline-flex items-center gap-1 text-sm uppercase font-medium text-foreground hover:text-primary hover:underline"
+                      <button
+                        type="button"
+                        onClick={() => abrirInfoPaciente(a.paciente_id, a.paciente_nome)}
+                        title="Ver informações do cliente"
+                        className="inline-flex items-center gap-1 text-xs uppercase font-medium text-foreground hover:text-primary hover:underline"
                       >
                         {a.status === "confirmado" && <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />}
                         {a.paciente_nome}
-                      </a>
+                      </button>
                     )}
                   </TableCell>
                   <TableCell>
@@ -1488,6 +1504,45 @@ function AgendaPage() {
           fmtHora={fmtHora}
         />
       )}
+
+      <Dialog open={pacInfoOpen} onOpenChange={setPacInfoOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Informações do cliente</DialogTitle>
+          </DialogHeader>
+          {pacInfoLoading ? (
+            <p className="text-sm text-muted-foreground py-4">Carregando…</p>
+          ) : pacInfo ? (
+            <div className="rounded-lg border p-4 space-y-2 text-sm">
+              <div className="flex items-center gap-3">
+                {pacInfo.foto_url ? (
+                  <img src={pacInfo.foto_url} alt={pacInfo.nome} className="h-14 w-14 rounded-full object-cover border" />
+                ) : null}
+                <div>
+                  <div className="font-semibold uppercase">{pacInfo.nome}</div>
+                  {pacInfo.numero_pasta && (
+                    <div className="text-xs text-muted-foreground">Pasta nº {pacInfo.numero_pasta}</div>
+                  )}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t">
+                <div><span className="text-muted-foreground">CPF: </span>{pacInfo.cpf || "—"}</div>
+                <div><span className="text-muted-foreground">Nasc.: </span>{pacInfo.data_nascimento ? new Date(pacInfo.data_nascimento + "T00:00:00").toLocaleDateString("pt-BR") : "—"}</div>
+                <div><span className="text-muted-foreground">Telefone: </span>{pacInfo.telefone || "—"}</div>
+                <div className="truncate"><span className="text-muted-foreground">Email: </span>{pacInfo.email || "—"}</div>
+                <div className="col-span-2"><span className="text-muted-foreground">Endereço: </span>{[pacInfo.logradouro, pacInfo.numero, pacInfo.bairro, pacInfo.cidade, pacInfo.estado].filter(Boolean).join(", ") || "—"}</div>
+              </div>
+              {pacInfo.id && (
+                <div className="pt-2">
+                  <a href={`/app/clientes?q=${encodeURIComponent(pacInfo.nome)}`} className="text-xs text-primary hover:underline">
+                    Abrir ficha completa →
+                  </a>
+                </div>
+              )}
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
