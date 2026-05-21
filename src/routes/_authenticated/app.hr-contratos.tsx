@@ -46,7 +46,6 @@ function ContratosPage() {
   const [rows, setRows] = useState<Contrato[]>([]);
   const [cargos, setCargos] = useState<Ref[]>([]);
   const [setores, setSetores] = useState<Ref[]>([]);
-  const [unidades, setUnidades] = useState<Ref[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
@@ -62,17 +61,15 @@ function ContratosPage() {
   async function load() {
     if (!clinicaAtual) return;
     setLoading(true);
-    const [c, cg, st, un] = await Promise.all([
+    const [c, cg, st] = await Promise.all([
       supabase.from("hr_contratos").select("*").eq("clinica_id", clinicaAtual.clinica_id).order("numero", { ascending: false }),
       supabase.from("cargos").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("setores").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
-      supabase.from("unidades").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
     ]);
     if (c.error) toast.error(c.error.message);
     setRows((c.data ?? []) as Contrato[]);
     setCargos((cg.data ?? []) as Ref[]);
     setSetores((st.data ?? []) as Ref[]);
-    setUnidades((un.data ?? []) as Ref[]);
     setLoading(false);
   }
   useEffect(() => { void load(); }, [clinicaAtual?.clinica_id]);
@@ -222,12 +219,12 @@ function ContratosPage() {
               <TabsTrigger value="dados">Dados</TabsTrigger>
               <TabsTrigger value="login">Login e perfil</TabsTrigger>
             </TabsList>
-            <TabsContent value="dados" className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
+            <TabsContent value="dados" className="space-y-3 min-h-[480px] max-h-[70vh] overflow-y-auto pr-1">
               <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2">
-                <Label>Clínica *</Label>
+                <Label>Unidade *</Label>
                 <Select value={form.clinica_id} onValueChange={v => setForm({ ...form, clinica_id: v })}>
-                  <SelectTrigger><SelectValue placeholder="Selecione a clínica" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Selecione a unidade" /></SelectTrigger>
                   <SelectContent>
                     {memberships.map(m => (
                       <SelectItem key={m.clinica_id} value={m.clinica_id}>{m.clinica.nome}</SelectItem>
@@ -263,13 +260,6 @@ function ContratosPage() {
                   <SelectContent>{setores.map(s => <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label>Unidade</Label>
-                <Select value={form.unidade_id} onValueChange={v => setForm({ ...form, unidade_id: v })}>
-                  <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                  <SelectContent>{unidades.map(u => <SelectItem key={u.id} value={u.id}>{u.nome}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
               <div><Label>Carga semanal (h)</Label><Input type="number" step="0.5" value={form.carga_horaria_semanal} onChange={e => setForm({ ...form, carga_horaria_semanal: e.target.value })} /></div>
               <div><Label>Salário (R$)</Label><Input type="number" step="0.01" value={form.salario} onChange={e => setForm({ ...form, salario: e.target.value })} /></div>
               <div><Label>Admissão</Label><Input type="date" value={form.data_admissao} onChange={e => setForm({ ...form, data_admissao: e.target.value })} /></div>
@@ -288,7 +278,7 @@ function ContratosPage() {
               </div>
               </div>
             </TabsContent>
-            <TabsContent value="login" className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
+            <TabsContent value="login" className="space-y-3 min-h-[480px] max-h-[70vh] overflow-y-auto pr-1">
               {editing ? (
                 <p className="text-sm text-muted-foreground py-4">
                   O login não pode ser alterado por aqui após o cadastro do funcionário.
@@ -304,21 +294,19 @@ function ContratosPage() {
                   />
                   Criar login de acesso ao sistema para este funcionário
                 </label>
-                {form.criar_login && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="col-span-2">
-                      <Label>Perfil de acesso *</Label>
-                      <Select value={form.perfil} onValueChange={v => setForm({ ...form, perfil: v })}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {PERFIS.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div><Label>E-mail (login) *</Label><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
-                    <div><Label>Senha inicial *</Label><Input type="text" value={form.senha} onChange={e => setForm({ ...form, senha: e.target.value })} placeholder="Mín. 6 caracteres" /></div>
+                <fieldset disabled={!form.criar_login} className="grid grid-cols-2 gap-3 disabled:opacity-60">
+                  <div className="col-span-2">
+                    <Label>Perfil de acesso *</Label>
+                    <Select value={form.perfil} onValueChange={v => setForm({ ...form, perfil: v })} disabled={!form.criar_login}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {PERFIS.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   </div>
-                )}
+                  <div><Label>E-mail (login) *</Label><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} disabled={!form.criar_login} /></div>
+                  <div><Label>Senha inicial *</Label><Input type="text" value={form.senha} onChange={e => setForm({ ...form, senha: e.target.value })} placeholder="Mín. 6 caracteres" disabled={!form.criar_login} /></div>
+                </fieldset>
                 </div>
               )}
             </TabsContent>
