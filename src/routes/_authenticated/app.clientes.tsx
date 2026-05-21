@@ -17,6 +17,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
 
 export const Route = createFileRoute("/_authenticated/app/clientes")({
@@ -32,6 +33,7 @@ interface Paciente {
   telefone: string | null;
   email: string | null;
   data_nascimento: string | null;
+  sexo: string | null;
   ativo: boolean;
   cep: string | null;
   logradouro: string | null;
@@ -50,7 +52,7 @@ interface Paciente {
 
 type FormState = {
   nome: string; cpf: string; numero_pasta: string; telefone: string; email: string;
-  data_nascimento: string; ativo: boolean;
+  data_nascimento: string; sexo: string; ativo: boolean;
   cep: string; logradouro: string; numero: string; complemento: string;
   bairro: string; cidade: string; estado: string;
   responsavel_nome: string; responsavel_cpf: string;
@@ -59,7 +61,7 @@ type FormState = {
 
 const EMPTY: FormState = {
   nome: "", cpf: "", numero_pasta: "", telefone: "", email: "",
-  data_nascimento: "", ativo: true,
+  data_nascimento: "", sexo: "nao_informar", ativo: true,
   cep: "", logradouro: "", numero: "", complemento: "",
   bairro: "", cidade: "", estado: "",
   responsavel_nome: "", responsavel_cpf: "",
@@ -357,7 +359,7 @@ function ClientesPage() {
       nome: paciente.nome,
       cpf: paciente.cpf ?? "", numero_pasta: paciente.numero_pasta ?? "",
       telefone: paciente.telefone ?? "", email: paciente.email ?? "",
-      data_nascimento: paciente.data_nascimento ?? "", ativo: paciente.ativo,
+      data_nascimento: paciente.data_nascimento ?? "", sexo: paciente.sexo ?? "nao_informar", ativo: paciente.ativo,
       cep: paciente.cep ?? "", logradouro: paciente.logradouro ?? "", numero: paciente.numero ?? "",
       complemento: paciente.complemento ?? "", bairro: paciente.bairro ?? "",
       cidade: paciente.cidade ?? "", estado: paciente.estado ?? "",
@@ -445,6 +447,7 @@ function ClientesPage() {
       telefone: form.telefone.trim() || null,
       email: form.email.trim() || null,
       data_nascimento: form.data_nascimento || null,
+      sexo: form.sexo,
       ativo: form.ativo,
       cep: form.cep.trim() || null,
       logradouro: form.logradouro.trim() || null,
@@ -736,7 +739,21 @@ function ClientesPage() {
                     <Input type="date" required value={form.data_nascimento}
                       onChange={(e) => setForm({ ...form, data_nascimento: e.target.value })} />
                   </div>
-                  {idade !== null && (
+                  <div className="space-y-1">
+                    <Label>Sexo</Label>
+                    <Select value={form.sexo} onValueChange={(v) => setForm({ ...form, sexo: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="masculino">Masculino</SelectItem>
+                        <SelectItem value="feminino">Feminino</SelectItem>
+                        <SelectItem value="outro">Outro</SelectItem>
+                        <SelectItem value="nao_informar">Prefiro não informar</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                {idade !== null && (
+                  <div className="grid grid-cols-2 gap-3 items-end">
                     <div className="text-sm text-muted-foreground pb-2">
                       Idade: <span className="font-medium text-foreground">{idade} anos</span>
                       {sugerirResponsavel && (
@@ -745,8 +762,8 @@ function ClientesPage() {
                         </span>
                       )}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
                 <label className="flex items-center gap-2 text-sm cursor-pointer">
                   <Checkbox checked={form.ativo} onCheckedChange={(v) => setForm({ ...form, ativo: !!v })} />
                   Cliente ativo

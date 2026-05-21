@@ -159,7 +159,7 @@ function EquipePage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <Button asChild size="icon" variant="ghost">
-                          <Link to="/app/funcionario/$userId" params={{ userId: f.user_id }}>
+                          <Link to="/app/hr-contratos" search={{ edit: f.user_id }}>
                             <Pencil className="h-4 w-4" />
                           </Link>
                         </Button>

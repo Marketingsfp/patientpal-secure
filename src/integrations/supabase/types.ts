@@ -1942,6 +1942,7 @@ export type Database = {
           regime: string
           salario: number
           setor_id: string | null
+          sexo: string
           status: string
           unidade_id: string | null
           updated_at: string
@@ -1962,6 +1963,7 @@ export type Database = {
           regime?: string
           salario?: number
           setor_id?: string | null
+          sexo?: string
           status?: string
           unidade_id?: string | null
           updated_at?: string
@@ -1982,6 +1984,7 @@ export type Database = {
           regime?: string
           salario?: number
           setor_id?: string | null
+          sexo?: string
           status?: string
           unidade_id?: string | null
           updated_at?: string
@@ -2896,6 +2899,7 @@ export type Database = {
           percentual_repasse_padrao: number
           pix_chave: string | null
           rg: string | null
+          sexo: string
           telefone: string | null
           tipo_repasse: string
           updated_at: string
@@ -2932,6 +2936,7 @@ export type Database = {
           percentual_repasse_padrao?: number
           pix_chave?: string | null
           rg?: string | null
+          sexo?: string
           telefone?: string | null
           tipo_repasse?: string
           updated_at?: string
@@ -2968,6 +2973,7 @@ export type Database = {
           percentual_repasse_padrao?: number
           pix_chave?: string | null
           rg?: string | null
+          sexo?: string
           telefone?: string | null
           tipo_repasse?: string
           updated_at?: string
@@ -3587,6 +3593,7 @@ export type Database = {
           responsavel_nome: string | null
           responsavel_parentesco: string | null
           responsavel_telefone: string | null
+          sexo: string
           telefone: string | null
           updated_at: string
         }
@@ -3616,6 +3623,7 @@ export type Database = {
           responsavel_nome?: string | null
           responsavel_parentesco?: string | null
           responsavel_telefone?: string | null
+          sexo?: string
           telefone?: string | null
           updated_at?: string
         }
@@ -3645,6 +3653,7 @@ export type Database = {
           responsavel_nome?: string | null
           responsavel_parentesco?: string | null
           responsavel_telefone?: string | null
+          sexo?: string
           telefone?: string | null
           updated_at?: string
         }

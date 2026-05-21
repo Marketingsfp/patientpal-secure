@@ -38,7 +38,7 @@ interface Medico {
   ativo: boolean;
   cpf?: string | null; rg?: string | null; data_nascimento?: string | null;
   email?: string | null; telefone?: string | null;
-  nacionalidade?: string | null; estado_civil?: string | null;
+  nacionalidade?: string | null; estado_civil?: string | null; sexo?: string | null;
   cep?: string | null; logradouro?: string | null; numero?: string | null;
   complemento?: string | null; bairro?: string | null; cidade?: string | null; estado?: string | null;
   banco?: string | null; agencia?: string | null; conta?: string | null; pix_chave?: string | null;
@@ -83,6 +83,7 @@ function MedicosPage() {
     valor: "",
     cpf: "", rg: "", data_nascimento: "", email: "", telefone: "",
     nacionalidade: "Brasileira", estado_civil: "",
+    sexo: "nao_informar",
     cep: "", logradouro: "", numero: "", complemento: "", bairro: "", cidade: "", estado: "",
     banco: "", agencia: "", conta: "", pix_chave: "",
     criarUsuario: false,
@@ -95,7 +96,7 @@ function MedicosPage() {
     if (!clinicaAtual) return;
     const { data } = await supabase
       .from("medicos")
-      .select("id, nome, crm, crm_uf, percentual_repasse_padrao, valor_repasse_padrao, tipo_repasse, ativo, cpf, rg, data_nascimento, email, telefone, nacionalidade, estado_civil, cep, logradouro, numero, complemento, bairro, cidade, estado, banco, agencia, conta, pix_chave, medico_especialidades(especialidade:especialidades(id, nome))")
+      .select("id, nome, crm, crm_uf, percentual_repasse_padrao, valor_repasse_padrao, tipo_repasse, ativo, cpf, rg, data_nascimento, email, telefone, nacionalidade, estado_civil, sexo, cep, logradouro, numero, complemento, bairro, cidade, estado, banco, agencia, conta, pix_chave, medico_especialidades(especialidade:especialidades(id, nome))")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("nome");
     setMedicos((data as unknown as Medico[]) ?? []);
@@ -136,6 +137,7 @@ function MedicosPage() {
       tipo_repasse: "percentual", percentual: "50", valor: "",
       cpf: "", rg: "", data_nascimento: "", email: "", telefone: "",
       nacionalidade: "Brasileira", estado_civil: "",
+      sexo: "nao_informar",
       cep: "", logradouro: "", numero: "", complemento: "", bairro: "", cidade: "", estado: "",
       banco: "", agencia: "", conta: "", pix_chave: "",
       criarUsuario: false, senhaUsuario: "", roleUsuario: "medico",
@@ -177,6 +179,7 @@ function MedicosPage() {
       cpf: m.cpf ?? "", rg: m.rg ?? "", data_nascimento: m.data_nascimento ?? "",
       email: m.email ?? "", telefone: m.telefone ?? "",
       nacionalidade: m.nacionalidade ?? "Brasileira", estado_civil: m.estado_civil ?? "",
+      sexo: m.sexo ?? "nao_informar",
       cep: m.cep ?? "", logradouro: m.logradouro ?? "", numero: m.numero ?? "",
       complemento: m.complemento ?? "", bairro: m.bairro ?? "", cidade: m.cidade ?? "", estado: m.estado ?? "",
       banco: m.banco ?? "", agencia: m.agencia ?? "", conta: m.conta ?? "", pix_chave: m.pix_chave ?? "",
@@ -205,6 +208,7 @@ function MedicosPage() {
       telefone: form.telefone || null,
       nacionalidade: form.nacionalidade || null,
       estado_civil: form.estado_civil || null,
+      sexo: form.sexo,
       cep: form.cep || null,
       logradouro: form.logradouro || null,
       numero: form.numero || null,
@@ -439,6 +443,20 @@ function MedicosPage() {
                     <div className="space-y-2">
                       <Label>Estado civil</Label>
                       <Input value={form.estado_civil} onChange={(e) => setForm({ ...form, estado_civil: e.target.value })} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-2">
+                      <Label>Sexo</Label>
+                      <Select value={form.sexo} onValueChange={(v) => setForm({ ...form, sexo: v })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="masculino">Masculino</SelectItem>
+                          <SelectItem value="feminino">Feminino</SelectItem>
+                          <SelectItem value="outro">Outro</SelectItem>
+                          <SelectItem value="nao_informar">Prefiro não informar</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                 </TabsContent>
