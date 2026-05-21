@@ -23,13 +23,12 @@ export const obterWhatsappConfig = createServerFn({ method: "POST" })
     await assertManager(context.userId, data.clinicaId);
     let cfg = await loadWhatsAppConfig(data.clinicaId);
     if (!cfg) {
-      const { data: novo, error } = await supabaseAdmin
+      const { error: upsertError } = await supabaseAdmin
         .from("whatsapp_configs")
-        .insert({ clinica_id: data.clinicaId })
-        .select("*")
-        .single();
-      if (error) throw new Error(error.message);
-      cfg = novo as any;
+        .upsert({ clinica_id: data.clinicaId }, { onConflict: "clinica_id", ignoreDuplicates: true });
+      if (upsertError) throw new Error(upsertError.message);
+      cfg = await loadWhatsAppConfig(data.clinicaId);
+      if (!cfg) throw new Error("Falha ao carregar configuração do WhatsApp");
     }
     return {
       clinica_id: cfg!.clinica_id,
