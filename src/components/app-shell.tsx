@@ -12,17 +12,17 @@ import logoConsultaHoje from "@/assets/logo-consulta-hoje.png";
 
 function corDaClinica(nome?: string): string {
   const n = (nome ?? "").toLowerCase();
-  if (n.includes("são francisco") || n.includes("sao francisco")) return "#16a34a"; // verde
-  if (n.includes("menino jesus")) return "#1e3a8a"; // azul royal mais escuro
-  if (n.includes("consulta hoje")) return "#51177E"; // PMS 2607
+  if (n.includes("são francisco") || n.includes("sao francisco")) return "#006634"; // verde São Francisco
+  if (n.includes("menino jesus")) return "#15274f"; // azul marinho Menino Jesus
+  if (n.includes("consulta hoje")) return "#141395"; // azul Consulta Hoje
   return "hsl(var(--muted-foreground))";
 }
 
 function corHoverDaClinica(nome?: string): string {
   const n = (nome ?? "").toLowerCase();
-  if (n.includes("são francisco") || n.includes("sao francisco")) return "#14532d"; // verde escuro
-  if (n.includes("menino jesus")) return "#172554"; // azul ainda mais escuro
-  if (n.includes("consulta hoje")) return "#3A0F5C"; // PMS 2607 escuro
+  if (n.includes("são francisco") || n.includes("sao francisco")) return "#004d27"; // verde escuro
+  if (n.includes("menino jesus")) return "#0d1a36"; // marinho escuro
+  if (n.includes("consulta hoje")) return "#0d0c6b"; // azul escuro
   return "rgba(0,0,0,0.25)";
 }
 
