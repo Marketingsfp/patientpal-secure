@@ -493,11 +493,7 @@ function ConfiguracaoWhatsApp() {
       : <Badge variant="outline">Não testado</Badge>;
 
   const canaisDisponiveis = [
-    { id: "evolution", label: "Evolution API", icon: Smartphone, color: "text-emerald-500", disabled: true },
     { id: "oficial", label: "API Oficial", icon: MessageCircle, color: "text-emerald-600", disabled: false },
-    { id: "instagram", label: "Instagram", icon: Instagram, color: "text-pink-500", disabled: true },
-    { id: "facebook", label: "Facebook", icon: Facebook, color: "text-blue-600", disabled: true },
-    { id: "site", label: "Chat do Site", icon: Globe, color: "text-teal-500", disabled: true },
   ] as const;
 
   return (
@@ -576,7 +572,7 @@ function ConfiguracaoWhatsApp() {
           <div className="space-y-4">
             <div>
               <Label className="text-xs mb-2 block">Canal</Label>
-              <div className="grid grid-cols-5 gap-2">
+              <div className="grid grid-cols-1 gap-2">
                 {canaisDisponiveis.map((c) => {
                   const Icon = c.icon;
                   const active = canal === c.id;
