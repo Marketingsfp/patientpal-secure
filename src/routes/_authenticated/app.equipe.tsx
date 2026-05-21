@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Plus, Pencil, Users, Stethoscope } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { FuncionarioFormDialog } from "@/components/funcionarios/FuncionarioFormDialog";
 
 export const Route = createFileRoute("/_authenticated/app/equipe")({
   component: EquipePage,
@@ -43,6 +44,8 @@ function EquipePage() {
   const [loading, setLoading] = useState(false);
   const [openChooser, setOpenChooser] = useState(false);
   const [busca, setBusca] = useState("");
+  const [funcDialog, setFuncDialog] = useState<{ open: boolean; userId?: string | null }>({ open: false, userId: null });
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (!clinicaAtual) return;
@@ -78,11 +81,11 @@ function EquipePage() {
       setMedicos((m.data ?? []) as Medico[]);
       setLoading(false);
     });
-  }, [clinicaAtual?.clinica_id]);
+  }, [clinicaAtual?.clinica_id, reloadKey]);
 
   const escolherFuncionario = () => {
     setOpenChooser(false);
-    void navigate({ to: "/app/hr-contratos", search: { new: "1" } });
+    setFuncDialog({ open: true, userId: null });
   };
   const escolherMedico = () => {
     setOpenChooser(false);
@@ -158,10 +161,8 @@ function EquipePage() {
                         <Badge variant={f.ativo ? "default" : "outline"}>{f.ativo ? "Ativo" : "Inativo"}</Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button asChild size="icon" variant="ghost">
-                          <Link to="/app/hr-contratos" search={{ edit: f.user_id }}>
-                            <Pencil className="h-4 w-4" />
-                          </Link>
+                        <Button size="icon" variant="ghost" onClick={() => setFuncDialog({ open: true, userId: f.user_id })}>
+                          <Pencil className="h-4 w-4" />
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -242,6 +243,16 @@ function EquipePage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {clinicaAtual && (
+        <FuncionarioFormDialog
+          open={funcDialog.open}
+          onOpenChange={(o) => setFuncDialog((s) => ({ ...s, open: o }))}
+          clinicaId={clinicaAtual.clinica_id}
+          editingUserId={funcDialog.userId ?? null}
+          onSaved={() => setReloadKey((k) => k + 1)}
+        />
+      )}
     </div>
   );
 }
