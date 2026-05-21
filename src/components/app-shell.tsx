@@ -246,6 +246,21 @@ export function AppShell() {
         : "#0f172a";
   const initial = (userName || user?.email || "?").trim().charAt(0).toUpperCase();
 
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const root = document.documentElement;
+    root.style.setProperty("--primary", clinicColor);
+    root.style.setProperty("--ring", clinicColor);
+    root.style.setProperty("--sidebar-primary", clinicColor);
+    root.style.setProperty("--primary-foreground", "#ffffff");
+    return () => {
+      root.style.removeProperty("--primary");
+      root.style.removeProperty("--ring");
+      root.style.removeProperty("--sidebar-primary");
+      root.style.removeProperty("--primary-foreground");
+    };
+  }, [clinicColor]);
+
   const medicoNavRows: typeof navRows = [
     {
       label: "Médico",
@@ -341,7 +356,7 @@ export function AppShell() {
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="h-8 w-8 rounded-full flex items-center justify-center text-sm font-semibold text-white shadow-sm shrink-0 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                  className="h-8 w-8 rounded-full flex items-center justify-center text-sm font-semibold text-white shadow-sm shrink-0 cursor-pointer hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
                   style={{ backgroundColor: clinicColor }}
                   title="Conta"
                 >
