@@ -18,13 +18,10 @@ export const Route = createFileRoute("/_authenticated/app/equipe")({
 
 interface Funcionario {
   id: string;
-  numero: number | null;
-  funcionario_nome: string;
-  cpf: string | null;
-  status: string | null;
-  salario: number | null;
-  data_admissao: string | null;
-  user_id: string | null;
+  user_id: string;
+  nome: string;
+  role: string;
+  ativo: boolean;
 }
 
 interface Medico {
@@ -52,17 +49,25 @@ function EquipePage() {
     setLoading(true);
     void Promise.all([
       supabase
-        .from("hr_contratos")
-        .select("id, numero, funcionario_nome, cpf, status, salario, data_admissao, user_id")
+        .from("clinica_memberships")
+        .select("id, user_id, role, ativo, profiles:user_id(nome)")
         .eq("clinica_id", clinicaAtual.clinica_id)
-        .order("funcionario_nome"),
+        .neq("role", "medico"),
       supabase
         .from("medicos")
         .select("id, nome, crm, crm_uf, email, telefone, ativo")
         .eq("clinica_id", clinicaAtual.clinica_id)
         .order("nome"),
     ]).then(([f, m]) => {
-      setFuncionarios((f.data ?? []) as Funcionario[]);
+      const rows = ((f.data ?? []) as any[]).map((r) => ({
+        id: r.id,
+        user_id: r.user_id,
+        nome: r.profiles?.nome ?? "—",
+        role: r.role,
+        ativo: r.ativo,
+      })) as Funcionario[];
+      rows.sort((a, b) => a.nome.localeCompare(b.nome));
+      setFuncionarios(rows);
       setMedicos((m.data ?? []) as Medico[]);
       setLoading(false);
     });
@@ -81,7 +86,7 @@ function EquipePage() {
 
   const q = busca.trim().toLowerCase();
   const funcsFiltrados = q
-    ? funcionarios.filter((f) => f.funcionario_nome.toLowerCase().includes(q) || (f.cpf ?? "").includes(q))
+    ? funcionarios.filter((f) => f.nome.toLowerCase().includes(q) || f.role.toLowerCase().includes(q))
     : funcionarios;
   const medicosFiltrados = q
     ? medicos.filter((m) => m.nome.toLowerCase().includes(q) || (m.crm ?? "").includes(q))
@@ -132,28 +137,24 @@ function EquipePage() {
             <Card>
               <Table>
                 <TableHeader><TableRow>
-                  <TableHead className="w-16">Nº</TableHead>
                   <TableHead>Nome</TableHead>
-                  <TableHead>CPF</TableHead>
-                  <TableHead>Admissão</TableHead>
-                  <TableHead>Acesso</TableHead>
+                  <TableHead>Função</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-16 text-right">Ações</TableHead>
                 </TableRow></TableHeader>
                 <TableBody>
                   {funcsFiltrados.map((f) => (
                     <TableRow key={f.id}>
-                      <TableCell className="text-muted-foreground">{f.numero ?? "—"}</TableCell>
-                      <TableCell>{f.funcionario_nome}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{f.cpf ?? "—"}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{f.data_admissao ?? "—"}</TableCell>
-                      <TableCell>{f.user_id ? <Badge>Tem login</Badge> : <Badge variant="outline">Sem login</Badge>}</TableCell>
+                      <TableCell>{f.nome}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground capitalize">{f.role}</TableCell>
                       <TableCell>
-                        <Badge variant={f.status === "ativo" ? "default" : "outline"} className="capitalize">{f.status ?? "—"}</Badge>
+                        <Badge variant={f.ativo ? "default" : "outline"}>{f.ativo ? "Ativo" : "Inativo"}</Badge>
                       </TableCell>
                       <TableCell className="text-right">
                         <Button asChild size="icon" variant="ghost">
-                          <Link to="/app/hr-contratos"><Pencil className="h-4 w-4" /></Link>
+                          <Link to="/app/funcionario/$userId" params={{ userId: f.user_id }}>
+                            <Pencil className="h-4 w-4" />
+                          </Link>
                         </Button>
                       </TableCell>
                     </TableRow>
