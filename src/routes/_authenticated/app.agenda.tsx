@@ -546,6 +546,10 @@ function AgendaPage() {
   const submit = async (e: FormEvent, irParaPagamento = false) => {
     e.preventDefault();
     if (!clinicaAtual) return;
+    if (editing && pagosSet.has(editing.id)) {
+      toast.error("Agendamento já pago — somente visualização.");
+      return;
+    }
     if (!form.paciente_nome.trim()) { toast.error("Informe o paciente"); return; }
     if (!form.paciente_id) {
       toast.error("Selecione um paciente cadastrado na lista ou clique em \"Cadastrar agora\" para criar o cadastro antes de salvar.");
