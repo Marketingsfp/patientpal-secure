@@ -1504,6 +1504,45 @@ function AgendaPage() {
           fmtHora={fmtHora}
         />
       )}
+
+      <Dialog open={pacInfoOpen} onOpenChange={setPacInfoOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Informações do cliente</DialogTitle>
+          </DialogHeader>
+          {pacInfoLoading ? (
+            <p className="text-sm text-muted-foreground py-4">Carregando…</p>
+          ) : pacInfo ? (
+            <div className="rounded-lg border p-4 space-y-2 text-sm">
+              <div className="flex items-center gap-3">
+                {pacInfo.foto_url ? (
+                  <img src={pacInfo.foto_url} alt={pacInfo.nome} className="h-14 w-14 rounded-full object-cover border" />
+                ) : null}
+                <div>
+                  <div className="font-semibold uppercase">{pacInfo.nome}</div>
+                  {pacInfo.numero_pasta && (
+                    <div className="text-xs text-muted-foreground">Pasta nº {pacInfo.numero_pasta}</div>
+                  )}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t">
+                <div><span className="text-muted-foreground">CPF: </span>{pacInfo.cpf || "—"}</div>
+                <div><span className="text-muted-foreground">Nasc.: </span>{pacInfo.data_nascimento ? new Date(pacInfo.data_nascimento + "T00:00:00").toLocaleDateString("pt-BR") : "—"}</div>
+                <div><span className="text-muted-foreground">Telefone: </span>{pacInfo.telefone || "—"}</div>
+                <div className="truncate"><span className="text-muted-foreground">Email: </span>{pacInfo.email || "—"}</div>
+                <div className="col-span-2"><span className="text-muted-foreground">Endereço: </span>{[pacInfo.logradouro, pacInfo.numero, pacInfo.bairro, pacInfo.cidade, pacInfo.estado].filter(Boolean).join(", ") || "—"}</div>
+              </div>
+              {pacInfo.id && (
+                <div className="pt-2">
+                  <Link to="/app/clientes" search={{ q: pacInfo.nome } as any} className="text-xs text-primary hover:underline">
+                    Abrir ficha completa →
+                  </Link>
+                </div>
+              )}
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
