@@ -639,7 +639,9 @@ function ProcedimentosPage() {
                   <TableHead className="w-44">Grupo</TableHead>
                   <TableHead className="w-24">Tipo</TableHead>
                   <TableHead className="w-24 text-right">Dinheiro</TableHead>
-                  <TableHead className="w-40 text-right">Pix / Débito / Crédito</TableHead>
+                  <TableHead className="w-20 text-right">Pix</TableHead>
+                  <TableHead className="w-20 text-right">Débito</TableHead>
+                  <TableHead className="w-20 text-right">Crédito</TableHead>
                   <TableHead className="w-24 text-right">C. Consulta</TableHead>
                   <TableHead className="w-24 text-right">C. Desconto</TableHead>
                   <TableHead className="w-24">Situação</TableHead>
@@ -648,11 +650,11 @@ function ProcedimentosPage() {
               </TableHeader>
               <TableBody>
                 {loading ? (
-                  <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>
                 ) : !clinicaAtual ? (
-                  <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
                 ) : filtrados.length === 0 ? (
-                  <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Nenhum procedimento.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Nenhum procedimento.</TableCell></TableRow>
                 ) : visiveis.map(p => (
                   <TableRow key={p.id} className="h-8">
                     <TableCell className="font-medium">{p.nome}</TableCell>
@@ -661,6 +663,8 @@ function ProcedimentosPage() {
                       <span className={`text-[10px] px-1.5 py-0 rounded-full ${TIPO_COR[p.tipo]}`}>{TIPO_LABEL[p.tipo]}</span>
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_dinheiro ?? p.valor_dinheiro_pix))}</TableCell>
+                    <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_pix ?? p.valor_cartao_credito ?? p.valor_cartao_debito ?? p.valor_cartao))}</TableCell>
+                    <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_cartao_debito ?? p.valor_cartao_credito ?? p.valor_cartao))}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_cartao_credito ?? p.valor_cartao_debito ?? p.valor_cartao))}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_cartao_consulta))}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_cartao_desconto))}</TableCell>
@@ -677,7 +681,7 @@ function ProcedimentosPage() {
                 ))}
                 {filtrados.length > visiveis.length && (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-4 text-xs text-muted-foreground bg-muted/20">
+                    <TableCell colSpan={11} className="text-center py-4 text-xs text-muted-foreground bg-muted/20">
                       Mostrando {visiveis.length} de {filtrados.length}. Use a busca ou filtros para refinar.
                     </TableCell>
                   </TableRow>
