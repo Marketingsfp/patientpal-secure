@@ -1357,7 +1357,7 @@ function AgendaPage() {
                           </Button>
                         </div>
                       ) : (
-                        <div className="flex flex-col leading-none gap-0">
+                        <div className="flex items-center flex-wrap gap-x-2 gap-y-0 leading-none">
                           <span className="text-[10px] uppercase tracking-wide text-muted-foreground truncate">
                             Dr(a). {medicos.find((m) => m.id === a.medico_id)?.nome ?? "—"}
                           </span>
