@@ -69,6 +69,7 @@ import { Route as AuthenticatedAppContratosRouteImport } from './routes/_authent
 import { Route as AuthenticatedAppConsultaRapidaRouteImport } from './routes/_authenticated/app.consulta-rapida'
 import { Route as AuthenticatedAppClinicasRouteImport } from './routes/_authenticated/app.clinicas'
 import { Route as AuthenticatedAppClientesRouteImport } from './routes/_authenticated/app.clientes'
+import { Route as AuthenticatedAppCheckinRouteImport } from './routes/_authenticated/app.checkin'
 import { Route as AuthenticatedAppChatRouteImport } from './routes/_authenticated/app.chat'
 import { Route as AuthenticatedAppCartaoBeneficiosRouteImport } from './routes/_authenticated/app.cartao-beneficios'
 import { Route as AuthenticatedAppCargosRouteImport } from './routes/_authenticated/app.cargos'
@@ -430,6 +431,11 @@ const AuthenticatedAppClientesRoute =
     path: '/clientes',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
+const AuthenticatedAppCheckinRoute = AuthenticatedAppCheckinRouteImport.update({
+  id: '/checkin',
+  path: '/checkin',
+  getParentRoute: () => AuthenticatedAppRoute,
+} as any)
 const AuthenticatedAppChatRoute = AuthenticatedAppChatRouteImport.update({
   id: '/chat',
   path: '/chat',
@@ -646,6 +652,7 @@ export interface FileRoutesByFullPath {
   '/app/cargos': typeof AuthenticatedAppCargosRoute
   '/app/cartao-beneficios': typeof AuthenticatedAppCartaoBeneficiosRouteWithChildren
   '/app/chat': typeof AuthenticatedAppChatRoute
+  '/app/checkin': typeof AuthenticatedAppCheckinRoute
   '/app/clientes': typeof AuthenticatedAppClientesRoute
   '/app/clinicas': typeof AuthenticatedAppClinicasRoute
   '/app/consulta-rapida': typeof AuthenticatedAppConsultaRapidaRoute
@@ -738,6 +745,7 @@ export interface FileRoutesByTo {
   '/app/cargos': typeof AuthenticatedAppCargosRoute
   '/app/cartao-beneficios': typeof AuthenticatedAppCartaoBeneficiosRouteWithChildren
   '/app/chat': typeof AuthenticatedAppChatRoute
+  '/app/checkin': typeof AuthenticatedAppCheckinRoute
   '/app/clientes': typeof AuthenticatedAppClientesRoute
   '/app/clinicas': typeof AuthenticatedAppClinicasRoute
   '/app/consulta-rapida': typeof AuthenticatedAppConsultaRapidaRoute
@@ -832,6 +840,7 @@ export interface FileRoutesById {
   '/_authenticated/app/cargos': typeof AuthenticatedAppCargosRoute
   '/_authenticated/app/cartao-beneficios': typeof AuthenticatedAppCartaoBeneficiosRouteWithChildren
   '/_authenticated/app/chat': typeof AuthenticatedAppChatRoute
+  '/_authenticated/app/checkin': typeof AuthenticatedAppCheckinRoute
   '/_authenticated/app/clientes': typeof AuthenticatedAppClientesRoute
   '/_authenticated/app/clinicas': typeof AuthenticatedAppClinicasRoute
   '/_authenticated/app/consulta-rapida': typeof AuthenticatedAppConsultaRapidaRoute
@@ -927,6 +936,7 @@ export interface FileRouteTypes {
     | '/app/cargos'
     | '/app/cartao-beneficios'
     | '/app/chat'
+    | '/app/checkin'
     | '/app/clientes'
     | '/app/clinicas'
     | '/app/consulta-rapida'
@@ -1019,6 +1029,7 @@ export interface FileRouteTypes {
     | '/app/cargos'
     | '/app/cartao-beneficios'
     | '/app/chat'
+    | '/app/checkin'
     | '/app/clientes'
     | '/app/clinicas'
     | '/app/consulta-rapida'
@@ -1112,6 +1123,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/cargos'
     | '/_authenticated/app/cartao-beneficios'
     | '/_authenticated/app/chat'
+    | '/_authenticated/app/checkin'
     | '/_authenticated/app/clientes'
     | '/_authenticated/app/clinicas'
     | '/_authenticated/app/consulta-rapida'
@@ -1621,6 +1633,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppClientesRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/app/checkin': {
+      id: '/_authenticated/app/checkin'
+      path: '/checkin'
+      fullPath: '/app/checkin'
+      preLoaderRoute: typeof AuthenticatedAppCheckinRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/app/chat': {
       id: '/_authenticated/app/chat'
       path: '/chat'
@@ -1932,6 +1951,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppCargosRoute: typeof AuthenticatedAppCargosRoute
   AuthenticatedAppCartaoBeneficiosRoute: typeof AuthenticatedAppCartaoBeneficiosRouteWithChildren
   AuthenticatedAppChatRoute: typeof AuthenticatedAppChatRoute
+  AuthenticatedAppCheckinRoute: typeof AuthenticatedAppCheckinRoute
   AuthenticatedAppClientesRoute: typeof AuthenticatedAppClientesRoute
   AuthenticatedAppClinicasRoute: typeof AuthenticatedAppClinicasRoute
   AuthenticatedAppConsultaRapidaRoute: typeof AuthenticatedAppConsultaRapidaRoute
@@ -1993,6 +2013,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppCartaoBeneficiosRoute:
     AuthenticatedAppCartaoBeneficiosRouteWithChildren,
   AuthenticatedAppChatRoute: AuthenticatedAppChatRoute,
+  AuthenticatedAppCheckinRoute: AuthenticatedAppCheckinRoute,
   AuthenticatedAppClientesRoute: AuthenticatedAppClientesRoute,
   AuthenticatedAppClinicasRoute: AuthenticatedAppClinicasRoute,
   AuthenticatedAppConsultaRapidaRoute: AuthenticatedAppConsultaRapidaRoute,

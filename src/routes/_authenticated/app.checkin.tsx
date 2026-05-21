@@ -23,7 +23,7 @@ type Item = {
   procedimento: string | null;
   fluxo_etapa: string;
   medicos?: { nome: string } | null;
-  pacientes?: { cpf: string | null; telefone: string | null; foto_url: string | null } | null;
+  pacientes?: Array<{ cpf: string | null; telefone: string | null; foto_url: string | null }> | null;
 };
 
 function normalizar(t: string) {
@@ -64,7 +64,7 @@ function CheckinPage() {
       pagos = new Set(((pg ?? []) as Array<{ agendamento_id: string | null }>)
         .map((r) => r.agendamento_id).filter((x): x is string => !!x));
     }
-    setItems(((ags ?? []) as Item[]).filter((a) => pagos.has(a.id)));
+    setItems(((ags ?? []) as unknown as Item[]).filter((a) => pagos.has(a.id)));
     setLoading(false);
   }, [clinicaAtual, data]);
 
@@ -74,7 +74,7 @@ function CheckinPage() {
     const b = normalizar(busca.trim());
     if (!b) return items;
     return items.filter((a) => {
-      const cpf = (a.pacientes?.cpf ?? "").replace(/\D/g, "");
+      const cpf = (a.pacientes?.[0]?.cpf ?? "").replace(/\D/g, "");
       return normalizar(a.paciente_nome).includes(b) || cpf.includes(b.replace(/\D/g, ""));
     });
   }, [items, busca]);
@@ -139,8 +139,8 @@ function CheckinPage() {
         <div className="grid gap-2">
           {filtrados.map((a) => (
             <Card key={a.id} className="p-3 flex items-center gap-3 flex-wrap">
-              {a.pacientes?.foto_url ? (
-                <img src={a.pacientes.foto_url} alt="" className="h-12 w-12 rounded-full object-cover border" />
+              {a.pacientes?.[0]?.foto_url ? (
+                <img src={a.pacientes[0].foto_url} alt="" className="h-12 w-12 rounded-full object-cover border" />
               ) : (
                 <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center font-semibold text-muted-foreground">
                   {a.paciente_nome.slice(0, 1).toUpperCase()}
@@ -153,8 +153,8 @@ function CheckinPage() {
                 </div>
                 <div className="text-xs text-muted-foreground">
                   {hora(a.inicio)} • {a.medicos?.nome ?? "—"} • {a.procedimento ?? "CONSULTA"}
-                  {a.pacientes?.cpf && ` • CPF ${a.pacientes.cpf}`}
-                  {a.pacientes?.telefone && ` • ${a.pacientes.telefone}`}
+                  {a.pacientes?.[0]?.cpf && ` • CPF ${a.pacientes[0].cpf}`}
+                  {a.pacientes?.[0]?.telefone && ` • ${a.pacientes[0].telefone}`}
                 </div>
               </div>
               <Button
