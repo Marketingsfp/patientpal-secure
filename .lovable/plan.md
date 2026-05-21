@@ -1,70 +1,40 @@
-## Objetivo
+## 1. Bug — pagamento em dinheiro sem informar valor recebido
 
-Quando um pagamento agrupa vários agendamentos do mesmo paciente envolvendo profissionais diferentes, imprimir **uma única Guia de Atendimento (GR)** contendo várias seções — uma por profissional — em vez de imprimir apenas a do agendamento principal.
+**Hoje** (`src/components/financeiro/lancamento-dialog.tsx`): quando a forma de pagamento é **Dinheiro**, o campo "Valor recebido" é opcional. Se ficar em branco, o salvamento prossegue e nenhum troco é calculado.
 
-## Situação atual
+**Correção (modo único):** antes do `INSERT` do lançamento, se `formaPagamento === "dinheiro"` (e não-misto), exigir `recebidoNum >= valorNum`. Caso contrário, `toast.error("Informe o valor recebido (deve ser ≥ R$ X,XX)")` e abortar. Tornar o campo "Valor recebido" obrigatório visualmente (asterisco + `required`).
 
-- `src/lib/print-gr.ts` (`printGuiaAtendimento`) gera a GR de **um único** `agendamentoId`.
-- Em `src/routes/_authenticated/app.agenda.tsx` (linha ~1079), após salvar um pagamento agrupado, é chamada `printGuiaAtendimento` apenas com `pagamentoAgId` (o principal). Os `pagamentoExtraIds` ficam de fora da impressão.
-- Resultado hoje: paciente paga 3 consultas (Dr A, Dr B, Dr C) → sai só a GR do Dr A.
+**Correção (modo misto):** para cada linha com `forma === "dinheiro"`, exigir `recebido > 0` e `recebido >= pago` (já é feito implicitamente, mas validar com mensagem clara). Bloquear salvamento se faltar.
 
-## Mudanças propostas
+Sem mudanças em banco — só validação no diálogo.
 
-### 1. `src/lib/print-gr.ts` — nova função `printGuiaAtendimentoAgrupada`
+---
 
-Assinatura:
-```ts
-printGuiaAtendimentoAgrupada({
-  agendamentoIds: string[],          // todos os ids (principal + extras)
-  clinicaId, usuarioNome, usuarioId,
-  pagamento: { valor, forma_pagamento, parcelas, bandeira_cartao, detalhe }
-})
-```
+## 2. Check-in de pacientes (pagaram antes, confirmam presença no balcão)
 
-Comportamento:
-- Busca em paralelo todos os agendamentos, agrupa por `medico_id`.
-- Para cada grupo de profissional, calcula:
-  - lista de procedimentos (linhas QTD / PROCEDIMENTO)
-  - subtotal do grupo (soma dos valores dos procedimentos do médico, derivados da tabela `procedimentos` da clínica, mesma lógica de hoje)
-  - repasse clínica × prestador desse médico (usa `medico_convenios` / padrão do médico — lógica já existente reutilizada)
-- Cabeçalho único: dados da clínica, paciente, data/hora, usuário, "GUIA DE ATENDIMENTO", indicação de via.
-- Corpo: um bloco por profissional, separado por linha tracejada:
-  ```
-  PROFISSIONAL: DR. FULANO
-  QTD  PROCEDIMENTO
-   1   CONSULTA CARDIOLOGIA   R$ 150,00
-   1   ECG                     R$  80,00
-  SUBTOTAL                     R$ 230,00
-  CLINICA                      R$  46,00
-  PRESTADOR                    R$ 184,00
-  ----
-  ```
-- Rodapé único: **VALOR TOTAL RECEBIDO** (= `pagamento.valor` informado pelo caixa), forma de pagamento (com detalhe se misto, parcelas/bandeira se crédito), totais consolidados (CLINICA total / PRESTADORES total).
-- Controle de vias: registra **uma única** linha em `gr_impressoes` por id (vias separadas por agendamento permanecem por id, para manter o limite de 2 vias já existente), mas a janela de impressão é única. Reimpressão: `reimprimirGuiaAtendimentoAgrupada` repete sem incrementar.
+### Fluxo desejado
+Paciente paga antecipado → no dia comparece ao balcão → atendente busca o paciente → clica **Confirmar presença** → `fluxo_etapa` avança para **triagem** (libera enfermagem / médico). Hoje isso só acontece automaticamente quando o pagamento é feito na hora (já implementado em `app.agenda.tsx` linha ~1066).
 
-A função `printGuiaAtendimento` (caso de 1 agendamento) continua existindo e é usada como atalho/fallback (a nova função pode internamente delegar para a antiga quando `agendamentoIds.length === 1`).
+### Mudanças
 
-### 2. `src/routes/_authenticated/app.agenda.tsx`
+**a) Nova rota:** `src/routes/_authenticated/app.checkin.tsx`
+- Lista agendamentos da clínica atual cuja data é **hoje** (com seletor de data, padrão hoje).
+- Mostra apenas pacientes com pagamento já confirmado (existe `fin_lancamentos` com `agendamento_id = a.id`, `tipo = 'receita'`, `status = 'confirmado'`) **e** `fluxo_etapa IN ('aguardando_recepcao', 'recepcao')`.
+- Campos por linha: foto/nome, CPF/telefone, horário, profissional, procedimento, status do pagamento (badge "PAGO"), botão grande **"Confirmar presença"**.
+- Busca por nome / CPF no topo.
+- Ao clicar: `UPDATE agendamentos SET fluxo_etapa='triagem', fluxo_atualizado_em=now() WHERE id = ?`, toast de sucesso, remove da lista.
+- Também exibe um contador "X aguardando check-in".
+- Item de menu **"Check-in"** (ícone `UserCheck` ou `BadgeCheck`) em `src/components/app-shell.tsx`, grupo "Operação".
 
-No `onSavedWithData` (linha ~1079), substituir a chamada atual por:
+**b) Atalho na Agenda** (`src/routes/_authenticated/app.agenda.tsx`)
+- Para cada agendamento já pago (`pagosSet.has(a.id)`) cujo `fluxo_etapa` ainda seja `aguardando_recepcao` ou `recepcao`, mostrar um botão verde compacto **"✓ Confirmar presença"** ao lado das ações existentes (Editar/Imprimir/Cobrar).
+- Clique → mesma atualização do `fluxo_etapa` para `triagem` + `toast.success("Presença confirmada — paciente liberado para triagem")` + recarrega a lista.
+- Carregar `fluxo_etapa` no `select` da query da agenda (atualmente apenas alguns campos são lidos — adicionar `fluxo_etapa`).
 
-```ts
-const todos = [pagamentoAgId, ...pagamentoExtraIds];
-await printGuiaAtendimentoAgrupada({
-  agendamentoIds: todos,
-  clinicaId: clinicaAtual.clinica_id,
-  usuarioNome: ...,
-  usuarioId: user?.id ?? null,
-  pagamento: { valor, forma_pagamento, parcelas, bandeira_cartao, detalhe },
-});
-```
+### Sem mudanças de banco
+Tudo já existe: `agendamentos.fluxo_etapa`, `fin_lancamentos` por `agendamento_id`. RLS já cobre por `clinica_id`.
 
-Botão "Imprimir GR" individual (`imprimirGR`, linha 690) continua usando `printGuiaAtendimento` — sem mudança.
-
-## Pontos a confirmar com o usuário
-
-1. Quando o pagamento agrupado é de **um único profissional** com vários procedimentos, devo mesmo assim usar o novo layout consolidado (uma seção só, com várias linhas QTD/PROCEDIMENTO)? Resposta esperada: **sim**, fica mais limpo que imprimir N guias.
-2. O **VALOR TOTAL** impresso no rodapé deve refletir exatamente o que foi cobrado no caixa (`pagamento.valor`), mesmo que difira da soma dos valores cadastrados em `procedimentos` (descontos, ajustes manuais)? Suposição: **sim**.
-3. Os blocos CLINICA / PRESTADOR por profissional devem aparecer **por médico** (como acima) **e** também um total geral no rodapé? Suposição: **sim, ambos**.
-
-Se as três suposições estiverem corretas, sigo direto. Caso queira ajustar algo, me avise antes da implementação.
+### Suposições
+- "Pago antes" = qualquer `fin_lancamentos` confirmado vinculado ao agendamento, independente da data do lançamento.
+- Após confirmar presença, o paciente vai direto para **triagem** (mesma etapa usada quando o pagamento ocorre na hora). Se preferir mandar para **recepcao** antes da triagem, me avise.
+- A tela mostra **apenas o dia selecionado**. Não vai listar futuros / passados nesta tela.
