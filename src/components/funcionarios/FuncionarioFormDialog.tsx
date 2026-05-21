@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
-import { cadastrarUsuario } from "@/lib/equipe.functions";
+import { cadastrarUsuario, getFuncionarioLogin, definirSenhaFuncionario } from "@/lib/equipe.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,6 +40,8 @@ const emptyForm = (clinicaId: string) => ({
 
 export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUserId, onSaved }: Props) {
   const cadastrarUsuarioFn = useServerFn(cadastrarUsuario);
+  const getLoginFn = useServerFn(getFuncionarioLogin);
+  const definirSenhaFn = useServerFn(definirSenhaFuncionario);
   const [cargos, setCargos] = useState<Ref[]>([]);
   const [setores, setSetores] = useState<Ref[]>([]);
   const [form, setForm] = useState(() => emptyForm(clinicaId));
@@ -48,6 +50,10 @@ export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUs
   const [existingEmail, setExistingEmail] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showSenha, setShowSenha] = useState(false);
+  const [novaSenha, setNovaSenha] = useState("");
+  const [confirmarSenha, setConfirmarSenha] = useState("");
+  const [savingSenha, setSavingSenha] = useState(false);
 
   // Load cargos/setores when dialog opens
   useEffect(() => {
@@ -104,13 +110,33 @@ export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUs
       }
       // Try to get email of this user
       try {
-        const { data: u } = await supabase.auth.getUser();
-        if (u.user && u.user.id === editingUserId) setExistingEmail(u.user.email ?? null);
-        else setExistingEmail(null);
+        const res = await getLoginFn({ data: { clinicaId, userId: editingUserId } });
+        setExistingEmail((res as { email?: string | null })?.email ?? null);
       } catch { setExistingEmail(null); }
+      setShowSenha(false);
+      setNovaSenha("");
+      setConfirmarSenha("");
       setLoading(false);
     })();
   }, [open, editingUserId, clinicaId]);
+
+  async function salvarNovaSenha() {
+    if (!editingUserId) return;
+    if (novaSenha.length < 6) { toast.error("Senha deve ter pelo menos 6 caracteres"); return; }
+    if (novaSenha !== confirmarSenha) { toast.error("As senhas não conferem"); return; }
+    setSavingSenha(true);
+    try {
+      await definirSenhaFn({ data: { clinicaId, userId: editingUserId, novaSenha } });
+      toast.success("Senha atualizada");
+      setShowSenha(false);
+      setNovaSenha("");
+      setConfirmarSenha("");
+    } catch (e) {
+      toast.error((e as Error)?.message ?? "Erro ao atualizar senha");
+    } finally {
+      setSavingSenha(false);
+    }
+  }
 
   async function salvar() {
     if (!form.clinica_id) { toast.error("Clínica não definida"); return; }
@@ -244,12 +270,41 @@ export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUs
             </TabsContent>
             <TabsContent value="login" className="space-y-3 min-h-[480px] max-h-[70vh] overflow-y-auto pr-1">
               {isEditingExisting ? (
-                <div className="space-y-3 py-2 text-sm">
+                <div className="space-y-4 py-2 text-sm">
                   {existingEmail ? (
                     <p><span className="text-muted-foreground">E-mail de login:</span> <span className="font-medium">{existingEmail}</span></p>
                   ) : (
-                    <p className="text-muted-foreground">Funcionário com login criado anteriormente. Para alterar e-mail ou senha use a tela de perfil do funcionário.</p>
+                    <p className="text-muted-foreground">Não foi possível recuperar o e-mail de login deste funcionário.</p>
                   )}
+                  <div className="border-t pt-4 space-y-3">
+                    {!showSenha ? (
+                      <Button type="button" variant="outline" size="sm" onClick={() => setShowSenha(true)}>
+                        Trocar senha
+                      </Button>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="text-sm font-medium">Definir nova senha</div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label>Nova senha *</Label>
+                            <Input type="text" value={novaSenha} onChange={e => setNovaSenha(e.target.value)} placeholder="Mín. 6 caracteres" />
+                          </div>
+                          <div>
+                            <Label>Confirmar senha *</Label>
+                            <Input type="text" value={confirmarSenha} onChange={e => setConfirmarSenha(e.target.value)} />
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button type="button" size="sm" onClick={salvarNovaSenha} disabled={savingSenha}>
+                            {savingSenha ? "Salvando…" : "Salvar nova senha"}
+                          </Button>
+                          <Button type="button" size="sm" variant="ghost" onClick={() => { setShowSenha(false); setNovaSenha(""); setConfirmarSenha(""); }}>
+                            Cancelar
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-3">
