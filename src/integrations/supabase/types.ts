@@ -3786,6 +3786,85 @@ export type Database = {
         }
         Relationships: []
       }
+      perfil_permissoes: {
+        Row: {
+          acesso: Database["public"]["Enums"]["modulo_acesso"]
+          created_at: string
+          id: string
+          modulo: string
+          perfil_id: string
+          updated_at: string
+        }
+        Insert: {
+          acesso?: Database["public"]["Enums"]["modulo_acesso"]
+          created_at?: string
+          id?: string
+          modulo: string
+          perfil_id: string
+          updated_at?: string
+        }
+        Update: {
+          acesso?: Database["public"]["Enums"]["modulo_acesso"]
+          created_at?: string
+          id?: string
+          modulo?: string
+          perfil_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "perfil_permissoes_perfil_id_fkey"
+            columns: ["perfil_id"]
+            isOneToOne: false
+            referencedRelation: "perfis_acesso"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      perfis_acesso: {
+        Row: {
+          ativo: boolean
+          chave: string
+          clinica_id: string
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+          sistema: boolean
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          chave: string
+          clinica_id: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          sistema?: boolean
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          chave?: string
+          clinica_id?: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          sistema?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "perfis_acesso_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       permissions: {
         Row: {
           chave: string
@@ -4831,6 +4910,7 @@ export type Database = {
         | "boleto"
         | "transferencia"
       lms_licao_tipo: "video" | "texto" | "quiz"
+      modulo_acesso: "none" | "read" | "write"
       odonto_status:
         | "higido"
         | "cariado"
@@ -5066,6 +5146,7 @@ export const Constants = {
         "transferencia",
       ],
       lms_licao_tipo: ["video", "texto", "quiz"],
+      modulo_acesso: ["none", "read", "write"],
       odonto_status: [
         "higido",
         "cariado",
