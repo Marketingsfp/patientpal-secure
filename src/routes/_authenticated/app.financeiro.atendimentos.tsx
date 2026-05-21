@@ -568,7 +568,14 @@ function Page() {
             </div>
             <div className="space-y-2">
               <Label>Forma de pagamento</Label>
-              <Input placeholder="PIX, dinheiro, transferência..." value={payForm.forma_pagamento} onChange={(e) => setPayForm({ ...payForm, forma_pagamento: e.target.value })} />
+              <Select value={payForm.forma_pagamento || undefined} onValueChange={(v) => setPayForm({ ...payForm, forma_pagamento: v })}>
+                <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Pix">Pix</SelectItem>
+                  <SelectItem value="Dinheiro">Dinheiro</SelectItem>
+                  <SelectItem value="Transferência">Transferência</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>
