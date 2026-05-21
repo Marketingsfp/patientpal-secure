@@ -64,6 +64,7 @@ function ContratosPage() {
     criar_login: false, email: "", senha: "", perfil: "recepcao",
   });
   const [saving, setSaving] = useState(false);
+  const [prefillUserId, setPrefillUserId] = useState<string | null>(null);
 
   async function load() {
     if (!clinicaAtual) return;
@@ -96,7 +97,6 @@ function ContratosPage() {
       if (existing) {
         openEdit(existing);
       } else {
-        // Sem contrato ainda — abrir novo já vinculado a este usuário
         const { data: prof } = await supabase.from("profiles").select("nome").eq("id", autoEdit).maybeSingle();
         setEditing(null);
         setForm({
@@ -114,8 +114,6 @@ function ContratosPage() {
     })();
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [autoEdit, clinicaAtual?.clinica_id, loading]);
-
-  const [prefillUserId, setPrefillUserId] = useState<string | null>(null);
 
   function openNew() {
     setEditing(null);
