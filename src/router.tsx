@@ -25,7 +25,10 @@ export const getRouter = () => {
     context: { queryClient },
     scrollRestoration: true,
     defaultPreloadStaleTime: 0,
-    defaultPreload: "intent",
+    // Preload apenas quando o link entra no viewport (mais leve que "intent",
+    // que dispara prefetch a cada hover na sidebar).
+    defaultPreload: "viewport",
+    defaultPreloadDelay: 150,
   });
 
   return router;
