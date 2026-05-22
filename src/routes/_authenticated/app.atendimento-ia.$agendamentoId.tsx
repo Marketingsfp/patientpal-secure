@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Brain, Sparkles, FileHeart, Stethoscope, Save, Loader2, History, Wand2, ArrowLeft, HeartPulse, CheckCircle2 } from "lucide-react";
+import { Brain, Sparkles, FileHeart, Stethoscope, Save, Loader2, History, Wand2, ArrowLeft, HeartPulse, CheckCircle2, Printer } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -317,6 +317,55 @@ function AtendimentoEditorPage() {
     setSoap((s) => ({ ...s, hipotese_diagnostica: s.hipotese_diagnostica ? `${s.hipotese_diagnostica} ${t}` : t }));
   }
 
+  function imprimirDocumento(tipo: "Conduta" | "Prescrição") {
+    const conteudo = tipo === "Conduta" ? soap.conduta : soap.prescricao;
+    if (!conteudo?.trim()) { toast.error(`Preencha o campo ${tipo} antes de imprimir`); return; }
+    const clinicaNome = clinicaAtual?.clinica_nome ?? "";
+    const dataStr = new Date().toLocaleDateString("pt-BR");
+    const horaStr = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${tipo} — ${pacienteNome}</title>
+<style>
+  @page { size: A4; margin: 20mm; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Helvetica', 'Arial', sans-serif; color: #000; font-size: 12pt; line-height: 1.5; margin: 0; padding: 24px; }
+  .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 16px; }
+  .header h1 { margin: 0; font-size: 16pt; text-transform: uppercase; }
+  .header .sub { font-size: 10pt; color: #444; }
+  .titulo { text-align: center; text-transform: uppercase; font-weight: 700; font-size: 14pt; margin: 18px 0 14px; letter-spacing: 1px; }
+  .meta { display: flex; justify-content: space-between; font-size: 11pt; margin-bottom: 14px; }
+  .meta b { text-transform: uppercase; }
+  .conteudo { white-space: pre-wrap; font-size: 12pt; min-height: 200px; border-top: 1px dashed #888; border-bottom: 1px dashed #888; padding: 14px 0; }
+  .assinatura { margin-top: 80px; text-align: center; }
+  .assinatura .linha { border-top: 1px solid #000; width: 60%; margin: 0 auto 4px; }
+  .assinatura .nome { font-weight: 700; text-transform: uppercase; }
+  .assinatura .esp { font-size: 10pt; color: #333; }
+  .rodape { margin-top: 24px; text-align: center; font-size: 9pt; color: #666; }
+</style></head><body>
+  <div class="header">
+    <h1>${clinicaNome || "Clínica"}</h1>
+    ${clinicaNome ? '<div class="sub">Documento médico</div>' : ""}
+  </div>
+  <div class="titulo">${tipo}</div>
+  <div class="meta">
+    <div>Paciente: <b>${pacienteNome}</b></div>
+    <div>Data: <b>${dataStr} ${horaStr}</b></div>
+  </div>
+  <div class="conteudo">${conteudo.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]!))}</div>
+  <div class="assinatura">
+    <div class="linha"></div>
+    <div class="nome">${medico?.nome ?? ""}</div>
+    ${especialidadeMedico ? `<div class="esp">${especialidadeMedico}</div>` : ""}
+  </div>
+  <div class="rodape">Emitido em ${dataStr} ${horaStr}</div>
+  <script>window.onload = () => { window.print(); setTimeout(() => window.close(), 500); };</script>
+</body></html>`;
+    const w = window.open("", "_blank", "width=900,height=700");
+    if (!w) { toast.error("Permita pop-ups para imprimir"); return; }
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+  }
+
   if (salvo) {
     return (
       <div className="space-y-4 p-1 max-w-2xl mx-auto">
@@ -548,6 +597,13 @@ function AtendimentoEditorPage() {
       </Card>
 
       <div className="flex justify-end">
+      <div className="flex justify-end gap-2 flex-wrap">
+        <Button variant="outline" size="lg" onClick={() => imprimirDocumento("Conduta")} disabled={!soap.conduta.trim()}>
+          <Printer className="h-4 w-4" /> Imprimir conduta
+        </Button>
+        <Button variant="outline" size="lg" onClick={() => imprimirDocumento("Prescrição")} disabled={!soap.prescricao.trim()}>
+          <Printer className="h-4 w-4" /> Imprimir prescrição
+        </Button>
         <Button size="lg" onClick={handleSalvar} disabled={loading === "salvar" || !pacienteId}>
           {loading === "salvar" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           Salvar prontuário
