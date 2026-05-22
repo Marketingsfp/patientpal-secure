@@ -1,5 +1,6 @@
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
+import DOMPurify from "isomorphic-dompurify";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -79,7 +80,15 @@ function LandingPageView() {
           )}
           {page.conteudo_html && (
             // eslint-disable-next-line react/no-danger
-            <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: page.conteudo_html }} />
+            <div
+              className="prose prose-sm max-w-none"
+              dangerouslySetInnerHTML={{
+                __html: DOMPurify.sanitize(page.conteudo_html, {
+                  FORBID_TAGS: ["script", "style", "iframe", "object", "embed", "form"],
+                  FORBID_ATTR: ["onerror", "onload", "onclick", "onmouseover", "onfocus", "onblur"],
+                }),
+              }}
+            />
           )}
         </div>
         <div className="bg-card border rounded-2xl p-6 shadow-xl">
