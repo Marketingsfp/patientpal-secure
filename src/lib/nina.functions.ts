@@ -5,7 +5,7 @@ import { z } from "zod";
 const DIAS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
 async function assertMembership(
-  supabase: ReturnType<typeof requireSupabaseAuth> extends never ? never : any,
+  supabase: any,
   userId: string,
   clinicaId: string,
 ) {
