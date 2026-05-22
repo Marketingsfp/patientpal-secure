@@ -64,6 +64,7 @@ function AtendimentoIaPage() {
   const [fila, setFila] = useState<FilaItem[]>([]);
   const [medicoId, setMedicoId] = useState("");
   const [triagens, setTriagens] = useState<Record<string, TriagemResumo>>({});
+  const [triagensTick, setTriagensTick] = useState(0);
 
   useEffect(() => {
     (async () => {
@@ -154,7 +155,7 @@ function AtendimentoIaPage() {
       setTriagens(map);
     })();
     return () => { cancel = true; };
-  }, [filaIdsKey]);
+  }, [filaIdsKey, triagensTick]);
 
   useEffect(() => {
     if (!clinicaAtual || !medicoId) return;
@@ -165,7 +166,7 @@ function AtendimentoIaPage() {
         () => { void carregarFila(medicoId); })
       .on("postgres_changes",
         { event: "*", schema: "public", table: "triagens_enfermagem" },
-        () => { void carregarFila(medicoId); })
+        () => { setTriagensTick((t) => t + 1); })
       .subscribe();
     return () => { void supabase.removeChannel(ch); };
   }, [medicoId, clinicaAtual?.clinica_id]);
