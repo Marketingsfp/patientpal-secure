@@ -1563,7 +1563,7 @@ function AgendaPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => openEdit(a)}><Pencil className="h-4 w-4 mr-2" /> Editar</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => abrirReagendar(a)}>
+                        <DropdownMenuItem onClick={() => iniciarReagendamento(a)}>
                           <CalendarDays className="h-4 w-4 mr-2" /> Reagendar
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => cobrarAgendamento(a)}>
