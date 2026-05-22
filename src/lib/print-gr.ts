@@ -400,7 +400,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   }
 
   // Busca agendamentos + clínica + tabela de procedimentos da clínica
-  const [agsRes, cliRes, procsRes] = await Promise.all([
+  const [agsRes, cliRes, procsRes, lancsRes] = await Promise.all([
     supabase
       .from("agendamentos")
       .select("id, paciente_nome, paciente_id, medico_id, inicio, procedimento")
@@ -414,6 +414,12 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
       .from("procedimentos")
       .select("nome, valor_dinheiro_pix, valor_cartao")
       .eq("clinica_id", clinicaId),
+    supabase
+      .from("fin_lancamentos")
+      .select("agendamento_id, valor, status, tipo")
+      .in("agendamento_id", ids)
+      .eq("tipo", "receita")
+      .eq("status", "confirmado"),
   ]);
 
   if (agsRes.error || !agsRes.data || agsRes.data.length === 0) {
@@ -423,6 +429,12 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   const c = cliRes.data;
   const procs = (procsRes.data ?? []) as Array<{ nome: string; valor_dinheiro_pix: number | null; valor_cartao: number | null }>;
   const procByNome = new Map(procs.map((p) => [normalizar(p.nome ?? ""), p]));
+  // Valor efetivamente pago por agendamento (fonte da verdade — usa quando há lançamento confirmado).
+  const valorPagoByAg = new Map<string, number>();
+  for (const l of ((lancsRes.data ?? []) as Array<{ agendamento_id: string | null; valor: number | string }>)) {
+    if (!l.agendamento_id) continue;
+    valorPagoByAg.set(l.agendamento_id, (valorPagoByAg.get(l.agendamento_id) ?? 0) + Number(l.valor));
+  }
 
   // Paciente: pega do primeiro agendamento (mesmo paciente esperado em todos).
   const pacIdRef = ags[0].paciente_id;
@@ -469,7 +481,11 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   for (const a of ags) {
     const procNome = (a.procedimento || "CONSULTA").toUpperCase();
     const proc = procByNome.get(normalizar(procNome));
-    const valor = Number(proc?.valor_dinheiro_pix ?? 0);
+    // Prioriza valor realmente pago (fin_lancamentos); cai para tabela de procedimentos.
+    const valorPago = valorPagoByAg.get(a.id);
+    const valor = valorPago != null && valorPago > 0
+      ? valorPago
+      : Number(proc?.valor_dinheiro_pix ?? 0);
 
     // Repasse: convenio por nome do procedimento → senão padrão do médico
     let prestador = 0;
