@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Plus, Pencil, Trash2, Stethoscope, Download, Filter, Wallet, CheckCircle2, Clock } from "lucide-react";
+import { Plus, Pencil, Trash2, Stethoscope, Download, Filter, Wallet, CheckCircle2, Clock, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useMedicoContext } from "@/hooks/use-medico-context";
+import { logAction } from "@/hooks/use-crud";
 import { exportToExcel } from "@/lib/export-csv";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,6 +51,7 @@ const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", curren
 function Page() {
   const { clinicaAtual } = useClinica();
   const { medicoId: medicoLogadoId, isMedicoOnly } = useMedicoContext();
+  const podeEstornar = ["admin", "gestor", "financeiro"].includes(clinicaAtual?.role ?? "");
   const [items, setItems] = useState<Atend[]>([]);
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [pacientes, setPacientes] = useState<Pac[]>([]);
@@ -224,6 +226,43 @@ function Page() {
     if (!confirm("Excluir atendimento?")) return;
     const { error } = await supabase.from("fin_atendimentos").delete().eq("id", a.id);
     if (error) toast.error(error.message); else { toast.success("Removido"); await load(); }
+  };
+
+  const estornar = async (a: Atend) => {
+    if (a.repasse_pago) {
+      toast.error("Repasse já pago — não é possível estornar. Estorne o pagamento do repasse primeiro.");
+      return;
+    }
+    if (a.origem !== "agenda") {
+      toast.error("Apenas atendimentos vindos da agenda podem ser estornados (voltam para 'Agendado').");
+      return;
+    }
+    if (!confirm("Estornar este atendimento? O agendamento voltará para o status 'Agendado'.")) return;
+    const { data: lanc, error: eLanc } = await supabase
+      .from("fin_lancamentos")
+      .select("agendamento_id")
+      .eq("id", a.id)
+      .maybeSingle();
+    if (eLanc) { toast.error(eLanc.message); return; }
+    const agId = lanc?.agendamento_id;
+    if (!agId) { toast.error("Agendamento de origem não encontrado."); return; }
+    const { data: agAntes } = await supabase
+      .from("agendamentos").select("id, status").eq("id", agId).maybeSingle();
+    const { error: eUpd } = await supabase
+      .from("agendamentos").update({ status: "agendado" }).eq("id", agId);
+    if (eUpd) { toast.error(eUpd.message); return; }
+    try {
+      await logAction({
+        table_name: "agendamentos",
+        record_id: agId,
+        action: "ESTORNO",
+        clinica_id: clinicaAtual?.clinica_id,
+        dados_antes: agAntes ?? { id: agId },
+        dados_depois: { id: agId, status: "agendado" },
+      });
+    } catch { /* auditoria best-effort */ }
+    toast.success("Atendimento estornado — agendamento voltou para 'Agendado'.");
+    await load();
   };
 
   const medMap = new Map(medicos.map((m) => [m.id, m.nome]));
@@ -531,7 +570,19 @@ function Page() {
                 {!isMedicoOnly && (
                   <TableCell className="text-right">
                     {a.origem === "agenda" ? (
-                      <span className="text-[10px] text-muted-foreground uppercase">Agenda</span>
+                      <div className="flex items-center justify-end gap-1">
+                        <span className="text-[10px] text-muted-foreground uppercase">Agenda</span>
+                        {podeEstornar && !a.repasse_pago && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Estornar atendimento (volta para Agendado)"
+                            onClick={() => estornar(a)}
+                          >
+                            <Undo2 className="h-3.5 w-3.5 text-amber-600" />
+                          </Button>
+                        )}
+                      </div>
                     ) : (<>
                       <Button variant="ghost" size="icon" onClick={() => openEdit(a)}><Pencil className="h-3.5 w-3.5" /></Button>
                       <Button variant="ghost" size="icon" onClick={() => remove(a)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
