@@ -596,7 +596,6 @@ function AtendimentoEditorPage() {
         )}
       </Card>
 
-      <div className="flex justify-end">
       <div className="flex justify-end gap-2 flex-wrap">
         <Button variant="outline" size="lg" onClick={() => imprimirDocumento("Conduta")} disabled={!soap.conduta.trim()}>
           <Printer className="h-4 w-4" /> Imprimir conduta
