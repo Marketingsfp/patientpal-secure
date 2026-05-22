@@ -54,6 +54,7 @@ function CheckinPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(false);
   const [busca, setBusca] = useState("");
+  const [buscaAplicada, setBuscaAplicada] = useState("");
   const [buscaAmpla, setBuscaAmpla] = useState(false);
 
   const load = useCallback(async () => {
@@ -61,7 +62,7 @@ function CheckinPage() {
     setLoading(true);
     const inicio = new Date(`${data}T00:00:00`).toISOString();
     const fim = new Date(`${data}T23:59:59`).toISOString();
-    const buscaComTexto = buscaAmpla && busca.trim().length > 0;
+    const buscaComTexto = buscaAmpla && buscaAplicada.length > 0;
     let query = supabase
       .from("agendamentos")
       .select("id,paciente_nome,paciente_id,inicio,procedimento,fluxo_etapa,medicos(nome)")
@@ -102,7 +103,7 @@ function CheckinPage() {
       pago: pagos.has(a.id),
     })));
     setLoading(false);
-  }, [clinicaAtual, data, buscaAmpla, busca]);
+  }, [clinicaAtual, data, buscaAmpla, buscaAplicada]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -115,8 +116,8 @@ function CheckinPage() {
     });
   }, [items, busca]);
 
-  const acionarBusca = () => setBuscaAmpla(true);
-  const limparBusca = () => { setBusca(""); setBuscaAmpla(false); };
+  const acionarBusca = () => { setBuscaAplicada(busca.trim()); setBuscaAmpla(true); };
+  const limparBusca = () => { setBusca(""); setBuscaAplicada(""); setBuscaAmpla(false); };
 
   const confirmar = async (a: Item) => {
     const { error } = await supabase
