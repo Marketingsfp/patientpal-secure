@@ -308,19 +308,6 @@ export function AppShell() {
             {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           </Button>
         </div>
-        {!collapsed && (
-        <div className="px-3 py-2 space-y-2 border-b border-white/10">
-          <Suspense fallback={null}>
-            <VoiceInput
-              append={false}
-              onTranscript={handleVoiceCommand}
-              title="Busca por voz (diga: agenda, clientes, financeiro…)"
-              prompt="Transcreva o comando de voz curto em português do Brasil. Retorne apenas as palavras ditas."
-              className="w-full bg-white/10 border-white/30 text-white hover:bg-white/20 hover:text-white"
-            />
-          </Suspense>
-        </div>
-        )}
         {!isMedicoOnly && subsystemLabel && (
           <div className={`${collapsed ? "px-1 py-2" : "px-3 py-2"} border-b border-white/10`}>
             <button
