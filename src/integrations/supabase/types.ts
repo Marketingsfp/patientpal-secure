@@ -4506,11 +4506,13 @@ export type Database = {
           id: string
           imc: number | null
           medicamentos: string | null
+          motivo_prioridade: string | null
           observacoes: string | null
           pa_diastolica: number | null
           pa_sistolica: number | null
           paciente_id: string | null
           peso_kg: number | null
+          prioridade: string | null
           queixa_principal: string | null
           saturacao: number | null
           temperatura: number | null
@@ -4530,11 +4532,13 @@ export type Database = {
           id?: string
           imc?: number | null
           medicamentos?: string | null
+          motivo_prioridade?: string | null
           observacoes?: string | null
           pa_diastolica?: number | null
           pa_sistolica?: number | null
           paciente_id?: string | null
           peso_kg?: number | null
+          prioridade?: string | null
           queixa_principal?: string | null
           saturacao?: number | null
           temperatura?: number | null
@@ -4554,11 +4558,13 @@ export type Database = {
           id?: string
           imc?: number | null
           medicamentos?: string | null
+          motivo_prioridade?: string | null
           observacoes?: string | null
           pa_diastolica?: number | null
           pa_sistolica?: number | null
           paciente_id?: string | null
           peso_kg?: number | null
+          prioridade?: string | null
           queixa_principal?: string | null
           saturacao?: number | null
           temperatura?: number | null
