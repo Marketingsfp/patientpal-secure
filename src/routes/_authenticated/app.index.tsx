@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Users, ConciergeBell, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { useClinica } from "@/hooks/use-clinica";
 import { Card } from "@/components/ui/card";
 import { setSubsystem, SUBSYSTEMS, type SubsystemId } from "@/lib/subsystem";
 import { supabase } from "@/integrations/supabase/client";
@@ -36,8 +37,17 @@ const CARDS: CardDef[] = [
   },
 ];
 
+function corDaClinica(nome?: string): string {
+  const n = (nome ?? "").toLowerCase();
+  if (n.includes("são francisco") || n.includes("sao francisco")) return "#006634";
+  if (n.includes("menino jesus")) return "#15274f";
+  if (n.includes("consulta hoje")) return "#141395";
+  return "#15274f";
+}
+
 function SubsystemChooser() {
   const { user } = useAuth();
+  const { clinicaAtual, modoTodas, branding } = useClinica();
   const navigate = useNavigate();
   const [nome, setNome] = useState<string>("");
 
@@ -62,10 +72,18 @@ function SubsystemChooser() {
 
   const filtrados = CARDS;
 
+  const headerColor = modoTodas
+    ? "#15274f"
+    : branding?.primary
+      ? branding.primary
+      : clinicaAtual
+        ? corDaClinica(clinicaAtual.clinica.nome)
+        : "#15274f";
+
   return (
     <div className="-m-3 sm:-m-4 lg:-m-6 min-h-[calc(100vh-3.5rem)] flex flex-col">
       {/* Header escuro com saudação e busca */}
-      <div className="bg-[#15274f] text-white px-6 sm:px-10 pt-8 pb-16">
+      <div className="text-white px-6 sm:px-10 pt-8 pb-16" style={{ backgroundColor: headerColor }}>
         <div className="mx-auto max-w-6xl">
           <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">
             Olá, {saudacao}!
