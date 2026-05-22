@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { VoiceInput } from "@/components/voice-input";
 import { Cid10Picker } from "@/components/cid10-picker";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import {
   gerarAnamneseEstruturada,
@@ -98,7 +99,6 @@ function AtendimentoIaPage() {
   const [resumoOpen, setResumoOpen] = useState(false);
   const [loading, setLoading] = useState<"estruturar" | "sugerir" | "resumir" | "salvar" | null>(null);
   const [triagem, setTriagem] = useState<Triagem | null>(null);
-  const [triados, setTriados] = useState<Array<{ agendamento_id: string; paciente_nome: string; medico_id: string; medico_nome: string; quando: string }>>([]);
 
   useEffect(() => {
     (async () => {
@@ -188,57 +188,6 @@ function AtendimentoIaPage() {
   };
 
   useEffect(() => { void carregarFila(medicoId); }, [medicoId, clinicaAtual?.clinica_id]);
-
-  // Carrega pacientes triados hoje (todos os médicos) — para o médico ver
-  // quando uma triagem foi feita e poder pular para o paciente certo.
-  const carregarTriados = async () => {
-    if (!clinicaAtual) { setTriados([]); return; }
-    const hoje = new Date().toISOString().slice(0, 10);
-    const { data } = await supabase
-      .from("triagens_enfermagem")
-      .select("agendamento_id, created_at")
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .gte("created_at", `${hoje}T00:00:00`)
-      .order("created_at", { ascending: false });
-    const rows = (data ?? []) as Array<{ agendamento_id: string; created_at: string }>;
-    const agendamentoIds = Array.from(new Set(rows.map((r) => r.agendamento_id).filter(Boolean)));
-    if (!agendamentoIds.length) { setTriados([]); return; }
-    const { data: ags } = await supabase
-      .from("agendamentos")
-      .select("id, paciente_nome, medico_id, fluxo_etapa, inicio")
-      .in("id", agendamentoIds);
-    const agMap = new Map((ags ?? []).map((a) => [a.id, a]));
-    const medicoIds = Array.from(new Set((ags ?? []).map((a) => a.medico_id).filter((id): id is string => Boolean(id))));
-    const { data: meds } = medicoIds.length
-      ? await supabase.from("medicos").select("id, nome").in("id", medicoIds)
-      : { data: [] };
-    const medMap = new Map((meds ?? []).map((m) => [m.id, m.nome]));
-    const lista = rows.flatMap((r) => {
-      const ag = agMap.get(r.agendamento_id);
-      if (!ag || !ag.medico_id || !["atendimento", "triagem"].includes(ag.fluxo_etapa)) return [];
-      return [{
-        agendamento_id: r.agendamento_id,
-        paciente_nome: ag.paciente_nome,
-        medico_id: ag.medico_id,
-        medico_nome: medMap.get(ag.medico_id) ?? "—",
-        quando: r.created_at,
-      }];
-    });
-    setTriados(lista);
-  };
-  useEffect(() => { void carregarTriados(); }, [clinicaAtual?.clinica_id]);
-
-  // Realtime: refaz a lista de triados quando há nova triagem
-  useEffect(() => {
-    if (!clinicaAtual) return;
-    const ch = supabase
-      .channel(`triados-${clinicaAtual.clinica_id}`)
-      .on("postgres_changes",
-        { event: "*", schema: "public", table: "triagens_enfermagem", filter: `clinica_id=eq.${clinicaAtual.clinica_id}` },
-        () => { void carregarTriados(); })
-      .subscribe();
-    return () => { void supabase.removeChannel(ch); };
-  }, [clinicaAtual?.clinica_id]);
 
   // Realtime: atualiza fila quando o fluxo muda
   useEffect(() => {
@@ -509,41 +458,6 @@ function AtendimentoIaPage() {
 
         {/* Fila do médico */}
         <div className="space-y-2">
-          {triados.length > 0 && (
-            <div className="rounded-md border border-rose-200/60 dark:border-rose-900/40 bg-rose-50/50 dark:bg-rose-950/20 p-2 space-y-1.5">
-              <div className="flex items-center gap-1.5 text-xs font-medium text-rose-700 dark:text-rose-300">
-                <HeartPulse className="h-3.5 w-3.5" /> Triados pela enfermagem hoje ({triados.length})
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {triados.map((t) => {
-                  const ehMeu = t.medico_id === medicoId;
-                  return (
-                    <button
-                      key={t.agendamento_id}
-                      type="button"
-                      onClick={async () => {
-                        if (!ehMeu) {
-                          setMedicoId(t.medico_id);
-                          await carregarFila(t.medico_id);
-                        }
-                        const it = (await supabase
-                          .from("agendamentos")
-                          .select("id, paciente_id, paciente_nome, inicio, procedimento, fluxo_etapa, prioridade")
-                          .eq("id", t.agendamento_id)
-                          .maybeSingle()).data as unknown as FilaItem | null;
-                        if (it) selecionar(it);
-                      }}
-                      className={`rounded-md border px-2 py-1 text-xs flex items-center gap-1.5 hover:border-rose-400 ${ehMeu ? "bg-background" : "bg-muted/40"}`}
-                      title={ehMeu ? "Seu paciente" : `Atribuído a ${t.medico_nome} — clique para abrir`}
-                    >
-                      <span className="font-medium uppercase">{t.paciente_nome}</span>
-                      <span className="text-muted-foreground">· {t.medico_nome}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
           <div className="flex items-center justify-between">
             <Label className="flex items-center gap-1.5"><Users className="h-4 w-4" /> Fila de atendimento ({filaOrdenada.length})</Label>
             {pacienteNome && (
@@ -555,36 +469,59 @@ function AtendimentoIaPage() {
               Nenhum paciente na fila para hoje.
             </div>
           ) : (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-64 overflow-auto pr-1">
-              {filaOrdenada.map((it, idx) => {
-                const ativo = it.id === agendamentoId;
-                const hora = new Date(it.inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-                const prioCls = it.prioridade === "urgente"
-                  ? "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-200"
-                  : it.prioridade === "prioritario"
-                  ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200"
-                  : "";
-                return (
-                  <button
-                    key={it.id}
-                    type="button"
-                    onClick={() => selecionar(it)}
-                    className={`text-left rounded-md border p-2 text-sm transition hover:border-primary ${ativo ? "border-primary bg-primary/5" : ""}`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="tabular-nums text-xs text-muted-foreground">#{idx + 1} · {hora}</span>
-                      {it.prioridade !== "normal" && (
-                        <Badge className={`${prioCls} border-0 text-[10px] gap-1`}>
-                          <AlertTriangle className="h-3 w-3" />
-                          {it.prioridade === "urgente" ? "URGENTE" : "PRIORITÁRIO"}
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="font-medium uppercase leading-tight mt-0.5 line-clamp-1">{it.paciente_nome}</div>
-                    <div className="text-[11px] text-muted-foreground line-clamp-1">{it.procedimento ?? "—"} · {it.fluxo_etapa.replace("_", " ")}</div>
-                  </button>
-                );
-              })}
+            <div className="rounded-md border max-h-80 overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-10">#</TableHead>
+                    <TableHead className="w-20">Hora</TableHead>
+                    <TableHead>Paciente</TableHead>
+                    <TableHead className="hidden md:table-cell">Procedimento</TableHead>
+                    <TableHead className="w-28">Prioridade</TableHead>
+                    <TableHead className="w-32 text-right">Ação</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filaOrdenada.map((it, idx) => {
+                    const ativo = it.id === agendamentoId;
+                    const hora = new Date(it.inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+                    const prioCls = it.prioridade === "urgente"
+                      ? "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-200"
+                      : it.prioridade === "prioritario"
+                      ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200"
+                      : "";
+                    return (
+                      <TableRow key={it.id} className={ativo ? "bg-primary/5" : ""}>
+                        <TableCell className="tabular-nums text-xs text-muted-foreground">{idx + 1}</TableCell>
+                        <TableCell className="tabular-nums text-xs">{hora}</TableCell>
+                        <TableCell className="font-medium uppercase">{it.paciente_nome}</TableCell>
+                        <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
+                          {it.procedimento ?? "—"} · {it.fluxo_etapa.replace("_", " ")}
+                        </TableCell>
+                        <TableCell>
+                          {it.prioridade !== "normal" ? (
+                            <Badge className={`${prioCls} border-0 text-[10px] gap-1`}>
+                              <AlertTriangle className="h-3 w-3" />
+                              {it.prioridade === "urgente" ? "URGENTE" : "PRIORITÁRIO"}
+                            </Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {ativo ? (
+                            <Button size="sm" variant="secondary" disabled>Em atendimento</Button>
+                          ) : (
+                            <Button size="sm" onClick={() => selecionar(it)}>
+                              <Stethoscope className="h-4 w-4" /> Atender
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
             </div>
           )}
         </div>
@@ -610,6 +547,12 @@ function AtendimentoIaPage() {
         )}
       </Card>
 
+      {!agendamentoId ? (
+        <Card className="p-6 text-center text-sm text-muted-foreground">
+          Selecione um paciente da fila e clique em <b>Atender</b> para iniciar o atendimento.
+        </Card>
+      ) : (
+        <>
       {triagem && (
         <Card className="p-4 space-y-3 border-rose-200/60 dark:border-rose-900/40">
           <div className="flex items-center justify-between flex-wrap gap-2">
@@ -791,6 +734,8 @@ function AtendimentoIaPage() {
           Salvar prontuário
         </Button>
       </div>
+        </>
+      )}
     </div>
   );
 }

@@ -1,48 +1,27 @@
-## Objetivo
+## Mudanças em `src/routes/_authenticated/app.atendimento-ia.tsx`
 
-1. Quando um agendamento já estiver com status **Realizado**, a opção **Reagendar** no menu de ações da Agenda deve ficar desabilitada (não permitir reagendar atendimento que o médico já fechou).
-2. Em **Financeiro → Atendimentos**, criar a ação **Estornar atendimento** disponível para os perfis **admin / gestor / financeiro**. O estorno volta o status do agendamento para **Agendado**, para o caso de o médico ter marcado "Realizado" por engano.
+### 1. Remover "Triados pela enfermagem hoje"
+- Apagar o bloco JSX das linhas ~512–546 (caixinha rose com os botões dos triados).
+- Remover o estado `triados`, a função `carregarTriados`, o `useEffect` que a chama e o canal realtime que a recarrega (linhas ~101, 194–229, 238).
+- Remover imports não usados depois (ex.: `HeartPulse` se só era usado aqui — manter se ainda for usado no bloco de Triagem).
 
-## Mudanças
+### 2. Fila de atendimento em formato de tabela
+Substituir o grid de cards (linhas 558–588) por uma `Table` (`@/components/ui/table`) com colunas:
 
-### 1) `src/routes/_authenticated/app.agenda.tsx` — desabilitar Reagendar quando realizado
+| # | Hora | Paciente | Procedimento | Prioridade | Ação |
 
-No `DropdownMenuItem` do "Reagendar" (linha ~1591), tornar o item desabilitado quando `a.status === "realizado"`:
+- Cada linha mostra `#idx`, hora, nome do paciente (uppercase), procedimento/etapa, badge de prioridade (quando ≠ normal).
+- Coluna "Ação" contém um botão **"Atender"** (`size="sm"`) por linha. Linha ativa (`it.id === agendamentoId`) fica com `bg-primary/5` e o botão vira "Em atendimento" desabilitado (ou variant `secondary`).
+- Container com `max-h-80 overflow-auto` para manter rolagem.
 
-- Adicionar `disabled={a.status === "realizado"}` no item.
-- Em `iniciarReagendamento(a)`, fazer guard: se `a.status === "realizado"`, mostrar toast "Atendimento já realizado — peça ao financeiro para estornar antes de reagendar" e retornar.
+### 3. Atender só abre o atendimento depois do clique
+Hoje o restante da tela (triagem, transcrição, SOAP, botão Salvar) já aparece sozinho sempre que há um `agendamentoId`/paciente — mas o paciente vinha sendo setado por clique direto no card. Mudanças:
 
-Apenas mudança visual/comportamental no menu; o restante do fluxo de reagendamento por slot já existente continua igual.
+- O clique na linha da tabela **não** seleciona mais o paciente — só o botão **"Atender"** chama `selecionar(item)`.
+- Envolver as seções abaixo da Card da fila (Triagem, gravação/transcrição, SOAP, ações de salvar — aproximadamente linhas 613 em diante) em uma condicional: renderizar somente quando `agendamentoId` estiver setado. Quando não houver atendimento iniciado, mostrar um aviso curto: "Selecione um paciente da fila e clique em Atender para iniciar."
+- A função `selecionar` permanece igual (continua marcando `fluxo_etapa = "atendimento"`).
 
-### 2) `src/routes/_authenticated/app.financeiro.atendimentos.tsx` — ação Estornar
-
-Contexto: a tela já mistura duas origens:
-- `origem: "agenda"` → item vem de `fin_lancamentos` (receita confirmada com `agendamento_id`), correspondente a um agendamento que foi cobrado e o médico marcou como realizado.
-- `origem: "manual"` → registro em `fin_atendimentos`, sem vínculo direto com agendamento.
-
-Adicionar:
-
-- Hook de permissão (inline no componente):
-  ```ts
-  const podeEstornar = ["admin","gestor","financeiro"].includes(clinicaAtual?.role ?? "");
-  ```
-- Nova coluna "Ações" / botão por linha (ou item no menu da linha existente) **Estornar**, visível apenas quando `podeEstornar` for verdadeiro e `!a.repasse_pago` (não permitir estornar atendimento cujo repasse já foi pago — mensagem clara no toast caso tente).
-- Função `estornar(a: Atend)`:
-  1. `confirm("Estornar este atendimento? O agendamento voltará para o status 'Agendado'.")`
-  2. Buscar `agendamento_id`:
-     - Se `a.origem === "agenda"`: ler `agendamento_id` de `fin_lancamentos` pelo `a.id`.
-     - Se `a.origem === "manual"`: buscar em `fin_atendimentos` o `agendamento_id` (campo já existente na tabela — se não existir, só desfazer o status manual).
-  3. Atualizar `agendamentos.status = 'agendado'` quando houver `agendamento_id`.
-  4. Apenas reverter status do agendamento — **não mexer no financeiro** (foi a opção confirmada pelo usuário). O lançamento de receita permanece como está; o repasse continua devido (e por isso bloqueamos estorno quando repasse já foi pago, para evitar inconsistência).
-  5. Toast de sucesso e `await load()`.
-- Registrar a ação na trilha de auditoria via `logAction` (importar de `@/hooks/use-crud`) com `table_name: "agendamentos"`, `action: "ESTORNO"`, `dados_antes/depois` com o id e status.
-
-### 3) Sem mudanças em perfis/permissões
-
-Conforme decidido, **não** criar perfil novo. A ação é liberada para quem já tem o role `financeiro` (mais `admin`/`gestor`), que é o gate atual de acesso à seção Financeiro. Nenhuma migration, nada em `app.perfis.tsx`, nada em `perfil_permissoes`.
-
-## Validação
-
-- Marcar um agendamento como "Realizado" na agenda → item "Reagendar" do menu deve aparecer cinza/desabilitado.
-- Logar como perfil `financeiro` → em Financeiro → Atendimentos, botão "Estornar" aparece nas linhas com repasse em aberto; após clicar e confirmar, voltar à Agenda e ver o agendamento de volta como "Agendado", agora com "Reagendar" liberado novamente.
-- Logar como perfil `recepcao` ou `medico` → botão "Estornar" não aparece.
+### Sem alterações
+- Lógica de IA, SOAP, salvar, triagem, transcrição: nada muda.
+- Banco de dados, RLS, rotas, permissões: nenhuma alteração.
+- Outras telas (Agenda, Financeiro): não tocadas.
