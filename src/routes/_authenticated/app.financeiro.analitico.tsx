@@ -4,17 +4,14 @@ import { LineChart as LineIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend,
-  LineChart, Line, XAxis, YAxis, CartesianGrid,
-} from "recharts";
+import { MiniPieChart } from "@/components/charts/MiniPieChart";
+import { MiniLineChart } from "@/components/charts/MiniLineChart";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro/analitico")({
   component: Page,
   head: () => ({ meta: [{ title: "Analítico — Financeiro" }] }),
 });
 
-const COLORS = ["#13b5a3", "#3b82f6", "#f59e0b", "#ef4444", "#a855f7", "#10b981", "#ec4899", "#6366f1"];
 const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 function Page() {
@@ -60,28 +57,18 @@ function Page() {
           <CardContent>
             {loading ? <div className="py-12 text-center text-muted-foreground">Carregando...</div>
               : byCat.length === 0 ? <div className="py-12 text-center text-muted-foreground">Sem dados</div>
-              : <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie data={byCat} dataKey="value" nameKey="name" outerRadius={100} label={(e: { name: string }) => e.name}>
-                    {byCat.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip formatter={(v: number) => fmt(v)} />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>}
+              : <MiniPieChart data={byCat} height={300} formatValue={fmt} />}
           </CardContent>
         </Card>
         <Card><CardHeader><CardTitle>Saldo diário</CardTitle></CardHeader>
           <CardContent>
             {loading ? <div className="py-12 text-center text-muted-foreground">Carregando...</div>
-              : <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={daily}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="dia" /><YAxis />
-                  <Tooltip formatter={(v: number) => fmt(v)} />
-                  <Line type="monotone" dataKey="Saldo" stroke="#13b5a3" strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>}
+              : <MiniLineChart
+                  labels={daily.map((d) => d.dia)}
+                  values={daily.map((d) => d.Saldo)}
+                  height={300}
+                  formatY={fmt}
+                />}
           </CardContent>
         </Card>
       </div>
