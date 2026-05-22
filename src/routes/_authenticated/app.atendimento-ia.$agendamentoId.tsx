@@ -320,7 +320,7 @@ function AtendimentoEditorPage() {
   function imprimirDocumento(tipo: "Conduta" | "Prescrição") {
     const conteudo = tipo === "Conduta" ? soap.conduta : soap.prescricao;
     if (!conteudo?.trim()) { toast.error(`Preencha o campo ${tipo} antes de imprimir`); return; }
-    const clinicaNome = clinicaAtual?.clinica_nome ?? "";
+    const clinicaNome = clinicaAtual?.clinica?.nome ?? "";
     const dataStr = new Date().toLocaleDateString("pt-BR");
     const horaStr = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>${tipo} — ${pacienteNome}</title>
