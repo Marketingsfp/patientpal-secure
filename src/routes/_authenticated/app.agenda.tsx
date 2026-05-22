@@ -143,6 +143,10 @@ function AgendaPage() {
   const [reagSalvando, setReagSalvando] = useState(false);
 
   const iniciarReagendamento = (a: Agendamento) => {
+    if (a.status === "realizado") {
+      toast.error("Atendimento já realizado — peça ao financeiro para estornar antes de reagendar.");
+      return;
+    }
     setReagendandoAg(a);
     toast.info("Selecione um horário disponível na agenda para confirmar o reagendamento.");
   };
@@ -1588,7 +1592,10 @@ function AgendaPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => openEdit(a)}><Pencil className="h-4 w-4 mr-2" /> Editar</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => iniciarReagendamento(a)}>
+                        <DropdownMenuItem
+                          onClick={() => iniciarReagendamento(a)}
+                          disabled={a.status === "realizado"}
+                        >
                           <CalendarDays className="h-4 w-4 mr-2" /> Reagendar
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => cobrarAgendamento(a)}>
