@@ -262,14 +262,14 @@ function AgendaPage() {
       .order("inicio", { ascending: false });
     const statusEspecifico = filtroStatus !== "todos" && filtroStatus !== "livres";
     if (statusEspecifico) {
-      // Quando filtra por situação específica, busca em todo o histórico
       q = q.eq("status", filtroStatus as Status).limit(1000);
-    } else if (apenasData) {
+    }
+    if (apenasData) {
       const inicio = new Date(`${dataRef}T00:00:00`).toISOString();
       const fimDia = dataFim ?? dataRef;
       const fim = new Date(`${fimDia}T23:59:59`).toISOString();
       q = q.gte("inicio", inicio).lte("inicio", fim);
-    } else {
+    } else if (!statusEspecifico) {
       const inicio = new Date(`${dataRef}T00:00:00`).toISOString();
       const f = new Date(`${(dataFim ?? dataRef)}T00:00:00`);
       if (!dataFim) f.setDate(f.getDate() + 30);
