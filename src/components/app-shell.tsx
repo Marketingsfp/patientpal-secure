@@ -318,12 +318,7 @@ export function AppShell() {
               className={`w-full flex items-center gap-2 rounded-md bg-white/10 hover:bg-white/20 transition-colors text-white text-xs font-medium ${collapsed ? "justify-center px-2 py-2" : "px-3 py-2"}`}
             >
               <LayoutGrid className="h-4 w-4 shrink-0" />
-              {!collapsed && (
-                <span className="flex-1 truncate text-left">
-                  <span className="block text-[10px] uppercase opacity-70 leading-none">Subsistema</span>
-                  <span className="block truncate">{subsystemLabel}</span>
-                </span>
-              )}
+              {!collapsed && <span className="flex-1 truncate text-left">Menu</span>}
             </button>
           </div>
         )}
