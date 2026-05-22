@@ -74,7 +74,6 @@ function CheckinPage() {
     setLoading(true);
     const inicio = new Date(`${data}T00:00:00`).toISOString();
     const fim = new Date(`${data}T23:59:59`).toISOString();
-    const buscaComTexto = buscaAmpla && buscaAplicada.length > 0;
     let query = supabase
       .from("agendamentos")
       .select("id,paciente_nome,paciente_id,inicio,procedimento,fluxo_etapa,medicos(nome)")
@@ -83,7 +82,9 @@ function CheckinPage() {
       .lte("inicio", fim)
       .neq("status", "cancelado")
       .not("paciente_id", "is", null);
-    if (!buscaComTexto) query = query.in("fluxo_etapa", ETAPAS_CHECKIN);
+    // Modo padrão (sem clicar Buscar): só etapas de check-in.
+    // Modo ampliado (clicou Buscar): traz o dia inteiro, qualquer etapa.
+    if (!buscaAmpla) query = query.in("fluxo_etapa", ETAPAS_CHECKIN);
     const { data: ags, error } = await query.order("inicio", { ascending: true });
     if (error) { setLoading(false); toast.error(error.message); return; }
     const ids = (ags ?? []).map((a) => a.id);
@@ -114,7 +115,12 @@ function CheckinPage() {
       paciente: a.paciente_id ? pacMap.get(a.paciente_id) ?? null : null,
       pago: pagos.has(a.id),
     }));
-    setItems(buscaComTexto ? comPaciente.filter((a) => itemCombinaComBuscaPaciente(a, buscaAplicada)) : comPaciente);
+    const termoAplicado = buscaAplicada.trim();
+    setItems(
+      buscaAmpla && termoAplicado.length > 0
+        ? comPaciente.filter((a) => itemCombinaComBuscaPaciente(a, termoAplicado))
+        : comPaciente,
+    );
     setLoading(false);
   }, [clinicaAtual, data, buscaAmpla, buscaAplicada]);
 
