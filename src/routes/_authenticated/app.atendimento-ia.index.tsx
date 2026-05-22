@@ -200,7 +200,7 @@ function AtendimentoIaPage() {
           <Label>Profissional</Label>
           {medicoLogado && medicoSelecionado ? (
             <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm font-medium uppercase">
-              {medicoSelecionado.nome}{medicoSelecionado.especialidades?.nome ? ` — ${medicoSelecionado.especialidades.nome}` : ""}
+              {medicoSelecionado.nome}
             </div>
           ) : (
             <Select value={medicoId} onValueChange={setMedicoId}>
@@ -208,7 +208,7 @@ function AtendimentoIaPage() {
               <SelectContent>
                 {medicos.map((m) => (
                   <SelectItem key={m.id} value={m.id} className="uppercase">
-                    {m.nome}{m.especialidades?.nome ? ` — ${m.especialidades.nome}` : ""}
+                    {m.nome}
                   </SelectItem>
                 ))}
               </SelectContent>
