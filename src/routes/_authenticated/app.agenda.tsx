@@ -1151,57 +1151,6 @@ function AgendaPage() {
         }}
       />
 
-      <Dialog open={reagOpen} onOpenChange={(v) => { setReagOpen(v); if (!v) setReagAg(null); }}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Reagendar · {reagAg?.paciente_nome}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="rounded-md border bg-muted/40 p-2 text-xs text-muted-foreground">
-              Atual: {reagAg ? new Date(reagAg.inicio).toLocaleString("pt-BR") : ""}
-              {reagAg?.procedimento ? ` · ${reagAg.procedimento}` : ""}
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <Label className="text-xs">Nova data</Label>
-                <Input type="date" value={reagData} onChange={(e) => setReagData(e.target.value)} />
-              </div>
-              <div>
-                <Label className="text-xs">Início</Label>
-                <Input type="time" value={reagInicio} onChange={(e) => setReagInicio(e.target.value)} />
-              </div>
-              <div>
-                <Label className="text-xs">Fim</Label>
-                <Input type="time" value={reagFim} onChange={(e) => setReagFim(e.target.value)} />
-              </div>
-            </div>
-            <div>
-              <Label className="text-xs">Médico</Label>
-              <Select value={reagMedicoId || "__sem__"} onValueChange={(v) => setReagMedicoId(v === "__sem__" ? "" : v)}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__sem__">Sem médico definido</SelectItem>
-                  {medicos.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-xs">Motivo do reagendamento (opcional)</Label>
-              <Textarea rows={2} value={reagMotivo} onChange={(e) => setReagMotivo(e.target.value)}
-                placeholder="Ex.: solicitação do paciente, ausência do médico…" />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setReagOpen(false)} disabled={reagSalvando}>Cancelar</Button>
-            <Button onClick={salvarReagendar} disabled={reagSalvando}>
-              {reagSalvando ? "Salvando…" : "Confirmar reagendamento"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       <Dialog open={novoPacOpen} onOpenChange={setNovoPacOpen}>
         <DialogContent className="max-w-md">
 
