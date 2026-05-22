@@ -63,6 +63,7 @@ function AtendimentoIaPage() {
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [fila, setFila] = useState<FilaItem[]>([]);
   const [medicoId, setMedicoId] = useState("");
+  const [triagens, setTriagens] = useState<Record<string, TriagemResumo>>({});
 
   useEffect(() => {
     (async () => {
@@ -134,12 +135,36 @@ function AtendimentoIaPage() {
 
   useEffect(() => { void carregarFila(medicoId); }, [medicoId, clinicaAtual?.clinica_id]);
 
+  const filaIdsKey = fila.map((f) => f.id).join(",");
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      const ids = fila.map((f) => f.id);
+      if (ids.length === 0) { setTriagens({}); return; }
+      const { data } = await supabase
+        .from("triagens_enfermagem")
+        .select("agendamento_id, enfermeira_nome, created_at, queixa_principal, pa_sistolica, pa_diastolica, freq_cardiaca, temperatura, saturacao, glicemia, peso_kg, altura_cm, imc, doencas, medicamentos, alergias, observacoes")
+        .in("agendamento_id", ids)
+        .order("created_at", { ascending: false });
+      if (cancel) return;
+      const map: Record<string, TriagemResumo> = {};
+      for (const row of (data ?? []) as unknown as TriagemResumo[]) {
+        if (!map[row.agendamento_id]) map[row.agendamento_id] = row;
+      }
+      setTriagens(map);
+    })();
+    return () => { cancel = true; };
+  }, [filaIdsKey]);
+
   useEffect(() => {
     if (!clinicaAtual || !medicoId) return;
     const ch = supabase
       .channel(`atend-fila-${medicoId}`)
       .on("postgres_changes",
         { event: "*", schema: "public", table: "agendamentos", filter: `medico_id=eq.${medicoId}` },
+        () => { void carregarFila(medicoId); })
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "triagens_enfermagem" },
         () => { void carregarFila(medicoId); })
       .subscribe();
     return () => { void supabase.removeChannel(ch); };
