@@ -27,6 +27,23 @@ type Item = {
   pago?: boolean;
 };
 
+const ETAPAS_CHECKIN = ["aguardando_recepcao", "recepcao"] as const;
+
+function estaPendenteCheckin(etapa: string) {
+  return (ETAPAS_CHECKIN as readonly string[]).includes(etapa);
+}
+
+function etapaLabel(etapa: string) {
+  const labels: Record<string, string> = {
+    aguardando_recepcao: "AGUARDANDO RECEPÇÃO",
+    recepcao: "RECEPÇÃO",
+    triagem: "CHECK-IN JÁ REALIZADO",
+    atendimento: "EM ATENDIMENTO",
+    caixa: "NO CAIXA",
+  };
+  return labels[etapa] ?? etapa.replace(/_/g, " ").toUpperCase();
+}
+
 function normalizar(t: string) {
   return (t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
@@ -37,6 +54,7 @@ function CheckinPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(false);
   const [busca, setBusca] = useState("");
+  const [buscaAplicada, setBuscaAplicada] = useState("");
   const [buscaAmpla, setBuscaAmpla] = useState(false);
 
   const load = useCallback(async () => {
@@ -44,16 +62,17 @@ function CheckinPage() {
     setLoading(true);
     const inicio = new Date(`${data}T00:00:00`).toISOString();
     const fim = new Date(`${data}T23:59:59`).toISOString();
-    const { data: ags, error } = await supabase
+    const buscaComTexto = buscaAmpla && buscaAplicada.length > 0;
+    let query = supabase
       .from("agendamentos")
       .select("id,paciente_nome,paciente_id,inicio,procedimento,fluxo_etapa,medicos(nome)")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .gte("inicio", inicio)
       .lte("inicio", fim)
-      .in("fluxo_etapa", ["aguardando_recepcao", "recepcao"])
       .neq("status", "cancelado")
-      .not("paciente_id", "is", null)
-      .order("inicio", { ascending: true });
+      .not("paciente_id", "is", null);
+    if (!buscaComTexto) query = query.in("fluxo_etapa", ETAPAS_CHECKIN);
+    const { data: ags, error } = await query.order("inicio", { ascending: true });
     if (error) { setLoading(false); toast.error(error.message); return; }
     const ids = (ags ?? []).map((a) => a.id);
     let pagos = new Set<string>();
@@ -84,7 +103,7 @@ function CheckinPage() {
       pago: pagos.has(a.id),
     })));
     setLoading(false);
-  }, [clinicaAtual, data, buscaAmpla]);
+  }, [clinicaAtual, data, buscaAmpla, buscaAplicada]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -97,8 +116,8 @@ function CheckinPage() {
     });
   }, [items, busca]);
 
-  const acionarBusca = () => setBuscaAmpla(true);
-  const limparBusca = () => { setBusca(""); setBuscaAmpla(false); };
+  const acionarBusca = () => { setBuscaAplicada(busca.trim()); setBuscaAmpla(true); };
+  const limparBusca = () => { setBusca(""); setBuscaAplicada(""); setBuscaAmpla(false); };
 
   const confirmar = async (a: Item) => {
     const { error } = await supabase
@@ -126,7 +145,7 @@ function CheckinPage() {
           </p>
         </div>
         <Badge variant="outline" className="text-base px-3 py-1">
-          {filtrados.length} aguardando
+          {filtrados.length} {buscaAmpla ? "resultado(s)" : "aguardando"}
         </Badge>
       </div>
 
@@ -163,7 +182,7 @@ function CheckinPage() {
         </div>
         {buscaAmpla && (
           <p className="text-xs text-muted-foreground">
-            Dica: clique em "Limpar" para voltar a ver apenas pacientes com pagamento já registrado.
+            Dica: com nome ou CPF digitado, a busca também mostra pacientes já avançados para triagem, atendimento ou caixa.
           </p>
         )}
       </Card>
@@ -195,6 +214,9 @@ function CheckinPage() {
                   ) : (
                     <Badge className="bg-amber-500 text-white">PAGAMENTO PENDENTE</Badge>
                   )}
+                  {!estaPendenteCheckin(a.fluxo_etapa) && (
+                    <Badge variant="outline">{etapaLabel(a.fluxo_etapa)}</Badge>
+                  )}
                 </div>
                 <div className="text-xs text-muted-foreground">
                   {hora(a.inicio)} • {a.medicos?.nome ?? "—"} • {a.procedimento ?? "CONSULTA"}
@@ -202,12 +224,18 @@ function CheckinPage() {
                   {a.paciente?.telefone && ` • ${a.paciente.telefone}`}
                 </div>
               </div>
-              <Button
-                onClick={() => confirmar(a)}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white"
-              >
-                <BadgeCheck className="h-4 w-4 mr-2" /> Confirmar presença
-              </Button>
+              {estaPendenteCheckin(a.fluxo_etapa) ? (
+                <Button
+                  onClick={() => confirmar(a)}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                >
+                  <BadgeCheck className="h-4 w-4 mr-2" /> Confirmar presença
+                </Button>
+              ) : (
+                <Button variant="outline" disabled>
+                  {etapaLabel(a.fluxo_etapa)}
+                </Button>
+              )}
             </Card>
           ))}
         </div>
