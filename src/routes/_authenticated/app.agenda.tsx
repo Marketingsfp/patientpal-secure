@@ -169,7 +169,7 @@ function AgendaPage() {
     const { error: e2 } = await supabase.from("agendamentos").update({
       paciente_id: null,
       paciente_nome: "DISPONÍVEL",
-      status: "disponivel",
+      status: "agendado",
     } as never).eq("id", slot.id);
     if (e2) { setReagSalvando(false); toast.error(e2.message); return; }
     setReagSalvando(false);
