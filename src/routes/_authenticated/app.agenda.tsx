@@ -1162,6 +1162,7 @@ function AgendaPage() {
 
       <Dialog open={novoPacOpen} onOpenChange={setNovoPacOpen}>
         <DialogContent className="max-w-md">
+
           <DialogHeader>
             <DialogTitle>Cadastro rápido de paciente</DialogTitle>
           </DialogHeader>
