@@ -1,4 +1,5 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { Activity } from "lucide-react";
 
 function hasSupabaseSession(): boolean {
@@ -35,6 +36,12 @@ export const Route = createFileRoute("/")({
 });
 
 function LandingPage() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    navigate({ to: hasSupabaseSession() ? "/app" : "/login", replace: true });
+  }, [navigate]);
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4 text-center">
       <div className="space-y-4">
