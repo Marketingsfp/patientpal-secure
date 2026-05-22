@@ -227,6 +227,43 @@ function Page() {
     if (error) toast.error(error.message); else { toast.success("Removido"); await load(); }
   };
 
+  const estornar = async (a: Atend) => {
+    if (a.repasse_pago) {
+      toast.error("Repasse já pago — não é possível estornar. Estorne o pagamento do repasse primeiro.");
+      return;
+    }
+    if (a.origem !== "agenda") {
+      toast.error("Apenas atendimentos vindos da agenda podem ser estornados (voltam para 'Agendado').");
+      return;
+    }
+    if (!confirm("Estornar este atendimento? O agendamento voltará para o status 'Agendado'.")) return;
+    const { data: lanc, error: eLanc } = await supabase
+      .from("fin_lancamentos")
+      .select("agendamento_id")
+      .eq("id", a.id)
+      .maybeSingle();
+    if (eLanc) { toast.error(eLanc.message); return; }
+    const agId = lanc?.agendamento_id;
+    if (!agId) { toast.error("Agendamento de origem não encontrado."); return; }
+    const { data: agAntes } = await supabase
+      .from("agendamentos").select("id, status").eq("id", agId).maybeSingle();
+    const { error: eUpd } = await supabase
+      .from("agendamentos").update({ status: "agendado" }).eq("id", agId);
+    if (eUpd) { toast.error(eUpd.message); return; }
+    try {
+      await logAction({
+        table_name: "agendamentos",
+        record_id: agId,
+        action: "ESTORNO",
+        clinica_id: clinicaAtual?.clinica_id,
+        dados_antes: agAntes ?? { id: agId },
+        dados_depois: { id: agId, status: "agendado" },
+      });
+    } catch { /* auditoria best-effort */ }
+    toast.success("Atendimento estornado — agendamento voltou para 'Agendado'.");
+    await load();
+  };
+
   const medMap = new Map(medicos.map((m) => [m.id, m.nome]));
   const pacMap = new Map(pacientes.map((p) => [p.id, p.nome]));
   const totais = useMemo(() => items.reduce(
@@ -532,7 +569,19 @@ function Page() {
                 {!isMedicoOnly && (
                   <TableCell className="text-right">
                     {a.origem === "agenda" ? (
-                      <span className="text-[10px] text-muted-foreground uppercase">Agenda</span>
+                      <div className="flex items-center justify-end gap-1">
+                        <span className="text-[10px] text-muted-foreground uppercase">Agenda</span>
+                        {podeEstornar && !a.repasse_pago && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Estornar atendimento (volta para Agendado)"
+                            onClick={() => estornar(a)}
+                          >
+                            <Undo2 className="h-3.5 w-3.5 text-amber-600" />
+                          </Button>
+                        )}
+                      </div>
                     ) : (<>
                       <Button variant="ghost" size="icon" onClick={() => openEdit(a)}><Pencil className="h-3.5 w-3.5" /></Button>
                       <Button variant="ghost" size="icon" onClick={() => remove(a)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
