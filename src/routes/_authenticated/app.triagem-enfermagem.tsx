@@ -85,11 +85,14 @@ type Form = {
   medicamentos: string;
   alergias: string;
   observacoes: string;
+  prioridade: "normal" | "prioritario" | "urgente";
+  motivo_prioridade: string;
 };
 
 const formVazio: Form = {
   peso: "", altura: "", pa_sis: "", pa_dia: "", fc: "", temp: "", sat: "", glicemia: "",
   queixa: "", doencas: [], outras_doencas: "", medicamentos: "", alergias: "", observacoes: "",
+  prioridade: "normal", motivo_prioridade: "",
 };
 
 function TriagemEnfermagemPage() {
@@ -209,10 +212,17 @@ function TriagemEnfermagemPage() {
       medicamentos: form.medicamentos || null,
       alergias: form.alergias || null,
       observacoes: form.observacoes || null,
+      prioridade: form.prioridade,
+      motivo_prioridade: form.prioridade !== "normal" ? (form.motivo_prioridade || null) : null,
     };
     const rows = aberto.agendamentos.map((a) => ({ ...base, agendamento_id: a.id }));
     const { error } = await supabase.from("triagens_enfermagem").insert(rows as never);
     if (error) { setSalvando(false); toast.error(error.message); return; }
+
+    const ids = aberto.agendamentos.map((a) => a.id);
+    if (form.prioridade !== "normal" && ids.length) {
+      await supabase.from("agendamentos").update({ prioridade: form.prioridade } as never).in("id", ids);
+    }
 
     if (avancar) {
       const isExame = (p: string | null) => /exame|raio|usg|ultra|tomo|ressona/i.test(p ?? "");
@@ -381,6 +391,41 @@ function TriagemEnfermagemPage() {
               <Label className="text-xs">Observações da enfermagem</Label>
               <Textarea rows={2} value={form.observacoes}
                 onChange={(e) => setForm({ ...form, observacoes: e.target.value })} />
+            </div>
+
+            <div className="rounded-md border p-3 space-y-2 bg-muted/30">
+              <Label className="text-xs flex items-center gap-1">
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-600" /> Prioridade do atendimento
+              </Label>
+              <div className="flex gap-2 flex-wrap">
+                {([
+                  { v: "normal", label: "Normal" },
+                  { v: "prioritario", label: "Prioritário" },
+                  { v: "urgente", label: "Urgente" },
+                ] as const).map((opt) => (
+                  <Button
+                    key={opt.v}
+                    type="button"
+                    size="sm"
+                    variant={form.prioridade === opt.v ? "default" : "outline"}
+                    className={
+                      form.prioridade === opt.v && opt.v === "urgente" ? "bg-rose-600 hover:bg-rose-700" :
+                      form.prioridade === opt.v && opt.v === "prioritario" ? "bg-amber-500 hover:bg-amber-600" : ""
+                    }
+                    onClick={() => setForm({ ...form, prioridade: opt.v })}
+                  >
+                    {opt.label}
+                  </Button>
+                ))}
+              </div>
+              {form.prioridade !== "normal" && (
+                <div>
+                  <Label className="text-xs">Motivo da prioridade</Label>
+                  <Textarea rows={2} value={form.motivo_prioridade}
+                    onChange={(e) => setForm({ ...form, motivo_prioridade: e.target.value })}
+                    placeholder="Ex.: gestante, idoso com dor intensa, suspeita de quadro grave…" />
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter className="gap-2">
