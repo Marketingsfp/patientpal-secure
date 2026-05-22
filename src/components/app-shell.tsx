@@ -279,7 +279,13 @@ export function AppShell() {
       ],
     },
   ];
-  const visibleNavRows = isMedicoOnly ? medicoNavRows : navRows;
+  const subsystem = useSyncExternalStore(subscribeSubsystem, getSubsystem, () => null);
+  const isChooser = location.pathname === "/app" || location.pathname === "/app/";
+  const filteredByGroup = subsystem
+    ? navRows.filter((r) => SUBSYSTEMS[subsystem].groups.includes(r.label))
+    : navRows;
+  const visibleNavRows = isMedicoOnly ? medicoNavRows : filteredByGroup;
+  const subsystemLabel = subsystem ? SUBSYSTEMS[subsystem].label : null;
 
   return (
     <div className="h-screen flex bg-background overflow-hidden">
