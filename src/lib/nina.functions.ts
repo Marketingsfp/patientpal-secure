@@ -4,6 +4,22 @@ import { z } from "zod";
 
 const DIAS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
+async function assertMembership(
+  supabase: any,
+  userId: string,
+  clinicaId: string,
+) {
+  const { data, error } = await supabase
+    .from("clinica_memberships")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("clinica_id", clinicaId)
+    .eq("ativo", true)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Sem acesso a esta clínica");
+}
+
 const ChatSchema = z.object({
   clinicaId: z.string().uuid(),
   messages: z
@@ -27,7 +43,8 @@ export const getContextoClinica = createServerFn({ method: "POST" })
     z.object({ clinicaId: z.string().uuid() }).parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    await assertMembership(supabase, userId, data.clinicaId);
     const [medR, dispR, procR] = await Promise.all([
       supabase
         .from("medicos")
@@ -126,7 +143,8 @@ export const chatNina = createServerFn({ method: "POST" })
     const key = process.env.LOVABLE_API_KEY;
     if (!key) return { reply: "", error: "LOVABLE_API_KEY ausente" };
 
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    await assertMembership(supabase, userId, data.clinicaId);
     const [medR, dispR, procR] = await Promise.all([
       supabase
         .from("medicos")
