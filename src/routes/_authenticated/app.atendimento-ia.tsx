@@ -547,6 +547,12 @@ function AtendimentoIaPage() {
         )}
       </Card>
 
+      {!agendamentoId ? (
+        <Card className="p-6 text-center text-sm text-muted-foreground">
+          Selecione um paciente da fila e clique em <b>Atender</b> para iniciar o atendimento.
+        </Card>
+      ) : (
+        <>
       {triagem && (
         <Card className="p-4 space-y-3 border-rose-200/60 dark:border-rose-900/40">
           <div className="flex items-center justify-between flex-wrap gap-2">
@@ -728,6 +734,8 @@ function AtendimentoIaPage() {
           Salvar prontuário
         </Button>
       </div>
+        </>
+      )}
     </div>
   );
 }
