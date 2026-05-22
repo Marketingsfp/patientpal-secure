@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { VoiceInput } from "@/components/voice-input";
 import { Cid10Picker } from "@/components/cid10-picker";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import {
   gerarAnamneseEstruturada,
@@ -98,7 +99,6 @@ function AtendimentoIaPage() {
   const [resumoOpen, setResumoOpen] = useState(false);
   const [loading, setLoading] = useState<"estruturar" | "sugerir" | "resumir" | "salvar" | null>(null);
   const [triagem, setTriagem] = useState<Triagem | null>(null);
-  const [triados, setTriados] = useState<Array<{ agendamento_id: string; paciente_nome: string; medico_id: string; medico_nome: string; quando: string }>>([]);
 
   useEffect(() => {
     (async () => {
