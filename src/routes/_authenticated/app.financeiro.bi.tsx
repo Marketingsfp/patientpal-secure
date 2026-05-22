@@ -4,9 +4,7 @@ import { BarChart3 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
-} from "recharts";
+import { MiniBarChart } from "@/components/charts/MiniBarChart";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro/bi")({
   component: Page,
@@ -62,16 +60,15 @@ function Page() {
       <Card><CardHeader><CardTitle>Receitas vs Despesas</CardTitle></CardHeader>
         <CardContent>
           {loading ? <div className="py-12 text-center text-muted-foreground">Carregando...</div>
-            : <ResponsiveContainer width="100%" height={320}>
-              <BarChart data={data}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="mes" /><YAxis />
-                <Tooltip formatter={(v: number) => fmt(v)} />
-                <Legend />
-                <Bar dataKey="Receitas" fill="#10b981" />
-                <Bar dataKey="Despesas" fill="#ef4444" />
-              </BarChart>
-            </ResponsiveContainer>}
+            : <MiniBarChart
+                labels={data.map((r) => r.mes)}
+                series={[
+                  { name: "Receitas", color: "#10b981", values: data.map((r) => r.Receitas) },
+                  { name: "Despesas", color: "#ef4444", values: data.map((r) => r.Despesas) },
+                ]}
+                height={320}
+                formatY={fmt}
+              />}
         </CardContent>
       </Card>
     </div>
