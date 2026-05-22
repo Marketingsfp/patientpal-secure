@@ -172,19 +172,6 @@ function AgendaPage() {
       status: "disponivel",
     } as never).eq("id", slot.id);
     if (e2) { setReagSalvando(false); toast.error(e2.message); return; }
-    // 3) Libera o horário antigo, marcando como disponível
-    const { error: e3 } = await supabase.from("agendamentos").insert({
-      clinica_id: origem.clinica_id,
-      medico_id: origem.medico_id,
-      paciente_id: null,
-      paciente_nome: "DISPONÍVEL",
-      inicio: origem.inicio,
-      fim: origem.fim,
-      status: "disponivel",
-      procedimento: origem.procedimento ?? null,
-    } as never);
-    // Se o insert falhar (ex.: constraint), apenas avisa — o reagendamento em si já ocorreu.
-    if (e3) console.warn("Não foi possível recriar slot disponível antigo:", e3.message);
     setReagSalvando(false);
     setReagendandoAg(null);
     toast.success(`Reagendado para ${new Date(slot.inicio).toLocaleString("pt-BR")}.`);
