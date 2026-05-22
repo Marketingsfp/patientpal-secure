@@ -23,7 +23,7 @@ type Item = {
   procedimento: string | null;
   fluxo_etapa: string;
   medicos?: { nome: string } | null;
-  pacientes?: Array<{ cpf: string | null; telefone: string | null; foto_url: string | null }> | null;
+  paciente?: { cpf: string | null; telefone: string | null; foto_url: string | null } | null;
 };
 
 function normalizar(t: string) {
@@ -44,7 +44,7 @@ function CheckinPage() {
     const fim = new Date(`${data}T23:59:59`).toISOString();
     const { data: ags, error } = await supabase
       .from("agendamentos")
-      .select("id,paciente_nome,paciente_id,inicio,procedimento,fluxo_etapa,medicos(nome),pacientes(cpf,telefone,foto_url)")
+      .select("id,paciente_nome,paciente_id,inicio,procedimento,fluxo_etapa,medicos(nome)")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .gte("inicio", inicio)
       .lte("inicio", fim)
@@ -64,7 +64,17 @@ function CheckinPage() {
       pagos = new Set(((pg ?? []) as Array<{ agendamento_id: string | null }>)
         .map((r) => r.agendamento_id).filter((x): x is string => !!x));
     }
-    setItems(((ags ?? []) as unknown as Item[]).filter((a) => pagos.has(a.id)));
+    const filtradosPagos = ((ags ?? []) as unknown as Item[]).filter((a) => pagos.has(a.id));
+    const pacIds = Array.from(new Set(filtradosPagos.map((a) => a.paciente_id).filter((x): x is string => !!x)));
+    const pacMap = new Map<string, { cpf: string | null; telefone: string | null; foto_url: string | null }>();
+    if (pacIds.length) {
+      const { data: pacs } = await supabase
+        .from("pacientes")
+        .select("id,cpf,telefone,foto_url")
+        .in("id", pacIds);
+      (pacs ?? []).forEach((p) => pacMap.set(p.id, { cpf: p.cpf, telefone: p.telefone, foto_url: p.foto_url }));
+    }
+    setItems(filtradosPagos.map((a) => ({ ...a, paciente: a.paciente_id ? pacMap.get(a.paciente_id) ?? null : null })));
     setLoading(false);
   }, [clinicaAtual, data]);
 
@@ -74,7 +84,7 @@ function CheckinPage() {
     const b = normalizar(busca.trim());
     if (!b) return items;
     return items.filter((a) => {
-      const cpf = (a.pacientes?.[0]?.cpf ?? "").replace(/\D/g, "");
+      const cpf = (a.paciente?.cpf ?? "").replace(/\D/g, "");
       return normalizar(a.paciente_nome).includes(b) || cpf.includes(b.replace(/\D/g, ""));
     });
   }, [items, busca]);
@@ -139,8 +149,8 @@ function CheckinPage() {
         <div className="grid gap-2">
           {filtrados.map((a) => (
             <Card key={a.id} className="p-3 flex items-center gap-3 flex-wrap">
-              {a.pacientes?.[0]?.foto_url ? (
-                <img src={a.pacientes[0].foto_url} alt="" className="h-12 w-12 rounded-full object-cover border" />
+              {a.paciente?.foto_url ? (
+                <img src={a.paciente.foto_url} alt="" className="h-12 w-12 rounded-full object-cover border" />
               ) : (
                 <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center font-semibold text-muted-foreground">
                   {a.paciente_nome.slice(0, 1).toUpperCase()}
@@ -153,8 +163,8 @@ function CheckinPage() {
                 </div>
                 <div className="text-xs text-muted-foreground">
                   {hora(a.inicio)} • {a.medicos?.nome ?? "—"} • {a.procedimento ?? "CONSULTA"}
-                  {a.pacientes?.[0]?.cpf && ` • CPF ${a.pacientes[0].cpf}`}
-                  {a.pacientes?.[0]?.telefone && ` • ${a.pacientes[0].telefone}`}
+                  {a.paciente?.cpf && ` • CPF ${a.paciente.cpf}`}
+                  {a.paciente?.telefone && ` • ${a.paciente.telefone}`}
                 </div>
               </div>
               <Button
