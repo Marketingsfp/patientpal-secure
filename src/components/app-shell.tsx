@@ -289,6 +289,7 @@ export function AppShell() {
 
   return (
     <div className="h-screen flex bg-background overflow-hidden">
+      {!isChooser && (
       <aside
         className={`${collapsed ? "w-16" : "w-64"} transition-all duration-200 shrink-0 text-white h-screen overflow-y-auto flex flex-col`}
         style={{ backgroundColor: clinicColor }}
@@ -367,6 +368,7 @@ export function AppShell() {
           })}
         </nav>
       </aside>
+      )}
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="sticky top-0 z-30 h-14 bg-card/80 backdrop-blur border-b flex items-center gap-3 px-3 sm:px-6">
