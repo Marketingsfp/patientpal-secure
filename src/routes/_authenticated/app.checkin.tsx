@@ -214,6 +214,9 @@ function CheckinPage() {
                   ) : (
                     <Badge className="bg-amber-500 text-white">PAGAMENTO PENDENTE</Badge>
                   )}
+                  {!estaPendenteCheckin(a.fluxo_etapa) && (
+                    <Badge variant="outline">{etapaLabel(a.fluxo_etapa)}</Badge>
+                  )}
                 </div>
                 <div className="text-xs text-muted-foreground">
                   {hora(a.inicio)} • {a.medicos?.nome ?? "—"} • {a.procedimento ?? "CONSULTA"}
@@ -221,12 +224,18 @@ function CheckinPage() {
                   {a.paciente?.telefone && ` • ${a.paciente.telefone}`}
                 </div>
               </div>
-              <Button
-                onClick={() => confirmar(a)}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white"
-              >
-                <BadgeCheck className="h-4 w-4 mr-2" /> Confirmar presença
-              </Button>
+              {estaPendenteCheckin(a.fluxo_etapa) ? (
+                <Button
+                  onClick={() => confirmar(a)}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                >
+                  <BadgeCheck className="h-4 w-4 mr-2" /> Confirmar presença
+                </Button>
+              ) : (
+                <Button variant="outline" disabled>
+                  {etapaLabel(a.fluxo_etapa)}
+                </Button>
+              )}
             </Card>
           ))}
         </div>
