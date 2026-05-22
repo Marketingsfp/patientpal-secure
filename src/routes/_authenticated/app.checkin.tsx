@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { BadgeCheck, Search, ConciergeBell } from "lucide-react";
+import { BadgeCheck, Search, ConciergeBell, X } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/checkin")({
   component: CheckinPage,
@@ -24,6 +24,7 @@ type Item = {
   fluxo_etapa: string;
   medicos?: { nome: string } | null;
   paciente?: { cpf: string | null; telefone: string | null; foto_url: string | null } | null;
+  pago?: boolean;
 };
 
 function normalizar(t: string) {
@@ -36,6 +37,7 @@ function CheckinPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(false);
   const [busca, setBusca] = useState("");
+  const [buscaAmpla, setBuscaAmpla] = useState(false);
 
   const load = useCallback(async () => {
     if (!clinicaAtual) return;
@@ -64,8 +66,9 @@ function CheckinPage() {
       pagos = new Set(((pg ?? []) as Array<{ agendamento_id: string | null }>)
         .map((r) => r.agendamento_id).filter((x): x is string => !!x));
     }
-    const filtradosPagos = ((ags ?? []) as unknown as Item[]).filter((a) => pagos.has(a.id));
-    const pacIds = Array.from(new Set(filtradosPagos.map((a) => a.paciente_id).filter((x): x is string => !!x)));
+    const base = ((ags ?? []) as unknown as Item[]);
+    const filtrados = buscaAmpla ? base : base.filter((a) => pagos.has(a.id));
+    const pacIds = Array.from(new Set(filtrados.map((a) => a.paciente_id).filter((x): x is string => !!x)));
     const pacMap = new Map<string, { cpf: string | null; telefone: string | null; foto_url: string | null }>();
     if (pacIds.length) {
       const { data: pacs } = await supabase
@@ -74,9 +77,13 @@ function CheckinPage() {
         .in("id", pacIds);
       (pacs ?? []).forEach((p) => pacMap.set(p.id, { cpf: p.cpf, telefone: p.telefone, foto_url: p.foto_url }));
     }
-    setItems(filtradosPagos.map((a) => ({ ...a, paciente: a.paciente_id ? pacMap.get(a.paciente_id) ?? null : null })));
+    setItems(filtrados.map((a) => ({
+      ...a,
+      paciente: a.paciente_id ? pacMap.get(a.paciente_id) ?? null : null,
+      pago: pagos.has(a.id),
+    })));
     setLoading(false);
-  }, [clinicaAtual, data]);
+  }, [clinicaAtual, data, buscaAmpla]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -88,6 +95,9 @@ function CheckinPage() {
       return normalizar(a.paciente_nome).includes(b) || cpf.includes(b.replace(/\D/g, ""));
     });
   }, [items, busca]);
+
+  const acionarBusca = () => setBuscaAmpla(true);
+  const limparBusca = () => { setBusca(""); setBuscaAmpla(false); };
 
   const confirmar = async (a: Item) => {
     const { error } = await supabase
@@ -109,7 +119,9 @@ function CheckinPage() {
             <ConciergeBell className="h-6 w-6" /> Check-in de pacientes
           </h1>
           <p className="text-sm text-muted-foreground">
-            Pacientes que já pagaram e estão aguardando confirmação de presença no balcão.
+            {buscaAmpla
+              ? "Modo busca ampliada: mostrando todos os agendados do dia ainda sem check-in."
+              : "Pacientes que já pagaram e estão aguardando confirmação de presença no balcão."}
           </p>
         </div>
         <Badge variant="outline" className="text-base px-3 py-1">
@@ -118,7 +130,7 @@ function CheckinPage() {
       </div>
 
       <Card className="p-4 space-y-3">
-        <div className="grid grid-cols-1 md:grid-cols-[180px_1fr] gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-[180px_1fr_auto] gap-3 items-end">
           <div className="space-y-1.5">
             <Label>Data</Label>
             <Input type="date" value={data} onChange={(e) => setData(e.target.value)} />
@@ -131,19 +143,37 @@ function CheckinPage() {
                 className="pl-9"
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); acionarBusca(); } }}
                 placeholder="Digite o nome ou CPF..."
                 autoFocus
               />
             </div>
           </div>
+          <div className="flex gap-2">
+            <Button onClick={acionarBusca} className="bg-primary text-primary-foreground">
+              <Search className="h-4 w-4 mr-2" /> Buscar
+            </Button>
+            {buscaAmpla && (
+              <Button variant="outline" onClick={limparBusca}>
+                <X className="h-4 w-4 mr-2" /> Limpar
+              </Button>
+            )}
+          </div>
         </div>
+        {buscaAmpla && (
+          <p className="text-xs text-muted-foreground">
+            Dica: clique em "Limpar" para voltar a ver apenas pacientes com pagamento já registrado.
+          </p>
+        )}
       </Card>
 
       {loading ? (
         <p className="text-sm text-muted-foreground p-4">Carregando...</p>
       ) : filtrados.length === 0 ? (
         <Card className="p-8 text-center text-muted-foreground">
-          Nenhum paciente aguardando check-in para esta data.
+          {buscaAmpla
+            ? "Nenhum agendamento pendente de check-in encontrado para esta data."
+            : "Nenhum paciente aguardando check-in para esta data."}
         </Card>
       ) : (
         <div className="grid gap-2">
@@ -159,7 +189,11 @@ function CheckinPage() {
               <div className="flex-1 min-w-[200px]">
                 <div className="font-semibold flex items-center gap-2">
                   {a.paciente_nome}
-                  <Badge className="bg-emerald-600 text-white">PAGO</Badge>
+                  {a.pago ? (
+                    <Badge className="bg-emerald-600 text-white">PAGO</Badge>
+                  ) : (
+                    <Badge className="bg-amber-500 text-white">PAGAMENTO PENDENTE</Badge>
+                  )}
                 </div>
                 <div className="text-xs text-muted-foreground">
                   {hora(a.inicio)} • {a.medicos?.nome ?? "—"} • {a.procedimento ?? "CONSULTA"}
