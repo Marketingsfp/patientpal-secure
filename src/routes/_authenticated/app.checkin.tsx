@@ -82,9 +82,8 @@ function CheckinPage() {
       .lte("inicio", fim)
       .neq("status", "cancelado")
       .not("paciente_id", "is", null);
-    // Modo padrão (sem clicar Buscar): só etapas de check-in.
-    // Modo ampliado (clicou Buscar): traz o dia inteiro, qualquer etapa.
-    if (!buscaAmpla) query = query.in("fluxo_etapa", ETAPAS_CHECKIN);
+    // Sempre mostrar apenas pacientes que ainda NÃO fizeram check-in.
+    query = query.in("fluxo_etapa", ETAPAS_CHECKIN);
     const { data: ags, error } = await query.order("inicio", { ascending: true });
     if (error) { setLoading(false); toast.error(error.message); return; }
     const ids = (ags ?? []).map((a) => a.id);
@@ -195,11 +194,9 @@ function CheckinPage() {
             )}
           </div>
         </div>
-        {buscaAmpla && (
-          <p className="text-xs text-muted-foreground">
-            Dica: com nome ou CPF digitado, a busca também mostra pacientes já avançados para triagem, atendimento ou caixa.
-          </p>
-        )}
+        <p className="text-xs text-muted-foreground">
+          Só aparecem aqui pacientes que ainda não confirmaram presença. Após o check-in, eles saem desta lista.
+        </p>
       </Card>
 
       {loading ? (
