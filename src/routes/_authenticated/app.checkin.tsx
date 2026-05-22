@@ -52,6 +52,7 @@ function CheckinPage() {
       .lte("inicio", fim)
       .in("fluxo_etapa", ["aguardando_recepcao", "recepcao"])
       .neq("status", "cancelado")
+      .not("paciente_id", "is", null)
       .order("inicio", { ascending: true });
     if (error) { setLoading(false); toast.error(error.message); return; }
     const ids = (ags ?? []).map((a) => a.id);
