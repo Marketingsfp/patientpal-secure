@@ -21,7 +21,7 @@ export const Route = createFileRoute("/_authenticated/app/unidades")({
 
 function UnidadesPage() {
   return (
-    <div className="p-6 space-y-4">
+    <div className="space-y-4 max-w-full">
       <div className="flex items-center gap-3">
         <MapPin className="h-6 w-6 text-primary" />
         <div className="flex-1">
