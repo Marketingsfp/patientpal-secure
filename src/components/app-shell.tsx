@@ -1,11 +1,12 @@
 import { Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
-import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet, ChevronLeft, ChevronRight, ChevronDown, Search, HeartPulse, Contact, ConciergeBell, Briefcase, MapPin, Palmtree, GraduationCap, Sparkles, Filter, Send, Megaphone, KeyRound, BadgeCheck } from "lucide-react";
+import { lazy, Suspense, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet, ChevronLeft, ChevronRight, ChevronDown, Search, HeartPulse, Contact, ConciergeBell, Briefcase, MapPin, Palmtree, GraduationCap, Sparkles, Filter, Send, Megaphone, KeyRound, BadgeCheck, LayoutGrid } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
 import { useMedicoContext } from "@/hooks/use-medico-context";
 import { supabase } from "@/integrations/supabase/client";
+import { getSubsystem, setSubsystem, subscribeSubsystem, SUBSYSTEMS } from "@/lib/subsystem";
 import logoSaoFrancisco from "@/assets/logo-sao-francisco.png";
 import logoMeninoJesus from "@/assets/logo-menino-jesus.png";
 import logoConsultaHoje from "@/assets/logo-consulta-hoje.png";
@@ -54,7 +55,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<{ to: string;
     { to: "/app/cartao-beneficios", label: "Cartão Benefícios", icon: CreditCard },
     { to: "/app/chat", label: "Chat interno", icon: MessageCircle },
     { to: "/app/clientes", label: "Clientes", icon: Contact },
-    { to: "/app", label: "Dashboard", icon: LayoutDashboard },
+    { to: "/app/painel", label: "Dashboard", icon: LayoutDashboard },
     { to: "/app/fluxo", label: "Fluxo do paciente", icon: Workflow },
     { to: "/app/orcamentos", label: "Orçamentos", icon: FileText },
     { to: "/app/recepcao", label: "Recepção / Filas", icon: ConciergeBell },
@@ -278,7 +279,13 @@ export function AppShell() {
       ],
     },
   ];
-  const visibleNavRows = isMedicoOnly ? medicoNavRows : navRows;
+  const subsystem = useSyncExternalStore(subscribeSubsystem, getSubsystem, () => null);
+  const isChooser = location.pathname === "/app" || location.pathname === "/app/";
+  const filteredByGroup = subsystem
+    ? navRows.filter((r) => SUBSYSTEMS[subsystem].groups.includes(r.label))
+    : navRows;
+  const visibleNavRows = isMedicoOnly ? medicoNavRows : filteredByGroup;
+  const subsystemLabel = subsystem ? SUBSYSTEMS[subsystem].label : null;
 
   return (
     <div className="h-screen flex bg-background overflow-hidden">
@@ -313,6 +320,24 @@ export function AppShell() {
             />
           </Suspense>
         </div>
+        )}
+        {!isMedicoOnly && subsystemLabel && (
+          <div className={`${collapsed ? "px-1 py-2" : "px-3 py-2"} border-b border-white/10`}>
+            <button
+              type="button"
+              onClick={() => { setSubsystem(null); navigate({ to: "/app" }); }}
+              title="Trocar subsistema"
+              className={`w-full flex items-center gap-2 rounded-md bg-white/10 hover:bg-white/20 transition-colors text-white text-xs font-medium ${collapsed ? "justify-center px-2 py-2" : "px-3 py-2"}`}
+            >
+              <LayoutGrid className="h-4 w-4 shrink-0" />
+              {!collapsed && (
+                <span className="flex-1 truncate text-left">
+                  <span className="block text-[10px] uppercase opacity-70 leading-none">Subsistema</span>
+                  <span className="block truncate">{subsystemLabel}</span>
+                </span>
+              )}
+            </button>
+          </div>
         )}
         <nav className="flex-1 px-2 py-3 space-y-5 overflow-y-auto">
           {visibleNavRows.map((row) => {
