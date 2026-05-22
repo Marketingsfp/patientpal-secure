@@ -1,8 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Users, ConciergeBell, Search, CheckCircle2 } from "lucide-react";
+import { Users, ConciergeBell, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { setSubsystem, SUBSYSTEMS, type SubsystemId } from "@/lib/subsystem";
 import { supabase } from "@/integrations/supabase/client";
@@ -40,7 +39,6 @@ const CARDS: CardDef[] = [
 function SubsystemChooser() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [busca, setBusca] = useState("");
   const [nome, setNome] = useState<string>("");
 
   useEffect(() => {
@@ -62,29 +60,16 @@ function SubsystemChooser() {
     navigate({ to: destino });
   };
 
-  const filtrados = CARDS.filter((c) => {
-    if (!busca.trim()) return true;
-    const q = busca.toLowerCase();
-    return c.title.toLowerCase().includes(q) || c.desc.toLowerCase().includes(q);
-  });
+  const filtrados = CARDS;
 
   return (
     <div className="-m-3 sm:-m-4 lg:-m-6 min-h-[calc(100vh-3.5rem)] flex flex-col">
       {/* Header escuro com saudação e busca */}
       <div className="bg-[#15274f] text-white px-6 sm:px-10 pt-8 pb-16">
-        <div className="mx-auto max-w-6xl flex flex-col md:flex-row md:items-center gap-4 md:gap-8">
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight whitespace-nowrap">
+        <div className="mx-auto max-w-6xl">
+          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">
             Olá, {saudacao}!
           </h1>
-          <div className="relative flex-1 max-w-2xl">
-            <Search className="h-5 w-5 absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              placeholder="Buscar subsistema ou módulo..."
-              className="h-12 pl-12 rounded-full bg-white text-foreground placeholder:text-muted-foreground border-0 shadow-sm"
-            />
-          </div>
         </div>
       </div>
 
@@ -112,7 +97,7 @@ function SubsystemChooser() {
           ))}
           {filtrados.length === 0 && (
             <p className="text-sm text-muted-foreground col-span-full text-center py-10">
-              Nenhum subsistema encontrado para "{busca}".
+              Nenhum subsistema disponível.
             </p>
           )}
         </div>
