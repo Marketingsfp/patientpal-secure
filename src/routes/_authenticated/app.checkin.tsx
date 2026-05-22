@@ -194,11 +194,9 @@ function CheckinPage() {
             )}
           </div>
         </div>
-        {buscaAmpla && (
-          <p className="text-xs text-muted-foreground">
-            Dica: com nome ou CPF digitado, a busca também mostra pacientes já avançados para triagem, atendimento ou caixa.
-          </p>
-        )}
+        <p className="text-xs text-muted-foreground">
+          Só aparecem aqui pacientes que ainda não confirmaram presença. Após o check-in, eles saem desta lista.
+        </p>
       </Card>
 
       {loading ? (
