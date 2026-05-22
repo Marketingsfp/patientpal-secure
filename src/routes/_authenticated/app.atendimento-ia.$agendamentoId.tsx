@@ -448,7 +448,6 @@ function AtendimentoEditorPage() {
               append
               prompt="Transcreva fielmente a conversa entre médico e paciente em português do Brasil. Retorne apenas o texto, sem rótulos."
               title="Gravar conversa"
-              autoStart
             />
           </div>
           <Textarea
