@@ -1,4 +1,34 @@
-## 1. Bug — pagamento em dinheiro sem informar valor recebido
+## GR agrupada — uma GR por médico, no mesmo arquivo
+
+Hoje (`src/lib/print-gr.ts` → `printGuiaAtendimentoAgrupadaCore`) a impressão agrupada gera **uma única GR consolidada** com blocos por profissional e um rodapé único de totais. O usuário quer voltar ao formato de **uma GR completa por médico** (igual à GR individual da screenshot), todas concatenadas no mesmo HTML/arquivo para sair em sequência na impressora térmica 80mm, separadas por linha tracejada.
+
+### Mudanças (apenas em `src/lib/print-gr.ts`)
+
+Reescrever `printGuiaAtendimentoAgrupadaCore` para:
+
+1. Manter o agrupamento por `medico_id` já existente (subtotal, prestador, clínica por médico).
+2. Para cada grupo, renderizar um **ticket completo** com o mesmo layout da GR individual:
+   - Cabeçalho da clínica (nome, endereço, fone, CNPJ).
+   - Título `GUIA DE ATENDIMENTO` + via (`1ª VIA` / `2ª VIA — REIMPRESSÃO`).
+   - Dados do paciente (nome, CPF, fone, nascimento).
+   - `FICHA`, `PROFISSIONAL`, `HORÁRIO` (do 1º agendamento do médico), `USUÁRIO`.
+   - Tabela `QTD / PROCEDIMENTO` com os procedimentos desse médico.
+   - Bloco `VALOR RECEBIDO` = subtotal do médico, com a forma de pagamento usada (rateio simples do pagamento informado: se forma única, replica em todos; se misto/cartão, mostra a mesma forma com o subtotal do médico — sem recalcular detalhe misto por médico).
+   - `CLINICA` / `PRESTADOR` do médico.
+   - `DATA IMPRESSAO`.
+3. Entre cada ticket inserir um separador tracejado bem visível (`<div class="sep"></div>` com margem maior ou linha dupla) para a atendente cortar entre as GRs.
+4. Remover o rodapé consolidado de totais (não é mais necessário, cada GR é autônoma).
+5. Manter o controle de vias e o registro em `gr_impressoes` para cada `agendamento_id` (sem mudanças).
+6. Caso só haja 1 grupo (um único médico), continuar delegando para `printGuiaAtendimento` simples — já implementado.
+
+### Observação sobre forma de pagamento por GR
+
+Como o pagamento foi feito de forma única (mesmo que misto) e cobre todos os médicos, em cada GR individual o `VALOR RECEBIDO` será o subtotal daquele médico, e a linha `(FORMA)` exibe a mesma forma global. Para misto, mostra `(MISTO)` sem repetir a tabela de detalhe em cada GR — o detalhe completo aparece apenas na **última** GR para evitar duplicação. Para cartão crédito, parcelamento e bandeira aparecem na última também.
+
+### Sem mudanças
+
+- Sem mudanças em banco.
+- Sem mudanças em `app.agenda.tsx` — segue chamando `printGuiaAtendimentoAgrupada` com os mesmos parâmetros.
 
 **Hoje** (`src/components/financeiro/lancamento-dialog.tsx`): quando a forma de pagamento é **Dinheiro**, o campo "Valor recebido" é opcional. Se ficar em branco, o salvamento prossegue e nenhum troco é calculado.
 
