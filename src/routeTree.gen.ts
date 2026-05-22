@@ -82,6 +82,7 @@ import { Route as AuthenticatedAppAnamnesesRouteImport } from './routes/_authent
 import { Route as AuthenticatedAppAlertasEnfermagemRouteImport } from './routes/_authenticated/app.alertas-enfermagem'
 import { Route as AuthenticatedAppAgendaRouteImport } from './routes/_authenticated/app.agenda'
 import { Route as AuthenticatedAppFinanceiroIndexRouteImport } from './routes/_authenticated/app.financeiro.index'
+import { Route as AuthenticatedAppAtendimentoIaIndexRouteImport } from './routes/_authenticated/app.atendimento-ia.index'
 import { Route as ApiPublicWhatsappClinicaIdRouteImport } from './routes/api/public/whatsapp.$clinicaId'
 import { Route as AuthenticatedAppMedicoMedicoIdRouteImport } from './routes/_authenticated/app.medico.$medicoId'
 import { Route as AuthenticatedAppImprimirAgendamentoIdRouteImport } from './routes/_authenticated/app.imprimir.$agendamentoId'
@@ -504,6 +505,12 @@ const AuthenticatedAppFinanceiroIndexRoute =
     path: '/',
     getParentRoute: () => AuthenticatedAppFinanceiroRoute,
   } as any)
+const AuthenticatedAppAtendimentoIaIndexRoute =
+  AuthenticatedAppAtendimentoIaIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedAppAtendimentoIaRoute,
+  } as any)
 const ApiPublicWhatsappClinicaIdRoute =
   ApiPublicWhatsappClinicaIdRouteImport.update({
     id: '/api/public/whatsapp/$clinicaId',
@@ -724,6 +731,7 @@ export interface FileRoutesByFullPath {
   '/app/imprimir/$agendamentoId': typeof AuthenticatedAppImprimirAgendamentoIdRoute
   '/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
+  '/app/atendimento-ia/': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/app/financeiro/': typeof AuthenticatedAppFinanceiroIndexRoute
 }
 export interface FileRoutesByTo {
@@ -745,7 +753,6 @@ export interface FileRoutesByTo {
   '/app/agenda': typeof AuthenticatedAppAgendaRoute
   '/app/alertas-enfermagem': typeof AuthenticatedAppAlertasEnfermagemRoute
   '/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
-  '/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaRouteWithChildren
   '/app/auditoria': typeof AuthenticatedAppAuditoriaRoute
   '/app/boletos': typeof AuthenticatedAppBoletosRoute
   '/app/caixa': typeof AuthenticatedAppCaixaRoute
@@ -817,6 +824,7 @@ export interface FileRoutesByTo {
   '/app/imprimir/$agendamentoId': typeof AuthenticatedAppImprimirAgendamentoIdRoute
   '/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
+  '/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/app/financeiro': typeof AuthenticatedAppFinanceiroIndexRoute
 }
 export interface FileRoutesById {
@@ -914,6 +922,7 @@ export interface FileRoutesById {
   '/_authenticated/app/imprimir/$agendamentoId': typeof AuthenticatedAppImprimirAgendamentoIdRoute
   '/_authenticated/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
+  '/_authenticated/app/atendimento-ia/': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/_authenticated/app/financeiro/': typeof AuthenticatedAppFinanceiroIndexRoute
 }
 export interface FileRouteTypes {
@@ -1011,6 +1020,7 @@ export interface FileRouteTypes {
     | '/app/imprimir/$agendamentoId'
     | '/app/medico/$medicoId'
     | '/api/public/whatsapp/$clinicaId'
+    | '/app/atendimento-ia/'
     | '/app/financeiro/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -1032,7 +1042,6 @@ export interface FileRouteTypes {
     | '/app/agenda'
     | '/app/alertas-enfermagem'
     | '/app/anamneses'
-    | '/app/atendimento-ia'
     | '/app/auditoria'
     | '/app/boletos'
     | '/app/caixa'
@@ -1104,6 +1113,7 @@ export interface FileRouteTypes {
     | '/app/imprimir/$agendamentoId'
     | '/app/medico/$medicoId'
     | '/api/public/whatsapp/$clinicaId'
+    | '/app/atendimento-ia'
     | '/app/financeiro'
   id:
     | '__root__'
@@ -1200,6 +1210,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/imprimir/$agendamentoId'
     | '/_authenticated/app/medico/$medicoId'
     | '/api/public/whatsapp/$clinicaId'
+    | '/_authenticated/app/atendimento-ia/'
     | '/_authenticated/app/financeiro/'
   fileRoutesById: FileRoutesById
 }
@@ -1737,6 +1748,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppFinanceiroIndexRouteImport
       parentRoute: typeof AuthenticatedAppFinanceiroRoute
     }
+    '/_authenticated/app/atendimento-ia/': {
+      id: '/_authenticated/app/atendimento-ia/'
+      path: '/'
+      fullPath: '/app/atendimento-ia/'
+      preLoaderRoute: typeof AuthenticatedAppAtendimentoIaIndexRouteImport
+      parentRoute: typeof AuthenticatedAppAtendimentoIaRoute
+    }
     '/api/public/whatsapp/$clinicaId': {
       id: '/api/public/whatsapp/$clinicaId'
       path: '/api/public/whatsapp/$clinicaId'
@@ -1889,12 +1907,15 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedAppAtendimentoIaRouteChildren {
   AuthenticatedAppAtendimentoIaAgendamentoIdRoute: typeof AuthenticatedAppAtendimentoIaAgendamentoIdRoute
+  AuthenticatedAppAtendimentoIaIndexRoute: typeof AuthenticatedAppAtendimentoIaIndexRoute
 }
 
 const AuthenticatedAppAtendimentoIaRouteChildren: AuthenticatedAppAtendimentoIaRouteChildren =
   {
     AuthenticatedAppAtendimentoIaAgendamentoIdRoute:
       AuthenticatedAppAtendimentoIaAgendamentoIdRoute,
+    AuthenticatedAppAtendimentoIaIndexRoute:
+      AuthenticatedAppAtendimentoIaIndexRoute,
   }
 
 const AuthenticatedAppAtendimentoIaRouteWithChildren =
@@ -2141,3 +2162,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
