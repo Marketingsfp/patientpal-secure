@@ -139,51 +139,42 @@ function AgendaPage() {
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   // Reagendamento
-  const [reagOpen, setReagOpen] = useState(false);
-  const [reagAg, setReagAg] = useState<Agendamento | null>(null);
-  const [reagData, setReagData] = useState("");
-  const [reagInicio, setReagInicio] = useState("");
-  const [reagFim, setReagFim] = useState("");
-  const [reagMedicoId, setReagMedicoId] = useState<string>("");
-  const [reagMotivo, setReagMotivo] = useState("");
+  const [reagendandoAg, setReagendandoAg] = useState<Agendamento | null>(null);
   const [reagSalvando, setReagSalvando] = useState(false);
 
-  const abrirReagendar = (a: Agendamento) => {
-    const ini = new Date(a.inicio);
-    const fim = new Date(a.fim);
-    const pad = (n: number) => String(n).padStart(2, "0");
-    setReagAg(a);
-    setReagData(`${ini.getFullYear()}-${pad(ini.getMonth() + 1)}-${pad(ini.getDate())}`);
-    setReagInicio(`${pad(ini.getHours())}:${pad(ini.getMinutes())}`);
-    setReagFim(`${pad(fim.getHours())}:${pad(fim.getMinutes())}`);
-    setReagMedicoId(a.medico_id ?? "");
-    setReagMotivo("");
-    setReagOpen(true);
+  const iniciarReagendamento = (a: Agendamento) => {
+    setReagendandoAg(a);
+    toast.info("Selecione um horário disponível na agenda para confirmar o reagendamento.");
   };
+  const cancelarReagendamento = () => setReagendandoAg(null);
 
-  const salvarReagendar = async () => {
-    if (!reagAg) return;
-    if (!reagData || !reagInicio || !reagFim) { toast.error("Informe data, início e fim."); return; }
-    const inicioIso = new Date(`${reagData}T${reagInicio}:00`);
-    const fimIso = new Date(`${reagData}T${reagFim}:00`);
-    if (!isFinite(inicioIso.getTime()) || !isFinite(fimIso.getTime())) { toast.error("Data/horário inválidos."); return; }
-    if (fimIso <= inicioIso) { toast.error("O horário final deve ser depois do inicial."); return; }
+  const confirmarReagendamentoNoSlot = async (slot: Agendamento) => {
+    const origem = reagendandoAg;
+    if (!origem || reagSalvando) return;
+    if (slot.id === origem.id) { toast.info("Esse já é o horário atual."); return; }
     setReagSalvando(true);
-    const obsAnt = reagAg.observacoes ?? "";
-    const trilha = `[Reagendado em ${new Date().toLocaleString("pt-BR")}] de ${new Date(reagAg.inicio).toLocaleString("pt-BR")}${reagMotivo ? ` — Motivo: ${reagMotivo}` : ""}`;
+    const obsAnt = origem.observacoes ?? "";
+    const trilha = `[Reagendado em ${new Date().toLocaleString("pt-BR")}] de ${new Date(origem.inicio).toLocaleString("pt-BR")} para ${new Date(slot.inicio).toLocaleString("pt-BR")}`;
     const novasObs = obsAnt ? `${obsAnt}\n${trilha}` : trilha;
-    const { error } = await supabase.from("agendamentos").update({
-      inicio: inicioIso.toISOString(),
-      fim: fimIso.toISOString(),
-      medico_id: reagMedicoId || null,
+    // 1) Move o agendamento para o novo horário/médico
+    const { error: e1 } = await supabase.from("agendamentos").update({
+      inicio: slot.inicio,
+      fim: slot.fim,
+      medico_id: slot.medico_id ?? null,
       status: "agendado",
       observacoes: novasObs,
-    } as never).eq("id", reagAg.id);
+    } as never).eq("id", origem.id);
+    if (e1) { setReagSalvando(false); toast.error(e1.message); return; }
+    // 2) Libera o slot escolhido (que era "DISPONÍVEL")
+    const { error: e2 } = await supabase.from("agendamentos").update({
+      paciente_id: null,
+      paciente_nome: "DISPONÍVEL",
+      status: "disponivel",
+    } as never).eq("id", slot.id);
+    if (e2) { setReagSalvando(false); toast.error(e2.message); return; }
     setReagSalvando(false);
-    if (error) { toast.error(error.message); return; }
-    toast.success("Paciente reagendado.");
-    setReagOpen(false);
-    setReagAg(null);
+    setReagendandoAg(null);
+    toast.success(`Reagendado para ${new Date(slot.inicio).toLocaleString("pt-BR")}.`);
     await load();
   };
 
@@ -566,6 +557,7 @@ function AgendaPage() {
     setOpen(true);
   };
   const openSlot = (a: Agendamento) => {
+    if (reagendandoAg) { void confirmarReagendamentoNoSlot(a); return; }
     setEditing(a);
     setForm({
       paciente_nome: "",
@@ -581,6 +573,7 @@ function AgendaPage() {
   };
 
   const openEdit = (a: Agendamento) => {
+    if (reagendandoAg) { toast.error("Esse horário já está ocupado. Escolha um slot disponível."); return; }
     setEditing(a);
     setForm({
       paciente_nome: a.paciente_nome,
@@ -779,6 +772,29 @@ function AgendaPage() {
 
   return (
     <div className="space-y-3">
+      {reagendandoAg && (
+        <div className="sticky top-0 z-30 -mx-4 px-4 py-2 border-b bg-primary text-primary-foreground shadow-sm">
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <CalendarDays className="h-4 w-4 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <span className="font-semibold uppercase">Reagendando · {reagendandoAg.paciente_nome}</span>
+              <span className="ml-2 opacity-90">
+                Atual: {new Date(reagendandoAg.inicio).toLocaleString("pt-BR")}
+                {reagendandoAg.procedimento ? ` — ${reagendandoAg.procedimento}` : ""}
+              </span>
+              <span className="ml-2 opacity-90 italic">Clique em um horário disponível na agenda para confirmar.</span>
+            </div>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={cancelarReagendamento}
+              disabled={reagSalvando}
+            >
+              {reagSalvando ? "Salvando…" : "Cancelar reagendamento"}
+            </Button>
+          </div>
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
@@ -1159,57 +1175,6 @@ function AgendaPage() {
           setPagamentoExtraIds([]);
         }}
       />
-
-      <Dialog open={reagOpen} onOpenChange={(v) => { setReagOpen(v); if (!v) setReagAg(null); }}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Reagendar · {reagAg?.paciente_nome}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="rounded-md border bg-muted/40 p-2 text-xs text-muted-foreground">
-              Atual: {reagAg ? new Date(reagAg.inicio).toLocaleString("pt-BR") : ""}
-              {reagAg?.procedimento ? ` · ${reagAg.procedimento}` : ""}
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <Label className="text-xs">Nova data</Label>
-                <Input type="date" value={reagData} onChange={(e) => setReagData(e.target.value)} />
-              </div>
-              <div>
-                <Label className="text-xs">Início</Label>
-                <Input type="time" value={reagInicio} onChange={(e) => setReagInicio(e.target.value)} />
-              </div>
-              <div>
-                <Label className="text-xs">Fim</Label>
-                <Input type="time" value={reagFim} onChange={(e) => setReagFim(e.target.value)} />
-              </div>
-            </div>
-            <div>
-              <Label className="text-xs">Médico</Label>
-              <Select value={reagMedicoId || "__sem__"} onValueChange={(v) => setReagMedicoId(v === "__sem__" ? "" : v)}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__sem__">Sem médico definido</SelectItem>
-                  {medicos.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-xs">Motivo do reagendamento (opcional)</Label>
-              <Textarea rows={2} value={reagMotivo} onChange={(e) => setReagMotivo(e.target.value)}
-                placeholder="Ex.: solicitação do paciente, ausência do médico…" />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setReagOpen(false)} disabled={reagSalvando}>Cancelar</Button>
-            <Button onClick={salvarReagendar} disabled={reagSalvando}>
-              {reagSalvando ? "Salvando…" : "Confirmar reagendamento"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={novoPacOpen} onOpenChange={setNovoPacOpen}>
         <DialogContent className="max-w-md">
@@ -1623,7 +1588,7 @@ function AgendaPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => openEdit(a)}><Pencil className="h-4 w-4 mr-2" /> Editar</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => abrirReagendar(a)}>
+                        <DropdownMenuItem onClick={() => iniciarReagendamento(a)}>
                           <CalendarDays className="h-4 w-4 mr-2" /> Reagendar
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => cobrarAgendamento(a)}>
