@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Brain, Stethoscope, AlertTriangle, Users } from "lucide-react";
+import { Brain, Stethoscope, AlertTriangle, Users, Check, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/app/atendimento-ia/")({
@@ -33,6 +34,25 @@ type FilaItem = {
   procedimento: string | null;
   fluxo_etapa: string;
   prioridade: "normal" | "prioritario" | "urgente";
+};
+type TriagemResumo = {
+  agendamento_id: string;
+  enfermeira_nome: string | null;
+  created_at: string;
+  queixa_principal: string | null;
+  pa_sistolica: number | null;
+  pa_diastolica: number | null;
+  freq_cardiaca: number | null;
+  temperatura: number | null;
+  saturacao: number | null;
+  glicemia: number | null;
+  peso_kg: number | null;
+  altura_cm: number | null;
+  imc: number | null;
+  doencas: string[] | null;
+  medicamentos: string | null;
+  alergias: string | null;
+  observacoes: string | null;
 };
 
 function AtendimentoIaPage() {
