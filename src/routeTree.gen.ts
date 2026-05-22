@@ -102,6 +102,7 @@ import { Route as AuthenticatedAppFinanceiroAlertasRouteImport } from './routes/
 import { Route as AuthenticatedAppCartaoBeneficiosRelatoriosRouteImport } from './routes/_authenticated/app.cartao-beneficios.relatorios'
 import { Route as AuthenticatedAppCartaoBeneficiosModelosRouteImport } from './routes/_authenticated/app.cartao-beneficios.modelos'
 import { Route as AuthenticatedAppCartaoBeneficiosContratosRouteImport } from './routes/_authenticated/app.cartao-beneficios.contratos'
+import { Route as AuthenticatedAppAtendimentoIaAgendamentoIdRouteImport } from './routes/_authenticated/app.atendimento-ia.$agendamentoId'
 
 const TotemRoute = TotemRouteImport.update({
   id: '/totem',
@@ -623,6 +624,12 @@ const AuthenticatedAppCartaoBeneficiosContratosRoute =
     path: '/contratos',
     getParentRoute: () => AuthenticatedAppCartaoBeneficiosRoute,
   } as any)
+const AuthenticatedAppAtendimentoIaAgendamentoIdRoute =
+  AuthenticatedAppAtendimentoIaAgendamentoIdRouteImport.update({
+    id: '/$agendamentoId',
+    path: '/$agendamentoId',
+    getParentRoute: () => AuthenticatedAppAtendimentoIaRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -644,7 +651,7 @@ export interface FileRoutesByFullPath {
   '/app/agenda': typeof AuthenticatedAppAgendaRoute
   '/app/alertas-enfermagem': typeof AuthenticatedAppAlertasEnfermagemRoute
   '/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
-  '/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaRoute
+  '/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaRouteWithChildren
   '/app/auditoria': typeof AuthenticatedAppAuditoriaRoute
   '/app/boletos': typeof AuthenticatedAppBoletosRoute
   '/app/caixa': typeof AuthenticatedAppCaixaRoute
@@ -696,6 +703,7 @@ export interface FileRoutesByFullPath {
   '/app/unidades': typeof AuthenticatedAppUnidadesRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
   '/app/': typeof AuthenticatedAppIndexRoute
+  '/app/atendimento-ia/$agendamentoId': typeof AuthenticatedAppAtendimentoIaAgendamentoIdRoute
   '/app/cartao-beneficios/contratos': typeof AuthenticatedAppCartaoBeneficiosContratosRoute
   '/app/cartao-beneficios/modelos': typeof AuthenticatedAppCartaoBeneficiosModelosRoute
   '/app/cartao-beneficios/relatorios': typeof AuthenticatedAppCartaoBeneficiosRelatoriosRoute
@@ -737,7 +745,7 @@ export interface FileRoutesByTo {
   '/app/agenda': typeof AuthenticatedAppAgendaRoute
   '/app/alertas-enfermagem': typeof AuthenticatedAppAlertasEnfermagemRoute
   '/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
-  '/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaRoute
+  '/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaRouteWithChildren
   '/app/auditoria': typeof AuthenticatedAppAuditoriaRoute
   '/app/boletos': typeof AuthenticatedAppBoletosRoute
   '/app/caixa': typeof AuthenticatedAppCaixaRoute
@@ -788,6 +796,7 @@ export interface FileRoutesByTo {
   '/app/unidades': typeof AuthenticatedAppUnidadesRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
   '/app': typeof AuthenticatedAppIndexRoute
+  '/app/atendimento-ia/$agendamentoId': typeof AuthenticatedAppAtendimentoIaAgendamentoIdRoute
   '/app/cartao-beneficios/contratos': typeof AuthenticatedAppCartaoBeneficiosContratosRoute
   '/app/cartao-beneficios/modelos': typeof AuthenticatedAppCartaoBeneficiosModelosRoute
   '/app/cartao-beneficios/relatorios': typeof AuthenticatedAppCartaoBeneficiosRelatoriosRoute
@@ -832,7 +841,7 @@ export interface FileRoutesById {
   '/_authenticated/app/agenda': typeof AuthenticatedAppAgendaRoute
   '/_authenticated/app/alertas-enfermagem': typeof AuthenticatedAppAlertasEnfermagemRoute
   '/_authenticated/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
-  '/_authenticated/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaRoute
+  '/_authenticated/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaRouteWithChildren
   '/_authenticated/app/auditoria': typeof AuthenticatedAppAuditoriaRoute
   '/_authenticated/app/boletos': typeof AuthenticatedAppBoletosRoute
   '/_authenticated/app/caixa': typeof AuthenticatedAppCaixaRoute
@@ -884,6 +893,7 @@ export interface FileRoutesById {
   '/_authenticated/app/unidades': typeof AuthenticatedAppUnidadesRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
   '/_authenticated/app/': typeof AuthenticatedAppIndexRoute
+  '/_authenticated/app/atendimento-ia/$agendamentoId': typeof AuthenticatedAppAtendimentoIaAgendamentoIdRoute
   '/_authenticated/app/cartao-beneficios/contratos': typeof AuthenticatedAppCartaoBeneficiosContratosRoute
   '/_authenticated/app/cartao-beneficios/modelos': typeof AuthenticatedAppCartaoBeneficiosModelosRoute
   '/_authenticated/app/cartao-beneficios/relatorios': typeof AuthenticatedAppCartaoBeneficiosRelatoriosRoute
@@ -980,6 +990,7 @@ export interface FileRouteTypes {
     | '/app/unidades'
     | '/p/contrato/$token'
     | '/app/'
+    | '/app/atendimento-ia/$agendamentoId'
     | '/app/cartao-beneficios/contratos'
     | '/app/cartao-beneficios/modelos'
     | '/app/cartao-beneficios/relatorios'
@@ -1072,6 +1083,7 @@ export interface FileRouteTypes {
     | '/app/unidades'
     | '/p/contrato/$token'
     | '/app'
+    | '/app/atendimento-ia/$agendamentoId'
     | '/app/cartao-beneficios/contratos'
     | '/app/cartao-beneficios/modelos'
     | '/app/cartao-beneficios/relatorios'
@@ -1167,6 +1179,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/unidades'
     | '/p/contrato/$token'
     | '/_authenticated/app/'
+    | '/_authenticated/app/atendimento-ia/$agendamentoId'
     | '/_authenticated/app/cartao-beneficios/contratos'
     | '/_authenticated/app/cartao-beneficios/modelos'
     | '/_authenticated/app/cartao-beneficios/relatorios'
@@ -1864,8 +1877,30 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppCartaoBeneficiosContratosRouteImport
       parentRoute: typeof AuthenticatedAppCartaoBeneficiosRoute
     }
+    '/_authenticated/app/atendimento-ia/$agendamentoId': {
+      id: '/_authenticated/app/atendimento-ia/$agendamentoId'
+      path: '/$agendamentoId'
+      fullPath: '/app/atendimento-ia/$agendamentoId'
+      preLoaderRoute: typeof AuthenticatedAppAtendimentoIaAgendamentoIdRouteImport
+      parentRoute: typeof AuthenticatedAppAtendimentoIaRoute
+    }
   }
 }
+
+interface AuthenticatedAppAtendimentoIaRouteChildren {
+  AuthenticatedAppAtendimentoIaAgendamentoIdRoute: typeof AuthenticatedAppAtendimentoIaAgendamentoIdRoute
+}
+
+const AuthenticatedAppAtendimentoIaRouteChildren: AuthenticatedAppAtendimentoIaRouteChildren =
+  {
+    AuthenticatedAppAtendimentoIaAgendamentoIdRoute:
+      AuthenticatedAppAtendimentoIaAgendamentoIdRoute,
+  }
+
+const AuthenticatedAppAtendimentoIaRouteWithChildren =
+  AuthenticatedAppAtendimentoIaRoute._addFileChildren(
+    AuthenticatedAppAtendimentoIaRouteChildren,
+  )
 
 interface AuthenticatedAppCartaoBeneficiosRouteChildren {
   AuthenticatedAppCartaoBeneficiosContratosRoute: typeof AuthenticatedAppCartaoBeneficiosContratosRoute
@@ -1943,7 +1978,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppAgendaRoute: typeof AuthenticatedAppAgendaRoute
   AuthenticatedAppAlertasEnfermagemRoute: typeof AuthenticatedAppAlertasEnfermagemRoute
   AuthenticatedAppAnamnesesRoute: typeof AuthenticatedAppAnamnesesRoute
-  AuthenticatedAppAtendimentoIaRoute: typeof AuthenticatedAppAtendimentoIaRoute
+  AuthenticatedAppAtendimentoIaRoute: typeof AuthenticatedAppAtendimentoIaRouteWithChildren
   AuthenticatedAppAuditoriaRoute: typeof AuthenticatedAppAuditoriaRoute
   AuthenticatedAppBoletosRoute: typeof AuthenticatedAppBoletosRoute
   AuthenticatedAppCaixaRoute: typeof AuthenticatedAppCaixaRoute
@@ -2004,7 +2039,8 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppAlertasEnfermagemRoute:
     AuthenticatedAppAlertasEnfermagemRoute,
   AuthenticatedAppAnamnesesRoute: AuthenticatedAppAnamnesesRoute,
-  AuthenticatedAppAtendimentoIaRoute: AuthenticatedAppAtendimentoIaRoute,
+  AuthenticatedAppAtendimentoIaRoute:
+    AuthenticatedAppAtendimentoIaRouteWithChildren,
   AuthenticatedAppAuditoriaRoute: AuthenticatedAppAuditoriaRoute,
   AuthenticatedAppBoletosRoute: AuthenticatedAppBoletosRoute,
   AuthenticatedAppCaixaRoute: AuthenticatedAppCaixaRoute,
