@@ -557,6 +557,7 @@ function AgendaPage() {
     setOpen(true);
   };
   const openSlot = (a: Agendamento) => {
+    if (reagendandoAg) { void confirmarReagendamentoNoSlot(a); return; }
     setEditing(a);
     setForm({
       paciente_nome: "",
@@ -572,6 +573,7 @@ function AgendaPage() {
   };
 
   const openEdit = (a: Agendamento) => {
+    if (reagendandoAg) { toast.error("Esse horário já está ocupado. Escolha um slot disponível."); return; }
     setEditing(a);
     setForm({
       paciente_nome: a.paciente_nome,
