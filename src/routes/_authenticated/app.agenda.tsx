@@ -138,6 +138,55 @@ function AgendaPage() {
   const [editing, setEditing] = useState<Agendamento | null>(null);
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
+  // Reagendamento
+  const [reagOpen, setReagOpen] = useState(false);
+  const [reagAg, setReagAg] = useState<Agendamento | null>(null);
+  const [reagData, setReagData] = useState("");
+  const [reagInicio, setReagInicio] = useState("");
+  const [reagFim, setReagFim] = useState("");
+  const [reagMedicoId, setReagMedicoId] = useState<string>("");
+  const [reagMotivo, setReagMotivo] = useState("");
+  const [reagSalvando, setReagSalvando] = useState(false);
+
+  const abrirReagendar = (a: Agendamento) => {
+    const ini = new Date(a.inicio);
+    const fim = new Date(a.fim);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    setReagAg(a);
+    setReagData(`${ini.getFullYear()}-${pad(ini.getMonth() + 1)}-${pad(ini.getDate())}`);
+    setReagInicio(`${pad(ini.getHours())}:${pad(ini.getMinutes())}`);
+    setReagFim(`${pad(fim.getHours())}:${pad(fim.getMinutes())}`);
+    setReagMedicoId(a.medico_id ?? "");
+    setReagMotivo("");
+    setReagOpen(true);
+  };
+
+  const salvarReagendar = async () => {
+    if (!reagAg) return;
+    if (!reagData || !reagInicio || !reagFim) { toast.error("Informe data, início e fim."); return; }
+    const inicioIso = new Date(`${reagData}T${reagInicio}:00`);
+    const fimIso = new Date(`${reagData}T${reagFim}:00`);
+    if (!isFinite(inicioIso.getTime()) || !isFinite(fimIso.getTime())) { toast.error("Data/horário inválidos."); return; }
+    if (fimIso <= inicioIso) { toast.error("O horário final deve ser depois do inicial."); return; }
+    setReagSalvando(true);
+    const obsAnt = reagAg.observacoes ?? "";
+    const trilha = `[Reagendado em ${new Date().toLocaleString("pt-BR")}] de ${new Date(reagAg.inicio).toLocaleString("pt-BR")}${reagMotivo ? ` — Motivo: ${reagMotivo}` : ""}`;
+    const novasObs = obsAnt ? `${obsAnt}\n${trilha}` : trilha;
+    const { error } = await supabase.from("agendamentos").update({
+      inicio: inicioIso.toISOString(),
+      fim: fimIso.toISOString(),
+      medico_id: reagMedicoId || null,
+      status: "agendado",
+      observacoes: novasObs,
+    } as never).eq("id", reagAg.id);
+    setReagSalvando(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Paciente reagendado.");
+    setReagOpen(false);
+    setReagAg(null);
+    await load();
+  };
+
   const [pagamentoOpen, setPagamentoOpen] = useState(false);
   const [pagamentoDesc, setPagamentoDesc] = useState("");
   const [pagamentoAgId, setPagamentoAgId] = useState<string | null>(null);
