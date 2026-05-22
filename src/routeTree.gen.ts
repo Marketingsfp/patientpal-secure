@@ -39,6 +39,7 @@ import { Route as AuthenticatedAppProntuarioModelosRouteImport } from './routes/
 import { Route as AuthenticatedAppProcedimentosRouteImport } from './routes/_authenticated/app.procedimentos'
 import { Route as AuthenticatedAppPlanosRouteImport } from './routes/_authenticated/app.planos'
 import { Route as AuthenticatedAppPerfisRouteImport } from './routes/_authenticated/app.perfis'
+import { Route as AuthenticatedAppPainelRouteImport } from './routes/_authenticated/app.painel'
 import { Route as AuthenticatedAppOrcamentosRouteImport } from './routes/_authenticated/app.orcamentos'
 import { Route as AuthenticatedAppOdontologiaRouteImport } from './routes/_authenticated/app.odontologia'
 import { Route as AuthenticatedAppNinaRouteImport } from './routes/_authenticated/app.nina'
@@ -260,6 +261,11 @@ const AuthenticatedAppPlanosRoute = AuthenticatedAppPlanosRouteImport.update({
 const AuthenticatedAppPerfisRoute = AuthenticatedAppPerfisRouteImport.update({
   id: '/perfis',
   path: '/perfis',
+  getParentRoute: () => AuthenticatedAppRoute,
+} as any)
+const AuthenticatedAppPainelRoute = AuthenticatedAppPainelRouteImport.update({
+  id: '/painel',
+  path: '/painel',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
 const AuthenticatedAppOrcamentosRoute =
@@ -697,6 +703,7 @@ export interface FileRoutesByFullPath {
   '/app/nina': typeof AuthenticatedAppNinaRoute
   '/app/odontologia': typeof AuthenticatedAppOdontologiaRoute
   '/app/orcamentos': typeof AuthenticatedAppOrcamentosRoute
+  '/app/painel': typeof AuthenticatedAppPainelRoute
   '/app/perfis': typeof AuthenticatedAppPerfisRoute
   '/app/planos': typeof AuthenticatedAppPlanosRoute
   '/app/procedimentos': typeof AuthenticatedAppProcedimentosRoute
@@ -790,6 +797,7 @@ export interface FileRoutesByTo {
   '/app/nina': typeof AuthenticatedAppNinaRoute
   '/app/odontologia': typeof AuthenticatedAppOdontologiaRoute
   '/app/orcamentos': typeof AuthenticatedAppOrcamentosRoute
+  '/app/painel': typeof AuthenticatedAppPainelRoute
   '/app/perfis': typeof AuthenticatedAppPerfisRoute
   '/app/planos': typeof AuthenticatedAppPlanosRoute
   '/app/procedimentos': typeof AuthenticatedAppProcedimentosRoute
@@ -888,6 +896,7 @@ export interface FileRoutesById {
   '/_authenticated/app/nina': typeof AuthenticatedAppNinaRoute
   '/_authenticated/app/odontologia': typeof AuthenticatedAppOdontologiaRoute
   '/_authenticated/app/orcamentos': typeof AuthenticatedAppOrcamentosRoute
+  '/_authenticated/app/painel': typeof AuthenticatedAppPainelRoute
   '/_authenticated/app/perfis': typeof AuthenticatedAppPerfisRoute
   '/_authenticated/app/planos': typeof AuthenticatedAppPlanosRoute
   '/_authenticated/app/procedimentos': typeof AuthenticatedAppProcedimentosRoute
@@ -986,6 +995,7 @@ export interface FileRouteTypes {
     | '/app/nina'
     | '/app/odontologia'
     | '/app/orcamentos'
+    | '/app/painel'
     | '/app/perfis'
     | '/app/planos'
     | '/app/procedimentos'
@@ -1079,6 +1089,7 @@ export interface FileRouteTypes {
     | '/app/nina'
     | '/app/odontologia'
     | '/app/orcamentos'
+    | '/app/painel'
     | '/app/perfis'
     | '/app/planos'
     | '/app/procedimentos'
@@ -1176,6 +1187,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/nina'
     | '/_authenticated/app/odontologia'
     | '/_authenticated/app/orcamentos'
+    | '/_authenticated/app/painel'
     | '/_authenticated/app/perfis'
     | '/_authenticated/app/planos'
     | '/_authenticated/app/procedimentos'
@@ -1445,6 +1457,13 @@ declare module '@tanstack/react-router' {
       path: '/perfis'
       fullPath: '/app/perfis'
       preLoaderRoute: typeof AuthenticatedAppPerfisRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/painel': {
+      id: '/_authenticated/app/painel'
+      path: '/painel'
+      fullPath: '/app/painel'
+      preLoaderRoute: typeof AuthenticatedAppPainelRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/orcamentos': {
@@ -2038,6 +2057,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppNinaRoute: typeof AuthenticatedAppNinaRoute
   AuthenticatedAppOdontologiaRoute: typeof AuthenticatedAppOdontologiaRoute
   AuthenticatedAppOrcamentosRoute: typeof AuthenticatedAppOrcamentosRoute
+  AuthenticatedAppPainelRoute: typeof AuthenticatedAppPainelRoute
   AuthenticatedAppPerfisRoute: typeof AuthenticatedAppPerfisRoute
   AuthenticatedAppPlanosRoute: typeof AuthenticatedAppPlanosRoute
   AuthenticatedAppProcedimentosRoute: typeof AuthenticatedAppProcedimentosRoute
@@ -2103,6 +2123,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppNinaRoute: AuthenticatedAppNinaRoute,
   AuthenticatedAppOdontologiaRoute: AuthenticatedAppOdontologiaRoute,
   AuthenticatedAppOrcamentosRoute: AuthenticatedAppOrcamentosRoute,
+  AuthenticatedAppPainelRoute: AuthenticatedAppPainelRoute,
   AuthenticatedAppPerfisRoute: AuthenticatedAppPerfisRoute,
   AuthenticatedAppPlanosRoute: AuthenticatedAppPlanosRoute,
   AuthenticatedAppProcedimentosRoute: AuthenticatedAppProcedimentosRoute,
@@ -2162,3 +2183,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
