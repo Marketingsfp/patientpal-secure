@@ -462,8 +462,8 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   }
 
   // Agrupa por médico
-  type Item = { procNome: string; valor: number; prestador: number; clinica: number };
-  type Grupo = { medicoId: string | null; medicoNome: string; itens: Item[]; subtotal: number; prestador: number; clinica: number };
+  type Item = { procNome: string; valor: number; prestador: number; clinica: number; inicio: string };
+  type Grupo = { medicoId: string | null; medicoNome: string; itens: Item[]; subtotal: number; prestador: number; clinica: number; inicioRef: string };
   const grupos = new Map<string, Grupo>();
 
   for (const a of ags) {
@@ -497,23 +497,16 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
 
     const key = a.medico_id ?? "__sem_medico__";
     const medicoNome = a.medico_id ? (medById.get(a.medico_id)?.nome ?? "—") : "SEM PROFISSIONAL";
-    const g = grupos.get(key) ?? { medicoId: a.medico_id ?? null, medicoNome, itens: [], subtotal: 0, prestador: 0, clinica: 0 };
-    g.itens.push({ procNome, valor, prestador, clinica: clin });
+    const g = grupos.get(key) ?? { medicoId: a.medico_id ?? null, medicoNome, itens: [], subtotal: 0, prestador: 0, clinica: 0, inicioRef: a.inicio };
+    g.itens.push({ procNome, valor, prestador, clinica: clin, inicio: a.inicio });
+    if (a.inicio < g.inicioRef) g.inicioRef = a.inicio;
     g.subtotal = +(g.subtotal + valor).toFixed(2);
     g.prestador = +(g.prestador + prestador).toFixed(2);
     g.clinica = +(g.clinica + clin).toFixed(2);
     grupos.set(key, g);
   }
 
-  const totalProcedimentos = Array.from(grupos.values()).reduce((s, g) => s + g.subtotal, 0);
-  const totalPrestadores = Array.from(grupos.values()).reduce((s, g) => s + g.prestador, 0);
-  const totalClinica = Array.from(grupos.values()).reduce((s, g) => s + g.clinica, 0);
-  const valorRecebido = Number(pagamento.valor) || totalProcedimentos;
-
   const formaLbl = pagamento.forma_pagamento ? (FORMA_LABEL[pagamento.forma_pagamento] ?? pagamento.forma_pagamento.toUpperCase()) : "DINHEIRO";
-  const parcelasTxt = pagamento.forma_pagamento === "cartao_credito" && pagamento.parcelas && pagamento.parcelas > 1
-    ? `${pagamento.parcelas}x DE ${fmtBRL(valorRecebido / pagamento.parcelas)}`
-    : "À VISTA";
   const bandeiraTxt = pagamento.bandeira_cartao ? pagamento.bandeira_cartao.toUpperCase() : "";
   const isMisto = pagamento.forma_pagamento === "misto" && (pagamento.detalhe?.length ?? 0) > 0;
   const detalheRows = isMisto
@@ -529,37 +522,89 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado].filter(Boolean).join("<br/>");
   const viaTexto = viaNumero === 1 ? "1ª VIA" : "2ª VIA — REIMPRESSÃO";
 
-  // Data/hora de referência: do primeiro agendamento (em ordem cronológica)
-  const inicioRef = ags.map((a) => a.inicio).sort()[0];
-  const ficha = (() => {
-    const d = new Date(inicioRef);
-    return String(d.getHours() * 60 + d.getMinutes()).padStart(3, "0");
-  })();
+  // Cabeçalho da clínica (reutilizado em cada GR)
+  const headerClinica = `
+    <div class="center bold">${esc(c?.nome ?? "")}</div>
+    <div class="center sm">${endereco}</div>
+    ${c?.telefone ? `<div class="center sm">FONE ${esc(c.telefone)}</div>` : ""}
+    ${c?.cnpj ? `<div class="center sm">CNPJ ${esc(c.cnpj)}</div>` : ""}
+  `;
+  const headerPaciente = `
+    <div class="center bold">${esc(pacienteNome)}</div>
+    ${paciente?.cpf ? `<div class="center sm">CPF: <span class="v">${esc(paciente.cpf)}</span></div>` : ""}
+    ${paciente?.telefone ? `<div class="center sm">FONE: <span class="v">${esc(paciente.telefone)}</span></div>` : ""}
+    ${paciente?.data_nascimento ? `<div class="center sm">NASC: <span class="v">${fmtDataSimples(paciente.data_nascimento)}</span></div>` : ""}
+  `;
 
-  const blocosHtml = Array.from(grupos.values()).map((g) => {
+  const gruposArr = Array.from(grupos.values());
+  const dataImpressao = fmtData(new Date().toISOString());
+
+  // Uma GR completa por médico, separadas por linha tracejada bem visível
+  const grsHtml = gruposArr.map((g, idx) => {
+    const isLast = idx === gruposArr.length - 1;
+    const ficha = (() => {
+      const d = new Date(g.inicioRef);
+      return String(d.getHours() * 60 + d.getMinutes()).padStart(3, "0");
+    })();
     const linhas = g.itens
       .map(
         (it) => `<tr>
-          <td style="width:8mm">1</td>
+          <td style="width:14mm">1</td>
           <td>${esc(it.procNome)}</td>
-          <td class="right">${fmtBRL(it.valor)}</td>
         </tr>`
       )
       .join("");
+    const parcelasTxt = pagamento.forma_pagamento === "cartao_credito" && pagamento.parcelas && pagamento.parcelas > 1
+      ? `${pagamento.parcelas}x DE ${fmtBRL(g.subtotal / pagamento.parcelas)}`
+      : "À VISTA";
     return `
-      <div class="sep"></div>
-      <div class="bold">PROFISSIONAL: ${esc(g.medicoNome)}</div>
-      <table style="margin-top:2px">
-        <tr class="bold">
-          <td>QTD</td><td>PROCEDIMENTO</td><td class="right">VALOR</td>
-        </tr>
-        ${linhas}
-      </table>
-      <table style="margin-top:4px">
-        <tr><td class="label">SUBTOTAL:</td><td class="v right">${fmtBRL(g.subtotal)}</td></tr>
-        <tr><td class="label">CLINICA:</td><td class="v right">${fmtBRL(g.clinica)}</td></tr>
-        <tr><td class="label">PRESTADOR:</td><td class="v right">${fmtBRL(g.prestador)}</td></tr>
-      </table>
+      <div class="ticket">
+        ${headerClinica}
+        <div class="sep"></div>
+        <div class="center lg">GUIA DE ATENDIMENTO</div>
+        <div class="center bold" style="margin-top:2px">${viaTexto}</div>
+        <div class="sep"></div>
+        ${headerPaciente}
+        <div class="sep"></div>
+        <table>
+          <tr><td class="label">FICHA:</td><td class="v right">${ficha}</td></tr>
+          <tr><td class="label">PROFISSIONAL:</td><td class="v right">${esc(g.medicoNome)}</td></tr>
+          <tr><td class="label">HORÁRIO:</td><td class="v right">${fmtData(g.inicioRef)}</td></tr>
+          ${usuarioNome ? `<tr><td class="label">USUÁRIO:</td><td class="v right">${esc(usuarioNome)}</td></tr>` : ""}
+        </table>
+        <div class="sep"></div>
+        <table>
+          <tr class="bold">
+            <td style="width:14mm">QTD</td>
+            <td>PROCEDIMENTO</td>
+          </tr>
+          ${linhas}
+        </table>
+        ${g.subtotal > 0 ? `
+        <div class="row" style="margin-top:8px">
+          <div class="bold">VALOR RECEBIDO<br/><span class="sm">(${esc(isMisto ? "MISTO" : formaLbl)})</span></div>
+          <div class="bold lg">${fmtBRL(g.subtotal)}</div>
+        </div>
+        ${isLast && isMisto ? `<table style="margin-top:4px">${detalheRows}</table>` : ""}
+        ${pagamento.forma_pagamento === "cartao_credito" ? `
+        <table>
+          ${bandeiraTxt ? `<tr><td class="label">BANDEIRA:</td><td class="v right">${esc(bandeiraTxt)}</td></tr>` : ""}
+          <tr><td class="label">PARCELAMENTO:</td><td class="v right">${parcelasTxt}</td></tr>
+        </table>
+        ` : ""}
+        <div class="sep"></div>
+        <table>
+          <tr><td class="label">CLINICA:</td><td class="v right">${fmtBRL(g.clinica)}</td></tr>
+          <tr><td class="label">PRESTADOR:</td><td class="v right">${fmtBRL(g.prestador)}</td></tr>
+        </table>
+        ` : ""}
+        <div class="sep"></div>
+        <div class="row sm">
+          <div>DATA IMPRESSAO</div>
+          <div>${dataImpressao}</div>
+        </div>
+      </div>
+      ${!isLast ? `<div class="cut"><div class="cut-line"></div><div class="cut-label">- - - - - - - - - - - - CORTE AQUI - - - - - - - - - - - -</div><div class="cut-line"></div></div>` : ""}
     `;
   }).join("");
 
@@ -581,7 +626,11 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   .row    { display: flex; justify-content: space-between; gap: 6px; }
   table   { width: 100%; border-collapse: collapse; }
   td      { padding: 1px 0; vertical-align: top; }
+  .label  { color: #000; }
   .v      { font-weight: 700; }
+  .cut    { width: 76mm; padding: 4mm 2mm; text-align: center; }
+  .cut-line { border-top: 2px dashed #000; margin: 2mm 0; }
+  .cut-label { font-size: 8pt; letter-spacing: 1px; }
   @media print { .noprint { display: none; } }
   .noprint { position: fixed; top: 8px; right: 8px; }
   .noprint button { padding: 6px 12px; font-size: 12px; cursor: pointer; }
@@ -591,64 +640,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     <button onclick="window.print()">Imprimir</button>
     <button onclick="window.close()">Fechar</button>
   </div>
-  <div class="ticket">
-    <div class="center bold">${esc(c?.nome ?? "")}</div>
-    <div class="center sm">${endereco}</div>
-    ${c?.telefone ? `<div class="center sm">FONE ${esc(c.telefone)}</div>` : ""}
-    ${c?.cnpj ? `<div class="center sm">CNPJ ${esc(c.cnpj)}</div>` : ""}
-
-    <div class="sep"></div>
-    <div class="center lg">GUIA DE ATENDIMENTO</div>
-    <div class="center bold" style="margin-top:2px">${viaTexto}</div>
-    <div class="center sm">PAGAMENTO AGRUPADO — ${grupos.size} PROFISSIONAL(IS)</div>
-    <div class="sep"></div>
-
-    <div class="center bold">${esc(pacienteNome)}</div>
-    ${paciente?.cpf ? `<div class="center sm">CPF: <span class="v">${esc(paciente.cpf)}</span></div>` : ""}
-    ${paciente?.telefone ? `<div class="center sm">FONE: <span class="v">${esc(paciente.telefone)}</span></div>` : ""}
-    ${paciente?.data_nascimento ? `<div class="center sm">NASC: <span class="v">${fmtDataSimples(paciente.data_nascimento)}</span></div>` : ""}
-
-    <div class="sep"></div>
-    <table>
-      <tr><td class="label">FICHA:</td><td class="v right">${ficha}</td></tr>
-      <tr><td class="label">HORÁRIO:</td><td class="v right">${fmtData(inicioRef)}</td></tr>
-      ${usuarioNome ? `<tr><td class="label">USUÁRIO:</td><td class="v right">${esc(usuarioNome)}</td></tr>` : ""}
-    </table>
-
-    ${blocosHtml}
-
-    <div class="sep"></div>
-    <div class="row" style="margin-top:4px">
-      <div class="bold">VALOR RECEBIDO<br/><span class="sm">(${esc(isMisto ? "MISTO" : formaLbl)})</span></div>
-      <div class="bold lg">${fmtBRL(valorRecebido)}</div>
-    </div>
-
-    ${isMisto ? `
-    <table style="margin-top:4px">
-      ${detalheRows}
-    </table>
-    ` : ""}
-
-    ${pagamento.forma_pagamento === "cartao_credito" ? `
-    <table>
-      ${bandeiraTxt ? `<tr><td class="label">BANDEIRA:</td><td class="v right">${esc(bandeiraTxt)}</td></tr>` : ""}
-      <tr><td class="label">PARCELAMENTO:</td><td class="v right">${parcelasTxt}</td></tr>
-    </table>
-    ` : ""}
-
-    <div class="sep"></div>
-    <table>
-      <tr class="bold"><td>TOTAL PROCEDIMENTOS:</td><td class="right">${fmtBRL(totalProcedimentos)}</td></tr>
-      <tr><td class="label">TOTAL CLINICA:</td><td class="v right">${fmtBRL(totalClinica)}</td></tr>
-      <tr><td class="label">TOTAL PRESTADORES:</td><td class="v right">${fmtBRL(totalPrestadores)}</td></tr>
-    </table>
-
-    <div class="sep"></div>
-    <div class="row sm">
-      <div>DATA IMPRESSAO</div>
-      <div>${fmtData(new Date().toISOString())}</div>
-    </div>
-  </div>
+  ${grsHtml}
   <script>
     window.addEventListener("load", function () {
       setTimeout(function () { window.print(); }, 150);
