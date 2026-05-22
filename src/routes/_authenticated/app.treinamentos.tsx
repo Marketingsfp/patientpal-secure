@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { Award, BookOpen, CheckCircle2, PlayCircle } from "lucide-react";
-import { gerarCertificadoPDF } from "@/lib/lms-certificate";
+// jsPDF + QRCode são pesados (~400 KB). Carregamos só quando o aluno
+// realmente emite o certificado.
 
 export const Route = createFileRoute("/_authenticated/app/treinamentos")({
   component: TreinamentosPage,
@@ -97,6 +98,7 @@ function TreinamentosPage() {
       codigo = data.codigo_verificacao; emitido = new Date(data.emitido_em);
     }
     const nomeAluno = (user.user_metadata?.full_name as string) ?? (user.email ?? "Aluno");
+    const { gerarCertificadoPDF } = await import("@/lib/lms-certificate");
     await gerarCertificadoPDF({
       nomeAluno, curso: cursoObj.titulo, cargaHorariaMin: cursoObj.carga_horaria_min,
       clinicaNome: clinicaAtual?.clinica.nome ?? "", codigoVerificacao: codigo, emitidoEm: emitido,
