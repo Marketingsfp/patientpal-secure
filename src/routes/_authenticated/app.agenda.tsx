@@ -138,6 +138,55 @@ function AgendaPage() {
   const [editing, setEditing] = useState<Agendamento | null>(null);
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
+  // Reagendamento
+  const [reagOpen, setReagOpen] = useState(false);
+  const [reagAg, setReagAg] = useState<Agendamento | null>(null);
+  const [reagData, setReagData] = useState("");
+  const [reagInicio, setReagInicio] = useState("");
+  const [reagFim, setReagFim] = useState("");
+  const [reagMedicoId, setReagMedicoId] = useState<string>("");
+  const [reagMotivo, setReagMotivo] = useState("");
+  const [reagSalvando, setReagSalvando] = useState(false);
+
+  const abrirReagendar = (a: Agendamento) => {
+    const ini = new Date(a.inicio);
+    const fim = new Date(a.fim);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    setReagAg(a);
+    setReagData(`${ini.getFullYear()}-${pad(ini.getMonth() + 1)}-${pad(ini.getDate())}`);
+    setReagInicio(`${pad(ini.getHours())}:${pad(ini.getMinutes())}`);
+    setReagFim(`${pad(fim.getHours())}:${pad(fim.getMinutes())}`);
+    setReagMedicoId(a.medico_id ?? "");
+    setReagMotivo("");
+    setReagOpen(true);
+  };
+
+  const salvarReagendar = async () => {
+    if (!reagAg) return;
+    if (!reagData || !reagInicio || !reagFim) { toast.error("Informe data, início e fim."); return; }
+    const inicioIso = new Date(`${reagData}T${reagInicio}:00`);
+    const fimIso = new Date(`${reagData}T${reagFim}:00`);
+    if (!isFinite(inicioIso.getTime()) || !isFinite(fimIso.getTime())) { toast.error("Data/horário inválidos."); return; }
+    if (fimIso <= inicioIso) { toast.error("O horário final deve ser depois do inicial."); return; }
+    setReagSalvando(true);
+    const obsAnt = reagAg.observacoes ?? "";
+    const trilha = `[Reagendado em ${new Date().toLocaleString("pt-BR")}] de ${new Date(reagAg.inicio).toLocaleString("pt-BR")}${reagMotivo ? ` — Motivo: ${reagMotivo}` : ""}`;
+    const novasObs = obsAnt ? `${obsAnt}\n${trilha}` : trilha;
+    const { error } = await supabase.from("agendamentos").update({
+      inicio: inicioIso.toISOString(),
+      fim: fimIso.toISOString(),
+      medico_id: reagMedicoId || null,
+      status: "agendado",
+      observacoes: novasObs,
+    } as never).eq("id", reagAg.id);
+    setReagSalvando(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Paciente reagendado.");
+    setReagOpen(false);
+    setReagAg(null);
+    await load();
+  };
+
   const [pagamentoOpen, setPagamentoOpen] = useState(false);
   const [pagamentoDesc, setPagamentoDesc] = useState("");
   const [pagamentoAgId, setPagamentoAgId] = useState<string | null>(null);
@@ -1111,8 +1160,60 @@ function AgendaPage() {
         }}
       />
 
+      <Dialog open={reagOpen} onOpenChange={(v) => { setReagOpen(v); if (!v) setReagAg(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Reagendar · {reagAg?.paciente_nome}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="rounded-md border bg-muted/40 p-2 text-xs text-muted-foreground">
+              Atual: {reagAg ? new Date(reagAg.inicio).toLocaleString("pt-BR") : ""}
+              {reagAg?.procedimento ? ` · ${reagAg.procedimento}` : ""}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <Label className="text-xs">Nova data</Label>
+                <Input type="date" value={reagData} onChange={(e) => setReagData(e.target.value)} />
+              </div>
+              <div>
+                <Label className="text-xs">Início</Label>
+                <Input type="time" value={reagInicio} onChange={(e) => setReagInicio(e.target.value)} />
+              </div>
+              <div>
+                <Label className="text-xs">Fim</Label>
+                <Input type="time" value={reagFim} onChange={(e) => setReagFim(e.target.value)} />
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">Médico</Label>
+              <Select value={reagMedicoId || "__sem__"} onValueChange={(v) => setReagMedicoId(v === "__sem__" ? "" : v)}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__sem__">Sem médico definido</SelectItem>
+                  {medicos.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Motivo do reagendamento (opcional)</Label>
+              <Textarea rows={2} value={reagMotivo} onChange={(e) => setReagMotivo(e.target.value)}
+                placeholder="Ex.: solicitação do paciente, ausência do médico…" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReagOpen(false)} disabled={reagSalvando}>Cancelar</Button>
+            <Button onClick={salvarReagendar} disabled={reagSalvando}>
+              {reagSalvando ? "Salvando…" : "Confirmar reagendamento"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={novoPacOpen} onOpenChange={setNovoPacOpen}>
         <DialogContent className="max-w-md">
+
           <DialogHeader>
             <DialogTitle>Cadastro rápido de paciente</DialogTitle>
           </DialogHeader>
@@ -1522,6 +1623,9 @@ function AgendaPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => openEdit(a)}><Pencil className="h-4 w-4 mr-2" /> Editar</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => abrirReagendar(a)}>
+                          <CalendarDays className="h-4 w-4 mr-2" /> Reagendar
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => cobrarAgendamento(a)}>
                           <DollarSign className="h-4 w-4 mr-2" /> Pagamento
                         </DropdownMenuItem>
