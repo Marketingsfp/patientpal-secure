@@ -259,6 +259,9 @@ export function AppShell() {
     };
   }, [clinicColor]);
 
+  const subsystem = useSyncExternalStore(subscribeSubsystem, getSubsystem, () => null);
+  const isChooser = location.pathname === "/app" || location.pathname === "/app/";
+
   if (loading || !user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
@@ -279,8 +282,6 @@ export function AppShell() {
       ],
     },
   ];
-  const subsystem = useSyncExternalStore(subscribeSubsystem, getSubsystem, () => null);
-  const isChooser = location.pathname === "/app" || location.pathname === "/app/";
   const filteredByGroup = subsystem
     ? navRows.filter((r) => SUBSYSTEMS[subsystem].groups.includes(r.label))
     : navRows;
