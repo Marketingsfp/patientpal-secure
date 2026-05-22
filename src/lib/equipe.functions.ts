@@ -14,6 +14,17 @@ async function assertManager(userId: string, clinicaId: string) {
   if (!data) throw new Error("Sem permissão para gerenciar a equipe desta clínica");
 }
 
+async function assertUserBelongsToClinica(userId: string, clinicaId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("clinica_memberships")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("clinica_id", clinicaId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Usuário não pertence a esta clínica");
+}
+
 export const listarEquipe = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
@@ -163,6 +174,7 @@ export const getFuncionarioLogin = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertManager(context.userId, data.clinicaId);
+    await assertUserBelongsToClinica(data.userId, data.clinicaId);
     const { data: u } = await supabaseAdmin.auth.admin.getUserById(data.userId);
     return { email: u?.user?.email ?? null };
   });
@@ -178,6 +190,7 @@ export const definirSenhaFuncionario = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertManager(context.userId, data.clinicaId);
+    await assertUserBelongsToClinica(data.userId, data.clinicaId);
     const { error } = await supabaseAdmin.auth.admin.updateUserById(data.userId, {
       password: data.novaSenha,
     });
