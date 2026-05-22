@@ -139,51 +139,55 @@ function AgendaPage() {
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   // Reagendamento
-  const [reagOpen, setReagOpen] = useState(false);
-  const [reagAg, setReagAg] = useState<Agendamento | null>(null);
-  const [reagData, setReagData] = useState("");
-  const [reagInicio, setReagInicio] = useState("");
-  const [reagFim, setReagFim] = useState("");
-  const [reagMedicoId, setReagMedicoId] = useState<string>("");
-  const [reagMotivo, setReagMotivo] = useState("");
+  const [reagendandoAg, setReagendandoAg] = useState<Agendamento | null>(null);
   const [reagSalvando, setReagSalvando] = useState(false);
 
-  const abrirReagendar = (a: Agendamento) => {
-    const ini = new Date(a.inicio);
-    const fim = new Date(a.fim);
-    const pad = (n: number) => String(n).padStart(2, "0");
-    setReagAg(a);
-    setReagData(`${ini.getFullYear()}-${pad(ini.getMonth() + 1)}-${pad(ini.getDate())}`);
-    setReagInicio(`${pad(ini.getHours())}:${pad(ini.getMinutes())}`);
-    setReagFim(`${pad(fim.getHours())}:${pad(fim.getMinutes())}`);
-    setReagMedicoId(a.medico_id ?? "");
-    setReagMotivo("");
-    setReagOpen(true);
+  const iniciarReagendamento = (a: Agendamento) => {
+    setReagendandoAg(a);
+    toast.info("Selecione um horário disponível na agenda para confirmar o reagendamento.");
   };
+  const cancelarReagendamento = () => setReagendandoAg(null);
 
-  const salvarReagendar = async () => {
-    if (!reagAg) return;
-    if (!reagData || !reagInicio || !reagFim) { toast.error("Informe data, início e fim."); return; }
-    const inicioIso = new Date(`${reagData}T${reagInicio}:00`);
-    const fimIso = new Date(`${reagData}T${reagFim}:00`);
-    if (!isFinite(inicioIso.getTime()) || !isFinite(fimIso.getTime())) { toast.error("Data/horário inválidos."); return; }
-    if (fimIso <= inicioIso) { toast.error("O horário final deve ser depois do inicial."); return; }
+  const confirmarReagendamentoNoSlot = async (slot: Agendamento) => {
+    const origem = reagendandoAg;
+    if (!origem || reagSalvando) return;
+    if (slot.id === origem.id) { toast.info("Esse já é o horário atual."); return; }
     setReagSalvando(true);
-    const obsAnt = reagAg.observacoes ?? "";
-    const trilha = `[Reagendado em ${new Date().toLocaleString("pt-BR")}] de ${new Date(reagAg.inicio).toLocaleString("pt-BR")}${reagMotivo ? ` — Motivo: ${reagMotivo}` : ""}`;
+    const obsAnt = origem.observacoes ?? "";
+    const trilha = `[Reagendado em ${new Date().toLocaleString("pt-BR")}] de ${new Date(origem.inicio).toLocaleString("pt-BR")} para ${new Date(slot.inicio).toLocaleString("pt-BR")}`;
     const novasObs = obsAnt ? `${obsAnt}\n${trilha}` : trilha;
-    const { error } = await supabase.from("agendamentos").update({
-      inicio: inicioIso.toISOString(),
-      fim: fimIso.toISOString(),
-      medico_id: reagMedicoId || null,
+    // 1) Move o agendamento para o novo horário/médico
+    const { error: e1 } = await supabase.from("agendamentos").update({
+      inicio: slot.inicio,
+      fim: slot.fim,
+      medico_id: slot.medico_id ?? null,
       status: "agendado",
       observacoes: novasObs,
-    } as never).eq("id", reagAg.id);
+    } as never).eq("id", origem.id);
+    if (e1) { setReagSalvando(false); toast.error(e1.message); return; }
+    // 2) Libera o slot escolhido (que era "DISPONÍVEL")
+    const { error: e2 } = await supabase.from("agendamentos").update({
+      paciente_id: null,
+      paciente_nome: "DISPONÍVEL",
+      status: "disponivel",
+    } as never).eq("id", slot.id);
+    if (e2) { setReagSalvando(false); toast.error(e2.message); return; }
+    // 3) Libera o horário antigo, marcando como disponível
+    const { error: e3 } = await supabase.from("agendamentos").insert({
+      clinica_id: origem.clinica_id,
+      medico_id: origem.medico_id,
+      paciente_id: null,
+      paciente_nome: "DISPONÍVEL",
+      inicio: origem.inicio,
+      fim: origem.fim,
+      status: "disponivel",
+      procedimento: origem.procedimento ?? null,
+    } as never);
+    // Se o insert falhar (ex.: constraint), apenas avisa — o reagendamento em si já ocorreu.
+    if (e3) console.warn("Não foi possível recriar slot disponível antigo:", e3.message);
     setReagSalvando(false);
-    if (error) { toast.error(error.message); return; }
-    toast.success("Paciente reagendado.");
-    setReagOpen(false);
-    setReagAg(null);
+    setReagendandoAg(null);
+    toast.success(`Reagendado para ${new Date(slot.inicio).toLocaleString("pt-BR")}.`);
     await load();
   };
 
