@@ -48,6 +48,18 @@ function normalizar(t: string) {
   return (t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
 
+function apenasDigitos(t: string) {
+  return (t || "").replace(/\D/g, "");
+}
+
+function itemCombinaComBuscaPaciente(a: Item, termo: string) {
+  const buscaNormalizada = normalizar(termo.trim());
+  const buscaCpf = apenasDigitos(termo);
+  if (!buscaNormalizada && !buscaCpf) return true;
+  const cpf = apenasDigitos(a.paciente?.cpf ?? "");
+  return normalizar(a.paciente_nome).includes(buscaNormalizada) || (!!buscaCpf && cpf.includes(buscaCpf));
+}
+
 function CheckinPage() {
   const { clinicaAtual } = useClinica();
   const [data, setData] = useState(() => new Date().toISOString().slice(0, 10));
@@ -87,8 +99,8 @@ function CheckinPage() {
         .map((r) => r.agendamento_id).filter((x): x is string => !!x));
     }
     const base = ((ags ?? []) as unknown as Item[]);
-    const filtrados = buscaAmpla ? base : base.filter((a) => pagos.has(a.id));
-    const pacIds = Array.from(new Set(filtrados.map((a) => a.paciente_id).filter((x): x is string => !!x)));
+    const candidatos = buscaAmpla ? base : base.filter((a) => pagos.has(a.id));
+    const pacIds = Array.from(new Set(candidatos.map((a) => a.paciente_id).filter((x): x is string => !!x)));
     const pacMap = new Map<string, { cpf: string | null; telefone: string | null; foto_url: string | null }>();
     if (pacIds.length) {
       const { data: pacs } = await supabase
@@ -97,24 +109,21 @@ function CheckinPage() {
         .in("id", pacIds);
       (pacs ?? []).forEach((p) => pacMap.set(p.id, { cpf: p.cpf, telefone: p.telefone, foto_url: p.foto_url }));
     }
-    setItems(filtrados.map((a) => ({
+    const comPaciente = candidatos.map((a) => ({
       ...a,
       paciente: a.paciente_id ? pacMap.get(a.paciente_id) ?? null : null,
       pago: pagos.has(a.id),
-    })));
+    }));
+    setItems(buscaComTexto ? comPaciente.filter((a) => itemCombinaComBuscaPaciente(a, buscaAplicada)) : comPaciente);
     setLoading(false);
   }, [clinicaAtual, data, buscaAmpla, buscaAplicada]);
 
   useEffect(() => { void load(); }, [load]);
 
   const filtrados = useMemo(() => {
-    const b = normalizar(busca.trim());
-    if (!b) return items;
-    return items.filter((a) => {
-      const cpf = (a.paciente?.cpf ?? "").replace(/\D/g, "");
-      return normalizar(a.paciente_nome).includes(b) || cpf.includes(b.replace(/\D/g, ""));
-    });
-  }, [items, busca]);
+    if (buscaAmpla) return items;
+    return items.filter((a) => itemCombinaComBuscaPaciente(a, busca));
+  }, [items, busca, buscaAmpla]);
 
   const acionarBusca = () => { setBuscaAplicada(busca.trim()); setBuscaAmpla(true); };
   const limparBusca = () => { setBusca(""); setBuscaAplicada(""); setBuscaAmpla(false); };
