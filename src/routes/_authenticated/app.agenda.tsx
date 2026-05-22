@@ -772,6 +772,29 @@ function AgendaPage() {
 
   return (
     <div className="space-y-3">
+      {reagendandoAg && (
+        <div className="sticky top-0 z-30 -mx-4 px-4 py-2 border-b bg-primary text-primary-foreground shadow-sm">
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <CalendarDays className="h-4 w-4 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <span className="font-semibold uppercase">Reagendando · {reagendandoAg.paciente_nome}</span>
+              <span className="ml-2 opacity-90">
+                Atual: {new Date(reagendandoAg.inicio).toLocaleString("pt-BR")}
+                {reagendandoAg.procedimento ? ` — ${reagendandoAg.procedimento}` : ""}
+              </span>
+              <span className="ml-2 opacity-90 italic">Clique em um horário disponível na agenda para confirmar.</span>
+            </div>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={cancelarReagendamento}
+              disabled={reagSalvando}
+            >
+              {reagSalvando ? "Salvando…" : "Cancelar reagendamento"}
+            </Button>
+          </div>
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
