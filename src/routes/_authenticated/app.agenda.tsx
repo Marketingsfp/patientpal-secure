@@ -1571,6 +1571,9 @@ function AgendaPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => openEdit(a)}><Pencil className="h-4 w-4 mr-2" /> Editar</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => abrirReagendar(a)}>
+                          <CalendarDays className="h-4 w-4 mr-2" /> Reagendar
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => cobrarAgendamento(a)}>
                           <DollarSign className="h-4 w-4 mr-2" /> Pagamento
                         </DropdownMenuItem>
