@@ -1,6 +1,5 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { Activity } from "lucide-react";
-import { useEffect } from "react";
 
 function hasSupabaseSession(): boolean {
   if (typeof window === "undefined") return false;
@@ -17,6 +16,11 @@ function hasSupabaseSession(): boolean {
 }
 
 export const Route = createFileRoute("/")({
+  // Redireciona ANTES de renderizar — elimina o flash de "Abrindo ClinicaOS…".
+  beforeLoad: () => {
+    if (typeof window === "undefined") return;
+    throw redirect({ to: hasSupabaseSession() ? "/app" : "/login", replace: true });
+  },
   component: LandingPage,
   head: () => ({
     meta: [
@@ -31,10 +35,6 @@ export const Route = createFileRoute("/")({
 });
 
 function LandingPage() {
-  const navigate = useNavigate();
-  useEffect(() => {
-    navigate({ to: hasSupabaseSession() ? "/app" : "/login", replace: true });
-  }, [navigate]);
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4 text-center">
       <div className="space-y-4">
