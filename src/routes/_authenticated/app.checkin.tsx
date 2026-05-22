@@ -27,6 +27,19 @@ type Item = {
   pago?: boolean;
 };
 
+const ETAPAS_CHECKIN = ["aguardando_recepcao", "recepcao"];
+
+function etapaLabel(etapa: string) {
+  const labels: Record<string, string> = {
+    aguardando_recepcao: "AGUARDANDO RECEPÇÃO",
+    recepcao: "RECEPÇÃO",
+    triagem: "CHECK-IN JÁ REALIZADO",
+    atendimento: "EM ATENDIMENTO",
+    caixa: "NO CAIXA",
+  };
+  return labels[etapa] ?? etapa.replace(/_/g, " ").toUpperCase();
+}
+
 function normalizar(t: string) {
   return (t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
@@ -44,16 +57,17 @@ function CheckinPage() {
     setLoading(true);
     const inicio = new Date(`${data}T00:00:00`).toISOString();
     const fim = new Date(`${data}T23:59:59`).toISOString();
-    const { data: ags, error } = await supabase
+    const buscaComTexto = buscaAmpla && busca.trim().length > 0;
+    let query = supabase
       .from("agendamentos")
       .select("id,paciente_nome,paciente_id,inicio,procedimento,fluxo_etapa,medicos(nome)")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .gte("inicio", inicio)
       .lte("inicio", fim)
-      .in("fluxo_etapa", ["aguardando_recepcao", "recepcao"])
       .neq("status", "cancelado")
-      .not("paciente_id", "is", null)
-      .order("inicio", { ascending: true });
+      .not("paciente_id", "is", null);
+    if (!buscaComTexto) query = query.in("fluxo_etapa", ETAPAS_CHECKIN);
+    const { data: ags, error } = await query.order("inicio", { ascending: true });
     if (error) { setLoading(false); toast.error(error.message); return; }
     const ids = (ags ?? []).map((a) => a.id);
     let pagos = new Set<string>();
@@ -84,7 +98,7 @@ function CheckinPage() {
       pago: pagos.has(a.id),
     })));
     setLoading(false);
-  }, [clinicaAtual, data, buscaAmpla]);
+  }, [clinicaAtual, data, buscaAmpla, busca]);
 
   useEffect(() => { void load(); }, [load]);
 
