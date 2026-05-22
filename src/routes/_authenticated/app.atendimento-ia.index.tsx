@@ -236,6 +236,7 @@ function AtendimentoIaPage() {
                     <TableHead className="w-20">Hora</TableHead>
                     <TableHead>Paciente</TableHead>
                     <TableHead className="hidden md:table-cell">Procedimento</TableHead>
+                    <TableHead className="w-24 text-center">Triagem</TableHead>
                     <TableHead className="w-28">Prioridade</TableHead>
                     <TableHead className="w-32 text-right">Ação</TableHead>
                   </TableRow>
@@ -256,15 +257,83 @@ function AtendimentoIaPage() {
                         <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
                           {it.procedimento ?? "—"} · {it.fluxo_etapa.replace("_", " ")}
                         </TableCell>
-                        <TableCell>
-                          {it.prioridade !== "normal" ? (
-                            <Badge className={`${prioCls} border-0 text-[10px] gap-1`}>
-                              <AlertTriangle className="h-3 w-3" />
-                              {it.prioridade === "urgente" ? "URGENTE" : "PRIORITÁRIO"}
-                            </Badge>
+                        <TableCell className="text-center">
+                          {triagens[it.id] ? (
+                            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300" title="Triagem realizada">
+                              <Check className="h-3.5 w-3.5" />
+                            </span>
                           ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
+                            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300" title="Triagem pendente">
+                              <X className="h-3.5 w-3.5" />
+                            </span>
                           )}
+                        </TableCell>
+                        <TableCell>
+                          <HoverCard openDelay={120} closeDelay={80}>
+                            <HoverCardTrigger asChild>
+                              <span className="cursor-help inline-flex">
+                                {it.prioridade !== "normal" ? (
+                                  <Badge className={`${prioCls} border-0 text-[10px] gap-1`}>
+                                    <AlertTriangle className="h-3 w-3" />
+                                    {it.prioridade === "urgente" ? "URGENTE" : "PRIORITÁRIO"}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">—</span>
+                                )}
+                              </span>
+                            </HoverCardTrigger>
+                            <HoverCardContent align="start" className="w-80 text-xs space-y-2">
+                              {(() => {
+                                const t = triagens[it.id];
+                                if (!t) return <div className="text-muted-foreground">Paciente ainda não passou pela triagem.</div>;
+                                const sv: string[] = [];
+                                if (t.pa_sistolica && t.pa_diastolica) sv.push(`PA ${t.pa_sistolica}/${t.pa_diastolica}`);
+                                if (t.freq_cardiaca) sv.push(`FC ${t.freq_cardiaca}`);
+                                if (t.temperatura) sv.push(`T ${t.temperatura}°`);
+                                if (t.saturacao) sv.push(`SatO₂ ${t.saturacao}%`);
+                                if (t.glicemia) sv.push(`Glic ${t.glicemia}`);
+                                if (t.peso_kg) sv.push(`${t.peso_kg}kg`);
+                                if (t.altura_cm) sv.push(`${t.altura_cm}cm`);
+                                if (t.imc) sv.push(`IMC ${t.imc}`);
+                                return (
+                                  <>
+                                    <div className="flex items-center justify-between gap-2 pb-1 border-b">
+                                      <div className="font-semibold">Triagem da enfermagem</div>
+                                      <div className="text-[10px] text-muted-foreground">
+                                        {new Date(t.created_at).toLocaleString("pt-BR")}
+                                      </div>
+                                    </div>
+                                    {t.enfermeira_nome && (
+                                      <div className="text-[11px] text-muted-foreground">Por {t.enfermeira_nome}</div>
+                                    )}
+                                    {sv.length > 0 && (
+                                      <div className="rounded-md bg-muted/50 px-2 py-1.5 text-[11px] leading-relaxed">{sv.join(" · ")}</div>
+                                    )}
+                                    {t.queixa_principal && (
+                                      <div><span className="text-[10px] uppercase text-muted-foreground">Queixa</span><div>{t.queixa_principal}</div></div>
+                                    )}
+                                    {t.doencas && t.doencas.length > 0 && (
+                                      <div>
+                                        <span className="text-[10px] uppercase text-muted-foreground">Doenças</span>
+                                        <div className="flex flex-wrap gap-1 mt-0.5">
+                                          {t.doencas.map((d, i) => <Badge key={i} variant="outline" className="text-[10px]">{d}</Badge>)}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {t.medicamentos && (
+                                      <div><span className="text-[10px] uppercase text-muted-foreground">Medicamentos</span><div>{t.medicamentos}</div></div>
+                                    )}
+                                    {t.alergias && (
+                                      <div><span className="text-[10px] uppercase text-muted-foreground">Alergias</span><div>{t.alergias}</div></div>
+                                    )}
+                                    {t.observacoes && (
+                                      <div><span className="text-[10px] uppercase text-muted-foreground">Observações</span><div className="whitespace-pre-wrap">{t.observacoes}</div></div>
+                                    )}
+                                  </>
+                                );
+                              })()}
+                            </HoverCardContent>
+                          </HoverCard>
                         </TableCell>
                         <TableCell className="text-right">
                           <Button size="sm" onClick={() => atender(it)}>
