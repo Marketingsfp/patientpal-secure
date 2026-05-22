@@ -27,7 +27,11 @@ type Item = {
   pago?: boolean;
 };
 
-const ETAPAS_CHECKIN = ["aguardando_recepcao", "recepcao"];
+const ETAPAS_CHECKIN = ["aguardando_recepcao", "recepcao"] as const;
+
+function estaPendenteCheckin(etapa: string) {
+  return (ETAPAS_CHECKIN as readonly string[]).includes(etapa);
+}
 
 function etapaLabel(etapa: string) {
   const labels: Record<string, string> = {
@@ -140,7 +144,7 @@ function CheckinPage() {
           </p>
         </div>
         <Badge variant="outline" className="text-base px-3 py-1">
-          {filtrados.length} aguardando
+          {filtrados.length} {buscaAmpla ? "resultado(s)" : "aguardando"}
         </Badge>
       </div>
 
@@ -177,7 +181,7 @@ function CheckinPage() {
         </div>
         {buscaAmpla && (
           <p className="text-xs text-muted-foreground">
-            Dica: clique em "Limpar" para voltar a ver apenas pacientes com pagamento já registrado.
+            Dica: com nome ou CPF digitado, a busca também mostra pacientes já avançados para triagem, atendimento ou caixa.
           </p>
         )}
       </Card>
