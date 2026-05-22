@@ -458,41 +458,6 @@ function AtendimentoIaPage() {
 
         {/* Fila do médico */}
         <div className="space-y-2">
-          {triados.length > 0 && (
-            <div className="rounded-md border border-rose-200/60 dark:border-rose-900/40 bg-rose-50/50 dark:bg-rose-950/20 p-2 space-y-1.5">
-              <div className="flex items-center gap-1.5 text-xs font-medium text-rose-700 dark:text-rose-300">
-                <HeartPulse className="h-3.5 w-3.5" /> Triados pela enfermagem hoje ({triados.length})
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {triados.map((t) => {
-                  const ehMeu = t.medico_id === medicoId;
-                  return (
-                    <button
-                      key={t.agendamento_id}
-                      type="button"
-                      onClick={async () => {
-                        if (!ehMeu) {
-                          setMedicoId(t.medico_id);
-                          await carregarFila(t.medico_id);
-                        }
-                        const it = (await supabase
-                          .from("agendamentos")
-                          .select("id, paciente_id, paciente_nome, inicio, procedimento, fluxo_etapa, prioridade")
-                          .eq("id", t.agendamento_id)
-                          .maybeSingle()).data as unknown as FilaItem | null;
-                        if (it) selecionar(it);
-                      }}
-                      className={`rounded-md border px-2 py-1 text-xs flex items-center gap-1.5 hover:border-rose-400 ${ehMeu ? "bg-background" : "bg-muted/40"}`}
-                      title={ehMeu ? "Seu paciente" : `Atribuído a ${t.medico_nome} — clique para abrir`}
-                    >
-                      <span className="font-medium uppercase">{t.paciente_nome}</span>
-                      <span className="text-muted-foreground">· {t.medico_nome}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
           <div className="flex items-center justify-between">
             <Label className="flex items-center gap-1.5"><Users className="h-4 w-4" /> Fila de atendimento ({filaOrdenada.length})</Label>
             {pacienteNome && (
@@ -504,36 +469,59 @@ function AtendimentoIaPage() {
               Nenhum paciente na fila para hoje.
             </div>
           ) : (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-64 overflow-auto pr-1">
-              {filaOrdenada.map((it, idx) => {
-                const ativo = it.id === agendamentoId;
-                const hora = new Date(it.inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-                const prioCls = it.prioridade === "urgente"
-                  ? "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-200"
-                  : it.prioridade === "prioritario"
-                  ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200"
-                  : "";
-                return (
-                  <button
-                    key={it.id}
-                    type="button"
-                    onClick={() => selecionar(it)}
-                    className={`text-left rounded-md border p-2 text-sm transition hover:border-primary ${ativo ? "border-primary bg-primary/5" : ""}`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="tabular-nums text-xs text-muted-foreground">#{idx + 1} · {hora}</span>
-                      {it.prioridade !== "normal" && (
-                        <Badge className={`${prioCls} border-0 text-[10px] gap-1`}>
-                          <AlertTriangle className="h-3 w-3" />
-                          {it.prioridade === "urgente" ? "URGENTE" : "PRIORITÁRIO"}
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="font-medium uppercase leading-tight mt-0.5 line-clamp-1">{it.paciente_nome}</div>
-                    <div className="text-[11px] text-muted-foreground line-clamp-1">{it.procedimento ?? "—"} · {it.fluxo_etapa.replace("_", " ")}</div>
-                  </button>
-                );
-              })}
+            <div className="rounded-md border max-h-80 overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-10">#</TableHead>
+                    <TableHead className="w-20">Hora</TableHead>
+                    <TableHead>Paciente</TableHead>
+                    <TableHead className="hidden md:table-cell">Procedimento</TableHead>
+                    <TableHead className="w-28">Prioridade</TableHead>
+                    <TableHead className="w-32 text-right">Ação</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filaOrdenada.map((it, idx) => {
+                    const ativo = it.id === agendamentoId;
+                    const hora = new Date(it.inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+                    const prioCls = it.prioridade === "urgente"
+                      ? "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-200"
+                      : it.prioridade === "prioritario"
+                      ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200"
+                      : "";
+                    return (
+                      <TableRow key={it.id} className={ativo ? "bg-primary/5" : ""}>
+                        <TableCell className="tabular-nums text-xs text-muted-foreground">{idx + 1}</TableCell>
+                        <TableCell className="tabular-nums text-xs">{hora}</TableCell>
+                        <TableCell className="font-medium uppercase">{it.paciente_nome}</TableCell>
+                        <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
+                          {it.procedimento ?? "—"} · {it.fluxo_etapa.replace("_", " ")}
+                        </TableCell>
+                        <TableCell>
+                          {it.prioridade !== "normal" ? (
+                            <Badge className={`${prioCls} border-0 text-[10px] gap-1`}>
+                              <AlertTriangle className="h-3 w-3" />
+                              {it.prioridade === "urgente" ? "URGENTE" : "PRIORITÁRIO"}
+                            </Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {ativo ? (
+                            <Button size="sm" variant="secondary" disabled>Em atendimento</Button>
+                          ) : (
+                            <Button size="sm" onClick={() => selecionar(it)}>
+                              <Stethoscope className="h-4 w-4" /> Atender
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
             </div>
           )}
         </div>
