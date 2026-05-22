@@ -1,26 +1,16 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Brain, Sparkles, FileHeart, Stethoscope, Save, Loader2, History, Wand2, AlertTriangle, Users, HeartPulse } from "lucide-react";
-import { useServerFn } from "@tanstack/react-start";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
+import { Brain, Stethoscope, AlertTriangle, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { VoiceInput } from "@/components/voice-input";
-import { Cid10Picker } from "@/components/cid10-picker";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import {
-  gerarAnamneseEstruturada,
-  sugerirCondutaClinica,
-  resumirHistoricoPaciente,
-} from "@/lib/atendimento-ai.functions";
 
 export const Route = createFileRoute("/_authenticated/app/atendimento-ia")({
   component: AtendimentoIaPage,
