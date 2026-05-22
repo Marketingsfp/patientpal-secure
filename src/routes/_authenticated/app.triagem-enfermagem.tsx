@@ -32,6 +32,44 @@ type Ag = {
   medicos?: { nome: string } | null;
 };
 
+type Grupo = {
+  chave: string;
+  paciente_id: string | null;
+  paciente_nome: string;
+  prioridade: "normal" | "prioritario" | "urgente";
+  agendamentos: Ag[];
+};
+
+function prioridadePeso(p?: string) {
+  return p === "urgente" ? 2 : p === "prioritario" ? 1 : 0;
+}
+
+function agruparPorPaciente(ags: Ag[]): Grupo[] {
+  const map = new Map<string, Grupo>();
+  for (const a of ags) {
+    const chave = a.paciente_id ?? `nome:${a.paciente_nome}`;
+    const g = map.get(chave);
+    if (!g) {
+      map.set(chave, {
+        chave,
+        paciente_id: a.paciente_id,
+        paciente_nome: a.paciente_nome,
+        prioridade: (a.prioridade ?? "normal"),
+        agendamentos: [a],
+      });
+    } else {
+      g.agendamentos.push(a);
+      if (prioridadePeso(a.prioridade) > prioridadePeso(g.prioridade)) {
+        g.prioridade = a.prioridade ?? "normal";
+      }
+    }
+  }
+  return Array.from(map.values()).map((g) => ({
+    ...g,
+    agendamentos: g.agendamentos.sort((x, y) => x.inicio.localeCompare(y.inicio)),
+  })).sort((a, b) => a.agendamentos[0].inicio.localeCompare(b.agendamentos[0].inicio));
+}
+
 const DOENCAS_COMUNS = [
   "Diabetes", "Hipertensão", "Asma", "Cardiopatia", "Dislipidemia",
   "Hipotireoidismo", "Hipertireoidismo", "DPOC", "Câncer", "Depressão", "Ansiedade",
@@ -59,7 +97,7 @@ function TriagemEnfermagemPage() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [ags, setAgs] = useState<Ag[]>([]);
-  const [aberto, setAberto] = useState<Ag | null>(null);
+  const [aberto, setAberto] = useState<Grupo | null>(null);
   const [form, setForm] = useState<Form>(formVazio);
   const [salvando, setSalvando] = useState(false);
   const [consultorio, setConsultorio] = useState<string>(() =>
@@ -107,15 +145,17 @@ function TriagemEnfermagemPage() {
     return v.toFixed(2);
   }, [form.peso, form.altura]);
 
-  function abrir(a: Ag) {
-    setAberto(a); setForm(formVazio);
+  const grupos = useMemo(() => agruparPorPaciente(ags), [ags]);
+
+  function abrir(g: Grupo) {
+    setAberto(g); setForm(formVazio);
   }
 
   function toggleDoenca(d: string) {
     setForm(f => ({ ...f, doencas: f.doencas.includes(d) ? f.doencas.filter(x => x !== d) : [...f.doencas, d] }));
   }
 
-  async function chamarPaciente(a: Ag) {
+  async function chamarPaciente(g: Grupo) {
     if (!clinicaAtual) return;
     if (!consultorio.trim()) { toast.error("Informe o consultório/sala da enfermagem no topo."); return; }
     const hoje = new Date().toISOString().slice(0, 10);
@@ -124,16 +164,16 @@ function TriagemEnfermagemPage() {
       .eq("clinica_id", clinicaAtual.clinica_id).eq("data_dia", hoje).eq("tipo", "N")
       .order("numero", { ascending: false }).limit(1).maybeSingle();
     const proximoNum = Math.min(9999, (ult?.numero ?? 0) + 1);
-    const nomeCurto = a.paciente_nome.split(/\s+/).slice(0, 2).join(" ").toUpperCase().slice(0, 24);
+    const nomeCurto = g.paciente_nome.split(/\s+/).slice(0, 2).join(" ").toUpperCase().slice(0, 24);
     const guicheStr = `Triagem · Sala ${consultorio.trim()}`;
     const { error } = await supabase.from("senhas").insert({
       clinica_id: clinicaAtual.clinica_id, tipo: "N", numero: proximoNum,
-      codigo: nomeCurto, status: "chamada", paciente_id: a.paciente_id,
+      codigo: nomeCurto, status: "chamada", paciente_id: g.paciente_id,
       guiche: guicheStr, chamada_em: new Date().toISOString(),
     } as never);
     if (error) { toast.error(error.message); return; }
     toast.success(`Chamando ${nomeCurto} · ${guicheStr}`);
-    abrir(a);
+    abrir(g);
   }
 
   async function salvarEAvancar(avancar: boolean) {
@@ -147,9 +187,11 @@ function TriagemEnfermagemPage() {
       const n = parseInt(v, 10);
       return isFinite(n) ? n : null;
     };
-    const payload = {
+    const doencasFinais = form.outras_doencas.trim()
+      ? [...form.doencas, ...form.outras_doencas.split(",").map(s => s.trim()).filter(Boolean)]
+      : form.doencas;
+    const base = {
       clinica_id: clinicaAtual.clinica_id,
-      agendamento_id: aberto.id,
       paciente_id: aberto.paciente_id,
       enfermeira_id: user?.id ?? null,
       enfermeira_nome: user?.email ?? null,
@@ -163,20 +205,25 @@ function TriagemEnfermagemPage() {
       saturacao: int(form.sat),
       glicemia: int(form.glicemia),
       queixa_principal: form.queixa || null,
-      doencas: form.outras_doencas.trim()
-        ? [...form.doencas, ...form.outras_doencas.split(",").map(s => s.trim()).filter(Boolean)]
-        : form.doencas,
+      doencas: doencasFinais,
       medicamentos: form.medicamentos || null,
       alergias: form.alergias || null,
       observacoes: form.observacoes || null,
     };
-    const { error } = await supabase.from("triagens_enfermagem").insert(payload as never);
+    const rows = aberto.agendamentos.map((a) => ({ ...base, agendamento_id: a.id }));
+    const { error } = await supabase.from("triagens_enfermagem").insert(rows as never);
     if (error) { setSalvando(false); toast.error(error.message); return; }
 
     if (avancar) {
-      const isExame = /exame|raio|usg|ultra|tomo|ressona/i.test(aberto.procedimento ?? "");
-      const proxima = isExame ? "exame" : "atendimento";
-      await supabase.from("agendamentos").update({ fluxo_etapa: proxima } as never).eq("id", aberto.id);
+      const isExame = (p: string | null) => /exame|raio|usg|ultra|tomo|ressona/i.test(p ?? "");
+      const idsExame = aberto.agendamentos.filter((a) => isExame(a.procedimento)).map((a) => a.id);
+      const idsAtend = aberto.agendamentos.filter((a) => !isExame(a.procedimento)).map((a) => a.id);
+      if (idsExame.length) {
+        await supabase.from("agendamentos").update({ fluxo_etapa: "exame", fluxo_atualizado_em: new Date().toISOString() } as never).in("id", idsExame);
+      }
+      if (idsAtend.length) {
+        await supabase.from("agendamentos").update({ fluxo_etapa: "atendimento", fluxo_atualizado_em: new Date().toISOString() } as never).in("id", idsAtend);
+      }
     }
     setSalvando(false);
     toast.success(avancar ? "Triagem salva. Paciente liberado." : "Triagem salva.");
@@ -207,41 +254,50 @@ function TriagemEnfermagemPage() {
         </div>
       </div>
 
-      {ags.length === 0 ? (
+      {grupos.length === 0 ? (
         <Card className="p-8 text-center text-sm text-muted-foreground">
           Nenhum paciente na fila de triagem.
         </Card>
       ) : (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {ags.map((a) => {
-            const h = new Date(a.inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-            return (
-              <Card key={a.id} className="p-3 space-y-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="font-semibold">{a.paciente_nome}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {h} · {a.procedimento ?? "—"}{a.medicos?.nome ? ` · ${a.medicos.nome}` : ""}
+          {grupos.map((g) => (
+            <Card key={g.chave} className="p-3 space-y-2">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-semibold truncate">{g.paciente_nome}</div>
+                  {g.agendamentos.length > 1 && (
+                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                      {g.agendamentos.length} atendimentos no dia
                     </div>
-                  </div>
-                  {a.prioridade && a.prioridade !== "normal" && (
-                    <Badge className={`border-0 text-[10px] gap-1 ${a.prioridade === "urgente" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}`}>
-                      <AlertTriangle className="h-3 w-3" />
-                      {a.prioridade === "urgente" ? "URGENTE" : "PRIORITÁRIO"}
-                    </Badge>
                   )}
                 </div>
-                <div className="flex items-center gap-2 pt-1">
-                  <Button size="sm" className="flex-1" onClick={() => chamarPaciente(a)}>
-                    <Bell className="h-4 w-4 mr-1" /> Chamar
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => abrir(a)}>
-                    <Stethoscope className="h-4 w-4 mr-1" /> Atender
-                  </Button>
-                </div>
-              </Card>
-            );
-          })}
+                {g.prioridade !== "normal" && (
+                  <Badge className={`border-0 text-[10px] gap-1 ${g.prioridade === "urgente" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}`}>
+                    <AlertTriangle className="h-3 w-3" />
+                    {g.prioridade === "urgente" ? "URGENTE" : "PRIORITÁRIO"}
+                  </Badge>
+                )}
+              </div>
+              <ul className="text-xs text-muted-foreground space-y-0.5">
+                {g.agendamentos.map((a) => {
+                  const h = new Date(a.inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+                  return (
+                    <li key={a.id}>
+                      {h} · {a.procedimento ?? "—"}{a.medicos?.nome ? ` · ${a.medicos.nome}` : ""}
+                    </li>
+                  );
+                })}
+              </ul>
+              <div className="flex items-center gap-2 pt-1">
+                <Button size="sm" className="flex-1" onClick={() => chamarPaciente(g)}>
+                  <Bell className="h-4 w-4 mr-1" /> Chamar
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => abrir(g)}>
+                  <Stethoscope className="h-4 w-4 mr-1" /> Atender
+                </Button>
+              </div>
+            </Card>
+          ))}
         </div>
       )}
 
@@ -250,6 +306,19 @@ function TriagemEnfermagemPage() {
           <DialogHeader>
             <DialogTitle>Triagem · {aberto?.paciente_nome}</DialogTitle>
           </DialogHeader>
+          {aberto && aberto.agendamentos.length > 0 && (
+            <div className="rounded-md border bg-muted/40 p-2 text-xs text-muted-foreground">
+              Os dados desta triagem serão enviados para {aberto.agendamentos.length === 1 ? "o atendimento" : `todos os ${aberto.agendamentos.length} atendimentos`} do paciente hoje:
+              <ul className="mt-1 space-y-0.5">
+                {aberto.agendamentos.map((a) => {
+                  const h = new Date(a.inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+                  return (
+                    <li key={a.id}>• {h} · {a.procedimento ?? "—"}{a.medicos?.nome ? ` · ${a.medicos.nome}` : ""}</li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
           <div className="space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div><Label className="text-xs">Peso (kg)</Label>
