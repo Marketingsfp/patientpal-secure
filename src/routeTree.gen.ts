@@ -57,6 +57,7 @@ import { Route as AuthenticatedAppHrPontoRouteImport } from './routes/_authentic
 import { Route as AuthenticatedAppHrHoleritesRouteImport } from './routes/_authenticated/app.hr-holerites'
 import { Route as AuthenticatedAppHrFeriasRouteImport } from './routes/_authenticated/app.hr-ferias'
 import { Route as AuthenticatedAppHrContratosRouteImport } from './routes/_authenticated/app.hr-contratos'
+import { Route as AuthenticatedAppFuncionariosRouteImport } from './routes/_authenticated/app.funcionarios'
 import { Route as AuthenticatedAppFluxoRouteImport } from './routes/_authenticated/app.fluxo'
 import { Route as AuthenticatedAppFinanceiroRouteImport } from './routes/_authenticated/app.financeiro'
 import { Route as AuthenticatedAppExamesResultadosRouteImport } from './routes/_authenticated/app.exames-resultados'
@@ -363,6 +364,12 @@ const AuthenticatedAppHrContratosRoute =
   AuthenticatedAppHrContratosRouteImport.update({
     id: '/hr-contratos',
     path: '/hr-contratos',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppFuncionariosRoute =
+  AuthenticatedAppFuncionariosRouteImport.update({
+    id: '/funcionarios',
+    path: '/funcionarios',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppFluxoRoute = AuthenticatedAppFluxoRouteImport.update({
@@ -686,6 +693,7 @@ export interface FileRoutesByFullPath {
   '/app/exames-resultados': typeof AuthenticatedAppExamesResultadosRoute
   '/app/financeiro': typeof AuthenticatedAppFinanceiroRouteWithChildren
   '/app/fluxo': typeof AuthenticatedAppFluxoRoute
+  '/app/funcionarios': typeof AuthenticatedAppFuncionariosRoute
   '/app/hr-contratos': typeof AuthenticatedAppHrContratosRoute
   '/app/hr-ferias': typeof AuthenticatedAppHrFeriasRoute
   '/app/hr-holerites': typeof AuthenticatedAppHrHoleritesRoute
@@ -780,6 +788,7 @@ export interface FileRoutesByTo {
   '/app/estoque': typeof AuthenticatedAppEstoqueRoute
   '/app/exames-resultados': typeof AuthenticatedAppExamesResultadosRoute
   '/app/fluxo': typeof AuthenticatedAppFluxoRoute
+  '/app/funcionarios': typeof AuthenticatedAppFuncionariosRoute
   '/app/hr-contratos': typeof AuthenticatedAppHrContratosRoute
   '/app/hr-ferias': typeof AuthenticatedAppHrFeriasRoute
   '/app/hr-holerites': typeof AuthenticatedAppHrHoleritesRoute
@@ -879,6 +888,7 @@ export interface FileRoutesById {
   '/_authenticated/app/exames-resultados': typeof AuthenticatedAppExamesResultadosRoute
   '/_authenticated/app/financeiro': typeof AuthenticatedAppFinanceiroRouteWithChildren
   '/_authenticated/app/fluxo': typeof AuthenticatedAppFluxoRoute
+  '/_authenticated/app/funcionarios': typeof AuthenticatedAppFuncionariosRoute
   '/_authenticated/app/hr-contratos': typeof AuthenticatedAppHrContratosRoute
   '/_authenticated/app/hr-ferias': typeof AuthenticatedAppHrFeriasRoute
   '/_authenticated/app/hr-holerites': typeof AuthenticatedAppHrHoleritesRoute
@@ -978,6 +988,7 @@ export interface FileRouteTypes {
     | '/app/exames-resultados'
     | '/app/financeiro'
     | '/app/fluxo'
+    | '/app/funcionarios'
     | '/app/hr-contratos'
     | '/app/hr-ferias'
     | '/app/hr-holerites'
@@ -1072,6 +1083,7 @@ export interface FileRouteTypes {
     | '/app/estoque'
     | '/app/exames-resultados'
     | '/app/fluxo'
+    | '/app/funcionarios'
     | '/app/hr-contratos'
     | '/app/hr-ferias'
     | '/app/hr-holerites'
@@ -1170,6 +1182,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/exames-resultados'
     | '/_authenticated/app/financeiro'
     | '/_authenticated/app/fluxo'
+    | '/_authenticated/app/funcionarios'
     | '/_authenticated/app/hr-contratos'
     | '/_authenticated/app/hr-ferias'
     | '/_authenticated/app/hr-holerites'
@@ -1583,6 +1596,13 @@ declare module '@tanstack/react-router' {
       path: '/hr-contratos'
       fullPath: '/app/hr-contratos'
       preLoaderRoute: typeof AuthenticatedAppHrContratosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/funcionarios': {
+      id: '/_authenticated/app/funcionarios'
+      path: '/funcionarios'
+      fullPath: '/app/funcionarios'
+      preLoaderRoute: typeof AuthenticatedAppFuncionariosRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/fluxo': {
@@ -2040,6 +2060,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppExamesResultadosRoute: typeof AuthenticatedAppExamesResultadosRoute
   AuthenticatedAppFinanceiroRoute: typeof AuthenticatedAppFinanceiroRouteWithChildren
   AuthenticatedAppFluxoRoute: typeof AuthenticatedAppFluxoRoute
+  AuthenticatedAppFuncionariosRoute: typeof AuthenticatedAppFuncionariosRoute
   AuthenticatedAppHrContratosRoute: typeof AuthenticatedAppHrContratosRoute
   AuthenticatedAppHrFeriasRoute: typeof AuthenticatedAppHrFeriasRoute
   AuthenticatedAppHrHoleritesRoute: typeof AuthenticatedAppHrHoleritesRoute
@@ -2104,6 +2125,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppExamesResultadosRoute: AuthenticatedAppExamesResultadosRoute,
   AuthenticatedAppFinanceiroRoute: AuthenticatedAppFinanceiroRouteWithChildren,
   AuthenticatedAppFluxoRoute: AuthenticatedAppFluxoRoute,
+  AuthenticatedAppFuncionariosRoute: AuthenticatedAppFuncionariosRoute,
   AuthenticatedAppHrContratosRoute: AuthenticatedAppHrContratosRoute,
   AuthenticatedAppHrFeriasRoute: AuthenticatedAppHrFeriasRoute,
   AuthenticatedAppHrHoleritesRoute: AuthenticatedAppHrHoleritesRoute,
@@ -2183,13 +2205,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

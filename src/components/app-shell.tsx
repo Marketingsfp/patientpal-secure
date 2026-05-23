@@ -103,6 +103,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<{ to: string;
     items: [
     { to: "/app/auditoria", label: "Auditoria", icon: ShieldCheck },
     { to: "/app/financeiro", label: "Financeiro", icon: DollarSign },
+    { to: "/app/funcionarios", label: "Funcionários", icon: Users },
     { to: "/app/integration-secrets", label: "Integrações", icon: KeyRound },
     { to: "/app/lgpd", label: "LGPD", icon: ShieldCheck },
     { to: "/app/relatorios", label: "Relatórios", icon: BarChart3 },
@@ -285,7 +286,14 @@ export function AppShell() {
   const filteredByGroup = subsystem
     ? navRows.filter((r) => SUBSYSTEMS[subsystem].groups.includes(r.label))
     : navRows;
-  const visibleNavRows = isMedicoOnly ? medicoNavRows : filteredByGroup;
+  const scopedNavRows = filteredByGroup.map((row) => {
+    if (row.label !== "Gestão") return row;
+    const items = subsystem === "gestao-pessoas"
+      ? row.items.filter((it) => it.to === "/app/funcionarios")
+      : row.items.filter((it) => it.to !== "/app/funcionarios");
+    return { ...row, items };
+  }).filter((row) => row.items.length > 0);
+  const visibleNavRows = isMedicoOnly ? medicoNavRows : scopedNavRows;
   const subsystemLabel = subsystem ? SUBSYSTEMS[subsystem].label : null;
 
   return (
@@ -326,10 +334,11 @@ export function AppShell() {
         <nav className="flex-1 px-2 py-3 space-y-5 overflow-y-auto">
           {visibleNavRows.map((row) => {
             const groupHasActive = row.items.some((it) => location.pathname === it.to || (it.to !== "/app" && location.pathname.startsWith(it.to)));
-            const open = collapsed ? true : (openGroups[row.label] ?? groupHasActive);
+            const hideLabel = subsystem === "gestao-pessoas" && row.label === "RH";
+            const open = collapsed || hideLabel ? true : (openGroups[row.label] ?? groupHasActive);
             return (
               <div key={row.label} className="space-y-1">
-                {!collapsed && (
+                {!collapsed && !hideLabel && (
                   <button
                     type="button"
                     onClick={() => setOpenGroups((prev) => ({ ...prev, [row.label]: !(prev[row.label] ?? groupHasActive) }))}
