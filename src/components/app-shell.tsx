@@ -286,7 +286,14 @@ export function AppShell() {
   const filteredByGroup = subsystem
     ? navRows.filter((r) => SUBSYSTEMS[subsystem].groups.includes(r.label))
     : navRows;
-  const visibleNavRows = isMedicoOnly ? medicoNavRows : filteredByGroup;
+  const scopedNavRows = filteredByGroup.map((row) => {
+    if (row.label !== "Gestão") return row;
+    const items = subsystem === "gestao-pessoas"
+      ? row.items.filter((it) => it.to === "/app/funcionarios")
+      : row.items.filter((it) => it.to !== "/app/funcionarios");
+    return { ...row, items };
+  }).filter((row) => row.items.length > 0);
+  const visibleNavRows = isMedicoOnly ? medicoNavRows : scopedNavRows;
   const subsystemLabel = subsystem ? SUBSYSTEMS[subsystem].label : null;
 
   return (
