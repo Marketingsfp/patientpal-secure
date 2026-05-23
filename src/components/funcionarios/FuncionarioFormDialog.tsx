@@ -62,7 +62,7 @@ export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUs
       const [st, disp] = await Promise.all([
         supabase.from("setores").select("id,nome").eq("clinica_id", clinicaId).eq("ativo", true).order("nome"),
         supabase.from("hr_contratos")
-          .select("id, funcionario_nome, setor_id, status")
+          .select("id, nome:funcionario_nome, setor_id, status")
           .eq("clinica_id", clinicaId)
           .is("user_id", null)
           .order("funcionario_nome"),
@@ -177,7 +177,7 @@ export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUs
       error = e;
     } else if (isNew && form.contrato_id) {
       // Vincula o login (se criado) ao contrato escolhido e atualiza setor/status
-      const updatePayload: Record<string, unknown> = {
+      const updatePayload: { setor_id: string | null; status: string; user_id?: string } = {
         setor_id: form.setor_id || null,
         status: form.status,
       };
