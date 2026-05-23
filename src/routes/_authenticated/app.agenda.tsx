@@ -487,7 +487,11 @@ function AgendaPage() {
   }), [filtrados]);
 
   const totalPages = Math.max(1, Math.ceil(filtrados.length / PAGE_SIZE));
-  const paginados = filtrados.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const filtradosOrdenados = useMemo(
+    () => [...filtrados].sort((a, b) => a.inicio.localeCompare(b.inicio)),
+    [filtrados]
+  );
+  const paginados = filtradosOrdenados.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const limparFiltros = () => {
     setFiltroMedico("todos"); setFiltroEspecialidade("todos"); setFiltroDiaSemana("todos");
