@@ -334,10 +334,11 @@ export function AppShell() {
         <nav className="flex-1 px-2 py-3 space-y-5 overflow-y-auto">
           {visibleNavRows.map((row) => {
             const groupHasActive = row.items.some((it) => location.pathname === it.to || (it.to !== "/app" && location.pathname.startsWith(it.to)));
-            const open = collapsed ? true : (openGroups[row.label] ?? groupHasActive);
+            const hideLabel = subsystem === "gestao-pessoas" && row.label === "RH";
+            const open = collapsed || hideLabel ? true : (openGroups[row.label] ?? groupHasActive);
             return (
               <div key={row.label} className="space-y-1">
-                {!collapsed && (
+                {!collapsed && !hideLabel && (
                   <button
                     type="button"
                     onClick={() => setOpenGroups((prev) => ({ ...prev, [row.label]: !(prev[row.label] ?? groupHasActive) }))}
