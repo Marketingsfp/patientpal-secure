@@ -1492,8 +1492,8 @@ function AgendaPage() {
               <TableHead className="min-w-[200px]">Profissional</TableHead>
               <TableHead className="min-w-[200px]">Cliente</TableHead>
               <TableHead className="w-40">Pasta</TableHead>
-              <TableHead className="w-20 text-center">Alertas</TableHead>
-              <TableHead className="w-20 text-right">Ações</TableHead>
+              <TableHead className="w-28 text-center">Alertas</TableHead>
+              <TableHead className="w-32 text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -1507,7 +1507,7 @@ function AgendaPage() {
               const fichaNum = fichaPorId.get(a.id) ?? "";
               const realizado = a.status === "realizado";
               return (
-                <TableRow key={a.id} className={realizado ? "bg-emerald-50 dark:bg-emerald-950/20 [&>td]:py-0 [&>td]:h-7 text-xs" : "[&>td]:py-0 [&>td]:h-7 text-xs"}>
+                <TableRow key={a.id} className={realizado ? "bg-emerald-50 dark:bg-emerald-950/20 [&>td]:py-1 [&>td]:h-9 text-xs" : "[&>td]:py-1 [&>td]:h-9 text-xs"}>
                   <TableCell title="Marque para cobrar este atendimento em um pagamento agrupado">
                     <Checkbox checked={selecionados.has(a.id)} onCheckedChange={() => toggleSel(a.id)} />
                   </TableCell>
@@ -1550,7 +1550,7 @@ function AgendaPage() {
                     <Badge variant="outline" className="text-xs">{a.procedimento || "CONSULTA"}</Badge>
                   </TableCell>
                   <TableCell className="text-center">
-                    <div className="inline-flex items-center gap-1 flex-wrap justify-center">
+                    <div className="flex flex-col items-center gap-0.5">
                       {normalizar(a.paciente_nome) === "disponivel" ? (
                         <Badge className="bg-slate-100 text-slate-600 border border-slate-300">Livre</Badge>
                       ) : (
@@ -1561,34 +1561,61 @@ function AgendaPage() {
                           Pago
                         </Badge>
                       )}
+                      {normalizar(a.paciente_nome) !== "disponivel" &&
+                        !["aguardando_recepcao","recepcao"].includes(etapaMap.get(a.id) ?? "aguardando_recepcao") && (
+                        <Badge className="bg-emerald-100 text-emerald-700 border border-emerald-300 hover:bg-emerald-100 inline-flex items-center gap-1">
+                          <BadgeCheck className="h-3 w-3" /> Check-in OK
+                        </Badge>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
-                    {pagosSet.has(a.id) && ["aguardando_recepcao","recepcao"].includes(etapaMap.get(a.id) ?? "aguardando_recepcao") && (
+                    <div className="flex items-center justify-end gap-1">
+                      {(() => {
+                        const etapa = etapaMap.get(a.id) ?? "aguardando_recepcao";
+                        const pendenteCheckin = ["aguardando_recepcao","recepcao"].includes(etapa);
+                        if (pagosSet.has(a.id) && pendenteCheckin) {
+                          return (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="Confirmar presença (check-in)"
+                              onClick={() => confirmarPresenca(a)}
+                              className="h-8 w-8 border-2 rounded-md text-emerald-700 border-emerald-600 hover:bg-emerald-50"
+                            >
+                              <BadgeCheck className="h-4 w-4" />
+                            </Button>
+                          );
+                        }
+                        if (!pendenteCheckin && normalizar(a.paciente_nome) !== "disponivel") {
+                          return (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              disabled
+                              title="Check-in já realizado"
+                              className="h-8 w-8 border-2 rounded-md bg-emerald-600 text-white border-emerald-600 disabled:opacity-100"
+                            >
+                              <BadgeCheck className="h-4 w-4" />
+                            </Button>
+                          );
+                        }
+                        return null;
+                      })()}
                       <Button
                         variant="ghost"
                         size="icon"
-                        title="Confirmar presença (check-in)"
-                        onClick={() => confirmarPresenca(a)}
-                        className="border-2 rounded-sm px-2 mr-1 text-emerald-700 border-emerald-600 hover:bg-emerald-50"
+                        title={pagosSet.has(a.id) ? "Pago" : "Pagamento pendente"}
+                        onClick={() => cobrarAgendamento(a)}
+                        className={`h-8 w-8 border-2 rounded-md ${pagosSet.has(a.id)
+                          ? "text-emerald-600 border-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                          : "text-rose-600 border-rose-600 hover:text-rose-700 hover:bg-rose-50"}`}
                       >
-                        <BadgeCheck className="h-4 w-4" />
+                        <DollarSign className="h-4 w-4" />
                       </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      title={pagosSet.has(a.id) ? "Pago" : "Pagamento pendente"}
-                      onClick={() => cobrarAgendamento(a)}
-                      className={`border-2 rounded-sm px-2 ${pagosSet.has(a.id)
-                        ? "text-emerald-600 border-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                        : "text-rose-600 border-rose-600 hover:text-rose-700 hover:bg-rose-50"}`}
-                    >
-                      <DollarSign className="h-4 w-4" />
-                    </Button>
-                    <DropdownMenu>
+                      <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => openEdit(a)}><Pencil className="h-4 w-4 mr-2" /> Editar</DropdownMenuItem>
@@ -1626,6 +1653,7 @@ function AgendaPage() {
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
+                    </div>
                   </TableCell>
                 </TableRow>
               );
