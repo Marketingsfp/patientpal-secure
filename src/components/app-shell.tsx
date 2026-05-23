@@ -103,6 +103,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<{ to: string;
     items: [
     { to: "/app/auditoria", label: "Auditoria", icon: ShieldCheck },
     { to: "/app/financeiro", label: "Financeiro", icon: DollarSign },
+    { to: "/app/funcionarios", label: "Funcionários", icon: Users },
     { to: "/app/integration-secrets", label: "Integrações", icon: KeyRound },
     { to: "/app/lgpd", label: "LGPD", icon: ShieldCheck },
     { to: "/app/relatorios", label: "Relatórios", icon: BarChart3 },
