@@ -291,7 +291,7 @@ export function AppShell() {
     const gestaoPessoasItems = new Set(["/app/funcionarios", "/app/cargos", "/app/setores"]);
     const items = subsystem === "gestao-pessoas"
       ? row.items.filter((it) => gestaoPessoasItems.has(it.to))
-      : row.items.filter((it) => !gestaoPessoasItems.has(it.to) || it.to !== "/app/funcionarios" ? it.to !== "/app/funcionarios" : false);
+      : row.items.filter((it) => it.to !== "/app/funcionarios");
     return { ...row, items };
   }).filter((row) => row.items.length > 0);
   const visibleNavRows = isMedicoOnly ? medicoNavRows : scopedNavRows;
