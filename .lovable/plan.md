@@ -1,36 +1,49 @@
 ## Objetivo
 
-Na tabela da Agenda (`src/routes/_authenticated/app.agenda.tsx`):
-
-1. Desembolar as colunas **Alertas** e **Ações** — hoje os badges (Agendado / Pago) e os botões ($, check-in, ...) se acumulam num espaço apertado e quebram em duas linhas.
-2. Manter um indicador visível de que o paciente **já fez check-in**, em vez de simplesmente sumir com o ícone verde.
+Em `src/routes/_authenticated/app.agenda.tsx`, adicionar uma nova ação no menu **Opções (N)** chamada **"Excluir horários selecionados"**, habilitada apenas quando houver agendamentos selecionados e visível apenas para perfis autorizados.
 
 ## Mudanças
 
-### 1. Coluna **Alertas** (mais larga, badges empilhados)
+### 1. Gating por perfil
 
-- Aumentar largura: `w-20` → `w-28`.
-- Trocar `inline-flex ... flex-wrap` por `flex flex-col items-center gap-0.5` para empilhar verticalmente Status / Pago / Check-in sem quebra estranha.
-- Adicionar novo badge persistente quando `etapaMap.get(a.id)` **não** está em `["aguardando_recepcao","recepcao"]` e o paciente não é "DISPONIVEL":
-  - Texto: `Check-in OK` (ou `Em atendimento` / `No caixa` conforme etapa, usando um pequeno mapa).
-  - Estilo: badge esmeralda com ícone `BadgeCheck` à esquerda (`bg-emerald-100 text-emerald-700 border-emerald-300`), para diferenciar do "Pago" sólido.
+Seguir o padrão já usado em `app.caixa.tsx`:
 
-### 2. Coluna **Ações** (mais larga, ícones alinhados)
+```ts
+const isManager = clinicaAtual?.role === "admin" || clinicaAtual?.role === "gestor";
+```
 
-- Aumentar largura: `w-20` → `w-32` e usar `<div className="flex items-center justify-end gap-1">` envolvendo os 3 botões para garantir linha única.
-- Padronizar tamanho dos botões: remover `px-2` extra, usar `size="icon"` consistente (`h-8 w-8`) e `rounded-md` em vez de `rounded-sm`.
-- Quando o check-in **já foi feito** (etapa fora de aguardando/recepcao): manter o botão `BadgeCheck` no lugar, porém:
-  - `disabled`, sem hover destrutivo;
-  - estilo sólido esmeralda preenchido (`bg-emerald-600 text-white border-emerald-600`);
-  - `title="Check-in já realizado"`.
-- Assim o ícone **não some** — apenas muda de "contorno clicável" para "preenchido travado", deixando claro que está concluído.
+Apenas **admin** e **gestor** verão o item de exclusão. Os demais perfis (recepção, médico, enfermagem etc.) continuam vendo somente "Cobrar selecionados".
 
-### 3. Pequenos ajustes de respiro
+### 2. Novo item no DropdownMenu (linhas ~841-845)
 
-- Aumentar a altura da linha de `h-7` para `h-9` (`[&>td]:h-9 [&>td]:py-1`) — hoje `h-7` força textos e badges a se sobreporem visualmente nas duas colunas finais.
-- Manter `text-xs` para não estourar largura.
+Adicionar abaixo de "Cobrar selecionados":
+
+- Separador (`DropdownMenuSeparator`).
+- `DropdownMenuItem` com texto **"🗑️ Excluir horários selecionados"**, em estilo destrutivo (`text-destructive focus:text-destructive`).
+- Renderizar somente quando `isManager` for true.
+- `onClick` chama um novo handler `excluirSelecionados()`.
+
+O botão "Opções" já fica desabilitado quando `selecionados.size === 0`, então o requisito de "habilitar somente com seleção" já está coberto — o novo item herda esse comportamento.
+
+### 3. Handler `excluirSelecionados`
+
+Novo handler na página, semelhante ao `cobrarSelecionados` existente:
+
+1. Pegar `ids = Array.from(selecionados)`.
+2. Validar que não há nada com `status` diferente de `agendado` / paciente diferente de "DISPONÍVEL" — para evitar excluir consultas já realizadas/pagas. Regra proposta:
+   - Permitir excluir apenas linhas onde `paciente_nome === "DISPONÍVEL"` **ou** `status === "agendado"` sem `pagamento_id`.
+   - Se algum item da seleção não puder ser excluído, mostrar `toast.error` listando quantos foram bloqueados e abortar.
+3. `window.confirm(`Excluir ${ids.length} horário(s)? Esta ação não pode ser desfeita.`)`.
+4. `await supabase.from("agendamentos").delete().in("id", ids)`.
+5. Em sucesso: `toast.success`, limpar `selecionados` (`setSelecionados(new Set())`) e recarregar a lista (mesmo `load()`/refetch usado pelos outros handlers da página).
+6. Em erro: `toast.error(error.message)`.
+
+### 4. Sem mudanças de backend
+
+A tabela `agendamentos` já tem RLS aplicada por clínica/perfil — admins e gestores já podem deletar. Não é necessária nova migration nem alteração de policies.
 
 ## Fora de escopo
 
-- Sem mudanças em backend, queries, RLS ou no fluxo de check-in.
-- Sem mexer nas demais colunas (Ficha, Dia, Profissional, Cliente, Pasta).
+- Não mexer no fluxo de "Cobrar selecionados".
+- Não alterar o layout das colunas Alertas/Ações.
+- Não criar tela de gerenciamento de permissões — apenas reaproveitar o `role` já existente em `clinicaAtual`.

@@ -555,6 +555,27 @@ function AgendaPage() {
     setFormaPagCtx({ agId: itens.map(i => i.id).join(","), desc });
     setFormaPagOpen(true);
   };
+
+  const isManager = clinicaAtual?.role === "admin" || clinicaAtual?.role === "gestor";
+
+  const excluirSelecionados = async () => {
+    if (!clinicaAtual) return;
+    if (!isManager) { toast.error("Você não tem permissão para excluir horários."); return; }
+    const ids = Array.from(selecionados);
+    const itens = items.filter(a => ids.includes(a.id));
+    if (itens.length === 0) { toast.info("Selecione ao menos um horário."); return; }
+    const bloqueados = itens.filter(i => pagosSet.has(i.id) || (i.paciente_nome !== "DISPONÍVEL" && i.status !== "agendado"));
+    if (bloqueados.length > 0) {
+      toast.error(`${bloqueados.length} item(ns) não podem ser excluídos (já pagos ou em atendimento). Desmarque-os.`);
+      return;
+    }
+    if (!confirm(`Excluir ${ids.length} horário(s)? Esta ação não pode ser desfeita.`)) return;
+    const { error } = await supabase.from("agendamentos").delete().in("id", ids);
+    if (error) { toast.error(error.message); return; }
+    toast.success(`${ids.length} horário(s) excluído(s).`);
+    setSelecionados(new Set());
+    await load();
+  };
   const [pagamentoValor, setPagamentoValor] = useState("");
 
   const openNew = () => {
@@ -842,6 +863,17 @@ function AgendaPage() {
               <DropdownMenuItem onClick={cobrarSelecionados}>
                 💳 Cobrar selecionados (1 pagamento)
               </DropdownMenuItem>
+              {isManager && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={excluirSelecionados}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    🗑️ Excluir horários selecionados
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
           <Button
