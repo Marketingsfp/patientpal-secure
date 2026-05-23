@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Users, ConciergeBell, CheckCircle2 } from "lucide-react";
+import { Users, HeartPulse, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
 import { Card } from "@/components/ui/card";
@@ -23,9 +23,9 @@ type CardDef = {
 const CARDS: CardDef[] = [
   {
     id: "recepcao",
-    title: "Recepção",
+    title: "Gestor Clínico",
     desc: "Agenda, atendimento, financeiro, marketing, cadastros e gestão.",
-    icon: ConciergeBell,
+    icon: HeartPulse,
     accent: "var(--primary)",
   },
   {
