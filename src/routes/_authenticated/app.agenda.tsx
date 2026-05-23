@@ -863,6 +863,17 @@ function AgendaPage() {
               <DropdownMenuItem onClick={cobrarSelecionados}>
                 💳 Cobrar selecionados (1 pagamento)
               </DropdownMenuItem>
+              {isManager && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={excluirSelecionados}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    🗑️ Excluir horários selecionados
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
           <Button
