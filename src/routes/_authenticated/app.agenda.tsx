@@ -1563,8 +1563,8 @@ function AgendaPage() {
                       )}
                       {normalizar(a.paciente_nome) !== "disponivel" &&
                         !["aguardando_recepcao","recepcao"].includes(etapaMap.get(a.id) ?? "aguardando_recepcao") && (
-                        <Badge className="bg-emerald-100 text-emerald-700 border border-emerald-300 hover:bg-emerald-100 inline-flex items-center gap-1">
-                          <BadgeCheck className="h-3 w-3" /> Check-in OK
+                        <Badge className="bg-emerald-100 text-emerald-700 border border-emerald-300 hover:bg-emerald-100 inline-flex items-center justify-center p-1" title="Check-in realizado">
+                          <BadgeCheck className="h-3.5 w-3.5" />
                         </Badge>
                       )}
                     </div>
