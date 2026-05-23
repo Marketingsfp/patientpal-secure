@@ -1,28 +1,36 @@
 ## Objetivo
 
-Ao abrir a tela `Agenda`, exibir apenas os agendamentos do dia atual. A faixa só deve mudar quando o usuário alterar manualmente a data ou desmarcar o filtro "Exibir apenas a data selecionada".
+Na tabela da Agenda (`src/routes/_authenticated/app.agenda.tsx`):
 
-## Causa atual
+1. Desembolar as colunas **Alertas** e **Ações** — hoje os badges (Agendado / Pago) e os botões ($, check-in, ...) se acumulam num espaço apertado e quebram em duas linhas.
+2. Manter um indicador visível de que o paciente **já fez check-in**, em vez de simplesmente sumir com o ícone verde.
 
-Em `src/routes/_authenticated/app.agenda.tsx`:
+## Mudanças
 
-- `dataRef` já inicia com hoje (linha 113).
-- Porém `apenasData` inicia como `false` (linha 115).
-- Por isso o `load()` (linhas 311–321) entra no ramo `else if (!statusEspecifico)` e busca de `dataRef` até `dataRef + 30 dias`, trazendo datas futuras como `17/06/2026` mesmo quando hoje é `23/05/2026`.
+### 1. Coluna **Alertas** (mais larga, badges empilhados)
 
-## Mudança
+- Aumentar largura: `w-20` → `w-28`.
+- Trocar `inline-flex ... flex-wrap` por `flex flex-col items-center gap-0.5` para empilhar verticalmente Status / Pago / Check-in sem quebra estranha.
+- Adicionar novo badge persistente quando `etapaMap.get(a.id)` **não** está em `["aguardando_recepcao","recepcao"]` e o paciente não é "DISPONIVEL":
+  - Texto: `Check-in OK` (ou `Em atendimento` / `No caixa` conforme etapa, usando um pequeno mapa).
+  - Estilo: badge esmeralda com ícone `BadgeCheck` à esquerda (`bg-emerald-100 text-emerald-700 border-emerald-300`), para diferenciar do "Pago" sólido.
 
-Arquivo: `src/routes/_authenticated/app.agenda.tsx`
+### 2. Coluna **Ações** (mais larga, ícones alinhados)
 
-- Linha 115: trocar `useState(false)` por `useState(true)` no estado `apenasData`.
+- Aumentar largura: `w-20` → `w-32` e usar `<div className="flex items-center justify-end gap-1">` envolvendo os 3 botões para garantir linha única.
+- Padronizar tamanho dos botões: remover `px-2` extra, usar `size="icon"` consistente (`h-8 w-8`) e `rounded-md` em vez de `rounded-sm`.
+- Quando o check-in **já foi feito** (etapa fora de aguardando/recepcao): manter o botão `BadgeCheck` no lugar, porém:
+  - `disabled`, sem hover destrutivo;
+  - estilo sólido esmeralda preenchido (`bg-emerald-600 text-white border-emerald-600`);
+  - `title="Check-in já realizado"`.
+- Assim o ícone **não some** — apenas muda de "contorno clicável" para "preenchido travado", deixando claro que está concluído.
 
-Efeitos:
+### 3. Pequenos ajustes de respiro
 
-- Na primeira carga o ramo `if (apenasData)` é usado e a query fica restrita a `dataRef 00:00:00` até `dataRef 23:59:59` (somente hoje).
-- O checkbox "Exibir apenas a data selecionada" passa a vir marcado por padrão.
-- O usuário pode:
-  - Mudar a data (`dataRef`) → recarrega para o novo dia.
-  - Desmarcar o checkbox → volta ao comportamento de janela ampla.
-- O `useEffect` em `load()` já depende de `dataRef`, `dataFim`, `apenasData` e `filtroStatus`, então nenhuma outra mudança é necessária.
+- Aumentar a altura da linha de `h-7` para `h-9` (`[&>td]:h-9 [&>td]:py-1`) — hoje `h-7` força textos e badges a se sobreporem visualmente nas duas colunas finais.
+- Manter `text-xs` para não estourar largura.
 
-Sem mudanças em backend, dados ou outras telas.
+## Fora de escopo
+
+- Sem mudanças em backend, queries, RLS ou no fluxo de check-in.
+- Sem mexer nas demais colunas (Ficha, Dia, Profissional, Cliente, Pasta).
