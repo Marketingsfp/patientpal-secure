@@ -99,6 +99,16 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<{ to: string;
     ],
   },
   {
+    label: "RH",
+    items: [
+    { to: "/app/hr-ponto", label: "Bater ponto", icon: Clock },
+    { to: "/app/lms-admin", label: "Cursos (admin)", icon: BookOpen },
+    { to: "/app/hr-ferias", label: "Férias", icon: Palmtree },
+    { to: "/app/hr-holerites", label: "Holerites", icon: FileText },
+    { to: "/app/treinamentos", label: "Treinamentos", icon: GraduationCap },
+    ],
+  },
+  {
     label: "Gestão",
     items: [
     { to: "/app/auditoria", label: "Auditoria", icon: ShieldCheck },
@@ -107,16 +117,6 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<{ to: string;
     { to: "/app/integration-secrets", label: "Integrações", icon: KeyRound },
     { to: "/app/lgpd", label: "LGPD", icon: ShieldCheck },
     { to: "/app/relatorios", label: "Relatórios", icon: BarChart3 },
-    ],
-  },
-  {
-    label: "RH",
-    items: [
-    { to: "/app/hr-ponto", label: "Bater ponto", icon: Clock },
-    { to: "/app/lms-admin", label: "Cursos (admin)", icon: BookOpen },
-    { to: "/app/hr-ferias", label: "Férias", icon: Palmtree },
-    { to: "/app/hr-holerites", label: "Holerites", icon: FileText },
-    { to: "/app/treinamentos", label: "Treinamentos", icon: GraduationCap },
     ],
   },
 ];
