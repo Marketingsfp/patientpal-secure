@@ -31,10 +31,10 @@ interface Props {
 
 const emptyForm = (clinicaId: string) => ({
   clinica_id: clinicaId,
-  funcionario_nome: "", cpf: "", cargo_id: "", setor_id: "",
-  regime: "clt", carga_horaria_semanal: "44", salario: "0",
-  data_admissao: new Date().toISOString().slice(0, 10), data_demissao: "", status: "ativo",
-  sexo: "nao_informar",
+  contrato_id: "",
+  funcionario_nome: "",
+  setor_id: "",
+  status: "ativo",
   criar_login: false, email: "", senha: "", perfil: "recepcao",
 });
 
@@ -42,8 +42,8 @@ export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUs
   const cadastrarUsuarioFn = useServerFn(cadastrarUsuario);
   const getLoginFn = useServerFn(getFuncionarioLogin);
   const definirSenhaFn = useServerFn(definirSenhaFuncionario);
-  const [cargos, setCargos] = useState<Ref[]>([]);
   const [setores, setSetores] = useState<Ref[]>([]);
+  const [disponiveis, setDisponiveis] = useState<Array<{ id: string; nome: string; setor_id: string | null; status: string }>>([]);
   const [form, setForm] = useState(() => emptyForm(clinicaId));
   const [editingContratoId, setEditingContratoId] = useState<string | null>(null);
   const [prefillUserId, setPrefillUserId] = useState<string | null>(null);
@@ -55,16 +55,20 @@ export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUs
   const [confirmarSenha, setConfirmarSenha] = useState("");
   const [savingSenha, setSavingSenha] = useState(false);
 
-  // Load cargos/setores when dialog opens
+  // Load setores + funcionários disponíveis (sem login) when dialog opens
   useEffect(() => {
     if (!open || !clinicaId) return;
     void (async () => {
-      const [cg, st] = await Promise.all([
-        supabase.from("cargos").select("id,nome").eq("clinica_id", clinicaId).eq("ativo", true).order("nome"),
+      const [st, disp] = await Promise.all([
         supabase.from("setores").select("id,nome").eq("clinica_id", clinicaId).eq("ativo", true).order("nome"),
+        supabase.from("hr_contratos")
+          .select("id, nome:funcionario_nome, setor_id, status")
+          .eq("clinica_id", clinicaId)
+          .is("user_id", null)
+          .order("funcionario_nome"),
       ]);
-      setCargos((cg.data ?? []) as Ref[]);
       setSetores((st.data ?? []) as Ref[]);
+      setDisponiveis((disp.data ?? []) as Array<{ id: string; nome: string; setor_id: string | null; status: string }>);
     })();
   }, [open, clinicaId]);
 
@@ -90,17 +94,10 @@ export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUs
         setPrefillUserId(null);
         setForm({
           clinica_id: clinicaId,
+          contrato_id: contrato.id as string,
           funcionario_nome: nome,
-          cpf: (contrato.cpf as string) ?? "",
-          cargo_id: (contrato.cargo_id as string) ?? "",
           setor_id: (contrato.setor_id as string) ?? "",
-          regime: (contrato.regime as string) ?? "clt",
-          carga_horaria_semanal: String(contrato.carga_horaria_semanal ?? "44"),
-          salario: String(contrato.salario ?? "0"),
-          data_admissao: (contrato.data_admissao as string) ?? new Date().toISOString().slice(0, 10),
-          data_demissao: (contrato.data_demissao as string) ?? "",
           status: (contrato.status as string) ?? "ativo",
-          sexo: (contrato.sexo as string) ?? "nao_informar",
           criar_login: false, email: "", senha: "", perfil: "recepcao",
         });
       } else {
@@ -140,14 +137,18 @@ export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUs
 
   async function salvar() {
     if (!form.clinica_id) { toast.error("Clínica não definida"); return; }
-    if (!form.funcionario_nome.trim()) { toast.error("Informe o nome"); return; }
     const isNew = !editingContratoId && !prefillUserId;
+    if (isNew && !form.contrato_id) { toast.error("Selecione um funcionário"); return; }
+    if (!isNew && !form.funcionario_nome.trim()) { toast.error("Informe o nome"); return; }
     if (form.criar_login && isNew) {
       if (!form.email.trim()) { toast.error("Informe o e-mail do login"); return; }
       if (form.senha.length < 6) { toast.error("Senha deve ter pelo menos 6 caracteres"); return; }
     }
     setSaving(true);
     let userId: string | null = null;
+    // Resolve o nome do funcionário escolhido (necessário ao criar login)
+    const escolhido = disponiveis.find((d) => d.id === form.contrato_id);
+    const nomeParaLogin = (escolhido?.nome ?? form.funcionario_nome).trim();
     if (form.criar_login && isNew) {
       try {
         const res = await cadastrarUsuarioFn({
@@ -155,7 +156,7 @@ export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUs
             clinicaId: form.clinica_id,
             email: form.email.trim(),
             password: form.senha,
-            nome: form.funcionario_nome.trim(),
+            nome: nomeParaLogin,
             role: form.perfil as "recepcao",
           },
         });
@@ -167,24 +168,36 @@ export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUs
       }
     }
 
-    const payload = {
-      clinica_id: form.clinica_id,
-      funcionario_nome: form.funcionario_nome.trim(),
-      cpf: form.cpf.trim() || null,
-      cargo_id: form.cargo_id || null,
-      setor_id: form.setor_id || null,
-      regime: form.regime,
-      carga_horaria_semanal: Number(form.carga_horaria_semanal),
-      salario: Number(form.salario),
-      data_admissao: form.data_admissao,
-      data_demissao: form.data_demissao || null,
-      status: form.status,
-      sexo: form.sexo,
-      ...(userId ? { user_id: userId } : prefillUserId ? { user_id: prefillUserId } : {}),
-    };
-    const { error } = editingContratoId
-      ? await supabase.from("hr_contratos").update(payload).eq("id", editingContratoId)
-      : await supabase.from("hr_contratos").insert(payload);
+    let error: { message: string } | null = null;
+    if (editingContratoId) {
+      const { error: e } = await supabase
+        .from("hr_contratos")
+        .update({ setor_id: form.setor_id || null, status: form.status })
+        .eq("id", editingContratoId);
+      error = e;
+    } else if (isNew && form.contrato_id) {
+      // Vincula o login (se criado) ao contrato escolhido e atualiza setor/status
+      const updatePayload: { setor_id: string | null; status: string; user_id?: string } = {
+        setor_id: form.setor_id || null,
+        status: form.status,
+      };
+      if (userId) updatePayload.user_id = userId;
+      const { error: e } = await supabase
+        .from("hr_contratos")
+        .update(updatePayload)
+        .eq("id", form.contrato_id);
+      error = e;
+    } else if (prefillUserId) {
+      // Caso raro: usuário existente sem contrato — cria um mínimo
+      const { error: e } = await supabase.from("hr_contratos").insert({
+        clinica_id: form.clinica_id,
+        funcionario_nome: nomeParaLogin || "(sem nome)",
+        setor_id: form.setor_id || null,
+        status: form.status,
+        user_id: prefillUserId,
+      });
+      error = e;
+    }
     setSaving(false);
     if (error) { toast.error(error.message); return; }
     toast.success(editingContratoId || prefillUserId ? "Funcionário atualizado" : "Funcionário cadastrado");
@@ -210,38 +223,34 @@ export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUs
             </TabsList>
             <TabsContent value="dados" className="space-y-3 min-h-[480px] max-h-[70vh] overflow-y-auto pr-1">
               <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2"><Label>Nome do funcionário *</Label><Input value={form.funcionario_nome} onChange={e => setForm({ ...form, funcionario_nome: e.target.value })} /></div>
-                <div><Label>CPF</Label><Input value={form.cpf} onChange={e => setForm({ ...form, cpf: e.target.value })} /></div>
-                <div>
-                  <Label>Sexo</Label>
-                  <Select value={form.sexo} onValueChange={v => setForm({ ...form, sexo: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="masculino">Masculino</SelectItem>
-                      <SelectItem value="feminino">Feminino</SelectItem>
-                      <SelectItem value="outro">Outro</SelectItem>
-                      <SelectItem value="nao_informar">Prefiro não informar</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Regime</Label>
-                  <Select value={form.regime} onValueChange={v => setForm({ ...form, regime: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="clt">CLT</SelectItem>
-                      <SelectItem value="pj">PJ</SelectItem>
-                      <SelectItem value="autonomo">Autônomo</SelectItem>
-                      <SelectItem value="estagio">Estágio</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Cargo</Label>
-                  <Select value={form.cargo_id} onValueChange={v => setForm({ ...form, cargo_id: v })}>
-                    <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                    <SelectContent>{cargos.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}</SelectContent>
-                  </Select>
+                <div className="col-span-2">
+                  <Label>Nome do funcionário *</Label>
+                  {isEditingExisting ? (
+                    <Input value={form.funcionario_nome} disabled />
+                  ) : (
+                    <Select
+                      value={form.contrato_id}
+                      onValueChange={(v) => {
+                        const d = disponiveis.find((x) => x.id === v);
+                        setForm({
+                          ...form,
+                          contrato_id: v,
+                          funcionario_nome: d?.nome ?? "",
+                          setor_id: d?.setor_id ?? "",
+                          status: d?.status ?? "ativo",
+                        });
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={disponiveis.length === 0 ? "Nenhum funcionário disponível — cadastre em Gestão de Pessoas" : "Selecione um funcionário"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {disponiveis.map((d) => (
+                          <SelectItem key={d.id} value={d.id}>{d.nome}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
                 <div>
                   <Label>Setor</Label>
@@ -250,10 +259,6 @@ export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUs
                     <SelectContent>{setores.map(s => <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
-                <div><Label>Carga semanal (h)</Label><Input type="number" step="0.5" value={form.carga_horaria_semanal} onChange={e => setForm({ ...form, carga_horaria_semanal: e.target.value })} /></div>
-                <div><Label>Salário (R$)</Label><Input type="number" step="0.01" value={form.salario} onChange={e => setForm({ ...form, salario: e.target.value })} /></div>
-                <div><Label>Admissão</Label><Input type="date" value={form.data_admissao} onChange={e => setForm({ ...form, data_admissao: e.target.value })} /></div>
-                <div><Label>Demissão</Label><Input type="date" value={form.data_demissao} onChange={e => setForm({ ...form, data_demissao: e.target.value })} /></div>
                 <div>
                   <Label>Status</Label>
                   <Select value={form.status} onValueChange={v => setForm({ ...form, status: v })}>
