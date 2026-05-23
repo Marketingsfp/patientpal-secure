@@ -87,14 +87,12 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<{ to: string;
   {
     label: "Cadastros",
     items: [
-    { to: "/app/cargos", label: "Cargos", icon: Briefcase },
     { to: "/app/equipe", label: "Equipe", icon: Users },
     { to: "/app/especialidades", label: "Especialidades", icon: HeartPulse },
     { to: "/app/disponibilidades", label: "Horários médicos", icon: Clock },
     { to: "/app/prontuario-modelos", label: "Modelos de Prontuário", icon: FileHeart },
     { to: "/app/perfis", label: "Perfis", icon: KeyRound },
     { to: "/app/procedimentos", label: "Procedimentos", icon: ClipboardList },
-    { to: "/app/setores", label: "Setores", icon: Building2 },
     { to: "/app/unidades", label: "Unidades", icon: MapPin },
     ],
   },
@@ -112,11 +110,13 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<{ to: string;
     label: "Gestão",
     items: [
     { to: "/app/auditoria", label: "Auditoria", icon: ShieldCheck },
+    { to: "/app/cargos", label: "Cargos", icon: Briefcase },
     { to: "/app/financeiro", label: "Financeiro", icon: DollarSign },
     { to: "/app/funcionarios", label: "Funcionários", icon: Users },
     { to: "/app/integration-secrets", label: "Integrações", icon: KeyRound },
     { to: "/app/lgpd", label: "LGPD", icon: ShieldCheck },
     { to: "/app/relatorios", label: "Relatórios", icon: BarChart3 },
+    { to: "/app/setores", label: "Setores", icon: Building2 },
     ],
   },
 ];
@@ -288,9 +288,10 @@ export function AppShell() {
     : navRows;
   const scopedNavRows = filteredByGroup.map((row) => {
     if (row.label !== "Gestão") return row;
+    const gestaoPessoasItems = new Set(["/app/funcionarios", "/app/cargos", "/app/setores"]);
     const items = subsystem === "gestao-pessoas"
-      ? row.items.filter((it) => it.to === "/app/funcionarios")
-      : row.items.filter((it) => it.to !== "/app/funcionarios");
+      ? row.items.filter((it) => gestaoPessoasItems.has(it.to))
+      : row.items.filter((it) => !gestaoPessoasItems.has(it.to) || it.to !== "/app/funcionarios" ? it.to !== "/app/funcionarios" : false);
     return { ...row, items };
   }).filter((row) => row.items.length > 0);
   const visibleNavRows = isMedicoOnly ? medicoNavRows : scopedNavRows;
