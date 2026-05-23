@@ -112,7 +112,7 @@ function AgendaPage() {
   const { user } = useAuth();
   const [dataRef, setDataRef] = useState(() => new Date().toISOString().slice(0, 10));
   const [dataFim, setDataFim] = useState<string | null>(null);
-  const [apenasData, setApenasData] = useState(false);
+  const [apenasData, setApenasData] = useState(true);
   const [mostrarLivres, setMostrarLivres] = useState(true);
   const [filtroMedico, setFiltroMedico] = useState<string>("todos");
   const [filtroEspecialidade, setFiltroEspecialidade] = useState<string>("todos");
