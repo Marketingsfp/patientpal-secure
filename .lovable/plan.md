@@ -1,29 +1,18 @@
-## Objetivo
+## Mudanças no menu — subsistema "Gestão de Pessoas"
 
-Separar a fila de atendimento da tela de atendimento em si. Hoje tudo vive em `app.atendimento-ia.tsx`. Vou dividir em duas rotas: a fila (lista) e o atendimento individual de um agendamento.
+### 1. `src/components/app-shell.tsx`
+- Adicionar novo grupo `"Gestão"` ao `navRows` contendo o item `Funcionários` apontando para `/app/funcionarios` (ícone `Users`).
+- Esconder o rótulo do grupo `"RH"` apenas quando o subsistema ativo for `gestao-pessoas`: na renderização do menu, se `subsystem === "gestao-pessoas"` e `row.label === "RH"`, não renderizar o cabeçalho (botão com o nome do grupo), mantendo os itens listados normalmente e sempre expandidos.
 
-## Mudanças
+### 2. `src/lib/subsystem.ts`
+- Incluir `"Gestão"` na lista de `groups` do subsistema `gestao-pessoas` para que o novo grupo apareça nesse subsistema (além de continuar visível no subsistema Recepção via inclusão também em "recepcao", se quisermos manter consistência — confirmar abaixo).
 
-### 1. Nova rota: `src/routes/_authenticated/app.atendimento-ia.$agendamentoId.tsx`
-- Recebe o `agendamentoId` pela URL.
-- Contém toda a parte de atendimento que hoje está dentro do bloco `{!agendamentoId ? ... : (...)}` em `app.atendimento-ia.tsx`: triagem, gravação/transcrição, SOAP, sugestões da IA, botão Salvar.
-- Carrega o paciente/agendamento via Supabase usando o `agendamentoId` da URL (mesma lógica do `selecionar()` atual).
-- Após salvar o prontuário com sucesso, em vez de limpar campos e continuar na mesma tela, exibe um estado de "Prontuário salvo" com um botão **"Voltar para fila de atendimento"** que navega para `/app/atendimento-ia`.
-- Também mantém um link/botão discreto "Voltar para fila" no topo, para o caso de o médico desistir antes de salvar.
+Como o usuário pediu o novo menu "Gestão > Funcionários" dentro do subsistema Gestão de Pessoas, adicionarei `"Gestão"` aos `groups` de **`gestao-pessoas`**. O subsistema Recepção já possui um grupo "Gestão" próprio (Auditoria, Financeiro, etc.) — não será alterado.
 
-### 2. Ajustar `src/routes/_authenticated/app.atendimento-ia.tsx`
-- Vira apenas a tela da fila (tabela de pacientes já implementada).
-- Botão **Atender** deixa de chamar `selecionar(item)` e passa a navegar para `/app/atendimento-ia/$agendamentoId` usando `useNavigate` do TanStack Router.
-- Remover todo o bloco de UI de atendimento (triagem, gravação, SOAP, salvar) e os estados/efeitos que só serviam para ele (`triagem`, transcrição, SOAP, sugestões, `handleSalvar`, etc.). Esses passam para a nova rota.
-- Mantém: carregamento da fila, realtime da fila, badges de prioridade, filtros existentes.
+### 3. Nova rota `src/routes/_authenticated/app.funcionarios.tsx`
+- Criar página em branco com título "Funcionários" e um placeholder, pronta para receber conteúdo futuramente.
+- Inclui `head()` com title próprio.
 
-### 3. Sem mudanças
-- Banco de dados, RLS, permissões, lógica de IA, lógica de salvar prontuário (apenas muda o que acontece *depois* de salvar).
-- Demais telas (agenda, financeiro, etc.).
-
-## Detalhes técnicos
-
-- Rota dinâmica com TanStack file-based routing: arquivo `app.atendimento-ia.$agendamentoId.tsx` → URL `/app/atendimento-ia/:agendamentoId`. Usar `createFileRoute("/_authenticated/app/atendimento-ia/$agendamentoId")` e `Route.useParams()` para pegar o id.
-- Navegação no botão Atender: `navigate({ to: "/app/atendimento-ia/$agendamentoId", params: { agendamentoId: it.id } })`.
-- Após salvar com sucesso (dentro do `handleSalvar`), trocar o `setLoading(null)` final por um `setSalvo(true)`; quando `salvo` for `true`, renderizar tela de confirmação com botão que faz `navigate({ to: "/app/atendimento-ia" })`.
-- Manter `<Link>` no topo da nova rota para retorno antecipado.
+### Resultado
+- No subsistema **Gestão de Pessoas**, o sidebar mostra os itens de RH sem o cabeçalho "RH", e um novo grupo **Gestão** com o item **Funcionários** levando a `/app/funcionarios`.
+- Demais subsistemas permanecem inalterados.

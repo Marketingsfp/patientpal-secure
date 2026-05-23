@@ -10,7 +10,7 @@ export const SUBSYSTEMS: Record<SubsystemId, { label: string; groups: string[] }
   },
   "gestao-pessoas": {
     label: "Gestão de Pessoas",
-    groups: ["RH"],
+    groups: ["RH", "Gestão"],
   },
 };
 
