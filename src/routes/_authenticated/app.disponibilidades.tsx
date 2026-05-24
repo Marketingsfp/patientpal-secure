@@ -16,6 +16,25 @@ export const Route = createFileRoute("/_authenticated/app/disponibilidades")({
 
 const DIAS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
+// Feriados nacionais fixos (MM-DD). Domingos são bloqueados separadamente.
+const FERIADOS_FIXOS = new Set<string>([
+  "01-01", // Confraternização Universal
+  "04-21", // Tiradentes
+  "05-01", // Dia do Trabalho
+  "09-07", // Independência
+  "10-12", // Nossa Senhora Aparecida
+  "11-02", // Finados
+  "11-15", // Proclamação da República
+  "11-20", // Consciência Negra
+  "12-25", // Natal
+]);
+
+function isFeriadoOuDomingo(d: Date): boolean {
+  if (d.getDay() === 0) return true;
+  const mmdd = `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return FERIADOS_FIXOS.has(mmdd);
+}
+
 interface Disp { id: string; medico_id: string; dia_semana: number; hora_inicio: string; hora_fim: string; observacoes: string | null; limite_pacientes: number | null }
 interface Medico { id: string; nome: string }
 
@@ -79,6 +98,7 @@ function Page() {
     const out: { data: string; medico: string; inicio: string; fim: string }[] = [];
     for (let i = 0; i < dias; i++) {
       const d = new Date(ini); d.setDate(d.getDate() + i);
+      if (isFeriadoOuDomingo(d)) continue;
       const dow = d.getDay();
       for (const m of alvo) {
         const ds = disps.filter((x) => x.medico_id === m.id && x.dia_semana === dow);
