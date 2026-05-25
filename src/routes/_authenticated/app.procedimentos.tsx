@@ -578,7 +578,7 @@ function ProcedimentosPage() {
                   filtrados.map((p) => ({
                     nome: p.nome,
                     grupo: p.grupo ?? "",
-                    tipo: TIPO_LABEL[p.tipo],
+                    tipo: tipoLabel(p.tipo),
                     codigo: p.codigo ?? "",
                     dinheiro: Number(p.valor_dinheiro ?? p.valor_dinheiro_pix ?? 0).toFixed(2),
                     cartao: Number(p.valor_cartao_credito ?? p.valor_cartao_debito ?? p.valor_cartao ?? 0).toFixed(2),
@@ -662,7 +662,7 @@ function ProcedimentosPage() {
                     <TableCell className="font-medium">{p.nome}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{p.grupo ?? "—"}</TableCell>
                     <TableCell>
-                      <span className={`text-[10px] px-1.5 py-0 rounded-full ${TIPO_COR[p.tipo]}`}>{TIPO_LABEL[p.tipo]}</span>
+                      <span className={`text-[10px] px-1.5 py-0 rounded-full ${tipoCor(p.tipo)}`}>{tipoLabel(p.tipo)}</span>
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_dinheiro ?? p.valor_dinheiro_pix))}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_pix ?? p.valor_cartao_credito ?? p.valor_cartao_debito ?? p.valor_cartao))}</TableCell>
