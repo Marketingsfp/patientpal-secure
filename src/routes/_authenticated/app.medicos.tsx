@@ -32,6 +32,9 @@ interface Medico {
   medico_especialidades: { especialidade: { id: string; nome: string } | null }[];
 }
 
+const limparPrefixoMedico = (nome: string) =>
+  nome.replace(/^(\s*(dr|dra)\.?\s+)+/i, "").trim();
+
 function MedicosPage() {
   const { clinicaAtual } = useClinica();
   const { new: autoNew, edit: autoEdit } = Route.useSearch();
@@ -48,7 +51,7 @@ function MedicosPage() {
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("nome");
     const base = ((data as unknown as Medico[]) ?? []).map((m) => ({
-      ...m, tipo_repasse: null, percentual_repasse_padrao: null, valor_repasse_padrao: null,
+      ...m, nome: limparPrefixoMedico(m.nome), tipo_repasse: null, percentual_repasse_padrao: null, valor_repasse_padrao: null,
     }));
     // Repasse só visível a gestores (RPC restrita)
     const { data: rep } = await supabase.rpc("medicos_repasse_lista", { _clinica_id: clinicaAtual.clinica_id });
