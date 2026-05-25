@@ -25,9 +25,9 @@ interface Medico {
   nome: string;
   crm: string;
   crm_uf: string;
-  percentual_repasse_padrao: number;
+  percentual_repasse_padrao: number | null;
   valor_repasse_padrao: number | null;
-  tipo_repasse: "percentual" | "valor";
+  tipo_repasse: "percentual" | "valor" | null;
   ativo: boolean;
   medico_especialidades: { especialidade: { id: string; nome: string } | null }[];
 }
@@ -44,10 +44,20 @@ function MedicosPage() {
     if (!clinicaAtual) return;
     const { data } = await supabase
       .from("medicos")
-      .select("id, nome, crm, crm_uf, percentual_repasse_padrao, valor_repasse_padrao, tipo_repasse, ativo, medico_especialidades(especialidade:especialidades(id, nome))")
+      .select("id, nome, crm, crm_uf, ativo, medico_especialidades(especialidade:especialidades(id, nome))")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("nome");
-    setMedicos((data as unknown as Medico[]) ?? []);
+    const base = ((data as unknown as Medico[]) ?? []).map((m) => ({
+      ...m, tipo_repasse: null, percentual_repasse_padrao: null, valor_repasse_padrao: null,
+    }));
+    // Repasse só visível a gestores (RPC restrita)
+    const { data: rep } = await supabase.rpc("medicos_repasse_lista", { _clinica_id: clinicaAtual.clinica_id });
+    const repMap = new Map<string, { tipo_repasse: string | null; percentual_repasse_padrao: number | null; valor_repasse_padrao: number | null }>();
+    for (const r of (rep as any[] | null) ?? []) repMap.set(r.id, r);
+    setMedicos(base.map((m) => {
+      const r = repMap.get(m.id);
+      return r ? { ...m, tipo_repasse: r.tipo_repasse as any, percentual_repasse_padrao: r.percentual_repasse_padrao, valor_repasse_padrao: r.valor_repasse_padrao } : m;
+    }));
   };
 
   useEffect(() => {
@@ -71,10 +81,12 @@ function MedicosPage() {
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [autoEdit]);
 
-  const fmtRepasse = (m: Medico) =>
-    m.tipo_repasse === "valor"
+  const fmtRepasse = (m: Medico) => {
+    if (m.tipo_repasse == null) return "—";
+    return m.tipo_repasse === "valor"
       ? `R$ ${Number(m.valor_repasse_padrao ?? 0).toFixed(2)}`
-      : `${m.percentual_repasse_padrao}%`;
+      : `${m.percentual_repasse_padrao ?? 0}%`;
+  };
 
   const handleExport = () => {
     if (medicos.length === 0) { toast.info("Sem dados para exportar."); return; }
