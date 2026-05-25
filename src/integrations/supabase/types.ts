@@ -2900,6 +2900,7 @@ export type Database = {
           pix_chave: string | null
           rg: string | null
           rqe_especialidade: string | null
+          rqes: Json
           sexo: string
           telefone: string | null
           tem_rqe: boolean
@@ -2939,6 +2940,7 @@ export type Database = {
           pix_chave?: string | null
           rg?: string | null
           rqe_especialidade?: string | null
+          rqes?: Json
           sexo?: string
           telefone?: string | null
           tem_rqe?: boolean
@@ -2978,6 +2980,7 @@ export type Database = {
           pix_chave?: string | null
           rg?: string | null
           rqe_especialidade?: string | null
+          rqes?: Json
           sexo?: string
           telefone?: string | null
           tem_rqe?: boolean
