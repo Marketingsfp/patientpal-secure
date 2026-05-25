@@ -2899,8 +2899,10 @@ export type Database = {
           percentual_repasse_padrao: number
           pix_chave: string | null
           rg: string | null
+          rqe_especialidade: string | null
           sexo: string
           telefone: string | null
+          tem_rqe: boolean
           tipo_repasse: string
           updated_at: string
           user_id: string | null
@@ -2936,8 +2938,10 @@ export type Database = {
           percentual_repasse_padrao?: number
           pix_chave?: string | null
           rg?: string | null
+          rqe_especialidade?: string | null
           sexo?: string
           telefone?: string | null
+          tem_rqe?: boolean
           tipo_repasse?: string
           updated_at?: string
           user_id?: string | null
@@ -2973,8 +2977,10 @@ export type Database = {
           percentual_repasse_padrao?: number
           pix_chave?: string | null
           rg?: string | null
+          rqe_especialidade?: string | null
           sexo?: string
           telefone?: string | null
+          tem_rqe?: boolean
           tipo_repasse?: string
           updated_at?: string
           user_id?: string | null

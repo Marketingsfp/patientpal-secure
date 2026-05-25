@@ -1,40 +1,25 @@
-# Completar lista de módulos em Perfis de Acesso
-
-## Problema
-
-A tela `/app/perfis` lista os módulos do sistema agrupados (Operação, Inteligência, Marketing, Cadastros, Gestão, RH, Sistema), mas várias rotas reais do sistema não aparecem para seleção de permissão. Hoje há 47 módulos cadastrados, mas o sistema tem mais funções acessíveis.
-
-## Módulos faltantes detectados
-
-Comparando `src/routes/_authenticated/app.*.tsx` com `GRUPOS` em `app.perfis.tsx`:
-
-| Rota | Sugestão de grupo | Nome sugerido |
-|---|---|---|
-| `app.anamneses.tsx` | Operação | Anamneses |
-| `app.boletos.tsx` | Gestão | Boletos |
-| `app.checkin.tsx` | Operação | Check-in |
-| `app.clinicas.tsx` | Cadastros | Clínicas |
-| `app.contratos.tsx` | Gestão | Contratos |
-| `app.documentos.tsx` | Operação | Documentos |
-| `app.estoque.tsx` | Cadastros | Estoque |
-| `app.funcionarios.tsx` | Cadastros | Funcionários (lista) |
-| `app.modelos-documentos.tsx` | Cadastros | Modelos de Documentos |
-| `app.nfse.tsx` | Gestão | NFS-e |
-| `app.painel.tsx` | Operação | Painel de Senhas |
-| `app.planos.tsx` | Cadastros | Planos de Saúde/Convênios |
-| `app.prontuarios.tsx` | Inteligência | Prontuários |
-
-Observação: `app.clinicas.tsx` e o módulo já existente `unidades` parecem cobrir conceitos próximos — confirmar se devem ser entradas separadas ou unificadas.
+## Objetivo
+Adicionar no cadastro de médicos um campo **RQE** (checkbox). Quando marcado, exibir um campo adicional **"Especialidade de RQE"** para o usuário preencher.
 
 ## Mudanças
 
-**Arquivo único:** `src/routes/_authenticated/app.perfis.tsx`
+### 1. Banco de dados (migration)
+Adicionar duas colunas em `public.medicos`:
+- `tem_rqe boolean NOT NULL DEFAULT false`
+- `rqe_especialidade text` (texto livre, nullable, com limite de 200 caracteres)
 
-1. Adicionar as 13 entradas acima nos respectivos grupos do array `GRUPOS`, mantendo ordem alfabética dentro de cada grupo.
-2. Atualizar `PRESETS` para incluir acessos padrão sensatos nos novos módulos para cada perfil (ex.: `recepcao` → `checkin: "write"`, `painel: "write"`, `anamneses: "write"`; `medico` → `prontuarios: "write"`, `anamneses: "write"`, `documentos: "write"`; `financeiro` → `boletos: "write"`, `nfse: "write"`, `contratos: "write"`; `admin` já recebe `write` em todos automaticamente).
-3. Nenhuma mudança de backend/RLS — a tela hoje é apenas pré-visualização (botão Salvar está desabilitado), então é só atualizar a listagem visual.
+### 2. Formulário do médico (`src/components/medicos/MedicoFormDialog.tsx`)
+- Adicionar `tem_rqe` e `rqe_especialidade` ao estado `form`.
+- Carregar esses valores ao editar (no `select` e no `setForm`).
+- Renderizar na aba de dados profissionais (junto ao CRM/especialidades):
+  - Checkbox "RQE"
+  - Quando marcado: input de texto "Especialidade de RQE" (obrigatório se marcado)
+- Incluir os campos no `payload` de insert/update.
+- Se `tem_rqe` for desmarcado, limpar `rqe_especialidade` (gravar `null`).
 
-## Fora de escopo
+### 3. Sem outras alterações
+Não alterar listagens, repasses ou outras telas — apenas o formulário e o schema.
 
-- Persistência das permissões no banco (continua mock como hoje).
-- Alteração das regras reais de acesso por rota (RLS / `can_manage_clinica`).
+## Detalhes técnicos
+- Texto livre em `rqe_especialidade` (sem FK para `especialidades`), pois RQE refere-se a uma área de atuação específica do CFM que pode não estar na tabela de especialidades.
+- Validação no front: se `tem_rqe = true`, exigir `rqe_especialidade` não vazio antes de enviar.
