@@ -41,6 +41,7 @@ const emptyForm = () => ({
   tipo_repasse: "percentual" as "percentual" | "valor",
   percentual: "50",
   valor: "",
+  aceita_cartao_beneficios: true,
   cpf: "", rg: "", data_nascimento: "", email: "", telefone: "", telefone2: "",
   nacionalidade: "Brasileira", estado_civil: "",
   sexo: "nao_informar",
@@ -173,6 +174,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         tipo_repasse: (sens.tipo_repasse as "percentual" | "valor") ?? "percentual",
         percentual: sens.percentual_repasse_padrao != null ? String(sens.percentual_repasse_padrao) : "",
         valor: sens.valor_repasse_padrao != null ? String(sens.valor_repasse_padrao) : "",
+        aceita_cartao_beneficios: sens.aceita_cartao_beneficios !== false,
         cpf: sens.cpf ?? "", rg: sens.rg ?? "", data_nascimento: sens.data_nascimento ?? "",
         email: med.email ?? "", telefone: med.telefone ?? "", telefone2: med.telefone2 ?? "",
         nacionalidade: med.nacionalidade ?? "Brasileira", estado_civil: med.estado_civil ?? "",
@@ -234,6 +236,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       tipo_repasse: form.tipo_repasse,
       percentual_repasse_padrao: form.tipo_repasse === "percentual" ? parseFloat(form.percentual || "0") : 0,
       valor_repasse_padrao: form.tipo_repasse === "valor" ? parseFloat(form.valor || "0") : null,
+      aceita_cartao_beneficios: form.aceita_cartao_beneficios,
       cpf: form.cpf || null,
       rg: form.rg || null,
       data_nascimento: form.data_nascimento || null,
@@ -711,6 +714,21 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
               </TabsContent>
 
               <TabsContent value="repasse" className="space-y-4 pt-4 pb-16">
+                <div className="rounded-md border p-3 flex items-start gap-3 bg-muted/30">
+                  <Checkbox
+                    id="aceita_cartao_beneficios"
+                    checked={form.aceita_cartao_beneficios}
+                    onCheckedChange={(c) => setForm({ ...form, aceita_cartao_beneficios: c === true })}
+                  />
+                  <div className="space-y-1">
+                    <Label htmlFor="aceita_cartao_beneficios" className="cursor-pointer">
+                      Aceita Cartões Benefícios
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Quando desmarcado, este médico não aceita os preços/descontos dos cartões benefícios em consultas e exames.
+                    </p>
+                  </div>
+                </div>
                 <div className="space-y-2">
                   <Label>Tipo de repasse</Label>
                   <div className="flex gap-4 text-sm">

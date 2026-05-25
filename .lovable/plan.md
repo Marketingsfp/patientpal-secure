@@ -1,30 +1,20 @@
 ## Objetivo
 
-No cadastro de médico, eliminar o bloco "RQE (Registro de Qualificação de Especialista)" como seção independente. Em vez disso, cada **especialidade** vinculada ao médico passa a ter um checkbox **"Tem RQE"** e, quando marcado, um campo para o **número do RQE**.
+Permitir marcar, na aba **Repasse** do médico, se ele aceita ou não Cartões Benefícios em consultas/exames.
 
 ## Banco de dados
 
-Migração em `public.medico_especialidades`:
-- Adicionar `tem_rqe boolean NOT NULL DEFAULT false`.
-- Adicionar `rqe_numero text` com check de tamanho (≤ 50).
-- Backfill: para cada item em `medicos.rqes` (JSON), se houver linha correspondente em `medico_especialidades` com a mesma `especialidade_id`, definir `tem_rqe = true` e `rqe_numero` = número informado.
-- Manter `medicos.rqes` por compatibilidade (sem novas gravações).
+Migração em `public.medicos`:
+- Adicionar `aceita_cartao_beneficios boolean NOT NULL DEFAULT true` (padrão: aceita, mantém comportamento atual).
+- Expor o campo na RPC `medico_dados_sensiveis` (retornando no JSON junto aos demais campos de repasse).
 
 ## Frontend — `src/components/medicos/MedicoFormDialog.tsx`
 
-1. Remover o bloco "RQE" (UI e estado `rqes` do form).
-2. Na aba **Especialidades**, cada linha passa a ter:
-   - Select da especialidade (como hoje)
-   - Checkbox **"Tem RQE"**
-   - Quando marcado: input **"Nº RQE"** (obrigatório)
-   - Botão remover
-3. `load`: hidratar `tem_rqe` e `rqe_numero` da query de `medico_especialidades`.
-4. `handleSubmit`:
-   - Validar: se "Tem RQE" estiver marcado, `rqe_numero` é obrigatório.
-   - Ao gravar `medico_especialidades`, incluir `tem_rqe` e `rqe_numero`.
-   - Remover envio dos campos `rqes`, `tem_rqe`, `rqe_especialidade` no payload de `medicos`.
+Na aba **Repasse**, adicionar um bloco no topo (acima do "Tipo de repasse"):
+- Checkbox **"Aceita Cartões Benefícios"** com descrição curta ("Quando desmarcado, este médico não aceita os preços/descontos dos cartões benefícios em consultas e exames.").
+- Estado `aceita_cartao_beneficios: boolean` no `form`, hidratado a partir de `medico_dados_sensiveis` (default `true` para novos).
+- Enviar o campo no payload de update/insert da tabela `medicos`.
 
 ## Fora de escopo
 
-- Tela e CRUD de **Especialidades** (cadastro global) — a marcação de RQE é por médico/especialidade, não no cadastro da especialidade.
-- Listagem de médicos, demais abas (Acesso, Banco, Repasse, etc.).
+- Aplicar a regra no fluxo de agendamento/orçamento/caixa (bloquear seleção de cartão quando o médico não aceita). Esta etapa apenas registra a preferência; a aplicação prática na precificação pode ser feita em uma próxima etapa, se desejado.
