@@ -7,6 +7,7 @@ import { useClinica } from "@/hooks/use-clinica";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
@@ -271,8 +272,10 @@ function ConveniosPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
                   <Label>Taxa de adesão (R$)</Label>
-                  <Input type="number" step="0.01" min="0" value={taxaAdesao}
-                    onChange={(e) => setTaxaAdesao(parseFloat(e.target.value) || 0)} />
+                  <CurrencyInput
+                    value={taxaAdesao ? taxaAdesao.toFixed(2) : ""}
+                    onChange={(v) => setTaxaAdesao(v ? parseFloat(v) : 0)}
+                  />
                 </div>
                 <div>
                   <Label>Nº parcelas</Label>
@@ -369,13 +372,12 @@ function ConveniosPage() {
                             />
                           </TableCell>
                           <TableCell>
-                            <Input
-                              type="number" step="0.01" min="0"
+                            <CurrencyInput
                               className="text-right"
                               value={f.valor_mensal}
-                              onChange={(e) => {
-                                const v = parseFloat(e.target.value) || 0;
-                                setFaixas(faixas.map((x, i) => i === idx ? { ...x, valor_mensal: v } : x));
+                              onChange={(v) => {
+                                const num = v ? parseFloat(v) : 0;
+                                setFaixas(faixas.map((x, i) => i === idx ? { ...x, valor_mensal: num } : x));
                               }}
                             />
                           </TableCell>
