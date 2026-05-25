@@ -452,8 +452,9 @@ function ProcedimentosPage() {
     return sort.dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
   };
 
-  const openNew = () => { setEditing(null); setForm(EMPTY); setOpen(true); };
+  const openNew = () => { void loadEspecialidades(); setEditing(null); setForm(EMPTY); setOpen(true); };
   const openEdit = (p: Procedimento) => {
+    void loadEspecialidades();
     setEditing(p);
     setForm({
       nome: p.nome, grupo: p.grupo ?? "", tipo: p.tipo, codigo: p.codigo ?? "",
