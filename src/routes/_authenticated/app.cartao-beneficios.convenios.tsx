@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, ShieldCheck, Layers, Lightbulb } from "lucide-react";
+import { Plus, Pencil, Trash2, ShieldCheck, Layers, Lightbulb, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -12,7 +12,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -50,7 +49,7 @@ function ConveniosPage() {
   const { clinicaAtual } = useClinica();
   const [rows, setRows] = useState<Convenio[]>([]);
   const [loading, setLoading] = useState(true);
-  const [open, setOpen] = useState(false);
+  const [view, setView] = useState<"list" | "form">("list");
   const [editing, setEditing] = useState<Convenio | null>(null);
   const [nome, setNome] = useState("");
   const [descricao, setDescricao] = useState("");
@@ -106,7 +105,7 @@ function ConveniosPage() {
     setMaxDependentes(0); setFidelidadeMeses(0); setVigenciaMeses(12);
     setBeneficiosTxt(""); setModeloContrato("");
     setFaixas([{ vidas_de: 1, vidas_ate: null, valor_mensal: 0 }]);
-    setOpen(true);
+    setView("form");
   };
 
   const openEdit = async (c: Convenio) => {
@@ -132,7 +131,7 @@ function ConveniosPage() {
       valor_mensal: Number(f.valor_mensal),
     }));
     setFaixas(list.length ? list : [{ vidas_de: 1, vidas_ate: null, valor_mensal: 0 }]);
-    setOpen(true);
+    setView("form");
   };
 
   const save = async () => {
@@ -184,7 +183,7 @@ function ConveniosPage() {
     }
     setSaving(false);
     toast.success(editing ? "Convênio atualizado." : "Convênio criado.");
-    setOpen(false);
+    setView("list");
     load();
   };
 
@@ -201,7 +200,9 @@ function ConveniosPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      {view === "list" ? (
+        <>
+        <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground flex items-center gap-2">
           <ShieldCheck className="h-4 w-4" />
           Tipos de cartão benefícios oferecidos pela clínica.
@@ -244,13 +245,18 @@ function ConveniosPage() {
           </Table>
         </CardContent>
       </Card>
-
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editing ? "Editar convênio" : "Novo convênio"}</DialogTitle>
-          </DialogHeader>
-          <Tabs defaultValue="info" className="w-full">
+        </>
+      ) : (
+        <Card>
+          <CardContent className="p-6 space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <Button variant="ghost" size="sm" onClick={() => setView("list")}>
+                <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
+              </Button>
+              <h2 className="text-lg font-semibold">{editing ? `Editar convênio: ${editing.nome}` : "Novo convênio"}</h2>
+              <div />
+            </div>
+            <Tabs defaultValue="info" className="w-full">
             <TabsList>
               <TabsTrigger value="info">Informações</TabsTrigger>
               <TabsTrigger value="faixas"><Layers className="h-4 w-4 mr-1" />Faixas de Preço</TabsTrigger>
@@ -397,12 +403,13 @@ function ConveniosPage() {
               </div>
             </TabsContent>
           </Tabs>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button onClick={save} disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <div className="flex justify-end gap-2 border-t pt-4">
+              <Button variant="outline" onClick={() => setView("list")}>Cancelar</Button>
+              <Button onClick={save} disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <AlertDialog open={!!toDelete} onOpenChange={(v) => !v && setToDelete(null)}>
         <AlertDialogContent>
