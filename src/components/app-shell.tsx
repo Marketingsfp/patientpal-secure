@@ -97,7 +97,8 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
       icon: Stethoscope,
       children: [
         { to: "/app/especialidades", label: "Especialidades", icon: HeartPulse },
-        { to: "/app/procedimentos", label: "Procedimentos", icon: ClipboardList },
+        { to: "/app/tipos-servico", label: "Tipo", icon: LayoutGrid },
+        { to: "/app/procedimentos", label: "Serviços", icon: ClipboardList },
       ],
     },
     { to: "/app/disponibilidades", label: "Horários médicos", icon: Clock },
