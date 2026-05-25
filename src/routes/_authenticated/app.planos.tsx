@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { CreditCard, Plus, Save, Trash2 } from "lucide-react";
+import { CreditCard, Plus, Save, Trash2, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -9,8 +9,11 @@ import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/_authenticated/app/planos")({
   component: PlanosPage,
@@ -38,6 +41,7 @@ export function PlanosPage() {
   const { clinicaAtual } = useClinica();
   const [list, setList] = useState<Plano[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState<Plano | null>(null);
 
   const load = async () => {
     if (!clinicaAtual) return;
@@ -56,17 +60,18 @@ export function PlanosPage() {
 
   const novo = async () => {
     if (!clinicaAtual) return;
-    const { error } = await supabase.from("planos_assinatura").insert({
+    const { data, error } = await supabase.from("planos_assinatura").insert({
       clinica_id: clinicaAtual.clinica_id,
       nome: "Novo plano",
       tipo: "outro",
       valor_mensal: 0, taxa_adesao: 0,
       max_dependentes: 0, max_agregados: 0,
       fidelidade_meses: 6, vigencia_meses: 12, num_parcelas: 12,
-    });
+    }).select().single();
     if (error) return toast.error(error.message);
     toast.success("Plano criado");
-    load();
+    await load();
+    if (data) setEditing(data as Plano);
   };
 
   const salvar = async (p: Plano) => {
@@ -74,6 +79,8 @@ export function PlanosPage() {
     const { error } = await supabase.from("planos_assinatura").update(rest).eq("id", id);
     if (error) return toast.error(error.message);
     toast.success("Plano salvo");
+    setEditing(null);
+    load();
   };
 
   const excluir = async (id: string) => {
@@ -84,8 +91,14 @@ export function PlanosPage() {
     load();
   };
 
-  const upd = (id: string, patch: Partial<Plano>) =>
-    setList((l) => l.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+  const updEdit = (patch: Partial<Plano>) =>
+    setEditing((e) => (e ? { ...e, ...patch } : e));
+
+  const tipoLabel = (t: string) =>
+    t === "cartao_consulta" ? "Cartão Consulta" : t === "cartao_desconto" ? "Cartão Desconto" : "Outro";
+
+  const fmtMoeda = (v: number) =>
+    new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v ?? 0);
 
   return (
     <div className="space-y-4">
@@ -93,25 +106,56 @@ export function PlanosPage() {
         <h1 className="text-2xl font-bold flex items-center gap-2"><CreditCard className="h-6 w-6 text-primary"/>Planos de Assinatura</h1>
         <Button onClick={novo}><Plus className="h-4 w-4 mr-2"/>Novo plano</Button>
       </div>
-      {loading ? <p className="text-sm text-muted-foreground">Carregando…</p> : null}
-      {!loading && list.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Nenhum plano cadastrado.</p>
-      ) : null}
-      <div className="space-y-4">
-        {list.map((p) => (
-          <Card key={p.id}>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center justify-between gap-2">
-                <Input className="max-w-md font-semibold" value={p.nome} onChange={(e) => upd(p.id, { nome: e.target.value })}/>
-                <div className="flex gap-2">
-                  <Button size="sm" variant="default" onClick={() => salvar(p)}><Save className="h-4 w-4 mr-1"/>Salvar</Button>
-                  <Button size="sm" variant="outline" onClick={() => excluir(p.id)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
-                </div>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <Card>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nome</TableHead>
+                <TableHead>Tipo</TableHead>
+                <TableHead>Valor mensal</TableHead>
+                <TableHead>Adesão</TableHead>
+                <TableHead>Parcelas</TableHead>
+                <TableHead>Vigência</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">Carregando…</TableCell></TableRow>
+              ) : list.length === 0 ? (
+                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">Nenhum plano cadastrado.</TableCell></TableRow>
+              ) : list.map((p) => (
+                <TableRow key={p.id}>
+                  <TableCell className="font-medium">{p.nome}</TableCell>
+                  <TableCell><Badge variant="outline">{tipoLabel(p.tipo)}</Badge></TableCell>
+                  <TableCell>{fmtMoeda(p.valor_mensal)}</TableCell>
+                  <TableCell>{fmtMoeda(p.taxa_adesao)}</TableCell>
+                  <TableCell>{p.num_parcelas}x</TableCell>
+                  <TableCell>{p.vigencia_meses} meses</TableCell>
+                  <TableCell className="text-right">
+                    <Button size="sm" variant="ghost" onClick={() => setEditing(p)}><Pencil className="h-4 w-4"/></Button>
+                    <Button size="sm" variant="ghost" onClick={() => excluir(p.id)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <Dialog open={!!editing} onOpenChange={(v) => !v && setEditing(null)}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar plano</DialogTitle>
+          </DialogHeader>
+          {editing ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="col-span-full"><Label>Nome</Label>
+                <Input value={editing.nome} onChange={(e) => updEdit({ nome: e.target.value })}/>
+              </div>
               <div><Label>Tipo</Label>
-                <Select value={p.tipo} onValueChange={(v) => upd(p.id, { tipo: v })}>
+                <Select value={editing.tipo} onValueChange={(v) => updEdit({ tipo: v })}>
                   <SelectTrigger><SelectValue/></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="cartao_consulta">Cartão Consulta</SelectItem>
@@ -120,23 +164,27 @@ export function PlanosPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div><Label>Valor mensal (R$)</Label><CurrencyInput value={String(p.valor_mensal ?? "")} onChange={(v) => upd(p.id, { valor_mensal: Number(v) || 0 })}/></div>
-              <div><Label>Taxa de adesão (R$)</Label><CurrencyInput value={String(p.taxa_adesao ?? "")} onChange={(v) => upd(p.id, { taxa_adesao: Number(v) || 0 })}/></div>
-              <div><Label>Nº parcelas</Label><Input type="number" value={p.num_parcelas} onChange={(e) => upd(p.id, { num_parcelas: Number(e.target.value) })}/></div>
-              <div><Label>Máx. dependentes</Label><Input type="number" value={p.max_dependentes} onChange={(e) => upd(p.id, { max_dependentes: Number(e.target.value) })}/></div>
-              <div><Label>Máx. agregados</Label><Input type="number" value={p.max_agregados} onChange={(e) => upd(p.id, { max_agregados: Number(e.target.value) })}/></div>
-              <div><Label>Fidelidade (meses)</Label><Input type="number" value={p.fidelidade_meses} onChange={(e) => upd(p.id, { fidelidade_meses: Number(e.target.value) })}/></div>
-              <div><Label>Vigência (meses)</Label><Input type="number" value={p.vigencia_meses} onChange={(e) => upd(p.id, { vigencia_meses: Number(e.target.value) })}/></div>
+              <div><Label>Valor mensal (R$)</Label><CurrencyInput value={String(editing.valor_mensal ?? "")} onChange={(v) => updEdit({ valor_mensal: Number(v) || 0 })}/></div>
+              <div><Label>Taxa de adesão (R$)</Label><CurrencyInput value={String(editing.taxa_adesao ?? "")} onChange={(v) => updEdit({ taxa_adesao: Number(v) || 0 })}/></div>
+              <div><Label>Nº parcelas</Label><Input type="number" value={editing.num_parcelas} onChange={(e) => updEdit({ num_parcelas: Number(e.target.value) })}/></div>
+              <div><Label>Máx. dependentes</Label><Input type="number" value={editing.max_dependentes} onChange={(e) => updEdit({ max_dependentes: Number(e.target.value) })}/></div>
+              <div><Label>Máx. agregados</Label><Input type="number" value={editing.max_agregados} onChange={(e) => updEdit({ max_agregados: Number(e.target.value) })}/></div>
+              <div><Label>Fidelidade (meses)</Label><Input type="number" value={editing.fidelidade_meses} onChange={(e) => updEdit({ fidelidade_meses: Number(e.target.value) })}/></div>
+              <div><Label>Vigência (meses)</Label><Input type="number" value={editing.vigencia_meses} onChange={(e) => updEdit({ vigencia_meses: Number(e.target.value) })}/></div>
               <div className="col-span-full"><Label>Benefícios</Label>
-                <Textarea rows={3} value={p.descricao_beneficios ?? ""} onChange={(e) => upd(p.id, { descricao_beneficios: e.target.value })}/>
+                <Textarea rows={3} value={editing.descricao_beneficios ?? ""} onChange={(e) => updEdit({ descricao_beneficios: e.target.value })}/>
               </div>
               <div className="col-span-full"><Label>Modelo do contrato (use {`{{VALOR_MENSAL}}, {{PACIENTE_NOME}}, {{DEPENDENTES}}, {{CLINICA_NOME}}`} etc.)</Label>
-                <Textarea rows={10} value={p.template_contrato ?? ""} onChange={(e) => upd(p.id, { template_contrato: e.target.value })}/>
+                <Textarea rows={10} value={editing.template_contrato ?? ""} onChange={(e) => updEdit({ template_contrato: e.target.value })}/>
               </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+            </div>
+          ) : null}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditing(null)}>Cancelar</Button>
+            {editing ? <Button onClick={() => salvar(editing)}><Save className="h-4 w-4 mr-1"/>Salvar</Button> : null}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
