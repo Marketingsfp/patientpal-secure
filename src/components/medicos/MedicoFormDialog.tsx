@@ -216,7 +216,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       nome: nomeLimpo,
       crm: form.crm,
       crm_uf: form.crm_uf.toUpperCase(),
-      especialidade_id: form.especialidades[0] || null,
+      especialidade_id: form.especialidades.find((x) => !!x) || null,
       rqes: form.rqes.map((r) => ({
         especialidade_id: r.especialidade_id,
         especialidade_nome: r.especialidade_id
@@ -261,8 +261,9 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       if (error || !novo) { setSaving(false); toast.error(error?.message ?? "Erro"); return; }
       medicoId = novo.id;
     }
-    if (medicoId && form.especialidades.length) {
-      const rows = form.especialidades.map((eid) => ({ medico_id: medicoId!, especialidade_id: eid }));
+    const especialidadesIds = Array.from(new Set(form.especialidades.filter((x) => !!x)));
+    if (medicoId && especialidadesIds.length) {
+      const rows = especialidadesIds.map((eid) => ({ medico_id: medicoId!, especialidade_id: eid }));
       const { error: e2 } = await supabase.from("medico_especialidades").insert(rows);
       if (e2) { setSaving(false); toast.error(e2.message); return; }
     }
