@@ -16,7 +16,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 
 interface Especialidade { id: string; nome: string }
 interface Procedimento { id: string; nome: string; grupo: string | null; tipo: string; valor_padrao: number }
-interface RqeRow { especialidade_id: string | null; especialidade_nome?: string | null; numero: string }
+interface EspecialidadeRow { especialidade_id: string; tem_rqe: boolean; rqe_numero: string }
 interface ConvenioRow {
   id?: string;
   nome: string;
@@ -36,9 +36,8 @@ const limparPrefixoMedico = (nome: string) =>
 
 const emptyForm = () => ({
   nome: "", crm: "", crm_uf: "",
-  especialidades: [] as string[],
+  especialidades: [] as EspecialidadeRow[],
   procedimentos: [] as string[],
-  rqes: [] as RqeRow[],
   tipo_repasse: "percentual" as "percentual" | "valor",
   percentual: "50",
   valor: "",
@@ -115,7 +114,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       setLoading(true);
       const { data: m } = await supabase
         .from("medicos")
-        .select("id, user_id, nome, crm, crm_uf, email, telefone, telefone2, nacionalidade, estado_civil, sexo, cep, logradouro, numero, complemento, bairro, cidade, estado, rqes, medico_especialidades(especialidade:especialidades(id, nome))")
+        .select("id, user_id, nome, crm, crm_uf, email, telefone, telefone2, nacionalidade, estado_civil, sexo, cep, logradouro, numero, complemento, bairro, cidade, estado, medico_especialidades(especialidade_id, tem_rqe, rqe_numero, especialidade:especialidades(id, nome))")
         .eq("id", editingMedicoId)
         .maybeSingle();
       if (cancelled) return;
@@ -163,15 +162,14 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         nome: limparPrefixoMedico(med.nome ?? ""),
         crm: med.crm,
         crm_uf: med.crm_uf,
-        especialidades: (med.medico_especialidades ?? []).map((me: any) => me.especialidade?.id).filter(Boolean) as string[],
+        especialidades: ((med.medico_especialidades ?? []) as any[])
+          .filter((me) => me?.especialidade_id)
+          .map((me) => ({
+            especialidade_id: me.especialidade_id as string,
+            tem_rqe: !!me.tem_rqe,
+            rqe_numero: me.rqe_numero ?? "",
+          })),
         procedimentos: (mprocs ?? []).map((p: any) => p.procedimento_id),
-        rqes: Array.isArray(med.rqes)
-          ? (med.rqes as any[]).map((r) => ({
-              especialidade_id: r?.especialidade_id ?? null,
-              especialidade_nome: r?.especialidade_nome ?? null,
-              numero: r?.numero ?? "",
-            }))
-          : [],
         tipo_repasse: (sens.tipo_repasse as "percentual" | "valor") ?? "percentual",
         percentual: sens.percentual_repasse_padrao != null ? String(sens.percentual_repasse_padrao) : "",
         valor: sens.valor_repasse_padrao != null ? String(sens.valor_repasse_padrao) : "",
@@ -219,13 +217,9 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    for (const r of form.rqes) {
-      if (!r.especialidade_id) {
-        toast.error("Selecione a especialidade de cada RQE");
-        return;
-      }
-      if (!r.numero.trim()) {
-        toast.error("Informe o número de cada RQE");
+    for (const er of form.especialidades) {
+      if (er.tem_rqe && !er.rqe_numero.trim()) {
+        toast.error("Informe o número do RQE da especialidade marcada");
         return;
       }
     }
@@ -236,18 +230,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       nome: nomeLimpo,
       crm: form.crm,
       crm_uf: form.crm_uf.toUpperCase(),
-      especialidade_id: form.especialidades.find((x) => !!x) || null,
-      rqes: form.rqes.map((r) => ({
-        especialidade_id: r.especialidade_id,
-        especialidade_nome: r.especialidade_id
-          ? esps.find((e) => e.id === r.especialidade_id)?.nome ?? r.especialidade_nome ?? null
-          : r.especialidade_nome ?? null,
-        numero: r.numero.trim(),
-      })),
-      tem_rqe: form.rqes.length > 0,
-      rqe_especialidade: form.rqes[0]
-        ? (esps.find((e) => e.id === form.rqes[0].especialidade_id)?.nome ?? null)
-        : null,
+      especialidade_id: form.especialidades[0]?.especialidade_id ?? null,
       tipo_repasse: form.tipo_repasse,
       percentual_repasse_padrao: form.tipo_repasse === "percentual" ? parseFloat(form.percentual || "0") : 0,
       valor_repasse_padrao: form.tipo_repasse === "valor" ? parseFloat(form.valor || "0") : null,
@@ -283,9 +266,21 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       if (error || !novo) { setSaving(false); toast.error(error?.message ?? "Erro"); return; }
       medicoId = novo.id;
     }
-    const especialidadesIds = Array.from(new Set(form.especialidades.filter((x) => !!x)));
-    if (medicoId && especialidadesIds.length) {
-      const rows = especialidadesIds.map((eid) => ({ medico_id: medicoId!, especialidade_id: eid }));
+    const especialidadesValidas = form.especialidades.filter((x) => !!x.especialidade_id);
+    if (medicoId && especialidadesValidas.length) {
+      const seen = new Set<string>();
+      const rows = form.especialidades
+        .filter((er) => {
+          if (!er.especialidade_id || seen.has(er.especialidade_id)) return false;
+          seen.add(er.especialidade_id);
+          return true;
+        })
+        .map((er) => ({
+          medico_id: medicoId!,
+          especialidade_id: er.especialidade_id,
+          tem_rqe: er.tem_rqe,
+          rqe_numero: er.tem_rqe ? er.rqe_numero.trim() || null : null,
+        }));
       const { error: e2 } = await supabase.from("medico_especialidades").insert(rows);
       if (e2) { setSaving(false); toast.error(e2.message); return; }
     }
@@ -530,8 +525,8 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                 <div className="border rounded-md p-3 space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <Label className="text-sm font-medium">RQE (Registro de Qualificação de Especialista)</Label>
-                      <p className="text-xs text-muted-foreground">Adicione um ou mais RQEs com a especialidade e o número de registro.</p>
+                      <Label className="text-sm font-medium">Especialidades</Label>
+                      <p className="text-xs text-muted-foreground">Adicione uma ou mais especialidades. Marque "Tem RQE" e informe o número quando aplicável.</p>
                     </div>
                     <Button
                       type="button"
@@ -540,78 +535,12 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                       onClick={() =>
                         setForm({
                           ...form,
-                          rqes: [...form.rqes, { especialidade_id: null, numero: "" }],
+                          especialidades: [
+                            ...form.especialidades,
+                            { especialidade_id: "", tem_rqe: false, rqe_numero: "" },
+                          ],
                         })
                       }
-                    >
-                      <Plus className="h-4 w-4 mr-1" /> Adicionar RQE
-                    </Button>
-                  </div>
-                  {form.rqes.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">Nenhum RQE cadastrado.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {form.rqes.map((r, idx) => (
-                        <div key={idx} className="grid grid-cols-[1fr_140px_auto] gap-2 items-end">
-                          <div className="space-y-1">
-                            <Label className="text-xs">Especialidade</Label>
-                            <SearchableSelect
-                              options={esps.map((e) => ({ value: e.id, label: e.nome }))}
-                              value={r.especialidade_id ?? ""}
-                              onChange={(v) =>
-                                setForm({
-                                  ...form,
-                                  rqes: form.rqes.map((x, i) => (i === idx ? { ...x, especialidade_id: v } : x)),
-                                })
-                              }
-                              placeholder="Selecione"
-                              searchPlaceholder="Buscar especialidade..."
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs">Nº RQE</Label>
-                            <Input
-                              value={r.numero}
-                              maxLength={50}
-                              placeholder="Ex.: 12345"
-                              onChange={(e) =>
-                                setForm({
-                                  ...form,
-                                  rqes: form.rqes.map((x, i) => (i === idx ? { ...x, numero: e.target.value } : x)),
-                                })
-                              }
-                            />
-                          </div>
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="ghost"
-                            onClick={() =>
-                              setForm({
-                                ...form,
-                                rqes: form.rqes.filter((_, i) => i !== idx),
-                              })
-                            }
-                            aria-label="Remover RQE"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="border rounded-md p-3 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-sm font-medium">Especialidades</Label>
-                      <p className="text-xs text-muted-foreground">Adicione uma ou mais especialidades cadastradas no sistema.</p>
-                    </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setForm({ ...form, especialidades: [...form.especialidades, ""] })}
                     >
                       <Plus className="h-4 w-4 mr-1" /> Adicionar especialidade
                     </Button>
@@ -622,38 +551,79 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                     <p className="text-xs text-muted-foreground">Nenhuma especialidade selecionada.</p>
                   ) : (
                     <div className="space-y-2">
-                      {form.especialidades.map((eid, idx) => (
-                        <div key={idx} className="grid grid-cols-[1fr_auto] gap-2 items-center">
-                          <SearchableSelect
-                            options={esps.map((e) => ({ value: e.id, label: e.nome }))}
-                            value={eid}
-                            onChange={(v) => {
-                              if (v && form.especialidades.some((x, i) => i !== idx && x === v)) {
-                                toast.warning("Especialidade já adicionada");
-                                return;
+                      {form.especialidades.map((er, idx) => (
+                        <div key={idx} className="space-y-2 border rounded-md p-2">
+                          <div className="grid grid-cols-[1fr_auto] gap-2 items-center">
+                            <SearchableSelect
+                              options={esps.map((e) => ({ value: e.id, label: e.nome }))}
+                              value={er.especialidade_id}
+                              onChange={(v) => {
+                                if (v && form.especialidades.some((x, i) => i !== idx && x.especialidade_id === v)) {
+                                  toast.warning("Especialidade já adicionada");
+                                  return;
+                                }
+                                setForm({
+                                  ...form,
+                                  especialidades: form.especialidades.map((x, i) =>
+                                    i === idx ? { ...x, especialidade_id: v } : x,
+                                  ),
+                                });
+                              }}
+                              placeholder="Selecione"
+                              searchPlaceholder="Buscar especialidade..."
+                            />
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              onClick={() =>
+                                setForm({
+                                  ...form,
+                                  especialidades: form.especialidades.filter((_, i) => i !== idx),
+                                })
                               }
-                              setForm({
-                                ...form,
-                                especialidades: form.especialidades.map((x, i) => (i === idx ? v : x)),
-                              });
-                            }}
-                            placeholder="Selecione"
-                            searchPlaceholder="Buscar especialidade..."
-                          />
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="ghost"
-                            onClick={() =>
-                              setForm({
-                                ...form,
-                                especialidades: form.especialidades.filter((_, i) => i !== idx),
-                              })
-                            }
-                            aria-label="Remover especialidade"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                              aria-label="Remover especialidade"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <div className="flex items-center gap-3 pl-1">
+                            <label className="flex items-center gap-2 text-sm">
+                              <Checkbox
+                                checked={er.tem_rqe}
+                                onCheckedChange={(v) =>
+                                  setForm({
+                                    ...form,
+                                    especialidades: form.especialidades.map((x, i) =>
+                                      i === idx
+                                        ? { ...x, tem_rqe: !!v, rqe_numero: v ? x.rqe_numero : "" }
+                                        : x,
+                                    ),
+                                  })
+                                }
+                              />
+                              Tem RQE
+                            </label>
+                            {er.tem_rqe && (
+                              <div className="flex items-center gap-2 flex-1">
+                                <Label className="text-xs whitespace-nowrap">Nº RQE</Label>
+                                <Input
+                                  className="h-8"
+                                  maxLength={50}
+                                  value={er.rqe_numero}
+                                  placeholder="Ex.: 12345"
+                                  onChange={(e) =>
+                                    setForm({
+                                      ...form,
+                                      especialidades: form.especialidades.map((x, i) =>
+                                        i === idx ? { ...x, rqe_numero: e.target.value } : x,
+                                      ),
+                                    })
+                                  }
+                                />
+                              </div>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>

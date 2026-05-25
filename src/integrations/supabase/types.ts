@@ -2840,16 +2840,22 @@ export type Database = {
           created_at: string
           especialidade_id: string
           medico_id: string
+          rqe_numero: string | null
+          tem_rqe: boolean
         }
         Insert: {
           created_at?: string
           especialidade_id: string
           medico_id: string
+          rqe_numero?: string | null
+          tem_rqe?: boolean
         }
         Update: {
           created_at?: string
           especialidade_id?: string
           medico_id?: string
+          rqe_numero?: string | null
+          tem_rqe?: boolean
         }
         Relationships: [
           {
