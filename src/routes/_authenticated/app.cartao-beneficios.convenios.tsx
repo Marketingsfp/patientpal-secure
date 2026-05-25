@@ -250,81 +250,153 @@ function ConveniosPage() {
           <DialogHeader>
             <DialogTitle>{editing ? "Editar convênio" : "Novo convênio"}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
-            <div>
-              <Label>Nome *</Label>
-              <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Plano Família" />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <Tabs defaultValue="info" className="w-full">
+            <TabsList>
+              <TabsTrigger value="info">Informações</TabsTrigger>
+              <TabsTrigger value="faixas"><Layers className="h-4 w-4 mr-1" />Faixas de Preço</TabsTrigger>
+            </TabsList>
+            <TabsContent value="info" className="space-y-3 mt-3">
               <div>
-                <Label>Taxa de adesão (R$)</Label>
-                <Input type="number" step="0.01" min="0" value={taxaAdesao}
-                  onChange={(e) => setTaxaAdesao(parseFloat(e.target.value) || 0)} />
+                <Label>Nome *</Label>
+                <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Plano Família" />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <Label>Taxa de adesão (R$)</Label>
+                  <Input type="number" step="0.01" min="0" value={taxaAdesao}
+                    onChange={(e) => setTaxaAdesao(parseFloat(e.target.value) || 0)} />
+                </div>
+                <div>
+                  <Label>Nº parcelas</Label>
+                  <Input type="number" min="1" value={numParcelas}
+                    onChange={(e) => setNumParcelas(parseInt(e.target.value) || 0)} />
+                </div>
+                <div>
+                  <Label>Máx. dependentes</Label>
+                  <Input type="number" min="0" value={maxDependentes}
+                    onChange={(e) => setMaxDependentes(parseInt(e.target.value) || 0)} />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <Label>Fidelidade (meses)</Label>
+                  <Input type="number" min="0" value={fidelidadeMeses}
+                    onChange={(e) => setFidelidadeMeses(parseInt(e.target.value) || 0)} />
+                </div>
+                <div>
+                  <Label>Vigência (meses)</Label>
+                  <Input type="number" min="0" value={vigenciaMeses}
+                    onChange={(e) => setVigenciaMeses(parseInt(e.target.value) || 0)} />
+                </div>
               </div>
               <div>
-                <Label>Nº parcelas</Label>
-                <Input type="number" min="1" value={numParcelas}
-                  onChange={(e) => setNumParcelas(parseInt(e.target.value) || 0)} />
+                <Label>Benefícios</Label>
+                <Textarea value={beneficiosTxt} onChange={(e) => setBeneficiosTxt(e.target.value)} rows={4}
+                  placeholder="Liste os benefícios deste convênio" />
               </div>
               <div>
-                <Label>Máx. dependentes</Label>
-                <Input type="number" min="0" value={maxDependentes}
-                  onChange={(e) => setMaxDependentes(parseInt(e.target.value) || 0)} />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <Label>Fidelidade (meses)</Label>
-                <Input type="number" min="0" value={fidelidadeMeses}
-                  onChange={(e) => setFidelidadeMeses(parseInt(e.target.value) || 0)} />
+                <Label>Modelo do contrato (use {"{{VALOR_MENSAL}}"}, {"{{PACIENTE_NOME}}"}, {"{{DEPENDENTES}}"}, {"{{CLINICA_NOME}}"} etc.)</Label>
+                <Textarea value={modeloContrato} onChange={(e) => setModeloContrato(e.target.value)} rows={6}
+                  placeholder="INSTRUMENTO PARTICULAR DE CONTRATO..." />
               </div>
               <div>
-                <Label>Vigência (meses)</Label>
-                <Input type="number" min="0" value={vigenciaMeses}
-                  onChange={(e) => setVigenciaMeses(parseInt(e.target.value) || 0)} />
+                <Label>Descrição</Label>
+                <Textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} rows={3} />
               </div>
-            </div>
-            <div className="border rounded-md p-3 space-y-2">
-              <Label>Valor mensal por nº de dependentes (R$) *</Label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                {Array.from({ length: maxDependentes + 1 }, (_, i) => i).map((dep) => (
-                  <div key={dep} className="flex flex-col gap-1">
-                    <span className="text-xs text-muted-foreground">
-                      {dep === 0 ? "Só titular" : `${dep} dep.`}
-                    </span>
-                    <Input
-                      type="number" step="0.01" min="0"
-                      value={valoresPorDep[dep] ?? 0}
-                      onChange={(e) => setValoresPorDep((prev) => ({
-                        ...prev, [dep]: parseFloat(e.target.value) || 0,
-                      }))}
-                    />
+              <div className="flex items-center gap-2">
+                <Switch checked={ativo} onCheckedChange={setAtivo} />
+                <Label>Ativo</Label>
+              </div>
+            </TabsContent>
+            <TabsContent value="faixas" className="mt-3">
+              <div className="space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2 font-medium">
+                      <Layers className="h-4 w-4" /> Faixas de Preço por Quantidade de Vidas
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Configure o valor mensal conforme a quantidade de vidas (titular + dependentes).
+                    </p>
                   </div>
-                ))}
+                  <Button
+                    variant="ghost" size="sm"
+                    onClick={() => {
+                      const last = faixas[faixas.length - 1];
+                      const nextDe = last ? (last.vidas_ate ?? last.vidas_de) + 1 : 1;
+                      setFaixas([...faixas, { vidas_de: nextDe, vidas_ate: null, valor_mensal: 0 }]);
+                    }}
+                  >
+                    <Plus className="h-4 w-4 mr-1" /> Adicionar Faixa
+                  </Button>
+                </div>
+                <div className="border rounded-md overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>De (pessoas)</TableHead>
+                        <TableHead>Até (pessoas)</TableHead>
+                        <TableHead className="text-right">Valor Mensal (R$)</TableHead>
+                        <TableHead className="w-10"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {faixas.map((f, idx) => (
+                        <TableRow key={idx}>
+                          <TableCell>
+                            <Input
+                              type="number" min="1"
+                              value={f.vidas_de}
+                              onChange={(e) => {
+                                const v = parseInt(e.target.value) || 1;
+                                setFaixas(faixas.map((x, i) => i === idx ? { ...x, vidas_de: v } : x));
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              type="number" min="1"
+                              placeholder="∞"
+                              value={f.vidas_ate ?? ""}
+                              onChange={(e) => {
+                                const raw = e.target.value;
+                                const v = raw === "" ? null : (parseInt(raw) || null);
+                                setFaixas(faixas.map((x, i) => i === idx ? { ...x, vidas_ate: v } : x));
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              type="number" step="0.01" min="0"
+                              className="text-right"
+                              value={f.valor_mensal}
+                              onChange={(e) => {
+                                const v = parseFloat(e.target.value) || 0;
+                                setFaixas(faixas.map((x, i) => i === idx ? { ...x, valor_mensal: v } : x));
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              size="sm" variant="ghost"
+                              onClick={() => setFaixas(faixas.filter((_, i) => i !== idx))}
+                              disabled={faixas.length === 1}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Lightbulb className="h-3.5 w-3.5" />
+                  Exemplo: 1 pessoa = R$200, de 2 a 3 = R$350, 4+ = R$500. Deixe "Até" vazio para indicar "ou mais".
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Ajuste "Máx. dependentes" acima para adicionar/remover faixas.
-              </p>
-            </div>
-            <div>
-              <Label>Benefícios</Label>
-              <Textarea value={beneficiosTxt} onChange={(e) => setBeneficiosTxt(e.target.value)} rows={4}
-                placeholder="Liste os benefícios deste convênio" />
-            </div>
-            <div>
-              <Label>Modelo do contrato (use {"{{VALOR_MENSAL}}"}, {"{{PACIENTE_NOME}}"}, {"{{DEPENDENTES}}"}, {"{{CLINICA_NOME}}"} etc.)</Label>
-              <Textarea value={modeloContrato} onChange={(e) => setModeloContrato(e.target.value)} rows={6}
-                placeholder="INSTRUMENTO PARTICULAR DE CONTRATO..." />
-            </div>
-            <div>
-              <Label>Descrição</Label>
-              <Textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} rows={3} />
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch checked={ativo} onCheckedChange={setAtivo} />
-              <Label>Ativo</Label>
-            </div>
-          </div>
+            </TabsContent>
+          </Tabs>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
             <Button onClick={save} disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
