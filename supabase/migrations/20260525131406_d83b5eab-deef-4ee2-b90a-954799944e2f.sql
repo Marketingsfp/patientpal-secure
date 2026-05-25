@@ -1,0 +1,1 @@
+GRANT SELECT (telefone2), INSERT (telefone2), UPDATE (telefone2) ON public.medicos TO authenticated;
