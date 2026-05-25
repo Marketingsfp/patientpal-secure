@@ -4,81 +4,78 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Stethoscope, Plus, Pencil, Search } from "lucide-react";
+import { LayoutGrid, Plus, Pencil, Search } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/app/tipos-servico")({
-  component: EspecialidadesPage,
-  head: () => ({ meta: [{ title: "Especialidades — ClinicaOS" }] }),
+  component: TiposServicoPage,
+  head: () => ({ meta: [{ title: "Tipos de Serviço — ClinicaOS" }] }),
 });
 
-interface Esp { id: string; nome: string; descricao: string | null; ativo: boolean }
+interface Tipo { id: string; nome: string; ativo: boolean }
 
-function EspecialidadesPage() {
-  const [rows, setRows] = useState<Esp[]>([]);
+function TiposServicoPage() {
+  const [rows, setRows] = useState<Tipo[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState<Esp | null>(null);
-  const [form, setForm] = useState({ nome: "", descricao: "", ativo: true });
+  const [editing, setEditing] = useState<Tipo | null>(null);
+  const [form, setForm] = useState({ nome: "", ativo: true });
   const [saving, setSaving] = useState(false);
 
   async function load() {
     setLoading(true);
     const { data, error } = await supabase
-      .from("especialidades")
-      .select("id,nome,descricao,ativo")
+      .from("tipos_servico")
+      .select("id,nome,ativo")
       .order("nome");
     if (error) toast.error(error.message);
-    else setRows((data ?? []) as Esp[]);
+    else setRows((data ?? []) as Tipo[]);
     setLoading(false);
   }
   useEffect(() => { void load(); }, []);
 
   function openNew() {
     setEditing(null);
-    setForm({ nome: "", descricao: "", ativo: true });
+    setForm({ nome: "", ativo: true });
     setOpen(true);
   }
-  function openEdit(e: Esp) {
-    setEditing(e);
-    setForm({ nome: e.nome, descricao: e.descricao ?? "", ativo: e.ativo });
+  function openEdit(t: Tipo) {
+    setEditing(t);
+    setForm({ nome: t.nome, ativo: t.ativo });
     setOpen(true);
   }
 
   async function salvar() {
-    if (!form.nome.trim()) { toast.error("Informe o nome"); return; }
+    const nome = form.nome.trim().toLowerCase();
+    if (!nome) { toast.error("Informe o nome"); return; }
     setSaving(true);
-    const payload = {
-      nome: form.nome.trim(),
-      descricao: form.descricao.trim() || null,
-      ativo: form.ativo,
-    };
+    const payload = { nome, ativo: form.ativo };
     const { error } = editing
-      ? await supabase.from("especialidades").update(payload).eq("id", editing.id)
-      : await supabase.from("especialidades").insert(payload);
+      ? await supabase.from("tipos_servico").update(payload).eq("id", editing.id)
+      : await supabase.from("tipos_servico").insert(payload);
     setSaving(false);
     if (error) { toast.error(error.message); return; }
-    toast.success(editing ? "Especialidade atualizada" : "Especialidade criada");
+    toast.success(editing ? "Tipo atualizado" : "Tipo criado");
     setOpen(false);
     void load();
   }
 
   const filtered = rows.filter(r => r.nome.toLowerCase().includes(q.toLowerCase()));
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
   return (
     <div className="p-6 space-y-4">
       <div className="flex items-center gap-3">
-        <Stethoscope className="h-6 w-6 text-primary" />
+        <LayoutGrid className="h-6 w-6 text-primary" />
         <div className="flex-1">
-          <h1 className="text-xl font-bold">Especialidades</h1>
-          <p className="text-sm text-muted-foreground">Cadastro global de especialidades médicas.</p>
+          <h1 className="text-xl font-bold">Tipos de Serviço</h1>
+          <p className="text-sm text-muted-foreground">Cadastro dos tipos de serviços da clínica (Consulta, Exame, Procedimento, Cirurgia…).</p>
         </div>
-        <Button onClick={openNew}><Plus className="h-4 w-4 mr-1" /> Nova</Button>
+        <Button onClick={openNew}><Plus className="h-4 w-4 mr-1" /> Novo</Button>
       </div>
 
       <Card className="p-3">
@@ -101,10 +98,10 @@ function EspecialidadesPage() {
             {loading ? (
               <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-6">Carregando…</TableCell></TableRow>
             ) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-6">Nenhuma especialidade.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-6">Nenhum tipo cadastrado.</TableCell></TableRow>
             ) : filtered.map(r => (
               <TableRow key={r.id}>
-                <TableCell className="font-medium">{r.nome}</TableCell>
+                <TableCell className="font-medium">{cap(r.nome)}</TableCell>
                 <TableCell>
                   <span className={`text-xs px-2 py-0.5 rounded-full ${r.ativo ? "bg-emerald-100 text-emerald-700" : "bg-muted text-muted-foreground"}`}>
                     {r.ativo ? "Ativo" : "Inativo"}
@@ -121,15 +118,11 @@ function EspecialidadesPage() {
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>{editing ? "Editar especialidade" : "Nova especialidade"}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editing ? "Editar tipo" : "Novo tipo"}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
               <Label>Nome *</Label>
-              <Input value={form.nome} onChange={e => setForm(f => ({ ...f, nome: e.target.value }))} placeholder="Ex: Hepatologia" />
-            </div>
-            <div className="space-y-1">
-              <Label>Descrição</Label>
-              <Textarea rows={2} value={form.descricao} onChange={e => setForm(f => ({ ...f, descricao: e.target.value }))} />
+              <Input value={form.nome} onChange={e => setForm(f => ({ ...f, nome: e.target.value }))} placeholder="Ex: Cirurgia" />
             </div>
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={form.ativo} onChange={e => setForm(f => ({ ...f, ativo: e.target.checked }))} />
