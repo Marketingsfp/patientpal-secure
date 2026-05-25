@@ -105,10 +105,17 @@ function AtendimentoEditorPage() {
       if (ag.medico_id) {
         const { data: med } = await supabase
           .from("medicos")
-          .select("id, nome, email, user_id, especialidade_id, tipo_repasse, percentual_repasse_padrao, valor_repasse_padrao, especialidades:especialidades!medicos_especialidade_id_fkey(nome)")
+          .select("id, nome, email, user_id, especialidade_id, especialidades:especialidades!medicos_especialidade_id_fkey(nome)")
           .eq("id", ag.medico_id)
           .maybeSingle();
-        if (!cancel && med) setMedico(med as never);
+        if (!cancel && med) {
+          let sens: any = {};
+          try {
+            const { data: s } = await supabase.rpc("medico_dados_sensiveis", { _medico_id: ag.medico_id });
+            sens = (s as any) ?? {};
+          } catch { sens = {}; }
+          setMedico({ ...(med as any), tipo_repasse: sens.tipo_repasse ?? null, percentual_repasse_padrao: sens.percentual_repasse_padrao ?? null, valor_repasse_padrao: sens.valor_repasse_padrao ?? null } as never);
+        }
       }
 
       // move para "atendimento" se ainda não estiver
