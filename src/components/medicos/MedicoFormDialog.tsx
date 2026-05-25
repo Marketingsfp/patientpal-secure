@@ -37,6 +37,7 @@ const limparPrefixoMedico = (nome: string) =>
 const emptyForm = () => ({
   nome: "", crm: "", crm_uf: "",
   especialidades: [] as string[],
+  procedimentos: [] as string[],
   rqes: [] as RqeRow[],
   tipo_repasse: "percentual" as "percentual" | "valor",
   percentual: "50",
@@ -143,11 +144,16 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       } else {
         setConvenios(CONVENIOS_PADRAO.map((c) => ({ ...c })));
       }
+      const { data: mprocs } = await supabase
+        .from("medico_procedimentos")
+        .select("procedimento_id")
+        .eq("medico_id", med.id);
       setForm({
         nome: limparPrefixoMedico(med.nome ?? ""),
         crm: med.crm,
         crm_uf: med.crm_uf,
         especialidades: (med.medico_especialidades ?? []).map((me: any) => me.especialidade?.id).filter(Boolean) as string[],
+        procedimentos: (mprocs ?? []).map((p: any) => p.procedimento_id),
         rqes: Array.isArray(med.rqes)
           ? (med.rqes as any[]).map((r) => ({
               especialidade_id: r?.especialidade_id ?? null,
@@ -256,6 +262,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       const { error } = await supabase.from("medicos").update(payload).eq("id", editId);
       if (error) { setSaving(false); toast.error(error.message); return; }
       await supabase.from("medico_especialidades").delete().eq("medico_id", editId);
+      await supabase.from("medico_procedimentos").delete().eq("medico_id", editId);
     } else {
       const { data: novo, error } = await supabase.from("medicos").insert(payload).select("id").single();
       if (error || !novo) { setSaving(false); toast.error(error?.message ?? "Erro"); return; }
@@ -266,6 +273,12 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       const rows = especialidadesIds.map((eid) => ({ medico_id: medicoId!, especialidade_id: eid }));
       const { error: e2 } = await supabase.from("medico_especialidades").insert(rows);
       if (e2) { setSaving(false); toast.error(e2.message); return; }
+    }
+    const procedimentosIds = Array.from(new Set(form.procedimentos.filter((x) => !!x)));
+    if (medicoId && procedimentosIds.length) {
+      const procRows = procedimentosIds.map((pid) => ({ medico_id: medicoId!, procedimento_id: pid }));
+      const { error: ep } = await supabase.from("medico_procedimentos").insert(procRows);
+      if (ep) { setSaving(false); toast.error(ep.message); return; }
     }
     if (medicoId) {
       await supabase.from("medico_convenios").delete().eq("medico_id", medicoId);
@@ -560,6 +573,64 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                               })
                             }
                             aria-label="Remover especialidade"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="border rounded-md p-3 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm font-medium">Procedimentos</Label>
+                      <p className="text-xs text-muted-foreground">Adicione os procedimentos que o médico realiza (cadastrados no menu "Procedimentos").</p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setForm({ ...form, procedimentos: [...form.procedimentos, ""] })}
+                    >
+                      <Plus className="h-4 w-4 mr-1" /> Adicionar procedimento
+                    </Button>
+                  </div>
+                  {procs.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">Nenhum procedimento cadastrado na clínica.</p>
+                  ) : form.procedimentos.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">Nenhum procedimento selecionado.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {form.procedimentos.map((pid, idx) => (
+                        <div key={idx} className="grid grid-cols-[1fr_auto] gap-2 items-center">
+                          <SearchableSelect
+                            options={procs.map((p) => ({ value: p.id, label: p.grupo ? `${p.nome} (${p.grupo})` : p.nome }))}
+                            value={pid}
+                            onChange={(v) => {
+                              if (v && form.procedimentos.some((x, i) => i !== idx && x === v)) {
+                                toast.warning("Procedimento já adicionado");
+                                return;
+                              }
+                              setForm({
+                                ...form,
+                                procedimentos: form.procedimentos.map((x, i) => (i === idx ? v : x)),
+                              });
+                            }}
+                            placeholder="Selecione"
+                            searchPlaceholder="Buscar procedimento..."
+                          />
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            onClick={() =>
+                              setForm({
+                                ...form,
+                                procedimentos: form.procedimentos.filter((_, i) => i !== idx),
+                              })
+                            }
+                            aria-label="Remover procedimento"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>

@@ -1,23 +1,31 @@
 ## Objetivo
-Substituir a seleção atual de **Especialidades** (lista de checkboxes) pela mesma dinâmica usada no **RQE**: linhas adicionáveis com um seletor pesquisável da lista de especialidades cadastradas no sistema.
+Na aba **Especialidades** do cadastro de médico, adicionar um terceiro bloco — **Procedimentos** — com a mesma dinâmica de RQE e Especialidades: botão "Adicionar procedimento" + seletor pesquisável por linha + botão de remover. A base da lista é a tabela `procedimentos` (mesma do menu "Procedimentos").
 
-## Mudanças no formulário do médico (`src/components/medicos/MedicoFormDialog.tsx`)
+## Mudanças
 
-Na aba **Especialidades**, abaixo do bloco de RQE, substituir o atual filtro + lista de checkboxes por:
+### 1. Banco de dados (nova tabela `medico_procedimentos`)
+Tabela de associação simples entre médico e procedimento:
+- `medico_id` (FK → `medicos.id`, on delete cascade)
+- `procedimento_id` (FK → `procedimentos.id`, on delete cascade)
+- `UNIQUE (medico_id, procedimento_id)`
+- RLS: membros da clínica do médico podem ler; gestores/admins podem inserir/atualizar/deletar (mesmo padrão de `medico_especialidades`).
+- GRANTs apropriados para `authenticated`.
 
-- Cabeçalho com título "Especialidades" + botão **"Adicionar especialidade"** (ícone `Plus`).
+### 2. Formulário (`src/components/medicos/MedicoFormDialog.tsx`)
+Na aba **Especialidades**, abaixo do bloco de Especialidades, adicionar um bloco "Procedimentos":
+- Cabeçalho com título + botão **"Adicionar procedimento"**.
 - Lista de linhas, cada uma com:
-  - `SearchableSelect` com todas as especialidades cadastradas no sistema (já carregadas em `esps`).
-  - Botão de remover (ícone `Trash2`).
-- Mensagem "Nenhuma especialidade selecionada." quando a lista estiver vazia.
-- Impedir duplicatas: ao adicionar/alterar, se a especialidade já estiver em outra linha, mostrar aviso e ignorar.
+  - `SearchableSelect` listando todos os procedimentos cadastrados na clínica (já carregados em `procs`).
+  - Botão de remover.
+- Mensagem "Nenhum procedimento selecionado." quando vazio.
+- Bloqueio de duplicatas.
 
-## Comportamento
-
-- `form.especialidades` continua sendo `string[]` (IDs), então **nenhuma mudança no payload** nem no banco — a tabela `medico_especialidades` continua sendo regravada do mesmo jeito no `handleSubmit`.
-- Remove-se o estado `espFilter` (não é mais necessário, a busca acontece dentro do `SearchableSelect`).
-- Validação opcional: exigir ao menos 1 especialidade? **Não** — manter o mesmo comportamento atual (opcional), a menos que você queira torná-la obrigatória.
+Estado:
+- `form.procedimentos: string[]` (IDs).
+- Carregar no edit: `select procedimento_id from medico_procedimentos where medico_id = ...`.
+- No `handleSubmit`: após salvar o médico, deletar todos os `medico_procedimentos` daquele médico e reinserir os atuais (mesmo padrão usado para `medico_especialidades`).
 
 ## Fora de escopo
-- Não altera RQE, repasse, convênios, banco de dados, RLS ou outras telas.
-- Não muda a tabela `medico_especialidades`.
+- Não altera a tabela `medico_convenios` (continua sendo a base de repasse).
+- Não altera UI da aba "Repasse" / "Convênios".
+- Não muda RQE nem Especialidades.
