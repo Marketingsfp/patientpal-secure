@@ -686,7 +686,13 @@ function ProcedimentosPage() {
           <div className="rounded-lg border border-border bg-card p-4 flex flex-wrap gap-3">
             <div className="relative flex-1 min-w-[240px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nome, especialidade ou código…" className="pl-9" />
+              <Input
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); aplicarFiltros(); } }}
+                placeholder="Buscar por nome, especialidade ou código…"
+                className="pl-9"
+              />
             </div>
             <Select value={filtroGrupo} onValueChange={setFiltroGrupo}>
               <SelectTrigger className="w-56"><SelectValue placeholder="Especialidade" /></SelectTrigger>
@@ -704,15 +710,29 @@ function ProcedimentosPage() {
                 ))}
               </SelectContent>
             </Select>
+            <Button onClick={aplicarFiltros}><Search className="h-4 w-4 mr-2" />Pesquisar</Button>
+            <Button variant="outline" onClick={limparFiltros}>Limpar</Button>
           </div>
 
           <div className="rounded-lg border border-border bg-card overflow-x-auto">
             <Table className="[&_td]:py-1 [&_td]:px-2 [&_th]:py-1.5 [&_th]:px-2 text-sm">
               <TableHeader>
                 <TableRow className="bg-muted/40">
-                  <TableHead>Nome</TableHead>
-                  <TableHead className="w-44">Especialidade</TableHead>
-                  <TableHead className="w-24">Tipo</TableHead>
+                  <TableHead>
+                    <button type="button" onClick={() => toggleSort("nome")} className="inline-flex items-center gap-1 hover:text-foreground">
+                      Nome <SortIcon col="nome" />
+                    </button>
+                  </TableHead>
+                  <TableHead className="w-44">
+                    <button type="button" onClick={() => toggleSort("grupo")} className="inline-flex items-center gap-1 hover:text-foreground">
+                      Especialidade <SortIcon col="grupo" />
+                    </button>
+                  </TableHead>
+                  <TableHead className="w-24">
+                    <button type="button" onClick={() => toggleSort("tipo")} className="inline-flex items-center gap-1 hover:text-foreground">
+                      Tipo <SortIcon col="tipo" />
+                    </button>
+                  </TableHead>
                   <TableHead className="w-24 text-right">Dinheiro</TableHead>
                   <TableHead className="w-20 text-right">Pix</TableHead>
                   <TableHead className="w-20 text-right">Débito</TableHead>
@@ -757,6 +777,30 @@ function ProcedimentosPage() {
               </TableBody>
             </Table>
           </div>
+
+          {/* ========== Paginação ========== */}
+          {ordenados.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 px-1">
+              <p className="text-xs text-muted-foreground">
+                Mostrando {(paginaAtual - 1) * PAGE_SIZE + 1}–{Math.min(paginaAtual * PAGE_SIZE, ordenados.length)} de {ordenados.length} itens
+              </p>
+              <div className="flex items-center gap-1">
+                <Button variant="outline" size="icon" className="h-8 w-8" disabled={paginaAtual === 1} onClick={() => setPagina(1)}>
+                  <ChevronsLeft className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="icon" className="h-8 w-8" disabled={paginaAtual === 1} onClick={() => setPagina(p => Math.max(1, p - 1))}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-xs px-3">Página {paginaAtual} de {totalPaginas}</span>
+                <Button variant="outline" size="icon" className="h-8 w-8" disabled={paginaAtual === totalPaginas} onClick={() => setPagina(p => Math.min(totalPaginas, p + 1))}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="icon" className="h-8 w-8" disabled={paginaAtual === totalPaginas} onClick={() => setPagina(totalPaginas)}>
+                  <ChevronsRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </TabsContent>
 
         {/* ============ CARTÕES ============ */}
