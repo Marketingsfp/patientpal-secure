@@ -807,13 +807,13 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                   </div>
                   <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
                     {convenios.map((c, i) => (
-                      <div key={i} className="grid grid-cols-12 gap-2 items-end border rounded-md p-2">
-                        <div className="col-span-5 space-y-1">
+                      <div key={i} className="grid grid-cols-12 gap-2 items-end border rounded-md p-2 min-w-0">
+                        <div className="col-span-5 space-y-1 min-w-0">
                           <Label className="text-xs">Nome</Label>
                           <Input value={c.nome} placeholder="Ex: Fimose"
                             onChange={(e) => setConvenios((cs) => cs.map((x, j) => j === i ? { ...x, nome: e.target.value } : x))} />
                         </div>
-                        <div className="col-span-3 space-y-1">
+                        <div className="col-span-3 space-y-1 min-w-0">
                           <Label className="text-xs">Tipo</Label>
                           <select className="h-9 w-full rounded-md border bg-background px-2 text-sm"
                             value={c.tipo_repasse}
@@ -822,7 +822,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                             <option value="valor">R$ Valor</option>
                           </select>
                         </div>
-                        <div className="col-span-3 space-y-1">
+                        <div className="col-span-3 space-y-1 min-w-0">
                           <Label className="text-xs">{c.tipo_repasse === "percentual" ? "%" : "R$"}</Label>
                           <Input type="number" step="0.01" min={0}
                             value={c.tipo_repasse === "percentual" ? c.percentual : c.valor}
