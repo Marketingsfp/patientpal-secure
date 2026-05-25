@@ -453,13 +453,13 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
 
   // Busca dados de todos os médicos envolvidos + seus convênios
   const medicoIds = Array.from(new Set(ags.map((a) => a.medico_id).filter((x): x is string => !!x)));
-  const [medsRes, convsRes] = await Promise.all([
+  const [medsRes, convsRes, repRes] = await Promise.all([
     medicoIds.length > 0
       ? supabase
           .from("medicos")
-          .select("id, nome, tipo_repasse, percentual_repasse_padrao, valor_repasse_padrao")
+          .select("id, nome")
           .in("id", medicoIds)
-      : Promise.resolve({ data: [] as Array<{ id: string; nome: string; tipo_repasse: string | null; percentual_repasse_padrao: number | null; valor_repasse_padrao: number | null }> }),
+      : Promise.resolve({ data: [] as Array<{ id: string; nome: string }> }),
     medicoIds.length > 0
       ? supabase
           .from("medico_convenios")
@@ -467,8 +467,18 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
           .in("medico_id", medicoIds)
           .eq("ativo", true)
       : Promise.resolve({ data: [] as Array<{ medico_id: string; nome: string; tipo_repasse: string | null; percentual: number | null; valor: number | null }> }),
+    medicoIds.length > 0
+      ? supabase.rpc("medicos_repasse_lista", { _clinica_id: clinicaId })
+      : Promise.resolve({ data: [] as Array<{ id: string; tipo_repasse: string | null; percentual_repasse_padrao: number | null; valor_repasse_padrao: number | null }> }),
   ]);
-  const medById = new Map(((medsRes.data ?? []) as Array<{ id: string; nome: string; tipo_repasse: string | null; percentual_repasse_padrao: number | null; valor_repasse_padrao: number | null }>).map((m) => [m.id, m]));
+  const repMap = new Map<string, { tipo_repasse: string | null; percentual_repasse_padrao: number | null; valor_repasse_padrao: number | null }>();
+  for (const r of ((repRes as any).data ?? []) as Array<{ id: string; tipo_repasse: string | null; percentual_repasse_padrao: number | null; valor_repasse_padrao: number | null }>) {
+    repMap.set(r.id, r);
+  }
+  const medById = new Map(((medsRes.data ?? []) as Array<{ id: string; nome: string }>).map((m) => {
+    const r = repMap.get(m.id);
+    return [m.id, { id: m.id, nome: m.nome, tipo_repasse: r?.tipo_repasse ?? null, percentual_repasse_padrao: r?.percentual_repasse_padrao ?? null, valor_repasse_padrao: r?.valor_repasse_padrao ?? null }] as const;
+  }));
   const convsByMedico = new Map<string, Array<{ nome: string; tipo_repasse: string | null; percentual: number | null; valor: number | null }>>();
   for (const cv of (convsRes.data ?? []) as Array<{ medico_id: string; nome: string; tipo_repasse: string | null; percentual: number | null; valor: number | null }>) {
     const arr = convsByMedico.get(cv.medico_id) ?? [];
