@@ -66,7 +66,7 @@ export function ContratosPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold flex items-center gap-2"><FileSignature className="h-6 w-6 text-primary"/>Contratos</h1>
-        <Button onClick={() => setOpenNew(true)} disabled={planos.length === 0}><Plus className="h-4 w-4 mr-2"/>Novo contrato</Button>
+        <Button onClick={() => setOpenNew(true)} disabled={planos.length === 0}><Plus className="h-4 w-4 mr-2"/>Nova venda</Button>
       </div>
       {planos.length === 0 && !loading ? (
         <div className="rounded-md border bg-muted/40 p-3 text-sm">Cadastre um plano antes em <strong>Planos de Assinatura</strong>.</div>
