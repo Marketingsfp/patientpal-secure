@@ -266,8 +266,8 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       if (error || !novo) { setSaving(false); toast.error(error?.message ?? "Erro"); return; }
       medicoId = novo.id;
     }
-    const especialidadesIds = Array.from(new Set(form.especialidades.filter((x) => !!x)));
-    if (medicoId && especialidadesIds.length) {
+    const especialidadesValidas = form.especialidades.filter((x) => !!x.especialidade_id);
+    if (medicoId && especialidadesValidas.length) {
       const seen = new Set<string>();
       const rows = form.especialidades
         .filter((er) => {
