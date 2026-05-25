@@ -383,11 +383,9 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <Tabs defaultValue="dados">
-              <TabsList className="grid grid-cols-7 w-full">
+              <TabsList className="grid grid-cols-5 w-full">
                 <TabsTrigger value="dados">Dados</TabsTrigger>
                 <TabsTrigger value="especialidades">Especialidades</TabsTrigger>
-                <TabsTrigger value="contato">Contato</TabsTrigger>
-                <TabsTrigger value="endereco">Endereço</TabsTrigger>
                 <TabsTrigger value="banco">Banco</TabsTrigger>
                 <TabsTrigger value="repasse">Repasse</TabsTrigger>
                 <TabsTrigger value="acesso">Acesso</TabsTrigger>
@@ -444,6 +442,66 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                         <SelectItem value="nao_informar">Prefiro não informar</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <div className="border-t pt-4 space-y-4">
+                    <div>
+                      <h3 className="text-sm font-semibold">Contato</h3>
+                      <p className="text-xs text-muted-foreground">Formas de contato do médico.</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>E-mail</Label>
+                      <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Telefone</Label>
+                      <Input value={form.telefone} onChange={(e) => setForm({ ...form, telefone: e.target.value })} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <div className="border-t pt-4 space-y-4">
+                    <div>
+                      <h3 className="text-sm font-semibold">Endereço</h3>
+                      <p className="text-xs text-muted-foreground">Endereço de referência do médico.</p>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="space-y-2">
+                        <Label>CEP</Label>
+                        <Input value={form.cep} onChange={(e) => setForm({ ...form, cep: e.target.value })} />
+                      </div>
+                      <div className="col-span-2 space-y-2">
+                        <Label>Logradouro</Label>
+                        <Input value={form.logradouro} onChange={(e) => setForm({ ...form, logradouro: e.target.value })} />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="space-y-2">
+                        <Label>Número</Label>
+                        <Input value={form.numero} onChange={(e) => setForm({ ...form, numero: e.target.value })} />
+                      </div>
+                      <div className="col-span-2 space-y-2">
+                        <Label>Complemento</Label>
+                        <Input value={form.complemento} onChange={(e) => setForm({ ...form, complemento: e.target.value })} />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="space-y-2">
+                        <Label>Bairro</Label>
+                        <Input value={form.bairro} onChange={(e) => setForm({ ...form, bairro: e.target.value })} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Cidade</Label>
+                        <Input value={form.cidade} onChange={(e) => setForm({ ...form, cidade: e.target.value })} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>UF</Label>
+                        <Input maxLength={2} value={form.estado} onChange={(e) => setForm({ ...form, estado: e.target.value.toUpperCase() })} />
+                      </div>
+                    </div>
                   </div>
                 </div>
               </TabsContent>
@@ -638,54 +696,6 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                       ))}
                     </div>
                   )}
-                </div>
-              </TabsContent>
-
-              <TabsContent value="contato" className="space-y-4 pt-4 pb-16">
-                <div className="space-y-2">
-                  <Label>E-mail</Label>
-                  <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Telefone</Label>
-                  <Input value={form.telefone} onChange={(e) => setForm({ ...form, telefone: e.target.value })} />
-                </div>
-              </TabsContent>
-
-              <TabsContent value="endereco" className="space-y-4 pt-4 pb-16">
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="space-y-2">
-                    <Label>CEP</Label>
-                    <Input value={form.cep} onChange={(e) => setForm({ ...form, cep: e.target.value })} />
-                  </div>
-                  <div className="col-span-2 space-y-2">
-                    <Label>Logradouro</Label>
-                    <Input value={form.logradouro} onChange={(e) => setForm({ ...form, logradouro: e.target.value })} />
-                  </div>
-                </div>
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="space-y-2">
-                    <Label>Número</Label>
-                    <Input value={form.numero} onChange={(e) => setForm({ ...form, numero: e.target.value })} />
-                  </div>
-                  <div className="col-span-2 space-y-2">
-                    <Label>Complemento</Label>
-                    <Input value={form.complemento} onChange={(e) => setForm({ ...form, complemento: e.target.value })} />
-                  </div>
-                </div>
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="space-y-2">
-                    <Label>Bairro</Label>
-                    <Input value={form.bairro} onChange={(e) => setForm({ ...form, bairro: e.target.value })} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Cidade</Label>
-                    <Input value={form.cidade} onChange={(e) => setForm({ ...form, cidade: e.target.value })} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>UF</Label>
-                    <Input maxLength={2} value={form.estado} onChange={(e) => setForm({ ...form, estado: e.target.value.toUpperCase() })} />
-                  </div>
                 </div>
               </TabsContent>
 
@@ -895,7 +905,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                         </Label>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        Cria um usuário com o e-mail informado na aba <b>Contato</b> e vincula este médico à equipe da clínica. Se já existir usuário com este e-mail, ele será apenas adicionado à equipe.
+                        Cria um usuário com o e-mail informado na seção <b>Contato</b> (aba Dados) e vincula este médico à equipe da clínica. Se já existir usuário com este e-mail, ele será apenas adicionado à equipe.
                       </p>
                       {form.criarUsuario && (
                         <div className="grid grid-cols-2 gap-3">
@@ -908,7 +918,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                               placeholder="medico@exemplo.com"
                             />
                             {!form.email && (
-                              <p className="text-xs text-amber-600">Informe um e-mail (também na aba Contato).</p>
+                              <p className="text-xs text-amber-600">Informe um e-mail (também na seção Contato da aba Dados).</p>
                             )}
                           </div>
                           <div className="space-y-2">

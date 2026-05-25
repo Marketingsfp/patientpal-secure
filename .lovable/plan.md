@@ -1,31 +1,19 @@
 ## Objetivo
-Na aba **Especialidades** do cadastro de médico, adicionar um terceiro bloco — **Procedimentos** — com a mesma dinâmica de RQE e Especialidades: botão "Adicionar procedimento" + seletor pesquisável por linha + botão de remover. A base da lista é a tabela `procedimentos` (mesma do menu "Procedimentos").
 
-## Mudanças
+Unificar as abas "Contato" e "Endereço" dentro da aba "Dados" no cadastro do médico, mantendo a mesma estrutura visual em blocos (como já é feito com RQE/Especialidades/Procedimentos).
 
-### 1. Banco de dados (nova tabela `medico_procedimentos`)
-Tabela de associação simples entre médico e procedimento:
-- `medico_id` (FK → `medicos.id`, on delete cascade)
-- `procedimento_id` (FK → `procedimentos.id`, on delete cascade)
-- `UNIQUE (medico_id, procedimento_id)`
-- RLS: membros da clínica do médico podem ler; gestores/admins podem inserir/atualizar/deletar (mesmo padrão de `medico_especialidades`).
-- GRANTs apropriados para `authenticated`.
+## Mudanças em `src/components/medicos/MedicoFormDialog.tsx`
 
-### 2. Formulário (`src/components/medicos/MedicoFormDialog.tsx`)
-Na aba **Especialidades**, abaixo do bloco de Especialidades, adicionar um bloco "Procedimentos":
-- Cabeçalho com título + botão **"Adicionar procedimento"**.
-- Lista de linhas, cada uma com:
-  - `SearchableSelect` listando todos os procedimentos cadastrados na clínica (já carregados em `procs`).
-  - Botão de remover.
-- Mensagem "Nenhum procedimento selecionado." quando vazio.
-- Bloqueio de duplicatas.
+1. **TabsList**: remover `TabsTrigger` de "Contato" e "Endereço". Ajustar grid de `grid-cols-7` para `grid-cols-5`.
 
-Estado:
-- `form.procedimentos: string[]` (IDs).
-- Carregar no edit: `select procedimento_id from medico_procedimentos where medico_id = ...`.
-- No `handleSubmit`: após salvar o médico, deletar todos os `medico_procedimentos` daquele médico e reinserir os atuais (mesmo padrão usado para `medico_especialidades`).
+2. **Aba "Dados"**: ao final do conteúdo atual (após os campos pessoais), adicionar dois novos blocos visualmente separados (com título/subseção e divisor) reutilizando o mesmo markup hoje presente em "Contato" e "Endereço":
+   - **Bloco "Contato"** — campos atuais (telefone, e-mail, etc.)
+   - **Bloco "Endereço"** — campos atuais (CEP, rua, número, etc.)
+
+3. **Remover** os `TabsContent value="contato"` e `TabsContent value="endereco"` (o conteúdo migra para dentro de "Dados").
+
+4. **Ajuste textual**: na aba "Acesso", as referências "também na aba Contato" / "informado na aba Contato" passam a apontar para a seção Contato dentro da aba Dados.
 
 ## Fora de escopo
-- Não altera a tabela `medico_convenios` (continua sendo a base de repasse).
-- Não altera UI da aba "Repasse" / "Convênios".
-- Não muda RQE nem Especialidades.
+
+- Nenhuma mudança em lógica de submit, estado do form, validações, RLS, banco de dados ou demais abas (Especialidades, Banco, Repasse, Acesso).
