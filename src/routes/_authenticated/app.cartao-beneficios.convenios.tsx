@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, ShieldCheck, Layers, Lightbulb, ArrowLeft, FileText, Info, Printer } from "lucide-react";
+import { Plus, Pencil, Trash2, ShieldCheck, Layers, Lightbulb, ArrowLeft, FileText, Info, Printer, Gift } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -44,6 +44,13 @@ type Faixa = {
   vidas_de: number;
   vidas_ate: number | null;
   valor_mensal: number;
+};
+
+type Beneficio = {
+  id: string;
+  nome: string;
+  descricao: string | null;
+  ativo: boolean;
 };
 
 function ConveniosPage() {
