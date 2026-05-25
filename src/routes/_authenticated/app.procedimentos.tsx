@@ -328,16 +328,17 @@ function ProcedimentosPage() {
     })();
   }, []);
   const [especialidades, setEspecialidades] = useState<{ id: string; nome: string }[]>([]);
+  const loadEspecialidades = async () => {
+    const { data, error } = await supabase
+      .from("especialidades")
+      .select("id,nome")
+      .eq("ativo", true)
+      .order("nome");
+    if (error) { toast.error(error.message); return; }
+    setEspecialidades((data ?? []) as { id: string; nome: string }[]);
+  };
   useEffect(() => {
-    void (async () => {
-      const { data, error } = await supabase
-        .from("especialidades")
-        .select("id,nome")
-        .eq("ativo", true)
-        .order("nome");
-      if (error) { toast.error(error.message); return; }
-      setEspecialidades((data ?? []) as { id: string; nome: string }[]);
-    })();
+    void loadEspecialidades();
   }, []);
 
   const load = async () => {
