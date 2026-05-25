@@ -389,7 +389,7 @@ function ConveniosPage() {
                     variant="ghost" size="sm"
                     onClick={() => {
                       const last = faixas[faixas.length - 1];
-                      const nextDe = last ? (last.vidas_ate ?? last.vidas_de) + 1 : 1;
+                      const nextDe = last ? last.vidas_de + 1 : 1;
                       setFaixas([...faixas, { vidas_de: nextDe, vidas_ate: null, valor_mensal: 0 }]);
                     }}
                   >
@@ -400,8 +400,7 @@ function ConveniosPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>De (pessoas)</TableHead>
-                        <TableHead>Até (pessoas)</TableHead>
+                        <TableHead>Quantidade de pessoas</TableHead>
                         <TableHead className="text-right">Valor Mensal (R$)</TableHead>
                         <TableHead className="w-10"></TableHead>
                       </TableRow>
@@ -415,19 +414,7 @@ function ConveniosPage() {
                               value={f.vidas_de}
                               onChange={(e) => {
                                 const v = parseInt(e.target.value) || 1;
-                                setFaixas(faixas.map((x, i) => i === idx ? { ...x, vidas_de: v } : x));
-                              }}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              type="number" min="1"
-                              placeholder="∞"
-                              value={f.vidas_ate ?? ""}
-                              onChange={(e) => {
-                                const raw = e.target.value;
-                                const v = raw === "" ? null : (parseInt(raw) || null);
-                                setFaixas(faixas.map((x, i) => i === idx ? { ...x, vidas_ate: v } : x));
+                                setFaixas(faixas.map((x, i) => i === idx ? { ...x, vidas_de: v, vidas_ate: v } : x));
                               }}
                             />
                           </TableCell>
@@ -457,7 +444,7 @@ function ConveniosPage() {
                 </div>
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
                   <Lightbulb className="h-3.5 w-3.5" />
-                  Exemplo: 1 pessoa = R$200, de 2 a 3 = R$350, 4+ = R$500. Deixe "Até" vazio para indicar "ou mais".
+                  Exemplo: 1 pessoa = R$200, 2 pessoas = R$350, 3 pessoas = R$500. Adicione uma linha para cada quantidade.
                 </p>
               </div>
             </TabsContent>
