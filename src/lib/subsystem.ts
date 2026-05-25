@@ -6,7 +6,7 @@ const EVT = "subsystem-change";
 export const SUBSYSTEMS: Record<SubsystemId, { label: string; groups: string[] }> = {
   "recepcao": {
     label: "Gestor Clínico",
-    groups: ["Operação", "Inteligência", "Marketing", "Cadastros", "Gestão"],
+    groups: ["Operação", "Cartão Benefícios", "Inteligência", "Marketing", "Cadastros", "Gestão"],
   },
   "gestao-pessoas": {
     label: "Gestão de Pessoas",
