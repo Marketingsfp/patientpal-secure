@@ -424,6 +424,32 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
               </TabsContent>
 
               <TabsContent value="especialidades" className="space-y-2 pt-4">
+                <div className="border rounded-md p-3 space-y-3">
+                  <label className="flex items-center gap-2 cursor-pointer text-sm font-medium">
+                    <Checkbox
+                      checked={form.tem_rqe}
+                      onCheckedChange={(v) =>
+                        setForm({
+                          ...form,
+                          tem_rqe: !!v,
+                          rqe_especialidade: v ? form.rqe_especialidade : "",
+                        })
+                      }
+                    />
+                    RQE (Registro de Qualificação de Especialista)
+                  </label>
+                  {form.tem_rqe && (
+                    <div className="space-y-2">
+                      <Label>Especialidade de RQE</Label>
+                      <Input
+                        value={form.rqe_especialidade}
+                        maxLength={200}
+                        placeholder="Ex.: Cardiologia"
+                        onChange={(e) => setForm({ ...form, rqe_especialidade: e.target.value })}
+                      />
+                    </div>
+                  )}
+                </div>
                 <Label>Especialidades</Label>
                 <Input
                   placeholder="Filtrar especialidade..."
