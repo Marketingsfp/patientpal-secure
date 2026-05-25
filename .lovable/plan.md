@@ -1,20 +1,31 @@
-## Objetivo
+## Submenu "Serviços" em Cadastros
 
-Permitir marcar, na aba **Repasse** do médico, se ele aceita ou não Cartões Benefícios em consultas/exames.
+Adicionar um submenu colapsável **Serviços** dentro do grupo **Cadastros** da sidebar (em `src/components/app-shell.tsx`) e mover **Especialidades** e **Procedimentos** para dentro dele.
 
-## Banco de dados
+### Mudanças
 
-Migração em `public.medicos`:
-- Adicionar `aceita_cartao_beneficios boolean NOT NULL DEFAULT true` (padrão: aceita, mantém comportamento atual).
-- Expor o campo na RPC `medico_dados_sensiveis` (retornando no JSON junto aos demais campos de repasse).
+**1. Estrutura de dados do menu** (`navRows`)
 
-## Frontend — `src/components/medicos/MedicoFormDialog.tsx`
+Trocar os dois itens soltos por um item-pai com `children`:
 
-Na aba **Repasse**, adicionar um bloco no topo (acima do "Tipo de repasse"):
-- Checkbox **"Aceita Cartões Benefícios"** com descrição curta ("Quando desmarcado, este médico não aceita os preços/descontos dos cartões benefícios em consultas e exames.").
-- Estado `aceita_cartao_beneficios: boolean` no `form`, hidratado a partir de `medico_dados_sensiveis` (default `true` para novos).
-- Enviar o campo no payload de update/insert da tabela `medicos`.
+```text
+Cadastros
+├── Equipe
+├── Serviços                ← novo (colapsável, ícone Stethoscope)
+│    ├── Especialidades
+│    └── Procedimentos
+├── Horários médicos
+├── Modelos de Prontuário
+├── Perfis
+└── Unidades
+```
 
-## Fora de escopo
+**2. Renderização** (linhas ~353–371)
 
-- Aplicar a regra no fluxo de agendamento/orçamento/caixa (bloquear seleção de cartão quando o médico não aceita). Esta etapa apenas registra a preferência; a aplicação prática na precificação pode ser feita em uma próxima etapa, se desejado.
+Estender o `.map` dos itens para suportar `item.children`:
+- Se `item.children` existir: renderiza um botão que abre/fecha o submenu (estado local `openSubgroups`), com chevron. Quando aberto, lista os filhos indentados (`pl-8`).
+- Sub-item ativo (`location.pathname` casa com `child.to`) mantém o estilo de ativo atual.
+- Se qualquer filho estiver ativo, o submenu abre automaticamente (mesmo padrão de `groupHasActive` já usado nos grupos).
+- Quando a sidebar está **collapsed** (modo ícone), o submenu mostra só o ícone do pai e expande os filhos automaticamente (mesmo comportamento dos grupos hoje), preservando navegação.
+
+**3. Nada mais muda** — rotas, permissões e demais grupos permanecem iguais.
