@@ -108,11 +108,17 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       setLoading(true);
       const { data: m } = await supabase
         .from("medicos")
-        .select("id, user_id, nome, crm, crm_uf, percentual_repasse_padrao, valor_repasse_padrao, tipo_repasse, cpf, rg, data_nascimento, email, telefone, nacionalidade, estado_civil, sexo, cep, logradouro, numero, complemento, bairro, cidade, estado, banco, agencia, conta, pix_chave, medico_especialidades(especialidade:especialidades(id, nome))")
+        .select("id, user_id, nome, crm, crm_uf, percentual_repasse_padrao, valor_repasse_padrao, tipo_repasse, email, telefone, nacionalidade, estado_civil, sexo, cep, logradouro, numero, complemento, bairro, cidade, estado, medico_especialidades(especialidade:especialidades(id, nome))")
         .eq("id", editingMedicoId)
         .maybeSingle();
       if (!m) { setLoading(false); toast.error("Médico não encontrado"); return; }
       const med = m as any;
+      // Dados sensíveis (CPF, RG, banco, PIX) vêm via RPC restrita a gestores/próprio médico
+      let sens: any = {};
+      try {
+        const { data: s } = await supabase.rpc("medico_dados_sensiveis", { _medico_id: editingMedicoId });
+        sens = (s as any) ?? {};
+      } catch { sens = {}; }
       setEditId(med.id);
       setMedicoUserId(med.user_id ?? null);
       const { data: convs } = await supabase
@@ -140,13 +146,13 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         tipo_repasse: med.tipo_repasse,
         percentual: String(med.percentual_repasse_padrao ?? ""),
         valor: med.valor_repasse_padrao != null ? String(med.valor_repasse_padrao) : "",
-        cpf: med.cpf ?? "", rg: med.rg ?? "", data_nascimento: med.data_nascimento ?? "",
+        cpf: sens.cpf ?? "", rg: sens.rg ?? "", data_nascimento: sens.data_nascimento ?? "",
         email: med.email ?? "", telefone: med.telefone ?? "",
         nacionalidade: med.nacionalidade ?? "Brasileira", estado_civil: med.estado_civil ?? "",
         sexo: med.sexo ?? "nao_informar",
         cep: med.cep ?? "", logradouro: med.logradouro ?? "", numero: med.numero ?? "",
         complemento: med.complemento ?? "", bairro: med.bairro ?? "", cidade: med.cidade ?? "", estado: med.estado ?? "",
-        banco: med.banco ?? "", agencia: med.agencia ?? "", conta: med.conta ?? "", pix_chave: med.pix_chave ?? "",
+        banco: sens.banco ?? "", agencia: sens.agencia ?? "", conta: sens.conta ?? "", pix_chave: sens.pix_chave ?? "",
         criarUsuario: false, senhaUsuario: "", roleUsuario: "medico",
       });
       if (med.user_id) {

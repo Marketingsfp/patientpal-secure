@@ -4945,6 +4945,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      medico_dados_sensiveis: { Args: { _medico_id: string }; Returns: Json }
       medicos_face_lista: {
         Args: { _clinica_id: string }
         Returns: {

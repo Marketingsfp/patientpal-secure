@@ -51,11 +51,16 @@ function PerfilMedicoPage() {
       setLoading(true);
       const { data: med } = await supabase
         .from("medicos")
-        .select("*, medico_especialidades(especialidade:especialidades(nome))")
+        .select("id, nome, crm, crm_uf, ativo, email, telefone, nacionalidade, estado_civil, cep, logradouro, numero, complemento, bairro, cidade, estado, tipo_repasse, percentual_repasse_padrao, valor_repasse_padrao, clinica_id, medico_especialidades(especialidade:especialidades(nome))")
         .eq("id", medicoId)
         .maybeSingle();
       if (cancel) return;
-      setMedico((med as MedicoFull) ?? null);
+      let sens: any = {};
+      try {
+        const { data: s } = await supabase.rpc("medico_dados_sensiveis", { _medico_id: medicoId });
+        sens = (s as any) ?? {};
+      } catch { sens = {}; }
+      setMedico(med ? ({ ...(med as any), cpf: sens.cpf ?? null, rg: sens.rg ?? null, data_nascimento: sens.data_nascimento ?? null, banco: sens.banco ?? null, agencia: sens.agencia ?? null, conta: sens.conta ?? null, pix_chave: sens.pix_chave ?? null } as MedicoFull) : null);
 
       const { data: ag } = await supabase
         .from("agendamentos")
