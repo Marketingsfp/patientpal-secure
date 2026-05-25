@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { FileSignature, Plus, Printer, Search, Trash2, Link2, Check, ChevronRight, CreditCard, Camera } from "lucide-react";
+import { FileSignature, Plus, Printer, Search, Trash2, Link2, Check, ChevronRight, CreditCard, Camera, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -11,7 +11,7 @@ import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { printContrato } from "@/lib/print-contrato";
@@ -39,7 +39,7 @@ export function ContratosPage() {
   const [planos, setPlanos] = useState<Plano[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
-  const [openNew, setOpenNew] = useState(false);
+  const [view, setView] = useState<"list" | "new">("list");
   const [detail, setDetail] = useState<Contrato | null>(null);
 
   const load = async () => {
@@ -62,11 +62,27 @@ export function ContratosPage() {
     return list.filter((c) => `${c.numero} ${c.paciente_nome}`.toLowerCase().includes(s));
   }, [list, q]);
 
+  if (view === "new") {
+    return (
+      <NovoContratoForm
+        onBack={() => setView("list")}
+        planos={planos}
+        clinicaId={clinicaAtual!.clinica_id}
+        userId={user?.id ?? null}
+        onCreated={() => { setView("list"); load(); }}
+      />
+    );
+  }
+
+  if (detail) {
+    return <DetalheContrato contrato={detail} onBack={() => { setDetail(null); load(); }} />;
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold flex items-center gap-2"><FileSignature className="h-6 w-6 text-primary"/>Contratos</h1>
-        <Button onClick={() => setOpenNew(true)} disabled={planos.length === 0}><Plus className="h-4 w-4 mr-2"/>Nova venda</Button>
+        <Button onClick={() => setView("new")} disabled={planos.length === 0}><Plus className="h-4 w-4 mr-2"/>Nova venda</Button>
       </div>
       {planos.length === 0 && !loading ? (
         <div className="rounded-md border bg-muted/40 p-3 text-sm">Cadastre um plano antes em <strong>Planos de Assinatura</strong>.</div>
@@ -102,13 +118,11 @@ export function ContratosPage() {
           </TableBody>
         </Table>
       </div>
-      {openNew ? <NovoContratoDialog open={openNew} onClose={() => setOpenNew(false)} planos={planos} clinicaId={clinicaAtual!.clinica_id} userId={user?.id ?? null} onCreated={load}/> : null}
-      {detail ? <DetalheContrato contrato={detail} onClose={() => { setDetail(null); load(); }}/> : null}
     </div>
   );
 }
 
-function NovoContratoDialog({ open, onClose, planos, clinicaId, userId, onCreated }: { open: boolean; onClose: () => void; planos: Plano[]; clinicaId: string; userId: string | null; onCreated: () => void }) {
+function NovoContratoForm({ onBack, planos, clinicaId, userId, onCreated }: { onBack: () => void; planos: Plano[]; clinicaId: string; userId: string | null; onCreated: () => void }) {
   const [planoId, setPlanoId] = useState(planos[0]?.id ?? "");
   const plano = planos.find((p) => p.id === planoId);
   const [titular, setTitular] = useState<Paciente | null>(null);
@@ -184,14 +198,21 @@ function NovoContratoDialog({ open, onClose, planos, clinicaId, userId, onCreate
 
     setSaving(false);
     toast.success(`Contrato #${contrato.numero} criado com ${plano.num_parcelas} mensalidades`);
-    onCreated(); onClose();
+    onCreated();
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-3xl max-h-[95vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Novo contrato</DialogTitle></DialogHeader>
-        <div className="grid grid-cols-2 gap-3">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <Button variant="ghost" size="sm" onClick={onBack}>
+          <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
+        </Button>
+        <h1 className="text-2xl font-bold flex items-center gap-2"><FileSignature className="h-6 w-6 text-primary"/>Novo contrato</h1>
+        <div />
+      </div>
+      <Card>
+        <CardContent className="p-6 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
           <div className="col-span-2"><Label>Plano</Label>
             <Select value={planoId} onValueChange={setPlanoId}>
               <SelectTrigger><SelectValue/></SelectTrigger>
@@ -280,11 +301,11 @@ function NovoContratoDialog({ open, onClose, planos, clinicaId, userId, onCreate
             ) : null}
           </div>
           <div className="col-span-2"><Label>Observações</Label><Textarea rows={2} value={obs} onChange={(e) => setObs(e.target.value)}/></div>
-        </div>
-        <DialogFooter className="sticky bottom-0 bg-background border-t -mx-6 -mb-6 px-6 py-3 z-10">
-          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          </div>
+          <div className="flex justify-end gap-2 border-t pt-4">
+          <Button variant="ghost" onClick={onBack}>Cancelar</Button>
           <Button onClick={salvar} disabled={saving || !titular || !plano}>Gerar contrato + {plano?.num_parcelas ?? 12} parcelas</Button>
-        </DialogFooter>
+          </div>
         {faceOpen ? (
           <FaceCaptureDialog
             open={!!faceOpen}
@@ -302,12 +323,13 @@ function NovoContratoDialog({ open, onClose, planos, clinicaId, userId, onCreate
             }}
           />
         ) : null}
-      </DialogContent>
-    </Dialog>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
-function DetalheContrato({ contrato, onClose }: { contrato: Contrato; onClose: () => void }) {
+function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () => void }) {
   const [mens, setMens] = useState<Mens[]>([]);
   const [deps, setDeps] = useState<Dep[]>([]);
   const [loading, setLoading] = useState(true);
@@ -344,14 +366,21 @@ function DetalheContrato({ contrato, onClose }: { contrato: Contrato; onClose: (
   const aReceber = mens.filter((m) => m.status !== "pago").reduce((s, m) => s + Number(m.valor), 0);
 
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Contrato #{contrato.numero} — {contrato.paciente_nome}</DialogTitle></DialogHeader>
-        <div className="grid grid-cols-3 gap-3 text-sm">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <Button variant="ghost" size="sm" onClick={onBack}>
+          <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
+        </Button>
+        <h1 className="text-2xl font-bold">Contrato #{contrato.numero} — {contrato.paciente_nome}</h1>
+        <div />
+      </div>
+      <Card>
+        <CardContent className="p-6 space-y-4">
+          <div className="grid grid-cols-3 gap-3 text-sm">
           <div className="rounded-md border p-3"><div className="text-muted-foreground text-xs">Pagas</div><div className="font-bold text-lg">{pagas}/{mens.length}</div></div>
           <div className="rounded-md border p-3"><div className="text-muted-foreground text-xs">Recebido</div><div className="font-bold text-lg text-green-600">{BRL(totalPago)}</div></div>
           <div className="rounded-md border p-3"><div className="text-muted-foreground text-xs">A receber</div><div className="font-bold text-lg text-orange-600">{BRL(aReceber)}</div></div>
-        </div>
+          </div>
         <div className="flex gap-2 flex-wrap">
           <Button size="sm" onClick={() => printContrato(contrato.id)}><Printer className="h-4 w-4 mr-1"/>Imprimir A4</Button>
           <Button size="sm" variant="secondary" onClick={() => printCartoes(contrato.id)}><CreditCard className="h-4 w-4 mr-1"/>Imprimir cartão{deps.length > 0 ? `(${deps.length + 1})` : ""}</Button>
@@ -393,7 +422,8 @@ function DetalheContrato({ contrato, onClose }: { contrato: Contrato; onClose: (
             </Table>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
