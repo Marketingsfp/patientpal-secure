@@ -399,9 +399,7 @@ function ProcedimentosPage() {
     return () => clearTimeout(t);
   }, [busca]);
 
-  // Performance: limita a renderização. O DOM trava com 2000+ linhas de tabela.
-  const LIMITE_RENDER = 200;
-  const visiveis = useMemo(() => filtrados.slice(0, LIMITE_RENDER), [filtrados]);
+  const visiveis = filtrados;
 
   const openNew = () => { setEditing(null); setForm(EMPTY); setOpen(true); };
   const openEdit = (p: Procedimento) => {
@@ -706,13 +704,6 @@ function ProcedimentosPage() {
                     </TableCell>
                   </TableRow>
                 ))}
-                {filtrados.length > visiveis.length && (
-                  <TableRow>
-                    <TableCell colSpan={11} className="text-center py-4 text-xs text-muted-foreground bg-muted/20">
-                      Mostrando {visiveis.length} de {filtrados.length}. Use a busca ou filtros para refinar.
-                    </TableCell>
-                  </TableRow>
-                )}
               </TableBody>
             </Table>
           </div>
