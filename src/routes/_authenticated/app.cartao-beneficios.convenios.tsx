@@ -29,6 +29,14 @@ type Convenio = {
   nome: string;
   descricao: string | null;
   ativo: boolean;
+  valor_mensal: number;
+  taxa_adesao: number;
+  num_parcelas: number;
+  max_dependentes: number;
+  fidelidade_meses: number;
+  vigencia_meses: number;
+  beneficios: string | null;
+  modelo_contrato: string | null;
 };
 
 function ConveniosPage() {
@@ -40,6 +48,14 @@ function ConveniosPage() {
   const [nome, setNome] = useState("");
   const [descricao, setDescricao] = useState("");
   const [ativo, setAtivo] = useState(true);
+  const [valorMensal, setValorMensal] = useState<number>(0);
+  const [taxaAdesao, setTaxaAdesao] = useState<number>(0);
+  const [numParcelas, setNumParcelas] = useState<number>(12);
+  const [maxDependentes, setMaxDependentes] = useState<number>(0);
+  const [fidelidadeMeses, setFidelidadeMeses] = useState<number>(0);
+  const [vigenciaMeses, setVigenciaMeses] = useState<number>(12);
+  const [beneficiosTxt, setBeneficiosTxt] = useState("");
+  const [modeloContrato, setModeloContrato] = useState("");
   const [saving, setSaving] = useState(false);
   const [toDelete, setToDelete] = useState<Convenio | null>(null);
 
@@ -48,7 +64,7 @@ function ConveniosPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from("cb_convenios")
-      .select("id, clinica_id, nome, descricao, ativo")
+      .select("*")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("nome");
     if (error) toast.error(error.message);
@@ -61,6 +77,9 @@ function ConveniosPage() {
   const openNew = () => {
     setEditing(null);
     setNome(""); setDescricao(""); setAtivo(true);
+    setValorMensal(0); setTaxaAdesao(0); setNumParcelas(12);
+    setMaxDependentes(0); setFidelidadeMeses(0); setVigenciaMeses(12);
+    setBeneficiosTxt(""); setModeloContrato("");
     setOpen(true);
   };
 
@@ -69,6 +88,14 @@ function ConveniosPage() {
     setNome(c.nome);
     setDescricao(c.descricao ?? "");
     setAtivo(c.ativo);
+    setValorMensal(Number(c.valor_mensal ?? 0));
+    setTaxaAdesao(Number(c.taxa_adesao ?? 0));
+    setNumParcelas(c.num_parcelas ?? 12);
+    setMaxDependentes(c.max_dependentes ?? 0);
+    setFidelidadeMeses(c.fidelidade_meses ?? 0);
+    setVigenciaMeses(c.vigencia_meses ?? 12);
+    setBeneficiosTxt(c.beneficios ?? "");
+    setModeloContrato(c.modelo_contrato ?? "");
     setOpen(true);
   };
 
@@ -81,6 +108,14 @@ function ConveniosPage() {
       nome: nome.trim(),
       descricao: descricao.trim() || null,
       ativo,
+      valor_mensal: valorMensal,
+      taxa_adesao: taxaAdesao,
+      num_parcelas: numParcelas,
+      max_dependentes: maxDependentes,
+      fidelidade_meses: fidelidadeMeses,
+      vigencia_meses: vigenciaMeses,
+      beneficios: beneficiosTxt.trim() || null,
+      modelo_contrato: modeloContrato.trim() || null,
     };
     const { error } = editing
       ? await supabase.from("cb_convenios").update(payload).eq("id", editing.id)
@@ -148,7 +183,7 @@ function ConveniosPage() {
       </Card>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? "Editar convênio" : "Novo convênio"}</DialogTitle>
           </DialogHeader>
@@ -156,6 +191,50 @@ function ConveniosPage() {
             <div>
               <Label>Nome *</Label>
               <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Plano Família" />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <Label>Valor mensal (R$)</Label>
+                <Input type="number" step="0.01" min="0" value={valorMensal}
+                  onChange={(e) => setValorMensal(parseFloat(e.target.value) || 0)} />
+              </div>
+              <div>
+                <Label>Taxa de adesão (R$)</Label>
+                <Input type="number" step="0.01" min="0" value={taxaAdesao}
+                  onChange={(e) => setTaxaAdesao(parseFloat(e.target.value) || 0)} />
+              </div>
+              <div>
+                <Label>Nº parcelas</Label>
+                <Input type="number" min="1" value={numParcelas}
+                  onChange={(e) => setNumParcelas(parseInt(e.target.value) || 0)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <Label>Máx. dependentes</Label>
+                <Input type="number" min="0" value={maxDependentes}
+                  onChange={(e) => setMaxDependentes(parseInt(e.target.value) || 0)} />
+              </div>
+              <div>
+                <Label>Fidelidade (meses)</Label>
+                <Input type="number" min="0" value={fidelidadeMeses}
+                  onChange={(e) => setFidelidadeMeses(parseInt(e.target.value) || 0)} />
+              </div>
+              <div>
+                <Label>Vigência (meses)</Label>
+                <Input type="number" min="0" value={vigenciaMeses}
+                  onChange={(e) => setVigenciaMeses(parseInt(e.target.value) || 0)} />
+              </div>
+            </div>
+            <div>
+              <Label>Benefícios</Label>
+              <Textarea value={beneficiosTxt} onChange={(e) => setBeneficiosTxt(e.target.value)} rows={4}
+                placeholder="Liste os benefícios deste convênio" />
+            </div>
+            <div>
+              <Label>Modelo do contrato (use {"{{VALOR_MENSAL}}"}, {"{{PACIENTE_NOME}}"}, {"{{DEPENDENTES}}"}, {"{{CLINICA_NOME}}"} etc.)</Label>
+              <Textarea value={modeloContrato} onChange={(e) => setModeloContrato(e.target.value)} rows={6}
+                placeholder="INSTRUMENTO PARTICULAR DE CONTRATO..." />
             </div>
             <div>
               <Label>Descrição</Label>

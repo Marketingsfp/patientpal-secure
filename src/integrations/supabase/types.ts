@@ -604,30 +604,54 @@ export type Database = {
       cb_convenios: {
         Row: {
           ativo: boolean
+          beneficios: string | null
           clinica_id: string
           created_at: string
           descricao: string | null
+          fidelidade_meses: number
           id: string
+          max_dependentes: number
+          modelo_contrato: string | null
           nome: string
+          num_parcelas: number
+          taxa_adesao: number
           updated_at: string
+          valor_mensal: number
+          vigencia_meses: number
         }
         Insert: {
           ativo?: boolean
+          beneficios?: string | null
           clinica_id: string
           created_at?: string
           descricao?: string | null
+          fidelidade_meses?: number
           id?: string
+          max_dependentes?: number
+          modelo_contrato?: string | null
           nome: string
+          num_parcelas?: number
+          taxa_adesao?: number
           updated_at?: string
+          valor_mensal?: number
+          vigencia_meses?: number
         }
         Update: {
           ativo?: boolean
+          beneficios?: string | null
           clinica_id?: string
           created_at?: string
           descricao?: string | null
+          fidelidade_meses?: number
           id?: string
+          max_dependentes?: number
+          modelo_contrato?: string | null
           nome?: string
+          num_parcelas?: number
+          taxa_adesao?: number
           updated_at?: string
+          valor_mensal?: number
+          vigencia_meses?: number
         }
         Relationships: [
           {
