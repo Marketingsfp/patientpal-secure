@@ -74,6 +74,55 @@ function ConveniosPage() {
   const [saving, setSaving] = useState(false);
   const [toDelete, setToDelete] = useState<Convenio | null>(null);
 
+  // Benefícios do convênio (aba)
+  const [beneficios, setBeneficios] = useState<Beneficio[]>([]);
+  const [benLoading, setBenLoading] = useState(false);
+  const [benForm, setBenForm] = useState<{ id: string | null; nome: string; descricao: string; ativo: boolean } | null>(null);
+  const [benSaving, setBenSaving] = useState(false);
+  const [benToDelete, setBenToDelete] = useState<Beneficio | null>(null);
+
+  const loadBeneficios = async (convenioId: string) => {
+    setBenLoading(true);
+    const { data, error } = await supabase
+      .from("cb_beneficios")
+      .select("id, nome, descricao, ativo")
+      .eq("convenio_id", convenioId)
+      .order("nome");
+    if (error) toast.error(error.message);
+    setBeneficios((data ?? []) as Beneficio[]);
+    setBenLoading(false);
+  };
+
+  const saveBeneficio = async () => {
+    if (!editing || !benForm) return;
+    if (!benForm.nome.trim()) { toast.error("Informe o nome do benefício."); return; }
+    setBenSaving(true);
+    const payload = {
+      clinica_id: editing.clinica_id,
+      convenio_id: editing.id,
+      nome: benForm.nome.trim(),
+      descricao: benForm.descricao.trim() || null,
+      ativo: benForm.ativo,
+    };
+    const { error } = benForm.id
+      ? await supabase.from("cb_beneficios").update(payload).eq("id", benForm.id)
+      : await supabase.from("cb_beneficios").insert(payload);
+    setBenSaving(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success(benForm.id ? "Benefício atualizado." : "Benefício adicionado.");
+    setBenForm(null);
+    loadBeneficios(editing.id);
+  };
+
+  const confirmDeleteBeneficio = async () => {
+    if (!benToDelete || !editing) return;
+    const { error } = await supabase.from("cb_beneficios").delete().eq("id", benToDelete.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Benefício excluído.");
+    setBenToDelete(null);
+    loadBeneficios(editing.id);
+  };
+
   const load = async () => {
     if (!clinicaAtual) return;
     setLoading(true);
@@ -113,6 +162,7 @@ function ConveniosPage() {
     setMaxDependentes(0); setFidelidadeMeses(0); setVigenciaMeses(12);
     setBeneficiosTxt(""); setModeloContrato("");
     setFaixas([{ vidas_de: 1, vidas_ate: null, valor_mensal: 0 }]);
+    setBeneficios([]); setBenForm(null);
     setView("form");
   };
 
@@ -139,6 +189,8 @@ function ConveniosPage() {
       valor_mensal: Number(f.valor_mensal),
     }));
     setFaixas(list.length ? list : [{ vidas_de: 1, vidas_ate: null, valor_mensal: 0 }]);
+    setBenForm(null);
+    loadBeneficios(c.id);
     setView("form");
   };
 
