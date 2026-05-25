@@ -45,7 +45,11 @@ import { Label } from "@/components/ui/label";
 
 const VoiceInput = lazy(() => import("@/components/voice-input").then((m) => ({ default: m.VoiceInput })));
 
-const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<{ to: string; label: string; icon: typeof LayoutDashboard }> }> = [
+type NavLeaf = { to: string; label: string; icon: typeof LayoutDashboard };
+type NavParent = { label: string; icon: typeof LayoutDashboard; children: ReadonlyArray<NavLeaf> };
+type NavItem = NavLeaf | NavParent;
+const isParent = (it: NavItem): it is NavParent => "children" in it;
+const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> = [
   {
     label: "Operação",
     items: [
@@ -88,11 +92,17 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<{ to: string;
     label: "Cadastros",
     items: [
     { to: "/app/equipe", label: "Equipe", icon: Users },
-    { to: "/app/especialidades", label: "Especialidades", icon: HeartPulse },
+    {
+      label: "Serviços",
+      icon: Stethoscope,
+      children: [
+        { to: "/app/especialidades", label: "Especialidades", icon: HeartPulse },
+        { to: "/app/procedimentos", label: "Procedimentos", icon: ClipboardList },
+      ],
+    },
     { to: "/app/disponibilidades", label: "Horários médicos", icon: Clock },
     { to: "/app/prontuario-modelos", label: "Modelos de Prontuário", icon: FileHeart },
     { to: "/app/perfis", label: "Perfis", icon: KeyRound },
-    { to: "/app/procedimentos", label: "Procedimentos", icon: ClipboardList },
     { to: "/app/unidades", label: "Unidades", icon: MapPin },
     ],
   },
