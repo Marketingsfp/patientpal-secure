@@ -1,0 +1,1 @@
+GRANT SELECT (tem_rqe, rqe_especialidade), INSERT (tem_rqe, rqe_especialidade), UPDATE (tem_rqe, rqe_especialidade) ON public.medicos TO authenticated;
