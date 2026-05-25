@@ -305,6 +305,19 @@ function ProcedimentosPage() {
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [seeding, setSeeding] = useState(false);
+  const [tipos, setTipos] = useState<{ id: string; nome: string }[]>([]);
+
+  useEffect(() => {
+    void (async () => {
+      const { data, error } = await supabase
+        .from("tipos_servico")
+        .select("id,nome")
+        .eq("ativo", true)
+        .order("nome");
+      if (error) { toast.error(error.message); return; }
+      setTipos((data ?? []) as { id: string; nome: string }[]);
+    })();
+  }, []);
 
   const load = async () => {
     if (!clinicaAtual) return;
@@ -532,7 +545,7 @@ function ProcedimentosPage() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-semibold flex items-center gap-2">
-            <ClipboardList className="h-6 w-6 text-primary" /> Procedimentos
+            <ClipboardList className="h-6 w-6 text-primary" /> Serviços
           </h1>
           <p className="text-sm text-muted-foreground">Consultas, exames e procedimentos — com valores por forma de pagamento.</p>
         </div>
@@ -626,9 +639,9 @@ function ProcedimentosPage() {
               <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Todos os tipos</SelectItem>
-                <SelectItem value="consulta">Consulta</SelectItem>
-                <SelectItem value="exame">Exame</SelectItem>
-                <SelectItem value="procedimento">Procedimento</SelectItem>
+                {tipos.map(t => (
+                  <SelectItem key={t.id} value={t.nome}>{tipoLabel(t.nome)}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -774,9 +787,9 @@ function ProcedimentosPage() {
                 <Select value={form.tipo} onValueChange={(v) => setForm({ ...form, tipo: v as Tipo })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="consulta">Consulta</SelectItem>
-                    <SelectItem value="exame">Exame</SelectItem>
-                    <SelectItem value="procedimento">Procedimento</SelectItem>
+                    {tipos.map(t => (
+                      <SelectItem key={t.id} value={t.nome}>{tipoLabel(t.nome)}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
