@@ -560,9 +560,18 @@ export type Database = {
           convenio_id: string
           created_at: string
           descricao: string | null
+          escopo: string
+          especialidade_id: string | null
           id: string
+          inicio_a_partir: number
+          limite_uso: string
           nome: string
+          periodicidade: string
+          pessoa: string
+          procedimento_id: string | null
+          tipo_desconto: string
           updated_at: string
+          valor_desconto: number | null
         }
         Insert: {
           ativo?: boolean
@@ -570,9 +579,18 @@ export type Database = {
           convenio_id: string
           created_at?: string
           descricao?: string | null
+          escopo?: string
+          especialidade_id?: string | null
           id?: string
+          inicio_a_partir?: number
+          limite_uso?: string
           nome: string
+          periodicidade?: string
+          pessoa?: string
+          procedimento_id?: string | null
+          tipo_desconto?: string
           updated_at?: string
+          valor_desconto?: number | null
         }
         Update: {
           ativo?: boolean
@@ -580,9 +598,18 @@ export type Database = {
           convenio_id?: string
           created_at?: string
           descricao?: string | null
+          escopo?: string
+          especialidade_id?: string | null
           id?: string
+          inicio_a_partir?: number
+          limite_uso?: string
           nome?: string
+          periodicidade?: string
+          pessoa?: string
+          procedimento_id?: string | null
+          tipo_desconto?: string
           updated_at?: string
+          valor_desconto?: number | null
         }
         Relationships: [
           {
@@ -597,6 +624,20 @@ export type Database = {
             columns: ["convenio_id"]
             isOneToOne: false
             referencedRelation: "cb_convenios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cb_beneficios_especialidade_id_fkey"
+            columns: ["especialidade_id"]
+            isOneToOne: false
+            referencedRelation: "especialidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cb_beneficios_procedimento_id_fkey"
+            columns: ["procedimento_id"]
+            isOneToOne: false
+            referencedRelation: "procedimentos"
             referencedColumns: ["id"]
           },
         ]
