@@ -2909,6 +2909,7 @@ export type Database = {
       }
       medicos: {
         Row: {
+          aceita_cartao_beneficios: boolean
           agencia: string | null
           ativo: boolean
           bairro: string | null
@@ -2950,6 +2951,7 @@ export type Database = {
           valor_repasse_padrao: number | null
         }
         Insert: {
+          aceita_cartao_beneficios?: boolean
           agencia?: string | null
           ativo?: boolean
           bairro?: string | null
@@ -2991,6 +2993,7 @@ export type Database = {
           valor_repasse_padrao?: number | null
         }
         Update: {
+          aceita_cartao_beneficios?: boolean
           agencia?: string | null
           ativo?: boolean
           bairro?: string | null
