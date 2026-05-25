@@ -47,7 +47,7 @@ type Faixa = {
 };
 
 type Beneficio = {
-  id: string;
+  id?: string;
   nome: string;
   descricao: string | null;
   ativo: boolean;
@@ -77,9 +77,6 @@ function ConveniosPage() {
   // Benefícios do convênio (aba)
   const [beneficios, setBeneficios] = useState<Beneficio[]>([]);
   const [benLoading, setBenLoading] = useState(false);
-  const [benForm, setBenForm] = useState<{ id: string | null; nome: string; descricao: string; ativo: boolean } | null>(null);
-  const [benSaving, setBenSaving] = useState(false);
-  const [benToDelete, setBenToDelete] = useState<Beneficio | null>(null);
 
   const loadBeneficios = async (convenioId: string) => {
     setBenLoading(true);
@@ -91,36 +88,6 @@ function ConveniosPage() {
     if (error) toast.error(error.message);
     setBeneficios((data ?? []) as Beneficio[]);
     setBenLoading(false);
-  };
-
-  const saveBeneficio = async () => {
-    if (!editing || !benForm) return;
-    if (!benForm.nome.trim()) { toast.error("Informe o nome do benefício."); return; }
-    setBenSaving(true);
-    const payload = {
-      clinica_id: editing.clinica_id,
-      convenio_id: editing.id,
-      nome: benForm.nome.trim(),
-      descricao: benForm.descricao.trim() || null,
-      ativo: benForm.ativo,
-    };
-    const { error } = benForm.id
-      ? await supabase.from("cb_beneficios").update(payload).eq("id", benForm.id)
-      : await supabase.from("cb_beneficios").insert(payload);
-    setBenSaving(false);
-    if (error) { toast.error(error.message); return; }
-    toast.success(benForm.id ? "Benefício atualizado." : "Benefício adicionado.");
-    setBenForm(null);
-    loadBeneficios(editing.id);
-  };
-
-  const confirmDeleteBeneficio = async () => {
-    if (!benToDelete || !editing) return;
-    const { error } = await supabase.from("cb_beneficios").delete().eq("id", benToDelete.id);
-    if (error) { toast.error(error.message); return; }
-    toast.success("Benefício excluído.");
-    setBenToDelete(null);
-    loadBeneficios(editing.id);
   };
 
   const load = async () => {

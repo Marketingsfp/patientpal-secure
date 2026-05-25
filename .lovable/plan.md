@@ -1,39 +1,32 @@
-## Mudança solicitada
+## Mudança na aba "Benefícios" do Convênio
 
-Na tela de **cadastro/edição de Convênio** (`/app/cartao-beneficios/convenios`), adicionar **duas novas abas** ao formulário, além das já existentes ("Informações" e "Faixas de Preço"):
-
-1. **Contrato** — exibirá o modelo de contrato (texto fixo) que será preenchido com dados das novas vendas. O modelo será enviado por você depois.
-2. **Informativo** — exibirá um conteúdo informativo (texto/imagem) somente para visualização e impressão. O modelo virá em Word e será apenas renderizado em tela.
+Hoje a aba Benefícios já não abre pop-up, mas o formulário só aparece quando você clica em "Novo benefício" ou "Editar" (um Card é montado/desmontado acima da tabela). No vídeo, tudo fica permanentemente na tela, igual ao padrão da aba **Faixas de Preço**: a tabela edita os itens diretamente nas linhas (inline) e um botão "Adicionar" acrescenta uma nova linha vazia.
 
 ## Como vai funcionar
 
-### Aba "Contrato"
-- Mostrará uma área de texto/preview com o **modelo do contrato** (placeholder por enquanto, até você enviar o modelo).
-- Reutilizará o campo `modelo_contrato` que já existe na tabela `cb_convenios` (atualmente está oculto da UI).
-- Aceitará variáveis como `{{VALOR_MENSAL}}`, `{{PACIENTE_NOME}}`, `{{DEPENDENTES}}`, `{{CLINICA_NOME}}` para preenchimento automático nas vendas.
-- Quando você me enviar o modelo, eu colo o texto como valor padrão fixo.
-
-### Aba "Informativo"
-- Exibirá o **conteúdo informativo** do convênio (somente leitura na tela).
-- Terá um botão **"Imprimir"** para gerar a versão impressa (`window.print()` com layout dedicado).
-- Quando você enviar o `.docx`, eu converto o conteúdo para HTML/JSX e deixo fixo na tela.
-- Precisará de um novo campo no banco (`informativo` TEXT) — ou, se for sempre o mesmo modelo para todos os convênios, pode ficar hardcoded no componente sem mexer no banco.
-
-## Decisão pendente
-
-Aguardo você enviar:
-1. **Modelo do contrato** (texto) — para colocar como padrão na aba "Contrato".
-2. **Modelo do informativo** (`.docx`) — para converter e exibir na aba "Informativo".
-
-Enquanto isso, vou apenas criar as duas abas vazias com placeholder ("Aguardando modelo…") e o botão de imprimir na aba Informativo.
+- A aba "Benefícios" passa a mostrar **uma única tabela sempre visível**, com as colunas:
+  - **Nome** — `<Input>` editável direto na linha
+  - **Descrição** — `<Input>` editável direto na linha
+  - **Ativo** — `<Switch>` direto na linha
+  - **Ações** — botão de excluir (lixeira)
+- Botão **"Adicionar benefício"** no topo da aba acrescenta uma nova linha vazia já editável (sem abrir card/modal).
+- As alterações ficam em memória enquanto você edita e são **persistidas no banco quando você clica em "Salvar" do convênio** (mesmo fluxo das Faixas de Preço: apaga e reinsere os benefícios do convênio).
+- O `AlertDialog` de confirmação de exclusão de benefício deixa de ser necessário — a exclusão remove a linha localmente; só efetiva no banco ao Salvar.
+- Mantém a regra atual: enquanto o convênio não foi salvo pela primeira vez (`!editing`), permite editar a lista localmente e ela é salva junto com o convênio na primeira gravação.
 
 ## Arquivo afetado
 
-- `src/routes/_authenticated/app.cartao-beneficios.convenios.tsx` — adicionar 2 novos `<TabsTrigger>` + 2 `<TabsContent>` no `<Tabs>` do formulário.
+- `src/routes/_authenticated/app.cartao-beneficios.convenios.tsx`
 
 ## Detalhes técnicos
 
-- Adicionar ícones `FileText` (Contrato) e `Info` (Informativo) do `lucide-react`.
-- Aba "Contrato": `<Textarea>` ligada ao state `modeloContrato` (já existe), com altura maior (`rows={15}`).
-- Aba "Informativo": `<div>` com conteúdo placeholder + `<Button onClick={() => window.print()}>Imprimir</Button>`. Adicionar regras `@media print` em `src/styles.css` para esconder navegação/sidebar ao imprimir, se necessário.
-- Nenhuma migração de banco por enquanto (o `modelo_contrato` já existe; o informativo entra hardcoded depois).
+- Remover `benForm`, `benSaving`, `benToDelete`, `saveBeneficio`, `confirmDeleteBeneficio` e o `AlertDialog` de exclusão de benefício.
+- Trocar o tipo local de benefício para aceitar entrada nova sem id: `{ id?: string; nome: string; descricao: string; ativo: boolean }`.
+- `loadBeneficios` continua igual (carrega no `openEdit`); `openNew` zera a lista.
+- Renderizar a tabela inline com inputs controlados que atualizam `beneficios[idx]` via `setBeneficios`.
+- No `save()` do convênio, após gravar/atualizar `cb_convenios` e reinserir `cb_convenio_faixas`, fazer:
+  1. `delete from cb_beneficios where convenio_id = <id>`
+  2. `insert` da lista atual (filtrando linhas com `nome` vazio).
+- Manter ícone `Gift` no `TabsTrigger`.
+
+Nenhuma migração de banco é necessária.
