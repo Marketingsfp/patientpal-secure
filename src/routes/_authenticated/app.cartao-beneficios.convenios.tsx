@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, ShieldCheck } from "lucide-react";
+import { Plus, Pencil, Trash2, ShieldCheck, Layers, Lightbulb } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -13,6 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -39,6 +40,12 @@ type Convenio = {
   modelo_contrato: string | null;
 };
 
+type Faixa = {
+  vidas_de: number;
+  vidas_ate: number | null;
+  valor_mensal: number;
+};
+
 function ConveniosPage() {
   const { clinicaAtual } = useClinica();
   const [rows, setRows] = useState<Convenio[]>([]);
@@ -55,7 +62,7 @@ function ConveniosPage() {
   const [vigenciaMeses, setVigenciaMeses] = useState<number>(12);
   const [beneficiosTxt, setBeneficiosTxt] = useState("");
   const [modeloContrato, setModeloContrato] = useState("");
-  const [valoresPorDep, setValoresPorDep] = useState<Record<number, number>>({ 0: 0 });
+  const [faixas, setFaixas] = useState<Faixa[]>([{ vidas_de: 1, vidas_ate: null, valor_mensal: 0 }]);
   const [valoresMin, setValoresMin] = useState<Record<string, number>>({});
   const [saving, setSaving] = useState(false);
   const [toDelete, setToDelete] = useState<Convenio | null>(null);
@@ -73,8 +80,8 @@ function ConveniosPage() {
     setRows(list);
     if (list.length) {
       const { data: vs } = await supabase
-        .from("cb_convenio_valores")
-        .select("convenio_id, dependentes, valor_mensal")
+        .from("cb_convenio_faixas")
+        .select("convenio_id, valor_mensal")
         .in("convenio_id", list.map((c) => c.id));
       const minMap: Record<string, number> = {};
       (vs ?? []).forEach((v: any) => {
@@ -98,7 +105,7 @@ function ConveniosPage() {
     setTaxaAdesao(0); setNumParcelas(12);
     setMaxDependentes(0); setFidelidadeMeses(0); setVigenciaMeses(12);
     setBeneficiosTxt(""); setModeloContrato("");
-    setValoresPorDep({ 0: 0 });
+    setFaixas([{ vidas_de: 1, vidas_ate: null, valor_mensal: 0 }]);
     setOpen(true);
   };
 
@@ -114,38 +121,38 @@ function ConveniosPage() {
     setVigenciaMeses(c.vigencia_meses ?? 12);
     setBeneficiosTxt(c.beneficios ?? "");
     setModeloContrato(c.modelo_contrato ?? "");
-    const { data: vs } = await supabase
-      .from("cb_convenio_valores")
-      .select("dependentes, valor_mensal")
-      .eq("convenio_id", c.id);
-    const map: Record<number, number> = {};
-    const max = c.max_dependentes ?? 0;
-    for (let i = 0; i <= max; i++) map[i] = 0;
-    (vs ?? []).forEach((v: any) => { map[v.dependentes] = Number(v.valor_mensal); });
-    setValoresPorDep(map);
+    const { data: fs } = await supabase
+      .from("cb_convenio_faixas")
+      .select("vidas_de, vidas_ate, valor_mensal")
+      .eq("convenio_id", c.id)
+      .order("vidas_de");
+    const list = (fs ?? []).map((f: any) => ({
+      vidas_de: Number(f.vidas_de),
+      vidas_ate: f.vidas_ate === null ? null : Number(f.vidas_ate),
+      valor_mensal: Number(f.valor_mensal),
+    }));
+    setFaixas(list.length ? list : [{ vidas_de: 1, vidas_ate: null, valor_mensal: 0 }]);
     setOpen(true);
   };
-
-  // Sincroniza linhas conforme maxDependentes muda
-  useEffect(() => {
-    setValoresPorDep((prev) => {
-      const next: Record<number, number> = {};
-      for (let i = 0; i <= maxDependentes; i++) next[i] = prev[i] ?? 0;
-      return next;
-    });
-  }, [maxDependentes]);
 
   const save = async () => {
     if (!clinicaAtual) return;
     if (!nome.trim()) { toast.error("Informe o nome."); return; }
+    if (!faixas.length) { toast.error("Adicione pelo menos uma faixa de preço."); return; }
+    for (const f of faixas) {
+      if (!f.vidas_de || f.vidas_de < 1) { toast.error("Campo 'De' inválido em uma faixa."); return; }
+      if (f.vidas_ate !== null && f.vidas_ate < f.vidas_de) {
+        toast.error("Campo 'Até' deve ser maior ou igual a 'De'."); return;
+      }
+    }
     setSaving(true);
-    const valor0 = valoresPorDep[0] ?? 0;
+    const valorMin = faixas.reduce((m, f) => Math.min(m, Number(f.valor_mensal) || 0), Number(faixas[0].valor_mensal) || 0);
     const payload = {
       clinica_id: clinicaAtual.clinica_id,
       nome: nome.trim(),
       descricao: descricao.trim() || null,
       ativo,
-      valor_mensal: valor0,
+      valor_mensal: valorMin,
       taxa_adesao: taxaAdesao,
       num_parcelas: numParcelas,
       max_dependentes: maxDependentes,
@@ -163,14 +170,17 @@ function ConveniosPage() {
       if (error || !data) { setSaving(false); toast.error(error?.message ?? "Erro ao criar"); return; }
       convenioId = data.id;
     }
-    // Substitui valores por dependente
-    await supabase.from("cb_convenio_valores").delete().eq("convenio_id", convenioId!);
-    const rowsToInsert = Object.entries(valoresPorDep)
-      .filter(([d]) => Number(d) <= maxDependentes)
-      .map(([d, v]) => ({ convenio_id: convenioId!, dependentes: Number(d), valor_mensal: Number(v) || 0 }));
+    // Substitui faixas de preço
+    await supabase.from("cb_convenio_faixas").delete().eq("convenio_id", convenioId!);
+    const rowsToInsert = faixas.map((f) => ({
+      convenio_id: convenioId!,
+      vidas_de: Number(f.vidas_de),
+      vidas_ate: f.vidas_ate === null ? null : Number(f.vidas_ate),
+      valor_mensal: Number(f.valor_mensal) || 0,
+    }));
     if (rowsToInsert.length) {
-      const { error: vErr } = await supabase.from("cb_convenio_valores").insert(rowsToInsert);
-      if (vErr) { setSaving(false); toast.error(vErr.message); return; }
+      const { error: fErr } = await supabase.from("cb_convenio_faixas").insert(rowsToInsert);
+      if (fErr) { setSaving(false); toast.error(fErr.message); return; }
     }
     setSaving(false);
     toast.success(editing ? "Convênio atualizado." : "Convênio criado.");
@@ -240,81 +250,153 @@ function ConveniosPage() {
           <DialogHeader>
             <DialogTitle>{editing ? "Editar convênio" : "Novo convênio"}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
-            <div>
-              <Label>Nome *</Label>
-              <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Plano Família" />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <Tabs defaultValue="info" className="w-full">
+            <TabsList>
+              <TabsTrigger value="info">Informações</TabsTrigger>
+              <TabsTrigger value="faixas"><Layers className="h-4 w-4 mr-1" />Faixas de Preço</TabsTrigger>
+            </TabsList>
+            <TabsContent value="info" className="space-y-3 mt-3">
               <div>
-                <Label>Taxa de adesão (R$)</Label>
-                <Input type="number" step="0.01" min="0" value={taxaAdesao}
-                  onChange={(e) => setTaxaAdesao(parseFloat(e.target.value) || 0)} />
+                <Label>Nome *</Label>
+                <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Plano Família" />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <Label>Taxa de adesão (R$)</Label>
+                  <Input type="number" step="0.01" min="0" value={taxaAdesao}
+                    onChange={(e) => setTaxaAdesao(parseFloat(e.target.value) || 0)} />
+                </div>
+                <div>
+                  <Label>Nº parcelas</Label>
+                  <Input type="number" min="1" value={numParcelas}
+                    onChange={(e) => setNumParcelas(parseInt(e.target.value) || 0)} />
+                </div>
+                <div>
+                  <Label>Máx. dependentes</Label>
+                  <Input type="number" min="0" value={maxDependentes}
+                    onChange={(e) => setMaxDependentes(parseInt(e.target.value) || 0)} />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <Label>Fidelidade (meses)</Label>
+                  <Input type="number" min="0" value={fidelidadeMeses}
+                    onChange={(e) => setFidelidadeMeses(parseInt(e.target.value) || 0)} />
+                </div>
+                <div>
+                  <Label>Vigência (meses)</Label>
+                  <Input type="number" min="0" value={vigenciaMeses}
+                    onChange={(e) => setVigenciaMeses(parseInt(e.target.value) || 0)} />
+                </div>
               </div>
               <div>
-                <Label>Nº parcelas</Label>
-                <Input type="number" min="1" value={numParcelas}
-                  onChange={(e) => setNumParcelas(parseInt(e.target.value) || 0)} />
+                <Label>Benefícios</Label>
+                <Textarea value={beneficiosTxt} onChange={(e) => setBeneficiosTxt(e.target.value)} rows={4}
+                  placeholder="Liste os benefícios deste convênio" />
               </div>
               <div>
-                <Label>Máx. dependentes</Label>
-                <Input type="number" min="0" value={maxDependentes}
-                  onChange={(e) => setMaxDependentes(parseInt(e.target.value) || 0)} />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <Label>Fidelidade (meses)</Label>
-                <Input type="number" min="0" value={fidelidadeMeses}
-                  onChange={(e) => setFidelidadeMeses(parseInt(e.target.value) || 0)} />
+                <Label>Modelo do contrato (use {"{{VALOR_MENSAL}}"}, {"{{PACIENTE_NOME}}"}, {"{{DEPENDENTES}}"}, {"{{CLINICA_NOME}}"} etc.)</Label>
+                <Textarea value={modeloContrato} onChange={(e) => setModeloContrato(e.target.value)} rows={6}
+                  placeholder="INSTRUMENTO PARTICULAR DE CONTRATO..." />
               </div>
               <div>
-                <Label>Vigência (meses)</Label>
-                <Input type="number" min="0" value={vigenciaMeses}
-                  onChange={(e) => setVigenciaMeses(parseInt(e.target.value) || 0)} />
+                <Label>Descrição</Label>
+                <Textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} rows={3} />
               </div>
-            </div>
-            <div className="border rounded-md p-3 space-y-2">
-              <Label>Valor mensal por nº de dependentes (R$) *</Label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                {Array.from({ length: maxDependentes + 1 }, (_, i) => i).map((dep) => (
-                  <div key={dep} className="flex flex-col gap-1">
-                    <span className="text-xs text-muted-foreground">
-                      {dep === 0 ? "Só titular" : `${dep} dep.`}
-                    </span>
-                    <Input
-                      type="number" step="0.01" min="0"
-                      value={valoresPorDep[dep] ?? 0}
-                      onChange={(e) => setValoresPorDep((prev) => ({
-                        ...prev, [dep]: parseFloat(e.target.value) || 0,
-                      }))}
-                    />
+              <div className="flex items-center gap-2">
+                <Switch checked={ativo} onCheckedChange={setAtivo} />
+                <Label>Ativo</Label>
+              </div>
+            </TabsContent>
+            <TabsContent value="faixas" className="mt-3">
+              <div className="space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2 font-medium">
+                      <Layers className="h-4 w-4" /> Faixas de Preço por Quantidade de Vidas
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Configure o valor mensal conforme a quantidade de vidas (titular + dependentes).
+                    </p>
                   </div>
-                ))}
+                  <Button
+                    variant="ghost" size="sm"
+                    onClick={() => {
+                      const last = faixas[faixas.length - 1];
+                      const nextDe = last ? (last.vidas_ate ?? last.vidas_de) + 1 : 1;
+                      setFaixas([...faixas, { vidas_de: nextDe, vidas_ate: null, valor_mensal: 0 }]);
+                    }}
+                  >
+                    <Plus className="h-4 w-4 mr-1" /> Adicionar Faixa
+                  </Button>
+                </div>
+                <div className="border rounded-md overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>De (pessoas)</TableHead>
+                        <TableHead>Até (pessoas)</TableHead>
+                        <TableHead className="text-right">Valor Mensal (R$)</TableHead>
+                        <TableHead className="w-10"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {faixas.map((f, idx) => (
+                        <TableRow key={idx}>
+                          <TableCell>
+                            <Input
+                              type="number" min="1"
+                              value={f.vidas_de}
+                              onChange={(e) => {
+                                const v = parseInt(e.target.value) || 1;
+                                setFaixas(faixas.map((x, i) => i === idx ? { ...x, vidas_de: v } : x));
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              type="number" min="1"
+                              placeholder="∞"
+                              value={f.vidas_ate ?? ""}
+                              onChange={(e) => {
+                                const raw = e.target.value;
+                                const v = raw === "" ? null : (parseInt(raw) || null);
+                                setFaixas(faixas.map((x, i) => i === idx ? { ...x, vidas_ate: v } : x));
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              type="number" step="0.01" min="0"
+                              className="text-right"
+                              value={f.valor_mensal}
+                              onChange={(e) => {
+                                const v = parseFloat(e.target.value) || 0;
+                                setFaixas(faixas.map((x, i) => i === idx ? { ...x, valor_mensal: v } : x));
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              size="sm" variant="ghost"
+                              onClick={() => setFaixas(faixas.filter((_, i) => i !== idx))}
+                              disabled={faixas.length === 1}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Lightbulb className="h-3.5 w-3.5" />
+                  Exemplo: 1 pessoa = R$200, de 2 a 3 = R$350, 4+ = R$500. Deixe "Até" vazio para indicar "ou mais".
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Ajuste "Máx. dependentes" acima para adicionar/remover faixas.
-              </p>
-            </div>
-            <div>
-              <Label>Benefícios</Label>
-              <Textarea value={beneficiosTxt} onChange={(e) => setBeneficiosTxt(e.target.value)} rows={4}
-                placeholder="Liste os benefícios deste convênio" />
-            </div>
-            <div>
-              <Label>Modelo do contrato (use {"{{VALOR_MENSAL}}"}, {"{{PACIENTE_NOME}}"}, {"{{DEPENDENTES}}"}, {"{{CLINICA_NOME}}"} etc.)</Label>
-              <Textarea value={modeloContrato} onChange={(e) => setModeloContrato(e.target.value)} rows={6}
-                placeholder="INSTRUMENTO PARTICULAR DE CONTRATO..." />
-            </div>
-            <div>
-              <Label>Descrição</Label>
-              <Textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} rows={3} />
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch checked={ativo} onCheckedChange={setAtivo} />
-              <Label>Ativo</Label>
-            </div>
-          </div>
+            </TabsContent>
+          </Tabs>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
             <Button onClick={save} disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
