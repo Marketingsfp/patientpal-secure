@@ -525,59 +525,146 @@ function ConveniosPage() {
                       Liste os benefícios oferecidos por este convênio. As alterações são salvas ao clicar em "Salvar".
                     </p>
                   </div>
-                  <Button variant="ghost" size="sm"
-                    onClick={() => setBeneficios([...beneficios, { nome: "", descricao: "", ativo: true }])}>
+                  <Button variant="ghost" size="sm" onClick={() => setEscopoDialogOpen(true)}>
                     <Plus className="h-4 w-4 mr-1" /> Adicionar benefício
                   </Button>
                 </div>
-                <div className="border rounded-md overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Nome</TableHead>
-                        <TableHead>Descrição</TableHead>
-                        <TableHead className="w-24">Ativo</TableHead>
-                        <TableHead className="w-10"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {benLoading ? (
-                        <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Carregando…</TableCell></TableRow>
-                      ) : beneficios.length === 0 ? (
-                        <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Nenhum benefício. Clique em "Adicionar benefício".</TableCell></TableRow>
-                      ) : beneficios.map((b, idx) => (
-                        <TableRow key={b.id ?? `new-${idx}`}>
-                          <TableCell>
-                            <Input
-                              value={b.nome}
-                              placeholder="Ex: Consulta gratuita"
-                              onChange={(e) => setBeneficios(beneficios.map((x, i) => i === idx ? { ...x, nome: e.target.value } : x))}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              value={b.descricao ?? ""}
-                              placeholder="Descrição (opcional)"
-                              onChange={(e) => setBeneficios(beneficios.map((x, i) => i === idx ? { ...x, descricao: e.target.value } : x))}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Switch
-                              checked={b.ativo}
-                              onCheckedChange={(v) => setBeneficios(beneficios.map((x, i) => i === idx ? { ...x, ativo: v } : x))}
-                            />
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button size="sm" variant="ghost"
-                              onClick={() => setBeneficios(beneficios.filter((_, i) => i !== idx))}>
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                {benLoading ? (
+                  <p className="text-center text-muted-foreground py-6 text-sm">Carregando…</p>
+                ) : beneficios.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-6 text-sm border rounded-md">
+                    Nenhum benefício. Clique em "Adicionar benefício".
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {beneficios.map((b, idx) => {
+                      const update = (patch: Partial<Beneficio>) =>
+                        setBeneficios(beneficios.map((x, i) => i === idx ? { ...x, ...patch } : x));
+                      const procOpts = procedimentosList.map((p) => ({ value: p.id, label: p.nome }));
+                      const espOpts = especialidadesList.map((e) => ({ value: e.id, label: e.nome }));
+                      return (
+                        <div key={b.id ?? `new-${idx}`} className="border rounded-md p-3 space-y-3 bg-card">
+                          <div className="flex items-center justify-between gap-2">
+                            <Badge variant={b.escopo === "servico" ? "default" : "secondary"}>
+                              {b.escopo === "servico" ? "Serviço único" : "Especialidade"}
+                            </Badge>
+                            <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-1.5">
+                                <Switch checked={b.ativo} onCheckedChange={(v) => update({ ativo: v })} />
+                                <Label className="text-xs">Ativo</Label>
+                              </div>
+                              <Button size="sm" variant="ghost"
+                                onClick={() => setBeneficios(beneficios.filter((_, i) => i !== idx))}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div className="md:col-span-2">
+                              <Label className="text-xs">{b.escopo === "servico" ? "Item" : "Especialidade"}</Label>
+                              {b.escopo === "servico" ? (
+                                <SearchableSelect
+                                  options={procOpts}
+                                  value={b.procedimento_id ?? ""}
+                                  onChange={(v) => update({ procedimento_id: v })}
+                                  placeholder="Selecione o item"
+                                />
+                              ) : (
+                                <SearchableSelect
+                                  options={espOpts}
+                                  value={b.especialidade_id ?? ""}
+                                  onChange={(v) => update({ especialidade_id: v })}
+                                  placeholder="Selecione a especialidade"
+                                />
+                              )}
+                            </div>
+                            <div>
+                              <Label className="text-xs">Tipo</Label>
+                              <Select value={b.tipo_desconto} onValueChange={(v) => update({ tipo_desconto: v as Beneficio["tipo_desconto"], valor_desconto: v === "gratuidade" ? null : b.valor_desconto })}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="percentual">Desconto %</SelectItem>
+                                  <SelectItem value="valor">Desconto R$</SelectItem>
+                                  <SelectItem value="gratuidade">Gratuidade</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                          {b.tipo_desconto !== "gratuidade" && (
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                              <div>
+                                <Label className="text-xs">
+                                  {b.tipo_desconto === "percentual" ? "Valor (%)" : "Valor (R$)"}
+                                </Label>
+                                {b.tipo_desconto === "percentual" ? (
+                                  <Input type="number" min="0" max="100" step="0.01"
+                                    value={b.valor_desconto ?? ""}
+                                    onChange={(e) => update({ valor_desconto: e.target.value ? parseFloat(e.target.value) : null })}
+                                  />
+                                ) : (
+                                  <CurrencyInput
+                                    value={b.valor_desconto !== null ? b.valor_desconto.toFixed(2) : ""}
+                                    onChange={(v) => update({ valor_desconto: v ? parseFloat(v) : null })}
+                                  />
+                                )}
+                              </div>
+                            </div>
+                          )}
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                            <div>
+                              <Label className="text-xs">A partir de</Label>
+                              <Select value={String(b.inicio_a_partir)} onValueChange={(v) => update({ inicio_a_partir: parseInt(v) as 1 | 2 | 6 })}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="1">1ª mensalidade</SelectItem>
+                                  <SelectItem value="2">2ª mensalidade</SelectItem>
+                                  <SelectItem value="6">6ª mensalidade</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label className="text-xs">Limite de uso</Label>
+                              <Select value={b.limite_uso} onValueChange={(v) => update({ limite_uso: v as Beneficio["limite_uso"] })}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="ilimitado">Ilimitado</SelectItem>
+                                  <SelectItem value="1">1</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label className="text-xs">Periodicidade</Label>
+                              <Select value={b.periodicidade} onValueChange={(v) => update({ periodicidade: v as Beneficio["periodicidade"] })}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="dia">Por dia</SelectItem>
+                                  <SelectItem value="mes">Por mês</SelectItem>
+                                  <SelectItem value="contrato">Por contrato</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label className="text-xs">Pessoa</Label>
+                              <Select value={b.pessoa} onValueChange={(v) => update({ pessoa: v as Beneficio["pessoa"] })}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="titular">Apenas titular</SelectItem>
+                                  <SelectItem value="titular_dependentes_soma">Titular + dependentes (somam)</SelectItem>
+                                  <SelectItem value="titular_ou_dependentes">Titular ou dependentes (um ou outro)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                          <div>
+                            <Label className="text-xs">Descrição (opcional)</Label>
+                            <Input value={b.descricao ?? ""}
+                              onChange={(e) => update({ descricao: e.target.value })} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </TabsContent>
             <TabsContent value="contrato" className="mt-3">
