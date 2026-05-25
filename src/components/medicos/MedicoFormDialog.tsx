@@ -197,9 +197,10 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setSaving(true);
+    const nomeLimpo = form.nome.replace(/^\s*(dr|dra)\.?\s+/i, "").trim();
     const payload = {
       clinica_id: clinicaId,
-      nome: form.nome,
+      nome: nomeLimpo,
       crm: form.crm,
       crm_uf: form.crm_uf.toUpperCase(),
       especialidade_id: form.especialidades[0] || null,
@@ -261,7 +262,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
     toast.success(editId ? "Médico atualizado!" : "Médico cadastrado!");
 
     // Auto-create paciente on new medico
-    if (!editId && form.nome.trim()) {
+    if (!editId && nomeLimpo) {
       try {
         let existe: { id: string } | null = null;
         if (form.cpf) {
@@ -285,7 +286,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         if (!existe) {
           await supabase.from("pacientes").insert({
             clinica_id: clinicaId,
-            nome: form.nome,
+            nome: nomeLimpo,
             cpf: form.cpf || null,
             data_nascimento: form.data_nascimento || null,
             email: form.email || null,
