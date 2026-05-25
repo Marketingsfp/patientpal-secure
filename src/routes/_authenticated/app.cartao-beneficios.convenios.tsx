@@ -320,6 +320,7 @@ function ConveniosPage() {
             <TabsList>
               <TabsTrigger value="info">Informações</TabsTrigger>
               <TabsTrigger value="faixas"><Layers className="h-4 w-4 mr-1" />Faixas de Preço</TabsTrigger>
+              <TabsTrigger value="beneficios"><Gift className="h-4 w-4 mr-1" />Benefícios</TabsTrigger>
               <TabsTrigger value="contrato"><FileText className="h-4 w-4 mr-1" />Contrato</TabsTrigger>
               <TabsTrigger value="informativo"><Info className="h-4 w-4 mr-1" />Informativo</TabsTrigger>
             </TabsList>
