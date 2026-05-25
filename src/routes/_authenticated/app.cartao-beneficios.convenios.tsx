@@ -48,7 +48,6 @@ function ConveniosPage() {
   const [nome, setNome] = useState("");
   const [descricao, setDescricao] = useState("");
   const [ativo, setAtivo] = useState(true);
-  const [valorMensal, setValorMensal] = useState<number>(0);
   const [taxaAdesao, setTaxaAdesao] = useState<number>(0);
   const [numParcelas, setNumParcelas] = useState<number>(12);
   const [maxDependentes, setMaxDependentes] = useState<number>(0);
@@ -56,6 +55,8 @@ function ConveniosPage() {
   const [vigenciaMeses, setVigenciaMeses] = useState<number>(12);
   const [beneficiosTxt, setBeneficiosTxt] = useState("");
   const [modeloContrato, setModeloContrato] = useState("");
+  const [valoresPorDep, setValoresPorDep] = useState<Record<number, number>>({ 0: 0 });
+  const [valoresMin, setValoresMin] = useState<Record<string, number>>({});
   const [saving, setSaving] = useState(false);
   const [toDelete, setToDelete] = useState<Convenio | null>(null);
 
@@ -68,7 +69,24 @@ function ConveniosPage() {
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("nome");
     if (error) toast.error(error.message);
-    setRows((data ?? []) as Convenio[]);
+    const list = (data ?? []) as Convenio[];
+    setRows(list);
+    if (list.length) {
+      const { data: vs } = await supabase
+        .from("cb_convenio_valores")
+        .select("convenio_id, dependentes, valor_mensal")
+        .in("convenio_id", list.map((c) => c.id));
+      const minMap: Record<string, number> = {};
+      (vs ?? []).forEach((v: any) => {
+        const val = Number(v.valor_mensal);
+        if (minMap[v.convenio_id] === undefined || val < minMap[v.convenio_id]) {
+          minMap[v.convenio_id] = val;
+        }
+      });
+      setValoresMin(minMap);
+    } else {
+      setValoresMin({});
+    }
     setLoading(false);
   };
 
@@ -77,18 +95,18 @@ function ConveniosPage() {
   const openNew = () => {
     setEditing(null);
     setNome(""); setDescricao(""); setAtivo(true);
-    setValorMensal(0); setTaxaAdesao(0); setNumParcelas(12);
+    setTaxaAdesao(0); setNumParcelas(12);
     setMaxDependentes(0); setFidelidadeMeses(0); setVigenciaMeses(12);
     setBeneficiosTxt(""); setModeloContrato("");
+    setValoresPorDep({ 0: 0 });
     setOpen(true);
   };
 
-  const openEdit = (c: Convenio) => {
+  const openEdit = async (c: Convenio) => {
     setEditing(c);
     setNome(c.nome);
     setDescricao(c.descricao ?? "");
     setAtivo(c.ativo);
-    setValorMensal(Number(c.valor_mensal ?? 0));
     setTaxaAdesao(Number(c.taxa_adesao ?? 0));
     setNumParcelas(c.num_parcelas ?? 12);
     setMaxDependentes(c.max_dependentes ?? 0);
@@ -96,19 +114,38 @@ function ConveniosPage() {
     setVigenciaMeses(c.vigencia_meses ?? 12);
     setBeneficiosTxt(c.beneficios ?? "");
     setModeloContrato(c.modelo_contrato ?? "");
+    const { data: vs } = await supabase
+      .from("cb_convenio_valores")
+      .select("dependentes, valor_mensal")
+      .eq("convenio_id", c.id);
+    const map: Record<number, number> = {};
+    const max = c.max_dependentes ?? 0;
+    for (let i = 0; i <= max; i++) map[i] = 0;
+    (vs ?? []).forEach((v: any) => { map[v.dependentes] = Number(v.valor_mensal); });
+    setValoresPorDep(map);
     setOpen(true);
   };
+
+  // Sincroniza linhas conforme maxDependentes muda
+  useEffect(() => {
+    setValoresPorDep((prev) => {
+      const next: Record<number, number> = {};
+      for (let i = 0; i <= maxDependentes; i++) next[i] = prev[i] ?? 0;
+      return next;
+    });
+  }, [maxDependentes]);
 
   const save = async () => {
     if (!clinicaAtual) return;
     if (!nome.trim()) { toast.error("Informe o nome."); return; }
     setSaving(true);
+    const valor0 = valoresPorDep[0] ?? 0;
     const payload = {
       clinica_id: clinicaAtual.clinica_id,
       nome: nome.trim(),
       descricao: descricao.trim() || null,
       ativo,
-      valor_mensal: valorMensal,
+      valor_mensal: valor0,
       taxa_adesao: taxaAdesao,
       num_parcelas: numParcelas,
       max_dependentes: maxDependentes,
@@ -117,11 +154,25 @@ function ConveniosPage() {
       beneficios: beneficiosTxt.trim() || null,
       modelo_contrato: modeloContrato.trim() || null,
     };
-    const { error } = editing
-      ? await supabase.from("cb_convenios").update(payload).eq("id", editing.id)
-      : await supabase.from("cb_convenios").insert(payload);
+    let convenioId = editing?.id;
+    if (editing) {
+      const { error } = await supabase.from("cb_convenios").update(payload).eq("id", editing.id);
+      if (error) { setSaving(false); toast.error(error.message); return; }
+    } else {
+      const { data, error } = await supabase.from("cb_convenios").insert(payload).select("id").single();
+      if (error || !data) { setSaving(false); toast.error(error?.message ?? "Erro ao criar"); return; }
+      convenioId = data.id;
+    }
+    // Substitui valores por dependente
+    await supabase.from("cb_convenio_valores").delete().eq("convenio_id", convenioId!);
+    const rowsToInsert = Object.entries(valoresPorDep)
+      .filter(([d]) => Number(d) <= maxDependentes)
+      .map(([d, v]) => ({ convenio_id: convenioId!, dependentes: Number(d), valor_mensal: Number(v) || 0 }));
+    if (rowsToInsert.length) {
+      const { error: vErr } = await supabase.from("cb_convenio_valores").insert(rowsToInsert);
+      if (vErr) { setSaving(false); toast.error(vErr.message); return; }
+    }
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
     toast.success(editing ? "Convênio atualizado." : "Convênio criado.");
     setOpen(false);
     load();
@@ -154,6 +205,7 @@ function ConveniosPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Nome</TableHead>
+                <TableHead>A partir de</TableHead>
                 <TableHead>Descrição</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
@@ -161,12 +213,13 @@ function ConveniosPage() {
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Carregando…</TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">Carregando…</TableCell></TableRow>
               ) : rows.length === 0 ? (
-                <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Nenhum convênio cadastrado.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">Nenhum convênio cadastrado.</TableCell></TableRow>
               ) : rows.map((c) => (
                 <TableRow key={c.id}>
                   <TableCell className="font-medium">{c.nome}</TableCell>
+                  <TableCell>{valoresMin[c.id] !== undefined ? `R$ ${valoresMin[c.id].toFixed(2)}` : "—"}</TableCell>
                   <TableCell className="text-muted-foreground">{c.descricao ?? "—"}</TableCell>
                   <TableCell>
                     <Badge variant={c.ativo ? "default" : "outline"}>{c.ativo ? "Ativo" : "Inativo"}</Badge>
@@ -194,11 +247,6 @@ function ConveniosPage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div>
-                <Label>Valor mensal (R$)</Label>
-                <Input type="number" step="0.01" min="0" value={valorMensal}
-                  onChange={(e) => setValorMensal(parseFloat(e.target.value) || 0)} />
-              </div>
-              <div>
                 <Label>Taxa de adesão (R$)</Label>
                 <Input type="number" step="0.01" min="0" value={taxaAdesao}
                   onChange={(e) => setTaxaAdesao(parseFloat(e.target.value) || 0)} />
@@ -208,13 +256,13 @@ function ConveniosPage() {
                 <Input type="number" min="1" value={numParcelas}
                   onChange={(e) => setNumParcelas(parseInt(e.target.value) || 0)} />
               </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div>
                 <Label>Máx. dependentes</Label>
                 <Input type="number" min="0" value={maxDependentes}
                   onChange={(e) => setMaxDependentes(parseInt(e.target.value) || 0)} />
               </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <Label>Fidelidade (meses)</Label>
                 <Input type="number" min="0" value={fidelidadeMeses}
@@ -225,6 +273,28 @@ function ConveniosPage() {
                 <Input type="number" min="0" value={vigenciaMeses}
                   onChange={(e) => setVigenciaMeses(parseInt(e.target.value) || 0)} />
               </div>
+            </div>
+            <div className="border rounded-md p-3 space-y-2">
+              <Label>Valor mensal por nº de dependentes (R$) *</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                {Array.from({ length: maxDependentes + 1 }, (_, i) => i).map((dep) => (
+                  <div key={dep} className="flex flex-col gap-1">
+                    <span className="text-xs text-muted-foreground">
+                      {dep === 0 ? "Só titular" : `${dep} dep.`}
+                    </span>
+                    <Input
+                      type="number" step="0.01" min="0"
+                      value={valoresPorDep[dep] ?? 0}
+                      onChange={(e) => setValoresPorDep((prev) => ({
+                        ...prev, [dep]: parseFloat(e.target.value) || 0,
+                      }))}
+                    />
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Ajuste "Máx. dependentes" acima para adicionar/remover faixas.
+              </p>
             </div>
             <div>
               <Label>Benefícios</Label>
