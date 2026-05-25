@@ -27,10 +27,10 @@ import {
 
 export const Route = createFileRoute("/_authenticated/app/procedimentos")({
   component: ProcedimentosPage,
-  head: () => ({ meta: [{ title: "Procedimentos — ClinicaOS" }] }),
+  head: () => ({ meta: [{ title: "Serviços — ClinicaOS" }] }),
 });
 
-type Tipo = "consulta" | "exame" | "procedimento";
+type Tipo = string;
 interface Procedimento {
   id: string;
   nome: string;
@@ -59,12 +59,14 @@ interface Cartao {
   ativo: boolean;
 }
 
-const TIPO_LABEL: Record<Tipo, string> = { consulta: "Consulta", exame: "Exame", procedimento: "Procedimento" };
-const TIPO_COR: Record<Tipo, string> = {
+const TIPO_COR_MAP: Record<string, string> = {
   consulta: "bg-primary/10 text-primary",
   exame: "bg-blue-500/15 text-blue-700 dark:text-blue-400",
   procedimento: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
+  cirurgia: "bg-rose-500/15 text-rose-700 dark:text-rose-400",
 };
+const tipoLabel = (t: string) => (t ? t.charAt(0).toUpperCase() + t.slice(1) : "");
+const tipoCor = (t: string) => TIPO_COR_MAP[t] ?? "bg-muted text-foreground";
 
 const EMPTY = {
   nome: "", grupo: "", tipo: "exame" as Tipo, codigo: "",
