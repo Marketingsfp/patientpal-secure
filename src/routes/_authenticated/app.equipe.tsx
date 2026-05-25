@@ -36,6 +36,9 @@ interface Medico {
   ativo: boolean;
 }
 
+const limparPrefixoMedico = (nome: string) =>
+  nome.replace(/^(\s*(dr|dra)\.?\s+)+/i, "").trim();
+
 function EquipePage() {
   const { clinicaAtual } = useClinica();
   const [tab, setTab] = useState<"funcionarios" | "medicos">("funcionarios");
@@ -79,7 +82,10 @@ function EquipePage() {
       }));
       rows.sort((a, b) => a.nome.localeCompare(b.nome));
       setFuncionarios(rows);
-      setMedicos((m.data ?? []) as Medico[]);
+      setMedicos(((m.data ?? []) as Medico[]).map((medico) => ({
+        ...medico,
+        nome: limparPrefixoMedico(medico.nome),
+      })));
       setLoading(false);
     });
   }, [clinicaAtual?.clinica_id, reloadKey]);

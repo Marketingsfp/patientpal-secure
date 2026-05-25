@@ -29,6 +29,9 @@ const CONVENIOS_PADRAO: ConvenioRow[] = [
   { nome: "Cartão Desconto", tipo_repasse: "percentual", percentual: "50", valor: "", ativo: true },
 ];
 
+const limparPrefixoMedico = (nome: string) =>
+  nome.replace(/^(\s*(dr|dra)\.?\s+)+/i, "").trim();
+
 const emptyForm = () => ({
   nome: "", crm: "", crm_uf: "",
   especialidades: [] as string[],
@@ -139,7 +142,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         setConvenios(CONVENIOS_PADRAO.map((c) => ({ ...c })));
       }
       setForm({
-        nome: med.nome,
+        nome: limparPrefixoMedico(med.nome ?? ""),
         crm: med.crm,
         crm_uf: med.crm_uf,
         especialidades: (med.medico_especialidades ?? []).map((me: any) => me.especialidade?.id).filter(Boolean) as string[],
@@ -197,7 +200,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    const nomeLimpo = form.nome.replace(/^\s*(dr|dra)\.?\s+/i, "").trim();
+    const nomeLimpo = limparPrefixoMedico(form.nome);
     const payload = {
       clinica_id: clinicaId,
       nome: nomeLimpo,
@@ -315,7 +318,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
             clinicaId,
             email: form.email,
             password: form.senhaUsuario,
-            nome: form.nome,
+            nome: nomeLimpo,
             role: form.roleUsuario,
           },
         });
