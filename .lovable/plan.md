@@ -1,66 +1,36 @@
-## Plano: novos submenus "Convênio" e "Benefícios" em Cartão Benefícios
+## Ajuste
 
-### Objetivo
-Criar dois novos submenus dentro de "Cartão Benefícios":
-- **Convênio**: lista os tipos de cartão benefícios (ex.: Família, Individual, Premium…).
-- **Benefícios**: lista os benefícios oferecidos, cada um vinculado a um Convênio.
+No cadastro de Convênio, o campo único **"Valor mensal"** vira uma **tabela de valores por nº de dependentes**, gerada automaticamente de acordo com o "Máx. dependentes" informado.
 
-Ambos com CRUD completo (criar, editar, excluir, listar), por clínica, com RLS.
+## Como vai funcionar na tela
 
-### Estrutura no app
+Exemplo com "Máx. dependentes = 3":
 
-Novos itens na sidebar dentro do grupo "Cartão Benefícios":
+| Nº de dependentes | Valor mensal (R$) |
+|---|---|
+| 0 (só titular) | 80,00 |
+| 1 | 110,00 |
+| 2 | 140,00 |
+| 3 | 170,00 |
 
-```text
-Cartão Benefícios
-  ├ Nova venda
-  ├ Modelo de contrato
-  ├ Convênio          ← NOVO
-  ├ Benefícios        ← NOVO
-  └ Relatórios
-```
+- Ao alterar "Máx. dependentes", as linhas se ajustam (preservando os valores já digitados nas faixas existentes).
+- Os demais campos (Taxa de adesão, Nº parcelas, Fidelidade, Vigência, Benefícios, Modelo do contrato) permanecem como estão — único por convênio.
+- Na listagem de Convênios, a coluna mostra "A partir de R$ X" usando a faixa de 0 dependentes.
 
-Novas rotas (file-based routing):
-- `src/routes/_authenticated/app.cartao-beneficios.convenios.tsx`
-- `src/routes/_authenticated/app.cartao-beneficios.beneficios.tsx`
+## Detalhes técnicos
 
-Cada uma terá sua aba ativa exclusiva no layout `app.cartao-beneficios.tsx` (mesmo padrão das demais).
+**Banco** — nova tabela `cb_convenio_valores`:
+- `convenio_id` (FK → `cb_convenios`, ON DELETE CASCADE)
+- `dependentes` (int)
+- `valor_mensal` (numeric)
+- UNIQUE (convenio_id, dependentes)
+- RLS espelhando `cb_convenios` (membros leem, gestores escrevem)
 
-### Banco de dados (migration)
+Mantenho `cb_convenios.valor_mensal` como fallback/legado (não removo para não quebrar dados existentes), mas a UI passa a usar exclusivamente a nova tabela.
 
-Duas tabelas novas, isoladas das tabelas atuais (`planos_assinatura`, `contratos_assinatura`), para não impactar fluxos existentes:
-
-- **cb_convenios**: `clinica_id`, `nome`, `descricao`, `ativo`
-- **cb_beneficios**: `clinica_id`, `convenio_id` (FK para cb_convenios), `nome`, `descricao`, `ativo`
-
-Regras de acesso (RLS):
-- Apenas membros ativos da clínica conseguem ver/criar/editar/excluir registros da sua clínica.
-- Gestores/admins têm permissão para administrar.
-
-Triggers padrão: `updated_at` automático.
-
-### Telas
-
-**Convênio** (`/app/cartao-beneficios/convenios`)
-- Tabela com colunas: Nome, Descrição, Status (Ativo/Inativo), ações (Editar / Excluir).
-- Botão "Novo convênio" abre dialog com: nome, descrição, ativo.
-
-**Benefícios** (`/app/cartao-beneficios/beneficios`)
-- Tabela com colunas: Nome, Convênio, Descrição, Status, ações.
-- Filtro por Convênio no topo.
-- Botão "Novo benefício" abre dialog com: nome, convênio (select), descrição, ativo.
-- Validação: não permite criar benefício se não houver nenhum convênio cadastrado (com link para cadastrar).
-
-### Detalhes técnicos
-
-- Padrão visual idêntico às telas existentes (`Card`, `Table`, `Dialog`, `Button` shadcn).
-- Consultas via `supabase` client (browser), respeitando RLS por `clinica_id` do `useClinica()`.
-- Ícones na sidebar: `ShieldCheck` (Convênio) e `Gift` (Benefícios), lucide-react.
-- Sem alterações nas tabelas/fluxos atuais de contratos e modelos.
-
-### Arquivos afetados
-- **Novo**: `src/routes/_authenticated/app.cartao-beneficios.convenios.tsx`
-- **Novo**: `src/routes/_authenticated/app.cartao-beneficios.beneficios.tsx`
-- **Editar**: `src/routes/_authenticated/app.cartao-beneficios.tsx` (adicionar abas)
-- **Editar**: `src/components/app-shell.tsx` (adicionar itens no grupo "Cartão Benefícios")
-- **Migration**: criar tabelas `cb_convenios` e `cb_beneficios` com RLS e triggers
+**Frontend** — `src/routes/_authenticated/app.cartao-beneficios.convenios.tsx`:
+- Substituir o input "Valor mensal (R$)" por um bloco de tabela com uma linha por faixa de dependentes (0..max).
+- Estado `valoresPorDep: Record<number, number>` sincronizado quando `maxDependentes` muda.
+- No `save`, após upsert do convênio, deletar/inserir as linhas em `cb_convenio_valores`.
+- No `openEdit`, carregar os valores existentes.
+- Na listagem, exibir "A partir de R$ X" (linha de 0 dependentes).
