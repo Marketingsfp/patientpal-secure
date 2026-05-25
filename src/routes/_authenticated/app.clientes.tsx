@@ -31,6 +31,7 @@ interface Paciente {
   cpf: string | null;
   numero_pasta: string | null;
   telefone: string | null;
+  telefone2: string | null;
   email: string | null;
   data_nascimento: string | null;
   sexo: string | null;
@@ -51,7 +52,7 @@ interface Paciente {
 }
 
 type FormState = {
-  nome: string; cpf: string; numero_pasta: string; telefone: string; email: string;
+  nome: string; cpf: string; numero_pasta: string; telefone: string; telefone2: string; email: string;
   data_nascimento: string; sexo: string; ativo: boolean;
   cep: string; logradouro: string; numero: string; complemento: string;
   bairro: string; cidade: string; estado: string;
@@ -60,7 +61,7 @@ type FormState = {
 };
 
 const EMPTY: FormState = {
-  nome: "", cpf: "", numero_pasta: "", telefone: "", email: "",
+  nome: "", cpf: "", numero_pasta: "", telefone: "", telefone2: "", email: "",
   data_nascimento: "", sexo: "nao_informar", ativo: true,
   cep: "", logradouro: "", numero: "", complemento: "",
   bairro: "", cidade: "", estado: "",
@@ -358,7 +359,7 @@ function ClientesPage() {
     setForm({
       nome: paciente.nome,
       cpf: paciente.cpf ?? "", numero_pasta: paciente.numero_pasta ?? "",
-      telefone: paciente.telefone ?? "", email: paciente.email ?? "",
+      telefone: paciente.telefone ?? "", telefone2: paciente.telefone2 ?? "", email: paciente.email ?? "",
       data_nascimento: paciente.data_nascimento ?? "", sexo: paciente.sexo ?? "nao_informar", ativo: paciente.ativo,
       cep: paciente.cep ?? "", logradouro: paciente.logradouro ?? "", numero: paciente.numero ?? "",
       complemento: paciente.complemento ?? "", bairro: paciente.bairro ?? "",
@@ -413,7 +414,7 @@ function ClientesPage() {
       const text = normalizarFala(field as string, raw);
       setForm(f => {
         const cur = (f[field] as string) ?? "";
-        const sep = cur && field !== "email" && field !== "cpf" && field !== "telefone" &&
+        const sep = cur && field !== "email" && field !== "cpf" && field !== "telefone" && field !== "telefone2" &&
                     field !== "cep" && field !== "numero" &&
                     field !== "responsavel_cpf" && field !== "responsavel_telefone" ? " " : "";
         return { ...f, [field]: cur + sep + text } as FormState;
@@ -445,6 +446,7 @@ function ClientesPage() {
       cpf: form.cpf.trim() ? somenteDigitos(form.cpf) : null,
       numero_pasta: form.numero_pasta.trim() || null,
       telefone: form.telefone.trim() || null,
+      telefone2: form.telefone2.trim() || null,
       email: form.email.trim() || null,
       data_nascimento: form.data_nascimento || null,
       sexo: form.sexo,
@@ -728,6 +730,10 @@ function ClientesPage() {
                     <Label>Telefone *</Label>
                     <InputVoz {...fieldProps("telefone")} />
                   </div>
+                </div>
+                <div className="space-y-1">
+                  <Label>Telefone 2 <span className="text-xs text-muted-foreground">(opcional)</span></Label>
+                  <InputVoz {...fieldProps("telefone2")} />
                 </div>
                 <div className="space-y-1">
                   <Label>E-mail <span className="text-xs text-muted-foreground">(usado em nota fiscal)</span></Label>
