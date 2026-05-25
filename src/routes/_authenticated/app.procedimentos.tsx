@@ -690,7 +690,7 @@ function ProcedimentosPage() {
               <SelectTrigger className="w-56"><SelectValue placeholder="Especialidade" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Especialidades</SelectItem>
-                {grupos.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+                {especialidades.map(e => <SelectItem key={e.id} value={e.nome}>{e.nome}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={filtroTipo} onValueChange={(v) => setFiltroTipo(v as typeof filtroTipo)}>
