@@ -70,7 +70,6 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     items: [
     { to: "/app/cartao-beneficios/contratos", label: "Nova venda", icon: CreditCard },
     { to: "/app/cartao-beneficios/convenios", label: "Convênio", icon: ShieldCheck },
-    { to: "/app/cartao-beneficios/beneficios", label: "Benefícios", icon: Gift },
     { to: "/app/cartao-beneficios/relatorios", label: "Relatórios", icon: BarChart3 },
     ],
   },
