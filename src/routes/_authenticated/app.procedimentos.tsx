@@ -718,11 +718,6 @@ function ProcedimentosPage() {
             <Table className="[&_td]:py-1 [&_td]:px-2 [&_th]:py-1.5 [&_th]:px-2 text-sm">
               <TableHeader>
                 <TableRow className="bg-muted/40">
-                  <TableHead>
-                    <button type="button" onClick={() => toggleSort("nome")} className="inline-flex items-center gap-1 hover:text-foreground">
-                      Nome <SortIcon col="nome" />
-                    </button>
-                  </TableHead>
                   <TableHead className="w-44">
                     <button type="button" onClick={() => toggleSort("grupo")} className="inline-flex items-center gap-1 hover:text-foreground">
                       Especialidade <SortIcon col="grupo" />
@@ -731,6 +726,11 @@ function ProcedimentosPage() {
                   <TableHead className="w-24">
                     <button type="button" onClick={() => toggleSort("tipo")} className="inline-flex items-center gap-1 hover:text-foreground">
                       Tipo <SortIcon col="tipo" />
+                    </button>
+                  </TableHead>
+                  <TableHead>
+                    <button type="button" onClick={() => toggleSort("nome")} className="inline-flex items-center gap-1 hover:text-foreground">
+                      Item <SortIcon col="nome" />
                     </button>
                   </TableHead>
                   <TableHead className="w-24 text-right">Dinheiro</TableHead>
@@ -752,11 +752,11 @@ function ProcedimentosPage() {
                   <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Nenhum item.</TableCell></TableRow>
                 ) : visiveis.map(p => (
                   <TableRow key={p.id} className="h-8">
-                    <TableCell className="font-medium">{p.nome}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{p.grupo ?? "—"}</TableCell>
                     <TableCell>
                       <span className={`text-[10px] px-1.5 py-0 rounded-full ${tipoCor(p.tipo)}`}>{tipoLabel(p.tipo)}</span>
                     </TableCell>
+                    <TableCell className="font-medium">{p.nome}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_dinheiro ?? p.valor_dinheiro_pix))}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_pix ?? p.valor_cartao_credito ?? p.valor_cartao_debito ?? p.valor_cartao))}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_cartao_debito ?? p.valor_cartao_credito ?? p.valor_cartao))}</TableCell>
