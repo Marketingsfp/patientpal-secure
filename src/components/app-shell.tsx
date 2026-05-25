@@ -300,8 +300,8 @@ export function AppShell() {
     if (row.label !== "Gestão") return row;
     const gestaoPessoasItems = new Set(["/app/funcionarios", "/app/cargos", "/app/setores"]);
     const items = subsystem === "gestao-pessoas"
-      ? row.items.filter((it) => gestaoPessoasItems.has(it.to))
-      : row.items.filter((it) => !gestaoPessoasItems.has(it.to));
+      ? row.items.filter((it) => !isParent(it) && gestaoPessoasItems.has(it.to))
+      : row.items.filter((it) => isParent(it) || !gestaoPessoasItems.has(it.to));
     return { ...row, items };
   }).filter((row) => row.items.length > 0);
   const visibleNavRows = isMedicoOnly ? medicoNavRows : scopedNavRows;
@@ -344,7 +344,9 @@ export function AppShell() {
         )}
         <nav className="flex-1 px-2 py-3 space-y-5 overflow-y-auto">
           {visibleNavRows.map((row) => {
-            const groupHasActive = row.items.some((it) => location.pathname === it.to || (it.to !== "/app" && location.pathname.startsWith(it.to)));
+            const leafIsActive = (to: string) => location.pathname === to || (to !== "/app" && location.pathname.startsWith(to));
+            const itemHasActive = (it: NavItem): boolean => isParent(it) ? it.children.some((c) => leafIsActive(c.to)) : leafIsActive(it.to);
+            const groupHasActive = row.items.some(itemHasActive);
             const hideLabel = subsystem === "gestao-pessoas" && row.label === "RH";
             const open = collapsed || hideLabel ? true : (openGroups[row.label] ?? groupHasActive);
             return (
@@ -361,6 +363,49 @@ export function AppShell() {
                   </button>
                 )}
                 {open && row.items.map((item) => {
+                  if (isParent(item)) {
+                    const subActive = item.children.some((c) => leafIsActive(c.to));
+                    const subKey = `${row.label}::${item.label}`;
+                    const subOpen = collapsed ? true : (openGroups[subKey] ?? subActive);
+                    return (
+                      <div key={subKey} className="space-y-1">
+                        {collapsed ? (
+                          <div className="flex justify-center py-2" title={item.label}>
+                            <item.icon className="h-4 w-4 shrink-0 opacity-80" />
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setOpenGroups((prev) => ({ ...prev, [subKey]: !(prev[subKey] ?? subActive) }))}
+                            className={`w-full flex items-center gap-2.5 rounded-full px-3 py-2 text-sm font-medium transition-all ${subActive ? "bg-white/10 text-white" : "text-white/85 hover:bg-white/10 hover:text-white"}`}
+                            aria-expanded={subOpen}
+                          >
+                            <item.icon className="h-4 w-4 shrink-0" />
+                            <span className="truncate flex-1 text-left">{item.label}</span>
+                            <ChevronDown className={`h-3 w-3 transition-transform ${subOpen ? "rotate-0" : "-rotate-90"}`} />
+                          </button>
+                        )}
+                        {subOpen && item.children.map((child) => {
+                          const active = leafIsActive(child.to);
+                          return (
+                            <Link
+                              key={child.to}
+                              to={child.to}
+                              title={collapsed ? child.label : undefined}
+                              className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "pl-8 pr-3"} py-2 text-sm font-medium transition-all ${
+                                active
+                                  ? "bg-white text-slate-900 shadow-sm"
+                                  : "text-white/85 hover:bg-white/10 hover:text-white"
+                              }`}
+                            >
+                              <child.icon className="h-4 w-4 shrink-0" />
+                              {!collapsed && <span className="truncate">{child.label}</span>}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    );
+                  }
                   const active = location.pathname === item.to ||
                     (item.to !== "/app" && location.pathname.startsWith(item.to));
                   return (
