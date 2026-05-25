@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, ShieldCheck, Layers, Lightbulb, ArrowLeft, FileText, Info, Printer } from "lucide-react";
+import { Plus, Pencil, Trash2, ShieldCheck, Layers, Lightbulb, ArrowLeft, FileText, Info, Printer, Gift } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -46,6 +46,13 @@ type Faixa = {
   valor_mensal: number;
 };
 
+type Beneficio = {
+  id: string;
+  nome: string;
+  descricao: string | null;
+  ativo: boolean;
+};
+
 function ConveniosPage() {
   const { clinicaAtual } = useClinica();
   const [rows, setRows] = useState<Convenio[]>([]);
@@ -66,6 +73,55 @@ function ConveniosPage() {
   const [valoresMin, setValoresMin] = useState<Record<string, number>>({});
   const [saving, setSaving] = useState(false);
   const [toDelete, setToDelete] = useState<Convenio | null>(null);
+
+  // Benefícios do convênio (aba)
+  const [beneficios, setBeneficios] = useState<Beneficio[]>([]);
+  const [benLoading, setBenLoading] = useState(false);
+  const [benForm, setBenForm] = useState<{ id: string | null; nome: string; descricao: string; ativo: boolean } | null>(null);
+  const [benSaving, setBenSaving] = useState(false);
+  const [benToDelete, setBenToDelete] = useState<Beneficio | null>(null);
+
+  const loadBeneficios = async (convenioId: string) => {
+    setBenLoading(true);
+    const { data, error } = await supabase
+      .from("cb_beneficios")
+      .select("id, nome, descricao, ativo")
+      .eq("convenio_id", convenioId)
+      .order("nome");
+    if (error) toast.error(error.message);
+    setBeneficios((data ?? []) as Beneficio[]);
+    setBenLoading(false);
+  };
+
+  const saveBeneficio = async () => {
+    if (!editing || !benForm) return;
+    if (!benForm.nome.trim()) { toast.error("Informe o nome do benefício."); return; }
+    setBenSaving(true);
+    const payload = {
+      clinica_id: editing.clinica_id,
+      convenio_id: editing.id,
+      nome: benForm.nome.trim(),
+      descricao: benForm.descricao.trim() || null,
+      ativo: benForm.ativo,
+    };
+    const { error } = benForm.id
+      ? await supabase.from("cb_beneficios").update(payload).eq("id", benForm.id)
+      : await supabase.from("cb_beneficios").insert(payload);
+    setBenSaving(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success(benForm.id ? "Benefício atualizado." : "Benefício adicionado.");
+    setBenForm(null);
+    loadBeneficios(editing.id);
+  };
+
+  const confirmDeleteBeneficio = async () => {
+    if (!benToDelete || !editing) return;
+    const { error } = await supabase.from("cb_beneficios").delete().eq("id", benToDelete.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Benefício excluído.");
+    setBenToDelete(null);
+    loadBeneficios(editing.id);
+  };
 
   const load = async () => {
     if (!clinicaAtual) return;
@@ -106,6 +162,7 @@ function ConveniosPage() {
     setMaxDependentes(0); setFidelidadeMeses(0); setVigenciaMeses(12);
     setBeneficiosTxt(""); setModeloContrato("");
     setFaixas([{ vidas_de: 1, vidas_ate: null, valor_mensal: 0 }]);
+    setBeneficios([]); setBenForm(null);
     setView("form");
   };
 
@@ -132,6 +189,8 @@ function ConveniosPage() {
       valor_mensal: Number(f.valor_mensal),
     }));
     setFaixas(list.length ? list : [{ vidas_de: 1, vidas_ate: null, valor_mensal: 0 }]);
+    setBenForm(null);
+    loadBeneficios(c.id);
     setView("form");
   };
 
@@ -261,6 +320,7 @@ function ConveniosPage() {
             <TabsList>
               <TabsTrigger value="info">Informações</TabsTrigger>
               <TabsTrigger value="faixas"><Layers className="h-4 w-4 mr-1" />Faixas de Preço</TabsTrigger>
+              <TabsTrigger value="beneficios"><Gift className="h-4 w-4 mr-1" />Benefícios</TabsTrigger>
               <TabsTrigger value="contrato"><FileText className="h-4 w-4 mr-1" />Contrato</TabsTrigger>
               <TabsTrigger value="informativo"><Info className="h-4 w-4 mr-1" />Informativo</TabsTrigger>
             </TabsList>
@@ -401,6 +461,98 @@ function ConveniosPage() {
                 </p>
               </div>
             </TabsContent>
+            <TabsContent value="beneficios" className="mt-3">
+              {!editing ? (
+                <p className="text-sm text-muted-foreground py-6 text-center">
+                  Salve o convênio primeiro para adicionar benefícios.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2 font-medium">
+                        <Gift className="h-4 w-4" /> Benefícios deste Convênio
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Liste os benefícios oferecidos por este convênio.
+                      </p>
+                    </div>
+                    {!benForm && (
+                      <Button variant="ghost" size="sm"
+                        onClick={() => setBenForm({ id: null, nome: "", descricao: "", ativo: true })}>
+                        <Plus className="h-4 w-4 mr-1" /> Novo benefício
+                      </Button>
+                    )}
+                  </div>
+
+                  {benForm ? (
+                    <Card>
+                      <CardContent className="p-4 space-y-3">
+                        <div>
+                          <Label>Nome *</Label>
+                          <Input value={benForm.nome}
+                            onChange={(e) => setBenForm({ ...benForm, nome: e.target.value })}
+                            placeholder="Ex: Consulta gratuita" />
+                        </div>
+                        <div>
+                          <Label>Descrição</Label>
+                          <Textarea value={benForm.descricao}
+                            onChange={(e) => setBenForm({ ...benForm, descricao: e.target.value })} rows={3} />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Switch checked={benForm.ativo}
+                            onCheckedChange={(v) => setBenForm({ ...benForm, ativo: v })} />
+                          <Label>Ativo</Label>
+                        </div>
+                        <div className="flex justify-end gap-2">
+                          <Button variant="outline" size="sm" onClick={() => setBenForm(null)}>Cancelar</Button>
+                          <Button size="sm" onClick={saveBeneficio} disabled={benSaving}>
+                            {benSaving ? "Salvando…" : "Salvar"}
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ) : null}
+
+                  <div className="border rounded-md overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Nome</TableHead>
+                          <TableHead>Descrição</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-right w-24">Ações</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {benLoading ? (
+                          <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Carregando…</TableCell></TableRow>
+                        ) : beneficios.length === 0 ? (
+                          <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Nenhum benefício cadastrado.</TableCell></TableRow>
+                        ) : beneficios.map((b) => (
+                          <TableRow key={b.id}>
+                            <TableCell className="font-medium">{b.nome}</TableCell>
+                            <TableCell className="text-muted-foreground">{b.descricao ?? "—"}</TableCell>
+                            <TableCell>
+                              <Badge variant={b.ativo ? "default" : "outline"}>{b.ativo ? "Ativo" : "Inativo"}</Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button size="sm" variant="ghost"
+                                onClick={() => setBenForm({ id: b.id, nome: b.nome, descricao: b.descricao ?? "", ativo: b.ativo })}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={() => setBenToDelete(b)}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+            </TabsContent>
             <TabsContent value="contrato" className="mt-3">
               <div className="space-y-3">
                 <div className="flex items-center gap-2 font-medium">
@@ -457,6 +609,21 @@ function ConveniosPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete}>Excluir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!benToDelete} onOpenChange={(v) => !v && setBenToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir benefício?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. "{benToDelete?.nome}" será removido deste convênio.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteBeneficio}>Excluir</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
