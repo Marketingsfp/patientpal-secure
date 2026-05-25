@@ -1,37 +1,39 @@
 ## Mudança solicitada
 
-Substituir os diálogos modais (pop-ups) de cadastro/edição por **telas inline** (tela cheia dentro da área de conteúdo) nos seguintes submenus de **Cartão Benefícios**:
+Na tela de **cadastro/edição de Convênio** (`/app/cartao-beneficios/convenios`), adicionar **duas novas abas** ao formulário, além das já existentes ("Informações" e "Faixas de Preço"):
 
-1. **Nova Venda** (`app.cartao-beneficios.contratos.tsx` → na verdade `app.contratos.tsx`)
-2. **Convênio** (`app.cartao-beneficios.convenios.tsx`)
-3. **Benefícios** (`app.cartao-beneficios.beneficios.tsx`)
-
-Cada tela de cadastro/edição terá um botão **"Voltar"** (ícone seta + texto) no topo, que retorna para a tela de listagem anterior — sem perder os filtros aplicados.
+1. **Contrato** — exibirá o modelo de contrato (texto fixo) que será preenchido com dados das novas vendas. O modelo será enviado por você depois.
+2. **Informativo** — exibirá um conteúdo informativo (texto/imagem) somente para visualização e impressão. O modelo virá em Word e será apenas renderizado em tela.
 
 ## Como vai funcionar
 
-Cada página manterá **dois modos de visualização** controlados por estado local (`view: "list" | "form"`):
+### Aba "Contrato"
+- Mostrará uma área de texto/preview com o **modelo do contrato** (placeholder por enquanto, até você enviar o modelo).
+- Reutilizará o campo `modelo_contrato` que já existe na tabela `cb_convenios` (atualmente está oculto da UI).
+- Aceitará variáveis como `{{VALOR_MENSAL}}`, `{{PACIENTE_NOME}}`, `{{DEPENDENTES}}`, `{{CLINICA_NOME}}` para preenchimento automático nas vendas.
+- Quando você me enviar o modelo, eu colo o texto como valor padrão fixo.
 
-- **Modo `list`**: tabela + botão "Novo" como hoje.
-- **Modo `form`**: substitui a tabela pelo formulário completo (mesmos campos do diálogo atual), com:
-  - Cabeçalho: `← Voltar` + título ("Novo convênio" / "Editar convênio: <nome>").
-  - Conteúdo do formulário (no caso do Convênio, mantém as abas "Informações" / "Faixas de Preço" implementadas anteriormente).
-  - Rodapé fixo com botões "Cancelar" e "Salvar".
-- Ao clicar em "Novo" ou "Editar", troca para `view: "form"` (sem abrir Dialog).
-- Ao clicar em "Voltar", "Cancelar" ou após salvar com sucesso, volta para `view: "list"` e recarrega os dados.
-- O `AlertDialog` de confirmação de exclusão **permanece** (é uma confirmação rápida, não um formulário).
+### Aba "Informativo"
+- Exibirá o **conteúdo informativo** do convênio (somente leitura na tela).
+- Terá um botão **"Imprimir"** para gerar a versão impressa (`window.print()` com layout dedicado).
+- Quando você enviar o `.docx`, eu converto o conteúdo para HTML/JSX e deixo fixo na tela.
+- Precisará de um novo campo no banco (`informativo` TEXT) — ou, se for sempre o mesmo modelo para todos os convênios, pode ficar hardcoded no componente sem mexer no banco.
 
-## Arquivos afetados
+## Decisão pendente
 
-- `src/routes/_authenticated/app.contratos.tsx` — Nova Venda
-- `src/routes/_authenticated/app.cartao-beneficios.convenios.tsx` — Convênio
-- `src/routes/_authenticated/app.cartao-beneficios.beneficios.tsx` — Benefícios
+Aguardo você enviar:
+1. **Modelo do contrato** (texto) — para colocar como padrão na aba "Contrato".
+2. **Modelo do informativo** (`.docx`) — para converter e exibir na aba "Informativo".
+
+Enquanto isso, vou apenas criar as duas abas vazias com placeholder ("Aguardando modelo…") e o botão de imprimir na aba Informativo.
+
+## Arquivo afetado
+
+- `src/routes/_authenticated/app.cartao-beneficios.convenios.tsx` — adicionar 2 novos `<TabsTrigger>` + 2 `<TabsContent>` no `<Tabs>` do formulário.
 
 ## Detalhes técnicos
 
-- Remover `<Dialog>` / `<DialogContent>` de cadastro nos 3 arquivos (manter `AlertDialog` de exclusão).
-- Adicionar estado `const [view, setView] = useState<"list" | "form">("list")` em cada página.
-- Renderização condicional: `view === "list" ? <Listagem/> : <Formulario/>`.
-- Botão "Voltar" usa `<Button variant="ghost"><ArrowLeft/> Voltar</Button>` chamando `setView("list")`.
-- Após salvar, `setView("list")` + `load()`.
-- **Nota sobre Nova Venda**: o arquivo real é `app.contratos.tsx` (importado em `app.cartao-beneficios.contratos.tsx`). Preciso ler esse arquivo durante a implementação para confirmar a estrutura do diálogo de venda.
+- Adicionar ícones `FileText` (Contrato) e `Info` (Informativo) do `lucide-react`.
+- Aba "Contrato": `<Textarea>` ligada ao state `modeloContrato` (já existe), com altura maior (`rows={15}`).
+- Aba "Informativo": `<div>` com conteúdo placeholder + `<Button onClick={() => window.print()}>Imprimir</Button>`. Adicionar regras `@media print` em `src/styles.css` para esconder navegação/sidebar ao imprimir, se necessário.
+- Nenhuma migração de banco por enquanto (o `modelo_contrato` já existe; o informativo entra hardcoded depois).
