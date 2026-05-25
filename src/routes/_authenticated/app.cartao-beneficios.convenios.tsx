@@ -374,7 +374,7 @@ function ConveniosPage() {
                           <TableCell>
                             <CurrencyInput
                               className="text-right"
-                              value={f.valor_mensal}
+                              value={f.valor_mensal ? Number(f.valor_mensal).toFixed(2) : ""}
                               onChange={(v) => {
                                 const num = v ? parseFloat(v) : 0;
                                 setFaixas(faixas.map((x, i) => i === idx ? { ...x, valor_mensal: num } : x));
