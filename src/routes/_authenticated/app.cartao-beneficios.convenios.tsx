@@ -1,0 +1,192 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { Plus, Pencil, Trash2, ShieldCheck } from "lucide-react";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useClinica } from "@/hooks/use-clinica";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+export const Route = createFileRoute("/_authenticated/app/cartao-beneficios/convenios")({
+  component: ConveniosPage,
+  head: () => ({ meta: [{ title: "Convênio — Cartão Benefícios" }] }),
+});
+
+type Convenio = {
+  id: string;
+  clinica_id: string;
+  nome: string;
+  descricao: string | null;
+  ativo: boolean;
+};
+
+function ConveniosPage() {
+  const { clinicaAtual } = useClinica();
+  const [rows, setRows] = useState<Convenio[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<Convenio | null>(null);
+  const [nome, setNome] = useState("");
+  const [descricao, setDescricao] = useState("");
+  const [ativo, setAtivo] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [toDelete, setToDelete] = useState<Convenio | null>(null);
+
+  const load = async () => {
+    if (!clinicaAtual) return;
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("cb_convenios")
+      .select("id, clinica_id, nome, descricao, ativo")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .order("nome");
+    if (error) toast.error(error.message);
+    setRows((data ?? []) as Convenio[]);
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [clinicaAtual?.clinica_id]);
+
+  const openNew = () => {
+    setEditing(null);
+    setNome(""); setDescricao(""); setAtivo(true);
+    setOpen(true);
+  };
+
+  const openEdit = (c: Convenio) => {
+    setEditing(c);
+    setNome(c.nome);
+    setDescricao(c.descricao ?? "");
+    setAtivo(c.ativo);
+    setOpen(true);
+  };
+
+  const save = async () => {
+    if (!clinicaAtual) return;
+    if (!nome.trim()) { toast.error("Informe o nome."); return; }
+    setSaving(true);
+    const payload = {
+      clinica_id: clinicaAtual.clinica_id,
+      nome: nome.trim(),
+      descricao: descricao.trim() || null,
+      ativo,
+    };
+    const { error } = editing
+      ? await supabase.from("cb_convenios").update(payload).eq("id", editing.id)
+      : await supabase.from("cb_convenios").insert(payload);
+    setSaving(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success(editing ? "Convênio atualizado." : "Convênio criado.");
+    setOpen(false);
+    load();
+  };
+
+  const confirmDelete = async () => {
+    if (!toDelete) return;
+    const { error } = await supabase.from("cb_convenios").delete().eq("id", toDelete.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Convênio excluído.");
+    setToDelete(null);
+    load();
+  };
+
+  if (!clinicaAtual) return <p className="text-sm text-muted-foreground">Selecione uma clínica.</p>;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground flex items-center gap-2">
+          <ShieldCheck className="h-4 w-4" />
+          Tipos de cartão benefícios oferecidos pela clínica.
+        </p>
+        <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" />Novo convênio</Button>
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nome</TableHead>
+                <TableHead>Descrição</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Carregando…</TableCell></TableRow>
+              ) : rows.length === 0 ? (
+                <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Nenhum convênio cadastrado.</TableCell></TableRow>
+              ) : rows.map((c) => (
+                <TableRow key={c.id}>
+                  <TableCell className="font-medium">{c.nome}</TableCell>
+                  <TableCell className="text-muted-foreground">{c.descricao ?? "—"}</TableCell>
+                  <TableCell>
+                    <Badge variant={c.ativo ? "default" : "outline"}>{c.ativo ? "Ativo" : "Inativo"}</Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button size="sm" variant="ghost" onClick={() => openEdit(c)}><Pencil className="h-4 w-4" /></Button>
+                    <Button size="sm" variant="ghost" onClick={() => setToDelete(c)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editing ? "Editar convênio" : "Novo convênio"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Nome *</Label>
+              <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Plano Família" />
+            </div>
+            <div>
+              <Label>Descrição</Label>
+              <Textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} rows={3} />
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={ativo} onCheckedChange={setAtivo} />
+              <Label>Ativo</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+            <Button onClick={save} disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!toDelete} onOpenChange={(v) => !v && setToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir convênio?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. Os benefícios vinculados a "{toDelete?.nome}" também serão excluídos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>Excluir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
