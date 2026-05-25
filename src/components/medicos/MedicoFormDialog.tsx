@@ -12,9 +12,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 interface Especialidade { id: string; nome: string }
 interface Procedimento { id: string; nome: string; grupo: string | null; tipo: string; valor_padrao: number }
+interface RqeRow { especialidade_id: string | null; especialidade_nome?: string | null; numero: string }
 interface ConvenioRow {
   id?: string;
   nome: string;
@@ -35,8 +37,7 @@ const limparPrefixoMedico = (nome: string) =>
 const emptyForm = () => ({
   nome: "", crm: "", crm_uf: "",
   especialidades: [] as string[],
-  tem_rqe: false,
-  rqe_especialidade: "",
+  rqes: [] as RqeRow[],
   tipo_repasse: "percentual" as "percentual" | "valor",
   percentual: "50",
   valor: "",
@@ -113,7 +114,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       setLoading(true);
       const { data: m } = await supabase
         .from("medicos")
-        .select("id, user_id, nome, crm, crm_uf, email, telefone, nacionalidade, estado_civil, sexo, cep, logradouro, numero, complemento, bairro, cidade, estado, tem_rqe, rqe_especialidade, medico_especialidades(especialidade:especialidades(id, nome))")
+        .select("id, user_id, nome, crm, crm_uf, email, telefone, nacionalidade, estado_civil, sexo, cep, logradouro, numero, complemento, bairro, cidade, estado, rqes, medico_especialidades(especialidade:especialidades(id, nome))")
         .eq("id", editingMedicoId)
         .maybeSingle();
       if (!m) { setLoading(false); toast.error("Médico não encontrado"); return; }
@@ -148,8 +149,13 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         crm: med.crm,
         crm_uf: med.crm_uf,
         especialidades: (med.medico_especialidades ?? []).map((me: any) => me.especialidade?.id).filter(Boolean) as string[],
-        tem_rqe: !!med.tem_rqe,
-        rqe_especialidade: med.rqe_especialidade ?? "",
+        rqes: Array.isArray(med.rqes)
+          ? (med.rqes as any[]).map((r) => ({
+              especialidade_id: r?.especialidade_id ?? null,
+              especialidade_nome: r?.especialidade_nome ?? null,
+              numero: r?.numero ?? "",
+            }))
+          : [],
         tipo_repasse: (sens.tipo_repasse as "percentual" | "valor") ?? "percentual",
         percentual: sens.percentual_repasse_padrao != null ? String(sens.percentual_repasse_padrao) : "",
         valor: sens.valor_repasse_padrao != null ? String(sens.valor_repasse_padrao) : "",
@@ -203,9 +209,15 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (form.tem_rqe && !form.rqe_especialidade.trim()) {
-      toast.error("Informe a Especialidade de RQE");
-      return;
+    for (const r of form.rqes) {
+      if (!r.especialidade_id) {
+        toast.error("Selecione a especialidade de cada RQE");
+        return;
+      }
+      if (!r.numero.trim()) {
+        toast.error("Informe o número de cada RQE");
+        return;
+      }
     }
     setSaving(true);
     const nomeLimpo = limparPrefixoMedico(form.nome);
@@ -215,8 +227,17 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       crm: form.crm,
       crm_uf: form.crm_uf.toUpperCase(),
       especialidade_id: form.especialidades[0] || null,
-      tem_rqe: form.tem_rqe,
-      rqe_especialidade: form.tem_rqe ? form.rqe_especialidade.trim() : null,
+      rqes: form.rqes.map((r) => ({
+        especialidade_id: r.especialidade_id,
+        especialidade_nome: r.especialidade_id
+          ? esps.find((e) => e.id === r.especialidade_id)?.nome ?? r.especialidade_nome ?? null
+          : r.especialidade_nome ?? null,
+        numero: r.numero.trim(),
+      })),
+      tem_rqe: form.rqes.length > 0,
+      rqe_especialidade: form.rqes[0]
+        ? (esps.find((e) => e.id === form.rqes[0].especialidade_id)?.nome ?? null)
+        : null,
       tipo_repasse: form.tipo_repasse,
       percentual_repasse_padrao: form.tipo_repasse === "percentual" ? parseFloat(form.percentual || "0") : 0,
       valor_repasse_padrao: form.tipo_repasse === "valor" ? parseFloat(form.valor || "0") : null,
