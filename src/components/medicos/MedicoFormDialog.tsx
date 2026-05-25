@@ -144,11 +144,16 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       } else {
         setConvenios(CONVENIOS_PADRAO.map((c) => ({ ...c })));
       }
+      const { data: mprocs } = await supabase
+        .from("medico_procedimentos")
+        .select("procedimento_id")
+        .eq("medico_id", med.id);
       setForm({
         nome: limparPrefixoMedico(med.nome ?? ""),
         crm: med.crm,
         crm_uf: med.crm_uf,
         especialidades: (med.medico_especialidades ?? []).map((me: any) => me.especialidade?.id).filter(Boolean) as string[],
+        procedimentos: (mprocs ?? []).map((p: any) => p.procedimento_id),
         rqes: Array.isArray(med.rqes)
           ? (med.rqes as any[]).map((r) => ({
               especialidade_id: r?.especialidade_id ?? null,
