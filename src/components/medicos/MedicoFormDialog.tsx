@@ -99,6 +99,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
   // Load medico when editing
   useEffect(() => {
     if (!open) return;
+    let cancelled = false;
     setShowSenha(false);
     setNovaSenha("");
     setConfirmarSenha("");
@@ -117,7 +118,16 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         .select("id, user_id, nome, crm, crm_uf, email, telefone, telefone2, nacionalidade, estado_civil, sexo, cep, logradouro, numero, complemento, bairro, cidade, estado, rqes, medico_especialidades(especialidade:especialidades(id, nome))")
         .eq("id", editingMedicoId)
         .maybeSingle();
-      if (!m) { setLoading(false); toast.error("Médico não encontrado"); return; }
+      if (cancelled) return;
+      if (!m) {
+        setLoading(false);
+        setEditId(null);
+        setMedicoUserId(null);
+        setExistingEmail(null);
+        setConvenios(CONVENIOS_PADRAO.map((c) => ({ ...c })));
+        setForm(emptyForm());
+        return;
+      }
       const med = m as any;
       // Dados sensíveis (CPF, RG, banco, PIX) vêm via RPC restrita a gestores/próprio médico
       let sens: any = {};
@@ -148,6 +158,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         .from("medico_procedimentos")
         .select("procedimento_id")
         .eq("medico_id", med.id);
+      if (cancelled) return;
       setForm({
         nome: limparPrefixoMedico(med.nome ?? ""),
         crm: med.crm,
@@ -183,6 +194,9 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       }
       setLoading(false);
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [open, editingMedicoId, clinicaId]);
 
   async function salvarNovaSenha() {
