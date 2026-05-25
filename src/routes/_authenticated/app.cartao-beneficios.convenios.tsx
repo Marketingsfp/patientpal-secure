@@ -612,6 +612,21 @@ function ConveniosPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog open={!!benToDelete} onOpenChange={(v) => !v && setBenToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir benefício?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. "{benToDelete?.nome}" será removido deste convênio.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteBeneficio}>Excluir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
