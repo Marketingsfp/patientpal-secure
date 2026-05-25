@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Pencil, Trash2, Gift } from "lucide-react";
+import { Plus, Pencil, Trash2, Gift, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -12,7 +12,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -41,7 +40,7 @@ function BeneficiosPage() {
   const [loading, setLoading] = useState(true);
   const [filtroConvenio, setFiltroConvenio] = useState<string>("todos");
 
-  const [open, setOpen] = useState(false);
+  const [view, setView] = useState<"list" | "form">("list");
   const [editing, setEditing] = useState<Beneficio | null>(null);
   const [nome, setNome] = useState("");
   const [descricao, setDescricao] = useState("");
@@ -86,7 +85,7 @@ function BeneficiosPage() {
     setEditing(null);
     setNome(""); setDescricao(""); setAtivo(true);
     setConvenioId(convenios[0]?.id ?? "");
-    setOpen(true);
+    setView("form");
   };
 
   const openEdit = (b: Beneficio) => {
@@ -95,7 +94,7 @@ function BeneficiosPage() {
     setDescricao(b.descricao ?? "");
     setConvenioId(b.convenio_id);
     setAtivo(b.ativo);
-    setOpen(true);
+    setView("form");
   };
 
   const save = async () => {
@@ -116,7 +115,7 @@ function BeneficiosPage() {
     setSaving(false);
     if (error) { toast.error(error.message); return; }
     toast.success(editing ? "Benefício atualizado." : "Benefício criado.");
-    setOpen(false);
+    setView("list");
     load();
   };
 
@@ -133,7 +132,9 @@ function BeneficiosPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      {view === "list" ? (
+        <>
+        <div className="flex items-center justify-between flex-wrap gap-3">
         <p className="text-sm text-muted-foreground flex items-center gap-2">
           <Gift className="h-4 w-4" />
           Benefícios oferecidos pelos cartões da clínica.
@@ -194,13 +195,18 @@ function BeneficiosPage() {
           </Table>
         </CardContent>
       </Card>
-
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editing ? "Editar benefício" : "Novo benefício"}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
+        </>
+      ) : (
+        <Card>
+          <CardContent className="p-6 space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <Button variant="ghost" size="sm" onClick={() => setView("list")}>
+                <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
+              </Button>
+              <h2 className="text-lg font-semibold">{editing ? `Editar benefício: ${editing.nome}` : "Novo benefício"}</h2>
+              <div />
+            </div>
+            <div className="space-y-3">
             <div>
               <Label>Nome *</Label>
               <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Consulta gratuita" />
@@ -224,13 +230,14 @@ function BeneficiosPage() {
               <Switch checked={ativo} onCheckedChange={setAtivo} />
               <Label>Ativo</Label>
             </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button onClick={save} disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </div>
+            <div className="flex justify-end gap-2 border-t pt-4">
+              <Button variant="outline" onClick={() => setView("list")}>Cancelar</Button>
+              <Button onClick={save} disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <AlertDialog open={!!toDelete} onOpenChange={(v) => !v && setToDelete(null)}>
         <AlertDialogContent>
