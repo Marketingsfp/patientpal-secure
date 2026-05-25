@@ -35,6 +35,8 @@ const limparPrefixoMedico = (nome: string) =>
 const emptyForm = () => ({
   nome: "", crm: "", crm_uf: "",
   especialidades: [] as string[],
+  tem_rqe: false,
+  rqe_especialidade: "",
   tipo_repasse: "percentual" as "percentual" | "valor",
   percentual: "50",
   valor: "",
@@ -111,7 +113,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       setLoading(true);
       const { data: m } = await supabase
         .from("medicos")
-        .select("id, user_id, nome, crm, crm_uf, email, telefone, nacionalidade, estado_civil, sexo, cep, logradouro, numero, complemento, bairro, cidade, estado, medico_especialidades(especialidade:especialidades(id, nome))")
+        .select("id, user_id, nome, crm, crm_uf, email, telefone, nacionalidade, estado_civil, sexo, cep, logradouro, numero, complemento, bairro, cidade, estado, tem_rqe, rqe_especialidade, medico_especialidades(especialidade:especialidades(id, nome))")
         .eq("id", editingMedicoId)
         .maybeSingle();
       if (!m) { setLoading(false); toast.error("Médico não encontrado"); return; }
@@ -146,6 +148,8 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         crm: med.crm,
         crm_uf: med.crm_uf,
         especialidades: (med.medico_especialidades ?? []).map((me: any) => me.especialidade?.id).filter(Boolean) as string[],
+        tem_rqe: !!med.tem_rqe,
+        rqe_especialidade: med.rqe_especialidade ?? "",
         tipo_repasse: (sens.tipo_repasse as "percentual" | "valor") ?? "percentual",
         percentual: sens.percentual_repasse_padrao != null ? String(sens.percentual_repasse_padrao) : "",
         valor: sens.valor_repasse_padrao != null ? String(sens.valor_repasse_padrao) : "",
@@ -199,6 +203,10 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (form.tem_rqe && !form.rqe_especialidade.trim()) {
+      toast.error("Informe a Especialidade de RQE");
+      return;
+    }
     setSaving(true);
     const nomeLimpo = limparPrefixoMedico(form.nome);
     const payload = {
@@ -207,6 +215,8 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       crm: form.crm,
       crm_uf: form.crm_uf.toUpperCase(),
       especialidade_id: form.especialidades[0] || null,
+      tem_rqe: form.tem_rqe,
+      rqe_especialidade: form.tem_rqe ? form.rqe_especialidade.trim() : null,
       tipo_repasse: form.tipo_repasse,
       percentual_repasse_padrao: form.tipo_repasse === "percentual" ? parseFloat(form.percentual || "0") : 0,
       valor_repasse_padrao: form.tipo_repasse === "valor" ? parseFloat(form.valor || "0") : null,
