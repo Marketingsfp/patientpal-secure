@@ -519,26 +519,63 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                     </div>
                   )}
                 </div>
-                <Label>Especialidades</Label>
-                <Input
-                  placeholder="Filtrar especialidade..."
-                  value={espFilter}
-                  onChange={(e) => setEspFilter(e.target.value)}
-                  className="h-8"
-                />
-                <div className="border rounded-md p-3 max-h-80 overflow-y-auto space-y-2">
-                  {esps.length === 0 && <p className="text-sm text-muted-foreground">Nenhuma especialidade cadastrada.</p>}
-                  {esps
-                    .filter((e) => e.nome.toLowerCase().includes(espFilter.toLowerCase()))
-                    .map((e) => (
-                      <label key={e.id} className="flex items-center gap-2 cursor-pointer text-sm">
-                        <Checkbox
-                          checked={form.especialidades.includes(e.id)}
-                          onCheckedChange={() => toggleEsp(e.id)}
-                        />
-                        {e.nome}
-                      </label>
-                    ))}
+                <div className="border rounded-md p-3 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm font-medium">Especialidades</Label>
+                      <p className="text-xs text-muted-foreground">Adicione uma ou mais especialidades cadastradas no sistema.</p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setForm({ ...form, especialidades: [...form.especialidades, ""] })}
+                    >
+                      <Plus className="h-4 w-4 mr-1" /> Adicionar especialidade
+                    </Button>
+                  </div>
+                  {esps.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">Nenhuma especialidade cadastrada no sistema.</p>
+                  ) : form.especialidades.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">Nenhuma especialidade selecionada.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {form.especialidades.map((eid, idx) => (
+                        <div key={idx} className="grid grid-cols-[1fr_auto] gap-2 items-center">
+                          <SearchableSelect
+                            options={esps.map((e) => ({ value: e.id, label: e.nome }))}
+                            value={eid}
+                            onChange={(v) => {
+                              if (v && form.especialidades.some((x, i) => i !== idx && x === v)) {
+                                toast.warning("Especialidade já adicionada");
+                                return;
+                              }
+                              setForm({
+                                ...form,
+                                especialidades: form.especialidades.map((x, i) => (i === idx ? v : x)),
+                              });
+                            }}
+                            placeholder="Selecione"
+                            searchPlaceholder="Buscar especialidade..."
+                          />
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            onClick={() =>
+                              setForm({
+                                ...form,
+                                especialidades: form.especialidades.filter((_, i) => i !== idx),
+                              })
+                            }
+                            aria-label="Remover especialidade"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </TabsContent>
 
