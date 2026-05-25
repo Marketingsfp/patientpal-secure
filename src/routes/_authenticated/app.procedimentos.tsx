@@ -687,14 +687,14 @@ function ProcedimentosPage() {
             <Select value={filtroGrupo} onValueChange={setFiltroGrupo}>
               <SelectTrigger className="w-56"><SelectValue placeholder="Especialidade" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="todos">Todas as especialidades</SelectItem>
+                <SelectItem value="todos">Especialidades</SelectItem>
                 {grupos.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={filtroTipo} onValueChange={(v) => setFiltroTipo(v as typeof filtroTipo)}>
               <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="todos">Todos os tipos</SelectItem>
+                <SelectItem value="todos">Tipos</SelectItem>
                 {tipos.map(t => (
                   <SelectItem key={t.id} value={t.nome}>{tipoLabel(t.nome)}</SelectItem>
                 ))}
@@ -706,7 +706,7 @@ function ProcedimentosPage() {
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); aplicarFiltros(); } }}
-                placeholder="Buscar por nome, especialidade ou código…"
+                placeholder="Item"
                 className="pl-9"
               />
             </div>
