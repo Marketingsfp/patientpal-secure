@@ -68,7 +68,6 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
   const [procs, setProcs] = useState<Procedimento[]>([]);
   const [procFilter, setProcFilter] = useState("");
   const [procGrupo, setProcGrupo] = useState<string>("__todos__");
-  const [espFilter, setEspFilter] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -179,15 +178,6 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       setLoading(false);
     })();
   }, [open, editingMedicoId, clinicaId]);
-
-  const toggleEsp = (id: string) => {
-    setForm((f) => ({
-      ...f,
-      especialidades: f.especialidades.includes(id)
-        ? f.especialidades.filter((x) => x !== id)
-        : [...f.especialidades, id],
-    }));
-  };
 
   async function salvarNovaSenha() {
     if (!medicoUserId) return;
