@@ -4956,6 +4956,15 @@ export type Database = {
           user_id: string
         }[]
       }
+      medicos_repasse_lista: {
+        Args: { _clinica_id: string }
+        Returns: {
+          id: string
+          percentual_repasse_padrao: number
+          tipo_repasse: string
+          valor_repasse_padrao: number
+        }[]
+      }
       meus_cartoes: { Args: never; Returns: Json }
       minhas_consultas: {
         Args: never
