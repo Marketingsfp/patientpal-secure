@@ -19,7 +19,7 @@ export const Route = createFileRoute("/_authenticated/app/funcionario/$userId")(
   head: () => ({ meta: [{ title: "Perfil do Funcionário — ClinicaOS" }] }),
 });
 
-interface Profile { id: string; nome: string; telefone: string | null; avatar_url: string | null }
+interface Profile { id: string; nome: string; telefone: string | null; telefone2: string | null; avatar_url: string | null }
 interface Membership { clinica_id: string; role: string; ativo: boolean; clinica: { nome: string } | null }
 interface Contrato {
   id: string; numero: number | null; regime: string | null; data_inicio: string | null; data_fim: string | null;
@@ -53,7 +53,7 @@ function PerfilFuncionarioPage() {
     async function load() {
       setLoading(true);
       const [{ data: prof }, { data: mems }, { data: ct }, { data: pt }] = await Promise.all([
-        supabase.from("profiles").select("id,nome,telefone,avatar_url").eq("id", userId).maybeSingle(),
+        supabase.from("profiles").select("id,nome,telefone,telefone2,avatar_url").eq("id", userId).maybeSingle(),
         supabase.from("clinica_memberships").select("clinica_id,role,ativo,clinica:clinicas(nome)").eq("user_id", userId),
         supabase.from("hr_contratos").select("id,numero,regime,data_inicio,data_fim,status,salario,cargo:cargos(nome),setor:setores(nome)").eq("user_id", userId).order("data_inicio", { ascending: false }),
         supabase.from("hr_pontos").select("id,tipo,registrado_em,unidade:unidades(nome)").eq("user_id", userId).order("registrado_em", { ascending: false }).limit(30),
@@ -128,6 +128,7 @@ function PerfilFuncionarioPage() {
               <div className="flex flex-wrap gap-4 mt-3 text-sm text-muted-foreground">
                 {email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{email}</span>}
                 {profile.telefone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{profile.telefone}</span>}
+                {profile.telefone2 && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{profile.telefone2}</span>}
               </div>
               <div className="flex flex-wrap gap-2 mt-3">
                 {memberships.map((m) => (
@@ -162,6 +163,10 @@ function PerfilFuncionarioPage() {
               <div>
                 <div className="text-muted-foreground text-xs uppercase tracking-wide">Telefone</div>
                 <div className="font-medium">{profile.telefone ?? "—"}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground text-xs uppercase tracking-wide">Telefone 2</div>
+                <div className="font-medium">{profile.telefone2 ?? "—"}</div>
               </div>
               <div>
                 <div className="text-muted-foreground text-xs uppercase tracking-wide">Perfis de acesso</div>
