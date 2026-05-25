@@ -162,11 +162,18 @@ function Page() {
   const loadOpts = async () => {
     if (!clinicaAtual) return;
     const [m, p, c] = await Promise.all([
-      supabase.from("medicos").select("id, nome, tipo_repasse, percentual_repasse_padrao, valor_repasse_padrao").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
+      supabase.from("medicos").select("id, nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("pacientes").select("id, nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome").limit(500),
       supabase.from("fin_contas").select("id, nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
     ]);
-    setMedicos((m.data ?? []) as Medico[]); setPacientes((p.data ?? []) as Pac[]);
+    const { data: rep } = await supabase.rpc("medicos_repasse_lista", { _clinica_id: clinicaAtual.clinica_id });
+    const repMap = new Map<string, { tipo_repasse: string; percentual_repasse_padrao: number | null; valor_repasse_padrao: number | null }>();
+    for (const r of (rep as any[] | null) ?? []) repMap.set(r.id, r);
+    const merged: Medico[] = ((m.data ?? []) as { id: string; nome: string }[]).map((x) => {
+      const r = repMap.get(x.id);
+      return { id: x.id, nome: x.nome, tipo_repasse: r?.tipo_repasse ?? "percentual", percentual_repasse_padrao: Number(r?.percentual_repasse_padrao ?? 0), valor_repasse_padrao: r?.valor_repasse_padrao ?? null };
+    });
+    setMedicos(merged); setPacientes((p.data ?? []) as Pac[]);
     setContas((c.data ?? []) as Conta[]);
     const ids = ((m.data ?? []) as Medico[]).map((x) => x.id);
     if (ids.length) {
