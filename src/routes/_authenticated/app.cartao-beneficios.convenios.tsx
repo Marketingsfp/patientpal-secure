@@ -14,6 +14,9 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -51,7 +54,19 @@ type Beneficio = {
   nome: string;
   descricao: string | null;
   ativo: boolean;
+  escopo: "servico" | "especialidade";
+  procedimento_id: string | null;
+  especialidade_id: string | null;
+  tipo_desconto: "percentual" | "valor" | "gratuidade";
+  valor_desconto: number | null;
+  inicio_a_partir: 1 | 2 | 6;
+  limite_uso: "ilimitado" | "1";
+  periodicidade: "dia" | "mes" | "contrato";
+  pessoa: "titular" | "titular_dependentes_soma" | "titular_ou_dependentes";
 };
+
+type ProcOpt = { id: string; nome: string };
+type EspOpt = { id: string; nome: string };
 
 function ConveniosPage() {
   const { clinicaAtual } = useClinica();
