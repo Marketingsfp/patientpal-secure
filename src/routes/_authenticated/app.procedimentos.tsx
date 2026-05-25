@@ -684,16 +684,6 @@ function ProcedimentosPage() {
           </div>
 
           <div className="rounded-lg border border-border bg-card p-4 flex flex-wrap gap-3">
-            <div className="relative flex-1 min-w-[240px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                value={busca}
-                onChange={(e) => setBusca(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); aplicarFiltros(); } }}
-                placeholder="Buscar por nome, especialidade ou código…"
-                className="pl-9"
-              />
-            </div>
             <Select value={filtroGrupo} onValueChange={setFiltroGrupo}>
               <SelectTrigger className="w-56"><SelectValue placeholder="Especialidade" /></SelectTrigger>
               <SelectContent>
@@ -710,6 +700,16 @@ function ProcedimentosPage() {
                 ))}
               </SelectContent>
             </Select>
+            <div className="relative flex-1 min-w-[240px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); aplicarFiltros(); } }}
+                placeholder="Buscar por nome, especialidade ou código…"
+                className="pl-9"
+              />
+            </div>
             <Button onClick={aplicarFiltros}><Search className="h-4 w-4 mr-2" />Pesquisar</Button>
             <Button variant="outline" onClick={limparFiltros}>Limpar</Button>
           </div>
