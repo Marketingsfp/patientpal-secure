@@ -525,8 +525,8 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                 <div className="border rounded-md p-3 space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <Label className="text-sm font-medium">RQE (Registro de Qualificação de Especialista)</Label>
-                      <p className="text-xs text-muted-foreground">Adicione um ou mais RQEs com a especialidade e o número de registro.</p>
+                      <Label className="text-sm font-medium">Especialidades</Label>
+                      <p className="text-xs text-muted-foreground">Adicione uma ou mais especialidades. Marque "Tem RQE" e informe o número quando aplicável.</p>
                     </div>
                     <Button
                       type="button"
@@ -535,78 +535,12 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                       onClick={() =>
                         setForm({
                           ...form,
-                          rqes: [...form.rqes, { especialidade_id: null, numero: "" }],
+                          especialidades: [
+                            ...form.especialidades,
+                            { especialidade_id: "", tem_rqe: false, rqe_numero: "" },
+                          ],
                         })
                       }
-                    >
-                      <Plus className="h-4 w-4 mr-1" /> Adicionar RQE
-                    </Button>
-                  </div>
-                  {form.rqes.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">Nenhum RQE cadastrado.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {form.rqes.map((r, idx) => (
-                        <div key={idx} className="grid grid-cols-[1fr_140px_auto] gap-2 items-end">
-                          <div className="space-y-1">
-                            <Label className="text-xs">Especialidade</Label>
-                            <SearchableSelect
-                              options={esps.map((e) => ({ value: e.id, label: e.nome }))}
-                              value={r.especialidade_id ?? ""}
-                              onChange={(v) =>
-                                setForm({
-                                  ...form,
-                                  rqes: form.rqes.map((x, i) => (i === idx ? { ...x, especialidade_id: v } : x)),
-                                })
-                              }
-                              placeholder="Selecione"
-                              searchPlaceholder="Buscar especialidade..."
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs">Nº RQE</Label>
-                            <Input
-                              value={r.numero}
-                              maxLength={50}
-                              placeholder="Ex.: 12345"
-                              onChange={(e) =>
-                                setForm({
-                                  ...form,
-                                  rqes: form.rqes.map((x, i) => (i === idx ? { ...x, numero: e.target.value } : x)),
-                                })
-                              }
-                            />
-                          </div>
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="ghost"
-                            onClick={() =>
-                              setForm({
-                                ...form,
-                                rqes: form.rqes.filter((_, i) => i !== idx),
-                              })
-                            }
-                            aria-label="Remover RQE"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="border rounded-md p-3 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-sm font-medium">Especialidades</Label>
-                      <p className="text-xs text-muted-foreground">Adicione uma ou mais especialidades cadastradas no sistema.</p>
-                    </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setForm({ ...form, especialidades: [...form.especialidades, ""] })}
                     >
                       <Plus className="h-4 w-4 mr-1" /> Adicionar especialidade
                     </Button>
@@ -617,38 +551,79 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                     <p className="text-xs text-muted-foreground">Nenhuma especialidade selecionada.</p>
                   ) : (
                     <div className="space-y-2">
-                      {form.especialidades.map((eid, idx) => (
-                        <div key={idx} className="grid grid-cols-[1fr_auto] gap-2 items-center">
-                          <SearchableSelect
-                            options={esps.map((e) => ({ value: e.id, label: e.nome }))}
-                            value={eid}
-                            onChange={(v) => {
-                              if (v && form.especialidades.some((x, i) => i !== idx && x === v)) {
-                                toast.warning("Especialidade já adicionada");
-                                return;
+                      {form.especialidades.map((er, idx) => (
+                        <div key={idx} className="space-y-2 border rounded-md p-2">
+                          <div className="grid grid-cols-[1fr_auto] gap-2 items-center">
+                            <SearchableSelect
+                              options={esps.map((e) => ({ value: e.id, label: e.nome }))}
+                              value={er.especialidade_id}
+                              onChange={(v) => {
+                                if (v && form.especialidades.some((x, i) => i !== idx && x.especialidade_id === v)) {
+                                  toast.warning("Especialidade já adicionada");
+                                  return;
+                                }
+                                setForm({
+                                  ...form,
+                                  especialidades: form.especialidades.map((x, i) =>
+                                    i === idx ? { ...x, especialidade_id: v } : x,
+                                  ),
+                                });
+                              }}
+                              placeholder="Selecione"
+                              searchPlaceholder="Buscar especialidade..."
+                            />
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              onClick={() =>
+                                setForm({
+                                  ...form,
+                                  especialidades: form.especialidades.filter((_, i) => i !== idx),
+                                })
                               }
-                              setForm({
-                                ...form,
-                                especialidades: form.especialidades.map((x, i) => (i === idx ? v : x)),
-                              });
-                            }}
-                            placeholder="Selecione"
-                            searchPlaceholder="Buscar especialidade..."
-                          />
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="ghost"
-                            onClick={() =>
-                              setForm({
-                                ...form,
-                                especialidades: form.especialidades.filter((_, i) => i !== idx),
-                              })
-                            }
-                            aria-label="Remover especialidade"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                              aria-label="Remover especialidade"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <div className="flex items-center gap-3 pl-1">
+                            <label className="flex items-center gap-2 text-sm">
+                              <Checkbox
+                                checked={er.tem_rqe}
+                                onCheckedChange={(v) =>
+                                  setForm({
+                                    ...form,
+                                    especialidades: form.especialidades.map((x, i) =>
+                                      i === idx
+                                        ? { ...x, tem_rqe: !!v, rqe_numero: v ? x.rqe_numero : "" }
+                                        : x,
+                                    ),
+                                  })
+                                }
+                              />
+                              Tem RQE
+                            </label>
+                            {er.tem_rqe && (
+                              <div className="flex items-center gap-2 flex-1">
+                                <Label className="text-xs whitespace-nowrap">Nº RQE</Label>
+                                <Input
+                                  className="h-8"
+                                  maxLength={50}
+                                  value={er.rqe_numero}
+                                  placeholder="Ex.: 12345"
+                                  onChange={(e) =>
+                                    setForm({
+                                      ...form,
+                                      especialidades: form.especialidades.map((x, i) =>
+                                        i === idx ? { ...x, rqe_numero: e.target.value } : x,
+                                      ),
+                                    })
+                                  }
+                                />
+                              </div>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
