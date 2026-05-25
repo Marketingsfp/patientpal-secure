@@ -328,16 +328,17 @@ function ProcedimentosPage() {
     })();
   }, []);
   const [especialidades, setEspecialidades] = useState<{ id: string; nome: string }[]>([]);
+  const loadEspecialidades = async () => {
+    const { data, error } = await supabase
+      .from("especialidades")
+      .select("id,nome")
+      .eq("ativo", true)
+      .order("nome");
+    if (error) { toast.error(error.message); return; }
+    setEspecialidades((data ?? []) as { id: string; nome: string }[]);
+  };
   useEffect(() => {
-    void (async () => {
-      const { data, error } = await supabase
-        .from("especialidades")
-        .select("id,nome")
-        .eq("ativo", true)
-        .order("nome");
-      if (error) { toast.error(error.message); return; }
-      setEspecialidades((data ?? []) as { id: string; nome: string }[]);
-    })();
+    void loadEspecialidades();
   }, []);
 
   const load = async () => {
@@ -451,8 +452,9 @@ function ProcedimentosPage() {
     return sort.dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
   };
 
-  const openNew = () => { setEditing(null); setForm(EMPTY); setOpen(true); };
+  const openNew = () => { void loadEspecialidades(); setEditing(null); setForm(EMPTY); setOpen(true); };
   const openEdit = (p: Procedimento) => {
+    void loadEspecialidades();
     setEditing(p);
     setForm({
       nome: p.nome, grupo: p.grupo ?? "", tipo: p.tipo, codigo: p.codigo ?? "",
@@ -688,7 +690,7 @@ function ProcedimentosPage() {
               <SelectTrigger className="w-56"><SelectValue placeholder="Especialidade" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Especialidades</SelectItem>
-                {grupos.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+                {especialidades.map(e => <SelectItem key={e.id} value={e.nome}>{e.nome}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={filtroTipo} onValueChange={(v) => setFiltroTipo(v as typeof filtroTipo)}>
