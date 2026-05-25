@@ -31,6 +31,7 @@ import { Route as PContratoTokenRouteImport } from './routes/p.contrato.$token'
 import { Route as AuthenticatedAppUnidadesRouteImport } from './routes/_authenticated/app.unidades'
 import { Route as AuthenticatedAppTriagemEnfermagemRouteImport } from './routes/_authenticated/app.triagem-enfermagem'
 import { Route as AuthenticatedAppTreinamentosRouteImport } from './routes/_authenticated/app.treinamentos'
+import { Route as AuthenticatedAppTiposServicoRouteImport } from './routes/_authenticated/app.tipos-servico'
 import { Route as AuthenticatedAppSetoresRouteImport } from './routes/_authenticated/app.setores'
 import { Route as AuthenticatedAppRelatoriosRouteImport } from './routes/_authenticated/app.relatorios'
 import { Route as AuthenticatedAppRecepcaoRouteImport } from './routes/_authenticated/app.recepcao'
@@ -217,6 +218,12 @@ const AuthenticatedAppTreinamentosRoute =
   AuthenticatedAppTreinamentosRouteImport.update({
     id: '/treinamentos',
     path: '/treinamentos',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppTiposServicoRoute =
+  AuthenticatedAppTiposServicoRouteImport.update({
+    id: '/tipos-servico',
+    path: '/tipos-servico',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppSetoresRoute = AuthenticatedAppSetoresRouteImport.update({
@@ -720,6 +727,7 @@ export interface FileRoutesByFullPath {
   '/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
   '/app/relatorios': typeof AuthenticatedAppRelatoriosRoute
   '/app/setores': typeof AuthenticatedAppSetoresRoute
+  '/app/tipos-servico': typeof AuthenticatedAppTiposServicoRoute
   '/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
   '/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/app/unidades': typeof AuthenticatedAppUnidadesRoute
@@ -815,6 +823,7 @@ export interface FileRoutesByTo {
   '/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
   '/app/relatorios': typeof AuthenticatedAppRelatoriosRoute
   '/app/setores': typeof AuthenticatedAppSetoresRoute
+  '/app/tipos-servico': typeof AuthenticatedAppTiposServicoRoute
   '/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
   '/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/app/unidades': typeof AuthenticatedAppUnidadesRoute
@@ -915,6 +924,7 @@ export interface FileRoutesById {
   '/_authenticated/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
   '/_authenticated/app/relatorios': typeof AuthenticatedAppRelatoriosRoute
   '/_authenticated/app/setores': typeof AuthenticatedAppSetoresRoute
+  '/_authenticated/app/tipos-servico': typeof AuthenticatedAppTiposServicoRoute
   '/_authenticated/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
   '/_authenticated/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/_authenticated/app/unidades': typeof AuthenticatedAppUnidadesRoute
@@ -1015,6 +1025,7 @@ export interface FileRouteTypes {
     | '/app/recepcao'
     | '/app/relatorios'
     | '/app/setores'
+    | '/app/tipos-servico'
     | '/app/treinamentos'
     | '/app/triagem-enfermagem'
     | '/app/unidades'
@@ -1110,6 +1121,7 @@ export interface FileRouteTypes {
     | '/app/recepcao'
     | '/app/relatorios'
     | '/app/setores'
+    | '/app/tipos-servico'
     | '/app/treinamentos'
     | '/app/triagem-enfermagem'
     | '/app/unidades'
@@ -1209,6 +1221,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/recepcao'
     | '/_authenticated/app/relatorios'
     | '/_authenticated/app/setores'
+    | '/_authenticated/app/tipos-servico'
     | '/_authenticated/app/treinamentos'
     | '/_authenticated/app/triagem-enfermagem'
     | '/_authenticated/app/unidades'
@@ -1414,6 +1427,13 @@ declare module '@tanstack/react-router' {
       path: '/treinamentos'
       fullPath: '/app/treinamentos'
       preLoaderRoute: typeof AuthenticatedAppTreinamentosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/tipos-servico': {
+      id: '/_authenticated/app/tipos-servico'
+      path: '/tipos-servico'
+      fullPath: '/app/tipos-servico'
+      preLoaderRoute: typeof AuthenticatedAppTiposServicoRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/setores': {
@@ -2087,6 +2107,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppRecepcaoRoute: typeof AuthenticatedAppRecepcaoRoute
   AuthenticatedAppRelatoriosRoute: typeof AuthenticatedAppRelatoriosRoute
   AuthenticatedAppSetoresRoute: typeof AuthenticatedAppSetoresRoute
+  AuthenticatedAppTiposServicoRoute: typeof AuthenticatedAppTiposServicoRoute
   AuthenticatedAppTreinamentosRoute: typeof AuthenticatedAppTreinamentosRoute
   AuthenticatedAppTriagemEnfermagemRoute: typeof AuthenticatedAppTriagemEnfermagemRoute
   AuthenticatedAppUnidadesRoute: typeof AuthenticatedAppUnidadesRoute
@@ -2155,6 +2176,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppRecepcaoRoute: AuthenticatedAppRecepcaoRoute,
   AuthenticatedAppRelatoriosRoute: AuthenticatedAppRelatoriosRoute,
   AuthenticatedAppSetoresRoute: AuthenticatedAppSetoresRoute,
+  AuthenticatedAppTiposServicoRoute: AuthenticatedAppTiposServicoRoute,
   AuthenticatedAppTreinamentosRoute: AuthenticatedAppTreinamentosRoute,
   AuthenticatedAppTriagemEnfermagemRoute:
     AuthenticatedAppTriagemEnfermagemRoute,

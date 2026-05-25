@@ -4141,7 +4141,7 @@ export type Database = {
           nome: string
           observacoes: string | null
           preparo: string | null
-          tipo: Database["public"]["Enums"]["procedimento_tipo"]
+          tipo: string
           updated_at: string
           valor_cartao: number
           valor_cartao_consulta: number
@@ -4164,7 +4164,7 @@ export type Database = {
           nome: string
           observacoes?: string | null
           preparo?: string | null
-          tipo?: Database["public"]["Enums"]["procedimento_tipo"]
+          tipo?: string
           updated_at?: string
           valor_cartao?: number
           valor_cartao_consulta?: number
@@ -4187,7 +4187,7 @@ export type Database = {
           nome?: string
           observacoes?: string | null
           preparo?: string | null
-          tipo?: Database["public"]["Enums"]["procedimento_tipo"]
+          tipo?: string
           updated_at?: string
           valor_cartao?: number
           valor_cartao_consulta?: number
@@ -4550,6 +4550,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      tipos_servico: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          id: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       triagens_enfermagem: {
         Row: {
@@ -5154,7 +5178,6 @@ export type Database = {
         | "locador_equipamento"
         | "parceiro_pj"
         | "outro"
-      procedimento_tipo: "consulta" | "exame" | "procedimento"
       resultado_status: "pendente" | "normal" | "alterado" | "critico"
       split_beneficiario_tipo: "clinica" | "medico" | "prestador" | "outro"
       status_senha: "emitida" | "chamada" | "atendida" | "cancelada"
@@ -5394,7 +5417,6 @@ export const Constants = {
         "parceiro_pj",
         "outro",
       ],
-      procedimento_tipo: ["consulta", "exame", "procedimento"],
       resultado_status: ["pendente", "normal", "alterado", "critico"],
       split_beneficiario_tipo: ["clinica", "medico", "prestador", "outro"],
       status_senha: ["emitida", "chamada", "atendida", "cancelada"],

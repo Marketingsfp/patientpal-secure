@@ -27,10 +27,10 @@ import {
 
 export const Route = createFileRoute("/_authenticated/app/procedimentos")({
   component: ProcedimentosPage,
-  head: () => ({ meta: [{ title: "Procedimentos — ClinicaOS" }] }),
+  head: () => ({ meta: [{ title: "Serviços — ClinicaOS" }] }),
 });
 
-type Tipo = "consulta" | "exame" | "procedimento";
+type Tipo = string;
 interface Procedimento {
   id: string;
   nome: string;
@@ -59,12 +59,14 @@ interface Cartao {
   ativo: boolean;
 }
 
-const TIPO_LABEL: Record<Tipo, string> = { consulta: "Consulta", exame: "Exame", procedimento: "Procedimento" };
-const TIPO_COR: Record<Tipo, string> = {
+const TIPO_COR_MAP: Record<string, string> = {
   consulta: "bg-primary/10 text-primary",
   exame: "bg-blue-500/15 text-blue-700 dark:text-blue-400",
   procedimento: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
+  cirurgia: "bg-rose-500/15 text-rose-700 dark:text-rose-400",
 };
+const tipoLabel = (t: string) => (t ? t.charAt(0).toUpperCase() + t.slice(1) : "");
+const tipoCor = (t: string) => TIPO_COR_MAP[t] ?? "bg-muted text-foreground";
 
 const EMPTY = {
   nome: "", grupo: "", tipo: "exame" as Tipo, codigo: "",
@@ -303,6 +305,19 @@ function ProcedimentosPage() {
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [seeding, setSeeding] = useState(false);
+  const [tipos, setTipos] = useState<{ id: string; nome: string }[]>([]);
+
+  useEffect(() => {
+    void (async () => {
+      const { data, error } = await supabase
+        .from("tipos_servico")
+        .select("id,nome")
+        .eq("ativo", true)
+        .order("nome");
+      if (error) { toast.error(error.message); return; }
+      setTipos((data ?? []) as { id: string; nome: string }[]);
+    })();
+  }, []);
 
   const load = async () => {
     if (!clinicaAtual) return;
@@ -530,7 +545,7 @@ function ProcedimentosPage() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-semibold flex items-center gap-2">
-            <ClipboardList className="h-6 w-6 text-primary" /> Procedimentos
+            <ClipboardList className="h-6 w-6 text-primary" /> Serviços
           </h1>
           <p className="text-sm text-muted-foreground">Consultas, exames e procedimentos — com valores por forma de pagamento.</p>
         </div>
@@ -538,7 +553,7 @@ function ProcedimentosPage() {
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="procedimentos">Procedimentos / Exames</TabsTrigger>
+          <TabsTrigger value="procedimentos">Serviços</TabsTrigger>
           <TabsTrigger value="cartoes">Cartões de convênio</TabsTrigger>
         </TabsList>
 
@@ -576,7 +591,7 @@ function ProcedimentosPage() {
                   filtrados.map((p) => ({
                     nome: p.nome,
                     grupo: p.grupo ?? "",
-                    tipo: TIPO_LABEL[p.tipo],
+                    tipo: tipoLabel(p.tipo),
                     codigo: p.codigo ?? "",
                     dinheiro: Number(p.valor_dinheiro ?? p.valor_dinheiro_pix ?? 0).toFixed(2),
                     cartao: Number(p.valor_cartao_credito ?? p.valor_cartao_debito ?? p.valor_cartao ?? 0).toFixed(2),
@@ -624,9 +639,9 @@ function ProcedimentosPage() {
               <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Todos os tipos</SelectItem>
-                <SelectItem value="consulta">Consulta</SelectItem>
-                <SelectItem value="exame">Exame</SelectItem>
-                <SelectItem value="procedimento">Procedimento</SelectItem>
+                {tipos.map(t => (
+                  <SelectItem key={t.id} value={t.nome}>{tipoLabel(t.nome)}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -654,13 +669,13 @@ function ProcedimentosPage() {
                 ) : !clinicaAtual ? (
                   <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
                 ) : filtrados.length === 0 ? (
-                  <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Nenhum procedimento.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Nenhum serviço.</TableCell></TableRow>
                 ) : visiveis.map(p => (
                   <TableRow key={p.id} className="h-8">
                     <TableCell className="font-medium">{p.nome}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{p.grupo ?? "—"}</TableCell>
                     <TableCell>
-                      <span className={`text-[10px] px-1.5 py-0 rounded-full ${TIPO_COR[p.tipo]}`}>{TIPO_LABEL[p.tipo]}</span>
+                      <span className={`text-[10px] px-1.5 py-0 rounded-full ${tipoCor(p.tipo)}`}>{tipoLabel(p.tipo)}</span>
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_dinheiro ?? p.valor_dinheiro_pix))}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_pix ?? p.valor_cartao_credito ?? p.valor_cartao_debito ?? p.valor_cartao))}</TableCell>
@@ -743,7 +758,7 @@ function ProcedimentosPage() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-2xl max-h-[95vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editing ? "Editar procedimento" : "Novo procedimento"}</DialogTitle>
+            <DialogTitle>{editing ? "Editar serviço" : "Novo serviço"}</DialogTitle>
             <DialogDescription>Preencha valores para cada forma de pagamento.</DialogDescription>
           </DialogHeader>
           <form onSubmit={onSubmit} className="space-y-4">
@@ -772,9 +787,9 @@ function ProcedimentosPage() {
                 <Select value={form.tipo} onValueChange={(v) => setForm({ ...form, tipo: v as Tipo })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="consulta">Consulta</SelectItem>
-                    <SelectItem value="exame">Exame</SelectItem>
-                    <SelectItem value="procedimento">Procedimento</SelectItem>
+                    {tipos.map(t => (
+                      <SelectItem key={t.id} value={t.nome}>{tipoLabel(t.nome)}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
