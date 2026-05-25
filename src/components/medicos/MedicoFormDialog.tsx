@@ -197,9 +197,10 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setSaving(true);
+    const nomeLimpo = form.nome.replace(/^\s*(dr|dra)\.?\s+/i, "").trim();
     const payload = {
       clinica_id: clinicaId,
-      nome: form.nome,
+      nome: nomeLimpo,
       crm: form.crm,
       crm_uf: form.crm_uf.toUpperCase(),
       especialidade_id: form.especialidades[0] || null,
