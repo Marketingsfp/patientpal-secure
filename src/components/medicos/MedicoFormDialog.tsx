@@ -37,6 +37,7 @@ const limparPrefixoMedico = (nome: string) =>
 const emptyForm = () => ({
   nome: "", crm: "", crm_uf: "",
   especialidades: [] as string[],
+  procedimentos: [] as string[],
   rqes: [] as RqeRow[],
   tipo_repasse: "percentual" as "percentual" | "valor",
   percentual: "50",
