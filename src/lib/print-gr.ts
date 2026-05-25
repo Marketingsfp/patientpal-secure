@@ -109,7 +109,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     a.medico_id
       ? supabase
           .from("medicos")
-          .select("nome, tipo_repasse, percentual_repasse_padrao, valor_repasse_padrao")
+          .select("nome")
           .eq("id", a.medico_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
@@ -124,13 +124,16 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   ]);
 
   const paciente = pac.data as { nome: string; cpf: string | null; telefone: string | null; data_nascimento: string | null } | null;
-  const medicoData = med.data as {
-    nome: string;
-    tipo_repasse: string | null;
-    percentual_repasse_padrao: number | null;
-    valor_repasse_padrao: number | null;
-  } | null;
-  const medicoNome = medicoData?.nome ?? "—";
+  const medicoBasic = med.data as { nome: string } | null;
+  const medicoNome = medicoBasic?.nome ?? "—";
+  let medicoData: { tipo_repasse: string | null; percentual_repasse_padrao: number | null; valor_repasse_padrao: number | null } | null = null;
+  if (a.medico_id) {
+    try {
+      const { data: sens } = await supabase.rpc("medico_dados_sensiveis", { _medico_id: a.medico_id });
+      const s = (sens as any) ?? {};
+      medicoData = { tipo_repasse: s.tipo_repasse ?? null, percentual_repasse_padrao: s.percentual_repasse_padrao ?? null, valor_repasse_padrao: s.valor_repasse_padrao ?? null };
+    } catch { medicoData = null; }
+  }
   const procData = proc.data as { nome: string; valor_dinheiro_pix: number | null; valor_cartao: number | null } | null;
 
   // Se já temos pagamento informado, usa ele; senão tenta tabela de procedimentos
