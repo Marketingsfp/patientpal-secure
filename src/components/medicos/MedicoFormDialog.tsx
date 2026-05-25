@@ -262,6 +262,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       const { error } = await supabase.from("medicos").update(payload).eq("id", editId);
       if (error) { setSaving(false); toast.error(error.message); return; }
       await supabase.from("medico_especialidades").delete().eq("medico_id", editId);
+      await supabase.from("medico_procedimentos").delete().eq("medico_id", editId);
     } else {
       const { data: novo, error } = await supabase.from("medicos").insert(payload).select("id").single();
       if (error || !novo) { setSaving(false); toast.error(error?.message ?? "Erro"); return; }
@@ -272,6 +273,12 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       const rows = especialidadesIds.map((eid) => ({ medico_id: medicoId!, especialidade_id: eid }));
       const { error: e2 } = await supabase.from("medico_especialidades").insert(rows);
       if (e2) { setSaving(false); toast.error(e2.message); return; }
+    }
+    const procedimentosIds = Array.from(new Set(form.procedimentos.filter((x) => !!x)));
+    if (medicoId && procedimentosIds.length) {
+      const procRows = procedimentosIds.map((pid) => ({ medico_id: medicoId!, procedimento_id: pid }));
+      const { error: ep } = await supabase.from("medico_procedimentos").insert(procRows);
+      if (ep) { setSaving(false); toast.error(ep.message); return; }
     }
     if (medicoId) {
       await supabase.from("medico_convenios").delete().eq("medico_id", medicoId);
