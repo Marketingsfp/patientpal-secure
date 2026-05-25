@@ -16,7 +16,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 
 interface Especialidade { id: string; nome: string }
 interface Procedimento { id: string; nome: string; grupo: string | null; tipo: string; valor_padrao: number }
-interface RqeRow { especialidade_id: string | null; especialidade_nome?: string | null; numero: string }
+interface EspecialidadeRow { especialidade_id: string; tem_rqe: boolean; rqe_numero: string }
 interface ConvenioRow {
   id?: string;
   nome: string;
@@ -36,9 +36,8 @@ const limparPrefixoMedico = (nome: string) =>
 
 const emptyForm = () => ({
   nome: "", crm: "", crm_uf: "",
-  especialidades: [] as string[],
+  especialidades: [] as EspecialidadeRow[],
   procedimentos: [] as string[],
-  rqes: [] as RqeRow[],
   tipo_repasse: "percentual" as "percentual" | "valor",
   percentual: "50",
   valor: "",
