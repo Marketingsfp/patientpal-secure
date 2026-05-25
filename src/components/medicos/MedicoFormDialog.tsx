@@ -385,7 +385,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[95vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-3xl w-[calc(100vw-2rem)] max-h-[95vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle>{editId ? "Editar médico" : "Novo médico"}</DialogTitle>
         </DialogHeader>
