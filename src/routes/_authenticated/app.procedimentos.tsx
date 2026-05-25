@@ -718,11 +718,6 @@ function ProcedimentosPage() {
             <Table className="[&_td]:py-1 [&_td]:px-2 [&_th]:py-1.5 [&_th]:px-2 text-sm">
               <TableHeader>
                 <TableRow className="bg-muted/40">
-                  <TableHead>
-                    <button type="button" onClick={() => toggleSort("nome")} className="inline-flex items-center gap-1 hover:text-foreground">
-                      Nome <SortIcon col="nome" />
-                    </button>
-                  </TableHead>
                   <TableHead className="w-44">
                     <button type="button" onClick={() => toggleSort("grupo")} className="inline-flex items-center gap-1 hover:text-foreground">
                       Especialidade <SortIcon col="grupo" />
@@ -731,6 +726,11 @@ function ProcedimentosPage() {
                   <TableHead className="w-24">
                     <button type="button" onClick={() => toggleSort("tipo")} className="inline-flex items-center gap-1 hover:text-foreground">
                       Tipo <SortIcon col="tipo" />
+                    </button>
+                  </TableHead>
+                  <TableHead>
+                    <button type="button" onClick={() => toggleSort("nome")} className="inline-flex items-center gap-1 hover:text-foreground">
+                      Item <SortIcon col="nome" />
                     </button>
                   </TableHead>
                   <TableHead className="w-24 text-right">Dinheiro</TableHead>
