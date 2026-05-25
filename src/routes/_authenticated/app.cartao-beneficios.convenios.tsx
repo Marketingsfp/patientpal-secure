@@ -272,15 +272,37 @@ function ConveniosPage() {
     }
     // Substitui benefícios
     await supabase.from("cb_beneficios").delete().eq("convenio_id", convenioId!);
-    const bensToInsert = beneficios
-      .filter((b) => b.nome.trim())
-      .map((b) => ({
+    const bensToInsert: any[] = [];
+    for (const b of beneficios) {
+      if (b.escopo === "servico" && !b.procedimento_id) {
+        setSaving(false); toast.error("Selecione o item em todos os benefícios de serviço único."); return;
+      }
+      if (b.escopo === "especialidade" && !b.especialidade_id) {
+        setSaving(false); toast.error("Selecione a especialidade em todos os benefícios."); return;
+      }
+      if (b.tipo_desconto !== "gratuidade" && (b.valor_desconto === null || b.valor_desconto <= 0)) {
+        setSaving(false); toast.error("Informe o valor do desconto."); return;
+      }
+      const nomeAuto = b.escopo === "servico"
+        ? (procedimentosList.find((p) => p.id === b.procedimento_id)?.nome ?? "Serviço")
+        : "Especialidade: " + (especialidadesList.find((e) => e.id === b.especialidade_id)?.nome ?? "");
+      bensToInsert.push({
         clinica_id: clinicaAtual.clinica_id,
         convenio_id: convenioId!,
-        nome: b.nome.trim(),
+        nome: nomeAuto,
         descricao: (b.descricao ?? "").toString().trim() || null,
         ativo: b.ativo,
-      }));
+        escopo: b.escopo,
+        procedimento_id: b.escopo === "servico" ? b.procedimento_id : null,
+        especialidade_id: b.escopo === "especialidade" ? b.especialidade_id : null,
+        tipo_desconto: b.tipo_desconto,
+        valor_desconto: b.tipo_desconto === "gratuidade" ? null : b.valor_desconto,
+        inicio_a_partir: b.inicio_a_partir,
+        limite_uso: b.limite_uso,
+        periodicidade: b.periodicidade,
+        pessoa: b.pessoa,
+      });
+    }
     if (bensToInsert.length) {
       const { error: bErr } = await supabase.from("cb_beneficios").insert(bensToInsert);
       if (bErr) { setSaving(false); toast.error(bErr.message); return; }
