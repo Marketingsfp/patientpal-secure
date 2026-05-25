@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, ShieldCheck } from "lucide-react";
+import { Plus, Pencil, Trash2, ShieldCheck, Layers, Lightbulb } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -13,6 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -39,6 +40,12 @@ type Convenio = {
   modelo_contrato: string | null;
 };
 
+type Faixa = {
+  vidas_de: number;
+  vidas_ate: number | null;
+  valor_mensal: number;
+};
+
 function ConveniosPage() {
   const { clinicaAtual } = useClinica();
   const [rows, setRows] = useState<Convenio[]>([]);
@@ -55,7 +62,7 @@ function ConveniosPage() {
   const [vigenciaMeses, setVigenciaMeses] = useState<number>(12);
   const [beneficiosTxt, setBeneficiosTxt] = useState("");
   const [modeloContrato, setModeloContrato] = useState("");
-  const [valoresPorDep, setValoresPorDep] = useState<Record<number, number>>({ 0: 0 });
+  const [faixas, setFaixas] = useState<Faixa[]>([{ vidas_de: 1, vidas_ate: null, valor_mensal: 0 }]);
   const [valoresMin, setValoresMin] = useState<Record<string, number>>({});
   const [saving, setSaving] = useState(false);
   const [toDelete, setToDelete] = useState<Convenio | null>(null);
@@ -73,8 +80,8 @@ function ConveniosPage() {
     setRows(list);
     if (list.length) {
       const { data: vs } = await supabase
-        .from("cb_convenio_valores")
-        .select("convenio_id, dependentes, valor_mensal")
+        .from("cb_convenio_faixas")
+        .select("convenio_id, valor_mensal")
         .in("convenio_id", list.map((c) => c.id));
       const minMap: Record<string, number> = {};
       (vs ?? []).forEach((v: any) => {
@@ -98,7 +105,7 @@ function ConveniosPage() {
     setTaxaAdesao(0); setNumParcelas(12);
     setMaxDependentes(0); setFidelidadeMeses(0); setVigenciaMeses(12);
     setBeneficiosTxt(""); setModeloContrato("");
-    setValoresPorDep({ 0: 0 });
+    setFaixas([{ vidas_de: 1, vidas_ate: null, valor_mensal: 0 }]);
     setOpen(true);
   };
 
@@ -114,38 +121,38 @@ function ConveniosPage() {
     setVigenciaMeses(c.vigencia_meses ?? 12);
     setBeneficiosTxt(c.beneficios ?? "");
     setModeloContrato(c.modelo_contrato ?? "");
-    const { data: vs } = await supabase
-      .from("cb_convenio_valores")
-      .select("dependentes, valor_mensal")
-      .eq("convenio_id", c.id);
-    const map: Record<number, number> = {};
-    const max = c.max_dependentes ?? 0;
-    for (let i = 0; i <= max; i++) map[i] = 0;
-    (vs ?? []).forEach((v: any) => { map[v.dependentes] = Number(v.valor_mensal); });
-    setValoresPorDep(map);
+    const { data: fs } = await supabase
+      .from("cb_convenio_faixas")
+      .select("vidas_de, vidas_ate, valor_mensal")
+      .eq("convenio_id", c.id)
+      .order("vidas_de");
+    const list = (fs ?? []).map((f: any) => ({
+      vidas_de: Number(f.vidas_de),
+      vidas_ate: f.vidas_ate === null ? null : Number(f.vidas_ate),
+      valor_mensal: Number(f.valor_mensal),
+    }));
+    setFaixas(list.length ? list : [{ vidas_de: 1, vidas_ate: null, valor_mensal: 0 }]);
     setOpen(true);
   };
-
-  // Sincroniza linhas conforme maxDependentes muda
-  useEffect(() => {
-    setValoresPorDep((prev) => {
-      const next: Record<number, number> = {};
-      for (let i = 0; i <= maxDependentes; i++) next[i] = prev[i] ?? 0;
-      return next;
-    });
-  }, [maxDependentes]);
 
   const save = async () => {
     if (!clinicaAtual) return;
     if (!nome.trim()) { toast.error("Informe o nome."); return; }
+    if (!faixas.length) { toast.error("Adicione pelo menos uma faixa de preço."); return; }
+    for (const f of faixas) {
+      if (!f.vidas_de || f.vidas_de < 1) { toast.error("Campo 'De' inválido em uma faixa."); return; }
+      if (f.vidas_ate !== null && f.vidas_ate < f.vidas_de) {
+        toast.error("Campo 'Até' deve ser maior ou igual a 'De'."); return;
+      }
+    }
     setSaving(true);
-    const valor0 = valoresPorDep[0] ?? 0;
+    const valorMin = faixas.reduce((m, f) => Math.min(m, Number(f.valor_mensal) || 0), Number(faixas[0].valor_mensal) || 0);
     const payload = {
       clinica_id: clinicaAtual.clinica_id,
       nome: nome.trim(),
       descricao: descricao.trim() || null,
       ativo,
-      valor_mensal: valor0,
+      valor_mensal: valorMin,
       taxa_adesao: taxaAdesao,
       num_parcelas: numParcelas,
       max_dependentes: maxDependentes,
@@ -163,14 +170,17 @@ function ConveniosPage() {
       if (error || !data) { setSaving(false); toast.error(error?.message ?? "Erro ao criar"); return; }
       convenioId = data.id;
     }
-    // Substitui valores por dependente
-    await supabase.from("cb_convenio_valores").delete().eq("convenio_id", convenioId!);
-    const rowsToInsert = Object.entries(valoresPorDep)
-      .filter(([d]) => Number(d) <= maxDependentes)
-      .map(([d, v]) => ({ convenio_id: convenioId!, dependentes: Number(d), valor_mensal: Number(v) || 0 }));
+    // Substitui faixas de preço
+    await supabase.from("cb_convenio_faixas").delete().eq("convenio_id", convenioId!);
+    const rowsToInsert = faixas.map((f) => ({
+      convenio_id: convenioId!,
+      vidas_de: Number(f.vidas_de),
+      vidas_ate: f.vidas_ate === null ? null : Number(f.vidas_ate),
+      valor_mensal: Number(f.valor_mensal) || 0,
+    }));
     if (rowsToInsert.length) {
-      const { error: vErr } = await supabase.from("cb_convenio_valores").insert(rowsToInsert);
-      if (vErr) { setSaving(false); toast.error(vErr.message); return; }
+      const { error: fErr } = await supabase.from("cb_convenio_faixas").insert(rowsToInsert);
+      if (fErr) { setSaving(false); toast.error(fErr.message); return; }
     }
     setSaving(false);
     toast.success(editing ? "Convênio atualizado." : "Convênio criado.");
