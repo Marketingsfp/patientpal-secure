@@ -92,6 +92,9 @@ function ConveniosPage() {
   // Benefícios do convênio (aba)
   const [beneficios, setBeneficios] = useState<Beneficio[]>([]);
   const [benLoading, setBenLoading] = useState(false);
+  const [procedimentosList, setProcedimentosList] = useState<ProcOpt[]>([]);
+  const [especialidadesList, setEspecialidadesList] = useState<EspOpt[]>([]);
+  const [escopoDialogOpen, setEscopoDialogOpen] = useState(false);
 
   const loadBeneficios = async (convenioId: string) => {
     setBenLoading(true);
@@ -101,8 +104,51 @@ function ConveniosPage() {
       .eq("convenio_id", convenioId)
       .order("nome");
     if (error) toast.error(error.message);
-    setBeneficios((data ?? []) as Beneficio[]);
+    setBeneficios(((data ?? []) as any[]).map((b) => ({
+      id: b.id,
+      nome: b.nome,
+      descricao: b.descricao,
+      ativo: b.ativo,
+      escopo: (b.escopo ?? "servico") as "servico" | "especialidade",
+      procedimento_id: b.procedimento_id ?? null,
+      especialidade_id: b.especialidade_id ?? null,
+      tipo_desconto: (b.tipo_desconto ?? "percentual") as "percentual" | "valor" | "gratuidade",
+      valor_desconto: b.valor_desconto !== null && b.valor_desconto !== undefined ? Number(b.valor_desconto) : null,
+      inicio_a_partir: (b.inicio_a_partir ?? 1) as 1 | 2 | 6,
+      limite_uso: (b.limite_uso ?? "ilimitado") as "ilimitado" | "1",
+      periodicidade: (b.periodicidade ?? "contrato") as "dia" | "mes" | "contrato",
+      pessoa: (b.pessoa ?? "titular") as Beneficio["pessoa"],
+    })));
     setBenLoading(false);
+  };
+
+  const loadCatalogos = async () => {
+    if (!clinicaAtual) return;
+    const [{ data: procs }, { data: esps }] = await Promise.all([
+      supabase.from("procedimentos").select("id, nome")
+        .eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
+      supabase.from("especialidades").select("id, nome").eq("ativo", true).order("nome"),
+    ]);
+    setProcedimentosList((procs ?? []) as ProcOpt[]);
+    setEspecialidadesList((esps ?? []) as EspOpt[]);
+  };
+
+  const addBeneficio = (escopo: "servico" | "especialidade") => {
+    setBeneficios((prev) => [...prev, {
+      nome: "",
+      descricao: "",
+      ativo: true,
+      escopo,
+      procedimento_id: null,
+      especialidade_id: null,
+      tipo_desconto: "percentual",
+      valor_desconto: null,
+      inicio_a_partir: 1,
+      limite_uso: "ilimitado",
+      periodicidade: "contrato",
+      pessoa: "titular",
+    }]);
+    setEscopoDialogOpen(false);
   };
 
   const load = async () => {
