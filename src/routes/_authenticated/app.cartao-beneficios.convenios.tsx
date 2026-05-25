@@ -303,11 +303,6 @@ function ConveniosPage() {
                   placeholder="Liste os benefícios deste convênio" />
               </div>
               <div>
-                <Label>Modelo do contrato (use {"{{VALOR_MENSAL}}"}, {"{{PACIENTE_NOME}}"}, {"{{DEPENDENTES}}"}, {"{{CLINICA_NOME}}"} etc.)</Label>
-                <Textarea value={modeloContrato} onChange={(e) => setModeloContrato(e.target.value)} rows={6}
-                  placeholder="INSTRUMENTO PARTICULAR DE CONTRATO..." />
-              </div>
-              <div>
                 <Label>Descrição</Label>
                 <Textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} rows={3} />
               </div>
