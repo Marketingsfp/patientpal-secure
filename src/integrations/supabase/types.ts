@@ -2936,6 +2936,7 @@ export type Database = {
           rqes: Json
           sexo: string
           telefone: string | null
+          telefone2: string | null
           tem_rqe: boolean
           tipo_repasse: string
           updated_at: string
@@ -2976,6 +2977,7 @@ export type Database = {
           rqes?: Json
           sexo?: string
           telefone?: string | null
+          telefone2?: string | null
           tem_rqe?: boolean
           tipo_repasse?: string
           updated_at?: string
@@ -3016,6 +3018,7 @@ export type Database = {
           rqes?: Json
           sexo?: string
           telefone?: string | null
+          telefone2?: string | null
           tem_rqe?: boolean
           tipo_repasse?: string
           updated_at?: string
@@ -3637,6 +3640,7 @@ export type Database = {
           responsavel_telefone: string | null
           sexo: string
           telefone: string | null
+          telefone2: string | null
           updated_at: string
         }
         Insert: {
@@ -3667,6 +3671,7 @@ export type Database = {
           responsavel_telefone?: string | null
           sexo?: string
           telefone?: string | null
+          telefone2?: string | null
           updated_at?: string
         }
         Update: {
@@ -3697,6 +3702,7 @@ export type Database = {
           responsavel_telefone?: string | null
           sexo?: string
           telefone?: string | null
+          telefone2?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -4193,6 +4199,7 @@ export type Database = {
           id: string
           nome: string
           telefone: string | null
+          telefone2: string | null
           updated_at: string
         }
         Insert: {
@@ -4201,6 +4208,7 @@ export type Database = {
           id: string
           nome: string
           telefone?: string | null
+          telefone2?: string | null
           updated_at?: string
         }
         Update: {
@@ -4209,6 +4217,7 @@ export type Database = {
           id?: string
           nome?: string
           telefone?: string | null
+          telefone2?: string | null
           updated_at?: string
         }
         Relationships: []

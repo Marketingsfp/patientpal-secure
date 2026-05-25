@@ -42,7 +42,7 @@ const emptyForm = () => ({
   tipo_repasse: "percentual" as "percentual" | "valor",
   percentual: "50",
   valor: "",
-  cpf: "", rg: "", data_nascimento: "", email: "", telefone: "",
+  cpf: "", rg: "", data_nascimento: "", email: "", telefone: "", telefone2: "",
   nacionalidade: "Brasileira", estado_civil: "",
   sexo: "nao_informar",
   cep: "", logradouro: "", numero: "", complemento: "", bairro: "", cidade: "", estado: "",
@@ -114,7 +114,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       setLoading(true);
       const { data: m } = await supabase
         .from("medicos")
-        .select("id, user_id, nome, crm, crm_uf, email, telefone, nacionalidade, estado_civil, sexo, cep, logradouro, numero, complemento, bairro, cidade, estado, rqes, medico_especialidades(especialidade:especialidades(id, nome))")
+        .select("id, user_id, nome, crm, crm_uf, email, telefone, telefone2, nacionalidade, estado_civil, sexo, cep, logradouro, numero, complemento, bairro, cidade, estado, rqes, medico_especialidades(especialidade:especialidades(id, nome))")
         .eq("id", editingMedicoId)
         .maybeSingle();
       if (!m) { setLoading(false); toast.error("Médico não encontrado"); return; }
@@ -165,7 +165,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         percentual: sens.percentual_repasse_padrao != null ? String(sens.percentual_repasse_padrao) : "",
         valor: sens.valor_repasse_padrao != null ? String(sens.valor_repasse_padrao) : "",
         cpf: sens.cpf ?? "", rg: sens.rg ?? "", data_nascimento: sens.data_nascimento ?? "",
-        email: med.email ?? "", telefone: med.telefone ?? "",
+        email: med.email ?? "", telefone: med.telefone ?? "", telefone2: med.telefone2 ?? "",
         nacionalidade: med.nacionalidade ?? "Brasileira", estado_civil: med.estado_civil ?? "",
         sexo: med.sexo ?? "nao_informar",
         cep: med.cep ?? "", logradouro: med.logradouro ?? "", numero: med.numero ?? "",
@@ -242,6 +242,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       data_nascimento: form.data_nascimento || null,
       email: form.email || null,
       telefone: form.telefone || null,
+      telefone2: form.telefone2 || null,
       nacionalidade: form.nacionalidade || null,
       estado_civil: form.estado_civil || null,
       sexo: form.sexo,
@@ -329,6 +330,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
             data_nascimento: form.data_nascimento || null,
             email: form.email || null,
             telefone: form.telefone || null,
+            telefone2: form.telefone2 || null,
             cep: form.cep || null,
             logradouro: form.logradouro || null,
             numero: form.numero || null,
@@ -458,6 +460,10 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                     <div className="space-y-2">
                       <Label>Telefone</Label>
                       <Input value={form.telefone} onChange={(e) => setForm({ ...form, telefone: e.target.value })} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Telefone 2</Label>
+                      <Input value={form.telefone2} onChange={(e) => setForm({ ...form, telefone2: e.target.value })} placeholder="Telefone secundário (opcional)" />
                     </div>
                   </div>
                 </div>

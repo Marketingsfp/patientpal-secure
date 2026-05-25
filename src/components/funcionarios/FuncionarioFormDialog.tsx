@@ -33,6 +33,8 @@ const emptyForm = (clinicaId: string) => ({
   clinica_id: clinicaId,
   contrato_id: "",
   funcionario_nome: "",
+  telefone: "",
+  telefone2: "",
   setor_id: "",
   status: "ativo",
   criar_login: false, email: "", senha: "", perfil: "recepcao",
@@ -86,9 +88,11 @@ export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUs
       setLoading(true);
       const [{ data: contrato }, { data: prof }] = await Promise.all([
         supabase.from("hr_contratos").select("*").eq("clinica_id", clinicaId).eq("user_id", editingUserId).maybeSingle(),
-        supabase.from("profiles").select("nome").eq("id", editingUserId).maybeSingle(),
+        supabase.from("profiles").select("nome, telefone, telefone2").eq("id", editingUserId).maybeSingle(),
       ]);
       const nome = (contrato?.funcionario_nome as string | undefined) ?? (prof?.nome as string | undefined) ?? "";
+      const telefone = (prof?.telefone as string | undefined) ?? "";
+      const telefone2 = ((prof as { telefone2?: string | null } | null)?.telefone2 as string | undefined) ?? "";
       if (contrato) {
         setEditingContratoId(contrato.id as string);
         setPrefillUserId(null);
@@ -96,6 +100,8 @@ export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUs
           clinica_id: clinicaId,
           contrato_id: contrato.id as string,
           funcionario_nome: nome,
+          telefone,
+          telefone2,
           setor_id: (contrato.setor_id as string) ?? "",
           status: (contrato.status as string) ?? "ativo",
           criar_login: false, email: "", senha: "", perfil: "recepcao",
@@ -103,7 +109,7 @@ export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUs
       } else {
         setEditingContratoId(null);
         setPrefillUserId(editingUserId);
-        setForm({ ...emptyForm(clinicaId), funcionario_nome: nome });
+        setForm({ ...emptyForm(clinicaId), funcionario_nome: nome, telefone, telefone2 });
       }
       // Try to get email of this user
       try {
@@ -200,6 +206,13 @@ export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUs
     }
     setSaving(false);
     if (error) { toast.error(error.message); return; }
+    // Atualiza telefones em profiles quando há um usuário vinculado
+    const targetUserId = editingUserId ?? userId ?? prefillUserId ?? null;
+    if (targetUserId) {
+      await supabase.from("profiles")
+        .update({ telefone: form.telefone.trim() || null, telefone2: form.telefone2.trim() || null })
+        .eq("id", targetUserId);
+    }
     toast.success(editingContratoId || prefillUserId ? "Funcionário atualizado" : "Funcionário cadastrado");
     onOpenChange(false);
     onSaved?.();
@@ -270,6 +283,14 @@ export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUs
                       <SelectItem value="desligado">Desligado</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+                <div>
+                  <Label>Telefone</Label>
+                  <Input value={form.telefone} onChange={e => setForm({ ...form, telefone: e.target.value })} placeholder="Telefone principal" />
+                </div>
+                <div>
+                  <Label>Telefone 2</Label>
+                  <Input value={form.telefone2} onChange={e => setForm({ ...form, telefone2: e.target.value })} placeholder="Telefone secundário (opcional)" />
                 </div>
               </div>
             </TabsContent>
