@@ -905,7 +905,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                         </Label>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        Cria um usuário com o e-mail informado na aba <b>Contato</b> e vincula este médico à equipe da clínica. Se já existir usuário com este e-mail, ele será apenas adicionado à equipe.
+                        Cria um usuário com o e-mail informado na seção <b>Contato</b> (aba Dados) e vincula este médico à equipe da clínica. Se já existir usuário com este e-mail, ele será apenas adicionado à equipe.
                       </p>
                       {form.criarUsuario && (
                         <div className="grid grid-cols-2 gap-3">
@@ -918,7 +918,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                               placeholder="medico@exemplo.com"
                             />
                             {!form.email && (
-                              <p className="text-xs text-amber-600">Informe um e-mail (também na aba Contato).</p>
+                              <p className="text-xs text-amber-600">Informe um e-mail (também na seção Contato da aba Dados).</p>
                             )}
                           </div>
                           <div className="space-y-2">
