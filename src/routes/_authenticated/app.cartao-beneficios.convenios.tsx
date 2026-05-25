@@ -461,6 +461,98 @@ function ConveniosPage() {
                 </p>
               </div>
             </TabsContent>
+            <TabsContent value="beneficios" className="mt-3">
+              {!editing ? (
+                <p className="text-sm text-muted-foreground py-6 text-center">
+                  Salve o convênio primeiro para adicionar benefícios.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2 font-medium">
+                        <Gift className="h-4 w-4" /> Benefícios deste Convênio
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Liste os benefícios oferecidos por este convênio.
+                      </p>
+                    </div>
+                    {!benForm && (
+                      <Button variant="ghost" size="sm"
+                        onClick={() => setBenForm({ id: null, nome: "", descricao: "", ativo: true })}>
+                        <Plus className="h-4 w-4 mr-1" /> Novo benefício
+                      </Button>
+                    )}
+                  </div>
+
+                  {benForm ? (
+                    <Card>
+                      <CardContent className="p-4 space-y-3">
+                        <div>
+                          <Label>Nome *</Label>
+                          <Input value={benForm.nome}
+                            onChange={(e) => setBenForm({ ...benForm, nome: e.target.value })}
+                            placeholder="Ex: Consulta gratuita" />
+                        </div>
+                        <div>
+                          <Label>Descrição</Label>
+                          <Textarea value={benForm.descricao}
+                            onChange={(e) => setBenForm({ ...benForm, descricao: e.target.value })} rows={3} />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Switch checked={benForm.ativo}
+                            onCheckedChange={(v) => setBenForm({ ...benForm, ativo: v })} />
+                          <Label>Ativo</Label>
+                        </div>
+                        <div className="flex justify-end gap-2">
+                          <Button variant="outline" size="sm" onClick={() => setBenForm(null)}>Cancelar</Button>
+                          <Button size="sm" onClick={saveBeneficio} disabled={benSaving}>
+                            {benSaving ? "Salvando…" : "Salvar"}
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ) : null}
+
+                  <div className="border rounded-md overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Nome</TableHead>
+                          <TableHead>Descrição</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-right w-24">Ações</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {benLoading ? (
+                          <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Carregando…</TableCell></TableRow>
+                        ) : beneficios.length === 0 ? (
+                          <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Nenhum benefício cadastrado.</TableCell></TableRow>
+                        ) : beneficios.map((b) => (
+                          <TableRow key={b.id}>
+                            <TableCell className="font-medium">{b.nome}</TableCell>
+                            <TableCell className="text-muted-foreground">{b.descricao ?? "—"}</TableCell>
+                            <TableCell>
+                              <Badge variant={b.ativo ? "default" : "outline"}>{b.ativo ? "Ativo" : "Inativo"}</Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button size="sm" variant="ghost"
+                                onClick={() => setBenForm({ id: b.id, nome: b.nome, descricao: b.descricao ?? "", ativo: b.ativo })}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={() => setBenToDelete(b)}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+            </TabsContent>
             <TabsContent value="contrato" className="mt-3">
               <div className="space-y-3">
                 <div className="flex items-center gap-2 font-medium">
