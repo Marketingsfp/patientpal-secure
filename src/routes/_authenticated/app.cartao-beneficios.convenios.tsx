@@ -129,7 +129,7 @@ function ConveniosPage() {
     setMaxDependentes(0); setFidelidadeMeses(0); setVigenciaMeses(12);
     setBeneficiosTxt(""); setModeloContrato("");
     setFaixas([{ vidas_de: 1, vidas_ate: null, valor_mensal: 0 }]);
-    setBeneficios([]); setBenForm(null);
+    setBeneficios([]);
     setView("form");
   };
 
@@ -156,7 +156,6 @@ function ConveniosPage() {
       valor_mensal: Number(f.valor_mensal),
     }));
     setFaixas(list.length ? list : [{ vidas_de: 1, vidas_ate: null, valor_mensal: 0 }]);
-    setBenForm(null);
     loadBeneficios(c.id);
     setView("form");
   };
@@ -207,6 +206,21 @@ function ConveniosPage() {
     if (rowsToInsert.length) {
       const { error: fErr } = await supabase.from("cb_convenio_faixas").insert(rowsToInsert);
       if (fErr) { setSaving(false); toast.error(fErr.message); return; }
+    }
+    // Substitui benefícios
+    await supabase.from("cb_beneficios").delete().eq("convenio_id", convenioId!);
+    const bensToInsert = beneficios
+      .filter((b) => b.nome.trim())
+      .map((b) => ({
+        clinica_id: clinicaAtual.clinica_id,
+        convenio_id: convenioId!,
+        nome: b.nome.trim(),
+        descricao: (b.descricao ?? "").toString().trim() || null,
+        ativo: b.ativo,
+      }));
+    if (bensToInsert.length) {
+      const { error: bErr } = await supabase.from("cb_beneficios").insert(bensToInsert);
+      if (bErr) { setSaving(false); toast.error(bErr.message); return; }
     }
     setSaving(false);
     toast.success(editing ? "Convênio atualizado." : "Convênio criado.");
