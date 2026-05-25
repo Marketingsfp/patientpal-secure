@@ -191,6 +191,7 @@ function ConveniosPage() {
     setBeneficiosTxt(""); setModeloContrato("");
     setFaixas([{ vidas_de: 1, vidas_ate: null, valor_mensal: 0 }]);
     setBeneficios([]);
+    loadCatalogos();
     setView("form");
   };
 
@@ -218,6 +219,7 @@ function ConveniosPage() {
     }));
     setFaixas(list.length ? list : [{ vidas_de: 1, vidas_ate: null, valor_mensal: 0 }]);
     loadBeneficios(c.id);
+    loadCatalogos();
     setView("form");
   };
 
