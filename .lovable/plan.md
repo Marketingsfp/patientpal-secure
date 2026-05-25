@@ -1,18 +1,28 @@
-## Renomear "Grupo" → "Especialidade" no formulário de Serviço
+## Paginação, botão Pesquisar e ordenação em "Item"
 
-### 1. Diálogo "Novo/Editar serviço" (`app.procedimentos.tsx`)
-- Renomear o label `Grupo` para `Especialidade`.
-- Trocar o `Input` + `datalist` por um `Select` populado com a lista de `especialidades` (ativas) carregadas via `supabase.from("especialidades").select("id,nome").eq("ativo", true).order("nome")`.
-- O valor selecionado continua sendo gravado na coluna existente `procedimentos.grupo` (texto), preservando dados atuais — sem migração de banco.
-- Permitir "Nenhuma" (limpa o campo).
+Alterações apenas em `src/routes/_authenticated/app.procedimentos.tsx` (aba "Item").
 
-### 2. Consistência na listagem
-- Renomear o filtro "Grupo" / "Todos os grupos" da toolbar para "Especialidade" / "Todas as especialidades".
-- Renomear o cabeçalho da coluna `Grupo` na tabela para `Especialidade`.
-- A label da coluna no Excel export também passa a ser "Especialidade".
+### 1. Botão "Pesquisar" (aplicar filtros sob demanda)
+- Remover o debounce automático em `busca`. Os três filtros (`busca`, `filtroTipo`, `filtroGrupo`) passam a alimentar apenas estado "rascunho".
+- Criar estado aplicado: `buscaAplicada`, `tipoAplicado`, `grupoAplicado`. O `useMemo filtrados` passa a depender desses valores aplicados.
+- Adicionar botão **Pesquisar** (ícone lupa) na barra de filtros que copia os valores rascunho para os aplicados e reseta a página para 1.
+- Adicionar botão **Limpar** ao lado, que zera filtros e aplica.
+- Pressionar Enter no campo de busca também dispara "Pesquisar".
 
-### 3. Campo "Tipo"
-- Já carrega dinamicamente de `tipos_servico` (feito no passo anterior). Nenhuma mudança necessária.
+### 2. Ordenação por coluna (Nome, Especialidade, Tipo)
+- Novo estado: `sort: { col: "nome" | "grupo" | "tipo"; dir: "asc" | "desc" } | null`.
+- Cabeçalhos das três colunas viram botões clicáveis com ícone de seta (↑ / ↓) indicando estado atual; clique alterna asc → desc → sem ordenação (cai no padrão atual: grupo asc + nome asc).
+- Aplicar a ordenação via `useMemo` em cima de `filtrados`, usando `localeCompare("pt-BR", { sensitivity: "base" })` para Nome/Especialidade e label do tipo para Tipo. Nulos vão para o fim.
+
+### 3. Paginação (20 por página)
+- Constante `PAGE_SIZE = 20` e estado `pagina` (1-based).
+- `paginados = ordenados.slice((pagina-1)*PAGE_SIZE, pagina*PAGE_SIZE)`; a tabela renderiza `paginados`.
+- Resetar `pagina` para 1 sempre que filtros aplicados ou ordenação mudarem.
+- Adicionar rodapé na tabela com:
+  - Texto "Mostrando X–Y de N itens"
+  - Controles: « Primeira · ‹ Anterior · "Página P de T" · Próxima › · Última »
+  - Usar componentes `Button` existentes (sem adicionar dependências); desabilitar nos extremos.
 
 ### Fora deste passo
-- Não vou alterar a coluna `grupo` no banco nem outras telas que exibem `grupo` (caixa, agenda, etc.). Apenas o cadastro de Serviços.
+- Sem mudanças em outras abas (Cartões, etc.), no schema, nas queries Supabase ou em outras telas.
+- Sem mudanças visuais no diálogo de cadastro/edição.
