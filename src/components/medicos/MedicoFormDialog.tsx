@@ -581,6 +581,64 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                     </div>
                   )}
                 </div>
+                <div className="border rounded-md p-3 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm font-medium">Procedimentos</Label>
+                      <p className="text-xs text-muted-foreground">Adicione os procedimentos que o médico realiza (cadastrados no menu "Procedimentos").</p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setForm({ ...form, procedimentos: [...form.procedimentos, ""] })}
+                    >
+                      <Plus className="h-4 w-4 mr-1" /> Adicionar procedimento
+                    </Button>
+                  </div>
+                  {procs.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">Nenhum procedimento cadastrado na clínica.</p>
+                  ) : form.procedimentos.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">Nenhum procedimento selecionado.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {form.procedimentos.map((pid, idx) => (
+                        <div key={idx} className="grid grid-cols-[1fr_auto] gap-2 items-center">
+                          <SearchableSelect
+                            options={procs.map((p) => ({ value: p.id, label: p.grupo ? `${p.nome} (${p.grupo})` : p.nome }))}
+                            value={pid}
+                            onChange={(v) => {
+                              if (v && form.procedimentos.some((x, i) => i !== idx && x === v)) {
+                                toast.warning("Procedimento já adicionado");
+                                return;
+                              }
+                              setForm({
+                                ...form,
+                                procedimentos: form.procedimentos.map((x, i) => (i === idx ? v : x)),
+                              });
+                            }}
+                            placeholder="Selecione"
+                            searchPlaceholder="Buscar procedimento..."
+                          />
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            onClick={() =>
+                              setForm({
+                                ...form,
+                                procedimentos: form.procedimentos.filter((_, i) => i !== idx),
+                              })
+                            }
+                            aria-label="Remover procedimento"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </TabsContent>
 
               <TabsContent value="contato" className="space-y-4 pt-4 pb-16">
