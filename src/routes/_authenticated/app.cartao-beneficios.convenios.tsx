@@ -430,96 +430,70 @@ function ConveniosPage() {
               </div>
             </TabsContent>
             <TabsContent value="beneficios" className="mt-3">
-              {!editing ? (
-                <p className="text-sm text-muted-foreground py-6 text-center">
-                  Salve o convênio primeiro para adicionar benefícios.
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2 font-medium">
-                        <Gift className="h-4 w-4" /> Benefícios deste Convênio
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        Liste os benefícios oferecidos por este convênio.
-                      </p>
+              <div className="space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2 font-medium">
+                      <Gift className="h-4 w-4" /> Benefícios deste Convênio
                     </div>
-                    {!benForm && (
-                      <Button variant="ghost" size="sm"
-                        onClick={() => setBenForm({ id: null, nome: "", descricao: "", ativo: true })}>
-                        <Plus className="h-4 w-4 mr-1" /> Novo benefício
-                      </Button>
-                    )}
+                    <p className="text-sm text-muted-foreground">
+                      Liste os benefícios oferecidos por este convênio. As alterações são salvas ao clicar em "Salvar".
+                    </p>
                   </div>
-
-                  {benForm ? (
-                    <Card>
-                      <CardContent className="p-4 space-y-3">
-                        <div>
-                          <Label>Nome *</Label>
-                          <Input value={benForm.nome}
-                            onChange={(e) => setBenForm({ ...benForm, nome: e.target.value })}
-                            placeholder="Ex: Consulta gratuita" />
-                        </div>
-                        <div>
-                          <Label>Descrição</Label>
-                          <Textarea value={benForm.descricao}
-                            onChange={(e) => setBenForm({ ...benForm, descricao: e.target.value })} rows={3} />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Switch checked={benForm.ativo}
-                            onCheckedChange={(v) => setBenForm({ ...benForm, ativo: v })} />
-                          <Label>Ativo</Label>
-                        </div>
-                        <div className="flex justify-end gap-2">
-                          <Button variant="outline" size="sm" onClick={() => setBenForm(null)}>Cancelar</Button>
-                          <Button size="sm" onClick={saveBeneficio} disabled={benSaving}>
-                            {benSaving ? "Salvando…" : "Salvar"}
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ) : null}
-
-                  <div className="border rounded-md overflow-hidden">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Nome</TableHead>
-                          <TableHead>Descrição</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead className="text-right w-24">Ações</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {benLoading ? (
-                          <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Carregando…</TableCell></TableRow>
-                        ) : beneficios.length === 0 ? (
-                          <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Nenhum benefício cadastrado.</TableCell></TableRow>
-                        ) : beneficios.map((b) => (
-                          <TableRow key={b.id}>
-                            <TableCell className="font-medium">{b.nome}</TableCell>
-                            <TableCell className="text-muted-foreground">{b.descricao ?? "—"}</TableCell>
-                            <TableCell>
-                              <Badge variant={b.ativo ? "default" : "outline"}>{b.ativo ? "Ativo" : "Inativo"}</Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button size="sm" variant="ghost"
-                                onClick={() => setBenForm({ id: b.id, nome: b.nome, descricao: b.descricao ?? "", ativo: b.ativo })}>
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button size="sm" variant="ghost" onClick={() => setBenToDelete(b)}>
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+                  <Button variant="ghost" size="sm"
+                    onClick={() => setBeneficios([...beneficios, { nome: "", descricao: "", ativo: true }])}>
+                    <Plus className="h-4 w-4 mr-1" /> Adicionar benefício
+                  </Button>
                 </div>
-              )}
+                <div className="border rounded-md overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nome</TableHead>
+                        <TableHead>Descrição</TableHead>
+                        <TableHead className="w-24">Ativo</TableHead>
+                        <TableHead className="w-10"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {benLoading ? (
+                        <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Carregando…</TableCell></TableRow>
+                      ) : beneficios.length === 0 ? (
+                        <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Nenhum benefício. Clique em "Adicionar benefício".</TableCell></TableRow>
+                      ) : beneficios.map((b, idx) => (
+                        <TableRow key={b.id ?? `new-${idx}`}>
+                          <TableCell>
+                            <Input
+                              value={b.nome}
+                              placeholder="Ex: Consulta gratuita"
+                              onChange={(e) => setBeneficios(beneficios.map((x, i) => i === idx ? { ...x, nome: e.target.value } : x))}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              value={b.descricao ?? ""}
+                              placeholder="Descrição (opcional)"
+                              onChange={(e) => setBeneficios(beneficios.map((x, i) => i === idx ? { ...x, descricao: e.target.value } : x))}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Switch
+                              checked={b.ativo}
+                              onCheckedChange={(v) => setBeneficios(beneficios.map((x, i) => i === idx ? { ...x, ativo: v } : x))}
+                            />
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button size="sm" variant="ghost"
+                              onClick={() => setBeneficios(beneficios.filter((_, i) => i !== idx))}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
             </TabsContent>
             <TabsContent value="contrato" className="mt-3">
               <div className="space-y-3">
