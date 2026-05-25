@@ -27,7 +27,7 @@ import {
 
 export const Route = createFileRoute("/_authenticated/app/procedimentos")({
   component: ProcedimentosPage,
-  head: () => ({ meta: [{ title: "Serviços — ClinicaOS" }] }),
+  head: () => ({ meta: [{ title: "Item — ClinicaOS" }] }),
 });
 
 type Tipo = string;
@@ -557,7 +557,7 @@ function ProcedimentosPage() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-semibold flex items-center gap-2">
-            <ClipboardList className="h-6 w-6 text-primary" /> Serviços
+            <ClipboardList className="h-6 w-6 text-primary" /> Item
           </h1>
           <p className="text-sm text-muted-foreground">Consultas, exames e procedimentos — com valores por forma de pagamento.</p>
         </div>
@@ -565,7 +565,7 @@ function ProcedimentosPage() {
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="procedimentos">Serviços</TabsTrigger>
+          <TabsTrigger value="procedimentos">Item</TabsTrigger>
           <TabsTrigger value="cartoes">Cartões de convênio</TabsTrigger>
         </TabsList>
 
@@ -681,7 +681,7 @@ function ProcedimentosPage() {
                 ) : !clinicaAtual ? (
                   <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
                 ) : filtrados.length === 0 ? (
-                  <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Nenhum serviço.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Nenhum item.</TableCell></TableRow>
                 ) : visiveis.map(p => (
                   <TableRow key={p.id} className="h-8">
                     <TableCell className="font-medium">{p.nome}</TableCell>
@@ -770,7 +770,7 @@ function ProcedimentosPage() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-2xl max-h-[95vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editing ? "Editar serviço" : "Novo serviço"}</DialogTitle>
+            <DialogTitle>{editing ? "Editar item" : "Novo item"}</DialogTitle>
             <DialogDescription>Preencha valores para cada forma de pagamento.</DialogDescription>
           </DialogHeader>
           <form onSubmit={onSubmit} className="space-y-4">
