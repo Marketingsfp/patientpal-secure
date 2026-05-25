@@ -318,6 +318,18 @@ function ProcedimentosPage() {
       setTipos((data ?? []) as { id: string; nome: string }[]);
     })();
   }, []);
+  const [especialidades, setEspecialidades] = useState<{ id: string; nome: string }[]>([]);
+  useEffect(() => {
+    void (async () => {
+      const { data, error } = await supabase
+        .from("especialidades")
+        .select("id,nome")
+        .eq("ativo", true)
+        .order("nome");
+      if (error) { toast.error(error.message); return; }
+      setEspecialidades((data ?? []) as { id: string; nome: string }[]);
+    })();
+  }, []);
 
   const load = async () => {
     if (!clinicaAtual) return;
@@ -604,7 +616,7 @@ function ProcedimentosPage() {
                   `procedimentos-${new Date().toISOString().slice(0, 10)}`,
                   [
                     { key: "nome", label: "Nome" },
-                    { key: "grupo", label: "Grupo" },
+                    { key: "grupo", label: "Especialidade" },
                     { key: "tipo", label: "Tipo" },
                     { key: "codigo", label: "Código" },
                     { key: "dinheiro", label: "Dinheiro (R$)" },
@@ -626,12 +638,12 @@ function ProcedimentosPage() {
           <div className="rounded-lg border border-border bg-card p-4 flex flex-wrap gap-3">
             <div className="relative flex-1 min-w-[240px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nome, grupo ou código…" className="pl-9" />
+              <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nome, especialidade ou código…" className="pl-9" />
             </div>
             <Select value={filtroGrupo} onValueChange={setFiltroGrupo}>
-              <SelectTrigger className="w-56"><SelectValue placeholder="Grupo" /></SelectTrigger>
+              <SelectTrigger className="w-56"><SelectValue placeholder="Especialidade" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="todos">Todos os grupos</SelectItem>
+                <SelectItem value="todos">Todas as especialidades</SelectItem>
                 {grupos.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -651,7 +663,7 @@ function ProcedimentosPage() {
               <TableHeader>
                 <TableRow className="bg-muted/40">
                   <TableHead>Nome</TableHead>
-                  <TableHead className="w-44">Grupo</TableHead>
+                  <TableHead className="w-44">Especialidade</TableHead>
                   <TableHead className="w-24">Tipo</TableHead>
                   <TableHead className="w-24 text-right">Dinheiro</TableHead>
                   <TableHead className="w-20 text-right">Pix</TableHead>
@@ -774,13 +786,19 @@ function ProcedimentosPage() {
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1 col-span-2">
-                <Label>Grupo</Label>
-                <Input value={form.grupo} list="grupos-list"
-                  onChange={(e) => setForm({ ...form, grupo: e.target.value })}
-                  placeholder="Ex.: Ultrassonografia, Consulta, Endoscopia…" />
-                <datalist id="grupos-list">
-                  {grupos.map(g => <option key={g} value={g} />)}
-                </datalist>
+                <Label>Especialidade</Label>
+                <Select
+                  value={form.grupo || "__none__"}
+                  onValueChange={(v) => setForm({ ...form, grupo: v === "__none__" ? "" : v })}
+                >
+                  <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Nenhuma</SelectItem>
+                    {especialidades.map(e => (
+                      <SelectItem key={e.id} value={e.nome}>{e.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-1">
                 <Label>Tipo</Label>
