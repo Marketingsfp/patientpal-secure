@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Plus, Search, Pencil, Trash2, ClipboardList, Sparkles, CreditCard, Download } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, ClipboardList, Sparkles, CreditCard, Download, ArrowUp, ArrowDown, ArrowUpDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -296,9 +296,18 @@ function ProcedimentosPage() {
   // ----- Procedimentos -----
   const [items, setItems] = useState<Procedimento[]>([]);
   const [busca, setBusca] = useState("");
-  const [buscaDebounced, setBuscaDebounced] = useState("");
   const [filtroGrupo, setFiltroGrupo] = useState<string>("todos");
   const [filtroTipo, setFiltroTipo] = useState<"todos" | Tipo>("todos");
+  // Valores aplicados (só mudam ao clicar em Pesquisar)
+  const [buscaAplicada, setBuscaAplicada] = useState("");
+  const [grupoAplicado, setGrupoAplicado] = useState<string>("todos");
+  const [tipoAplicado, setTipoAplicado] = useState<"todos" | Tipo>("todos");
+  // Ordenação
+  type SortCol = "nome" | "grupo" | "tipo";
+  const [sort, setSort] = useState<{ col: SortCol; dir: "asc" | "desc" } | null>(null);
+  // Paginação
+  const PAGE_SIZE = 20;
+  const [pagina, setPagina] = useState(1);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Procedimento | null>(null);
@@ -385,21 +394,62 @@ function ProcedimentosPage() {
 
   const filtrados = useMemo(() => {
     const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-    const q = norm(buscaDebounced.trim());
+    const q = norm(buscaAplicada.trim());
     return items.filter(p => {
-      if (filtroTipo !== "todos" && p.tipo !== filtroTipo) return false;
-      if (filtroGrupo !== "todos" && (p.grupo ?? "") !== filtroGrupo) return false;
+      if (tipoAplicado !== "todos" && p.tipo !== tipoAplicado) return false;
+      if (grupoAplicado !== "todos" && (p.grupo ?? "") !== grupoAplicado) return false;
       if (q && !norm(p.nome).includes(q) && !norm(p.codigo ?? "").includes(q) && !norm(p.grupo ?? "").includes(q)) return false;
       return true;
     });
-  }, [items, buscaDebounced, filtroTipo, filtroGrupo]);
+  }, [items, buscaAplicada, tipoAplicado, grupoAplicado]);
 
-  useEffect(() => {
-    const t = setTimeout(() => setBuscaDebounced(busca), 200);
-    return () => clearTimeout(t);
-  }, [busca]);
+  const ordenados = useMemo(() => {
+    if (!sort) return filtrados;
+    const cmp = (a: string, b: string) =>
+      a.localeCompare(b, "pt-BR", { sensitivity: "base" });
+    const get = (p: Procedimento): string => {
+      if (sort.col === "nome") return p.nome ?? "";
+      if (sort.col === "grupo") return p.grupo ?? "";
+      return tipoLabel(p.tipo ?? "");
+    };
+    const arr = [...filtrados].sort((a, b) => {
+      const va = get(a), vb = get(b);
+      // vazios sempre ao fim
+      if (!va && vb) return 1;
+      if (va && !vb) return -1;
+      const r = cmp(va, vb);
+      return sort.dir === "asc" ? r : -r;
+    });
+    return arr;
+  }, [filtrados, sort]);
 
-  const visiveis = filtrados;
+  const totalPaginas = Math.max(1, Math.ceil(ordenados.length / PAGE_SIZE));
+  const paginaAtual = Math.min(pagina, totalPaginas);
+  const visiveis = ordenados.slice((paginaAtual - 1) * PAGE_SIZE, paginaAtual * PAGE_SIZE);
+
+  // Reset de página quando filtros aplicados ou ordenação mudam
+  useEffect(() => { setPagina(1); }, [buscaAplicada, tipoAplicado, grupoAplicado, sort]);
+
+  const aplicarFiltros = () => {
+    setBuscaAplicada(busca);
+    setGrupoAplicado(filtroGrupo);
+    setTipoAplicado(filtroTipo);
+  };
+  const limparFiltros = () => {
+    setBusca(""); setFiltroGrupo("todos"); setFiltroTipo("todos");
+    setBuscaAplicada(""); setGrupoAplicado("todos"); setTipoAplicado("todos");
+  };
+  const toggleSort = (col: SortCol) => {
+    setSort(prev => {
+      if (!prev || prev.col !== col) return { col, dir: "asc" };
+      if (prev.dir === "asc") return { col, dir: "desc" };
+      return null;
+    });
+  };
+  const SortIcon = ({ col }: { col: SortCol }) => {
+    if (!sort || sort.col !== col) return <ArrowUpDown className="h-3 w-3 opacity-50" />;
+    return sort.dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
+  };
 
   const openNew = () => { setEditing(null); setForm(EMPTY); setOpen(true); };
   const openEdit = (p: Procedimento) => {
@@ -636,7 +686,13 @@ function ProcedimentosPage() {
           <div className="rounded-lg border border-border bg-card p-4 flex flex-wrap gap-3">
             <div className="relative flex-1 min-w-[240px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nome, especialidade ou código…" className="pl-9" />
+              <Input
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); aplicarFiltros(); } }}
+                placeholder="Buscar por nome, especialidade ou código…"
+                className="pl-9"
+              />
             </div>
             <Select value={filtroGrupo} onValueChange={setFiltroGrupo}>
               <SelectTrigger className="w-56"><SelectValue placeholder="Especialidade" /></SelectTrigger>
@@ -654,15 +710,29 @@ function ProcedimentosPage() {
                 ))}
               </SelectContent>
             </Select>
+            <Button onClick={aplicarFiltros}><Search className="h-4 w-4 mr-2" />Pesquisar</Button>
+            <Button variant="outline" onClick={limparFiltros}>Limpar</Button>
           </div>
 
           <div className="rounded-lg border border-border bg-card overflow-x-auto">
             <Table className="[&_td]:py-1 [&_td]:px-2 [&_th]:py-1.5 [&_th]:px-2 text-sm">
               <TableHeader>
                 <TableRow className="bg-muted/40">
-                  <TableHead>Nome</TableHead>
-                  <TableHead className="w-44">Especialidade</TableHead>
-                  <TableHead className="w-24">Tipo</TableHead>
+                  <TableHead>
+                    <button type="button" onClick={() => toggleSort("nome")} className="inline-flex items-center gap-1 hover:text-foreground">
+                      Nome <SortIcon col="nome" />
+                    </button>
+                  </TableHead>
+                  <TableHead className="w-44">
+                    <button type="button" onClick={() => toggleSort("grupo")} className="inline-flex items-center gap-1 hover:text-foreground">
+                      Especialidade <SortIcon col="grupo" />
+                    </button>
+                  </TableHead>
+                  <TableHead className="w-24">
+                    <button type="button" onClick={() => toggleSort("tipo")} className="inline-flex items-center gap-1 hover:text-foreground">
+                      Tipo <SortIcon col="tipo" />
+                    </button>
+                  </TableHead>
                   <TableHead className="w-24 text-right">Dinheiro</TableHead>
                   <TableHead className="w-20 text-right">Pix</TableHead>
                   <TableHead className="w-20 text-right">Débito</TableHead>
@@ -707,6 +777,30 @@ function ProcedimentosPage() {
               </TableBody>
             </Table>
           </div>
+
+          {/* ========== Paginação ========== */}
+          {ordenados.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 px-1">
+              <p className="text-xs text-muted-foreground">
+                Mostrando {(paginaAtual - 1) * PAGE_SIZE + 1}–{Math.min(paginaAtual * PAGE_SIZE, ordenados.length)} de {ordenados.length} itens
+              </p>
+              <div className="flex items-center gap-1">
+                <Button variant="outline" size="icon" className="h-8 w-8" disabled={paginaAtual === 1} onClick={() => setPagina(1)}>
+                  <ChevronsLeft className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="icon" className="h-8 w-8" disabled={paginaAtual === 1} onClick={() => setPagina(p => Math.max(1, p - 1))}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-xs px-3">Página {paginaAtual} de {totalPaginas}</span>
+                <Button variant="outline" size="icon" className="h-8 w-8" disabled={paginaAtual === totalPaginas} onClick={() => setPagina(p => Math.min(totalPaginas, p + 1))}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="icon" className="h-8 w-8" disabled={paginaAtual === totalPaginas} onClick={() => setPagina(totalPaginas)}>
+                  <ChevronsRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </TabsContent>
 
         {/* ============ CARTÕES ============ */}
