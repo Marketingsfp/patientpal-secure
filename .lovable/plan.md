@@ -1,25 +1,23 @@
 ## Objetivo
-Adicionar no cadastro de médicos um campo **RQE** (checkbox). Quando marcado, exibir um campo adicional **"Especialidade de RQE"** para o usuário preencher.
+Substituir a seleção atual de **Especialidades** (lista de checkboxes) pela mesma dinâmica usada no **RQE**: linhas adicionáveis com um seletor pesquisável da lista de especialidades cadastradas no sistema.
 
-## Mudanças
+## Mudanças no formulário do médico (`src/components/medicos/MedicoFormDialog.tsx`)
 
-### 1. Banco de dados (migration)
-Adicionar duas colunas em `public.medicos`:
-- `tem_rqe boolean NOT NULL DEFAULT false`
-- `rqe_especialidade text` (texto livre, nullable, com limite de 200 caracteres)
+Na aba **Especialidades**, abaixo do bloco de RQE, substituir o atual filtro + lista de checkboxes por:
 
-### 2. Formulário do médico (`src/components/medicos/MedicoFormDialog.tsx`)
-- Adicionar `tem_rqe` e `rqe_especialidade` ao estado `form`.
-- Carregar esses valores ao editar (no `select` e no `setForm`).
-- Renderizar na aba de dados profissionais (junto ao CRM/especialidades):
-  - Checkbox "RQE"
-  - Quando marcado: input de texto "Especialidade de RQE" (obrigatório se marcado)
-- Incluir os campos no `payload` de insert/update.
-- Se `tem_rqe` for desmarcado, limpar `rqe_especialidade` (gravar `null`).
+- Cabeçalho com título "Especialidades" + botão **"Adicionar especialidade"** (ícone `Plus`).
+- Lista de linhas, cada uma com:
+  - `SearchableSelect` com todas as especialidades cadastradas no sistema (já carregadas em `esps`).
+  - Botão de remover (ícone `Trash2`).
+- Mensagem "Nenhuma especialidade selecionada." quando a lista estiver vazia.
+- Impedir duplicatas: ao adicionar/alterar, se a especialidade já estiver em outra linha, mostrar aviso e ignorar.
 
-### 3. Sem outras alterações
-Não alterar listagens, repasses ou outras telas — apenas o formulário e o schema.
+## Comportamento
 
-## Detalhes técnicos
-- Texto livre em `rqe_especialidade` (sem FK para `especialidades`), pois RQE refere-se a uma área de atuação específica do CFM que pode não estar na tabela de especialidades.
-- Validação no front: se `tem_rqe = true`, exigir `rqe_especialidade` não vazio antes de enviar.
+- `form.especialidades` continua sendo `string[]` (IDs), então **nenhuma mudança no payload** nem no banco — a tabela `medico_especialidades` continua sendo regravada do mesmo jeito no `handleSubmit`.
+- Remove-se o estado `espFilter` (não é mais necessário, a busca acontece dentro do `SearchableSelect`).
+- Validação opcional: exigir ao menos 1 especialidade? **Não** — manter o mesmo comportamento atual (opcional), a menos que você queira torná-la obrigatória.
+
+## Fora de escopo
+- Não altera RQE, repasse, convênios, banco de dados, RLS ou outras telas.
+- Não muda a tabela `medico_especialidades`.
