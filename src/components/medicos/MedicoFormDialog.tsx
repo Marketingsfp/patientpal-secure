@@ -108,7 +108,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       setLoading(true);
       const { data: m } = await supabase
         .from("medicos")
-        .select("id, user_id, nome, crm, crm_uf, percentual_repasse_padrao, valor_repasse_padrao, tipo_repasse, email, telefone, nacionalidade, estado_civil, sexo, cep, logradouro, numero, complemento, bairro, cidade, estado, medico_especialidades(especialidade:especialidades(id, nome))")
+        .select("id, user_id, nome, crm, crm_uf, email, telefone, nacionalidade, estado_civil, sexo, cep, logradouro, numero, complemento, bairro, cidade, estado, medico_especialidades(especialidade:especialidades(id, nome))")
         .eq("id", editingMedicoId)
         .maybeSingle();
       if (!m) { setLoading(false); toast.error("Médico não encontrado"); return; }
@@ -143,9 +143,9 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         crm: med.crm,
         crm_uf: med.crm_uf,
         especialidades: (med.medico_especialidades ?? []).map((me: any) => me.especialidade?.id).filter(Boolean) as string[],
-        tipo_repasse: med.tipo_repasse,
-        percentual: String(med.percentual_repasse_padrao ?? ""),
-        valor: med.valor_repasse_padrao != null ? String(med.valor_repasse_padrao) : "",
+        tipo_repasse: (sens.tipo_repasse as "percentual" | "valor") ?? "percentual",
+        percentual: sens.percentual_repasse_padrao != null ? String(sens.percentual_repasse_padrao) : "",
+        valor: sens.valor_repasse_padrao != null ? String(sens.valor_repasse_padrao) : "",
         cpf: sens.cpf ?? "", rg: sens.rg ?? "", data_nascimento: sens.data_nascimento ?? "",
         email: med.email ?? "", telefone: med.telefone ?? "",
         nacionalidade: med.nacionalidade ?? "Brasileira", estado_civil: med.estado_civil ?? "",
