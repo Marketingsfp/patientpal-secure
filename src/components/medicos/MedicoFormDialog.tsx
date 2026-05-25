@@ -446,28 +446,76 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
 
               <TabsContent value="especialidades" className="space-y-2 pt-4">
                 <div className="border rounded-md p-3 space-y-3">
-                  <label className="flex items-center gap-2 cursor-pointer text-sm font-medium">
-                    <Checkbox
-                      checked={form.tem_rqe}
-                      onCheckedChange={(v) =>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm font-medium">RQE (Registro de Qualificação de Especialista)</Label>
+                      <p className="text-xs text-muted-foreground">Adicione um ou mais RQEs com a especialidade e o número de registro.</p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
                         setForm({
                           ...form,
-                          tem_rqe: !!v,
-                          rqe_especialidade: v ? form.rqe_especialidade : "",
+                          rqes: [...form.rqes, { especialidade_id: null, numero: "" }],
                         })
                       }
-                    />
-                    RQE (Registro de Qualificação de Especialista)
-                  </label>
-                  {form.tem_rqe && (
+                    >
+                      <Plus className="h-4 w-4 mr-1" /> Adicionar RQE
+                    </Button>
+                  </div>
+                  {form.rqes.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">Nenhum RQE cadastrado.</p>
+                  ) : (
                     <div className="space-y-2">
-                      <Label>Especialidade de RQE</Label>
-                      <Input
-                        value={form.rqe_especialidade}
-                        maxLength={200}
-                        placeholder="Ex.: Cardiologia"
-                        onChange={(e) => setForm({ ...form, rqe_especialidade: e.target.value })}
-                      />
+                      {form.rqes.map((r, idx) => (
+                        <div key={idx} className="grid grid-cols-[1fr_140px_auto] gap-2 items-end">
+                          <div className="space-y-1">
+                            <Label className="text-xs">Especialidade</Label>
+                            <SearchableSelect
+                              options={esps.map((e) => ({ value: e.id, label: e.nome }))}
+                              value={r.especialidade_id ?? ""}
+                              onChange={(v) =>
+                                setForm({
+                                  ...form,
+                                  rqes: form.rqes.map((x, i) => (i === idx ? { ...x, especialidade_id: v } : x)),
+                                })
+                              }
+                              placeholder="Selecione"
+                              searchPlaceholder="Buscar especialidade..."
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Nº RQE</Label>
+                            <Input
+                              value={r.numero}
+                              maxLength={50}
+                              placeholder="Ex.: 12345"
+                              onChange={(e) =>
+                                setForm({
+                                  ...form,
+                                  rqes: form.rqes.map((x, i) => (i === idx ? { ...x, numero: e.target.value } : x)),
+                                })
+                              }
+                            />
+                          </div>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            onClick={() =>
+                              setForm({
+                                ...form,
+                                rqes: form.rqes.filter((_, i) => i !== idx),
+                              })
+                            }
+                            aria-label="Remover RQE"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
