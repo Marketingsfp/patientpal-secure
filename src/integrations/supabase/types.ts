@@ -601,34 +601,37 @@ export type Database = {
           },
         ]
       }
-      cb_convenio_valores: {
+      cb_convenio_faixas: {
         Row: {
           convenio_id: string
           created_at: string
-          dependentes: number
           id: string
           updated_at: string
           valor_mensal: number
+          vidas_ate: number | null
+          vidas_de: number
         }
         Insert: {
           convenio_id: string
           created_at?: string
-          dependentes: number
           id?: string
           updated_at?: string
           valor_mensal?: number
+          vidas_ate?: number | null
+          vidas_de: number
         }
         Update: {
           convenio_id?: string
           created_at?: string
-          dependentes?: number
           id?: string
           updated_at?: string
           valor_mensal?: number
+          vidas_ate?: number | null
+          vidas_de?: number
         }
         Relationships: [
           {
-            foreignKeyName: "cb_convenio_valores_convenio_id_fkey"
+            foreignKeyName: "cb_convenio_faixas_convenio_id_fkey"
             columns: ["convenio_id"]
             isOneToOne: false
             referencedRelation: "cb_convenios"
