@@ -17,7 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import DOMPurify from "dompurify";
 import { ChevronsUpDown } from "lucide-react";
@@ -25,6 +25,7 @@ import { printContrato } from "@/lib/print-contrato";
 import { fmtDataExtenso } from "@/lib/print-contrato";
 import { printCartoes } from "@/lib/print-cartao";
 import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
+import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 
 export const Route = createFileRoute("/_authenticated/app/contratos")({
   component: ContratosPage,
@@ -63,7 +64,17 @@ type Beneficio = {
 type Paciente = { id: string; nome: string; cpf: string | null; telefone: string | null; email: string | null; face_descriptor?: number[] | null };
 type Contrato = { id: string; numero: number; paciente_nome: string; convenio_id: string | null; plano_id: string | null; valor_mensal: number; status: string; data_inicio: string; data_fim: string | null; assinado_em: string | null; token_publico: string; forma_pagamento: string | null; dia_vencimento?: number | null; taxa_adesao?: number | null; num_parcelas?: number | null; paciente_id?: string | null; clinica_id?: string | null; observacoes?: string | null };
 type Mens = { id: string; numero_parcela: number; vencimento: string; valor: number; status: string; pago_em: string | null; forma_pagamento: string | null };
-type Dep = { id: string; paciente_nome: string; parentesco: string | null; tipo: string; cpf?: string | null };
+type Dep = {
+  id: string;
+  paciente_id: string;
+  paciente_nome: string;
+  parentesco: string | null;
+  tipo: string;
+  cpf?: string | null;
+  incluido_em: string | null;
+  excluido_em: string | null;
+  ativo: boolean;
+};
 
 export function ContratosPage() {
   const { clinicaAtual } = useClinica();
