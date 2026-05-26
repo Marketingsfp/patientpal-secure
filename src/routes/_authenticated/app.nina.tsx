@@ -791,7 +791,7 @@ type InboxProps = {
 
 function InboxWhatsapp({ conversas, todasConversas, sel, setSel, busca, setBusca, draft, setDraft, enviando, enviarMensagem, loadingConv }: InboxProps) {
   const [filtro, setFiltro] = useState<"todas" | "naolidas" | "nina" | "humano">("todas");
-  const [painelAberto, setPainelAberto] = useState(true);
+  const [painelAberto, setPainelAberto] = useState(false);
   const [notas, setNotas] = useState<Record<string, string>>({});
   const [isWide, setIsWide] = useState<boolean>(() =>
     typeof window !== "undefined" ? window.matchMedia("(min-width: 1280px)").matches : true,
