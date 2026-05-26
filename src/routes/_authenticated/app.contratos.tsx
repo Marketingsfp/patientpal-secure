@@ -665,6 +665,7 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
         <Tabs defaultValue="resumo">
           <TabsList>
             <TabsTrigger value="resumo">Resumo</TabsTrigger>
+            <TabsTrigger value="dados">Dados</TabsTrigger>
             <TabsTrigger value="contrato">Contrato</TabsTrigger>
           </TabsList>
           <TabsContent value="resumo" className="space-y-4 mt-4">
