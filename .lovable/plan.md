@@ -1,25 +1,22 @@
-## Objetivo
-Na tela "Nova venda" do Cartão Benefícios, os campos **Paciente titular** e **Dependentes** devem listar diretamente os Clientes (tabela `pacientes`) já cadastrados, em vez de exigir digitação no campo de busca.
+## Mudanças em `src/routes/_authenticated/app.contratos.tsx` (apenas frontend)
 
-## Mudanças
+### 1. Valor mensal e Taxa de adesão vêm do convênio e ficam read-only
 
-### `src/routes/_authenticated/app.contratos.tsx` (frontend apenas)
+Hoje os campos usam `CurrencyInput` editável (linhas 323–324). Vou trocar por uma exibição read-only formatada (caixa com fundo `bg-muted/30`), mostrando o valor calculado em BRL. Os states `valor`/`taxa` continuam existindo (são usados no `insert` do contrato e na geração das parcelas), mas o usuário não pode mais editá-los.
 
-1. **Carregar todos os clientes ativos da clínica** ao abrir o formulário "Novo contrato" (`useEffect` com `supabase.from("pacientes").select("id, nome, cpf, face_descriptor").eq("clinica_id", clinicaId).eq("ativo", true).order("nome")`).
+- **Taxa de adesão**: sempre `convenio.taxa_adesao` (cobrada uma única vez — já é assim hoje no insert: o campo `taxa_adesao` vai só no contrato, não nas parcelas mensais). Apenas remover a editabilidade e deixar claro na UI ("cobrança única").
+- **Valor mensal**: sempre derivado do convênio + nº de vidas (titular + dependentes), via faixas (`cb_convenio_faixas`). A lógica de recálculo já existe (linhas 199–205); só preciso garantir que ele recalcule também quando faixas estão vazias (fallback para `convenio.valor_mensal`) — já faz. Adicionar texto auxiliar: "Recalculado automaticamente conforme dependentes".
 
-2. **Paciente titular** — substituir o `Input` "Buscar paciente…" por um **Combobox** (padrão do projeto, baseado em `Popover` + `Command` do shadcn):
-   - Mostra a lista completa de clientes ao abrir.
-   - Permite filtrar digitando o nome ou CPF.
-   - Ao selecionar, popula `titular` como já acontece hoje.
-   - Mantém o cartão de "titular escolhido" com botões Trocar / Foto.
+### 2. Bug: câmera não abre ao clicar em "Foto" do 1º dependente
 
-3. **Dependentes** — mesmo padrão de Combobox:
-   - Lista todos os clientes (exceto o titular e os já adicionados como dependentes).
-   - Respeita `convenio.max_dependentes`.
-   - Ao selecionar, chama `addDep(p)` (já existente).
+Causa: `setFaceOpen(i)` recebe `0` para o primeiro dependente, e o render usa `!!faceOpen` / `faceOpen ?` (linhas 399, 401) — `0` é falsy, então o `FaceCaptureDialog` nem é montado.
 
-4. Remover os states/handlers de busca livre que ficam obsoletos (`pacBusca`, `pacResults`, `depBusca`, `depResults`, `buscarPac`) — substituídos pela lista carregada uma vez + filtro local do `Command`.
+Correção: trocar todas as checagens de truthiness por `faceOpen !== null`:
+- linha 399: `{faceOpen !== null ? (`
+- linha 401: `open={faceOpen !== null}`
+
+O resto da lógica (`faceOpen === "titular"` vs `typeof faceOpen === "number"`) já está correta.
 
 ## Fora do escopo
-- Nenhuma alteração no backend, schema ou RLS — a tabela `pacientes` já é a fonte de "Clientes" e o usuário autenticado já tem acesso via membership da clínica.
-- Sem mudanças em outras abas (Convênio, Relatórios, Contratos existentes).
+- Backend, schema, RLS — sem mudanças.
+- Outras telas e o fluxo de assinatura/contrato em si.
