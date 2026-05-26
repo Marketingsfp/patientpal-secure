@@ -618,6 +618,21 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
               >
                 <Crop className="h-4 w-4" />
               </ToolbarButton>
+              <ToolbarButton
+                title="Posição livre (arrastar imagem)"
+                active={imgActive && Boolean(editor.getAttributes("image").free)}
+                disabled={!imgActive}
+                onClick={() => {
+                  const isFree = Boolean(editor.getAttributes("image").free);
+                  editor.chain().focus().updateAttributes("image", {
+                    free: !isFree,
+                    posX: isFree ? 0 : (editor.getAttributes("image").posX ?? 40),
+                    posY: isFree ? 0 : (editor.getAttributes("image").posY ?? 40),
+                  }).run();
+                }}
+              >
+                <span className="text-[10px] font-bold">✥</span>
+              </ToolbarButton>
               <Select
                 value=""
                 disabled={!imgActive}
