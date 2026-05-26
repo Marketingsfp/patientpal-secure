@@ -530,6 +530,17 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
   const [faixas, setFaixas] = useState<Faixa[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Inclusão/exclusão de dependentes pós-venda
+  const [incOpen, setIncOpen] = useState(false);
+  const [incPaciente, setIncPaciente] = useState<PatientOption | null>(null);
+  const [incParentesco, setIncParentesco] = useState<string>("");
+  const [incTipo, setIncTipo] = useState<string>("dependente");
+  const [incSaving, setIncSaving] = useState(false);
+  const [excAlvo, setExcAlvo] = useState<Dep | null>(null);
+  const [termoOpen, setTermoOpen] = useState(false);
+  const [termoMovimento, setTermoMovimento] = useState<"Inclusão" | "Exclusão">("Inclusão");
+  const [termoDep, setTermoDep] = useState<Dep | null>(null);
+
   // Diálogo de forma de pagamento (espelha o da agenda)
   const [pagMens, setPagMens] = useState<Mens | null>(null);
   const [formaPagOpen, setFormaPagOpen] = useState(false);
@@ -547,9 +558,16 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     setLoading(true);
     const [m, d, cv, cl, pa, fx] = await Promise.all([
       supabase.from("contrato_mensalidades").select("*").eq("contrato_id", contrato.id).order("numero_parcela"),
-      supabase.from("contrato_dependentes").select("id, paciente_nome, parentesco, tipo, pacientes:paciente_id(cpf)").eq("contrato_id", contrato.id).eq("ativo", true),
+      supabase
+        .from("contrato_dependentes")
+        .select("id, paciente_id, paciente_nome, parentesco, tipo, incluido_em, excluido_em, ativo, pacientes:paciente_id(cpf)")
+        .eq("contrato_id", contrato.id),
       contrato.convenio_id
-        ? supabase.from("cb_convenios").select("nome, modelo_contrato, vigencia_meses, fidelidade_meses, max_dependentes").eq("id", contrato.convenio_id).maybeSingle()
+        ? supabase
+            .from("cb_convenios")
+            .select("nome, modelo_contrato, termo_inclusao_html, vigencia_meses, fidelidade_meses, max_dependentes")
+            .eq("id", contrato.convenio_id)
+            .maybeSingle()
         : Promise.resolve({ data: null }),
       supabase.from("clinicas").select("nome, cnpj, endereco, cidade, estado, telefone").eq("id", (contrato as any).clinica_id ?? "").maybeSingle(),
       supabase.from("pacientes").select("cpf, data_nascimento, telefone, email, logradouro, numero, bairro, cidade, estado, cep").eq("id", (contrato as any).paciente_id ?? "").maybeSingle(),
@@ -558,10 +576,24 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
         : Promise.resolve({ data: [] }),
     ]);
     setMens((m.data ?? []) as Mens[]);
-    setDeps(((d.data ?? []) as any[]).map((r) => ({
-      id: r.id, paciente_nome: r.paciente_nome, parentesco: r.parentesco, tipo: r.tipo,
+    const depsRows = ((d.data ?? []) as any[]).map((r) => ({
+      id: r.id,
+      paciente_id: r.paciente_id,
+      paciente_nome: r.paciente_nome,
+      parentesco: r.parentesco,
+      tipo: r.tipo,
       cpf: r.pacientes?.cpf ?? null,
-    })));
+      incluido_em: r.incluido_em ?? null,
+      excluido_em: r.excluido_em ?? null,
+      ativo: !!r.ativo,
+    })) as Dep[];
+    // Ativos primeiro (por inclusão asc), depois excluídos (por exclusão desc)
+    depsRows.sort((a, b) => {
+      if (a.ativo !== b.ativo) return a.ativo ? -1 : 1;
+      if (a.ativo) return (a.incluido_em ?? "").localeCompare(b.incluido_em ?? "");
+      return (b.excluido_em ?? "").localeCompare(a.excluido_em ?? "");
+    });
+    setDeps(depsRows);
     setConvenio(cv.data ?? null);
     setClinica(cl.data ?? null);
     setPacienteFull(pa.data ?? null);
