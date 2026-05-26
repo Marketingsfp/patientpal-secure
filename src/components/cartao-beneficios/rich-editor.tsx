@@ -201,6 +201,7 @@ function ToolbarButton({
     <button
       type="button"
       title={title}
+      onMouseDown={(e) => e.preventDefault()}
       onClick={onClick}
       disabled={disabled}
       className={`h-8 w-8 inline-flex items-center justify-center rounded text-sm transition-colors
@@ -223,6 +224,7 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [cropOpen, setCropOpen] = useState(false);
   const [cropSrc, setCropSrc] = useState<string>("");
+  const [cropTargetPos, setCropTargetPos] = useState<number | null>(null);
   // Margens da página em mm (A4: 210 × 297). Persistidas em localStorage por clínica.
   const storageKey = `rt-margins:${clinicaId || "default"}`;
   const readStored = () => {
@@ -281,6 +283,27 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
   }, [value, editor]);
 
   if (!editor) return null;
+
+  const getSelectedImageTarget = () => {
+    const { selection } = editor.state;
+    const selectedNode = "node" in selection ? selection.node : null;
+    if (selectedNode?.type.name !== "image") return null;
+    const src = selectedNode.attrs.src as string | undefined;
+    return src ? { src, pos: selection.from } : null;
+  };
+
+  const replaceCropTarget = (dataUrl: string) => {
+    if (cropTargetPos === null) {
+      editor.chain().focus().updateAttributes("image", { src: dataUrl }).run();
+      return;
+    }
+    editor.chain().focus().command(({ state, tr, dispatch }) => {
+      const node = state.doc.nodeAt(cropTargetPos);
+      if (!node || node.type.name !== "image") return false;
+      dispatch?.(tr.setNodeMarkup(cropTargetPos, undefined, { ...node.attrs, src: dataUrl }));
+      return true;
+    }).run();
+  };
 
   const handleUpload = async (file: File) => {
     if (!file.type.startsWith("image/")) {
