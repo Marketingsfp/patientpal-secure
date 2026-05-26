@@ -71,7 +71,7 @@ function BeneficiosPage() {
       supabase.from("cb_convenios").select("id, nome, ativo").eq("clinica_id", cid).order("nome"),
       supabase.from("cb_beneficios").select("id, clinica_id, convenio_id, nome, descricao, ativo, escopo, procedimento_id, especialidade_id, tipo_desconto, valor_desconto").eq("clinica_id", cid).order("nome"),
       supabase.from("procedimentos").select("id, nome").eq("clinica_id", cid).order("nome"),
-      supabase.from("especialidades").select("id, nome").eq("clinica_id", cid).order("nome"),
+      supabase.from("especialidades").select("id, nome").eq("ativo", true).order("nome"),
     ]);
     if (cs.error) toast.error(cs.error.message);
     if (bs.error) toast.error(bs.error.message);
