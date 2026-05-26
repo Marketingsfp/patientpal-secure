@@ -46,6 +46,20 @@ const ColoredTableCell = TableCell.extend({
           };
         },
       },
+      verticalAlign: {
+        default: null,
+        parseHTML: (el) =>
+          (el as HTMLElement).getAttribute("data-valign") ||
+          (el as HTMLElement).style.verticalAlign ||
+          null,
+        renderHTML: (attrs) => {
+          if (!attrs.verticalAlign) return {};
+          return {
+            "data-valign": attrs.verticalAlign,
+            style: `vertical-align: ${attrs.verticalAlign}`,
+          };
+        },
+      },
     };
   },
 });
@@ -64,6 +78,20 @@ const ColoredTableHeader = TableHeader.extend({
           return {
             "data-bg": attrs.backgroundColor,
             style: `background-color: ${attrs.backgroundColor}`,
+          };
+        },
+      },
+      verticalAlign: {
+        default: null,
+        parseHTML: (el) =>
+          (el as HTMLElement).getAttribute("data-valign") ||
+          (el as HTMLElement).style.verticalAlign ||
+          null,
+        renderHTML: (attrs) => {
+          if (!attrs.verticalAlign) return {};
+          return {
+            "data-valign": attrs.verticalAlign,
+            style: `vertical-align: ${attrs.verticalAlign}`,
           };
         },
       },
@@ -526,6 +554,53 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
         </ToolbarButton>
         <ToolbarButton title="Excluir tabela" onClick={() => editor.chain().focus().deleteTable().run()} disabled={!editor.can().deleteTable()}>
           <Trash2 className="h-4 w-4" />
+        </ToolbarButton>
+        <ToolbarButton
+          title="Mesclar células selecionadas"
+          onClick={() => editor.chain().focus().mergeCells().run()}
+          disabled={!editor.can().mergeCells()}
+        >
+          <span className="text-[10px] font-bold">⊞→▭</span>
+        </ToolbarButton>
+        <ToolbarButton
+          title="Desmesclar célula"
+          onClick={() => editor.chain().focus().splitCell().run()}
+          disabled={!editor.can().splitCell()}
+        >
+          <span className="text-[10px] font-bold">▭→⊞</span>
+        </ToolbarButton>
+        <ToolbarButton
+          title="Centralizar conteúdo da célula (horizontal + vertical)"
+          onClick={() => {
+            editor.chain().focus()
+              .setCellAttribute("verticalAlign", "middle")
+              .setTextAlign("center")
+              .run();
+          }}
+          disabled={!editor.can().setCellAttribute("verticalAlign", "middle")}
+        >
+          <span className="text-[10px] font-bold">⊕</span>
+        </ToolbarButton>
+        <ToolbarButton
+          title="Alinhar célula ao topo"
+          onClick={() => editor.chain().focus().setCellAttribute("verticalAlign", "top").run()}
+          disabled={!editor.can().setCellAttribute("verticalAlign", "top")}
+        >
+          <span className="text-[10px] font-bold">⤒</span>
+        </ToolbarButton>
+        <ToolbarButton
+          title="Alinhar célula ao meio (vertical)"
+          onClick={() => editor.chain().focus().setCellAttribute("verticalAlign", "middle").run()}
+          disabled={!editor.can().setCellAttribute("verticalAlign", "middle")}
+        >
+          <span className="text-[10px] font-bold">↕</span>
+        </ToolbarButton>
+        <ToolbarButton
+          title="Alinhar célula à base"
+          onClick={() => editor.chain().focus().setCellAttribute("verticalAlign", "bottom").run()}
+          disabled={!editor.can().setCellAttribute("verticalAlign", "bottom")}
+        >
+          <span className="text-[10px] font-bold">⤓</span>
         </ToolbarButton>
         <label
           className="h-8 w-8 inline-flex items-center justify-center rounded hover:bg-muted cursor-pointer relative"
