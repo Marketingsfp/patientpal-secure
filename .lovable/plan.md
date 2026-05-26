@@ -1,48 +1,37 @@
 ## Objetivo
 
-Expandir o conhecimento da Nina para que ela possa **ler qualquer dado do sistema** (médicos, horários, exames, preparos, procedimentos, convênios, agenda do dia, estoque, modelos, etc.), mantendo o acesso **somente leitura** e bloqueando respostas sobre **financeiro/caixa** e **dados de outros pacientes**.
+No detalhe do contrato (`/app/cartao-beneficios/contratos` → ao clicar em uma venda), adicionar uma terceira aba chamada **"Dados"** ao lado de "Resumo" e "Contrato", exibindo as informações cadastradas no momento da venda (mesmos campos da foto 2).
 
-## Escopo das alterações
+## Mudança
 
-Apenas dois arquivos no backend da Nina — sem mudanças de UI, schema ou RLS:
+Arquivo único: `src/routes/_authenticated/app.contratos.tsx`, dentro do componente `DetalheContrato`.
 
-1. `src/lib/nina.functions.ts` — usado pela aba "Nina treinada" (chat interno do sistema).
-2. `src/lib/whatsapp.server.ts` — usado pelas respostas automáticas via WhatsApp.
+### 1. Carregar campos extras no `load()`
 
-### 1. Ampliar o contexto enviado ao modelo
+- Acrescentar à query de `cb_convenios`: `faixas_pessoas` (para mostrar o rótulo da faixa selecionada).
+- Acrescentar à query de `cb_planos` (novo `select` se necessário) ou ler do próprio contrato os campos: `dia_vencimento`, `taxa_adesao`, `num_pessoas`, `plano_id`, `paciente_id`.
+- Estender o tipo `Contrato` local com `dia_vencimento`, `taxa_adesao`, `num_pessoas`, `paciente_id` (já lidos via cast hoje — vamos tipar).
 
-Hoje a Nina só recebe médicos + procedimentos. Vamos passar a carregar (via `supabaseAdmin` no webhook e via cliente autenticado no chat interno, sempre com `SELECT`):
+### 2. Nova aba `<TabsTrigger value="dados">Dados</TabsTrigger>`
 
-- Médicos (nome, CRM, especialidade, telefone público).
-- Disponibilidades / horários de atendimento.
-- Procedimentos / exames com preço PIX, preço cartão, duração e **preparo**.
-- Convênios e planos do Cartão Benefício (nome, faixas de preço, descrição de benefícios).
-- Especialidades cadastradas.
-- Resumo do dia da agenda **agregado e anonimizado** (ex.: "Dr. X tem 3 horários livres entre 14h e 18h hoje"), sem nomes/telefones de pacientes.
-- Informações públicas da clínica (nome, endereço, telefones, horário de funcionamento).
+Conteúdo em grid 2 colunas (responsivo: 1 coluna em mobile) com campos read-only no mesmo estilo da foto 2:
 
-Tudo isso permanece somente leitura: a Nina **não recebe nem ferramentas de escrita** nem chamadas de função que alterem dados.
+- **Convênio** — `convenio.nome`
+- **Nº de pessoas no contrato** — faixa selecionada (`num_pessoas` + valor) calculada a partir de `convenio.faixas_pessoas`
+- **Paciente titular** — `contrato.paciente_nome` (+ CPF do `pacienteFull`)
+- **Data início** — `fmtD(contrato.data_inicio)`
+- **Dia de vencimento** — `contrato.dia_vencimento`
+- **Valor mensal** — `BRL(contrato.valor_mensal)`
+- **Taxa de adesão** — `BRL(contrato.taxa_adesao)`
+- **Forma de pagamento** — label de `contrato.forma_pagamento` (dinheiro/pix/débito/crédito/boleto)
+- **Dependentes (n/máx)** — lista dos `deps` já carregados, com nome, parentesco e CPF; se nenhum, mostrar "Nenhum dependente".
 
-### 2. Bloqueios de privacidade no system prompt
+### 3. Sem mudanças em backend
 
-Reforçar regras explícitas no `systemPrompt` da Nina (chat interno e WhatsApp):
+Todos os dados já existem no banco (tabela `contratos`, `cb_convenios`, `contrato_dependentes`, `pacientes`). Apenas leitura — nenhuma migração, nenhuma alteração de RLS, nenhuma alteração nas abas existentes "Resumo" e "Contrato".
 
-- **Proibido** revelar qualquer dado financeiro, de caixa, faturamento, repasses, contas a pagar/receber, boletos, mensalidades, comissões.
-- **Proibido** falar sobre outros pacientes: nomes, telefones, CPF, prontuários, agendamentos individuais, histórico clínico, fotos, exames.
-- Quando perguntada sobre "quem tem horário marcado", "quanto entrou no caixa", "qual o saldo", "o paciente X esteve aqui?", responder educadamente que essa informação é sigilosa e orientar a procurar o gestor responsável.
-- Permitido: informações **públicas e agregadas** — médicos disponíveis, preços de tabela, preparos, horários da clínica, convênios aceitos, slots livres no dia (sem identificar pacientes).
-- No WhatsApp, regra adicional: tratar o número que escreve como **paciente externo desconhecido** — nunca confirmar se uma pessoa é paciente da clínica nem revelar dados de cadastro.
+## Fora do escopo
 
-### 3. Garantias técnicas de "somente leitura"
-
-- Manter o uso do AI Gateway sem nenhuma `tool`/function-calling — modelo só gera texto.
-- Nenhuma rota nova; nenhum `insert`/`update`/`delete` é adicionado.
-- Continuar usando `requireSupabaseAuth` no `chatNina` (já valida membership) e `supabaseAdmin` apenas para leitura no webhook do WhatsApp.
-
-## Fora de escopo
-
-- Mudanças na UI da página `/app/nina`.
-- Novas migrations, RLS, tabelas ou permissões.
-- Ferramentas de ação (agendar, cancelar, cobrar) — Nina segue puramente informativa.
-
-Posso seguir com a implementação?
+- Edição dos dados pela nova aba (apenas leitura).
+- Mudanças no fluxo de Nova venda.
+- Mudanças nos diálogos de pagamento de parcela.
