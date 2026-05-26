@@ -1892,6 +1892,7 @@ function MedicoFiltroInput({
     <div className="relative">
       <div className="flex gap-1">
         <Input
+          data-agenda-filtro-prof
           disabled={disabled}
           placeholder="TODOS — digite para buscar"
           value={texto}
