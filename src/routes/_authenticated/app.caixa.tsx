@@ -134,6 +134,43 @@ function Page() {
   const [obsFechamento, setObsFechamento] = useState("");
   const [saving, setSaving] = useState(false);
 
+  // Atalho: 1..5 na modal de cobrança seleciona a forma da última linha
+  useEffect(() => {
+    if (!openCobranca) return;
+    const formas = ["dinheiro", "pix", "debito", "credito"] as const;
+    const onKey = (e: KeyboardEvent) => {
+      const tgt = e.target as HTMLElement | null;
+      if (tgt && (tgt.tagName === "INPUT" || tgt.tagName === "TEXTAREA" || tgt.isContentEditable)) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key >= "1" && e.key <= "4") {
+        e.preventDefault();
+        const forma = formas[Number(e.key) - 1];
+        setCobrancaLinhas(prev => {
+          const next = [...prev];
+          const i = next.length - 1;
+          next[i] = { ...next[i], forma, bandeira: "", parcelas: "1" };
+          return next;
+        });
+      } else if (e.key === "5") {
+        e.preventDefault();
+        setCobrancaLinhas(prev => {
+          if (!openCobranca) return [...prev, linhaVazia()];
+          const next = [...prev];
+          if (prev.length === 1) {
+            const atual = Number(prev[0].valor) || 0;
+            if (Math.abs(atual - openCobranca.valor) < 0.01) {
+              next[0] = { ...prev[0], valor: String(openCobranca.valor_cartao || atual) };
+            }
+          }
+          next.push(linhaVazia());
+          return next;
+        });
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [openCobranca]);
+
   const load = useCallback(async () => {
     if (!clinicaAtual || !user) return;
     setLoading(true);
