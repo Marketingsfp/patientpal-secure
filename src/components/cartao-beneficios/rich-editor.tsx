@@ -80,12 +80,11 @@ function ImageNodeView(props: NodeViewProps) {
   const { node, updateAttributes, selected, editor } = props;
   const width = (node.attrs.width as string) || "";
   const align = (node.attrs.align as string) || "none";
-  const wrapRef = useRef<HTMLSpanElement>(null);
 
   const startResize = (e: React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    const wrap = wrapRef.current;
+    const wrap = (e.currentTarget as HTMLElement).parentElement;
     const img = wrap?.querySelector("img") as HTMLImageElement | null;
     if (!img) return;
     const startX = e.clientX;
@@ -111,7 +110,6 @@ function ImageNodeView(props: NodeViewProps) {
   return (
     <NodeViewWrapper
       as="span"
-      ref={wrapRef as any}
       className={`rt-img-wrap ${alignClass} ${selected ? "is-selected" : ""}`}
       data-drag-handle
     >
