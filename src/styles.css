@@ -240,3 +240,58 @@
 .rt-editor .selectedCell {
   background: hsl(var(--primary) / 0.12);
 }
+
+/* Imagens dentro do editor: alinhamento + estado selecionado */
+.rt-editor img { max-width: 100%; height: auto; }
+.rt-editor img.rt-img-left {
+  float: left;
+  margin: 0.25rem 1rem 0.5rem 0;
+}
+.rt-editor img.rt-img-right {
+  float: right;
+  margin: 0.25rem 0 0.5rem 1rem;
+}
+.rt-editor img.rt-img-center {
+  display: block;
+  margin: 0.5rem auto;
+}
+/* Wrapper do NodeView de imagem */
+.rt-img-wrap {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+  max-width: 100%;
+}
+.rt-img-wrap.rt-img-block-center {
+  display: block;
+  margin: 0.5rem auto;
+  text-align: center;
+}
+.rt-img-wrap.rt-img-block-left {
+  float: left;
+  margin: 0.25rem 1rem 0.5rem 0;
+}
+.rt-img-wrap.rt-img-block-right {
+  float: right;
+  margin: 0.25rem 0 0.5rem 1rem;
+}
+.rt-img-wrap img { display: block; max-width: 100%; height: auto; }
+.rt-img-wrap.is-selected img {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--primary) 25%, transparent);
+}
+.rt-img-handle {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  width: 12px;
+  height: 12px;
+  background: var(--primary);
+  border: 2px solid #fff;
+  border-radius: 2px;
+  cursor: nwse-resize;
+  z-index: 5;
+  display: none;
+}
+.rt-img-wrap.is-selected .rt-img-handle { display: block; }
