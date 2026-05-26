@@ -78,7 +78,7 @@ const SIZES = ["10px", "12px", "14px", "16px", "18px", "20px", "24px", "28px", "
 
 // NodeView React para imagem: contorno quando selecionada + handle para redimensionar.
 function ImageNodeView(props: NodeViewProps) {
-  const { node, updateAttributes, selected, editor } = props;
+  const { node, updateAttributes, selected, editor, getPos } = props;
   const width = (node.attrs.width as string) || "";
   const align = (node.attrs.align as string) || "none";
 
@@ -128,6 +128,18 @@ function ImageNodeView(props: NodeViewProps) {
         title={node.attrs.title || ""}
         style={width ? { width } : undefined}
         draggable={false}
+        onMouseDown={(e) => {
+          // Garante que clicar na imagem cria uma NodeSelection,
+          // para que editor.isActive("image") fique true e a toolbar
+          // de imagem (alinhar/cortar/largura) habilite.
+          if (typeof getPos === "function") {
+            const pos = getPos();
+            if (typeof pos === "number") {
+              e.preventDefault();
+              editor.chain().focus().setNodeSelection(pos).run();
+            }
+          }
+        }}
       />
       {selected && editor.isEditable && (
         <>
