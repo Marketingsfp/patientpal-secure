@@ -1148,7 +1148,7 @@ function AgendaPage() {
                     >
                       Salvar e Pagar
                     </Button>
-                    <Button type="submit" disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
+                    <Button type="submit" data-primary disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
                   </>
                 )}
               </DialogFooter>
