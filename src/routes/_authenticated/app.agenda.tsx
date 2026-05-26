@@ -771,6 +771,29 @@ function AgendaPage() {
     setPagamentoOpen(true);
   };
 
+  // Atalhos de teclado no diálogo "Forma de pagamento":
+  // 1=Dinheiro, 2=PIX, 3=Débito, 4=Crédito, 5=Mais de uma forma
+  // (segue a ordem exibida em formaPagOpcoes; tecla 5 = misto).
+  useEffect(() => {
+    if (!formaPagOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      const tgt = e.target as HTMLElement | null;
+      if (tgt && (tgt.tagName === "INPUT" || tgt.tagName === "TEXTAREA" || tgt.isContentEditable)) return;
+      if (e.key >= "1" && e.key <= "9") {
+        const idx = Number(e.key) - 1;
+        if (idx < formaPagOpcoes.length) {
+          e.preventDefault();
+          escolherForma(formaPagOpcoes[idx]);
+        } else if (idx === formaPagOpcoes.length) {
+          e.preventDefault();
+          escolherMisto();
+        }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [formaPagOpen, formaPagOpcoes, formaPagCtx]);
+
   const imprimirGR = async (a: Agendamento) => {
     if (!clinicaAtual) return;
     try {
