@@ -19,7 +19,8 @@ export function ProcedimentoCell({ valor, opcoes, disabled, onChange }: Props) {
   const [q, setQ] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Deduplicar pelo nome normalizado e ordenar alfabeticamente
+  // Deduplicar pelo nome normalizado, preservando a ordem recebida
+  // (o caller já entrega ordenado — top 10 mais usados primeiro, depois alfabético)
   const lista = useMemo(() => {
     const seen = new Set<string>();
     const out: { id: string; nome: string }[] = [];
@@ -29,7 +30,6 @@ export function ProcedimentoCell({ valor, opcoes, disabled, onChange }: Props) {
       seen.add(k);
       out.push(p);
     }
-    out.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
     return out;
   }, [opcoes]);
 
