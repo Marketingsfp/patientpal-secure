@@ -578,6 +578,17 @@ export function AppShell() {
           )}
           <div className="flex-1" />
           <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 w-9 p-0 rounded-full"
+              title="Atalhos de teclado (?)"
+              onClick={() => {
+                window.dispatchEvent(new KeyboardEvent("keydown", { key: "?" }));
+              }}
+            >
+              <span className="text-base font-semibold">?</span>
+            </Button>
             <Button variant="ghost" size="sm" className="h-9 w-9 p-0 rounded-full" title="Notificações">
               <Bell className="h-4 w-4" />
             </Button>
