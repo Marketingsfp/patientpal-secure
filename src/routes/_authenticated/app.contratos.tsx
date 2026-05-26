@@ -306,18 +306,29 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
                 </div>
               </div>
             ) : (
-              <>
-                <Input placeholder="Buscar paciente…" value={pacBusca} onChange={(e) => { setPacBusca(e.target.value); buscarPac(e.target.value, setPacResults); }}/>
-                {pacResults.length > 0 ? (
-                  <div className="rounded-md border mt-1 max-h-40 overflow-auto">
-                    {pacResults.map((p) => (
-                      <button type="button" key={p.id} className="block w-full text-left px-3 py-2 hover:bg-muted text-sm" onClick={() => { setTitular(p); setPacBusca(""); setPacResults([]); }}>
-                        {p.nome} {p.cpf ? `— ${p.cpf}` : ""}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-              </>
+              <Popover open={titularOpen} onOpenChange={setTitularOpen}>
+                <PopoverTrigger asChild>
+                  <Button type="button" variant="outline" role="combobox" className="w-full justify-between font-normal">
+                    <span className="text-muted-foreground">Selecionar cliente…</span>
+                    <ChevronsUpDown className="h-4 w-4 opacity-50"/>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
+                  <Command>
+                    <CommandInput placeholder="Buscar cliente por nome ou CPF…"/>
+                    <CommandList>
+                      <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
+                      <CommandGroup>
+                        {clientes.map((p) => (
+                          <CommandItem key={p.id} value={`${p.nome} ${p.cpf ?? ""}`} onSelect={() => { setTitular(p); setTitularOpen(false); }}>
+                            {p.nome} {p.cpf ? `— ${p.cpf}` : ""}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             )}
           </div>
           <div><Label>Data início</Label><Input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)}/></div>
@@ -338,16 +349,31 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
           </div>
           <div className="col-span-2 border-t pt-3">
             <Label>Dependentes {convenio && convenio.max_dependentes > 0 ? `(máx ${convenio.max_dependentes})` : ""}</Label>
-            <Input className="mt-1" placeholder="Buscar paciente para incluir…" value={depBusca} onChange={(e) => { setDepBusca(e.target.value); buscarPac(e.target.value, setDepResults); }}/>
-            {depResults.length > 0 ? (
-              <div className="rounded-md border mt-1 max-h-32 overflow-auto">
-                {depResults.map((p) => (
-                  <button type="button" key={p.id} className="block w-full text-left px-3 py-2 hover:bg-muted text-sm" onClick={() => addDep(p)}>
-                    + {p.nome}
-                  </button>
-                ))}
-              </div>
-            ) : null}
+            <Popover open={depOpen} onOpenChange={setDepOpen}>
+              <PopoverTrigger asChild>
+                <Button type="button" variant="outline" role="combobox" className="w-full justify-between font-normal mt-1">
+                  <span className="text-muted-foreground">Adicionar cliente como dependente…</span>
+                  <ChevronsUpDown className="h-4 w-4 opacity-50"/>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
+                <Command>
+                  <CommandInput placeholder="Buscar cliente por nome ou CPF…"/>
+                  <CommandList>
+                    <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
+                    <CommandGroup>
+                      {clientes
+                        .filter((p) => p.id !== titular?.id && !deps.find((d) => d.id === p.id))
+                        .map((p) => (
+                          <CommandItem key={p.id} value={`${p.nome} ${p.cpf ?? ""}`} onSelect={() => addDep(p)}>
+                            + {p.nome} {p.cpf ? `— ${p.cpf}` : ""}
+                          </CommandItem>
+                        ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
             {deps.length > 0 ? (
               <div className="mt-2 space-y-1">
                 {deps.map((d, i) => (
