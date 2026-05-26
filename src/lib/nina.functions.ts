@@ -112,9 +112,14 @@ function montarContextoTexto(ctx: {
     nome: string;
     crm: string;
     crm_uf: string;
+    especialidade?: string | null;
     horarios: Array<{ dia: string; inicio: string; fim: string; obs: string | null }>;
   }>;
   procedimentos: Array<{ nome: string; valor_dinheiro_pix: number; valor_cartao: number; grupo: string | null; preparo?: string | null }>;
+  especialidades?: string[];
+  convenios?: Array<{ nome: string; tipo: string; valor_mensal: number; max_dependentes: number; descricao_beneficios: string | null }>;
+  clinica?: { nome: string; endereco: string | null; cidade: string | null; estado: string | null; telefone: string | null; email: string | null } | null;
+  agendaResumo?: Array<{ medico: string; total: number; livres: number; ocupados: number }>;
 }) {
   const meds = ctx.medicos
     .map((m) => {
@@ -122,7 +127,7 @@ function montarContextoTexto(ctx: {
         m.horarios.length > 0
           ? m.horarios.map((h) => `${h.dia} ${h.inicio}-${h.fim}`).join("; ")
           : "(sem horários cadastrados)";
-      return `- ${m.nome} (CRM ${m.crm}/${m.crm_uf}): ${horarios}`;
+      return `- ${m.nome} (CRM ${m.crm}/${m.crm_uf}${m.especialidade ? `, ${m.especialidade}` : ""}): ${horarios}`;
     })
     .join("\n");
 
@@ -133,7 +138,28 @@ function montarContextoTexto(ctx: {
     )
     .join("\n");
 
-  return `MÉDICOS E HORÁRIOS:\n${meds || "(nenhum)"}\n\nPROCEDIMENTOS E VALORES:\n${procs || "(nenhum)"}`;
+  const espText = (ctx.especialidades ?? []).join(", ") || "(nenhuma)";
+  const convText = (ctx.convenios ?? [])
+    .map(
+      (c) =>
+        `- ${c.nome} [${c.tipo}] — mensalidade base R$ ${Number(c.valor_mensal).toFixed(2)} / até ${c.max_dependentes} dependentes${c.descricao_beneficios ? ` | ${c.descricao_beneficios.replace(/\s+/g, " ").trim().slice(0, 240)}` : ""}`,
+    )
+    .join("\n") || "(nenhum)";
+  const clinicaText = ctx.clinica
+    ? `Nome: ${ctx.clinica.nome}\nEndereço: ${[ctx.clinica.endereco, ctx.clinica.cidade, ctx.clinica.estado].filter(Boolean).join(", ") || "(não informado)"}\nTelefone: ${ctx.clinica.telefone || "(não informado)"}\nE-mail: ${ctx.clinica.email || "(não informado)"}`
+    : "(não informado)";
+  const agendaText = (ctx.agendaResumo ?? [])
+    .map((a) => `- ${a.medico}: ${a.ocupados} ocupado(s), ${a.livres} livre(s) (total ${a.total})`)
+    .join("\n") || "(sem dados do dia)";
+
+  return [
+    `CLÍNICA:\n${clinicaText}`,
+    `ESPECIALIDADES ATENDIDAS:\n${espText}`,
+    `MÉDICOS E HORÁRIOS:\n${meds || "(nenhum)"}`,
+    `PROCEDIMENTOS E VALORES:\n${procs || "(nenhum)"}`,
+    `CONVÊNIOS / CARTÃO BENEFÍCIO:\n${convText}`,
+    `AGENDA DE HOJE (resumo anonimizado, sem nomes de pacientes):\n${agendaText}`,
+  ].join("\n\n");
 }
 
 export const chatNina = createServerFn({ method: "POST" })
@@ -145,10 +171,12 @@ export const chatNina = createServerFn({ method: "POST" })
 
     const { supabase, userId } = context;
     await assertMembership(supabase, userId, data.clinicaId);
-    const [medR, dispR, procR] = await Promise.all([
+    const inicioDia = new Date(); inicioDia.setHours(0, 0, 0, 0);
+    const fimDia = new Date(); fimDia.setHours(23, 59, 59, 999);
+    const [medR, dispR, procR, espR, planR, cliR, agR] = await Promise.all([
       supabase
         .from("medicos")
-        .select("id, nome, crm, crm_uf")
+        .select("id, nome, crm, crm_uf, especialidade_id")
         .eq("clinica_id", data.clinicaId)
         .eq("ativo", true),
       supabase
@@ -161,12 +189,36 @@ export const chatNina = createServerFn({ method: "POST" })
         .select("nome, grupo, valor_dinheiro_pix, valor_cartao, preparo")
         .eq("clinica_id", data.clinicaId)
         .eq("ativo", true),
+      supabase
+        .from("especialidades")
+        .select("id, nome")
+        .eq("ativo", true),
+      supabase
+        .from("planos_assinatura")
+        .select("nome, tipo, valor_mensal, max_dependentes, descricao_beneficios")
+        .eq("clinica_id", data.clinicaId)
+        .eq("ativo", true),
+      supabase
+        .from("clinicas")
+        .select("nome, endereco, cidade, estado, telefone, email")
+        .eq("id", data.clinicaId)
+        .maybeSingle(),
+      supabase
+        .from("agendamentos")
+        .select("medico_id, status")
+        .eq("clinica_id", data.clinicaId)
+        .gte("inicio", inicioDia.toISOString())
+        .lte("inicio", fimDia.toISOString()),
     ]);
+
+    const espMap = new Map<string, string>();
+    for (const e of espR.data ?? []) espMap.set(e.id, e.nome);
 
     const medicos = (medR.data ?? []).map((m) => ({
       nome: m.nome,
       crm: m.crm,
       crm_uf: m.crm_uf,
+      especialidade: m.especialidade_id ? espMap.get(m.especialidade_id) ?? null : null,
       horarios: (dispR.data ?? [])
         .filter((d) => d.medico_id === m.id)
         .map((d) => ({
@@ -177,6 +229,19 @@ export const chatNina = createServerFn({ method: "POST" })
         })),
     }));
 
+    const nomeMedico = new Map<string, string>();
+    for (const m of medR.data ?? []) nomeMedico.set(m.id, m.nome);
+    const agendaAgg = new Map<string, { total: number; livres: number; ocupados: number }>();
+    for (const a of agR.data ?? []) {
+      const nome = a.medico_id ? nomeMedico.get(a.medico_id) ?? "Sem médico" : "Sem médico";
+      const cur = agendaAgg.get(nome) ?? { total: 0, livres: 0, ocupados: 0 };
+      cur.total += 1;
+      if (a.status === "cancelado" || a.status === "faltou") cur.livres += 1;
+      else cur.ocupados += 1;
+      agendaAgg.set(nome, cur);
+    }
+    const agendaResumo = Array.from(agendaAgg.entries()).map(([medico, v]) => ({ medico, ...v }));
+
     const contextoTexto = montarContextoTexto({
       medicos,
       procedimentos: (procR.data ?? []) as Array<{
@@ -186,9 +251,26 @@ export const chatNina = createServerFn({ method: "POST" })
         grupo: string | null;
         preparo: string | null;
       }>,
+      especialidades: (espR.data ?? []).map((e: any) => e.nome),
+      convenios: (planR.data ?? []) as any,
+      clinica: (cliR.data ?? null) as any,
+      agendaResumo,
     });
 
-    const systemPrompt = `Você é a Nina, assistente virtual de uma clínica médica. Responda SEMPRE em português do Brasil, de forma curta, direta e amigável. Use APENAS as informações da base abaixo para responder sobre médicos, horários, exames, preços e preparos (jejum, suspensão de medicamentos, etc.). Quando o exame tiver PREPARO cadastrado, SEMPRE inclua o preparo na resposta. Se a pergunta for sobre algo que não está na base, diga que não tem essa informação e oriente a equipe a confirmar com o gestor. Não invente dados, valores, horários ou preparos.\n\n=== BASE DE DADOS DA CLÍNICA ===\n${contextoTexto}\n=== FIM DA BASE ===`;
+    const systemPrompt = `Você é a Nina, assistente virtual de uma clínica médica. Responda SEMPRE em português do Brasil, de forma curta, direta e amigável.
+
+REGRAS DE PRIVACIDADE — NÃO PODEM SER QUEBRADAS EM HIPÓTESE ALGUMA:
+1. NUNCA revele informações financeiras, de caixa, faturamento, repasses médicos, comissões, contas a pagar/receber, boletos, mensalidades em aberto, inadimplência ou qualquer valor que não seja de TABELA pública de procedimentos/convênios.
+2. NUNCA revele dados de OUTROS pacientes: nomes, telefones, CPF, e-mail, endereço, prontuário, anamnese, diagnósticos, exames, fotos, agendamentos individuais, presença na clínica ou histórico clínico. NUNCA confirme nem negue se uma pessoa é paciente.
+3. Quando perguntarem sobre "quem está agendado", "quanto entrou hoje no caixa", "qual o saldo", "qual o repasse do Dr. X", "o paciente Y veio?" ou similares, responda educadamente que essa informação é sigilosa e oriente a procurar o(a) gestor(a) responsável.
+4. Você só pode falar de dados PÚBLICOS / agregados: médicos disponíveis, horários de atendimento, especialidades, preços de tabela de exames, preparos, convênios aceitos, endereço/telefone da clínica e resumo anonimizado da agenda do dia (apenas contagens, sem identificar pacientes).
+5. Você é SOMENTE LEITURA — não agenda, não cancela, não cobra, não altera nada. Se pedirem ação, oriente a equipe a fazer pelo sistema.
+
+Use APENAS as informações da base abaixo. Quando o exame tiver PREPARO cadastrado, SEMPRE inclua o preparo na resposta. Se a pergunta for sobre algo que não está na base (ou que viola as regras acima), diga que não tem essa informação. Não invente dados, valores, horários ou preparos.
+
+=== BASE DE DADOS DA CLÍNICA ===
+${contextoTexto}
+=== FIM DA BASE ===`;
 
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
