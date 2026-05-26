@@ -65,8 +65,16 @@ export async function metaSendText(
   );
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const msg = (json as any)?.error?.message ?? `HTTP ${res.status}`;
-    throw new Error(msg);
+    const metaErr = (json as any)?.error ?? {};
+    const msg = metaErr.message ?? `HTTP ${res.status}`;
+    const code = metaErr.code;
+    // 190 = OAuth token inválido/expirado; 200/10 = sem permissão
+    if (res.status === 401 || code === 190 || /authentication/i.test(String(msg))) {
+      throw new Error(
+        "Token do WhatsApp inválido ou expirado. Gere um novo Access Token no Meta Business Manager e salve em Configurações → WhatsApp.",
+      );
+    }
+    throw new Error(`WhatsApp: ${msg}`);
   }
   const wa_message_id = (json as any)?.messages?.[0]?.id ?? null;
   return { wa_message_id };
