@@ -284,11 +284,17 @@ export type Database = {
       }
       boletos: {
         Row: {
+          banco: string | null
           clinica_id: string
+          codigo_barras: string | null
+          contrato_id: string | null
           created_at: string
+          emitido_em: string | null
+          erro_emissao: string | null
           id: string
           lancamento_id: string | null
           linha_digitavel: string | null
+          mensalidade_id: string | null
           nosso_numero: string | null
           observacoes: string | null
           paciente_id: string | null
@@ -300,11 +306,17 @@ export type Database = {
           vencimento: string
         }
         Insert: {
+          banco?: string | null
           clinica_id: string
+          codigo_barras?: string | null
+          contrato_id?: string | null
           created_at?: string
+          emitido_em?: string | null
+          erro_emissao?: string | null
           id?: string
           lancamento_id?: string | null
           linha_digitavel?: string | null
+          mensalidade_id?: string | null
           nosso_numero?: string | null
           observacoes?: string | null
           paciente_id?: string | null
@@ -316,11 +328,17 @@ export type Database = {
           vencimento: string
         }
         Update: {
+          banco?: string | null
           clinica_id?: string
+          codigo_barras?: string | null
+          contrato_id?: string | null
           created_at?: string
+          emitido_em?: string | null
+          erro_emissao?: string | null
           id?: string
           lancamento_id?: string | null
           linha_digitavel?: string | null
+          mensalidade_id?: string | null
           nosso_numero?: string | null
           observacoes?: string | null
           paciente_id?: string | null
@@ -331,7 +349,22 @@ export type Database = {
           valor?: number
           vencimento?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "boletos_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos_assinatura"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "boletos_mensalidade_id_fkey"
+            columns: ["mensalidade_id"]
+            isOneToOne: false
+            referencedRelation: "contrato_mensalidades"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       caixa_movimentos: {
         Row: {

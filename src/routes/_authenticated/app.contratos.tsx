@@ -25,6 +25,10 @@ import { printContrato } from "@/lib/print-contrato";
 import { fmtDataExtenso } from "@/lib/print-contrato";
 import { printCartoes } from "@/lib/print-cartao";
 import { printGuiaMensalidade } from "@/lib/print-gr";
+import { gerarCarnePDF } from "@/lib/print-carne";
+import { gerarBoletosContrato } from "@/lib/boleto.functions";
+import { useServerFn } from "@tanstack/react-start";
+import { Barcode, FileText } from "lucide-react";
 import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
 import type { PatientOption } from "@/components/patient-search-input";
 
@@ -181,11 +185,12 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
   const [faixaId, setFaixaId] = useState<string>("");
   const [diaVenc, setDiaVenc] = useState(10);
   const [dataInicio, setDataInicio] = useState(new Date().toISOString().slice(0, 10));
-  const [forma, setForma] = useState("dinheiro");
+  const [tipoCobranca, setTipoCobranca] = useState<"boleto" | "carne">("carne");
   const [obs, setObs] = useState("");
   const [deps, setDeps] = useState<Array<Paciente & { parentesco: string; tipo: string }>>([]);
   const [saving, setSaving] = useState(false);
   const [faceOpen, setFaceOpen] = useState<null | "titular" | number>(null);
+  const gerarBoletosFn = useServerFn(gerarBoletosContrato);
 
   useEffect(() => {
     if (convenio) { setValor(Number(convenio.valor_mensal)); setTaxa(Number(convenio.taxa_adesao)); }
@@ -279,7 +284,7 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
     const { data: contrato, error } = await supabase.from("contratos_assinatura").insert({
       clinica_id: clinicaId, convenio_id: convenio.id, paciente_id: titular.id, paciente_nome: titular.nome,
       data_inicio: dataInicio, dia_vencimento: diaVenc, valor_mensal: valor, taxa_adesao: taxa,
-      num_parcelas: convenio.num_parcelas, forma_pagamento: forma, observacoes: obs, criado_por: userId,
+      num_parcelas: convenio.num_parcelas, forma_pagamento: tipoCobranca, observacoes: obs, criado_por: userId,
     }).select("*").single();
     if (error || !contrato) { setSaving(false); return toast.error(error?.message ?? "Erro"); }
 
@@ -292,7 +297,7 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
 
     // Gerar 12 parcelas
     const base = new Date(dataInicio + "T00:00:00");
-    const valorParcela = valor + (forma === "boleto" ? TAXA_BOLETO : 0);
+    const valorParcela = valor + (tipoCobranca === "boleto" ? TAXA_BOLETO : 0);
     const parcelas = Array.from({ length: convenio.num_parcelas }, (_, i) => {
       const venc = new Date(base.getFullYear(), base.getMonth() + i, diaVenc);
       return {
@@ -305,6 +310,22 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
 
     setSaving(false);
     toast.success(`Contrato #${contrato.numero} criado com ${convenio.num_parcelas} mensalidades`);
+
+    // Pós-criação: gerar carnê ou boletos conforme tipo de cobrança
+    if (tipoCobranca === "carne") {
+      try {
+        await gerarCarnePDF(contrato.id);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Falha ao gerar carnê");
+      }
+    } else {
+      try {
+        const res = await gerarBoletosFn({ data: { contratoId: contrato.id } });
+        toast.info(res.mensagem);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Falha ao gerar boletos");
+      }
+    }
     onCreated();
   };
 
@@ -403,7 +424,7 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
               {faixas.length > 0
                 ? "Definido pela faixa de pessoas selecionada acima."
                 : "Definido pelo convênio."}
-              {forma === "boleto" ? (
+              {tipoCobranca === "boleto" ? (
                 <span className="block text-amber-600 font-medium">
                   + {BRL(TAXA_BOLETO)} de taxa de boleto por parcela — total da parcela: {BRL(valor + TAXA_BOLETO)}
                 </span>
@@ -415,17 +436,51 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
             <div className="h-10 rounded-md border bg-muted/30 px-3 flex items-center font-semibold">{BRL(taxa)}</div>
             <p className="text-xs text-muted-foreground mt-1">Cobrança única, definida pelo convênio.</p>
           </div>
-          <div className="col-span-2"><Label>Forma de pagamento</Label>
-            <Select value={forma} onValueChange={setForma}>
-              <SelectTrigger><SelectValue/></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="dinheiro">Dinheiro</SelectItem>
-                <SelectItem value="carne">Carnê</SelectItem>
-                <SelectItem value="boleto">Boleto</SelectItem>
-                <SelectItem value="pix">PIX</SelectItem>
-                <SelectItem value="cartao_credito">Cartão de Crédito</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="col-span-2">
+            <Label>Tipo de cobrança</Label>
+            <div className="grid grid-cols-2 gap-3 mt-1">
+              {([
+                {
+                  v: "boleto" as const,
+                  icon: Barcode,
+                  title: "Boleto bancário",
+                  desc: `Geramos um boleto via banco para cada parcela. Taxa de ${BRL(TAXA_BOLETO)} por boleto.`,
+                },
+                {
+                  v: "carne" as const,
+                  icon: FileText,
+                  title: "Carnê interno",
+                  desc: "Geramos um PDF de carnê com todas as parcelas para baixar/imprimir. Sem taxa.",
+                },
+              ]).map((opt) => {
+                const Icon = opt.icon;
+                const ativo = tipoCobranca === opt.v;
+                return (
+                  <button
+                    type="button"
+                    key={opt.v}
+                    onClick={() => setTipoCobranca(opt.v)}
+                    className={`text-left rounded-md border p-3 transition flex gap-3 items-start ${
+                      ativo
+                        ? "border-primary ring-2 ring-primary/30 bg-primary/5"
+                        : "border-border hover:bg-muted/50"
+                    }`}
+                  >
+                    <Icon className={`h-5 w-5 mt-0.5 ${ativo ? "text-primary" : "text-muted-foreground"}`} />
+                    <div className="flex-1">
+                      <div className="font-semibold text-sm flex items-center gap-2">
+                        {opt.title}
+                        {ativo ? <Check className="h-4 w-4 text-primary" /> : null}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-0.5">{opt.desc}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              A forma de pagamento real (Dinheiro / PIX / Cartão / etc.) será escolhida apenas na hora de baixar cada parcela.
+            </p>
           </div>
           <div className="col-span-2 border-t pt-3">
             <Label>
@@ -542,6 +597,7 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
   const [pacienteFull, setPacienteFull] = useState<any>(null);
   const [faixas, setFaixas] = useState<Faixa[]>([]);
   const [loading, setLoading] = useState(true);
+  const gerarBoletosFn = useServerFn(gerarBoletosContrato);
 
   // Inclusão/exclusão de dependentes pós-venda
   const [incOpen, setIncOpen] = useState(false);
@@ -755,7 +811,7 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     : "—";
   const formaLabelMap: Record<string, string> = {
     dinheiro: "Dinheiro", pix: "Pix", debito: "Cartão de Débito",
-    credito: "Cartão de Crédito", boleto: "Boleto",
+    credito: "Cartão de Crédito", boleto: "Boleto", carne: "Carnê interno",
   };
   const formaLabel = formaLabelMap[contrato.forma_pagamento ?? ""] ?? (contrato.forma_pagamento ?? "—");
   const maxDep = Number(convenio?.max_dependentes ?? 0) || 0;
@@ -1021,6 +1077,23 @@ h1, h2, h3 { margin: 0 0 6mm; }
         <div className="flex gap-2 flex-wrap">
           <Button size="sm" onClick={() => printContrato(contrato.id)}><Printer className="h-4 w-4 mr-1"/>Imprimir A4</Button>
           <Button size="sm" variant="secondary" onClick={() => printCartoes(contrato.id)}><CreditCard className="h-4 w-4 mr-1"/>Imprimir cartão{deps.length > 0 ? `(${deps.length + 1})` : ""}</Button>
+          {contrato.forma_pagamento === "carne" ? (
+            <Button size="sm" variant="outline" onClick={async () => {
+              try { await gerarCarnePDF(contrato.id); } catch (e) { toast.error(e instanceof Error ? e.message : "Falha ao gerar carnê"); }
+            }}>
+              <FileText className="h-4 w-4 mr-1"/>Reimprimir carnê
+            </Button>
+          ) : null}
+          {contrato.forma_pagamento === "boleto" ? (
+            <Button size="sm" variant="outline" onClick={async () => {
+              try {
+                const res = await gerarBoletosFn({ data: { contratoId: contrato.id } });
+                if (res.erro) toast.error(res.mensagem); else toast.info(res.mensagem);
+              } catch (e) { toast.error(e instanceof Error ? e.message : "Falha ao gerar boletos"); }
+            }}>
+              <Barcode className="h-4 w-4 mr-1"/>Reemitir boletos
+            </Button>
+          ) : null}
           <Button size="sm" variant="outline" onClick={copiarLink}><Link2 className="h-4 w-4 mr-1"/>Link de assinatura</Button>
           {contrato.assinado_em ? <Badge variant="default"><Check className="h-3 w-3 mr-1"/>Assinado em {fmtD(contrato.assinado_em)}</Badge> : <Badge variant="outline">Aguardando assinatura</Badge>}
         </div>

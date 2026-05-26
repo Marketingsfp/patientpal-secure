@@ -1,81 +1,68 @@
 
-# Layout WhatsApp estilo Hi Platform (3 colunas)
+# Tipo de cobrança no contrato: Boleto ou Carnê
 
-Reformular a área de WhatsApp da Nina para o padrão de inbox profissional (Hi Platform / WhatsApp Web): **lista de conversas | chat central | painel do contato**, mantendo todas as funcionalidades atuais.
+Remover o seletor "Forma de pagamento" da venda do convênio e substituir por uma escolha entre **Boleto** e **Carnê** (radio — uma OU outra). Forma de pagamento real continua sendo perguntada apenas na hora de baixar cada parcela (fluxo já existente).
 
-## Estrutura visual nova
+## Mudanças no formulário de venda (`NovoContratoDialog`)
 
-```text
-┌──────────────────────────────────────────────────────────────────────┐
-│  Header: Nina — WhatsApp  · status online · busca global · filtros   │
-├────────────┬────────────────────────────────────┬────────────────────┤
-│ CONVERSAS  │ CHAT                               │ CONTATO            │
-│ (320px)    │ (flex-1)                           │ (320px)            │
-│            │                                    │                    │
-│ filtros:   │ ┌── header do contato ───────────┐ │ avatar + nome      │
-│ [Todas]    │ │ avatar + nome + tel + status   │ │ telefone           │
-│ [Não lidas]│ │ Nina ON/OFF · ações ⋮          │ │ tags               │
-│ [Nina]     │ └────────────────────────────────┘ │ ─────              │
-│ [Humano]   │                                    │ Paciente vinculado │
-│            │  msgs com bubbles                  │ Última consulta    │
-│ avatar+nome│  separadores por dia               │ Mensalidades       │
-│ prévia     │  status "entregue/lida"            │ ─────              │
-│ hora+badge │                                    │ Notas internas     │
-│ ...        │ ┌── composer ────────────────────┐ │ Histórico de       │
-│            │ │ 📎 emoji │ textarea │ 🎤 │ →  │ │ atendimentos       │
-│            │ └────────────────────────────────┘ │                    │
-└────────────┴────────────────────────────────────┴────────────────────┘
-```
+Remover:
+- `<Select>` "Forma de pagamento" (linhas 418-429) e o aviso "+ R$3,50 de taxa de boleto por parcela".
+- State `forma` deixa de existir como dropdown.
 
-A página passa a ocupar `h-[calc(100vh-var(--header))]` sem padding externo, como um app de chat dedicado (não dentro de um Card scrollável).
+Adicionar no lugar (mesma posição, `col-span-2`):
+- Label "Tipo de cobrança"
+- Dois cards/botões em grid 2 colunas (radio mutuamente exclusivo):
+  - **Boleto bancário** — ícone Barcode + descrição "Geramos o boleto via banco para cada parcela. Taxa de R$ 3,50 por boleto."
+  - **Carnê interno** — ícone FileText + descrição "Geramos um PDF do carnê com todas as parcelas. Sem taxa."
+- Card selecionado fica com borda primary + check.
 
-## Mudanças por aba
+Novo state: `tipoCobranca: "boleto" | "carne"` (default `"carne"`).
 
-A página `/app/nina` mantém as 4 abas (**Nina treinada · Conversas · Automações · Configuração**). Só a aba **Conversas** é reescrita.
+No `salvar()`:
+- `forma_pagamento` do contrato passa a gravar `"boleto"` ou `"carne"` conforme escolhido.
+- A taxa de R$3,50/parcela continua sendo aplicada quando `tipoCobranca === "boleto"`.
+- Após criar o contrato e as parcelas:
+  - **Carnê**: chamar `gerarCarnePDF(contratoId)` automaticamente e abrir/baixar o PDF.
+  - **Boleto**: chamar `gerarBoletosBanco(contratoId)` — função stub preparada para integração futura (ver abaixo).
 
-### 1. Coluna esquerda — Lista de conversas
-- Topo: input de busca + chips de filtro (Todas / Não lidas / Nina / Humano / Arquivadas).
-- Itens da lista: avatar redondo (iniciais ou foto do paciente), nome, prévia da última mensagem (1 linha), horário e badge de não lidas. Indicador colorido se a Nina está respondendo (●verde) ou aguardando humano (●âmbar).
-- Item selecionado com fundo destacado e barra lateral primary.
-- Scroll independente; lista densa estilo Hi/Intercom.
+## Geração do Carnê interno
 
-### 2. Coluna central — Conversa
-- Header fixo com avatar + nome + telefone + último visto + toggle "Nina respondendo" + menu de ações (marcar como resolvida, transferir, arquivar).
-- Mensagens agrupadas por dia (separador "Hoje", "Ontem", data), bubbles arredondados estilo WhatsApp: entrada à esquerda (cinza), saída à direita (verde para Nina, azul/primary para humano), com horário e duplo-check.
-- Suporte a áudio transcrito, imagens e anexos (placeholder visual).
-- Composer com: anexo (📎), emoji (😊), textarea com auto-resize, gravar áudio (🎤), botão enviar verde. Enter envia, Shift+Enter quebra linha.
+Novo arquivo `src/lib/print-carne.ts`:
+- Função `gerarCarnePDF(contratoId, clinicaId)` que:
+  - Carrega contrato + plano + paciente + clínica + parcelas.
+  - Monta HTML A4 com layout de carnê simples: cabeçalho com logo/nome da clínica, dados do contrato (nº, titular, CPF, plano, valor), e **uma "ficha" por parcela** dispostas 3 por página, cada ficha com:
+    - Nº da parcela / total
+    - Vencimento
+    - Valor
+    - Linha "Pago em: ___ / Forma: ___" (campos para preenchimento manual)
+    - Linha picotada de corte entre fichas
+  - Abre em nova janela e dispara `window.print()` para salvar como PDF.
+- Mesmo padrão visual de `src/lib/print-gr.ts` (já existe na codebase).
 
-### 3. Coluna direita — Painel do contato (nova)
-- Avatar grande + nome + telefone formatado.
-- Tags do paciente (VIP, Convênio X, etc).
-- Cards compactos: **Paciente vinculado** (com link para o cadastro), **Última consulta**, **Mensalidades em aberto**, **Próximo agendamento**.
-- Área de **Notas internas** (textarea persistente por conversa).
-- Pode ser colapsada com botão `>` no header do chat (esconde a coluna).
+Botão "Reimprimir carnê" adicionado no header do `DetalheContrato` quando `forma_pagamento === "carne"`.
 
-## Detalhes técnicos
+## Geração de Boletos (stub para integração)
 
-**Arquivos alterados**
-- `src/routes/_authenticated/app.nina.tsx` — apenas o `TabsContent value="chat"` é reescrito; abas Treinada/Automações/Configuração ficam intactas. O wrapper externo da página perde `space-y-6` para a aba conversas usar altura total.
-- Criar `src/components/nina/ConversasInbox.tsx` (novo) com 3 sub-componentes: `ListaConversas`, `ChatJanela`, `PainelContato`. Mantém o estado e o `useEffect` de realtime que já existem hoje em `app.nina.tsx` — só extrai a UI.
-- Reaproveitar `formatWhatsappText` para markdown de WhatsApp.
+Novo arquivo `src/lib/boleto.functions.ts` (server function):
+- `gerarBoletosContrato({ contratoId })` — `createServerFn` com middleware `requireSupabaseAuth`.
+- Por enquanto:
+  - Lê o contrato + parcelas.
+  - Para cada parcela cria/atualiza um registro em nova tabela `boletos` (ver migração abaixo) com `status='pendente_emissao'`.
+  - Retorna `{ pendentes: N, mensagem: "Integração bancária não configurada — boletos marcados como pendentes." }`.
+- A lógica real (chamada à API do banco — Itaú/Sicredi/Asaas/etc.) fica isolada nessa função, comentada com `TODO: integrar API do banco`.
 
-**Dados (sem mudança de schema)**
-- Continuamos lendo de `whatsapp_mensagens` e agrupando por `from_number`/`to_number` como já feito hoje.
-- Para o painel direito: lookup do paciente por `telefone` em `pacientes`, e queries leves de `agendamentos` (último/próximo) e `contrato_mensalidades` em aberto. Tudo client-side com `supabase` (RLS já cobre).
+Migração nova (`boletos`):
+- Colunas: `id`, `clinica_id`, `contrato_id`, `mensalidade_id` (FK), `nosso_numero` (text, nullable), `linha_digitavel` (text, nullable), `codigo_barras` (text, nullable), `url_pdf` (text, nullable), `valor`, `vencimento`, `status` (`pendente_emissao` | `emitido` | `pago` | `cancelado`), `banco` (text, nullable), `created_at`, `updated_at`.
+- GRANTs para `authenticated` e `service_role`.
+- RLS por `clinica_id` (mesmo padrão das demais tabelas do projeto).
 
-**Tokens / cores**
-- Bubble Nina: `bg-emerald-500 text-white` (mantém).
-- Bubble paciente: `bg-card border border-border`.
-- Coluna ativa / hover: `bg-muted` / `bg-muted/50`.
-- Sem cores hardcoded fora das já presentes no projeto.
+Botão "Reemitir boletos" no header do `DetalheContrato` quando `forma_pagamento === "boleto"`.
 
-**Responsivo**
-- `<lg`: mostra só a lista; ao clicar numa conversa abre o chat full-screen com botão voltar; painel do contato vira sheet (drawer).
-- `lg`: 2 colunas (lista + chat), painel toggleável.
-- `xl+`: 3 colunas completas.
+## Pagamento das parcelas — sem mudança
+
+O fluxo já existente em `DetalheContrato` continua igual: ao clicar **Pagar** numa parcela, abre o diálogo "Forma de pagamento" (Dinheiro / PIX / Cartão / etc.) e gera a GR. Nenhuma alteração nesse fluxo.
 
 ## Fora do escopo
-- Configuração WhatsApp (token, número, horário) **mantém o layout atual** dentro da aba "Configuração" — o usuário pediu o mesmo layout do Hi apenas para a área de conversas/inbox.
-- Campanhas (`/app/campanhas`) e Envios (`/app/mkt-envios`) recebem apenas um ajuste leve de header para ficarem visualmente coerentes com a nova inbox (mesma tipografia de título e badges); a estrutura tabular delas permanece.
-- Sem alterações no webhook, no `whatsapp.functions.ts` ou em `whatsapp.server.ts`.
-- Sem alterações nas automações cadastradas.
+- Integração real com banco (fica como stub `TODO`, pronta para receber as credenciais e o cliente HTTP do banco escolhido).
+- Mudar o cadastro de convênio (não precisa de novo campo).
+- Mudar contratos antigos com `forma_pagamento` em "dinheiro/pix/cartao" — eles continuam exibindo o valor antigo no campo, sem botão de boleto/carnê.
