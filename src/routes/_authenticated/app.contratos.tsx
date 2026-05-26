@@ -61,7 +61,7 @@ type Beneficio = {
 type Paciente = { id: string; nome: string; cpf: string | null; telefone: string | null; email: string | null; face_descriptor?: number[] | null };
 type Contrato = { id: string; numero: number; paciente_nome: string; convenio_id: string | null; plano_id: string | null; valor_mensal: number; status: string; data_inicio: string; data_fim: string | null; assinado_em: string | null; token_publico: string; forma_pagamento: string | null };
 type Mens = { id: string; numero_parcela: number; vencimento: string; valor: number; status: string; pago_em: string | null; forma_pagamento: string | null };
-type Dep = { id: string; paciente_nome: string; parentesco: string | null; tipo: string };
+type Dep = { id: string; paciente_nome: string; parentesco: string | null; tipo: string; cpf?: string | null };
 
 export function ContratosPage() {
   const { clinicaAtual } = useClinica();
