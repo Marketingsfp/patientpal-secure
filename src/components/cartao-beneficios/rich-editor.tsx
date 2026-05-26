@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Color } from "@tiptap/extension-color";
@@ -104,6 +104,13 @@ interface Props {
 
 export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
+  // Margens da página em mm (A4: 210 × 297). Padrão: 12mm topo/baixo, 14mm laterais.
+  const [marginTop, setMarginTop] = useState(12);
+  const [marginBottom, setMarginBottom] = useState(12);
+  const [marginLeft, setMarginLeft] = useState(14);
+  const [marginRight, setMarginRight] = useState(14);
+  const [showRuler, setShowRuler] = useState(true);
+  const pageWidthMm = 210;
 
   const editor = useEditor({
     extensions: [
@@ -354,9 +361,163 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
       </div>
 
       <div className="rt-scroll bg-muted/40 overflow-auto" style={{ maxHeight: "70vh" }}>
-        <div className="rt-page mx-auto my-4 bg-white shadow-md" style={{ width: "210mm", minHeight: "297mm", padding: "12mm 14mm" }}>
-          <EditorContent editor={editor} />
+        <div className="mx-auto my-4" style={{ width: "210mm" }}>
+          {showRuler && (
+            <HorizontalRuler
+              widthMm={pageWidthMm}
+              marginLeft={marginLeft}
+              marginRight={marginRight}
+              onChangeLeft={(v) => setMarginLeft(Math.max(0, Math.min(pageWidthMm - marginRight - 20, v)))}
+              onChangeRight={(v) => setMarginRight(Math.max(0, Math.min(pageWidthMm - marginLeft - 20, v)))}
+            />
+          )}
+          <div
+            className="rt-page bg-white shadow-md"
+            style={{
+              width: "210mm",
+              minHeight: "297mm",
+              paddingTop: `${marginTop}mm`,
+              paddingBottom: `${marginBottom}mm`,
+              paddingLeft: `${marginLeft}mm`,
+              paddingRight: `${marginRight}mm`,
+            }}
+          >
+            <EditorContent editor={editor} />
+          </div>
         </div>
+      </div>
+
+      {/* Barra de margens */}
+      <div className="flex flex-wrap items-center gap-3 border-t px-3 py-2 bg-muted/30 text-xs print:hidden">
+        <button
+          type="button"
+          onClick={() => setShowRuler((s) => !s)}
+          className="px-2 py-1 rounded hover:bg-muted"
+          title="Mostrar/ocultar régua"
+        >
+          {showRuler ? "Ocultar régua" : "Mostrar régua"}
+        </button>
+        <div className="w-px h-5 bg-border" />
+        <span className="font-medium text-muted-foreground">Margens (mm):</span>
+        <MarginInput label="Sup" value={marginTop} onChange={setMarginTop} />
+        <MarginInput label="Inf" value={marginBottom} onChange={setMarginBottom} />
+        <MarginInput label="Esq" value={marginLeft} onChange={setMarginLeft} />
+        <MarginInput label="Dir" value={marginRight} onChange={setMarginRight} />
+        <button
+          type="button"
+          onClick={() => { setMarginTop(12); setMarginBottom(12); setMarginLeft(14); setMarginRight(14); }}
+          className="px-2 py-1 rounded hover:bg-muted ml-auto"
+        >
+          Restaurar padrão
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function MarginInput({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+  return (
+    <label className="inline-flex items-center gap-1">
+      <span className="text-muted-foreground">{label}</span>
+      <input
+        type="number"
+        min={0}
+        max={100}
+        step={1}
+        value={value}
+        onChange={(e) => {
+          const n = Number(e.target.value);
+          if (!Number.isNaN(n)) onChange(Math.max(0, Math.min(100, n)));
+        }}
+        className="h-7 w-14 rounded border border-border bg-background px-1.5 text-xs text-right focus:outline-none focus:ring-1 focus:ring-primary"
+      />
+    </label>
+  );
+}
+
+// Régua horizontal estilo Word: marcações em cm + alças arrastáveis para margem esq./dir.
+function HorizontalRuler({
+  widthMm, marginLeft, marginRight, onChangeLeft, onChangeRight,
+}: {
+  widthMm: number;
+  marginLeft: number;
+  marginRight: number;
+  onChangeLeft: (mm: number) => void;
+  onChangeRight: (mm: number) => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const totalCm = Math.floor(widthMm / 10);
+
+  const startDrag = (which: "left" | "right") => (e: React.PointerEvent) => {
+    e.preventDefault();
+    const el = ref.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const pxPerMm = rect.width / widthMm;
+    const move = (ev: PointerEvent) => {
+      const xMm = (ev.clientX - rect.left) / pxPerMm;
+      if (which === "left") onChangeLeft(Math.round(xMm));
+      else onChangeRight(Math.round(widthMm - xMm));
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+
+  const leftPct = (marginLeft / widthMm) * 100;
+  const rightPct = ((widthMm - marginRight) / widthMm) * 100;
+
+  return (
+    <div
+      ref={ref}
+      className="relative h-6 mb-1 select-none print:hidden"
+      style={{ width: "210mm" }}
+    >
+      {/* faixa de fundo: margens (cinza) + área editável (branca) */}
+      <div className="absolute inset-y-0 left-0 right-0 rounded-sm bg-muted-foreground/30" />
+      <div
+        className="absolute inset-y-0 bg-background border-x border-border"
+        style={{ left: `${leftPct}%`, right: `${100 - rightPct}%` }}
+      />
+      {/* marcações em cm */}
+      {Array.from({ length: totalCm + 1 }).map((_, cm) => {
+        const pct = (cm * 10 / widthMm) * 100;
+        const inMargin = cm * 10 < marginLeft || cm * 10 > widthMm - marginRight;
+        return (
+          <div
+            key={cm}
+            className="absolute top-0 bottom-0 flex flex-col items-center"
+            style={{ left: `${pct}%`, transform: "translateX(-50%)" }}
+          >
+            <span
+              className={`text-[9px] leading-none mt-0.5 ${inMargin ? "text-background/90" : "text-muted-foreground"}`}
+            >
+              {cm}
+            </span>
+            <span className={`w-px flex-1 mt-0.5 ${inMargin ? "bg-background/60" : "bg-muted-foreground/50"}`} />
+          </div>
+        );
+      })}
+      {/* alça margem esquerda */}
+      <div
+        onPointerDown={startDrag("left")}
+        title={`Margem esquerda: ${marginLeft} mm`}
+        className="absolute top-0 bottom-0 w-3 cursor-ew-resize z-10"
+        style={{ left: `calc(${leftPct}% - 6px)` }}
+      >
+        <div className="mx-auto w-0 h-0 border-l-[6px] border-r-[6px] border-t-[8px] border-l-transparent border-r-transparent border-t-primary" />
+      </div>
+      {/* alça margem direita */}
+      <div
+        onPointerDown={startDrag("right")}
+        title={`Margem direita: ${marginRight} mm`}
+        className="absolute top-0 bottom-0 w-3 cursor-ew-resize z-10"
+        style={{ left: `calc(${rightPct}% - 6px)` }}
+      >
+        <div className="mx-auto w-0 h-0 border-l-[6px] border-r-[6px] border-t-[8px] border-l-transparent border-r-transparent border-t-primary" />
       </div>
     </div>
   );
