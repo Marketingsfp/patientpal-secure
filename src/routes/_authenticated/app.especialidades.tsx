@@ -53,8 +53,18 @@ function EspecialidadesPage() {
   async function salvar() {
     if (!form.nome.trim()) { toast.error("Informe o nome"); return; }
     setSaving(true);
+    const toTitle = (s: string) =>
+      s
+        .toLocaleLowerCase("pt-BR")
+        .split(/(\s+|-)/)
+        .map((part) =>
+          /^\s+$|^-$/.test(part)
+            ? part
+            : part.charAt(0).toLocaleUpperCase("pt-BR") + part.slice(1),
+        )
+        .join("");
     const payload = {
-      nome: form.nome.trim(),
+      nome: toTitle(form.nome.trim()),
       descricao: form.descricao.trim() || null,
       ativo: form.ativo,
     };
