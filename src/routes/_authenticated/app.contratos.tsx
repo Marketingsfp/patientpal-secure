@@ -1048,6 +1048,97 @@ h1, h2, h3 { margin: 0 0 6mm; }
           setPagMens(null);
         }}
       />
+
+      <Dialog open={incOpen} onOpenChange={setIncOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Incluir dependente</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label>Paciente</Label>
+              <PatientSearchInput value={incPaciente} onSelect={setIncPaciente} placeholder="Buscar paciente por nome ou CPF…" />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label>Parentesco</Label>
+                <Select value={incParentesco} onValueChange={setIncParentesco}>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Filho(a)">Filho(a)</SelectItem>
+                    <SelectItem value="Cônjuge">Cônjuge</SelectItem>
+                    <SelectItem value="Pai">Pai</SelectItem>
+                    <SelectItem value="Mãe">Mãe</SelectItem>
+                    <SelectItem value="Irmão(ã)">Irmão(ã)</SelectItem>
+                    <SelectItem value="Outro">Outro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Tipo</Label>
+                <Select value={incTipo} onValueChange={setIncTipo}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="dependente">Dependente</SelectItem>
+                    <SelectItem value="agregado">Agregado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            {contrato.assinado_em && convenio?.termo_inclusao_html ? (
+              <p className="text-xs text-muted-foreground">
+                Após incluir, será gerado o <strong>Termo de Inclusão</strong> para impressão/assinatura.
+              </p>
+            ) : null}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIncOpen(false)}>Cancelar</Button>
+            <Button onClick={confirmarIncluir} disabled={incSaving || !incPaciente}>
+              {incSaving ? "Incluindo…" : "Incluir"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!excAlvo} onOpenChange={(v) => { if (!v) setExcAlvo(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Excluir dependente</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm">
+            Excluir <strong>{excAlvo?.paciente_nome}</strong> do contrato?
+          </p>
+          {contrato.assinado_em && convenio?.termo_inclusao_html ? (
+            <p className="text-xs text-muted-foreground">
+              Após excluir, será gerado o <strong>Termo de Exclusão</strong> para impressão/assinatura.
+            </p>
+          ) : null}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setExcAlvo(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={confirmarExcluir}>Excluir</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={termoOpen} onOpenChange={setTermoOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Termo de {termoMovimento} — {termoDep?.paciente_nome}</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-auto rounded-md border bg-card p-4">
+            {termoDep ? (
+              <div
+                className="prose prose-sm max-w-none"
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderTermo(termoDep, termoMovimento)) }}
+              />
+            ) : null}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setTermoOpen(false)}>Fechar</Button>
+            <Button onClick={printTermoInclusao}><Printer className="h-4 w-4 mr-1" />Imprimir A4</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
