@@ -698,6 +698,37 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
           <span className="text-[10px] font-bold">⌫</span>
         </ToolbarButton>
 
+        {/* Largura da tabela */}
+        <Select
+          value={currentTableWidth || "auto"}
+          onValueChange={(v) => updateAncestor("table", { width: v === "auto" ? null : v })}
+        >
+          <SelectTrigger className="h-8 w-[110px] text-xs" title="Largura da tabela" disabled={!tableNode}>
+            <SelectValue placeholder="Larg. tabela" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="auto">Auto</SelectItem>
+            <SelectItem value="100%">100%</SelectItem>
+            <SelectItem value="75%">75%</SelectItem>
+            <SelectItem value="50%">50%</SelectItem>
+            <SelectItem value="25%">25%</SelectItem>
+          </SelectContent>
+        </Select>
+        {/* Altura da linha */}
+        <input
+          type="text"
+          inputMode="numeric"
+          placeholder="Alt. linha (px)"
+          className="h-8 w-[110px] rounded border border-input bg-background px-2 text-xs disabled:opacity-50"
+          title="Altura da linha em px (vazio = automático)"
+          disabled={!rowNode}
+          value={currentRowHeight.replace(/px$/, "")}
+          onChange={(e) => {
+            const v = e.target.value.trim();
+            updateAncestor("tableRow", { height: v ? (`${parseInt(v, 10) || 0}px`) : null });
+          }}
+        />
+
         <div className="w-px h-6 bg-border mx-1" />
         <ToolbarButton title="Inserir imagem" onClick={() => fileRef.current?.click()}>
           <ImageIcon className="h-4 w-4" />
