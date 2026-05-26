@@ -1087,7 +1087,37 @@ h1, h2, h3 { margin: 0 0 6mm; }
           <div className="space-y-3">
             <div className="space-y-1">
               <Label>Paciente</Label>
-              <PatientSearchInput value={incPaciente} onSelect={setIncPaciente} placeholder="Buscar paciente por nome ou CPF…" />
+              <Select
+                value={incPaciente?.id ?? ""}
+                onValueChange={(id) => {
+                  const p = incPacientes.find((x) => x.id === id) ?? null;
+                  setIncPaciente(p);
+                }}
+                disabled={incLoadingPac}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={incLoadingPac ? "Carregando pacientes…" : "Selecione o paciente"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {(() => {
+                    const titularId = (contrato as any).paciente_id as string | undefined;
+                    const jaDep = new Set(depsAtivos.map((d) => d.paciente_id));
+                    const list = incPacientes.filter((p) => p.id !== titularId && !jaDep.has(p.id));
+                    if (list.length === 0) {
+                      return (
+                        <div className="px-3 py-2 text-sm text-muted-foreground">
+                          Nenhum paciente disponível
+                        </div>
+                      );
+                    }
+                    return list.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.nome}{p.cpf ? ` — ${p.cpf}` : ""}
+                      </SelectItem>
+                    ));
+                  })()}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
