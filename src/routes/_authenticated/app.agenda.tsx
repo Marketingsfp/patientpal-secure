@@ -794,6 +794,33 @@ function AgendaPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [formaPagOpen, formaPagOpcoes, formaPagCtx]);
 
+  // Atalhos da tela Agenda:
+  // N = novo encaixe, F = focar filtro de profissional, R = recarregar
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tgt = e.target as HTMLElement | null;
+      if (tgt) {
+        const tag = tgt.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || tgt.isContentEditable) return;
+        if (tgt.closest('[role="dialog"], [role="listbox"], [role="menu"], [role="combobox"]')) return;
+      }
+      if (e.altKey || e.ctrlKey || e.metaKey) return;
+      const k = e.key.toLowerCase();
+      if (k === "n") {
+        e.preventDefault();
+        openNew();
+      } else if (k === "f") {
+        const el = document.querySelector<HTMLElement>("[data-agenda-filtro-prof]");
+        if (el) { e.preventDefault(); el.focus(); }
+      } else if (k === "r") {
+        e.preventDefault();
+        void load();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   const imprimirGR = async (a: Agendamento) => {
     if (!clinicaAtual) return;
     try {
