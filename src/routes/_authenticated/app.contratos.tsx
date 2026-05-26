@@ -938,6 +938,24 @@ h1, h2, h3 { margin: 0 0 6mm; }
             <TabsTrigger value="contrato">Contrato</TabsTrigger>
           </TabsList>
           <TabsContent value="resumo" className="space-y-4 mt-4">
+          {cancelado ? (
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 flex items-start gap-2">
+              <XCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+              <div className="text-sm">
+                <div className="font-semibold text-destructive">
+                  Contrato Cancelado em {new Date(canceladoEm!).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
+                </div>
+                {cancelMotivoAtual ? (
+                  <div className="text-muted-foreground mt-0.5">
+                    Motivo: {cancelMotivoAtual}
+                  </div>
+                ) : null}
+                <div className="text-muted-foreground mt-0.5">
+                  O plano e todos os benefícios foram cancelados.
+                </div>
+              </div>
+            </div>
+          ) : null}
           <div className="grid grid-cols-3 gap-3 text-sm">
           <div className="rounded-md border p-3"><div className="text-muted-foreground text-xs">Pagas</div><div className="font-bold text-lg">{pagas}/{mens.length}</div></div>
           <div className="rounded-md border p-3"><div className="text-muted-foreground text-xs">Recebido</div><div className="font-bold text-lg text-green-600">{BRL(totalPago)}</div></div>
