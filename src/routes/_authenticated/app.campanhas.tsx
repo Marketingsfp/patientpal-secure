@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { SectionTabs, MARKETING_TABS, MARKETING_META } from "@/components/section-tabs";
 import { Megaphone } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -7,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SimpleCrud } from "@/components/simple-crud/SimpleCrud";
 
 export const Route = createFileRoute("/_authenticated/app/campanhas")({
-  component: CampanhasPage,
+  component: CampanhasPageWithTabs,
   head: () => ({ meta: [{ title: "Campanhas — ClinicaOS" }] }),
 });
 
@@ -66,5 +67,13 @@ function CampanhasPage() {
         </div>
       )}
     />
+  );
+}
+function CampanhasPageWithTabs() {
+  return (
+    <>
+      <SectionTabs title={MARKETING_META.title} icon={MARKETING_META.icon} tabs={MARKETING_TABS} />
+      <CampanhasPage />
+    </>
   );
 }

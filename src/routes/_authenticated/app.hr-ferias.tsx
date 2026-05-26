@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { SectionTabs, RH_TABS, RH_META } from "@/components/section-tabs";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -15,7 +16,7 @@ import { toast } from "sonner";
 import { formatDatePura } from "@/lib/date-utils";
 
 export const Route = createFileRoute("/_authenticated/app/hr-ferias")({
-  component: FeriasPage,
+  component: FeriasPageWithTabs,
   head: () => ({ meta: [{ title: "Férias — ClinicaOS" }] }),
 });
 
@@ -180,5 +181,13 @@ function FeriasPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+function FeriasPageWithTabs() {
+  return (
+    <>
+      <SectionTabs title={RH_META.title} icon={RH_META.icon} tabs={RH_TABS} />
+      <FeriasPage />
+    </>
   );
 }

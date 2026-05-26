@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { SectionTabs, SEGURANCA_TABS, SEGURANCA_META } from "@/components/section-tabs";
 import { KeyRound } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { SimpleCrud } from "@/components/simple-crud/SimpleCrud";
 
 export const Route = createFileRoute("/_authenticated/app/integration-secrets")({
-  component: SecretsPage,
+  component: SecretsPageWithTabs,
   head: () => ({ meta: [{ title: "Segredos de Integração — ClinicaOS" }] }),
 });
 
@@ -37,5 +38,13 @@ function SecretsPage() {
         </div>
       )}
     />
+  );
+}
+function SecretsPageWithTabs() {
+  return (
+    <>
+      <SectionTabs title={SEGURANCA_META.title} icon={SEGURANCA_META.icon} tabs={SEGURANCA_TABS} />
+      <SecretsPage />
+    </>
   );
 }
