@@ -11,6 +11,7 @@ import { TableRow } from "@tiptap/extension-table-row";
 import { TableHeader } from "@tiptap/extension-table-header";
 import { TableCell } from "@tiptap/extension-table-cell";
 import { Image } from "@tiptap/extension-image";
+import { NodeSelection } from "@tiptap/pm/state";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -286,9 +287,8 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
 
   const getSelectedImageTarget = () => {
     const { selection } = editor.state;
-    const selectedNode = "node" in selection ? selection.node : null;
-    if (selectedNode?.type.name !== "image") return null;
-    const src = selectedNode.attrs.src as string | undefined;
+    if (!(selection instanceof NodeSelection) || selection.node.type.name !== "image") return null;
+    const src = selection.node.attrs.src as string | undefined;
     return src ? { src, pos: selection.from } : null;
   };
 
@@ -536,12 +536,13 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
                 title="Cortar imagem"
                 disabled={!imgActive}
                 onClick={() => {
-                  const src = editor.getAttributes("image").src as string | undefined;
-                  if (!src) {
+                  const target = getSelectedImageTarget();
+                  if (!target) {
                     toast.info("Clique na imagem que deseja cortar e tente novamente.");
                     return;
                   }
-                  setCropSrc(src);
+                  setCropTargetPos(target.pos);
+                  setCropSrc(target.src);
                   setCropOpen(true);
                 }}
               >
@@ -667,7 +668,7 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
         onClose={() => setCropOpen(false)}
         onCropped={(dataUrl) => {
           // Substitui o src da imagem selecionada pelo recorte (data URL PNG).
-          editor.chain().focus().updateAttributes("image", { src: dataUrl }).run();
+          replaceCropTarget(dataUrl);
         }}
       />
     </div>
