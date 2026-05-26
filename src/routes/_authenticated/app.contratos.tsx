@@ -932,14 +932,35 @@ h1, h2, h3 { margin: 0 0 6mm; }
             </div>
             <DadosField label="Forma de pagamento" value={formaLabel} />
             <div className="space-y-1">
-              <div className="text-sm font-medium">Dependentes ({deps.length}/{maxDep})</div>
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-medium">Dependentes ({depsAtivos.length}/{maxDep})</div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIncOpen(true)}
+                  disabled={maxDep === 0 || depsAtivos.length >= maxDep}
+                >
+                  <Plus className="h-4 w-4 mr-1" /> Incluir dependente
+                </Button>
+              </div>
               <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
                 {deps.length === 0 ? "Nenhum dependente" : (
                   <ul className="space-y-1">
                     {deps.map((d) => (
-                      <li key={d.id}>
-                        • {d.paciente_nome}
-                        <span className="text-muted-foreground"> — {d.parentesco ?? "—"} ({d.tipo}){d.cpf ? ` — CPF ${d.cpf}` : ""}</span>
+                      <li key={d.id} className="flex items-center justify-between gap-2">
+                        <div className={d.ativo ? "" : "text-muted-foreground line-through"}>
+                          • {d.paciente_nome}
+                          <span className="text-muted-foreground no-underline"> — {d.parentesco ?? "—"} ({d.tipo}){d.cpf ? ` — CPF ${d.cpf}` : ""}</span>
+                          <span className="text-muted-foreground no-underline"> — Incluído: {fmtD(d.incluido_em)}</span>
+                          {d.excluido_em ? (
+                            <span className="text-destructive no-underline"> — Excluído: {fmtD(d.excluido_em)}</span>
+                          ) : null}
+                        </div>
+                        {d.ativo ? (
+                          <Button size="sm" variant="ghost" onClick={() => setExcAlvo(d)}>
+                            <Trash2 className="h-3 w-3 text-destructive" />
+                          </Button>
+                        ) : null}
                       </li>
                     ))}
                   </ul>
