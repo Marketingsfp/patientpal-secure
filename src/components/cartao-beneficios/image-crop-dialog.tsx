@@ -83,21 +83,23 @@ export function ImageCropDialog({ open, src, onClose, onCropped }: Props) {
         </DialogHeader>
         <div className="w-full bg-muted rounded-md overflow-auto flex items-center justify-center" style={{ maxHeight: 480 }}>
           {open && (
-            <ReactCrop
-              crop={crop}
-              onChange={(c) => setCrop(c)}
-              onComplete={(c) => setCompleted(c)}
-              aspect={aspectNum}
-              ruleOfThirds
-            >
-              <img
-                ref={imgRef}
-                src={src}
-                alt=""
-                crossOrigin="anonymous"
-                style={{ maxHeight: 460, maxWidth: "100%" }}
-              />
-            </ReactCrop>
+            <Suspense fallback={<div className="p-8 text-xs text-muted-foreground">Carregando…</div>}>
+              <ReactCrop
+                crop={crop}
+                onChange={(c) => setCrop(c)}
+                onComplete={(c) => setCompleted(c)}
+                aspect={aspectNum}
+                ruleOfThirds
+              >
+                <img
+                  ref={imgRef}
+                  src={src}
+                  alt=""
+                  crossOrigin="anonymous"
+                  style={{ maxHeight: 460, maxWidth: "100%" }}
+                />
+              </ReactCrop>
+            </Suspense>
           )}
         </div>
         <div className="flex items-center gap-3 pt-2">
