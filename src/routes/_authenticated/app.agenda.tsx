@@ -716,6 +716,41 @@ function AgendaPage() {
     if (!form.inicio || !form.fim) { toast.error("Defina início e fim"); return; }
     if (new Date(form.fim) <= new Date(form.inicio)) { toast.error("O horário final deve ser após o inicial"); return; }
     if (!form.procedimento.trim()) { toast.error("Selecione o procedimento"); return; }
+    // Bloqueia criação/movimentação para um médico sem agenda aberta naquele dia
+    if (form.medico_id) {
+      const di = new Date(form.inicio);
+      const df = new Date(form.fim);
+      const inicioDia = new Date(di.getFullYear(), di.getMonth(), di.getDate(), 0, 0, 0).toISOString();
+      const fimDia = new Date(di.getFullYear(), di.getMonth(), di.getDate(), 23, 59, 59).toISOString();
+      const q = supabase
+        .from("agendamentos")
+        .select("id,paciente_nome,inicio,fim", { count: "exact", head: false })
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("medico_id", form.medico_id)
+        .gte("inicio", inicioDia)
+        .lte("inicio", fimDia)
+        .limit(500);
+      const { data: slotsDia } = await q;
+      const lista = (slotsDia ?? []) as { id: string; paciente_nome: string; inicio: string; fim: string }[];
+      const excluindoEditing = editing ? lista.filter((x) => x.id !== editing.id) : lista;
+      if (excluindoEditing.length === 0) {
+        toast.error("Este médico não tem agenda aberta nessa data. Gere os horários em Disponibilidades antes de agendar.");
+        return;
+      }
+      // Precisa existir um slot livre que cubra o horário escolhido (ou conflito com o próprio agendamento em edição)
+      const inicioMs = di.getTime();
+      const fimMs = df.getTime();
+      const cobre = excluindoEditing.some((s) => {
+        if (normalizar(s.paciente_nome) !== "disponivel") return false;
+        const sIni = new Date(s.inicio).getTime();
+        const sFim = new Date(s.fim).getTime();
+        return sIni <= inicioMs && sFim >= fimMs;
+      });
+      if (!cobre) {
+        toast.error("Não há horário livre desse médico cobrindo o intervalo escolhido. Escolha um slot DISPONÍVEL na agenda ou gere mais horários em Disponibilidades.");
+        return;
+      }
+    }
     if (editing && pagosSet.has(editing.id) && form.paciente_nome.trim() !== editing.paciente_nome) {
       toast.error("Não é permitido alterar o nome do paciente em agendamento já pago.");
       return;
