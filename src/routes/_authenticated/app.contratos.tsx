@@ -919,7 +919,15 @@ h1, h2, h3 { margin: 0 0 6mm; }
           <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
         </Button>
         <h1 className="text-2xl font-bold">Contrato #{contrato.numero} — {contrato.paciente_nome}</h1>
-        <div />
+        <div>
+          {!cancelado ? (
+            <Button size="sm" variant="destructive" onClick={() => setCancelOpen(true)}>
+              <Ban className="h-4 w-4 mr-1" /> Cancelar contrato
+            </Button>
+          ) : (
+            <div className="w-[160px]" />
+          )}
+        </div>
       </div>
       <Card>
         <CardContent className="p-6 space-y-4">
