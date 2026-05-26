@@ -99,6 +99,52 @@ const ColoredTableHeader = TableHeader.extend({
   },
 });
 
+// Table com largura customizável (width em % ou px)
+const ResizableTable = Table.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      width: {
+        default: null,
+        parseHTML: (el) =>
+          (el as HTMLElement).getAttribute("data-width") ||
+          (el as HTMLElement).style.width ||
+          null,
+        renderHTML: (attrs) => {
+          if (!attrs.width) return {};
+          return {
+            "data-width": attrs.width,
+            style: `width: ${attrs.width}`,
+          };
+        },
+      },
+    };
+  },
+});
+
+// TableRow com altura customizável
+const ResizableTableRow = TableRow.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      height: {
+        default: null,
+        parseHTML: (el) =>
+          (el as HTMLElement).getAttribute("data-height") ||
+          (el as HTMLElement).style.height ||
+          null,
+        renderHTML: (attrs) => {
+          if (!attrs.height) return {};
+          return {
+            "data-height": attrs.height,
+            style: `height: ${attrs.height}`,
+          };
+        },
+      },
+    };
+  },
+});
+
 const FONTS = [
   "Arial", "Calibri", "Times New Roman", "Georgia", "Verdana",
   "Tahoma", "Courier New", "Helvetica", "Garamond", "Trebuchet MS",
@@ -346,8 +392,8 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
       Color,
       FontFamily.configure({ types: ["textStyle"] }),
       TextAlign.configure({ types: ["heading", "paragraph"] }),
-      Table.configure({ resizable: true, HTMLAttributes: { class: "rt-table" } }),
-      TableRow, ColoredTableHeader, ColoredTableCell,
+      ResizableTable.configure({ resizable: true, HTMLAttributes: { class: "rt-table" } }),
+      ResizableTableRow, ColoredTableHeader, ColoredTableCell,
       ResizableImage.configure({ inline: true, allowBase64: true }),
     ],
     content: value || "<p></p>",
@@ -387,6 +433,32 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
     const src = selection.node.attrs.src as string | undefined;
     return src ? { src, pos: selection.from } : null;
   };
+
+  // Helpers para encontrar a tabela/linha atuais e atualizar atributos (largura/altura)
+  const findAncestorPos = (typeName: string): { pos: number; attrs: Record<string, unknown> } | null => {
+    const { $from } = editor.state.selection;
+    for (let d = $from.depth; d > 0; d--) {
+      const node = $from.node(d);
+      if (node.type.name === typeName) {
+        return { pos: $from.before(d), attrs: node.attrs };
+      }
+    }
+    return null;
+  };
+  const updateAncestor = (typeName: string, patch: Record<string, unknown>) => {
+    const found = findAncestorPos(typeName);
+    if (!found) return;
+    editor.chain().focus().command(({ tr, dispatch, state }) => {
+      const node = state.doc.nodeAt(found.pos);
+      if (!node) return false;
+      dispatch?.(tr.setNodeMarkup(found.pos, undefined, { ...node.attrs, ...patch }));
+      return true;
+    }).run();
+  };
+  const tableNode = findAncestorPos("table");
+  const rowNode = findAncestorPos("tableRow");
+  const currentTableWidth = (tableNode?.attrs.width as string | null) || "";
+  const currentRowHeight = (rowNode?.attrs.height as string | null) || "";
 
   const replaceCropTarget = (dataUrl: string) => {
     if (cropTargetPos === null) {
@@ -625,6 +697,37 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
         >
           <span className="text-[10px] font-bold">⌫</span>
         </ToolbarButton>
+
+        {/* Largura da tabela */}
+        <Select
+          value={currentTableWidth || "auto"}
+          onValueChange={(v) => updateAncestor("table", { width: v === "auto" ? null : v })}
+        >
+          <SelectTrigger className="h-8 w-[110px] text-xs" title="Largura da tabela" disabled={!tableNode}>
+            <SelectValue placeholder="Larg. tabela" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="auto">Auto</SelectItem>
+            <SelectItem value="100%">100%</SelectItem>
+            <SelectItem value="75%">75%</SelectItem>
+            <SelectItem value="50%">50%</SelectItem>
+            <SelectItem value="25%">25%</SelectItem>
+          </SelectContent>
+        </Select>
+        {/* Altura da linha */}
+        <input
+          type="text"
+          inputMode="numeric"
+          placeholder="Alt. linha (px)"
+          className="h-8 w-[110px] rounded border border-input bg-background px-2 text-xs disabled:opacity-50"
+          title="Altura da linha em px (vazio = automático)"
+          disabled={!rowNode}
+          value={currentRowHeight.replace(/px$/, "")}
+          onChange={(e) => {
+            const v = e.target.value.trim();
+            updateAncestor("tableRow", { height: v ? (`${parseInt(v, 10) || 0}px`) : null });
+          }}
+        />
 
         <div className="w-px h-6 bg-border mx-1" />
         <ToolbarButton title="Inserir imagem" onClick={() => fileRef.current?.click()}>
