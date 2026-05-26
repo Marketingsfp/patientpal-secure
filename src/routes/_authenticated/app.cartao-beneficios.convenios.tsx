@@ -40,9 +40,20 @@ const CONTRATO_VARIAVEIS: { label: string; token: string }[] = [
   { label: "Nº de parcelas", token: "NUM_PARCELAS" },
   { label: "Vigência (meses)", token: "VIGENCIA_MESES" },
   { label: "Fidelidade (meses)", token: "FIDELIDADE_MESES" },
-  { label: "Data de hoje", token: "DATA_HOJE" },
-  { label: "Dependentes", token: "DEPENDENTES" },
+  { label: "Data de hoje (por extenso)", token: "DATA_HOJE" },
+  { label: "Dependentes (lista completa)", token: "DEPENDENTES" },
 ];
+
+function buildContratoVariaveis(maxDeps: number): { label: string; token: string }[] {
+  const base = [...CONTRATO_VARIAVEIS];
+  const n = Math.max(0, Number(maxDeps) || 0);
+  for (let i = 1; i <= n; i++) {
+    base.push({ label: `Dependente ${i} — nome`, token: `DEPENDENTE_${i}` });
+    base.push({ label: `Dependente ${i} — parentesco`, token: `DEPENDENTE_${i}_PARENTESCO` });
+    base.push({ label: `Dependente ${i} — CPF`, token: `DEPENDENTE_${i}_CPF` });
+  }
+  return base;
+}
 
 export const Route = createFileRoute("/_authenticated/app/cartao-beneficios/convenios")({
   component: ConveniosPage,
@@ -725,14 +736,17 @@ function ConveniosPage() {
                   <span className="font-medium"> Inserir variável </span>
                   na barra de ferramentas para incluir campos como{" "}
                   <code>{"{{PACIENTE_NOME}}"}</code>, <code>{"{{VALOR_MENSAL}}"}</code>,{" "}
-                  <code>{"{{DEPENDENTES}}"}</code>, <code>{"{{CLINICA_NOME}}"}</code>.
+                  <code>{"{{DEPENDENTE_1}}"}</code>, <code>{"{{DEPENDENTE_1_PARENTESCO}}"}</code>,{" "}
+                  <code>{"{{CLINICA_NOME}}"}</code>. Use as variáveis numeradas
+                  (<code>{"{{DEPENDENTE_1}}"}</code>… até o máximo de dependentes do convênio)
+                  para um slot por dependente; slots não preenchidos ficam vazios.
                 </p>
                 <div id="convenio-contrato-print">
                   <RichEditor
                     value={modeloContrato}
                     onChange={setModeloContrato}
                     clinicaId={clinicaAtual.clinica_id}
-                    variables={CONTRATO_VARIAVEIS}
+                    variables={buildContratoVariaveis(maxDependentes)}
                   />
                 </div>
                 <style>{`

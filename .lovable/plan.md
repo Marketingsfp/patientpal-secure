@@ -1,25 +1,57 @@
-## Mudança em `src/routes/_authenticated/app.contratos.tsx` (frontend)
+## 1. Taxa de boleto: +R$ 3,50 por parcela
 
-Refatorar `DetalheContrato` para usar abas (`Tabs` do shadcn, já disponível):
+Quando a forma de pagamento da venda for **Boleto**, somar R$ 3,50 em cada parcela mensal gerada.
 
-### Aba 1 — "Resumo" (conteúdo atual)
-Move todo o conteúdo existente (cards Pagas/Recebido/A receber, botões de imprimir/link/assinatura, lista de Dependentes/Agregados e tabela de Mensalidades) para dentro desta aba. Sem mudança visual além do wrapper.
+- `src/routes/_authenticated/app.contratos.tsx` (função `salvar`):
+  - Ao montar `parcelas`, usar `valor = valor_mensal + (forma === "boleto" ? 3.5 : 0)`.
+- No formulário de venda, mostrar logo abaixo do "Valor mensal" um aviso quando boleto estiver selecionado: *"+ R$ 3,50 de taxa de boleto por parcela — total da parcela: R$ X,XX"*.
+- O campo `valor_mensal` salvo em `contratos_assinatura` permanece sem a taxa (valor "limpo" do convênio); a taxa entra apenas em cada `contrato_mensalidades.valor`.
+- A taxa de adesão (cobrança única) não é afetada.
 
-### Aba 2 — "Contrato" (nova)
-- Ao montar o detalhe, carregar em paralelo (junto com mensalidades e dependentes):
-  - `cb_convenios` (campo `modelo_contrato`, mais `nome`, `vigencia_meses`, `fidelidade_meses`) pelo `contrato.convenio_id`
-  - `clinicas` (nome, cnpj, endereco, cidade, estado, telefone) pelo `clinica_id` do contrato
-  - `pacientes` (cpf, data_nascimento, telefone, email, logradouro, numero, bairro, cidade, estado, cep) pelo `paciente_id` do contrato
-- Substituir as variáveis `{{CHAVE}}` do `modelo_contrato` usando o mesmo conjunto já implementado em `src/lib/print-contrato.ts`:
-  `CLINICA_NOME`, `CLINICA_CNPJ`, `CLINICA_ENDERECO`, `CIDADE`, `PACIENTE_NOME`, `PACIENTE_CPF`, `PACIENTE_NASCIMENTO`, `PACIENTE_ENDERECO`, `PACIENTE_TELEFONE`, `PACIENTE_EMAIL`, `VALOR_MENSAL`, `TAXA_ADESAO`, `NUM_PARCELAS`, `VIGENCIA_MESES`, `FIDELIDADE_MESES`, `DATA_HOJE`, `DEPENDENTES`.
-  A função `applyTemplate` será replicada localmente (mesma lógica regex `\{\{(\w+)\}\}`), sem usar `esc()` pois o conteúdo é renderizado em `<pre>` (texto puro, sem risco de XSS na própria aba React).
-- Renderização: bloco em `<pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed p-4 rounded-md border bg-card">`.
-- Se `modelo_contrato` estiver vazio, exibir mensagem: "Nenhum modelo cadastrado neste convênio. Configure em **Cartão de Benefícios → Convênio**."
-- Botão "Imprimir A4" continua disponível na aba Resumo (já existente).
+## 2. Variável `{{DATA_HOJE}}` por extenso
 
-### Estados/efeitos
-Adicionar states `convenio`, `clinica`, `pacienteFull` em `DetalheContrato` e popular no `load()`. `useMemo` para gerar o texto substituído. Sem mudança de schema, RLS ou backend.
+Hoje a variável é renderizada como `26/05/2026`. Passar a renderizar como **"26 de maio de 2026"** (formato padrão de contratos brasileiros).
 
-## Fora do escopo
-- Não editar `print-contrato.ts` (já funciona). 
-- Sem mudanças na criação do contrato nem no fluxo de assinatura.
+- Criar helper `fmtDataExtenso(dateISO)` em `src/lib/print-contrato.ts` que retorna `"<dia> de <mês> de <ano>"` (meses em minúsculo: janeiro, fevereiro…).
+- Usar esse helper:
+  - `src/lib/print-contrato.ts` → substituição de `DATA_HOJE`.
+  - `src/routes/_authenticated/app.contratos.tsx` → memo `contratoTexto` (aba "Contrato").
+- `{{PACIENTE_NASCIMENTO}}` e `{{DATA_INICIO}}` (se existir) continuam no formato `dd/mm/aaaa`.
+
+> Obs: estou usando "por extenso" no sentido usual de contrato (dia + mês escrito + ano em algarismos). Se quiser **totalmente** por extenso ("vinte e seis de maio de dois mil e vinte e seis"), me avise que troco o helper.
+
+## 3. Variáveis por dependente no modelo do contrato
+
+O template do convênio "CARTÃO CONSULTA + SEGUROS" usa **5 ocorrências** literais de `{{DEPENDENTES}}` (uma por slot de dependente). Como hoje `{{DEPENDENTES}}` é substituído sempre pela lista completa, o único dependente cadastrado acaba sendo impresso 5×.
+
+Solução: criar variáveis numeradas por slot.
+
+- Novos tokens reconhecidos na substituição:
+  - `{{DEPENDENTE_1}}` … `{{DEPENDENTE_N}}` → apenas o **nome**, ou string vazia se o slot não foi preenchido.
+  - `{{DEPENDENTE_1_PARENTESCO}}` … `{{DEPENDENTE_N_PARENTESCO}}` → parentesco do slot ou vazio.
+  - `{{DEPENDENTE_1_CPF}}` … `{{DEPENDENTE_N_CPF}}` → CPF do slot ou vazio.
+- Mantém `{{DEPENDENTES}}` (lista completa) para retro-compatibilidade.
+- Aplicado em **dois lugares** (mesma lógica):
+  - `src/lib/print-contrato.ts` (impressão A4).
+  - `src/routes/_authenticated/app.contratos.tsx` (memo `contratoTexto` da aba "Contrato").
+- Em `src/routes/_authenticated/app.cartao-beneficios.convenios.tsx`, adicionar à lista de variáveis disponíveis (no editor de modelo de contrato): "Dependente 1 (nome)", "Dependente 1 — parentesco", … até o `max_dependentes` do convênio sendo editado.
+
+Depois desse ajuste, o template precisa ser editado uma vez (trocar as 5 ocorrências de `{{DEPENDENTES}}` por `{{DEPENDENTE_1}}`…`{{DEPENDENTE_5}}`); avisarei isso no toast/UI do editor.
+
+## 4. Respeitar limite máximo de dependentes
+
+O `addDep` em `app.contratos.tsx` só bloqueia quando `max > 0`. Se um convênio estiver com `max_dependentes = 0` (ou nulo), hoje vira "ilimitado" — foi o que permitiu adicionar 7 numa simulação.
+
+- Tratar `max_dependentes` como **limite real sempre**:
+  - `0` ou `null` → 0 dependentes permitidos (somente titular).
+  - `>0` → até esse número (já funciona, mantemos).
+- Desabilitar o botão "Adicionar cliente como dependente…" e mostrar "Limite atingido (X/X)" quando `deps.length >= max`.
+- Validar novamente no `salvar` antes de inserir em `contrato_dependentes`, recusando com toast se o array exceder `max`.
+
+## Arquivos afetados
+
+- `src/routes/_authenticated/app.contratos.tsx` — formulário de venda + memo do contrato.
+- `src/lib/print-contrato.ts` — impressão A4.
+- `src/routes/_authenticated/app.cartao-beneficios.convenios.tsx` — lista de variáveis no editor de modelo.
+
+Nada no banco precisa mudar.

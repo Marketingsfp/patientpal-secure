@@ -20,6 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DOMPurify from "dompurify";
 import { ChevronsUpDown } from "lucide-react";
 import { printContrato } from "@/lib/print-contrato";
+import { fmtDataExtenso } from "@/lib/print-contrato";
 import { printCartoes } from "@/lib/print-cartao";
 import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
 
@@ -30,6 +31,7 @@ export const Route = createFileRoute("/_authenticated/app/contratos")({
 
 const BRL = (v: number) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtD = (s?: string | null) => (s ? new Date(s + (s.length === 10 ? "T00:00:00" : "")).toLocaleDateString("pt-BR") : "—");
+const TAXA_BOLETO = 3.5;
 
 type Convenio = {
   id: string;
@@ -59,7 +61,7 @@ type Beneficio = {
 type Paciente = { id: string; nome: string; cpf: string | null; telefone: string | null; email: string | null; face_descriptor?: number[] | null };
 type Contrato = { id: string; numero: number; paciente_nome: string; convenio_id: string | null; plano_id: string | null; valor_mensal: number; status: string; data_inicio: string; data_fim: string | null; assinado_em: string | null; token_publico: string; forma_pagamento: string | null };
 type Mens = { id: string; numero_parcela: number; vencimento: string; valor: number; status: string; pago_em: string | null; forma_pagamento: string | null };
-type Dep = { id: string; paciente_nome: string; parentesco: string | null; tipo: string };
+type Dep = { id: string; paciente_nome: string; parentesco: string | null; tipo: string; cpf?: string | null };
 
 export function ContratosPage() {
   const { clinicaAtual } = useClinica();
@@ -208,8 +210,12 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
 
   const addDep = (p: Paciente) => {
     if (!convenio) return;
-    const max = convenio.max_dependentes;
-    if (max > 0 && deps.length >= max) return toast.error(`Limite de ${max} dependentes`);
+    const max = Number(convenio.max_dependentes ?? 0) || 0;
+    if (deps.length >= max) {
+      return toast.error(max === 0
+        ? "Este convênio não permite dependentes."
+        : `Limite de ${max} dependentes atingido.`);
+    }
     if (deps.find((d) => d.id === p.id) || titular?.id === p.id) return;
     setDeps([...deps, { ...p, parentesco: "", tipo: "dependente" }]);
     setDepOpen(false);
@@ -217,6 +223,12 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
 
   const salvar = async () => {
     if (!titular || !convenio) return toast.error("Selecione paciente e convênio");
+    const maxDep = Number(convenio.max_dependentes ?? 0) || 0;
+    if (deps.length > maxDep) {
+      return toast.error(maxDep === 0
+        ? "Este convênio não permite dependentes."
+        : `Limite de ${maxDep} dependentes excedido.`);
+    }
     if (!titular.email) return toast.error("Titular precisa ter e-mail para acessar o app. Cadastre o e-mail no paciente antes de gerar o contrato.");
     if (!titular.face_descriptor || titular.face_descriptor.length === 0) return toast.error("Capture a foto do titular antes de gerar o contrato.");
     const semEmailDeps = deps.filter((d) => !d.email);
@@ -240,12 +252,13 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
 
     // Gerar 12 parcelas
     const base = new Date(dataInicio + "T00:00:00");
+    const valorParcela = valor + (forma === "boleto" ? TAXA_BOLETO : 0);
     const parcelas = Array.from({ length: convenio.num_parcelas }, (_, i) => {
       const venc = new Date(base.getFullYear(), base.getMonth() + i, diaVenc);
       return {
         contrato_id: contrato.id, clinica_id: clinicaId,
         numero_parcela: i + 1, vencimento: venc.toISOString().slice(0, 10),
-        valor, status: "pendente",
+        valor: valorParcela, status: "pendente",
       };
     });
     await supabase.from("contrato_mensalidades").insert(parcelas);
@@ -325,7 +338,14 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
           <div>
             <Label>Valor mensal</Label>
             <div className="h-10 rounded-md border bg-muted/30 px-3 flex items-center font-semibold">{BRL(valor)}</div>
-            <p className="text-xs text-muted-foreground mt-1">Recalculado automaticamente conforme dependentes.</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Recalculado automaticamente conforme dependentes.
+              {forma === "boleto" ? (
+                <span className="block text-amber-600 font-medium">
+                  + {BRL(TAXA_BOLETO)} de taxa de boleto por parcela — total da parcela: {BRL(valor + TAXA_BOLETO)}
+                </span>
+              ) : null}
+            </p>
           </div>
           <div>
             <Label>Taxa de adesão</Label>
@@ -345,11 +365,25 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
             </Select>
           </div>
           <div className="col-span-2 border-t pt-3">
-            <Label>Dependentes {convenio && convenio.max_dependentes > 0 ? `(máx ${convenio.max_dependentes})` : ""}</Label>
+            <Label>
+              Dependentes {convenio ? `(${deps.length}/${convenio.max_dependentes ?? 0})` : ""}
+            </Label>
             <Popover open={depOpen} onOpenChange={setDepOpen}>
               <PopoverTrigger asChild>
-                <Button type="button" variant="outline" role="combobox" className="w-full justify-between font-normal mt-1">
-                  <span className="text-muted-foreground">Adicionar cliente como dependente…</span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  role="combobox"
+                  className="w-full justify-between font-normal mt-1"
+                  disabled={!convenio || deps.length >= (Number(convenio?.max_dependentes ?? 0) || 0)}
+                >
+                  <span className="text-muted-foreground">
+                    {convenio && deps.length >= (Number(convenio.max_dependentes ?? 0) || 0)
+                      ? (convenio.max_dependentes ?? 0) === 0
+                        ? "Convênio sem dependentes"
+                        : `Limite atingido (${deps.length}/${convenio.max_dependentes})`
+                      : "Adicionar cliente como dependente…"}
+                  </span>
                   <ChevronsUpDown className="h-4 w-4 opacity-50"/>
                 </Button>
               </PopoverTrigger>
@@ -441,15 +475,18 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     setLoading(true);
     const [m, d, cv, cl, pa] = await Promise.all([
       supabase.from("contrato_mensalidades").select("*").eq("contrato_id", contrato.id).order("numero_parcela"),
-      supabase.from("contrato_dependentes").select("id, paciente_nome, parentesco, tipo").eq("contrato_id", contrato.id).eq("ativo", true),
+      supabase.from("contrato_dependentes").select("id, paciente_nome, parentesco, tipo, pacientes:paciente_id(cpf)").eq("contrato_id", contrato.id).eq("ativo", true),
       contrato.convenio_id
-        ? supabase.from("cb_convenios").select("nome, modelo_contrato, vigencia_meses, fidelidade_meses").eq("id", contrato.convenio_id).maybeSingle()
+        ? supabase.from("cb_convenios").select("nome, modelo_contrato, vigencia_meses, fidelidade_meses, max_dependentes").eq("id", contrato.convenio_id).maybeSingle()
         : Promise.resolve({ data: null }),
       supabase.from("clinicas").select("nome, cnpj, endereco, cidade, estado, telefone").eq("id", (contrato as any).clinica_id ?? "").maybeSingle(),
       supabase.from("pacientes").select("cpf, data_nascimento, telefone, email, logradouro, numero, bairro, cidade, estado, cep").eq("id", (contrato as any).paciente_id ?? "").maybeSingle(),
     ]);
     setMens((m.data ?? []) as Mens[]);
-    setDeps((d.data ?? []) as Dep[]);
+    setDeps(((d.data ?? []) as any[]).map((r) => ({
+      id: r.id, paciente_nome: r.paciente_nome, parentesco: r.parentesco, tipo: r.tipo,
+      cpf: r.pacientes?.cpf ?? null,
+    })));
     setConvenio(cv.data ?? null);
     setClinica(cl.data ?? null);
     setPacienteFull(pa.data ?? null);
@@ -485,6 +522,15 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
       ? deps.map((d, i) => `${i + 1}. ${d.paciente_nome} — ${d.parentesco ?? "—"} (${d.tipo})`).join("\n")
       : "(nenhum)";
     const enderecoPaciente = [_pa.logradouro, _pa.numero, _pa.bairro, _pa.cidade && _pa.estado ? `${_pa.cidade}-${_pa.estado}` : _pa.cidade].filter(Boolean).join(", ");
+    const maxSlots = Math.max(Number(convenio?.max_dependentes ?? 0) || 0, deps.length);
+    const depSlotVars: Record<string, string> = {};
+    for (let i = 0; i < maxSlots; i++) {
+      const d = deps[i];
+      const idx = i + 1;
+      depSlotVars[`DEPENDENTE_${idx}`] = d?.paciente_nome ?? "";
+      depSlotVars[`DEPENDENTE_${idx}_PARENTESCO`] = d?.parentesco ?? "";
+      depSlotVars[`DEPENDENTE_${idx}_CPF`] = d?.cpf ?? "";
+    }
     const vars: Record<string, string> = {
       CLINICA_NOME: _cl.nome ?? "",
       CLINICA_CNPJ: _cl.cnpj ?? "",
@@ -501,8 +547,9 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
       NUM_PARCELAS: String((contrato as any).num_parcelas ?? mens.length),
       VIGENCIA_MESES: String(convenio?.vigencia_meses ?? 12),
       FIDELIDADE_MESES: String(convenio?.fidelidade_meses ?? 0),
-      DATA_HOJE: fmtD(new Date().toISOString().slice(0, 10)),
+      DATA_HOJE: fmtDataExtenso(new Date().toISOString()),
       DEPENDENTES: dependentesTxt,
+      ...depSlotVars,
     };
     return tpl.replace(/\{\{(\w+)\}\}/g, (_m: string, k: string) => vars[k] ?? "");
   }, [convenio, clinica, pacienteFull, deps, mens.length, contrato]);

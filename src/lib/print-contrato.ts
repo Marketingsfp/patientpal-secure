@@ -10,6 +10,18 @@ const fmtData = (iso?: string | null) => {
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
 };
 
+const MESES_PT = [
+  "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+  "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
+];
+
+export const fmtDataExtenso = (iso?: string | null) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  return `${d.getDate()} de ${MESES_PT[d.getMonth()]} de ${d.getFullYear()}`;
+};
+
 const esc = (s: string | null | undefined) =>
   (s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!);
 
@@ -39,7 +51,7 @@ export async function printContrato(contratoId: string) {
 
   const { data: deps } = await supabase
     .from("contrato_dependentes")
-    .select("*")
+    .select("*, pacientes:paciente_id(cpf)")
     .eq("contrato_id", contratoId)
     .eq("ativo", true);
 
@@ -51,6 +63,16 @@ export async function printContrato(contratoId: string) {
   ).join("\n");
 
   const enderecoPaciente = [_pa.logradouro, _pa.numero, _pa.bairro, _pa.cidade && _pa.estado ? `${_pa.cidade}-${_pa.estado}` : _pa.cidade].filter(Boolean).join(", ");
+
+  const maxSlots = Math.max(Number(_pl.max_dependentes ?? 0) || 0, (deps ?? []).length);
+  const depSlotVars: Record<string, string> = {};
+  for (let i = 0; i < maxSlots; i++) {
+    const d: any = (deps ?? [])[i];
+    const idx = i + 1;
+    depSlotVars[`DEPENDENTE_${idx}`] = d?.paciente_nome ?? "";
+    depSlotVars[`DEPENDENTE_${idx}_PARENTESCO`] = d?.parentesco ?? "";
+    depSlotVars[`DEPENDENTE_${idx}_CPF`] = d?.pacientes?.cpf ?? "";
+  }
 
   const corpo = applyTemplate(_pl.template_contrato || "", {
     CLINICA_NOME: _cl.nome ?? "",
@@ -68,8 +90,9 @@ export async function printContrato(contratoId: string) {
     NUM_PARCELAS: String(c.num_parcelas),
     VIGENCIA_MESES: String(_pl.vigencia_meses ?? 12),
     FIDELIDADE_MESES: String(_pl.fidelidade_meses ?? 6),
-    DATA_HOJE: fmtData(new Date().toISOString()),
+    DATA_HOJE: fmtDataExtenso(new Date().toISOString()),
     DEPENDENTES: dependentes || "(nenhum)",
+    ...depSlotVars,
   });
 
   const rawSig = (c as any).assinatura_svg as string | null | undefined;
