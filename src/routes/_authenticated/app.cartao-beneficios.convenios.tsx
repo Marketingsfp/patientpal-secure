@@ -348,7 +348,10 @@ function ConveniosPage() {
     }
     setSaving(false);
     toast.success(editing ? "Convênio atualizado." : "Convênio criado.");
-    setView("list");
+    // Se for um novo convênio, passa a editar o recém-criado para permanecer na tela.
+    if (!editing && convenioId) {
+      setEditing({ ...(payload as any), id: convenioId } as Convenio);
+    }
     load();
   };
 
