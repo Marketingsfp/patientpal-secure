@@ -505,6 +505,12 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
 }
 
 function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () => void }) {
+  const DadosField = ({ label, value }: { label: string; value: React.ReactNode }) => (
+    <div className="space-y-1">
+      <div className="text-sm font-medium">{label}</div>
+      <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">{value || "—"}</div>
+    </div>
+  );
   const [mens, setMens] = useState<Mens[]>([]);
   const [deps, setDeps] = useState<Dep[]>([]);
   const [convenio, setConvenio] = useState<any>(null);
