@@ -522,6 +522,15 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
       ? deps.map((d, i) => `${i + 1}. ${d.paciente_nome} — ${d.parentesco ?? "—"} (${d.tipo})`).join("\n")
       : "(nenhum)";
     const enderecoPaciente = [_pa.logradouro, _pa.numero, _pa.bairro, _pa.cidade && _pa.estado ? `${_pa.cidade}-${_pa.estado}` : _pa.cidade].filter(Boolean).join(", ");
+    const maxSlots = Math.max(Number(convenio?.max_dependentes ?? 0) || 0, deps.length);
+    const depSlotVars: Record<string, string> = {};
+    for (let i = 0; i < maxSlots; i++) {
+      const d = deps[i];
+      const idx = i + 1;
+      depSlotVars[`DEPENDENTE_${idx}`] = d?.paciente_nome ?? "";
+      depSlotVars[`DEPENDENTE_${idx}_PARENTESCO`] = d?.parentesco ?? "";
+      depSlotVars[`DEPENDENTE_${idx}_CPF`] = d?.cpf ?? "";
+    }
     const vars: Record<string, string> = {
       CLINICA_NOME: _cl.nome ?? "",
       CLINICA_CNPJ: _cl.cnpj ?? "",
@@ -538,8 +547,9 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
       NUM_PARCELAS: String((contrato as any).num_parcelas ?? mens.length),
       VIGENCIA_MESES: String(convenio?.vigencia_meses ?? 12),
       FIDELIDADE_MESES: String(convenio?.fidelidade_meses ?? 0),
-      DATA_HOJE: fmtD(new Date().toISOString().slice(0, 10)),
+      DATA_HOJE: fmtDataExtenso(new Date().toISOString()),
       DEPENDENTES: dependentesTxt,
+      ...depSlotVars,
     };
     return tpl.replace(/\{\{(\w+)\}\}/g, (_m: string, k: string) => vars[k] ?? "");
   }, [convenio, clinica, pacienteFull, deps, mens.length, contrato]);
