@@ -815,7 +815,7 @@ function InboxWhatsapp({ conversas, todasConversas, sel, setSel, busca, setBusca
 
   return (
     <div className="h-[calc(100vh-260px)] min-h-[560px] border border-border rounded-lg overflow-hidden bg-card">
-     <ResizablePanelGroup direction="horizontal" className="h-full">
+     <ResizablePanelGroup orientation="horizontal" className="h-full">
       {/* ============ COLUNA 1 — LISTA DE CONVERSAS ============ */}
       <ResizablePanel defaultSize={22} minSize={16} maxSize={40} className="flex flex-col bg-card min-w-0">
         <div className="p-3 border-b border-border space-y-2">
