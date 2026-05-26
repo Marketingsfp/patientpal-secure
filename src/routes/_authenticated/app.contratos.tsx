@@ -61,7 +61,7 @@ type Beneficio = {
   pessoa: string;
 };
 type Paciente = { id: string; nome: string; cpf: string | null; telefone: string | null; email: string | null; face_descriptor?: number[] | null };
-type Contrato = { id: string; numero: number; paciente_nome: string; convenio_id: string | null; plano_id: string | null; valor_mensal: number; status: string; data_inicio: string; data_fim: string | null; assinado_em: string | null; token_publico: string; forma_pagamento: string | null };
+type Contrato = { id: string; numero: number; paciente_nome: string; convenio_id: string | null; plano_id: string | null; valor_mensal: number; status: string; data_inicio: string; data_fim: string | null; assinado_em: string | null; token_publico: string; forma_pagamento: string | null; dia_vencimento?: number | null; taxa_adesao?: number | null; num_parcelas?: number | null; paciente_id?: string | null; clinica_id?: string | null; observacoes?: string | null };
 type Mens = { id: string; numero_parcela: number; vencimento: string; valor: number; status: string; pago_em: string | null; forma_pagamento: string | null };
 type Dep = { id: string; paciente_nome: string; parentesco: string | null; tipo: string; cpf?: string | null };
 
@@ -510,6 +510,7 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
   const [convenio, setConvenio] = useState<any>(null);
   const [clinica, setClinica] = useState<any>(null);
   const [pacienteFull, setPacienteFull] = useState<any>(null);
+  const [faixas, setFaixas] = useState<Faixa[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Diálogo de forma de pagamento (espelha o da agenda)
@@ -527,7 +528,7 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
 
   const load = async () => {
     setLoading(true);
-    const [m, d, cv, cl, pa] = await Promise.all([
+    const [m, d, cv, cl, pa, fx] = await Promise.all([
       supabase.from("contrato_mensalidades").select("*").eq("contrato_id", contrato.id).order("numero_parcela"),
       supabase.from("contrato_dependentes").select("id, paciente_nome, parentesco, tipo, pacientes:paciente_id(cpf)").eq("contrato_id", contrato.id).eq("ativo", true),
       contrato.convenio_id
@@ -535,6 +536,9 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
         : Promise.resolve({ data: null }),
       supabase.from("clinicas").select("nome, cnpj, endereco, cidade, estado, telefone").eq("id", (contrato as any).clinica_id ?? "").maybeSingle(),
       supabase.from("pacientes").select("cpf, data_nascimento, telefone, email, logradouro, numero, bairro, cidade, estado, cep").eq("id", (contrato as any).paciente_id ?? "").maybeSingle(),
+      contrato.convenio_id
+        ? supabase.from("cb_convenio_faixas").select("*").eq("convenio_id", contrato.convenio_id).order("vidas_de")
+        : Promise.resolve({ data: [] }),
     ]);
     setMens((m.data ?? []) as Mens[]);
     setDeps(((d.data ?? []) as any[]).map((r) => ({
@@ -544,6 +548,7 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     setConvenio(cv.data ?? null);
     setClinica(cl.data ?? null);
     setPacienteFull(pa.data ?? null);
+    setFaixas(((fx as any).data ?? []) as Faixa[]);
     setLoading(false);
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [contrato.id]);
@@ -660,6 +665,7 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
         <Tabs defaultValue="resumo">
           <TabsList>
             <TabsTrigger value="resumo">Resumo</TabsTrigger>
+            <TabsTrigger value="dados">Dados</TabsTrigger>
             <TabsTrigger value="contrato">Contrato</TabsTrigger>
           </TabsList>
           <TabsContent value="resumo" className="space-y-4 mt-4">
@@ -709,6 +715,66 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
             </Table>
           </div>
         </div>
+          </TabsContent>
+          <TabsContent value="dados" className="mt-4 space-y-4">
+            {(() => {
+              const faixa = faixas.find((f) => Number(f.valor_mensal) === Number(contrato.valor_mensal)) ?? null;
+              const faixaLabel = faixa
+                ? (faixa.vidas_ate == null
+                    ? `${faixa.vidas_de}+ pessoas`
+                    : faixa.vidas_ate === faixa.vidas_de
+                      ? `${faixa.vidas_de} ${faixa.vidas_de === 1 ? "pessoa" : "pessoas"}`
+                      : `${faixa.vidas_de} a ${faixa.vidas_ate} pessoas`) + ` — ${BRL(Number(faixa.valor_mensal))}`
+                : "—";
+              const formaLabel = ({
+                dinheiro: "Dinheiro", pix: "Pix", debito: "Cartão de Débito",
+                credito: "Cartão de Crédito", boleto: "Boleto",
+              } as Record<string, string>)[contrato.forma_pagamento ?? ""] ?? (contrato.forma_pagamento ?? "—");
+              const maxDep = Number(convenio?.max_dependentes ?? 0) || 0;
+              const Field = ({ label, value }: { label: string; value: React.ReactNode }) => (
+                <div className="space-y-1">
+                  <div className="text-sm font-medium">{label}</div>
+                  <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">{value || "—"}</div>
+                </div>
+              );
+              return (
+                <>
+                  <Field label="Convênio" value={convenio?.nome ?? "—"} />
+                  <Field label="Nº de pessoas no contrato" value={faixaLabel} />
+                  <Field
+                    label="Paciente titular"
+                    value={`${contrato.paciente_nome}${pacienteFull?.cpf ? ` — CPF ${pacienteFull.cpf}` : ""}`}
+                  />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Field label="Data início" value={fmtD(contrato.data_inicio)} />
+                    <Field label="Dia de vencimento" value={contrato.dia_vencimento ?? "—"} />
+                    <Field label="Valor mensal" value={BRL(Number(contrato.valor_mensal))} />
+                    <Field label="Taxa de adesão" value={BRL(Number(contrato.taxa_adesao ?? 0))} />
+                  </div>
+                  <Field label="Forma de pagamento" value={formaLabel} />
+                  <div className="space-y-1">
+                    <div className="text-sm font-medium">Dependentes ({deps.length}/{maxDep})</div>
+                    <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
+                      {deps.length === 0
+                        ? "Nenhum dependente"
+                        : (
+                          <ul className="space-y-1">
+                            {deps.map((d) => (
+                              <li key={d.id}>
+                                • {d.paciente_nome}
+                                <span className="text-muted-foreground"> — {d.parentesco ?? "—"} ({d.tipo}){d.cpf ? ` — CPF ${d.cpf}` : ""}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                    </div>
+                  </div>
+                  {contrato.observacoes ? (
+                    <Field label="Observações" value={contrato.observacoes} />
+                  ) : null}
+                </>
+              );
+            })()}
           </TabsContent>
           <TabsContent value="contrato" className="mt-4">
             <div className="flex items-center justify-between mb-2">
