@@ -264,14 +264,6 @@ export function AppShell() {
   const subsystem = useSyncExternalStore(subscribeSubsystem, getSubsystem, () => null);
   const isChooser = location.pathname === "/app" || location.pathname === "/app/";
 
-  if (loading || !user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
-        Entrando…
-      </div>
-    );
-  }
-
   const initial = (userName || user?.email || "?").trim().charAt(0).toUpperCase();
 
   const medicoNavRows: typeof navRows = [
@@ -378,6 +370,14 @@ export function AppShell() {
     });
     return () => window.cancelAnimationFrame(frame);
   }, [location.pathname, collapsed, openGroups]);
+
+  if (loading || !user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
+        Entrando…
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen flex bg-background overflow-hidden">
