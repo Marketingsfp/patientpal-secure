@@ -190,6 +190,7 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
   const [deps, setDeps] = useState<Array<Paciente & { parentesco: string; tipo: string }>>([]);
   const [saving, setSaving] = useState(false);
   const [faceOpen, setFaceOpen] = useState<null | "titular" | number>(null);
+  const gerarBoletosFn = useServerFn(gerarBoletosContrato);
 
   useEffect(() => {
     if (convenio) { setValor(Number(convenio.valor_mensal)); setTaxa(Number(convenio.taxa_adesao)); }
