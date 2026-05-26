@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Card } from "@/components/ui/card";
@@ -146,6 +146,8 @@ function CheckinPage() {
     if (buscaAmpla) return items;
     return items.filter((a) => itemCombinaComBuscaPaciente(a, busca));
   }, [items, busca, buscaAmpla]);
+  const filtradosRef = useRef<Item[]>([]);
+  useEffect(() => { filtradosRef.current = filtrados; }, [filtrados]);
 
   const acionarBusca = () => { setBuscaAplicada(busca.trim()); setBuscaAmpla(true); };
   const limparBusca = () => { setBusca(""); setBuscaAplicada(""); setBuscaAmpla(false); };
