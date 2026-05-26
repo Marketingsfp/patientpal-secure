@@ -21,7 +21,8 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { InformativoCartaoConsultaSeguros } from "@/components/cartao-beneficios/informativo-cartao-consulta-seguros";
+import { RichEditor } from "@/components/cartao-beneficios/rich-editor";
+import { INFORMATIVO_CARTAO_CONSULTA_SEGUROS_HTML } from "@/components/cartao-beneficios/informativo-seed";
 
 export const Route = createFileRoute("/_authenticated/app/cartao-beneficios/convenios")({
   component: ConveniosPage,
@@ -42,6 +43,7 @@ type Convenio = {
   vigencia_meses: number;
   beneficios: string | null;
   modelo_contrato: string | null;
+  informativo_html: string | null;
 };
 
 type Faixa = {
@@ -85,6 +87,7 @@ function ConveniosPage() {
   const [vigenciaMeses, setVigenciaMeses] = useState<number>(12);
   const [beneficiosTxt, setBeneficiosTxt] = useState("");
   const [modeloContrato, setModeloContrato] = useState("");
+  const [informativoHtml, setInformativoHtml] = useState("");
   const [faixas, setFaixas] = useState<Faixa[]>([{ vidas_de: 1, vidas_ate: null, valor_mensal: 0 }]);
   const [valoresMin, setValoresMin] = useState<Record<string, number>>({});
   const [saving, setSaving] = useState(false);
@@ -190,6 +193,7 @@ function ConveniosPage() {
     setTaxaAdesao(0); setNumParcelas(12);
     setMaxDependentes(0); setFidelidadeMeses(0); setVigenciaMeses(12);
     setBeneficiosTxt(""); setModeloContrato("");
+    setInformativoHtml("");
     setFaixas([{ vidas_de: 1, vidas_ate: null, valor_mensal: 0 }]);
     setBeneficios([]);
     loadCatalogos();
@@ -208,6 +212,13 @@ function ConveniosPage() {
     setVigenciaMeses(c.vigencia_meses ?? 12);
     setBeneficiosTxt(c.beneficios ?? "");
     setModeloContrato(c.modelo_contrato ?? "");
+    if (c.informativo_html && c.informativo_html.trim()) {
+      setInformativoHtml(c.informativo_html);
+    } else if (/CART[ÃA]O\s*CONSULTA.*SEGUROS/i.test(c.nome)) {
+      setInformativoHtml(INFORMATIVO_CARTAO_CONSULTA_SEGUROS_HTML);
+    } else {
+      setInformativoHtml("");
+    }
     const { data: fs } = await supabase
       .from("cb_convenio_faixas")
       .select("vidas_de, vidas_ate, valor_mensal")
@@ -249,6 +260,7 @@ function ConveniosPage() {
       vigencia_meses: vigenciaMeses,
       beneficios: beneficiosTxt.trim() || null,
       modelo_contrato: modeloContrato.trim() || null,
+      informativo_html: informativoHtml.trim() || null,
     };
     let convenioId = editing?.id;
     if (editing) {
@@ -697,15 +709,22 @@ function ConveniosPage() {
                     <Printer className="h-4 w-4 mr-1" /> Imprimir
                   </Button>
                 </div>
-                <div id="convenio-informativo-print" className="border rounded-md p-6 bg-muted/30 min-h-[300px]">
-                  {/CART[ÃA]O\s*CONSULTA.*SEGUROS/i.test(nome) ? (
-                    <InformativoCartaoConsultaSeguros />
-                  ) : (
-                    <p className="text-sm text-muted-foreground text-center py-12">
-                      Informativo disponível para o convênio "CARTÃO CONSULTA + SEGUROS". Para outros convênios, envie o modelo correspondente.
-                    </p>
-                  )}
+                <div id="convenio-informativo-print">
+                  <RichEditor
+                    value={informativoHtml}
+                    onChange={setInformativoHtml}
+                    clinicaId={clinicaAtual.clinica_id}
+                  />
                 </div>
+                <style>{`
+                  @media print {
+                    @page { size: A4; margin: 10mm; }
+                    body * { visibility: hidden !important; }
+                    #convenio-informativo-print, #convenio-informativo-print * { visibility: visible !important; }
+                    #convenio-informativo-print { position: absolute; left: 0; top: 0; width: 100%; }
+                    #convenio-informativo-print .print\\:hidden { display: none !important; }
+                  }
+                `}</style>
               </div>
             </TabsContent>
           </Tabs>
