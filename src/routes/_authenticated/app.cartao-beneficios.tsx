@@ -28,8 +28,8 @@ function CartaoBeneficiosLayout() {
         <h1 className="text-2xl font-bold">Cartão Benefícios</h1>
       </div>
       <nav className="flex gap-1 border-b">
-        {tabs.filter((t) => loc.pathname.startsWith(t.to)).map((t) => {
-          const active = true;
+        {tabs.map((t) => {
+          const active = loc.pathname === t.to || loc.pathname.startsWith(t.to + "/");
           return (
             <Link
               key={t.to}
