@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, ShieldCheck, Layers, Lightbulb, ArrowLeft, FileText, Info, Printer, Gift } from "lucide-react";
+import { Plus, Pencil, Trash2, ShieldCheck, Layers, Lightbulb, ArrowLeft, FileText, Info, Printer, Gift, FileSignature } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -64,6 +64,7 @@ type Convenio = {
   beneficios: string | null;
   modelo_contrato: string | null;
   informativo_html: string | null;
+  termo_inclusao_html: string | null;
 };
 
 type Faixa = {
@@ -108,6 +109,7 @@ function ConveniosPage() {
   const [beneficiosTxt, setBeneficiosTxt] = useState("");
   const [modeloContrato, setModeloContrato] = useState("");
   const [informativoHtml, setInformativoHtml] = useState("");
+  const [termoInclusaoHtml, setTermoInclusaoHtml] = useState("");
   const [faixas, setFaixas] = useState<Faixa[]>([{ vidas_de: 1, vidas_ate: null, valor_mensal: 0 }]);
   const [valoresMin, setValoresMin] = useState<Record<string, number>>({});
   const [saving, setSaving] = useState(false);
@@ -214,6 +216,7 @@ function ConveniosPage() {
     setMaxDependentes(0); setFidelidadeMeses(0); setVigenciaMeses(12);
     setBeneficiosTxt(""); setModeloContrato("");
     setInformativoHtml("");
+    setTermoInclusaoHtml("");
     setFaixas([{ vidas_de: 1, vidas_ate: null, valor_mensal: 0 }]);
     setBeneficios([]);
     loadCatalogos();
@@ -239,6 +242,7 @@ function ConveniosPage() {
     } else {
       setInformativoHtml("");
     }
+    setTermoInclusaoHtml(c.termo_inclusao_html ?? "");
     const { data: fs } = await supabase
       .from("cb_convenio_faixas")
       .select("vidas_de, vidas_ate, valor_mensal")
@@ -281,6 +285,7 @@ function ConveniosPage() {
       beneficios: beneficiosTxt.trim() || null,
       modelo_contrato: modeloContrato.trim() || null,
       informativo_html: informativoHtml.trim() || null,
+      termo_inclusao_html: termoInclusaoHtml.trim() || null,
     };
     let convenioId = editing?.id;
     if (editing) {
@@ -422,6 +427,7 @@ function ConveniosPage() {
               <TabsTrigger value="beneficios"><Gift className="h-4 w-4 mr-1" />Benefícios</TabsTrigger>
               <TabsTrigger value="contrato"><FileText className="h-4 w-4 mr-1" />Contrato</TabsTrigger>
               <TabsTrigger value="informativo"><Info className="h-4 w-4 mr-1" />Informativo</TabsTrigger>
+              <TabsTrigger value="termo"><FileSignature className="h-4 w-4 mr-1" />Termo de Inclusão</TabsTrigger>
             </TabsList>
             <TabsContent value="info" className="space-y-3 mt-3">
               <div>
