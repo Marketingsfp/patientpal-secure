@@ -11,20 +11,61 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+function readCachedSession(): Session | null {
+  if (typeof window === "undefined") return null;
+  try {
+    for (let i = 0; i < window.localStorage.length; i += 1) {
+      const key = window.localStorage.key(i);
+      if (!key?.startsWith("sb-") || !key.endsWith("-auth-token")) continue;
+      const raw = window.localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      const cached = parsed?.currentSession ?? parsed;
+      if (cached?.access_token && cached?.user) return cached as Session;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(typeof window !== "undefined");
+  const [session, setSession] = useState<Session | null>(() => readCachedSession());
+  const [loading, setLoading] = useState(() => typeof window !== "undefined" && !readCachedSession());
 
   useEffect(() => {
+    let cancelled = false;
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+      if (cancelled) return;
       setSession(s);
       setLoading(false);
     });
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
+
+    const fallbackTimer = window.setTimeout(() => {
+      if (cancelled) return;
+      setSession((current) => current ?? readCachedSession());
       setLoading(false);
-    });
-    return () => subscription.unsubscribe();
+    }, 2500);
+
+    supabase.auth.getSession()
+      .then(({ data }) => {
+        if (cancelled) return;
+        window.clearTimeout(fallbackTimer);
+        setSession(data.session ?? readCachedSession());
+        setLoading(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        window.clearTimeout(fallbackTimer);
+        setSession((current) => current ?? readCachedSession());
+        setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(fallbackTimer);
+      subscription.unsubscribe();
+    };
   }, []);
 
   return (
