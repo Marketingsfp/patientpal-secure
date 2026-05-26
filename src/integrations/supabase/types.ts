@@ -1123,6 +1123,7 @@ export type Database = {
           assinatura_ip: string | null
           assinatura_svg: string | null
           clinica_id: string
+          convenio_id: string | null
           created_at: string
           criado_por: string | null
           data_fim: string | null
@@ -1135,7 +1136,7 @@ export type Database = {
           observacoes: string | null
           paciente_id: string
           paciente_nome: string
-          plano_id: string
+          plano_id: string | null
           status: string
           taxa_adesao: number
           token_publico: string | null
@@ -1147,6 +1148,7 @@ export type Database = {
           assinatura_ip?: string | null
           assinatura_svg?: string | null
           clinica_id: string
+          convenio_id?: string | null
           created_at?: string
           criado_por?: string | null
           data_fim?: string | null
@@ -1159,7 +1161,7 @@ export type Database = {
           observacoes?: string | null
           paciente_id: string
           paciente_nome: string
-          plano_id: string
+          plano_id?: string | null
           status?: string
           taxa_adesao?: number
           token_publico?: string | null
@@ -1171,6 +1173,7 @@ export type Database = {
           assinatura_ip?: string | null
           assinatura_svg?: string | null
           clinica_id?: string
+          convenio_id?: string | null
           created_at?: string
           criado_por?: string | null
           data_fim?: string | null
@@ -1183,7 +1186,7 @@ export type Database = {
           observacoes?: string | null
           paciente_id?: string
           paciente_nome?: string
-          plano_id?: string
+          plano_id?: string | null
           status?: string
           taxa_adesao?: number
           token_publico?: string | null
@@ -1191,6 +1194,13 @@ export type Database = {
           valor_mensal?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "contratos_assinatura_convenio_id_fkey"
+            columns: ["convenio_id"]
+            isOneToOne: false
+            referencedRelation: "cb_convenios"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "contratos_assinatura_plano_id_fkey"
             columns: ["plano_id"]
