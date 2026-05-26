@@ -1043,7 +1043,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                           ) : null}
                         </div>
                         {d.ativo ? (
-                          <Button size="sm" variant="ghost" onClick={() => setExcAlvo(d)}>
+                          <Button size="sm" variant="ghost" disabled={cancelado} onClick={() => setExcAlvo(d)}>
                             <Trash2 className="h-3 w-3 text-destructive" />
                           </Button>
                         ) : null}
