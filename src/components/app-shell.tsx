@@ -295,6 +295,51 @@ export function AppShell() {
   const visibleNavRows = isMedicoOnly ? medicoNavRows : scopedNavRows;
   const subsystemLabel = subsystem ? SUBSYSTEMS[subsystem].label : null;
 
+  // Lista plana de rotas visíveis no menu (respeitando grupos abertos) para navegação por seta
+  const flatNavLeaves = useMemo(() => {
+    const leaves: string[] = [];
+    for (const row of visibleNavRows) {
+      const hideLabel = subsystem === "gestao-pessoas" && row.label === "RH";
+      const open = collapsed || hideLabel ? true : (openGroups[row.label] ?? false);
+      if (!open) continue;
+      for (const item of row.items) {
+        if (isParent(item)) {
+          const subKey = `${row.label}::${item.label}`;
+          const subOpen = collapsed ? true : (openGroups[subKey] ?? false);
+          if (!subOpen) continue;
+          for (const c of item.children) leaves.push(c.to);
+        } else {
+          leaves.push(item.to);
+        }
+      }
+    }
+    return leaves;
+  }, [visibleNavRows, openGroups, collapsed, subsystem]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+      const tgt = e.target as HTMLElement | null;
+      if (tgt) {
+        const tag = tgt.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || tgt.isContentEditable) return;
+        if (tgt.closest('[role="dialog"], [role="listbox"], [role="menu"], [role="combobox"]')) return;
+      }
+      if (flatNavLeaves.length === 0) return;
+      const path = location.pathname;
+      let idx = flatNavLeaves.findIndex((to) => path === to || (to !== "/app" && path.startsWith(to)));
+      if (idx < 0) return;
+      const next = e.key === "ArrowDown"
+        ? Math.min(flatNavLeaves.length - 1, idx + 1)
+        : Math.max(0, idx - 1);
+      if (next === idx) return;
+      e.preventDefault();
+      navigate({ to: flatNavLeaves[next] });
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [flatNavLeaves, location.pathname, navigate]);
+
   return (
     <div className="h-screen flex bg-background overflow-hidden">
       {!isChooser && (
