@@ -1,57 +1,27 @@
-## 1. Taxa de boleto: +R$ 3,50 por parcela
+## Objetivo
 
-Quando a forma de pagamento da venda for **Boleto**, somar R$ 3,50 em cada parcela mensal gerada.
+Na tela de venda do contrato (cartão benefícios), adicionar um campo **"Nº de pessoas no contrato"** que lista as opções vindas das **Faixas de Preço** do convênio selecionado. O valor mensal da parcela passa a vir dessa escolha (não mais do cálculo automático por `titular + dependentes`).
 
-- `src/routes/_authenticated/app.contratos.tsx` (função `salvar`):
-  - Ao montar `parcelas`, usar `valor = valor_mensal + (forma === "boleto" ? 3.5 : 0)`.
-- No formulário de venda, mostrar logo abaixo do "Valor mensal" um aviso quando boleto estiver selecionado: *"+ R$ 3,50 de taxa de boleto por parcela — total da parcela: R$ X,XX"*.
-- O campo `valor_mensal` salvo em `contratos_assinatura` permanece sem a taxa (valor "limpo" do convênio); a taxa entra apenas em cada `contrato_mensalidades.valor`.
-- A taxa de adesão (cobrança única) não é afetada.
+## Comportamento
 
-## 2. Variável `{{DATA_HOJE}}` por extenso
-
-Hoje a variável é renderizada como `26/05/2026`. Passar a renderizar como **"26 de maio de 2026"** (formato padrão de contratos brasileiros).
-
-- Criar helper `fmtDataExtenso(dateISO)` em `src/lib/print-contrato.ts` que retorna `"<dia> de <mês> de <ano>"` (meses em minúsculo: janeiro, fevereiro…).
-- Usar esse helper:
-  - `src/lib/print-contrato.ts` → substituição de `DATA_HOJE`.
-  - `src/routes/_authenticated/app.contratos.tsx` → memo `contratoTexto` (aba "Contrato").
-- `{{PACIENTE_NASCIMENTO}}` e `{{DATA_INICIO}}` (se existir) continuam no formato `dd/mm/aaaa`.
-
-> Obs: estou usando "por extenso" no sentido usual de contrato (dia + mês escrito + ano em algarismos). Se quiser **totalmente** por extenso ("vinte e seis de maio de dois mil e vinte e seis"), me avise que troco o helper.
-
-## 3. Variáveis por dependente no modelo do contrato
-
-O template do convênio "CARTÃO CONSULTA + SEGUROS" usa **5 ocorrências** literais de `{{DEPENDENTES}}` (uma por slot de dependente). Como hoje `{{DEPENDENTES}}` é substituído sempre pela lista completa, o único dependente cadastrado acaba sendo impresso 5×.
-
-Solução: criar variáveis numeradas por slot.
-
-- Novos tokens reconhecidos na substituição:
-  - `{{DEPENDENTE_1}}` … `{{DEPENDENTE_N}}` → apenas o **nome**, ou string vazia se o slot não foi preenchido.
-  - `{{DEPENDENTE_1_PARENTESCO}}` … `{{DEPENDENTE_N_PARENTESCO}}` → parentesco do slot ou vazio.
-  - `{{DEPENDENTE_1_CPF}}` … `{{DEPENDENTE_N_CPF}}` → CPF do slot ou vazio.
-- Mantém `{{DEPENDENTES}}` (lista completa) para retro-compatibilidade.
-- Aplicado em **dois lugares** (mesma lógica):
-  - `src/lib/print-contrato.ts` (impressão A4).
-  - `src/routes/_authenticated/app.contratos.tsx` (memo `contratoTexto` da aba "Contrato").
-- Em `src/routes/_authenticated/app.cartao-beneficios.convenios.tsx`, adicionar à lista de variáveis disponíveis (no editor de modelo de contrato): "Dependente 1 (nome)", "Dependente 1 — parentesco", … até o `max_dependentes` do convênio sendo editado.
-
-Depois desse ajuste, o template precisa ser editado uma vez (trocar as 5 ocorrências de `{{DEPENDENTES}}` por `{{DEPENDENTE_1}}`…`{{DEPENDENTE_5}}`); avisarei isso no toast/UI do editor.
-
-## 4. Respeitar limite máximo de dependentes
-
-O `addDep` em `app.contratos.tsx` só bloqueia quando `max > 0`. Se um convênio estiver com `max_dependentes = 0` (ou nulo), hoje vira "ilimitado" — foi o que permitiu adicionar 7 numa simulação.
-
-- Tratar `max_dependentes` como **limite real sempre**:
-  - `0` ou `null` → 0 dependentes permitidos (somente titular).
-  - `>0` → até esse número (já funciona, mantemos).
-- Desabilitar o botão "Adicionar cliente como dependente…" e mostrar "Limite atingido (X/X)" quando `deps.length >= max`.
-- Validar novamente no `salvar` antes de inserir em `contrato_dependentes`, recusando com toast se o array exceder `max`.
+- Ao selecionar um convênio, carregar suas faixas (`cb_convenio_faixas`) ordenadas por `vidas_de`.
+- Renderizar um `Select` com uma opção por faixa, no formato:
+  - faixa com `vidas_ate` igual a `vidas_de` → `"1 pessoa — R$ 120,00"`
+  - faixa com intervalo → `"3 a 4 pessoas — R$ 180,00"`
+  - faixa aberta (`vidas_ate = null`) → `"5+ pessoas — R$ 250,00"`
+- Pré-selecionar a faixa que cobre `1 + deps.length` (estado atual) ao abrir/trocar de convênio; se o usuário trocar manualmente, respeita a escolha dele.
+- O **Valor mensal** vira somente leitura, ditado pela faixa escolhida. Some a taxa de boleto (R$ 3,50/parcela) na hora de gravar `contrato_mensalidades` — regra já existente, sem mudança.
+- Se o convênio não tiver faixas cadastradas, ocultar o campo e manter o comportamento atual (`convenio.valor_mensal`).
+- Continuar respeitando o limite de dependentes (`max_dependentes`) — sem alteração nessa regra.
 
 ## Arquivos afetados
 
-- `src/routes/_authenticated/app.contratos.tsx` — formulário de venda + memo do contrato.
-- `src/lib/print-contrato.ts` — impressão A4.
-- `src/routes/_authenticated/app.cartao-beneficios.convenios.tsx` — lista de variáveis no editor de modelo.
+- `src/routes/_authenticated/app.contratos.tsx`
+  - Novo estado `faixaId` (id da faixa escolhida).
+  - Remover o `useEffect` que recalcula valor via `vidas` (titular+deps) e trocar pela seleção explícita: ao mudar `faixaId`, setar `valor` com `faixa.valor_mensal`.
+  - Ao carregar faixas / trocar convênio, definir `faixaId` inicial pela faixa que cobre `1 + deps.length` (fallback: primeira faixa).
+  - Renderizar `<Select>` "Nº de pessoas no contrato" logo abaixo do campo Convênio, antes de "Paciente titular".
+  - Tornar o input "Valor mensal" `readOnly` quando houver faixas; manter editável caso não haja.
+  - Helper local `labelFaixa(f)` para gerar o texto da opção.
 
-Nada no banco precisa mudar.
+Nada muda no banco nem em outros arquivos.
