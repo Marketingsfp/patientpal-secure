@@ -475,6 +475,17 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
             >
               <AlignRight className="h-4 w-4" />
             </ToolbarButton>
+            <ToolbarButton
+              title="Cortar imagem"
+              onClick={() => {
+                const src = editor.getAttributes("image").src as string | undefined;
+                if (!src) return;
+                setCropSrc(src);
+                setCropOpen(true);
+              }}
+            >
+              <Crop className="h-4 w-4" />
+            </ToolbarButton>
             <Select
               value=""
               onValueChange={(v) => {
