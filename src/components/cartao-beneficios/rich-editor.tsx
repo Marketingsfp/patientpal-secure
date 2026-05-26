@@ -75,7 +75,7 @@ export function RichEditor({ value, onChange, clinicaId }: Props) {
     editorProps: {
       attributes: {
         class:
-          "prose prose-sm max-w-none focus:outline-none min-h-[60vh] [&_table]:w-full [&_table]:border-collapse [&_th]:border [&_th]:border-black [&_th]:p-1 [&_td]:border [&_td]:border-black [&_td]:p-1",
+          "rt-editor prose prose-sm max-w-none focus:outline-none min-h-[60vh]",
       },
     },
     onUpdate: ({ editor }) => onChange(editor.getHTML()),
