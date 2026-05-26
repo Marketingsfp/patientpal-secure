@@ -126,7 +126,7 @@ export function ContratosPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold flex items-center gap-2"><FileSignature className="h-6 w-6 text-primary"/>Contratos</h1>
-        <Button onClick={() => setView("new")} disabled={convenios.length === 0}><Plus className="h-4 w-4 mr-2"/>Nova venda</Button>
+        <Button onClick={() => setView("new")} disabled={convenios.length === 0}><Plus className="h-4 w-4 mr-2"/>Venda</Button>
       </div>
       {convenios.length === 0 && !loading ? (
         <div className="rounded-md border bg-muted/40 p-3 text-sm">Cadastre um convênio antes em <strong>Cartão de Benefícios → Convênio</strong>.</div>
