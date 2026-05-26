@@ -533,6 +533,8 @@ function ConfiguracaoWhatsApp() {
   const [canal, setCanal] = useState<"evolution" | "oficial" | "instagram" | "facebook" | "site">("oficial");
   const [showToken, setShowToken] = useState(false);
   const [form, setForm] = useState({ display_name: "", phone_number_id: "", waba_id: "", access_token: "" });
+  const [horario, setHorario] = useState({ inicio: "08:00", fim: "18:00" });
+  const [savingHorario, setSavingHorario] = useState(false);
 
   const carregar = useCallback(async () => {
     if (!clinicaAtual) return;
@@ -540,6 +542,10 @@ function ConfiguracaoWhatsApp() {
     try {
       const data = await obter({ data: { clinicaId: clinicaAtual.clinica_id } });
       setCfg(data as WppCfg);
+      setHorario({
+        inicio: (data as WppCfg).horario_inicio || "08:00",
+        fim: (data as WppCfg).horario_fim || "18:00",
+      });
     } catch (e: any) {
       toast.error(e?.message ?? "Erro ao carregar configuração");
     } finally {
@@ -627,6 +633,30 @@ function ConfiguracaoWhatsApp() {
     }
   };
 
+  const onSalvarHorario = async () => {
+    if (!cfg) return;
+    if (horario.inicio >= horario.fim) {
+      toast.error("O horário inicial deve ser menor que o final");
+      return;
+    }
+    setSavingHorario(true);
+    try {
+      await salvar({
+        data: {
+          clinicaId: cfg.clinica_id,
+          horario_inicio: horario.inicio,
+          horario_fim: horario.fim,
+        },
+      });
+      toast.success("Horário salvo");
+      await carregar();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Erro ao salvar horário");
+    } finally {
+      setSavingHorario(false);
+    }
+  };
+
   const statusBadge = cfg.ultimo_teste_ok
     ? <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100"><CheckCircle2 className="h-3 w-3 mr-1" /> Conectado{cfg.display_phone_number ? ` — ${cfg.display_phone_number}` : ""}</Badge>
     : cfg.ultimo_teste_ok === false
@@ -699,6 +729,40 @@ function ConfiguracaoWhatsApp() {
             <p className="text-xs text-muted-foreground">
               Em <strong>Meta for Developers → Seu App → WhatsApp → Configuration → Webhooks</strong>, cole a URL e o Verify Token, depois assine o campo <code>messages</code>.
             </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Horário de atendimento humano</CardTitle>
+          <CardDescription>
+            Dentro deste intervalo a equipe responde manualmente. <strong>Fora</strong> dele a Nina responde automaticamente pelo WhatsApp.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4 max-w-sm">
+            <div className="space-y-1">
+              <Label>Início</Label>
+              <Input
+                type="time"
+                value={horario.inicio}
+                onChange={(e) => setHorario({ ...horario, inicio: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Fim</Label>
+              <Input
+                type="time"
+                value={horario.fim}
+                onChange={(e) => setHorario({ ...horario, fim: e.target.value })}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <Button onClick={onSalvarHorario} disabled={savingHorario}>
+              {savingHorario ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Salvando…</> : "Salvar horário"}
+            </Button>
           </div>
         </CardContent>
       </Card>
