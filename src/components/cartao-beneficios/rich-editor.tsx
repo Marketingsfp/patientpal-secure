@@ -281,6 +281,29 @@ export function RichEditor({ value, onChange, clinicaId }: Props) {
         <ToolbarButton title="Excluir tabela" onClick={() => editor.chain().focus().deleteTable().run()} disabled={!editor.can().deleteTable()}>
           <Trash2 className="h-4 w-4" />
         </ToolbarButton>
+        <label
+          className="h-8 w-8 inline-flex items-center justify-center rounded hover:bg-muted cursor-pointer relative"
+          title="Cor de fundo da célula (selecione células para pintar linha/coluna)"
+        >
+          <TableIcon className="h-4 w-4" />
+          <span
+            className="absolute bottom-1 left-1.5 right-1.5 h-1 rounded-sm border border-border"
+            style={{ background: (editor.getAttributes("tableCell").backgroundColor as string) || (editor.getAttributes("tableHeader").backgroundColor as string) || "#ffffff" }}
+          />
+          <input
+            type="color"
+            className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-not-allowed"
+            disabled={!editor.can().setCellAttribute("backgroundColor", "#ffffff")}
+            onChange={(e) => editor.chain().focus().setCellAttribute("backgroundColor", e.target.value).run()}
+          />
+        </label>
+        <ToolbarButton
+          title="Remover cor da célula"
+          onClick={() => editor.chain().focus().setCellAttribute("backgroundColor", null).run()}
+          disabled={!editor.can().setCellAttribute("backgroundColor", null)}
+        >
+          <span className="text-[10px] font-bold">⌫</span>
+        </ToolbarButton>
 
         <div className="w-px h-6 bg-border mx-1" />
         <ToolbarButton title="Inserir imagem" onClick={() => fileRef.current?.click()}>
