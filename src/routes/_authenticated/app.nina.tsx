@@ -90,6 +90,7 @@ function NinaPage() {
   const clinicaId = clinicaAtual?.clinica_id;
   const [conversas, setConversas] = useState<Conv[]>([]);
   const [sel, setSel] = useState<Conv | null>(null);
+  const [abaAtiva, setAbaAtiva] = useState<string>("chat");
   const [draft, setDraft] = useState("");
   const [busca, setBusca] = useState("");
   const [loadingConv, setLoadingConv] = useState(false);
