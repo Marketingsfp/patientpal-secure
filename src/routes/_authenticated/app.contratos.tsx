@@ -283,7 +283,7 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
     const { data: contrato, error } = await supabase.from("contratos_assinatura").insert({
       clinica_id: clinicaId, convenio_id: convenio.id, paciente_id: titular.id, paciente_nome: titular.nome,
       data_inicio: dataInicio, dia_vencimento: diaVenc, valor_mensal: valor, taxa_adesao: taxa,
-      num_parcelas: convenio.num_parcelas, forma_pagamento: forma, observacoes: obs, criado_por: userId,
+      num_parcelas: convenio.num_parcelas, forma_pagamento: tipoCobranca, observacoes: obs, criado_por: userId,
     }).select("*").single();
     if (error || !contrato) { setSaving(false); return toast.error(error?.message ?? "Erro"); }
 
@@ -296,7 +296,7 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
 
     // Gerar 12 parcelas
     const base = new Date(dataInicio + "T00:00:00");
-    const valorParcela = valor + (forma === "boleto" ? TAXA_BOLETO : 0);
+    const valorParcela = valor + (tipoCobranca === "boleto" ? TAXA_BOLETO : 0);
     const parcelas = Array.from({ length: convenio.num_parcelas }, (_, i) => {
       const venc = new Date(base.getFullYear(), base.getMonth() + i, diaVenc);
       return {
@@ -309,6 +309,22 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
 
     setSaving(false);
     toast.success(`Contrato #${contrato.numero} criado com ${convenio.num_parcelas} mensalidades`);
+
+    // Pós-criação: gerar carnê ou boletos conforme tipo de cobrança
+    if (tipoCobranca === "carne") {
+      try {
+        await gerarCarnePDF(contrato.id);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Falha ao gerar carnê");
+      }
+    } else {
+      try {
+        const res = await gerarBoletosFn({ data: { contratoId: contrato.id } });
+        toast.info(res.mensagem);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Falha ao gerar boletos");
+      }
+    }
     onCreated();
   };
 
