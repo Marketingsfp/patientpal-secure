@@ -66,10 +66,22 @@ function renderCard(item: CardItem, planoTipo: string): string {
 export async function printCartoes(contratoId: string) {
   const { data: c, error } = await supabase
     .from("contratos_assinatura")
-    .select(`*, plano:planos_assinatura(nome, tipo, vigencia_meses), clinica:clinicas(nome, cidade, estado, telefone), paciente:pacientes(cpf)`)
+    .select("*")
     .eq("id", contratoId)
     .maybeSingle();
   if (error || !c) throw new Error(error?.message ?? "Contrato não encontrado");
+
+  const [{ data: pl }, { data: cl }, { data: pa }] = await Promise.all([
+    c.plano_id
+      ? supabase.from("planos_assinatura").select("nome, tipo, vigencia_meses").eq("id", c.plano_id).maybeSingle()
+      : Promise.resolve({ data: null as any }),
+    c.clinica_id
+      ? supabase.from("clinicas").select("nome, cidade, estado, telefone").eq("id", c.clinica_id).maybeSingle()
+      : Promise.resolve({ data: null as any }),
+    c.paciente_id
+      ? supabase.from("pacientes").select("cpf").eq("id", c.paciente_id).maybeSingle()
+      : Promise.resolve({ data: null as any }),
+  ]);
 
   const { data: deps } = await supabase
     .from("contrato_dependentes")
@@ -77,11 +89,11 @@ export async function printCartoes(contratoId: string) {
     .eq("contrato_id", contratoId)
     .eq("ativo", true);
 
-  const cl = (c as any).clinica ?? {};
-  const pl = (c as any).plano ?? {};
-  const pa = (c as any).paciente ?? {};
+  const _cl: any = cl ?? {};
+  const _pl: any = pl ?? {};
+  const _pa: any = pa ?? {};
 
-  const vigencia = Number(pl.vigencia_meses ?? 12);
+  const vigencia = Number(_pl.vigencia_meses ?? 12);
   const validade = fmtData(addMeses(c.data_inicio, vigencia));
   const numero = String(c.numero).padStart(6, "0");
 
@@ -93,15 +105,15 @@ export async function printCartoes(contratoId: string) {
     (pacs ?? []).forEach((p: any) => depCpf.set(p.id, p.cpf ?? ""));
   }
 
-  const cidadeUf = [cl.cidade, cl.estado].filter(Boolean).join("/");
-  const clinicaNome = cl.nome ?? "";
-  const telefone = cl.telefone ?? "";
-  const planoNome = pl.nome ?? "";
+  const cidadeUf = [_cl.cidade, _cl.estado].filter(Boolean).join("/");
+  const clinicaNome = _cl.nome ?? "";
+  const telefone = _cl.telefone ?? "";
+  const planoNome = _pl.nome ?? "";
 
   const items: CardItem[] = [
     {
       nome: c.paciente_nome,
-      cpf: pa.cpf ?? "",
+      cpf: _pa.cpf ?? "",
       tipo: "TITULAR",
       numero, plano: planoNome, validade, clinica: clinicaNome, cidadeUf, telefone,
     },
@@ -141,7 +153,7 @@ export async function printCartoes(contratoId: string) {
   @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
 </style></head>
 <body>
-  <div class="sheet">${items.map((i) => renderCard(i, pl.tipo ?? "outro")).join("")}</div>
+  <div class="sheet">${items.map((i) => renderCard(i, _pl.tipo ?? "outro")).join("")}</div>
   <script>window.onload = () => { setTimeout(() => { window.print(); }, 200); };</script>
 </body></html>`;
 
