@@ -736,14 +736,17 @@ function ConveniosPage() {
                   <span className="font-medium"> Inserir variável </span>
                   na barra de ferramentas para incluir campos como{" "}
                   <code>{"{{PACIENTE_NOME}}"}</code>, <code>{"{{VALOR_MENSAL}}"}</code>,{" "}
-                  <code>{"{{DEPENDENTES}}"}</code>, <code>{"{{CLINICA_NOME}}"}</code>.
+                  <code>{"{{DEPENDENTE_1}}"}</code>, <code>{"{{DEPENDENTE_1_PARENTESCO}}"}</code>,{" "}
+                  <code>{"{{CLINICA_NOME}}"}</code>. Use as variáveis numeradas
+                  (<code>{"{{DEPENDENTE_1}}"}</code>… até o máximo de dependentes do convênio)
+                  para um slot por dependente; slots não preenchidos ficam vazios.
                 </p>
                 <div id="convenio-contrato-print">
                   <RichEditor
                     value={modeloContrato}
                     onChange={setModeloContrato}
                     clinicaId={clinicaAtual.clinica_id}
-                    variables={CONTRATO_VARIAVEIS}
+                    variables={buildContratoVariaveis(maxDependentes)}
                   />
                 </div>
                 <style>{`
