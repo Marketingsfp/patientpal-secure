@@ -229,8 +229,13 @@ function CheckinPage() {
         </Card>
       ) : (
         <div className="grid gap-2">
-          {filtrados.map((a) => (
+          {filtrados.map((a, idx) => (
             <Card key={a.id} className="p-3 flex items-center gap-3 flex-wrap">
+              {idx < 9 && (
+                <kbd className="hidden md:inline-flex h-7 min-w-7 items-center justify-center rounded border bg-muted px-1.5 text-xs font-mono">
+                  Alt+{idx + 1}
+                </kbd>
+              )}
               {a.paciente?.foto_url ? (
                 <img src={a.paciente.foto_url} alt="" className="h-12 w-12 rounded-full object-cover border" />
               ) : (
