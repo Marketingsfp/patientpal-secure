@@ -345,6 +345,19 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
         <ToolbarButton title="Inserir imagem" onClick={() => fileRef.current?.click()}>
           <ImageIcon className="h-4 w-4" />
         </ToolbarButton>
+        <ToolbarButton
+          title="Excluir imagem selecionada"
+          disabled={!editor.isActive("image")}
+          onClick={() => {
+            if (editor.isActive("image")) {
+              editor.chain().focus().deleteSelection().run();
+            } else {
+              toast.info("Clique na imagem que deseja excluir e tente novamente.");
+            }
+          }}
+        >
+          <Trash2 className="h-4 w-4" />
+        </ToolbarButton>
         <ToolbarButton title="Link" active={editor.isActive("link")} onClick={setLink}>
           <LinkIcon className="h-4 w-4" />
         </ToolbarButton>
