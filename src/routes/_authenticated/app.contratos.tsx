@@ -424,7 +424,7 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
               {faixas.length > 0
                 ? "Definido pela faixa de pessoas selecionada acima."
                 : "Definido pelo convênio."}
-              {forma === "boleto" ? (
+              {tipoCobranca === "boleto" ? (
                 <span className="block text-amber-600 font-medium">
                   + {BRL(TAXA_BOLETO)} de taxa de boleto por parcela — total da parcela: {BRL(valor + TAXA_BOLETO)}
                 </span>
@@ -436,17 +436,51 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
             <div className="h-10 rounded-md border bg-muted/30 px-3 flex items-center font-semibold">{BRL(taxa)}</div>
             <p className="text-xs text-muted-foreground mt-1">Cobrança única, definida pelo convênio.</p>
           </div>
-          <div className="col-span-2"><Label>Forma de pagamento</Label>
-            <Select value={forma} onValueChange={setForma}>
-              <SelectTrigger><SelectValue/></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="dinheiro">Dinheiro</SelectItem>
-                <SelectItem value="carne">Carnê</SelectItem>
-                <SelectItem value="boleto">Boleto</SelectItem>
-                <SelectItem value="pix">PIX</SelectItem>
-                <SelectItem value="cartao_credito">Cartão de Crédito</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="col-span-2">
+            <Label>Tipo de cobrança</Label>
+            <div className="grid grid-cols-2 gap-3 mt-1">
+              {([
+                {
+                  v: "boleto" as const,
+                  icon: Barcode,
+                  title: "Boleto bancário",
+                  desc: `Geramos um boleto via banco para cada parcela. Taxa de ${BRL(TAXA_BOLETO)} por boleto.`,
+                },
+                {
+                  v: "carne" as const,
+                  icon: FileText,
+                  title: "Carnê interno",
+                  desc: "Geramos um PDF de carnê com todas as parcelas para baixar/imprimir. Sem taxa.",
+                },
+              ]).map((opt) => {
+                const Icon = opt.icon;
+                const ativo = tipoCobranca === opt.v;
+                return (
+                  <button
+                    type="button"
+                    key={opt.v}
+                    onClick={() => setTipoCobranca(opt.v)}
+                    className={`text-left rounded-md border p-3 transition flex gap-3 items-start ${
+                      ativo
+                        ? "border-primary ring-2 ring-primary/30 bg-primary/5"
+                        : "border-border hover:bg-muted/50"
+                    }`}
+                  >
+                    <Icon className={`h-5 w-5 mt-0.5 ${ativo ? "text-primary" : "text-muted-foreground"}`} />
+                    <div className="flex-1">
+                      <div className="font-semibold text-sm flex items-center gap-2">
+                        {opt.title}
+                        {ativo ? <Check className="h-4 w-4 text-primary" /> : null}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-0.5">{opt.desc}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              A forma de pagamento real (Dinheiro / PIX / Cartão / etc.) será escolhida apenas na hora de baixar cada parcela.
+            </p>
           </div>
           <div className="col-span-2 border-t pt-3">
             <Label>
