@@ -718,11 +718,19 @@ function ConveniosPage() {
                 </div>
                 <style>{`
                   @media print {
-                    @page { size: A4; margin: 10mm; }
+                    @page { size: A4; margin: 12mm; }
                     body * { visibility: hidden !important; }
                     #convenio-informativo-print, #convenio-informativo-print * { visibility: visible !important; }
                     #convenio-informativo-print { position: absolute; left: 0; top: 0; width: 100%; }
                     #convenio-informativo-print .print\\:hidden { display: none !important; }
+                    /* Neutralize the editor chrome (scroll wrapper + A4 mock page) for print */
+                    #convenio-informativo-print .rt-shell { border: 0 !important; border-radius: 0 !important; overflow: visible !important; background: transparent !important; }
+                    #convenio-informativo-print .rt-scroll { max-height: none !important; overflow: visible !important; background: transparent !important; }
+                    #convenio-informativo-print .rt-page { width: 100% !important; min-height: 0 !important; margin: 0 !important; padding: 0 !important; box-shadow: none !important; background: transparent !important; }
+                    #convenio-informativo-print .ProseMirror { min-height: 0 !important; }
+                    #convenio-informativo-print table { page-break-inside: auto; }
+                    #convenio-informativo-print tr { page-break-inside: avoid; page-break-after: auto; }
+                    #convenio-informativo-print img { max-width: 100% !important; height: auto !important; }
                   }
                 `}</style>
               </div>
