@@ -104,13 +104,33 @@ interface Props {
 
 export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
-  // Margens da página em mm (A4: 210 × 297). Padrão: 12mm topo/baixo, 14mm laterais.
-  const [marginTop, setMarginTop] = useState(12);
-  const [marginBottom, setMarginBottom] = useState(12);
-  const [marginLeft, setMarginLeft] = useState(14);
-  const [marginRight, setMarginRight] = useState(14);
-  const [showRuler, setShowRuler] = useState(true);
+  // Margens da página em mm (A4: 210 × 297). Persistidas em localStorage por clínica.
+  const storageKey = `rt-margins:${clinicaId || "default"}`;
+  const readStored = () => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = window.localStorage.getItem(storageKey);
+      return raw ? (JSON.parse(raw) as { t: number; b: number; l: number; r: number; s: boolean }) : null;
+    } catch { return null; }
+  };
+  const stored = readStored();
+  const [marginTop, setMarginTop] = useState(stored?.t ?? 12);
+  const [marginBottom, setMarginBottom] = useState(stored?.b ?? 12);
+  const [marginLeft, setMarginLeft] = useState(stored?.l ?? 14);
+  const [marginRight, setMarginRight] = useState(stored?.r ?? 14);
+  const [showRuler, setShowRuler] = useState(stored?.s ?? true);
   const pageWidthMm = 210;
+
+  // Persiste margens sempre que mudarem
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(
+        storageKey,
+        JSON.stringify({ t: marginTop, b: marginBottom, l: marginLeft, r: marginRight, s: showRuler }),
+      );
+    } catch { /* ignore */ }
+  }, [storageKey, marginTop, marginBottom, marginLeft, marginRight, showRuler]);
 
   const editor = useEditor({
     extensions: [
