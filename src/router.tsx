@@ -25,9 +25,10 @@ export const getRouter = () => {
     context: { queryClient },
     scrollRestoration: true,
     defaultPreloadStaleTime: 0,
-    // Preload apenas quando o link entra no viewport (mais leve que "intent",
-    // que dispara prefetch a cada hover na sidebar).
-    defaultPreload: "viewport",
+    // Preload no hover (intent). "viewport" estava disparando
+    // loadRouteMatch em matches ainda n o inicializados e quebrando a
+    // navega o com "Cannot read properties of undefined (reading '_nonReactive')".
+    defaultPreload: "intent",
     defaultPreloadDelay: 150,
   });
 
