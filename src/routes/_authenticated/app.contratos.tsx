@@ -1255,6 +1255,38 @@ h1, h2, h3 { margin: 0 0 6mm; }
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={cancelOpen} onOpenChange={(v) => { setCancelOpen(v); if (!v) setCancelMotivo(""); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cancelar contrato</DialogTitle>
+            <DialogDescription>
+              Esta ação cancela o plano e todos os benefícios deste contrato. Informe o motivo do cancelamento.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="cancel-motivo">Motivo</Label>
+            <Textarea
+              id="cancel-motivo"
+              rows={4}
+              placeholder="Ex.: solicitado pelo titular, inadimplência, mudança de plano…"
+              value={cancelMotivo}
+              onChange={(e) => setCancelMotivo(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setCancelOpen(false)} disabled={cancelSaving}>Voltar</Button>
+            <Button
+              variant="destructive"
+              onClick={confirmarCancelamento}
+              disabled={cancelSaving || !cancelMotivo.trim()}
+            >
+              {cancelSaving ? "Cancelando…" : "Confirmar cancelamento"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
