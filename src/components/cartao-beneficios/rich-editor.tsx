@@ -226,6 +226,21 @@ const ResizableImage = Image.extend({
           return { class: `rt-img-${attrs.align}` };
         },
       },
+      free: {
+        default: false,
+        parseHTML: (el) => (el as HTMLElement).getAttribute("data-free") === "1",
+        renderHTML: (attrs) => (attrs.free ? { "data-free": "1" } : {}),
+      },
+      posX: {
+        default: 0,
+        parseHTML: (el) => Number((el as HTMLElement).getAttribute("data-x") || 0),
+        renderHTML: (attrs) => (attrs.free ? { "data-x": String(attrs.posX ?? 0) } : {}),
+      },
+      posY: {
+        default: 0,
+        parseHTML: (el) => Number((el as HTMLElement).getAttribute("data-y") || 0),
+        renderHTML: (attrs) => (attrs.free ? { "data-y": String(attrs.posY ?? 0) } : {}),
+      },
     };
   },
   addNodeView() {
