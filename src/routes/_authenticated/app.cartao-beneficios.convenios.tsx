@@ -24,6 +24,26 @@ import {
 import { RichEditor } from "@/components/cartao-beneficios/rich-editor";
 import { INFORMATIVO_CARTAO_CONSULTA_SEGUROS_HTML } from "@/components/cartao-beneficios/informativo-seed";
 
+const CONTRATO_VARIAVEIS: { label: string; token: string }[] = [
+  { label: "Nome da clínica", token: "CLINICA_NOME" },
+  { label: "CNPJ da clínica", token: "CLINICA_CNPJ" },
+  { label: "Endereço da clínica", token: "CLINICA_ENDERECO" },
+  { label: "Cidade", token: "CIDADE" },
+  { label: "Nome do paciente", token: "PACIENTE_NOME" },
+  { label: "CPF do paciente", token: "PACIENTE_CPF" },
+  { label: "Nascimento do paciente", token: "PACIENTE_NASCIMENTO" },
+  { label: "Endereço do paciente", token: "PACIENTE_ENDERECO" },
+  { label: "Telefone do paciente", token: "PACIENTE_TELEFONE" },
+  { label: "E-mail do paciente", token: "PACIENTE_EMAIL" },
+  { label: "Valor mensal", token: "VALOR_MENSAL" },
+  { label: "Taxa de adesão", token: "TAXA_ADESAO" },
+  { label: "Nº de parcelas", token: "NUM_PARCELAS" },
+  { label: "Vigência (meses)", token: "VIGENCIA_MESES" },
+  { label: "Fidelidade (meses)", token: "FIDELIDADE_MESES" },
+  { label: "Data de hoje", token: "DATA_HOJE" },
+  { label: "Dependentes", token: "DEPENDENTES" },
+];
+
 export const Route = createFileRoute("/_authenticated/app/cartao-beneficios/convenios")({
   component: ConveniosPage,
   head: () => ({ meta: [{ title: "Convênio — Cartão Benefícios" }] }),
