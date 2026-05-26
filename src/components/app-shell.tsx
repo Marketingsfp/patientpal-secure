@@ -340,6 +340,11 @@ export function AppShell() {
     return () => window.removeEventListener("keydown", onKey);
   }, [flatNavLeaves, location.pathname, navigate]);
 
+  useEffect(() => {
+    const el = document.querySelector<HTMLElement>('[data-nav-active="true"]');
+    if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [location.pathname]);
+
   return (
     <div className="h-screen flex bg-background overflow-hidden">
       {!isChooser && (
