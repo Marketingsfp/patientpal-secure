@@ -808,7 +808,6 @@ h1, h2, h3 { margin: 0 0 6mm; }
   };
 
   const confirmarIncluir = async () => {
-    // implementation below
     if (!incPaciente) { toast.error("Selecione um paciente"); return; }
     if (depsAtivos.length >= maxDep) {
       toast.error(maxDep === 0 ? "Este convênio não permite dependentes." : `Limite de ${maxDep} dependentes atingido.`);
