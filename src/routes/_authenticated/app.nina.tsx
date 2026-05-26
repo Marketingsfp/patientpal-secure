@@ -429,20 +429,23 @@ function NinaTreinada() {
           {messages.map((m, i) => (
             <div key={i} className={`flex ${m.role === "assistant" ? "justify-start" : "justify-end"}`}>
               <div
-                className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm shadow-sm whitespace-pre-wrap ${
+                className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm shadow-sm break-words ${
                   m.role === "assistant"
                     ? "bg-card border border-border rounded-bl-sm"
                     : "bg-emerald-500 text-white rounded-br-sm"
                 }`}
               >
-                {m.content}
+                <NinaMessage
+                  content={m.content}
+                  variant={m.role === "assistant" ? "assistant" : "user"}
+                />
               </div>
             </div>
           ))}
           {loading && (
             <div className="flex justify-start">
               <div className="bg-card border border-border rounded-2xl rounded-bl-sm px-4 py-2 text-sm flex items-center gap-2 text-muted-foreground">
-                <Loader2 className="h-3 w-3 animate-spin" /> Nina está digitando…
+                <TypingDots /> <span>Nina está digitando…</span>
               </div>
             </div>
           )}
