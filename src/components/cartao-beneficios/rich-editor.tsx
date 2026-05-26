@@ -525,10 +525,10 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
           </>
         )}
         <input
-          ref={fileRef} type="file" accept="image/*" className="hidden"
+          ref={fileRef} type="file" accept="image/*" multiple className="hidden"
           onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) handleUpload(f);
+            const files = e.target.files ? Array.from(e.target.files) : [];
+            if (files.length) handleUploadMany(files);
             e.target.value = "";
           }}
         />
