@@ -794,6 +794,33 @@ function AgendaPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [formaPagOpen, formaPagOpcoes, formaPagCtx]);
 
+  // Atalhos da tela Agenda:
+  // N = novo encaixe, F = focar filtro de profissional, R = recarregar
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tgt = e.target as HTMLElement | null;
+      if (tgt) {
+        const tag = tgt.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || tgt.isContentEditable) return;
+        if (tgt.closest('[role="dialog"], [role="listbox"], [role="menu"], [role="combobox"]')) return;
+      }
+      if (e.altKey || e.ctrlKey || e.metaKey) return;
+      const k = e.key.toLowerCase();
+      if (k === "n") {
+        e.preventDefault();
+        openNew();
+      } else if (k === "f") {
+        const el = document.querySelector<HTMLElement>("[data-agenda-filtro-prof]");
+        if (el) { e.preventDefault(); el.focus(); }
+      } else if (k === "r") {
+        e.preventDefault();
+        void load();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   const imprimirGR = async (a: Agendamento) => {
     if (!clinicaAtual) return;
     try {
@@ -1121,7 +1148,7 @@ function AgendaPage() {
                     >
                       Salvar e Pagar
                     </Button>
-                    <Button type="submit" disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
+                    <Button type="submit" data-primary disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
                   </>
                 )}
               </DialogFooter>
@@ -1468,7 +1495,7 @@ function AgendaPage() {
           <div className="space-y-0.5">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Cliente</Label>
             <div className="flex gap-1">
-              <Input value={filtroCliente} onChange={(e) => setFiltroCliente(e.target.value)} placeholder="Buscar paciente…" />
+              <Input data-quick-search value={filtroCliente} onChange={(e) => setFiltroCliente(e.target.value)} placeholder="Buscar paciente…" />
               <Button
                 type="button"
                 variant="outline"
@@ -1865,6 +1892,7 @@ function MedicoFiltroInput({
     <div className="relative">
       <div className="flex gap-1">
         <Input
+          data-agenda-filtro-prof
           disabled={disabled}
           placeholder="TODOS — digite para buscar"
           value={texto}

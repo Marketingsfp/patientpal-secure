@@ -42,6 +42,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
 
 const VoiceInput = lazy(() => import("@/components/voice-input").then((m) => ({ default: m.VoiceInput })));
 
@@ -577,6 +578,17 @@ export function AppShell() {
           )}
           <div className="flex-1" />
           <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 w-9 p-0 rounded-full"
+              title="Atalhos de teclado (?)"
+              onClick={() => {
+                window.dispatchEvent(new KeyboardEvent("keydown", { key: "?" }));
+              }}
+            >
+              <span className="text-base font-semibold">?</span>
+            </Button>
             <Button variant="ghost" size="sm" className="h-9 w-9 p-0 rounded-full" title="Notificações">
               <Bell className="h-4 w-4" />
             </Button>
@@ -603,10 +615,11 @@ export function AppShell() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPwOpen(false)} disabled={pwSaving}>Cancelar</Button>
-            <Button onClick={() => void handleChangePassword()} disabled={pwSaving}>{pwSaving ? "Salvando…" : "Salvar"}</Button>
+            <Button data-primary onClick={() => void handleChangePassword()} disabled={pwSaving}>{pwSaving ? "Salvando…" : "Salvar"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <KeyboardShortcuts />
     </div>
   );
 }
