@@ -689,6 +689,7 @@ export type Database = {
           descricao: string | null
           fidelidade_meses: number
           id: string
+          informativo_html: string | null
           max_dependentes: number
           modelo_contrato: string | null
           nome: string
@@ -706,6 +707,7 @@ export type Database = {
           descricao?: string | null
           fidelidade_meses?: number
           id?: string
+          informativo_html?: string | null
           max_dependentes?: number
           modelo_contrato?: string | null
           nome: string
@@ -723,6 +725,7 @@ export type Database = {
           descricao?: string | null
           fidelidade_meses?: number
           id?: string
+          informativo_html?: string | null
           max_dependentes?: number
           modelo_contrato?: string | null
           nome?: string

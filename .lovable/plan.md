@@ -1,62 +1,40 @@
 ## Objetivo
-Reduzir a quantidade de itens no menu lateral agrupando cadastros relacionados em **uma única página com abas internas**, sem perder nenhuma funcionalidade nem quebrar URLs existentes (redirecionamentos serão mantidos).
+Transformar a aba **Informativo do Convênio** num editor rich-text completo: formatação de fonte (família/tamanho/cor/negrito/itálico/sublinhado), listas, alinhamento, tabelas (inserir/+linha/+coluna/excluir), upload de imagens e impressão em A4.
 
-## Consolidações propostas
+## Mudanças
 
-### 1. Cartão Benefícios → 1 item só
-Hoje: Nova venda · Convênio · Relatórios (3 itens)
-Vira: **Cartão Benefícios** (1 item) com abas internas:
-- Nova venda
-- Convênios
-- Relatórios
+### 1. Banco de dados (migração)
+- Adicionar coluna `informativo_html text` em `cb_convenios`.
+- Criar bucket de Storage `cb-informativos` (público para leitura, escrita restrita).
+- Policies em `storage.objects`:
+  - SELECT público para `bucket_id = 'cb-informativos'`.
+  - INSERT/UPDATE/DELETE apenas para membros da clínica (validar via `is_member(auth.uid(), ...)` usando o primeiro segmento do path como `clinica_id`).
 
-### 2. Marketing → 1 item só
-Hoje: Campanhas · Envios · Landing Pages · Leads · Segmentos (5 itens)
-Vira: **Marketing** (1 item) com abas:
-- Leads
-- Campanhas
-- Envios
-- Segmentos
-- Landing Pages
+### 2. Novo componente: editor rich-text
+`src/components/cartao-beneficios/rich-editor.tsx` baseado em **TipTap** com:
+- StarterKit, Underline, TextStyle + Color, FontFamily, TextAlign, Link
+- Table + TableRow + TableHeader + TableCell (resizable)
+- Image (com upload para o bucket `cb-informativos`)
+- Toolbar com: desfazer/refazer · família e tamanho de fonte · N I S U · cor · alinhamento · listas · H1-H3 · tabela (inserir, +linha, +coluna, excluir linha/coluna/tabela) · inserir imagem · link
+- Editor renderizado dentro de um container A4 (210mm) com classes `prose`
+- Props: `value: string`, `onChange: (html) => void`, `clinicaId: string` (usado no path do upload)
 
-### 3. RH → 1 item só
-Hoje: Bater ponto · Cursos (admin) · Férias · Holerites · Treinamentos (5 itens)
-Vira: **RH** (1 item) com abas:
-- Ponto
-- Férias
-- Holerites
-- Treinamentos
-- Cursos (admin)
+### 3. Rota de convênios
+`src/routes/_authenticated/app.cartao-beneficios.convenios.tsx`:
+- Estado novo: `informativoHtml`.
+- `openEdit`: carregar `c.informativo_html`; se vazio e o nome casar com CARTÃO CONSULTA + SEGUROS, usar o HTML do componente atual como seed inicial.
+- `openNew`: limpar estado.
+- `save`: incluir `informativo_html: informativoHtml || null` no payload.
+- Substituir o conteúdo da `<TabsContent value="informativo">` pelo `<RichEditor value={informativoHtml} onChange={setInformativoHtml} clinicaId={clinicaAtual.clinica_id} />`.
+- Manter o botão **Imprimir** e o CSS `@page size: A4` (escondendo o resto da UI durante a impressão e mostrando só o `#convenio-informativo-print`).
 
-### 4. Cadastros → Serviços já é submenu, simplificar
-Hoje (Cadastros): Equipe · Serviços[Especialidades/Tipo/Item] · Horários médicos · Modelos de Prontuário · Perfis · Unidades
-Vira:
-- **Serviços** (1 item) com abas internas: Especialidades · Tipos · Itens (remove o submenu expansível)
-- Restante continua igual
+### 4. Seed do informativo "CARTÃO CONSULTA + SEGUROS"
+Mover o conteúdo do componente fixo `informativo-cartao-consulta-seguros.tsx` para uma constante HTML usada apenas como ponto de partida quando o convênio não tem `informativo_html` salvo ainda. Após o primeiro salvamento, prevalece sempre o que estiver no banco.
 
-### 5. Gestão → agrupar Segurança & Compliance
-Hoje: Auditoria · Cargos · Financeiro · Funcionários · Integrações · LGPD · Relatórios · Setores (8 itens)
-Vira:
-- **Segurança** (1 item) com abas: Auditoria · LGPD · Integrações
-- Demais continuam separados (Financeiro/Relatórios/Funcionários/Cargos/Setores)
+### 5. Dependências
+`@tiptap/react`, `@tiptap/pm`, `@tiptap/starter-kit`, `@tiptap/extension-color`, `@tiptap/extension-text-style`, `@tiptap/extension-font-family`, `@tiptap/extension-underline`, `@tiptap/extension-text-align`, `@tiptap/extension-table`, `@tiptap/extension-table-row`, `@tiptap/extension-table-cell`, `@tiptap/extension-table-header`, `@tiptap/extension-image`, `@tiptap/extension-link`.
 
-### Inteligência
-Mantém como está — cada item tem natureza muito diferente (IA médica, CRM, Nina, Odontologia, etc.).
-
-## Resultado
-- **Antes:** ~33 itens visíveis no menu
-- **Depois:** ~22 itens visíveis (redução de ~33%)
-
-## Detalhes técnicos
-- Criar rotas pai com `<Outlet />` + barra de abas (shadcn `Tabs` controlada por URL):
-  - `/app/cartao-beneficios` (já existe como pai, apenas adicionar abas no layout)
-  - `/app/marketing` (novo layout)
-  - `/app/rh` (novo layout)
-  - `/app/servicos` (novo layout para Especialidades/Tipos/Itens)
-  - `/app/seguranca` (novo layout para Auditoria/LGPD/Integrações)
-- Rotas atuais (`/app/mkt-leads`, `/app/hr-ponto`, `/app/especialidades`, etc.) continuam funcionando — vão redirecionar para o novo caminho com a aba correspondente, então links salvos não quebram.
-- Atualizar `navRows` em `src/components/app-shell.tsx` para refletir a nova estrutura.
-- Reaproveitar 100% das páginas existentes (apenas renderizadas dentro do Outlet do novo layout).
-
-## Confirmação
-Posso aplicar essa organização? Se preferir, posso ajustar — por exemplo, manter Marketing/RH separados e consolidar só Cartão Benefícios + Serviços + Segurança.
+## Fora de escopo
+- Versionamento/histórico do informativo
+- Editor colaborativo em tempo real
+- Conversão direta de DOCX → HTML dentro do app (continua-se podendo colar do Word; formatação básica é preservada pelo TipTap)
