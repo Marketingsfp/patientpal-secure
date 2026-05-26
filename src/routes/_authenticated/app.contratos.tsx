@@ -369,7 +369,17 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
                       {d.nome}
                       {d.face_descriptor && d.face_descriptor.length > 0 ? <Check className="h-3 w-3 text-green-600"/> : null}
                     </span>
-                    <Input className="col-span-3 h-8" placeholder="Parentesco" value={d.parentesco} onChange={(e) => setDeps(deps.map((x, j) => j === i ? { ...x, parentesco: e.target.value } : x))}/>
+                    <Select value={d.parentesco} onValueChange={(v) => setDeps(deps.map((x, j) => j === i ? { ...x, parentesco: v } : x))}>
+                      <SelectTrigger className="col-span-3 h-8"><SelectValue placeholder="Parentesco"/></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Filho(a)">Filho(a)</SelectItem>
+                        <SelectItem value="Cônjuge">Cônjuge</SelectItem>
+                        <SelectItem value="Pai">Pai</SelectItem>
+                        <SelectItem value="Mãe">Mãe</SelectItem>
+                        <SelectItem value="Irmão(ã)">Irmão(ã)</SelectItem>
+                        <SelectItem value="Outro">Outro</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <div className="col-span-2 text-xs text-muted-foreground self-center">Dependente</div>
                     <Button size="sm" variant="outline" className="col-span-3 h-8" onClick={() => setFaceOpen(i)}>
                       <Camera className="h-3 w-3 mr-1"/>{d.face_descriptor?.length ? "Refazer" : "Foto"}
