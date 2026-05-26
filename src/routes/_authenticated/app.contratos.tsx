@@ -384,7 +384,17 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
             )}
           </div>
           <div><Label>Data início</Label><Input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)}/></div>
-          <div><Label>Dia de vencimento</Label><Input type="number" min={1} max={28} value={diaVenc} onChange={(e) => setDiaVenc(Number(e.target.value))}/></div>
+          <div>
+            <Label>Dia de vencimento</Label>
+            <Select value={String(diaVenc)} onValueChange={(v) => setDiaVenc(Number(v))}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {[5, 10, 15, 20, 25, 30].map((d) => (
+                  <SelectItem key={d} value={String(d)}>{d}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div>
             <Label>Valor mensal</Label>
             <div className="h-10 rounded-md border bg-muted/30 px-3 flex items-center font-semibold">{BRL(valor)}</div>
