@@ -19,11 +19,12 @@ import {
   AlignLeft, AlignCenter, AlignRight, AlignJustify,
   List, ListOrdered, Heading1, Heading2, Heading3,
   Undo2, Redo2, Image as ImageIcon, Link as LinkIcon,
-  Table as TableIcon, Rows3, Columns3, Trash2,
+  Table as TableIcon, Rows3, Columns3, Trash2, Crop,
 } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { ImageCropDialog } from "./image-crop-dialog";
 
 // Extend table cells with a backgroundColor attribute so users can paint cells/rows/columns.
 const ColoredTableCell = TableCell.extend({
@@ -199,6 +200,8 @@ interface Props {
 
 export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const [cropOpen, setCropOpen] = useState(false);
+  const [cropSrc, setCropSrc] = useState<string>("");
   // Margens da página em mm (A4: 210 × 297). Persistidas em localStorage por clínica.
   const storageKey = `rt-margins:${clinicaId || "default"}`;
   const readStored = () => {
@@ -472,6 +475,17 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
             >
               <AlignRight className="h-4 w-4" />
             </ToolbarButton>
+            <ToolbarButton
+              title="Cortar imagem"
+              onClick={() => {
+                const src = editor.getAttributes("image").src as string | undefined;
+                if (!src) return;
+                setCropSrc(src);
+                setCropOpen(true);
+              }}
+            >
+              <Crop className="h-4 w-4" />
+            </ToolbarButton>
             <Select
               value=""
               onValueChange={(v) => {
@@ -584,6 +598,15 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
           Restaurar padrão
         </button>
       </div>
+      <ImageCropDialog
+        open={cropOpen}
+        src={cropSrc}
+        onClose={() => setCropOpen(false)}
+        onCropped={(dataUrl) => {
+          // Substitui o src da imagem selecionada pelo recorte (data URL PNG).
+          editor.chain().focus().updateAttributes("image", { src: dataUrl }).run();
+        }}
+      />
     </div>
   );
 }
