@@ -248,7 +248,7 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       Table.configure({ resizable: true, HTMLAttributes: { class: "rt-table" } }),
       TableRow, ColoredTableHeader, ColoredTableCell,
-      ResizableImage.configure({ inline: false, allowBase64: true }),
+      ResizableImage.configure({ inline: true, allowBase64: true }),
     ],
     content: value || "<p></p>",
     editorProps: {
