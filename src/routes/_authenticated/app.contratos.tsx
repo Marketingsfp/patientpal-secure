@@ -17,6 +17,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import DOMPurify from "dompurify";
 import { ChevronsUpDown } from "lucide-react";
 import { printContrato } from "@/lib/print-contrato";
@@ -510,6 +512,19 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
   const [pacienteFull, setPacienteFull] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  // Diálogo de forma de pagamento (espelha o da agenda)
+  const [pagMens, setPagMens] = useState<Mens | null>(null);
+  const [formaPagOpen, setFormaPagOpen] = useState(false);
+  const [lancOpen, setLancOpen] = useState(false);
+
+  const formaOpcoes: Array<{ forma: string; label: string }> = [
+    { forma: "dinheiro", label: "Dinheiro" },
+    { forma: "pix", label: "Pix" },
+    { forma: "debito", label: "Cartão de Débito" },
+    { forma: "credito", label: "Cartão de Crédito" },
+    { forma: "boleto", label: "Boleto" },
+  ];
+
   const load = async () => {
     setLoading(true);
     const [m, d, cv, cl, pa] = await Promise.all([
@@ -533,14 +548,52 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [contrato.id]);
 
-  const marcarPago = async (id: string, paga: boolean) => {
+  const marcarPago = async (id: string, paga: boolean, forma?: string | null) => {
     const patch = paga
-      ? { status: "pago", pago_em: new Date().toISOString().slice(0, 10) }
-      : { status: "pendente", pago_em: null };
+      ? {
+          status: "pago",
+          pago_em: new Date().toISOString().slice(0, 10),
+          ...(forma !== undefined ? { forma_pagamento: forma } : {}),
+        }
+      : { status: "pendente", pago_em: null, forma_pagamento: null };
     const { error } = await supabase.from("contrato_mensalidades").update(patch).eq("id", id);
     if (error) return toast.error(error.message);
     load();
   };
+
+  const abrirFormaPag = (m: Mens) => {
+    setPagMens(m);
+    setFormaPagOpen(true);
+  };
+  const escolherForma = async (forma: string) => {
+    if (!pagMens) return;
+    setFormaPagOpen(false);
+    await marcarPago(pagMens.id, true, forma);
+    setPagMens(null);
+  };
+  const escolherMisto = () => {
+    setFormaPagOpen(false);
+    setLancOpen(true);
+  };
+
+  // Atalhos 1–6 dentro do diálogo de forma de pagamento
+  useEffect(() => {
+    if (!formaPagOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      const n = Number(e.key);
+      if (!Number.isFinite(n)) return;
+      if (n >= 1 && n <= formaOpcoes.length) {
+        e.preventDefault();
+        void escolherForma(formaOpcoes[n - 1].forma);
+      } else if (n === formaOpcoes.length + 1) {
+        e.preventDefault();
+        escolherMisto();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [formaPagOpen, pagMens?.id]);
 
   const copiarLink = async () => {
     const url = `${window.location.origin}/p/contrato/${contrato.token_publico}`;
@@ -648,7 +701,7 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
                     <TableCell>
                       {m.status === "pago"
                         ? <Button size="sm" variant="outline" onClick={() => marcarPago(m.id, false)}>Reverter</Button>
-                        : <Button size="sm" onClick={() => marcarPago(m.id, true)}><Check className="h-3 w-3 mr-1"/>Pagar</Button>}
+                        : <Button size="sm" onClick={() => abrirFormaPag(m)}><Check className="h-3 w-3 mr-1"/>Pagar</Button>}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -684,6 +737,56 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
         </Tabs>
         </CardContent>
       </Card>
+
+      <Dialog open={formaPagOpen} onOpenChange={setFormaPagOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Forma de pagamento</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground -mt-2">
+            {contrato.paciente_nome} — Contrato #{contrato.numero}
+            {pagMens ? ` · Parcela ${pagMens.numero_parcela}/${mens.length}` : ""}
+            <span className="block text-xs mt-1 opacity-70">Dica: use as teclas 1–{formaOpcoes.length + 1} para escolher rapidamente.</span>
+          </p>
+          <div className="grid gap-2 mt-2">
+            {formaOpcoes.map((op, idx) => (
+              <Button
+                key={op.forma}
+                variant="outline"
+                className="justify-between h-12"
+                onClick={() => escolherForma(op.forma)}
+              >
+                <span className="flex items-center gap-2">
+                  <kbd className="inline-flex h-6 w-6 items-center justify-center rounded border bg-muted text-xs font-mono">{idx + 1}</kbd>
+                  {op.label}
+                </span>
+                <span className="font-semibold">{BRL(Number(pagMens?.valor ?? 0))}</span>
+              </Button>
+            ))}
+            <Button
+              variant="default"
+              className="justify-center h-12 mt-1 bg-primary"
+              onClick={escolherMisto}
+            >
+              <kbd className="inline-flex h-6 w-6 items-center justify-center rounded border border-primary-foreground/40 bg-primary-foreground/10 text-xs font-mono mr-2">{formaOpcoes.length + 1}</kbd>
+              💰 Mais de uma forma de pagamento
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <LancamentoDialog
+        open={lancOpen}
+        onOpenChange={(v) => { setLancOpen(v); if (!v) setPagMens(null); }}
+        tipo="receita"
+        initialDescricao={pagMens ? `Mensalidade ${pagMens.numero_parcela}/${mens.length} — Contrato #${contrato.numero} — ${contrato.paciente_nome}` : ""}
+        initialValor={pagMens ? String(pagMens.valor) : ""}
+        onSavedWithData={async (dados) => {
+          if (!pagMens) return;
+          await marcarPago(pagMens.id, true, dados.forma_pagamento ?? "misto");
+          setPagMens(null);
+        }}
+      />
     </div>
   );
 }
