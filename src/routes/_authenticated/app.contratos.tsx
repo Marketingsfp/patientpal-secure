@@ -164,6 +164,7 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
   const [depOpen, setDepOpen] = useState(false);
   const [valor, setValor] = useState(0);
   const [taxa, setTaxa] = useState(0);
+  const [faixaId, setFaixaId] = useState<string>("");
   const [diaVenc, setDiaVenc] = useState(10);
   const [dataInicio, setDataInicio] = useState(new Date().toISOString().slice(0, 10));
   const [forma, setForma] = useState("dinheiro");
@@ -199,14 +200,39 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
     })();
   }, [convenioId]);
 
-  // Recalcula valor mensal conforme a faixa de vidas (titular + dependentes)
-  const vidas = (titular ? 1 : 0) + deps.length;
+  // Quando faixas mudam (troca de convênio), pré-seleciona a faixa que cobre titular+deps atuais
   useEffect(() => {
     if (!convenio) return;
-    if (faixas.length === 0) { setValor(Number(convenio.valor_mensal)); return; }
-    const faixa = faixas.find((f) => vidas >= f.vidas_de && (f.vidas_ate == null || vidas <= f.vidas_ate));
-    if (faixa) setValor(Number(faixa.valor_mensal));
-  }, [vidas, faixas, convenioId]);
+    if (faixas.length === 0) {
+      setFaixaId("");
+      setValor(Number(convenio.valor_mensal));
+      return;
+    }
+    const vidasAtuais = (titular ? 1 : 0) + deps.length;
+    const inicial =
+      faixas.find((f) => vidasAtuais >= f.vidas_de && (f.vidas_ate == null || vidasAtuais <= f.vidas_ate)) ??
+      faixas[0];
+    setFaixaId(inicial.id);
+    setValor(Number(inicial.valor_mensal));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [faixas]);
+
+  // Quando o usuário muda a faixa manualmente, atualiza o valor mensal
+  useEffect(() => {
+    if (!faixaId) return;
+    const f = faixas.find((x) => x.id === faixaId);
+    if (f) setValor(Number(f.valor_mensal));
+  }, [faixaId, faixas]);
+
+  const labelFaixa = (f: Faixa) => {
+    const range =
+      f.vidas_ate == null
+        ? `${f.vidas_de}+ pessoas`
+        : f.vidas_ate === f.vidas_de
+          ? `${f.vidas_de} ${f.vidas_de === 1 ? "pessoa" : "pessoas"}`
+          : `${f.vidas_de} a ${f.vidas_ate} pessoas`;
+    return `${range} — ${BRL(Number(f.valor_mensal))}`;
+  };
 
   const addDep = (p: Paciente) => {
     if (!convenio) return;
@@ -285,12 +311,23 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
               <SelectTrigger><SelectValue/></SelectTrigger>
               <SelectContent>{convenios.map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}</SelectContent>
             </Select>
-            {faixas.length > 0 ? (
-              <div className="mt-2 text-xs text-muted-foreground">
-                Valor calculado pela faixa de vidas: <span className="font-semibold text-foreground">{vidas} vida(s)</span>
-              </div>
-            ) : null}
           </div>
+          {faixas.length > 0 ? (
+            <div className="col-span-2">
+              <Label>Nº de pessoas no contrato</Label>
+              <Select value={faixaId} onValueChange={setFaixaId}>
+                <SelectTrigger><SelectValue placeholder="Selecione a faixa…"/></SelectTrigger>
+                <SelectContent>
+                  {faixas.map((f) => (
+                    <SelectItem key={f.id} value={f.id}>{labelFaixa(f)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                O valor mensal é definido pela faixa selecionada (cadastrada no convênio).
+              </p>
+            </div>
+          ) : null}
           <div className="col-span-2"><Label>Paciente titular</Label>
             {titular ? (
               <div className="flex items-center justify-between rounded-md border p-2 bg-muted/30">
@@ -339,7 +376,9 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
             <Label>Valor mensal</Label>
             <div className="h-10 rounded-md border bg-muted/30 px-3 flex items-center font-semibold">{BRL(valor)}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              Recalculado automaticamente conforme dependentes.
+              {faixas.length > 0
+                ? "Definido pela faixa de pessoas selecionada acima."
+                : "Definido pelo convênio."}
               {forma === "boleto" ? (
                 <span className="block text-amber-600 font-medium">
                   + {BRL(TAXA_BOLETO)} de taxa de boleto por parcela — total da parcela: {BRL(valor + TAXA_BOLETO)}
