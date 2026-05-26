@@ -386,6 +386,28 @@ function AgendaPage() {
       nm.get(r.medico_id)!.add(normalizar(r.nome));
     }
     setProcNomesPorMedico(nm);
+
+    // Ranking de procedimentos mais usados por médico — últimos 180 dias
+    const desde = new Date();
+    desde.setDate(desde.getDate() - 180);
+    const { data: histRows } = await supabase
+      .from("agendamentos")
+      .select("medico_id,procedimento")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .gte("inicio", desde.toISOString())
+      .not("medico_id", "is", null)
+      .not("procedimento", "is", null)
+      .limit(20000);
+    const rk = new Map<string, Map<string, number>>();
+    for (const r of (histRows ?? []) as Array<{ medico_id: string | null; procedimento: string | null }>) {
+      if (!r.medico_id || !r.procedimento) continue;
+      const k = normalizar(r.procedimento);
+      if (!k || k === "disponivel") continue;
+      if (!rk.has(r.medico_id)) rk.set(r.medico_id, new Map());
+      const mm = rk.get(r.medico_id)!;
+      mm.set(k, (mm.get(k) ?? 0) + 1);
+    }
+    setRankingPorMedico(rk);
   };
 
   useEffect(() => { loadRef(); }, [clinicaAtual?.clinica_id]);
