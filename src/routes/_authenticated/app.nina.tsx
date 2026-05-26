@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -89,6 +90,7 @@ function NinaPage() {
   const clinicaId = clinicaAtual?.clinica_id;
   const [conversas, setConversas] = useState<Conv[]>([]);
   const [sel, setSel] = useState<Conv | null>(null);
+  const [abaAtiva, setAbaAtiva] = useState<string>("chat");
   const [draft, setDraft] = useState("");
   const [busca, setBusca] = useState("");
   const [loadingConv, setLoadingConv] = useState(false);
@@ -192,13 +194,19 @@ function NinaPage() {
         </Badge>
       </div>
 
-      <Tabs defaultValue="chat" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="treinada">Nina treinada</TabsTrigger>
-          <TabsTrigger value="chat">Conversas WhatsApp</TabsTrigger>
-          <TabsTrigger value="automacoes">Automações</TabsTrigger>
-          <TabsTrigger value="config">Configuração</TabsTrigger>
-        </TabsList>
+      <Tabs value={abaAtiva} onValueChange={setAbaAtiva} className="space-y-4">
+        <Select value={abaAtiva} onValueChange={setAbaAtiva}>
+          <SelectTrigger className="w-full sm:w-[280px] bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-400 font-medium">
+            <MessageCircle className="h-4 w-4 mr-2 text-emerald-500" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="treinada">Nina treinada</SelectItem>
+            <SelectItem value="chat">Conversas WhatsApp</SelectItem>
+            <SelectItem value="automacoes">Automações</SelectItem>
+            <SelectItem value="config">Configuração</SelectItem>
+          </SelectContent>
+        </Select>
 
         {/* ============ NINA TREINADA ============ */}
         <TabsContent value="treinada">
