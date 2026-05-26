@@ -785,6 +785,41 @@ function ConveniosPage() {
                 `}</style>
               </div>
             </TabsContent>
+            <TabsContent value="termo" className="mt-3">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 font-medium">
+                    <FileSignature className="h-4 w-4" /> Termo de Inclusão
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => window.print()}>
+                    <Printer className="h-4 w-4 mr-1" /> Imprimir
+                  </Button>
+                </div>
+                <div id="convenio-termo-print">
+                  <RichEditor
+                    value={termoInclusaoHtml}
+                    onChange={setTermoInclusaoHtml}
+                    clinicaId={clinicaAtual.clinica_id}
+                  />
+                </div>
+                <style>{`
+                  @media print {
+                    @page { size: A4; margin: 12mm; }
+                    body * { visibility: hidden !important; }
+                    #convenio-termo-print, #convenio-termo-print * { visibility: visible !important; }
+                    #convenio-termo-print { position: absolute; left: 0; top: 0; width: 100%; }
+                    #convenio-termo-print .print\\:hidden { display: none !important; }
+                    #convenio-termo-print .rt-shell { border: 0 !important; border-radius: 0 !important; overflow: visible !important; background: transparent !important; }
+                    #convenio-termo-print .rt-scroll { max-height: none !important; overflow: visible !important; background: transparent !important; }
+                    #convenio-termo-print .rt-page { width: 100% !important; min-height: 0 !important; margin: 0 !important; padding: 0 !important; box-shadow: none !important; background: transparent !important; }
+                    #convenio-termo-print .ProseMirror { min-height: 0 !important; }
+                    #convenio-termo-print table { page-break-inside: auto; }
+                    #convenio-termo-print tr { page-break-inside: avoid; page-break-after: auto; }
+                    #convenio-termo-print img { max-width: 100% !important; height: auto !important; }
+                  }
+                `}</style>
+              </div>
+            </TabsContent>
           </Tabs>
             <div className="flex justify-end gap-2 border-t pt-4">
               <Button variant="outline" onClick={() => setView("list")}>Cancelar</Button>
