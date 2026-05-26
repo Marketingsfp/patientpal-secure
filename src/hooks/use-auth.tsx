@@ -30,11 +30,17 @@ function readCachedSession(): Session | null {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(() => readCachedSession());
-  const [loading, setLoading] = useState(() => typeof window !== "undefined" && !readCachedSession());
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(typeof window !== "undefined");
 
   useEffect(() => {
     let cancelled = false;
+    const cachedSession = readCachedSession();
+    if (cachedSession) {
+      setSession(cachedSession);
+      setLoading(false);
+    }
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
       if (cancelled) return;
       setSession(s);
