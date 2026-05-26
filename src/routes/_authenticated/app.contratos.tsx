@@ -716,6 +716,66 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
           </div>
         </div>
           </TabsContent>
+          <TabsContent value="dados" className="mt-4 space-y-4">
+            {(() => {
+              const faixa = faixas.find((f) => Number(f.valor_mensal) === Number(contrato.valor_mensal)) ?? null;
+              const faixaLabel = faixa
+                ? (faixa.vidas_ate == null
+                    ? `${faixa.vidas_de}+ pessoas`
+                    : faixa.vidas_ate === faixa.vidas_de
+                      ? `${faixa.vidas_de} ${faixa.vidas_de === 1 ? "pessoa" : "pessoas"}`
+                      : `${faixa.vidas_de} a ${faixa.vidas_ate} pessoas`) + ` — ${BRL(Number(faixa.valor_mensal))}`
+                : "—";
+              const formaLabel = ({
+                dinheiro: "Dinheiro", pix: "Pix", debito: "Cartão de Débito",
+                credito: "Cartão de Crédito", boleto: "Boleto",
+              } as Record<string, string>)[contrato.forma_pagamento ?? ""] ?? (contrato.forma_pagamento ?? "—");
+              const maxDep = Number(convenio?.max_dependentes ?? 0) || 0;
+              const Field = ({ label, value }: { label: string; value: React.ReactNode }) => (
+                <div className="space-y-1">
+                  <div className="text-sm font-medium">{label}</div>
+                  <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">{value || "—"}</div>
+                </div>
+              );
+              return (
+                <>
+                  <Field label="Convênio" value={convenio?.nome ?? "—"} />
+                  <Field label="Nº de pessoas no contrato" value={faixaLabel} />
+                  <Field
+                    label="Paciente titular"
+                    value={`${contrato.paciente_nome}${pacienteFull?.cpf ? ` — CPF ${pacienteFull.cpf}` : ""}`}
+                  />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Field label="Data início" value={fmtD(contrato.data_inicio)} />
+                    <Field label="Dia de vencimento" value={contrato.dia_vencimento ?? "—"} />
+                    <Field label="Valor mensal" value={BRL(Number(contrato.valor_mensal))} />
+                    <Field label="Taxa de adesão" value={BRL(Number(contrato.taxa_adesao ?? 0))} />
+                  </div>
+                  <Field label="Forma de pagamento" value={formaLabel} />
+                  <div className="space-y-1">
+                    <div className="text-sm font-medium">Dependentes ({deps.length}/{maxDep})</div>
+                    <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
+                      {deps.length === 0
+                        ? "Nenhum dependente"
+                        : (
+                          <ul className="space-y-1">
+                            {deps.map((d) => (
+                              <li key={d.id}>
+                                • {d.paciente_nome}
+                                <span className="text-muted-foreground"> — {d.parentesco ?? "—"} ({d.tipo}){d.cpf ? ` — CPF ${d.cpf}` : ""}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                    </div>
+                  </div>
+                  {contrato.observacoes ? (
+                    <Field label="Observações" value={contrato.observacoes} />
+                  ) : null}
+                </>
+              );
+            })()}
+          </TabsContent>
           <TabsContent value="contrato" className="mt-4">
             <div className="flex items-center justify-between mb-2">
               <div className="text-sm text-muted-foreground">
