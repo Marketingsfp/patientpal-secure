@@ -929,6 +929,9 @@ function Page() {
             )}
           </DialogHeader>
           <form onSubmit={cobrar} className="space-y-3">
+            <p className="text-[11px] text-muted-foreground -mt-2">
+              Atalhos: <kbd className="px-1 border rounded">1</kbd> dinheiro · <kbd className="px-1 border rounded">2</kbd> PIX · <kbd className="px-1 border rounded">3</kbd> débito · <kbd className="px-1 border rounded">4</kbd> crédito · <kbd className="px-1 border rounded">5</kbd> adicionar forma · <kbd className="px-1 border rounded">Enter</kbd> confirmar
+            </p>
             {(() => {
               const total = cobrancaLinhas.reduce((a, l) => a + (Number(l.valor) || 0), 0);
               const multi = cobrancaLinhas.length > 1;

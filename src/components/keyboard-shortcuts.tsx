@@ -128,6 +128,27 @@ function ShortcutsHelpDialog({
           { keys: ["5"], desc: "Mais de uma forma" },
         ],
       },
+      {
+        title: "Check-in",
+        items: [
+          { keys: ["Alt", "1–9"], desc: "Confirmar presença do N-ésimo paciente da lista" },
+          { keys: ["/"], desc: "Focar busca de paciente" },
+        ],
+      },
+      {
+        title: "Recepção / Filas",
+        items: [
+          { keys: ["C"], desc: "Chamar próxima senha" },
+        ],
+      },
+      {
+        title: "Caixa — Cobrança",
+        items: [
+          { keys: ["1–4"], desc: "Forma de pagamento da linha atual" },
+          { keys: ["5"], desc: "Adicionar nova forma de pagamento" },
+          { keys: ["Enter"], desc: "Confirmar cobrança" },
+        ],
+      },
     ],
     []
   );
