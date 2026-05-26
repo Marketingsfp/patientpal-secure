@@ -610,6 +610,22 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
   const totalPago = mens.filter((m) => m.status === "pago").reduce((s, m) => s + Number(m.valor), 0);
   const aReceber = mens.filter((m) => m.status !== "pago").reduce((s, m) => s + Number(m.valor), 0);
 
+  // ---- Dados da venda (aba "Dados") ----
+  const faixaAtual = faixas.find((f) => Number(f.valor_mensal) === Number(contrato.valor_mensal)) ?? null;
+  const faixaLabel = faixaAtual
+    ? (faixaAtual.vidas_ate == null
+        ? `${faixaAtual.vidas_de}+ pessoas`
+        : faixaAtual.vidas_ate === faixaAtual.vidas_de
+          ? `${faixaAtual.vidas_de} ${faixaAtual.vidas_de === 1 ? "pessoa" : "pessoas"}`
+          : `${faixaAtual.vidas_de} a ${faixaAtual.vidas_ate} pessoas`) + ` — ${BRL(Number(faixaAtual.valor_mensal))}`
+    : "—";
+  const formaLabelMap: Record<string, string> = {
+    dinheiro: "Dinheiro", pix: "Pix", debito: "Cartão de Débito",
+    credito: "Cartão de Crédito", boleto: "Boleto",
+  };
+  const formaLabel = formaLabelMap[contrato.forma_pagamento ?? ""] ?? (contrato.forma_pagamento ?? "—");
+  const maxDep = Number(convenio?.max_dependentes ?? 0) || 0;
+
   const contratoTexto = useMemo(() => {
     const tpl = convenio?.modelo_contrato ?? "";
     if (!tpl) return "";
