@@ -1,27 +1,32 @@
-## Objetivo
+## Diagnóstico
 
-Transformar a aba **"Contrato"** (em `Cartão de Benefícios → Convênios`) num editor rico igual ao da aba "Informativo", e adicionar um seletor de **variáveis** que insere placeholders como `{{PACIENTE_NOME}}` na posição do cursor.
+Os botões **Imprimir A4** e **Imprimir cartão** em `Cartão de Benefícios → Contratos` falham porque as queries em `src/lib/print-contrato.ts` e `src/lib/print-cartao.ts` usam *embeds* do PostgREST:
 
-## Mudanças
+```ts
+.select(`*, plano:planos_assinatura(*), clinica:clinicas(...), paciente:pacientes(...)`)
+```
 
-### 1. `src/components/cartao-beneficios/rich-editor.tsx`
-- Adicionar nova prop opcional `variables?: { label: string; token: string }[]`.
-- Quando a prop existir, renderizar na barra de ferramentas um `Select` "Inserir variável" que, ao escolher um item, executa `editor.chain().focus().insertContent('{{TOKEN}}').run()` e reseta o valor do select.
-- Nenhuma outra alteração de comportamento — formatação, tabelas (com redimensionamento + cor), upload de imagens, impressão continuam iguais.
+A tabela `contratos_assinatura` possui as colunas `clinica_id`, `paciente_id`, `plano_id`, mas **apenas `plano_id` tem foreign key**. Sem FK, o PostgREST devolve o erro visto no console:
 
-### 2. `src/routes/_authenticated/app.cartao-beneficios.convenios.tsx`
-- Na aba `contrato` (linhas ~683–701):
-  - Substituir o `<Textarea>` pelo `<RichEditor value={modeloContrato} onChange={setModeloContrato} clinicaId={clinicaAtual.clinica_id} variables={CONTRATO_VARIAVEIS} />`.
-  - Adicionar o botão **Imprimir** (mesmo padrão da aba Informativo) envolvendo o editor num `<div id="convenio-contrato-print">` e replicando o bloco `@media print` para esse id.
-  - Manter o texto de ajuda explicando o uso das variáveis (agora também acessíveis pelo dropdown).
-- Definir uma constante `CONTRATO_VARIAVEIS` no mesmo arquivo com os tokens já suportados pela renderização de contratos (alinhados a `src/lib/print-contrato.ts`):
-  - `CLINICA_NOME`, `CLINICA_CNPJ`, `CLINICA_ENDERECO`, `CIDADE`
-  - `PACIENTE_NOME`, `PACIENTE_CPF`, `PACIENTE_NASCIMENTO`, `PACIENTE_ENDERECO`, `PACIENTE_TELEFONE`, `PACIENTE_EMAIL`
-  - `VALOR_MENSAL`, `TAXA_ADESAO`, `NUM_PARCELAS`, `VIGENCIA_MESES`, `FIDELIDADE_MESES`
-  - `DATA_HOJE`, `DEPENDENTES`
+> Could not find a relationship between 'contratos_assinatura' and 'clinicas' in the schema cache
 
-## Observações técnicas
+Como a query inteira falha, nada é impresso.
 
-- O campo `modelo_contrato` é `text` no banco — passa a guardar HTML (mesmo formato do Informativo). Sem migração.
-- A substituição de `{{VAR}}` em `src/lib/print-contrato.ts` continua funcionando (regex `\{\{(\w+)\}\}` atua sobre o texto, independentemente de tags HTML em volta).
-- Não altero o template de `planos_assinatura.template_contrato` (`src/routes/_authenticated/app.planos.tsx`) — fora do escopo pedido.
+## Correção
+
+Refatorar as duas funções de impressão para buscar contrato + relações em chamadas separadas (sem depender de FK no schema cache). Sem migração — evita risco de FKs falharem por dados órfãos legados.
+
+### `src/lib/print-contrato.ts`
+- Trocar a query única por:
+  1. `select("*")` em `contratos_assinatura` pelo `id`;
+  2. `select(...)` em `planos_assinatura` por `plano_id`;
+  3. `select(...)` em `clinicas` por `clinica_id`;
+  4. `select(...)` em `pacientes` por `paciente_id` (quando existir).
+- Manter a montagem do HTML idêntica — só muda a forma de obter `cl`, `pl`, `pa`.
+
+### `src/lib/print-cartao.ts`
+- Mesmo padrão: buscar contrato, depois plano, clínica e paciente titular por id, e os dependentes (já é query separada). Manter o restante do código de renderização inalterado.
+
+## Fora do escopo
+- Não vou adicionar FKs via migração (pode falhar por dados antigos órfãos e está além do que o usuário pediu).
+- Não vou tocar nada além das duas funções de impressão.
