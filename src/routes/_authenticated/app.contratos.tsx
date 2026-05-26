@@ -674,6 +674,142 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
   };
   const formaLabel = formaLabelMap[contrato.forma_pagamento ?? ""] ?? (contrato.forma_pagamento ?? "—");
   const maxDep = Number(convenio?.max_dependentes ?? 0) || 0;
+  const depsAtivos = deps.filter((d) => d.ativo);
+
+  const renderTermo = (dep: Dep, movimento: "Inclusão" | "Exclusão"): string => {
+    const tpl = convenio?.termo_inclusao_html ?? "";
+    if (!tpl) return "";
+    const _cl = clinica ?? {};
+    const _pa = pacienteFull ?? {};
+    const enderecoPaciente = [_pa.logradouro, _pa.numero, _pa.bairro, _pa.cidade && _pa.estado ? `${_pa.cidade}-${_pa.estado}` : _pa.cidade].filter(Boolean).join(", ");
+    const dataMov = movimento === "Inclusão" ? dep.incluido_em : dep.excluido_em;
+    const vars: Record<string, string> = {
+      CLINICA_NOME: _cl.nome ?? "",
+      CLINICA_CNPJ: _cl.cnpj ?? "",
+      CLINICA_ENDERECO: [_cl.endereco, _cl.cidade, _cl.estado].filter(Boolean).join(", "),
+      CIDADE: _cl.cidade ?? "",
+      CONTRATO_NUMERO: String(contrato.numero),
+      PACIENTE_NOME: contrato.paciente_nome ?? "",
+      PACIENTE_CPF: _pa.cpf ?? "",
+      PACIENTE_NASCIMENTO: fmtD(_pa.data_nascimento),
+      PACIENTE_ENDERECO: enderecoPaciente,
+      PACIENTE_TELEFONE: _pa.telefone ?? "",
+      PACIENTE_EMAIL: _pa.email ?? "",
+      VALOR_MENSAL: BRL(Number(contrato.valor_mensal)),
+      TAXA_ADESAO: BRL(Number((contrato as any).taxa_adesao ?? 0)),
+      DATA_HOJE: fmtDataExtenso(new Date().toISOString()),
+      DEPENDENTE_NOME: dep.paciente_nome,
+      DEPENDENTE_PARENTESCO: dep.parentesco ?? "",
+      DEPENDENTE_CPF: dep.cpf ?? "",
+      DEPENDENTE_TIPO: dep.tipo,
+      TIPO_MOVIMENTO: movimento,
+      DATA_MOVIMENTO: fmtDataExtenso(dataMov ?? new Date().toISOString().slice(0, 10)),
+    };
+    return tpl.replace(/\{\{(\w+)\}\}/g, (_m: string, k: string) => vars[k] ?? "");
+  };
+
+  const printTermoInclusao = () => {
+    if (!termoDep) return;
+    const html = renderTermo(termoDep, termoMovimento);
+    const safe = DOMPurify.sanitize(html);
+    const titulo = `Termo de ${termoMovimento} — Contrato #${contrato.numero}`;
+    const doc = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/>
+<title>${titulo}</title>
+<style>
+@page { size: A4; margin: 18mm; }
+body { font-family: Arial, Helvetica, sans-serif; font-size: 11pt; color:#000; line-height: 1.45; }
+h1, h2, h3 { margin: 0 0 6mm; }
+.head { text-align:center; margin-bottom: 6mm; font-size: 10pt; }
+.sig { margin-top: 14mm; display:flex; justify-content: space-around; gap:10mm; text-align:center; font-size: 10pt; }
+.sig div { width:45%; }
+</style></head><body>
+<div class="head"><strong>${clinica?.nome ?? ""}</strong><br/>${[clinica?.endereco, clinica?.cidade, clinica?.estado].filter(Boolean).join(" — ")}<br/>CNPJ: ${clinica?.cnpj ?? ""}</div>
+<div>${safe}</div>
+<div class="sig">
+  <div>____________________________<br/>${clinica?.nome ?? ""}</div>
+  <div>____________________________<br/>${contrato.paciente_nome}</div>
+</div>
+<script>window.onload=()=>{setTimeout(()=>{window.print();},300);};</script>
+</body></html>`;
+    const w = window.open("", "_blank", "width=900,height=700");
+    if (!w) { toast.error("Bloqueador de pop-up impediu a impressão"); return; }
+    w.document.open(); w.document.write(doc); w.document.close();
+  };
+
+  const abrirTermoSeAssinado = (dep: Dep, movimento: "Inclusão" | "Exclusão") => {
+    if (!contrato.assinado_em) return;
+    if (!convenio?.termo_inclusao_html) {
+      toast.message("Contrato assinado, mas o convênio não possui Termo de Inclusão cadastrado.");
+      return;
+    }
+    setTermoDep(dep);
+    setTermoMovimento(movimento);
+    setTermoOpen(true);
+  };
+
+  const confirmarIncluir = async () => {
+    if (!incPaciente) { toast.error("Selecione um paciente"); return; }
+    if (depsAtivos.length >= maxDep) {
+      toast.error(maxDep === 0 ? "Este convênio não permite dependentes." : `Limite de ${maxDep} dependentes atingido.`);
+      return;
+    }
+    if (depsAtivos.find((d) => d.paciente_id === incPaciente.id)) {
+      toast.error("Esse paciente já é dependente ativo deste contrato");
+      return;
+    }
+    if (incPaciente.id === (contrato as any).paciente_id) {
+      toast.error("O titular não pode ser dependente");
+      return;
+    }
+    setIncSaving(true);
+    const hoje = new Date().toISOString().slice(0, 10);
+    const { data, error } = await supabase
+      .from("contrato_dependentes")
+      .insert({
+        contrato_id: contrato.id,
+        paciente_id: incPaciente.id,
+        paciente_nome: incPaciente.nome,
+        parentesco: incParentesco || null,
+        tipo: incTipo,
+        incluido_em: hoje,
+        ativo: true,
+      })
+      .select("id, paciente_id, paciente_nome, parentesco, tipo, incluido_em, excluido_em, ativo")
+      .maybeSingle();
+    setIncSaving(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Dependente incluído");
+    setIncOpen(false);
+    const novoDep: Dep = {
+      id: data!.id,
+      paciente_id: data!.paciente_id,
+      paciente_nome: data!.paciente_nome,
+      parentesco: data!.parentesco,
+      tipo: data!.tipo,
+      cpf: incPaciente.cpf,
+      incluido_em: data!.incluido_em,
+      excluido_em: data!.excluido_em,
+      ativo: !!data!.ativo,
+    };
+    setIncPaciente(null); setIncParentesco(""); setIncTipo("dependente");
+    await load();
+    abrirTermoSeAssinado(novoDep, "Inclusão");
+  };
+
+  const confirmarExcluir = async () => {
+    if (!excAlvo) return;
+    const hoje = new Date().toISOString().slice(0, 10);
+    const { error } = await supabase
+      .from("contrato_dependentes")
+      .update({ ativo: false, excluido_em: hoje })
+      .eq("id", excAlvo.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Dependente excluído");
+    const alvo = { ...excAlvo, ativo: false, excluido_em: hoje };
+    setExcAlvo(null);
+    await load();
+    abrirTermoSeAssinado(alvo, "Exclusão");
+  };
 
   const contratoTexto = useMemo(() => {
     const tpl = convenio?.modelo_contrato ?? "";
