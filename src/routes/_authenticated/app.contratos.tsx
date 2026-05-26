@@ -852,6 +852,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
       ativo: !!data!.ativo,
     };
     setIncPaciente(null); setIncParentesco(""); setIncTipo("dependente");
+    // Recalcula valor das parcelas em aberto conforme a nova quantidade de vidas
+    // (titular + dependentes ativos, incluindo o recém-incluído)
+    await recalcularParcelasAbertas(depsAtivos.length + 2);
     await load();
     abrirTermoSeAssinado(novoDep, "Inclusão");
   };
