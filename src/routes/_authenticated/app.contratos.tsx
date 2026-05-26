@@ -717,9 +717,6 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
         </div>
           </TabsContent>
           <TabsContent value="contrato" className="mt-4">
-          </TabsContent>
-          <TabsContent value="dados" className="mt-4">
-          </TabsContent>
             <div className="flex items-center justify-between mb-2">
               <div className="text-sm text-muted-foreground">
                 {convenio?.nome ? `Modelo do convênio: ${convenio.nome}` : "Modelo do contrato"}
