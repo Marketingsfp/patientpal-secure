@@ -1671,7 +1671,12 @@ function AgendaPage() {
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline" className="text-xs">{a.procedimento || "CONSULTA"}</Badge>
+                    <ProcedimentoCell
+                      valor={a.procedimento}
+                      opcoes={opcoesProcedimentoMedico(a.medico_id)}
+                      disabled={normalizar(a.paciente_nome) === "disponivel"}
+                      onChange={(novo) => atualizarProcedimento(a, novo)}
+                    />
                   </TableCell>
                   <TableCell className="text-center">
                     <div className="flex flex-col items-center gap-0.5">
