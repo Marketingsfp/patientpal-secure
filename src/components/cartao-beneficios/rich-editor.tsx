@@ -82,17 +82,25 @@ function ImageNodeView(props: NodeViewProps) {
   const width = (node.attrs.width as string) || "";
   const align = (node.attrs.align as string) || "none";
 
-  const startResize = (e: React.PointerEvent) => {
+  const startResize = (corner: "nw" | "ne" | "sw" | "se") => (e: React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
     const wrap = (e.currentTarget as HTMLElement).parentElement;
     const img = wrap?.querySelector("img") as HTMLImageElement | null;
     if (!img) return;
+    const rect = img.getBoundingClientRect();
     const startX = e.clientX;
-    const startWidth = img.getBoundingClientRect().width;
+    const startWidth = rect.width;
+    const startHeight = rect.height || 1;
+    const ratio = startWidth / startHeight;
+    const dirX = corner === "ne" || corner === "se" ? 1 : -1;
+    const keepRatio = !e.altKey; // Alt libera proporção (igual Word ~ Shift, mas usamos Alt)
     const move = (ev: PointerEvent) => {
-      const next = Math.max(40, Math.round(startWidth + (ev.clientX - startX)));
+      const dx = (ev.clientX - startX) * dirX;
+      const next = Math.max(40, Math.round(startWidth + dx));
       updateAttributes({ width: `${next}px` });
+      // height segue via CSS height:auto + ratio mantido naturalmente pelo img
+      void keepRatio; void ratio;
     };
     const up = () => {
       window.removeEventListener("pointermove", move);
@@ -122,11 +130,12 @@ function ImageNodeView(props: NodeViewProps) {
         draggable={false}
       />
       {selected && editor.isEditable && (
-        <span
-          className="rt-img-handle"
-          onPointerDown={startResize}
-          title="Arraste para redimensionar"
-        />
+        <>
+          <span className="rt-img-handle rt-img-handle-nw" onPointerDown={startResize("nw")} title="Redimensionar" />
+          <span className="rt-img-handle rt-img-handle-ne" onPointerDown={startResize("ne")} title="Redimensionar" />
+          <span className="rt-img-handle rt-img-handle-sw" onPointerDown={startResize("sw")} title="Redimensionar" />
+          <span className="rt-img-handle rt-img-handle-se" onPointerDown={startResize("se")} title="Redimensionar" />
+        </>
       )}
     </NodeViewWrapper>
   );
