@@ -560,7 +560,7 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
       supabase.from("contrato_mensalidades").select("*").eq("contrato_id", contrato.id).order("numero_parcela"),
       supabase
         .from("contrato_dependentes")
-        .select("id, paciente_id, paciente_nome, parentesco, tipo, incluido_em, excluido_em, ativo, pacientes:paciente_id(cpf)")
+        .select("id, paciente_id, paciente_nome, parentesco, tipo, incluido_em, excluido_em, ativo")
         .eq("contrato_id", contrato.id),
       contrato.convenio_id
         ? supabase
@@ -576,13 +576,23 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
         : Promise.resolve({ data: [] }),
     ]);
     setMens((m.data ?? []) as Mens[]);
-    const depsRows = ((d.data ?? []) as any[]).map((r) => ({
+    const rows = (d.data ?? []) as any[];
+    const pids = Array.from(new Set(rows.map((r) => r.paciente_id).filter(Boolean)));
+    let cpfMap: Record<string, string | null> = {};
+    if (pids.length) {
+      const { data: pacs } = await supabase
+        .from("pacientes")
+        .select("id, cpf")
+        .in("id", pids);
+      cpfMap = Object.fromEntries((pacs ?? []).map((p: any) => [p.id, p.cpf]));
+    }
+    const depsRows = rows.map((r) => ({
       id: r.id,
       paciente_id: r.paciente_id,
       paciente_nome: r.paciente_nome,
       parentesco: r.parentesco,
       tipo: r.tipo,
-      cpf: r.pacientes?.cpf ?? null,
+      cpf: cpfMap[r.paciente_id] ?? null,
       incluido_em: r.incluido_em ?? null,
       excluido_em: r.excluido_em ?? null,
       ativo: !!r.ativo,
