@@ -17,6 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import DOMPurify from "dompurify";
 import { ChevronsUpDown } from "lucide-react";
 import { printContrato } from "@/lib/print-contrato";
 import { printCartoes } from "@/lib/print-cartao";
@@ -580,7 +581,14 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
               </Button>
             </div>
             {contratoTexto ? (
-              <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed p-4 rounded-md border bg-card">{contratoTexto}</pre>
+              /<[a-z][\s\S]*>/i.test(contratoTexto) ? (
+                <div
+                  className="prose prose-sm max-w-none p-4 rounded-md border bg-card"
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(contratoTexto) }}
+                />
+              ) : (
+                <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed p-4 rounded-md border bg-card">{contratoTexto}</pre>
+              )
             ) : (
               <div className="rounded-md border bg-muted/40 p-4 text-sm text-muted-foreground">
                 Nenhum modelo cadastrado neste convênio. Configure em <strong>Cartão de Benefícios → Convênio</strong>.
