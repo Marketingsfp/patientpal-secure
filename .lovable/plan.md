@@ -1,38 +1,55 @@
 ## Objetivo
-No `RichEditor` (abas Contrato, Informativo e Termo de Inclusão), permitir editar imagens depois de inseridas: redimensionar, alinhar (esquerda/centro/direita) e mostrar visualmente quando a imagem está selecionada.
+
+No `RichEditor` (abas Contrato, Informativo, Termo de Inclusão), reproduzir o comportamento do Word mostrado no vídeo: inserir várias imagens lado a lado ou uma embaixo da outra, redimensionar mantendo proporção e cortar.
+
+Hoje já temos: seleção visual da imagem, alinhar esquerda/centro/direita (float), redimensionar por largura (handle no canto), Select de largura na toolbar e diálogo de corte (`image-crop-dialog.tsx`). Faltam basicamente duas coisas que o vídeo mostra:
+
+1. Colocar **várias imagens no mesmo parágrafo** (lado a lado) ou em parágrafos seguidos (empilhadas).
+2. Redimensionar **proporcionalmente** a partir dos cantos, como no Word.
 
 ## Mudanças
 
-### 1. Extensão de Image customizada (`src/components/cartao-beneficios/rich-editor.tsx`)
-Estender `@tiptap/extension-image` para suportar novos atributos persistidos no HTML:
-- `width` (ex.: `"320px"` ou `"50%"`) — renderizado como `style="width:..."`.
-- `align` (`left` | `center` | `right`) — renderizado via classes (`rt-img-left/center/right`) que aplicam `float`/`margin: 0 auto`/`display: block`.
-- `data-selected` quando o node estiver selecionado (via `NodeView` ou classe condicional) para feedback visual.
+### 1. Imagem inline por padrão (`rich-editor.tsx`)
 
-Trocar `Image` por `ResizableImage` (NodeView em React) para:
-- Mostrar contorno azul + handle no canto inferior direito quando selecionada.
-- Arrastar o handle para redimensionar (atualiza `width` em px).
-- Manter `handleClickOn` já existente selecionando o node.
+- Trocar `ResizableImage.configure({ inline: false, ... })` por `inline: true` e atualizar o `extend` (`inline: true`, `group: "inline"`).
+- Resultado: duas imagens digitadas/inseridas em sequência ficam **lado a lado** no mesmo parágrafo, exatamente como o Word inline. Para empilhar, basta `Enter` entre elas.
+- Compatibilidade: o NodeView já usa `<span>` (`as="span"`), então o HTML continua válido inline. Conteúdo antigo (imagens em parágrafo próprio) continua renderizando — vira inline dentro do `<p>`, sem quebra visual.
 
-### 2. Barra de ferramentas contextual
-Quando `editor.isActive("image")` for `true`, mostrar um grupo extra na toolbar (ou logo acima da imagem como bubble menu simples) com:
-- Botões de alinhar Esquerda / Centro / Direita (ícones `AlignLeft`, `AlignCenter`, `AlignRight`) — chamam `updateAttributes({ align })`.
-- Campo numérico de largura em px + botões rápidos 25% / 50% / 75% / 100% — atualizam `width`.
-- Botão "Tamanho original" — limpa `width`.
-- Botão excluir (já existe) continua funcionando.
+### 2. Upload de várias imagens de uma vez
 
-Implementação mais simples: adicionar esses controles inline na toolbar existente, exibidos apenas quando `editor.isActive("image")` — evita adicionar dependência de BubbleMenu.
+- O `<input type="file">` atual aceita um arquivo. Adicionar `multiple` e, no handler, fazer upload em sequência e inserir cada uma com `editor.chain().focus().setImage({ src }).run()` na mesma posição → ficam lado a lado automaticamente (porque a imagem agora é inline).
 
-### 3. Estilos (`src/styles.css` ou bloco `<style>` no shell do editor)
-- `.rt-editor img.rt-img-left { float: left; margin: 0 1rem 0.5rem 0; }`
-- `.rt-editor img.rt-img-right { float: right; margin: 0 0 0.5rem 1rem; }`
-- `.rt-editor img.rt-img-center { display: block; margin: 0.5rem auto; }`
-- `.rt-editor img.ProseMirror-selectednode` → contorno (`outline: 2px solid hsl(var(--primary)); outline-offset: 2px;`) para feedback de seleção.
-- Handle de resize: pequeno quadrado no canto inferior direito visível só quando selecionada.
+### 3. Redimensionar com proporção (cantos)
 
-### 4. Compatibilidade
-- Conteúdo HTML antigo (imagens sem `width`/`align`) continua renderizando normalmente.
-- Persistência: atributos vão direto no HTML salvo no banco — nenhuma mudança de schema.
+No `ImageNodeView`:
+- Substituir o único handle do canto inferior-direito por 4 handles (`nw`, `ne`, `sw`, `se`) — visíveis só quando selecionada.
+- Capturar `naturalWidth/naturalHeight` no `pointerdown` para calcular a razão.
+- Por padrão **manter proporção** (atualiza `width` em px; altura segue via `height: auto` no CSS). Se o usuário segurar `Alt`, libera distorção (não é o caso do Word, mas é útil).
+- Manter o atual handle inferior-direito como um dos quatro cantos.
+
+### 4. Estilos (`src/styles.css`)
+
+- Adicionar `.rt-img-handle-nw/.ne/.sw/.se` posicionando cada canto com o cursor correto (`nwse-resize` / `nesw-resize`).
+- Pequeno espaçamento horizontal entre imagens inline: `.rt-img-wrap + .rt-img-wrap { margin-left: 4px; }` para que duas imagens lado a lado não fiquem coladas.
+- Garantir que `.rt-editor p` permita `display: inline-block` das imagens (já permite, é o default).
+
+### 5. Toolbar — pequenos ajustes
+
+- Manter os controles atuais (alinhar L/C/R, Select de largura, botão Cortar) — já cobrem o que o vídeo mostra.
+- O botão "Inserir imagem" agora suporta múltiplos arquivos.
+
+### 6. Corte — sem mudanças funcionais
+
+O `ImageCropDialog` já existe e funciona; só verificar que continua disparando com a imagem selecionada após a mudança para inline (o `editor.getAttributes("image").src` continua válido).
 
 ## Resultado
-Usuário clica numa imagem → aparece contorno azul + handle. Pode arrastar o canto para redimensionar, ou usar os botões de alinhamento/largura que surgem na toolbar. Funciona nas três abas porque todas usam o mesmo `RichEditor`.
+
+- Usuário clica em "Inserir imagem", seleciona 2+ arquivos → aparecem lado a lado no editor.
+- Para empilhar: pressiona Enter entre elas (ou usa alinhar centro/esquerda como já funciona).
+- Arrasta qualquer canto da imagem selecionada para redimensionar mantendo a proporção.
+- Corta pelo botão "Cortar imagem" (já existente).
+- Funciona nas três abas (Contrato, Informativo, Termo de Inclusão) porque todas usam o mesmo `RichEditor`.
+
+## Arquivos tocados
+- `src/components/cartao-beneficios/rich-editor.tsx` (inline:true, handles dos 4 cantos, upload múltiplo)
+- `src/styles.css` (estilos dos 4 handles + gap entre imagens inline)

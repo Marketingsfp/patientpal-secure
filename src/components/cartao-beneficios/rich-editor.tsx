@@ -82,17 +82,25 @@ function ImageNodeView(props: NodeViewProps) {
   const width = (node.attrs.width as string) || "";
   const align = (node.attrs.align as string) || "none";
 
-  const startResize = (e: React.PointerEvent) => {
+  const startResize = (corner: "nw" | "ne" | "sw" | "se") => (e: React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
     const wrap = (e.currentTarget as HTMLElement).parentElement;
     const img = wrap?.querySelector("img") as HTMLImageElement | null;
     if (!img) return;
+    const rect = img.getBoundingClientRect();
     const startX = e.clientX;
-    const startWidth = img.getBoundingClientRect().width;
+    const startWidth = rect.width;
+    const startHeight = rect.height || 1;
+    const ratio = startWidth / startHeight;
+    const dirX = corner === "ne" || corner === "se" ? 1 : -1;
+    const keepRatio = !e.altKey; // Alt libera proporção (igual Word ~ Shift, mas usamos Alt)
     const move = (ev: PointerEvent) => {
-      const next = Math.max(40, Math.round(startWidth + (ev.clientX - startX)));
+      const dx = (ev.clientX - startX) * dirX;
+      const next = Math.max(40, Math.round(startWidth + dx));
       updateAttributes({ width: `${next}px` });
+      // height segue via CSS height:auto + ratio mantido naturalmente pelo img
+      void keepRatio; void ratio;
     };
     const up = () => {
       window.removeEventListener("pointermove", move);
@@ -122,11 +130,12 @@ function ImageNodeView(props: NodeViewProps) {
         draggable={false}
       />
       {selected && editor.isEditable && (
-        <span
-          className="rt-img-handle"
-          onPointerDown={startResize}
-          title="Arraste para redimensionar"
-        />
+        <>
+          <span className="rt-img-handle rt-img-handle-nw" onPointerDown={startResize("nw")} title="Redimensionar" />
+          <span className="rt-img-handle rt-img-handle-ne" onPointerDown={startResize("ne")} title="Redimensionar" />
+          <span className="rt-img-handle rt-img-handle-sw" onPointerDown={startResize("sw")} title="Redimensionar" />
+          <span className="rt-img-handle rt-img-handle-se" onPointerDown={startResize("se")} title="Redimensionar" />
+        </>
       )}
     </NodeViewWrapper>
   );
@@ -239,7 +248,7 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       Table.configure({ resizable: true, HTMLAttributes: { class: "rt-table" } }),
       TableRow, ColoredTableHeader, ColoredTableCell,
-      ResizableImage.configure({ inline: false, allowBase64: true }),
+      ResizableImage.configure({ inline: true, allowBase64: true }),
     ],
     content: value || "<p></p>",
     editorProps: {
@@ -278,6 +287,14 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
     if (error) { toast.error(error.message); return; }
     const { data } = supabase.storage.from("cb-informativos").getPublicUrl(path);
     editor.chain().focus().setImage({ src: data.publicUrl }).run();
+  };
+
+  const handleUploadMany = async (files: File[]) => {
+    for (const f of files) {
+      // sequencial para preservar ordem de inserção (ficam lado a lado)
+      // eslint-disable-next-line no-await-in-loop
+      await handleUpload(f);
+    }
   };
 
   const setLink = () => {
@@ -508,10 +525,10 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
           </>
         )}
         <input
-          ref={fileRef} type="file" accept="image/*" className="hidden"
+          ref={fileRef} type="file" accept="image/*" multiple className="hidden"
           onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) handleUpload(f);
+            const files = e.target.files ? Array.from(e.target.files) : [];
+            if (files.length) handleUploadMany(files);
             e.target.value = "";
           }}
         />
