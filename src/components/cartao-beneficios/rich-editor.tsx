@@ -46,6 +46,20 @@ const ColoredTableCell = TableCell.extend({
           };
         },
       },
+      verticalAlign: {
+        default: null,
+        parseHTML: (el) =>
+          (el as HTMLElement).getAttribute("data-valign") ||
+          (el as HTMLElement).style.verticalAlign ||
+          null,
+        renderHTML: (attrs) => {
+          if (!attrs.verticalAlign) return {};
+          return {
+            "data-valign": attrs.verticalAlign,
+            style: `vertical-align: ${attrs.verticalAlign}`,
+          };
+        },
+      },
     };
   },
 });
@@ -64,6 +78,20 @@ const ColoredTableHeader = TableHeader.extend({
           return {
             "data-bg": attrs.backgroundColor,
             style: `background-color: ${attrs.backgroundColor}`,
+          };
+        },
+      },
+      verticalAlign: {
+        default: null,
+        parseHTML: (el) =>
+          (el as HTMLElement).getAttribute("data-valign") ||
+          (el as HTMLElement).style.verticalAlign ||
+          null,
+        renderHTML: (attrs) => {
+          if (!attrs.verticalAlign) return {};
+          return {
+            "data-valign": attrs.verticalAlign,
+            style: `vertical-align: ${attrs.verticalAlign}`,
           };
         },
       },
