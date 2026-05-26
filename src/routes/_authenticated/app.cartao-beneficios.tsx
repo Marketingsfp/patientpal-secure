@@ -1,5 +1,5 @@
 import { createFileRoute, Link, Outlet, useLocation, redirect } from "@tanstack/react-router";
-import { CreditCard, FileText, FileSignature, BarChart3, ShieldCheck, Gift } from "lucide-react";
+import { CreditCard, FileSignature, BarChart3, ShieldCheck } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/cartao-beneficios")({
   beforeLoad: ({ location }) => {
@@ -13,9 +13,7 @@ export const Route = createFileRoute("/_authenticated/app/cartao-beneficios")({
 
 const tabs = [
   { to: "/app/cartao-beneficios/contratos", label: "Nova venda", icon: FileSignature },
-  { to: "/app/cartao-beneficios/modelos", label: "Modelo de contrato", icon: FileText },
   { to: "/app/cartao-beneficios/convenios", label: "Convênio", icon: ShieldCheck },
-  { to: "/app/cartao-beneficios/beneficios", label: "Benefícios", icon: Gift },
   { to: "/app/cartao-beneficios/relatorios", label: "Relatórios", icon: BarChart3 },
 ];
 
