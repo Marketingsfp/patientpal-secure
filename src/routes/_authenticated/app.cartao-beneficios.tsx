@@ -12,8 +12,8 @@ export const Route = createFileRoute("/_authenticated/app/cartao-beneficios")({
 });
 
 const tabs = [
-  { to: "/app/cartao-beneficios/contratos", label: "Nova venda", icon: FileSignature },
-  { to: "/app/cartao-beneficios/convenios", label: "Convênio", icon: ShieldCheck },
+  { to: "/app/cartao-beneficios/contratos", label: "Vendas", icon: FileSignature },
+  { to: "/app/cartao-beneficios/convenios", label: "Convênios", icon: ShieldCheck },
   { to: "/app/cartao-beneficios/relatorios", label: "Relatórios", icon: BarChart3 },
 ];
 
