@@ -5,6 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useClinica } from "@/hooks/use-clinica";
 import { chatNina } from "@/lib/nina.functions";
 import { obterWhatsappConfig, salvarWhatsappConfig, testarConexaoWhatsapp } from "@/lib/whatsapp.functions";
+import { enviarMensagemWhatsapp } from "@/lib/whatsapp.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -88,6 +89,24 @@ function NinaPage() {
   const [draft, setDraft] = useState("");
   const [busca, setBusca] = useState("");
   const [loadingConv, setLoadingConv] = useState(false);
+  const [enviando, setEnviando] = useState(false);
+  const enviarFn = useServerFn(enviarMensagemWhatsapp);
+
+  const enviarMensagem = async () => {
+    const text = draft.trim();
+    if (!text || !sel || !clinicaId || enviando) return;
+    setEnviando(true);
+    try {
+      const to = sel.id.startsWith("+") ? sel.id : `+${sel.id}`;
+      await enviarFn({ data: { clinicaId, to, text } });
+      setDraft("");
+      await carregar();
+    } catch (e: any) {
+      toast.error(e?.message || "Falha ao enviar mensagem");
+    } finally {
+      setEnviando(false);
+    }
+  };
 
   const carregar = useCallback(async () => {
     if (!clinicaId) return;
@@ -265,10 +284,22 @@ function NinaPage() {
                   placeholder="Digite uma mensagem… (Nina responde se IA estiver ligada)"
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      enviarMensagem();
+                    }
+                  }}
+                  disabled={enviando}
                   className="flex-1"
                 />
-                <Button size="icon" className="bg-emerald-500 hover:bg-emerald-600">
-                  <Send className="h-4 w-4" />
+                <Button
+                  size="icon"
+                  onClick={enviarMensagem}
+                  disabled={enviando || !draft.trim()}
+                  className="bg-emerald-500 hover:bg-emerald-600"
+                >
+                  {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 </Button>
               </div>
               </>
