@@ -271,7 +271,7 @@ function NinaPage() {
                       m.from === "nina" ? "bg-emerald-500 text-white rounded-br-sm" : "bg-card border border-border rounded-bl-sm"
                     }`}>
                       {m.tipo === "audio" && <div className="text-xs opacity-70 mb-1 flex items-center gap-1"><Mic className="h-3 w-3" /> transcrito por IA</div>}
-                      <div className="whitespace-pre-wrap">{m.text}</div>
+                      <div className="whitespace-pre-wrap break-words">{formatWhatsappText(m.text)}</div>
                       <div className={`text-[10px] mt-1 flex items-center gap-1 ${m.from === "nina" ? "text-white/80 justify-end" : "text-muted-foreground"}`}>
                         {m.at} {m.from === "nina" && <CheckCheck className="h-3 w-3" />}
                       </div>
