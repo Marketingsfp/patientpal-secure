@@ -131,6 +131,8 @@ function AgendaPage() {
   const [procedimentosList, setProcedimentosList] = useState<{ id: string; nome: string }[]>([]);
   const [procPorMedico, setProcPorMedico] = useState<Map<string, Set<string>>>(new Map());
   const [procNomesPorMedico, setProcNomesPorMedico] = useState<Map<string, Set<string>>>(new Map());
+  // Ranking de procedimentos mais usados por médico (nome normalizado -> contagem)
+  const [rankingPorMedico, setRankingPorMedico] = useState<Map<string, Map<string, number>>>(new Map());
   const [especialidades, setEspecialidades] = useState<Especialidade[]>([]);
   const [medicoEspec, setMedicoEspec] = useState<Map<string, Set<string>>>(new Map());
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
