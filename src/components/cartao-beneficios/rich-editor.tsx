@@ -226,6 +226,7 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
   const [cropOpen, setCropOpen] = useState(false);
   const [cropSrc, setCropSrc] = useState<string>("");
   const [cropTargetPos, setCropTargetPos] = useState<number | null>(null);
+  const [selectionVersion, setSelectionVersion] = useState(0);
   // Margens da página em mm (A4: 210 × 297). Persistidas em localStorage por clínica.
   const storageKey = `rt-margins:${clinicaId || "default"}`;
   const readStored = () => {
@@ -282,6 +283,17 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
     if (value !== current) editor.commands.setContent(value || "<p></p>", { emitUpdate: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, editor]);
+
+  useEffect(() => {
+    if (!editor) return;
+    const refreshSelection = () => setSelectionVersion((version) => version + 1);
+    editor.on("selectionUpdate", refreshSelection);
+    editor.on("transaction", refreshSelection);
+    return () => {
+      editor.off("selectionUpdate", refreshSelection);
+      editor.off("transaction", refreshSelection);
+    };
+  }, [editor]);
 
   if (!editor) return null;
 
@@ -489,9 +501,9 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
         </ToolbarButton>
         <ToolbarButton
           title="Excluir imagem selecionada"
-          disabled={!editor.isActive("image")}
+          disabled={!getSelectedImageTarget()}
           onClick={() => {
-            if (editor.isActive("image")) {
+            if (getSelectedImageTarget()) {
               editor.chain().focus().deleteSelection().run();
             } else {
               toast.info("Clique na imagem que deseja excluir e tente novamente.");
@@ -504,7 +516,9 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
           <LinkIcon className="h-4 w-4" />
         </ToolbarButton>
         {(() => {
-          const imgActive = editor.isActive("image");
+          void selectionVersion;
+          const imgTarget = getSelectedImageTarget();
+          const imgActive = Boolean(imgTarget);
           return (
             <>
               <div className="w-px h-6 bg-border mx-1" />
@@ -536,7 +550,7 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
                 title="Cortar imagem"
                 disabled={!imgActive}
                 onClick={() => {
-                  const target = getSelectedImageTarget();
+                  const target = imgTarget ?? getSelectedImageTarget();
                   if (!target) {
                     toast.info("Clique na imagem que deseja cortar e tente novamente.");
                     return;
