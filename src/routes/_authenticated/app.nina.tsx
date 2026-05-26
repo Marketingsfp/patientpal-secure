@@ -733,6 +733,40 @@ function ConfiguracaoWhatsApp() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>Horário de atendimento humano</CardTitle>
+          <CardDescription>
+            Dentro deste intervalo a equipe responde manualmente. <strong>Fora</strong> dele a Nina responde automaticamente pelo WhatsApp.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4 max-w-sm">
+            <div className="space-y-1">
+              <Label>Início</Label>
+              <Input
+                type="time"
+                value={horario.inicio}
+                onChange={(e) => setHorario({ ...horario, inicio: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Fim</Label>
+              <Input
+                type="time"
+                value={horario.fim}
+                onChange={(e) => setHorario({ ...horario, fim: e.target.value })}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <Button onClick={onSalvarHorario} disabled={savingHorario}>
+              {savingHorario ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Salvando…</> : "Salvar horário"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
