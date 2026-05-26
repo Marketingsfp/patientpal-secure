@@ -24,6 +24,7 @@ import { ChevronsUpDown } from "lucide-react";
 import { printContrato } from "@/lib/print-contrato";
 import { fmtDataExtenso } from "@/lib/print-contrato";
 import { printCartoes } from "@/lib/print-cartao";
+import { printGuiaMensalidade } from "@/lib/print-gr";
 import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
 import type { PatientOption } from "@/components/patient-search-input";
 
@@ -526,6 +527,8 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
 }
 
 function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () => void }) {
+  const { clinicaAtual } = useClinica();
+  const { user } = useAuth();
   const DadosField = ({ label, value }: { label: string; value: React.ReactNode }) => (
     <div className="space-y-1">
       <div className="text-sm font-medium">{label}</div>
@@ -587,6 +590,7 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
   const [pagMens, setPagMens] = useState<Mens | null>(null);
   const [formaPagOpen, setFormaPagOpen] = useState(false);
   const [lancOpen, setLancOpen] = useState(false);
+  const [pagInitialForma, setPagInitialForma] = useState<string>("");
 
   const formaOpcoes: Array<{ forma: string; label: string }> = [
     { forma: "dinheiro", label: "Dinheiro" },
@@ -689,13 +693,18 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     setPagMens(m);
     setFormaPagOpen(true);
   };
-  const escolherForma = async (forma: string) => {
+  // Normaliza para os valores aceitos pelo LancamentoDialog (igual à Agenda)
+  const normalizarForma = (f: string) =>
+    f === "credito" ? "cartao_credito" : f === "debito" ? "cartao_debito" : f;
+
+  const escolherForma = (forma: string) => {
     if (!pagMens) return;
+    setPagInitialForma(normalizarForma(forma));
     setFormaPagOpen(false);
-    await marcarPago(pagMens.id, true, forma);
-    setPagMens(null);
+    setLancOpen(true);
   };
   const escolherMisto = () => {
+    setPagInitialForma("__misto__");
     setFormaPagOpen(false);
     setLancOpen(true);
   };
@@ -708,7 +717,7 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
       if (!Number.isFinite(n)) return;
       if (n >= 1 && n <= formaOpcoes.length) {
         e.preventDefault();
-        void escolherForma(formaOpcoes[n - 1].forma);
+        escolherForma(formaOpcoes[n - 1].forma);
       } else if (n === formaOpcoes.length + 1) {
         e.preventDefault();
         escolherMisto();
@@ -1163,14 +1172,35 @@ h1, h2, h3 { margin: 0 0 6mm; }
 
       <LancamentoDialog
         open={lancOpen}
-        onOpenChange={(v) => { setLancOpen(v); if (!v) setPagMens(null); }}
+        onOpenChange={(v) => { setLancOpen(v); if (!v) { setPagMens(null); setPagInitialForma(""); } }}
         tipo="receita"
         initialDescricao={pagMens ? `Mensalidade ${pagMens.numero_parcela}/${mens.length} — Contrato #${contrato.numero} — ${contrato.paciente_nome}` : ""}
         initialValor={pagMens ? String(pagMens.valor) : ""}
+        initialFormaPagamento={pagInitialForma}
         onSavedWithData={async (dados) => {
-          if (!pagMens) return;
-          await marcarPago(pagMens.id, true, dados.forma_pagamento ?? "misto");
+          if (!pagMens || !clinicaAtual) return;
+          const mensId = pagMens.id;
+          await marcarPago(mensId, true, dados.forma_pagamento ?? "misto");
+          try {
+            await printGuiaMensalidade({
+              mensalidadeId: mensId,
+              clinicaId: clinicaAtual.clinica_id,
+              usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
+              usuarioId: user?.id ?? null,
+              pagamento: {
+                valor: dados.valor,
+                forma_pagamento: dados.forma_pagamento,
+                parcelas: dados.parcelas,
+                bandeira_cartao: dados.bandeira_cartao,
+                detalhe: dados.pagamentos_detalhe,
+              },
+            });
+            toast.success("Pagamento registrado e GR enviado para impressão.");
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Falha ao imprimir GR");
+          }
           setPagMens(null);
+          setPagInitialForma("");
         }}
       />
 

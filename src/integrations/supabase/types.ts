@@ -2055,33 +2055,44 @@ export type Database = {
       }
       gr_impressoes: {
         Row: {
-          agendamento_id: string
+          agendamento_id: string | null
           clinica_id: string
           created_at: string
           id: string
           impresso_por: string | null
           impresso_por_nome: string | null
+          mensalidade_id: string | null
           via_numero: number
         }
         Insert: {
-          agendamento_id: string
+          agendamento_id?: string | null
           clinica_id: string
           created_at?: string
           id?: string
           impresso_por?: string | null
           impresso_por_nome?: string | null
+          mensalidade_id?: string | null
           via_numero: number
         }
         Update: {
-          agendamento_id?: string
+          agendamento_id?: string | null
           clinica_id?: string
           created_at?: string
           id?: string
           impresso_por?: string | null
           impresso_por_nome?: string | null
+          mensalidade_id?: string | null
           via_numero?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "gr_impressoes_mensalidade_id_fkey"
+            columns: ["mensalidade_id"]
+            isOneToOne: false
+            referencedRelation: "contrato_mensalidades"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       hr_banco_horas: {
         Row: {
