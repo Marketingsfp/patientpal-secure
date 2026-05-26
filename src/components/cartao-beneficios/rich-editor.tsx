@@ -19,11 +19,12 @@ import {
   AlignLeft, AlignCenter, AlignRight, AlignJustify,
   List, ListOrdered, Heading1, Heading2, Heading3,
   Undo2, Redo2, Image as ImageIcon, Link as LinkIcon,
-  Table as TableIcon, Rows3, Columns3, Trash2,
+  Table as TableIcon, Rows3, Columns3, Trash2, Crop,
 } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { ImageCropDialog } from "./image-crop-dialog";
 
 // Extend table cells with a backgroundColor attribute so users can paint cells/rows/columns.
 const ColoredTableCell = TableCell.extend({
