@@ -810,7 +810,7 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     : "—";
   const formaLabelMap: Record<string, string> = {
     dinheiro: "Dinheiro", pix: "Pix", debito: "Cartão de Débito",
-    credito: "Cartão de Crédito", boleto: "Boleto",
+    credito: "Cartão de Crédito", boleto: "Boleto", carne: "Carnê interno",
   };
   const formaLabel = formaLabelMap[contrato.forma_pagamento ?? ""] ?? (contrato.forma_pagamento ?? "—");
   const maxDep = Number(convenio?.max_dependentes ?? 0) || 0;
