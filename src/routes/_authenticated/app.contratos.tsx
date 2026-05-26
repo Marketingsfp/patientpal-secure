@@ -25,7 +25,7 @@ import { printContrato } from "@/lib/print-contrato";
 import { fmtDataExtenso } from "@/lib/print-contrato";
 import { printCartoes } from "@/lib/print-cartao";
 import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
-import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
+import type { PatientOption } from "@/components/patient-search-input";
 
 export const Route = createFileRoute("/_authenticated/app/contratos")({
   component: ContratosPage,
@@ -536,6 +536,8 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
   const [incParentesco, setIncParentesco] = useState<string>("");
   const [incTipo, setIncTipo] = useState<string>("dependente");
   const [incSaving, setIncSaving] = useState(false);
+  const [incPacientes, setIncPacientes] = useState<PatientOption[]>([]);
+  const [incLoadingPac, setIncLoadingPac] = useState(false);
   const [excAlvo, setExcAlvo] = useState<Dep | null>(null);
   const [termoOpen, setTermoOpen] = useState(false);
   const [termoMovimento, setTermoMovimento] = useState<"Inclusão" | "Exclusão">("Inclusão");
@@ -560,7 +562,7 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
       supabase.from("contrato_mensalidades").select("*").eq("contrato_id", contrato.id).order("numero_parcela"),
       supabase
         .from("contrato_dependentes")
-        .select("id, paciente_id, paciente_nome, parentesco, tipo, incluido_em, excluido_em, ativo, pacientes:paciente_id(cpf)")
+        .select("id, paciente_id, paciente_nome, parentesco, tipo, incluido_em, excluido_em, ativo")
         .eq("contrato_id", contrato.id),
       contrato.convenio_id
         ? supabase
@@ -576,13 +578,23 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
         : Promise.resolve({ data: [] }),
     ]);
     setMens((m.data ?? []) as Mens[]);
-    const depsRows = ((d.data ?? []) as any[]).map((r) => ({
+    const rows = (d.data ?? []) as any[];
+    const pids = Array.from(new Set(rows.map((r) => r.paciente_id).filter(Boolean)));
+    let cpfMap: Record<string, string | null> = {};
+    if (pids.length) {
+      const { data: pacs } = await supabase
+        .from("pacientes")
+        .select("id, cpf")
+        .in("id", pids);
+      cpfMap = Object.fromEntries((pacs ?? []).map((p: any) => [p.id, p.cpf]));
+    }
+    const depsRows = rows.map((r) => ({
       id: r.id,
       paciente_id: r.paciente_id,
       paciente_nome: r.paciente_nome,
       parentesco: r.parentesco,
       tipo: r.tipo,
-      cpf: r.pacientes?.cpf ?? null,
+      cpf: cpfMap[r.paciente_id] ?? null,
       incluido_em: r.incluido_em ?? null,
       excluido_em: r.excluido_em ?? null,
       ativo: !!r.ativo,
@@ -601,6 +613,24 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     setLoading(false);
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [contrato.id]);
+
+  // Carrega lista de pacientes da clínica do contrato ao abrir o diálogo
+  useEffect(() => {
+    if (!incOpen) return;
+    let cancelled = false;
+    (async () => {
+      setIncLoadingPac(true);
+      const { data } = await supabase
+        .from("pacientes")
+        .select("id, nome, cpf, telefone, data_nascimento, clinica_id")
+        .eq("clinica_id", (contrato as any).clinica_id)
+        .order("nome");
+      if (cancelled) return;
+      setIncPacientes((data ?? []) as PatientOption[]);
+      setIncLoadingPac(false);
+    })();
+    return () => { cancelled = true; };
+  }, [incOpen, contrato]);
 
   const marcarPago = async (id: string, paga: boolean, forma?: string | null) => {
     const patch = paga
@@ -1057,7 +1087,37 @@ h1, h2, h3 { margin: 0 0 6mm; }
           <div className="space-y-3">
             <div className="space-y-1">
               <Label>Paciente</Label>
-              <PatientSearchInput value={incPaciente} onSelect={setIncPaciente} placeholder="Buscar paciente por nome ou CPF…" />
+              <Select
+                value={incPaciente?.id ?? ""}
+                onValueChange={(id) => {
+                  const p = incPacientes.find((x) => x.id === id) ?? null;
+                  setIncPaciente(p);
+                }}
+                disabled={incLoadingPac}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={incLoadingPac ? "Carregando pacientes…" : "Selecione o paciente"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {(() => {
+                    const titularId = (contrato as any).paciente_id as string | undefined;
+                    const jaDep = new Set(depsAtivos.map((d) => d.paciente_id));
+                    const list = incPacientes.filter((p) => p.id !== titularId && !jaDep.has(p.id));
+                    if (list.length === 0) {
+                      return (
+                        <div className="px-3 py-2 text-sm text-muted-foreground">
+                          Nenhum paciente disponível
+                        </div>
+                      );
+                    }
+                    return list.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.nome}{p.cpf ? ` — ${p.cpf}` : ""}
+                      </SelectItem>
+                    ));
+                  })()}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
