@@ -31,11 +31,20 @@ type Beneficio = {
   nome: string;
   descricao: string | null;
   ativo: boolean;
+  escopo: "servico" | "especialidade";
+  procedimento_id: string | null;
+  especialidade_id: string | null;
+  tipo_desconto: "percentual" | "valor" | "gratuidade";
+  valor_desconto: number | null;
 };
+type Procedimento = { id: string; nome: string };
+type Especialidade = { id: string; nome: string };
 
 function BeneficiosPage() {
   const { clinicaAtual } = useClinica();
   const [convenios, setConvenios] = useState<Convenio[]>([]);
+  const [procedimentos, setProcedimentos] = useState<Procedimento[]>([]);
+  const [especialidades, setEspecialidades] = useState<Especialidade[]>([]);
   const [rows, setRows] = useState<Beneficio[]>([]);
   const [loading, setLoading] = useState(true);
   const [filtroConvenio, setFiltroConvenio] = useState<string>("todos");
@@ -46,6 +55,11 @@ function BeneficiosPage() {
   const [descricao, setDescricao] = useState("");
   const [convenioId, setConvenioId] = useState<string>("");
   const [ativo, setAtivo] = useState(true);
+  const [escopo, setEscopo] = useState<"servico" | "especialidade">("servico");
+  const [procedimentoId, setProcedimentoId] = useState<string>("");
+  const [especialidadeId, setEspecialidadeId] = useState<string>("");
+  const [tipoDesconto, setTipoDesconto] = useState<"percentual" | "valor" | "gratuidade">("percentual");
+  const [valorDesconto, setValorDesconto] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [toDelete, setToDelete] = useState<Beneficio | null>(null);
 
@@ -53,14 +67,18 @@ function BeneficiosPage() {
     if (!clinicaAtual) return;
     setLoading(true);
     const cid = clinicaAtual.clinica_id;
-    const [cs, bs] = await Promise.all([
+    const [cs, bs, ps, es] = await Promise.all([
       supabase.from("cb_convenios").select("id, nome, ativo").eq("clinica_id", cid).order("nome"),
-      supabase.from("cb_beneficios").select("id, clinica_id, convenio_id, nome, descricao, ativo").eq("clinica_id", cid).order("nome"),
+      supabase.from("cb_beneficios").select("id, clinica_id, convenio_id, nome, descricao, ativo, escopo, procedimento_id, especialidade_id, tipo_desconto, valor_desconto").eq("clinica_id", cid).order("nome"),
+      supabase.from("procedimentos").select("id, nome").eq("clinica_id", cid).order("nome"),
+      supabase.from("especialidades").select("id, nome").eq("ativo", true).order("nome"),
     ]);
     if (cs.error) toast.error(cs.error.message);
     if (bs.error) toast.error(bs.error.message);
     setConvenios((cs.data ?? []) as Convenio[]);
     setRows((bs.data ?? []) as Beneficio[]);
+    setProcedimentos((ps.data ?? []) as Procedimento[]);
+    setEspecialidades((es.data ?? []) as Especialidade[]);
     setLoading(false);
   };
 
@@ -85,6 +103,11 @@ function BeneficiosPage() {
     setEditing(null);
     setNome(""); setDescricao(""); setAtivo(true);
     setConvenioId(convenios[0]?.id ?? "");
+    setEscopo("servico");
+    setProcedimentoId("");
+    setEspecialidadeId("");
+    setTipoDesconto("percentual");
+    setValorDesconto("");
     setView("form");
   };
 
@@ -94,20 +117,41 @@ function BeneficiosPage() {
     setDescricao(b.descricao ?? "");
     setConvenioId(b.convenio_id);
     setAtivo(b.ativo);
+    setEscopo(b.escopo);
+    setProcedimentoId(b.procedimento_id ?? "");
+    setEspecialidadeId(b.especialidade_id ?? "");
+    setTipoDesconto(b.tipo_desconto);
+    setValorDesconto(b.valor_desconto != null ? String(b.valor_desconto) : "");
     setView("form");
   };
 
   const save = async () => {
     if (!clinicaAtual) return;
-    if (!nome.trim()) { toast.error("Informe o nome."); return; }
     if (!convenioId) { toast.error("Selecione um convênio."); return; }
+    if (escopo === "servico" && !procedimentoId) { toast.error("Selecione o procedimento."); return; }
+    if (escopo === "especialidade" && !especialidadeId) { toast.error("Selecione a especialidade."); return; }
+    const valorNum = valorDesconto ? Number(valorDesconto.replace(",", ".")) : null;
+    if (tipoDesconto !== "gratuidade" && (!valorNum || valorNum <= 0)) {
+      toast.error("Informe um valor de desconto.");
+      return;
+    }
+    const alvoNome = escopo === "servico"
+      ? procedimentos.find((p) => p.id === procedimentoId)?.nome
+      : especialidades.find((e) => e.id === especialidadeId)?.nome;
+    const nomeFinal = nome.trim() || (alvoNome ? (escopo === "servico" ? alvoNome : `Especialidade: ${alvoNome}`) : "");
+    if (!nomeFinal) { toast.error("Informe o nome."); return; }
     setSaving(true);
     const payload = {
       clinica_id: clinicaAtual.clinica_id,
       convenio_id: convenioId,
-      nome: nome.trim(),
+      nome: nomeFinal,
       descricao: descricao.trim() || null,
       ativo,
+      escopo,
+      procedimento_id: escopo === "servico" ? procedimentoId : null,
+      especialidade_id: escopo === "especialidade" ? especialidadeId : null,
+      tipo_desconto: tipoDesconto,
+      valor_desconto: tipoDesconto === "gratuidade" ? null : valorNum,
     };
     const { error } = editing
       ? await supabase.from("cb_beneficios").update(payload).eq("id", editing.id)
@@ -167,21 +211,33 @@ function BeneficiosPage() {
               <TableRow>
                 <TableHead>Nome</TableHead>
                 <TableHead>Convênio</TableHead>
-                <TableHead>Descrição</TableHead>
+                <TableHead>Tipo</TableHead>
+                <TableHead>Desconto</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">Carregando…</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">Carregando…</TableCell></TableRow>
               ) : filtered.length === 0 ? (
-                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">Nenhum benefício encontrado.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">Nenhum benefício encontrado.</TableCell></TableRow>
               ) : filtered.map((b) => (
                 <TableRow key={b.id}>
                   <TableCell className="font-medium">{b.nome}</TableCell>
                   <TableCell><Badge variant="outline">{convMap.get(b.convenio_id) ?? "—"}</Badge></TableCell>
-                  <TableCell className="text-muted-foreground">{b.descricao ?? "—"}</TableCell>
+                  <TableCell>
+                    <Badge variant={b.escopo === "servico" ? "default" : "secondary"}>
+                      {b.escopo === "servico" ? "Serviço" : "Especialidade"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {b.tipo_desconto === "gratuidade"
+                      ? "Gratuito"
+                      : b.tipo_desconto === "percentual"
+                      ? `${b.valor_desconto ?? 0}%`
+                      : `R$ ${Number(b.valor_desconto ?? 0).toFixed(2)}`}
+                  </TableCell>
                   <TableCell>
                     <Badge variant={b.ativo ? "default" : "outline"}>{b.ativo ? "Ativo" : "Inativo"}</Badge>
                   </TableCell>
@@ -208,8 +264,8 @@ function BeneficiosPage() {
             </div>
             <div className="space-y-3">
             <div>
-              <Label>Nome *</Label>
-              <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Consulta gratuita" />
+              <Label>Nome</Label>
+              <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Opcional — preenchido automaticamente" />
             </div>
             <div>
               <Label>Convênio *</Label>
@@ -221,6 +277,65 @@ function BeneficiosPage() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Aplicar em *</Label>
+                <Select value={escopo} onValueChange={(v) => setEscopo(v as "servico" | "especialidade")}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="servico">Serviço (procedimento)</SelectItem>
+                    <SelectItem value="especialidade">Especialidade inteira</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>{escopo === "servico" ? "Procedimento *" : "Especialidade *"}</Label>
+                {escopo === "servico" ? (
+                  <Select value={procedimentoId} onValueChange={setProcedimentoId}>
+                    <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                    <SelectContent>
+                      {procedimentos.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Select value={especialidadeId} onValueChange={setEspecialidadeId}>
+                    <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                    <SelectContent>
+                      {especialidades.map((e) => (
+                        <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Tipo de desconto *</Label>
+                <Select value={tipoDesconto} onValueChange={(v) => setTipoDesconto(v as "percentual" | "valor" | "gratuidade")}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="percentual">Percentual (%)</SelectItem>
+                    <SelectItem value="valor">Valor fixo (R$)</SelectItem>
+                    <SelectItem value="gratuidade">Gratuito</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {tipoDesconto !== "gratuidade" && (
+                <div>
+                  <Label>{tipoDesconto === "percentual" ? "Valor (%)" : "Valor (R$)"} *</Label>
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    value={valorDesconto}
+                    onChange={(e) => setValorDesconto(e.target.value)}
+                    placeholder={tipoDesconto === "percentual" ? "Ex: 20" : "Ex: 50.00"}
+                  />
+                </div>
+              )}
             </div>
             <div>
               <Label>Descrição</Label>
