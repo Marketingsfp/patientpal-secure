@@ -994,7 +994,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     <TableCell>
                       {m.status === "pago"
                         ? <Button size="sm" variant="outline" onClick={() => marcarPago(m.id, false)}>Reverter</Button>
-                        : <Button size="sm" onClick={() => abrirFormaPag(m)}><Check className="h-3 w-3 mr-1"/>Pagar</Button>}
+                        : <Button size="sm" disabled={cancelado} onClick={() => abrirFormaPag(m)}><Check className="h-3 w-3 mr-1"/>Pagar</Button>}
                     </TableCell>
                   </TableRow>
                 ))}
