@@ -31,6 +31,7 @@ export const Route = createFileRoute("/_authenticated/app/contratos")({
 
 const BRL = (v: number) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtD = (s?: string | null) => (s ? new Date(s + (s.length === 10 ? "T00:00:00" : "")).toLocaleDateString("pt-BR") : "—");
+const TAXA_BOLETO = 3.5;
 
 type Convenio = {
   id: string;
