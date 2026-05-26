@@ -5,6 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useClinica } from "@/hooks/use-clinica";
 import { chatNina } from "@/lib/nina.functions";
 import { obterWhatsappConfig, salvarWhatsappConfig, testarConexaoWhatsapp } from "@/lib/whatsapp.functions";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -60,9 +61,100 @@ const MOCK: Conv[] = [
   },
 ];
 
+function formatRelativo(iso: string): string {
+  const d = new Date(iso);
+  const diff = (Date.now() - d.getTime()) / 1000;
+  if (diff < 60) return "agora";
+  if (diff < 3600) return `${Math.floor(diff / 60)} min`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+  if (diff < 172800) return "ontem";
+  return d.toLocaleDateString("pt-BR");
+}
+function formatHora(iso: string): string {
+  return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+}
+function formatTelefone(num: string): string {
+  const d = (num || "").replace(/\D/g, "");
+  if (d.length === 13) return `+${d.slice(0, 2)} ${d.slice(2, 4)} ${d.slice(4, 9)}-${d.slice(9)}`;
+  if (d.length === 12) return `+${d.slice(0, 2)} ${d.slice(2, 4)} ${d.slice(4, 8)}-${d.slice(8)}`;
+  return num || "—";
+}
+
 function NinaPage() {
-  const [sel, setSel] = useState<Conv>(MOCK[0]);
+  const { clinicaAtual } = useClinica();
+  const clinicaId = clinicaAtual?.clinica_id;
+  const [conversas, setConversas] = useState<Conv[]>([]);
+  const [sel, setSel] = useState<Conv | null>(null);
   const [draft, setDraft] = useState("");
+  const [busca, setBusca] = useState("");
+  const [loadingConv, setLoadingConv] = useState(false);
+
+  const carregar = useCallback(async () => {
+    if (!clinicaId) return;
+    setLoadingConv(true);
+    const { data, error } = await supabase
+      .from("whatsapp_mensagens")
+      .select("id, wa_message_id, direction, from_number, to_number, body, tipo, enviada_por, recebida_em")
+      .eq("clinica_id", clinicaId)
+      .order("recebida_em", { ascending: true })
+      .limit(1000);
+    setLoadingConv(false);
+    if (error) {
+      toast.error("Erro ao carregar conversas: " + error.message);
+      return;
+    }
+    const map = new Map<string, Conv>();
+    for (const row of data || []) {
+      const telefone = row.direction === "in" ? (row.from_number || "") : (row.to_number || "");
+      if (!telefone) continue;
+      const key = telefone.replace(/\D/g, "");
+      let conv = map.get(key);
+      if (!conv) {
+        conv = {
+          id: key,
+          nome: formatTelefone(telefone),
+          telefone: formatTelefone(telefone),
+          ultima: "",
+          quando: "",
+          naoLidas: 0,
+          msgs: [],
+        };
+        map.set(key, conv);
+      }
+      const isIn = row.direction === "in";
+      conv.msgs.push({
+        from: isIn ? "paciente" : "nina",
+        text: row.body || `[${row.tipo}]`,
+        at: formatHora(row.recebida_em),
+        tipo: row.tipo === "audio" ? "audio" : "texto",
+      });
+      conv.ultima = row.body || `[${row.tipo}]`;
+      conv.quando = formatRelativo(row.recebida_em);
+    }
+    const lista = Array.from(map.values()).sort((a, b) => (a.quando === "agora" ? -1 : 1));
+    setConversas(lista);
+    setSel((prev) => (prev ? lista.find((c) => c.id === prev.id) || lista[0] || null : lista[0] || null));
+  }, [clinicaId]);
+
+  useEffect(() => { carregar(); }, [carregar]);
+
+  // Realtime: novas mensagens chegam automaticamente
+  useEffect(() => {
+    if (!clinicaId) return;
+    const channel = supabase
+      .channel(`wa-msgs-${clinicaId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "whatsapp_mensagens", filter: `clinica_id=eq.${clinicaId}` },
+        () => { carregar(); },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [clinicaId, carregar]);
+
+  const conversasFiltradas = conversas.filter((c) =>
+    !busca || c.nome.toLowerCase().includes(busca.toLowerCase()) || c.telefone.includes(busca),
+  );
 
   return (
     <div className="space-y-6">
@@ -97,12 +189,22 @@ function NinaPage() {
             {/* Lista */}
             <Card className="col-span-4 overflow-hidden flex flex-col">
               <CardHeader className="py-3 border-b">
-                <Input placeholder="Buscar conversa…" className="h-9" />
+                <Input
+                  placeholder="Buscar conversa…"
+                  className="h-9"
+                  value={busca}
+                  onChange={(e) => setBusca(e.target.value)}
+                />
               </CardHeader>
               <div className="flex-1 overflow-auto">
-                {MOCK.map(c => (
+                {conversasFiltradas.length === 0 && (
+                  <div className="p-6 text-sm text-muted-foreground text-center">
+                    {loadingConv ? "Carregando…" : "Nenhuma conversa ainda. Quando um paciente enviar mensagem no WhatsApp, ela aparece aqui."}
+                  </div>
+                )}
+                {conversasFiltradas.map(c => (
                   <button key={c.id} onClick={() => setSel(c)}
-                    className={`w-full text-left px-4 py-3 border-b border-border hover:bg-muted/50 transition-colors ${sel.id === c.id ? "bg-muted" : ""}`}>
+                    className={`w-full text-left px-4 py-3 border-b border-border hover:bg-muted/50 transition-colors ${sel?.id === c.id ? "bg-muted" : ""}`}>
                     <div className="flex justify-between items-start gap-2">
                       <div className="min-w-0 flex-1">
                         <div className="font-medium truncate">{c.nome}</div>
@@ -120,6 +222,8 @@ function NinaPage() {
 
             {/* Chat */}
             <Card className="col-span-8 overflow-hidden flex flex-col">
+             {sel ? (
+              <>
               <CardHeader className="py-3 border-b flex flex-row items-center justify-between space-y-0">
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 rounded-full bg-primary/15 text-primary flex items-center justify-center font-semibold">
@@ -167,6 +271,12 @@ function NinaPage() {
                   <Send className="h-4 w-4" />
                 </Button>
               </div>
+              </>
+             ) : (
+              <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground p-8 text-center">
+                Selecione uma conversa à esquerda para visualizar as mensagens.
+              </div>
+             )}
             </Card>
           </div>
         </TabsContent>
