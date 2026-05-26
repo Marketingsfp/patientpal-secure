@@ -1136,16 +1136,22 @@ function AgendaPage() {
           <DialogHeader>
             <DialogTitle>Forma de pagamento</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground -mt-2">{formaPagCtx?.desc}</p>
+          <p className="text-sm text-muted-foreground -mt-2">
+            {formaPagCtx?.desc}
+            <span className="block text-xs mt-1 opacity-70">Dica: use as teclas 1–5 para escolher rapidamente.</span>
+          </p>
           <div className="grid gap-2 mt-2">
-            {formaPagOpcoes.map((op) => (
+            {formaPagOpcoes.map((op, idx) => (
               <Button
                 key={op.forma}
                 variant="outline"
                 className="justify-between h-12"
                 onClick={() => escolherForma(op)}
               >
-                <span>{op.label}</span>
+                <span className="flex items-center gap-2">
+                  <kbd className="inline-flex h-6 w-6 items-center justify-center rounded border bg-muted text-xs font-mono">{idx + 1}</kbd>
+                  {op.label}
+                </span>
                 <span className="font-semibold">
                   {op.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                 </span>
@@ -1156,6 +1162,7 @@ function AgendaPage() {
               className="justify-center h-12 mt-1 bg-primary"
               onClick={escolherMisto}
             >
+              <kbd className="inline-flex h-6 w-6 items-center justify-center rounded border border-primary-foreground/40 bg-primary-foreground/10 text-xs font-mono mr-2">{formaPagOpcoes.length + 1}</kbd>
               💰 Mais de uma forma de pagamento
             </Button>
           </div>
