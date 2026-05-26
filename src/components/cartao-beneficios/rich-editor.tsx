@@ -75,6 +75,102 @@ const FONTS = [
 ];
 const SIZES = ["10px", "12px", "14px", "16px", "18px", "20px", "24px", "28px", "32px", "40px"];
 
+// NodeView React para imagem: contorno quando selecionada + handle para redimensionar.
+function ImageNodeView(props: NodeViewProps) {
+  const { node, updateAttributes, selected, editor } = props;
+  const width = (node.attrs.width as string) || "";
+  const align = (node.attrs.align as string) || "none";
+  const wrapRef = useRef<HTMLSpanElement>(null);
+
+  const startResize = (e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const wrap = wrapRef.current;
+    const img = wrap?.querySelector("img") as HTMLImageElement | null;
+    if (!img) return;
+    const startX = e.clientX;
+    const startWidth = img.getBoundingClientRect().width;
+    const move = (ev: PointerEvent) => {
+      const next = Math.max(40, Math.round(startWidth + (ev.clientX - startX)));
+      updateAttributes({ width: `${next}px` });
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+
+  const alignClass =
+    align === "center" ? "rt-img-block-center"
+    : align === "left" ? "rt-img-block-left"
+    : align === "right" ? "rt-img-block-right"
+    : "";
+
+  return (
+    <NodeViewWrapper
+      as="span"
+      ref={wrapRef as any}
+      className={`rt-img-wrap ${alignClass} ${selected ? "is-selected" : ""}`}
+      data-drag-handle
+    >
+      <img
+        src={node.attrs.src}
+        alt={node.attrs.alt || ""}
+        title={node.attrs.title || ""}
+        style={width ? { width } : undefined}
+        draggable={false}
+      />
+      {selected && editor.isEditable && (
+        <span
+          className="rt-img-handle"
+          onPointerDown={startResize}
+          title="Arraste para redimensionar"
+        />
+      )}
+    </NodeViewWrapper>
+  );
+}
+
+// Estende Image para suportar width + align persistidos no HTML.
+const ResizableImage = Image.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      width: {
+        default: null,
+        parseHTML: (el) => {
+          const html = el as HTMLElement;
+          const w = html.style.width || html.getAttribute("width");
+          return w || null;
+        },
+        renderHTML: (attrs) => {
+          if (!attrs.width) return {};
+          return { style: `width: ${attrs.width}` };
+        },
+      },
+      align: {
+        default: "none",
+        parseHTML: (el) => {
+          const cls = (el as HTMLElement).className || "";
+          if (cls.includes("rt-img-center")) return "center";
+          if (cls.includes("rt-img-left")) return "left";
+          if (cls.includes("rt-img-right")) return "right";
+          return "none";
+        },
+        renderHTML: (attrs) => {
+          if (!attrs.align || attrs.align === "none") return {};
+          return { class: `rt-img-${attrs.align}` };
+        },
+      },
+    };
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(ImageNodeView);
+  },
+});
+
 function ToolbarButton({
   active, onClick, title, children, disabled,
 }: {
