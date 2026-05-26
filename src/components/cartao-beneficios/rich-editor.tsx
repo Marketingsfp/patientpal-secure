@@ -697,6 +697,7 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
             style={{
               width: "210mm",
               minHeight: "297mm",
+              position: "relative",
               paddingTop: `${marginTop}mm`,
               paddingBottom: `${marginBottom}mm`,
               paddingLeft: `${marginLeft}mm`,
