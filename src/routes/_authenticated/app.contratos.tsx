@@ -807,6 +807,32 @@ h1, h2, h3 { margin: 0 0 6mm; }
     setTermoOpen(true);
   };
 
+  // Recalcula o valor das parcelas em aberto conforme a faixa de vidas do convênio
+  const recalcularParcelasAbertas = async (totalVidas: number) => {
+    if (!faixas.length) return;
+    const f = faixas.find(
+      (fx) => totalVidas >= fx.vidas_de && (fx.vidas_ate == null || totalVidas <= fx.vidas_ate)
+    );
+    if (!f) return;
+    const novoValor = Number(f.valor_mensal);
+    if (novoValor !== Number(contrato.valor_mensal)) {
+      await supabase
+        .from("contratos_assinatura")
+        .update({ valor_mensal: novoValor })
+        .eq("id", contrato.id);
+    }
+    const abertas = mens.filter((m) => m.status !== "pago");
+    if (abertas.length === 0) return;
+    await Promise.all(
+      abertas.map((m) => {
+        const isBoleto = (m.forma_pagamento ?? contrato.forma_pagamento) === "boleto";
+        const v = novoValor + (isBoleto ? TAXA_BOLETO : 0);
+        return supabase.from("contrato_mensalidades").update({ valor: v }).eq("id", m.id);
+      })
+    );
+    toast.success(`Parcelas em aberto recalculadas para ${BRL(novoValor)}/mês (${totalVidas} vidas)`);
+  };
+
   const confirmarIncluir = async () => {
     if (!incPaciente) { toast.error("Selecione um paciente"); return; }
     if (depsAtivos.length >= maxDep) {
@@ -852,6 +878,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
       ativo: !!data!.ativo,
     };
     setIncPaciente(null); setIncParentesco(""); setIncTipo("dependente");
+    // Recalcula valor das parcelas em aberto conforme a nova quantidade de vidas
+    // (titular + dependentes ativos, incluindo o recém-incluído)
+    await recalcularParcelasAbertas(depsAtivos.length + 2);
     await load();
     abrirTermoSeAssinado(novoDep, "Inclusão");
   };
