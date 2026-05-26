@@ -771,6 +771,29 @@ function AgendaPage() {
     setPagamentoOpen(true);
   };
 
+  // Atalhos de teclado no diálogo "Forma de pagamento":
+  // 1=Dinheiro, 2=PIX, 3=Débito, 4=Crédito, 5=Mais de uma forma
+  // (segue a ordem exibida em formaPagOpcoes; tecla 5 = misto).
+  useEffect(() => {
+    if (!formaPagOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      const tgt = e.target as HTMLElement | null;
+      if (tgt && (tgt.tagName === "INPUT" || tgt.tagName === "TEXTAREA" || tgt.isContentEditable)) return;
+      if (e.key >= "1" && e.key <= "9") {
+        const idx = Number(e.key) - 1;
+        if (idx < formaPagOpcoes.length) {
+          e.preventDefault();
+          escolherForma(formaPagOpcoes[idx]);
+        } else if (idx === formaPagOpcoes.length) {
+          e.preventDefault();
+          escolherMisto();
+        }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [formaPagOpen, formaPagOpcoes, formaPagCtx]);
+
   const imprimirGR = async (a: Agendamento) => {
     if (!clinicaAtual) return;
     try {
@@ -1113,16 +1136,22 @@ function AgendaPage() {
           <DialogHeader>
             <DialogTitle>Forma de pagamento</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground -mt-2">{formaPagCtx?.desc}</p>
+          <p className="text-sm text-muted-foreground -mt-2">
+            {formaPagCtx?.desc}
+            <span className="block text-xs mt-1 opacity-70">Dica: use as teclas 1–5 para escolher rapidamente.</span>
+          </p>
           <div className="grid gap-2 mt-2">
-            {formaPagOpcoes.map((op) => (
+            {formaPagOpcoes.map((op, idx) => (
               <Button
                 key={op.forma}
                 variant="outline"
                 className="justify-between h-12"
                 onClick={() => escolherForma(op)}
               >
-                <span>{op.label}</span>
+                <span className="flex items-center gap-2">
+                  <kbd className="inline-flex h-6 w-6 items-center justify-center rounded border bg-muted text-xs font-mono">{idx + 1}</kbd>
+                  {op.label}
+                </span>
                 <span className="font-semibold">
                   {op.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                 </span>
@@ -1133,6 +1162,7 @@ function AgendaPage() {
               className="justify-center h-12 mt-1 bg-primary"
               onClick={escolherMisto}
             >
+              <kbd className="inline-flex h-6 w-6 items-center justify-center rounded border border-primary-foreground/40 bg-primary-foreground/10 text-xs font-mono mr-2">{formaPagOpcoes.length + 1}</kbd>
               💰 Mais de uma forma de pagamento
             </Button>
           </div>
