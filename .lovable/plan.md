@@ -1,43 +1,48 @@
 ## Objetivo
 
-Ao clicar em **Pagar** em uma mensalidade do contrato (tela "Resumo"), abrir o mesmo diálogo de **Forma de pagamento** que já existe na agenda (foto 2), em vez de marcar a parcela como paga direto.
+Expandir o conhecimento da Nina para que ela possa **ler qualquer dado do sistema** (médicos, horários, exames, preparos, procedimentos, convênios, agenda do dia, estoque, modelos, etc.), mantendo o acesso **somente leitura** e bloqueando respostas sobre **financeiro/caixa** e **dados de outros pacientes**.
 
-## Comportamento
+## Escopo das alterações
 
-- Clique em **Pagar** numa linha da tabela de Mensalidades abre o diálogo.
-- Cabeçalho: "Forma de pagamento" + subtítulo com nome do paciente, nº do contrato e nº da parcela (ex.: `QUÉDIMA SILVA — Contrato #12 · Parcela 1/12`).
-- Mesma dica de teclas 1–5.
-- Opções listadas, todas mostrando o valor da parcela (`m.valor`):
-  1. Dinheiro
-  2. Pix
-  3. Cartão de Débito
-  4. Cartão de Crédito
-  5. Boleto
-  6. Mais de uma forma de pagamento (botão destacado azul, igual à agenda)
-- Atalhos de teclado 1–6 enquanto o diálogo está aberto.
+Apenas dois arquivos no backend da Nina — sem mudanças de UI, schema ou RLS:
 
-## O que acontece ao escolher a forma
+1. `src/lib/nina.functions.ts` — usado pela aba "Nina treinada" (chat interno do sistema).
+2. `src/lib/whatsapp.server.ts` — usado pelas respostas automáticas via WhatsApp.
 
-- Opções 1–5: salva a parcela como paga com `status = "pago"`, `pago_em = hoje` e `forma_pagamento = <forma escolhida>` em `contrato_mensalidades`.
-- Opção 6 ("Mais de uma forma"): abre o `LancamentoDialog` já usado pela agenda (componente `src/components/financeiro/lancamento-dialog.tsx`) com:
-  - `tipo="receita"`, `initialValor = m.valor`, `initialDescricao = "Mensalidade <#parcela> — Contrato #<num> — <paciente>"`.
-  - Ao salvar, atualiza a parcela como paga (`forma_pagamento = "misto"` ou a forma consolidada retornada) — não cria lançamento financeiro duplicado além do que o próprio `LancamentoDialog` já gera.
+### 1. Ampliar o contexto enviado ao modelo
 
-Botão **Reverter** (quando a parcela já está paga) permanece como está.
+Hoje a Nina só recebe médicos + procedimentos. Vamos passar a carregar (via `supabaseAdmin` no webhook e via cliente autenticado no chat interno, sempre com `SELECT`):
 
-## Arquivos a editar
+- Médicos (nome, CRM, especialidade, telefone público).
+- Disponibilidades / horários de atendimento.
+- Procedimentos / exames com preço PIX, preço cartão, duração e **preparo**.
+- Convênios e planos do Cartão Benefício (nome, faixas de preço, descrição de benefícios).
+- Especialidades cadastradas.
+- Resumo do dia da agenda **agregado e anonimizado** (ex.: "Dr. X tem 3 horários livres entre 14h e 18h hoje"), sem nomes/telefones de pacientes.
+- Informações públicas da clínica (nome, endereço, telefones, horário de funcionamento).
 
-- `src/routes/_authenticated/app.contratos.tsx`
-  - Adicionar estado `pagamentoMens` (a mensalidade selecionada) e `formaPagOpen`.
-  - Adicionar componente `<Dialog>` de forma de pagamento, espelhando o da agenda (linhas 1284–1320 de `app.agenda.tsx`).
-  - Trocar `onClick={() => marcarPago(m.id, true)}` por `onClick={() => abrirFormaPag(m)}`.
-  - Adicionar handler `escolherForma(forma)` que chama um `marcarPago(id, true, forma)` estendido (passa também `forma_pagamento`).
-  - Adicionar integração com `LancamentoDialog` para "Mais de uma forma".
-  - Listener `useEffect` para atalhos 1–6 enquanto o diálogo está aberto.
+Tudo isso permanece somente leitura: a Nina **não recebe nem ferramentas de escrita** nem chamadas de função que alterem dados.
 
-Sem alterações em banco, RLS, ou outros arquivos.
+### 2. Bloqueios de privacidade no system prompt
+
+Reforçar regras explícitas no `systemPrompt` da Nina (chat interno e WhatsApp):
+
+- **Proibido** revelar qualquer dado financeiro, de caixa, faturamento, repasses, contas a pagar/receber, boletos, mensalidades, comissões.
+- **Proibido** falar sobre outros pacientes: nomes, telefones, CPF, prontuários, agendamentos individuais, histórico clínico, fotos, exames.
+- Quando perguntada sobre "quem tem horário marcado", "quanto entrou no caixa", "qual o saldo", "o paciente X esteve aqui?", responder educadamente que essa informação é sigilosa e orientar a procurar o gestor responsável.
+- Permitido: informações **públicas e agregadas** — médicos disponíveis, preços de tabela, preparos, horários da clínica, convênios aceitos, slots livres no dia (sem identificar pacientes).
+- No WhatsApp, regra adicional: tratar o número que escreve como **paciente externo desconhecido** — nunca confirmar se uma pessoa é paciente da clínica nem revelar dados de cadastro.
+
+### 3. Garantias técnicas de "somente leitura"
+
+- Manter o uso do AI Gateway sem nenhuma `tool`/function-calling — modelo só gera texto.
+- Nenhuma rota nova; nenhum `insert`/`update`/`delete` é adicionado.
+- Continuar usando `requireSupabaseAuth` no `chatNina` (já valida membership) e `supabaseAdmin` apenas para leitura no webhook do WhatsApp.
 
 ## Fora de escopo
 
-- Não recalcular taxa de boleto na hora do pagamento (a taxa de R$ 3,50 já é aplicada na criação do contrato, conforme combinado anteriormente).
-- Sem mudanças no fluxo de "Reverter".
+- Mudanças na UI da página `/app/nina`.
+- Novas migrations, RLS, tabelas ou permissões.
+- Ferramentas de ação (agendar, cancelar, cobrar) — Nina segue puramente informativa.
+
+Posso seguir com a implementação?
