@@ -1,40 +1,27 @@
 ## Objetivo
-Transformar a aba **Informativo do Convênio** num editor rich-text completo: formatação de fonte (família/tamanho/cor/negrito/itálico/sublinhado), listas, alinhamento, tabelas (inserir/+linha/+coluna/excluir), upload de imagens e impressão em A4.
+
+Transformar a aba **"Contrato"** (em `Cartão de Benefícios → Convênios`) num editor rico igual ao da aba "Informativo", e adicionar um seletor de **variáveis** que insere placeholders como `{{PACIENTE_NOME}}` na posição do cursor.
 
 ## Mudanças
 
-### 1. Banco de dados (migração)
-- Adicionar coluna `informativo_html text` em `cb_convenios`.
-- Criar bucket de Storage `cb-informativos` (público para leitura, escrita restrita).
-- Policies em `storage.objects`:
-  - SELECT público para `bucket_id = 'cb-informativos'`.
-  - INSERT/UPDATE/DELETE apenas para membros da clínica (validar via `is_member(auth.uid(), ...)` usando o primeiro segmento do path como `clinica_id`).
+### 1. `src/components/cartao-beneficios/rich-editor.tsx`
+- Adicionar nova prop opcional `variables?: { label: string; token: string }[]`.
+- Quando a prop existir, renderizar na barra de ferramentas um `Select` "Inserir variável" que, ao escolher um item, executa `editor.chain().focus().insertContent('{{TOKEN}}').run()` e reseta o valor do select.
+- Nenhuma outra alteração de comportamento — formatação, tabelas (com redimensionamento + cor), upload de imagens, impressão continuam iguais.
 
-### 2. Novo componente: editor rich-text
-`src/components/cartao-beneficios/rich-editor.tsx` baseado em **TipTap** com:
-- StarterKit, Underline, TextStyle + Color, FontFamily, TextAlign, Link
-- Table + TableRow + TableHeader + TableCell (resizable)
-- Image (com upload para o bucket `cb-informativos`)
-- Toolbar com: desfazer/refazer · família e tamanho de fonte · N I S U · cor · alinhamento · listas · H1-H3 · tabela (inserir, +linha, +coluna, excluir linha/coluna/tabela) · inserir imagem · link
-- Editor renderizado dentro de um container A4 (210mm) com classes `prose`
-- Props: `value: string`, `onChange: (html) => void`, `clinicaId: string` (usado no path do upload)
+### 2. `src/routes/_authenticated/app.cartao-beneficios.convenios.tsx`
+- Na aba `contrato` (linhas ~683–701):
+  - Substituir o `<Textarea>` pelo `<RichEditor value={modeloContrato} onChange={setModeloContrato} clinicaId={clinicaAtual.clinica_id} variables={CONTRATO_VARIAVEIS} />`.
+  - Adicionar o botão **Imprimir** (mesmo padrão da aba Informativo) envolvendo o editor num `<div id="convenio-contrato-print">` e replicando o bloco `@media print` para esse id.
+  - Manter o texto de ajuda explicando o uso das variáveis (agora também acessíveis pelo dropdown).
+- Definir uma constante `CONTRATO_VARIAVEIS` no mesmo arquivo com os tokens já suportados pela renderização de contratos (alinhados a `src/lib/print-contrato.ts`):
+  - `CLINICA_NOME`, `CLINICA_CNPJ`, `CLINICA_ENDERECO`, `CIDADE`
+  - `PACIENTE_NOME`, `PACIENTE_CPF`, `PACIENTE_NASCIMENTO`, `PACIENTE_ENDERECO`, `PACIENTE_TELEFONE`, `PACIENTE_EMAIL`
+  - `VALOR_MENSAL`, `TAXA_ADESAO`, `NUM_PARCELAS`, `VIGENCIA_MESES`, `FIDELIDADE_MESES`
+  - `DATA_HOJE`, `DEPENDENTES`
 
-### 3. Rota de convênios
-`src/routes/_authenticated/app.cartao-beneficios.convenios.tsx`:
-- Estado novo: `informativoHtml`.
-- `openEdit`: carregar `c.informativo_html`; se vazio e o nome casar com CARTÃO CONSULTA + SEGUROS, usar o HTML do componente atual como seed inicial.
-- `openNew`: limpar estado.
-- `save`: incluir `informativo_html: informativoHtml || null` no payload.
-- Substituir o conteúdo da `<TabsContent value="informativo">` pelo `<RichEditor value={informativoHtml} onChange={setInformativoHtml} clinicaId={clinicaAtual.clinica_id} />`.
-- Manter o botão **Imprimir** e o CSS `@page size: A4` (escondendo o resto da UI durante a impressão e mostrando só o `#convenio-informativo-print`).
+## Observações técnicas
 
-### 4. Seed do informativo "CARTÃO CONSULTA + SEGUROS"
-Mover o conteúdo do componente fixo `informativo-cartao-consulta-seguros.tsx` para uma constante HTML usada apenas como ponto de partida quando o convênio não tem `informativo_html` salvo ainda. Após o primeiro salvamento, prevalece sempre o que estiver no banco.
-
-### 5. Dependências
-`@tiptap/react`, `@tiptap/pm`, `@tiptap/starter-kit`, `@tiptap/extension-color`, `@tiptap/extension-text-style`, `@tiptap/extension-font-family`, `@tiptap/extension-underline`, `@tiptap/extension-text-align`, `@tiptap/extension-table`, `@tiptap/extension-table-row`, `@tiptap/extension-table-cell`, `@tiptap/extension-table-header`, `@tiptap/extension-image`, `@tiptap/extension-link`.
-
-## Fora de escopo
-- Versionamento/histórico do informativo
-- Editor colaborativo em tempo real
-- Conversão direta de DOCX → HTML dentro do app (continua-se podendo colar do Word; formatação básica é preservada pelo TipTap)
+- O campo `modelo_contrato` é `text` no banco — passa a guardar HTML (mesmo formato do Informativo). Sem migração.
+- A substituição de `{{VAR}}` em `src/lib/print-contrato.ts` continua funcionando (regex `\{\{(\w+)\}\}` atua sobre o texto, independentemente de tags HTML em volta).
+- Não altero o template de `planos_assinatura.template_contrato` (`src/routes/_authenticated/app.planos.tsx`) — fora do escopo pedido.
