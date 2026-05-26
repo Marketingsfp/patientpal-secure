@@ -598,6 +598,15 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
           Restaurar padrão
         </button>
       </div>
+      <ImageCropDialog
+        open={cropOpen}
+        src={cropSrc}
+        onClose={() => setCropOpen(false)}
+        onCropped={(dataUrl) => {
+          // Substitui o src da imagem selecionada pelo recorte (data URL PNG).
+          editor.chain().focus().updateAttributes("image", { src: dataUrl }).run();
+        }}
+      />
     </div>
   );
 }
