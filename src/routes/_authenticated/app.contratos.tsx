@@ -1024,7 +1024,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   size="sm"
                   variant="outline"
                   onClick={() => setIncOpen(true)}
-                  disabled={maxDep === 0 || depsAtivos.length >= maxDep}
+                  disabled={cancelado || maxDep === 0 || depsAtivos.length >= maxDep}
                 >
                   <Plus className="h-4 w-4 mr-1" /> Incluir dependente
                 </Button>
