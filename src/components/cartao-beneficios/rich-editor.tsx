@@ -149,6 +149,14 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
         class:
           "rt-editor prose prose-sm max-w-none focus:outline-none min-h-[60vh]",
       },
+      handleClickOn: (_view, _pos, node, nodePos) => {
+        // Clique em imagem seleciona o node para permitir excluir com Delete/Backspace
+        if (node.type.name === "image") {
+          editor?.chain().focus().setNodeSelection(nodePos).run();
+          return true;
+        }
+        return false;
+      },
     },
     onUpdate: ({ editor }) => onChange(editor.getHTML()),
   });
@@ -336,6 +344,19 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
         <div className="w-px h-6 bg-border mx-1" />
         <ToolbarButton title="Inserir imagem" onClick={() => fileRef.current?.click()}>
           <ImageIcon className="h-4 w-4" />
+        </ToolbarButton>
+        <ToolbarButton
+          title="Excluir imagem selecionada"
+          disabled={!editor.isActive("image")}
+          onClick={() => {
+            if (editor.isActive("image")) {
+              editor.chain().focus().deleteSelection().run();
+            } else {
+              toast.info("Clique na imagem que deseja excluir e tente novamente.");
+            }
+          }}
+        >
+          <Trash2 className="h-4 w-4" />
         </ToolbarButton>
         <ToolbarButton title="Link" active={editor.isActive("link")} onClick={setLink}>
           <LinkIcon className="h-4 w-4" />
