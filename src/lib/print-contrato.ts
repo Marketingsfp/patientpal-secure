@@ -20,10 +20,22 @@ function applyTemplate(tpl: string, vars: Record<string, string>): string {
 export async function printContrato(contratoId: string) {
   const { data: c, error } = await supabase
     .from("contratos_assinatura")
-    .select(`*, plano:planos_assinatura(*), clinica:clinicas(nome, cnpj, endereco, cidade, estado, telefone), paciente:pacientes(cpf, data_nascimento, telefone, email, logradouro, numero, bairro, cidade, estado, cep)`)
+    .select("*")
     .eq("id", contratoId)
     .maybeSingle();
   if (error || !c) throw new Error(error?.message ?? "Contrato não encontrado");
+
+  const [{ data: pl }, { data: cl }, { data: pa }] = await Promise.all([
+    (c as any).plano_id
+      ? supabase.from("planos_assinatura").select("*").eq("id", (c as any).plano_id).maybeSingle()
+      : Promise.resolve({ data: null as any }),
+    (c as any).clinica_id
+      ? supabase.from("clinicas").select("nome, cnpj, endereco, cidade, estado, telefone").eq("id", (c as any).clinica_id).maybeSingle()
+      : Promise.resolve({ data: null as any }),
+    (c as any).paciente_id
+      ? supabase.from("pacientes").select("cpf, data_nascimento, telefone, email, logradouro, numero, bairro, cidade, estado, cep").eq("id", (c as any).paciente_id).maybeSingle()
+      : Promise.resolve({ data: null as any }),
+  ]);
 
   const { data: deps } = await supabase
     .from("contrato_dependentes")
@@ -31,31 +43,31 @@ export async function printContrato(contratoId: string) {
     .eq("contrato_id", contratoId)
     .eq("ativo", true);
 
-  const cl = (c as any).clinica ?? {};
-  const pl = (c as any).plano ?? {};
-  const pa = (c as any).paciente ?? {};
+  const _cl: any = cl ?? {};
+  const _pl: any = pl ?? {};
+  const _pa: any = pa ?? {};
   const dependentes = (deps ?? []).map((d: any, i: number) =>
     `${i + 1}. ${d.paciente_nome} — ${d.parentesco ?? "—"} (${d.tipo})`
   ).join("\n");
 
-  const enderecoPaciente = [pa.logradouro, pa.numero, pa.bairro, pa.cidade && pa.estado ? `${pa.cidade}-${pa.estado}` : pa.cidade].filter(Boolean).join(", ");
+  const enderecoPaciente = [_pa.logradouro, _pa.numero, _pa.bairro, _pa.cidade && _pa.estado ? `${_pa.cidade}-${_pa.estado}` : _pa.cidade].filter(Boolean).join(", ");
 
-  const corpo = applyTemplate(pl.template_contrato || "", {
-    CLINICA_NOME: cl.nome ?? "",
-    CLINICA_CNPJ: cl.cnpj ?? "",
-    CLINICA_ENDERECO: [cl.endereco, cl.cidade, cl.estado].filter(Boolean).join(", "),
-    CIDADE: cl.cidade ?? "",
+  const corpo = applyTemplate(_pl.template_contrato || "", {
+    CLINICA_NOME: _cl.nome ?? "",
+    CLINICA_CNPJ: _cl.cnpj ?? "",
+    CLINICA_ENDERECO: [_cl.endereco, _cl.cidade, _cl.estado].filter(Boolean).join(", "),
+    CIDADE: _cl.cidade ?? "",
     PACIENTE_NOME: c.paciente_nome ?? "",
-    PACIENTE_CPF: pa.cpf ?? "",
-    PACIENTE_NASCIMENTO: fmtData(pa.data_nascimento),
+    PACIENTE_CPF: _pa.cpf ?? "",
+    PACIENTE_NASCIMENTO: fmtData(_pa.data_nascimento),
     PACIENTE_ENDERECO: enderecoPaciente,
-    PACIENTE_TELEFONE: pa.telefone ?? "",
-    PACIENTE_EMAIL: pa.email ?? "",
+    PACIENTE_TELEFONE: _pa.telefone ?? "",
+    PACIENTE_EMAIL: _pa.email ?? "",
     VALOR_MENSAL: fmtBRL(Number(c.valor_mensal)),
     TAXA_ADESAO: fmtBRL(Number(c.taxa_adesao)),
     NUM_PARCELAS: String(c.num_parcelas),
-    VIGENCIA_MESES: String(pl.vigencia_meses ?? 12),
-    FIDELIDADE_MESES: String(pl.fidelidade_meses ?? 6),
+    VIGENCIA_MESES: String(_pl.vigencia_meses ?? 12),
+    FIDELIDADE_MESES: String(_pl.fidelidade_meses ?? 6),
     DATA_HOJE: fmtData(new Date().toISOString()),
     DEPENDENTES: dependentes || "(nenhum)",
   });
