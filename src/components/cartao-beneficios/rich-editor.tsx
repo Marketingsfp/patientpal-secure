@@ -149,7 +149,7 @@ const FONTS = [
   "Arial", "Calibri", "Times New Roman", "Georgia", "Verdana",
   "Tahoma", "Courier New", "Helvetica", "Garamond", "Trebuchet MS",
 ];
-const SIZES = ["10px", "12px", "14px", "16px", "18px", "20px", "24px", "28px", "32px", "40px"];
+const SIZES = ["5px", "6px", "7px", "8px", "9px", "10px", "12px", "14px", "16px", "18px", "20px", "24px", "28px", "32px", "40px"];
 
 // NodeView React para imagem: contorno quando selecionada + handle para redimensionar.
 function ImageNodeView(props: NodeViewProps) {
