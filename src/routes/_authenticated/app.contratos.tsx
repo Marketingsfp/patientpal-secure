@@ -510,6 +510,7 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
   const [convenio, setConvenio] = useState<any>(null);
   const [clinica, setClinica] = useState<any>(null);
   const [pacienteFull, setPacienteFull] = useState<any>(null);
+  const [faixas, setFaixas] = useState<Faixa[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Diálogo de forma de pagamento (espelha o da agenda)
@@ -527,7 +528,7 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
 
   const load = async () => {
     setLoading(true);
-    const [m, d, cv, cl, pa] = await Promise.all([
+    const [m, d, cv, cl, pa, fx] = await Promise.all([
       supabase.from("contrato_mensalidades").select("*").eq("contrato_id", contrato.id).order("numero_parcela"),
       supabase.from("contrato_dependentes").select("id, paciente_nome, parentesco, tipo, pacientes:paciente_id(cpf)").eq("contrato_id", contrato.id).eq("ativo", true),
       contrato.convenio_id
@@ -535,6 +536,9 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
         : Promise.resolve({ data: null }),
       supabase.from("clinicas").select("nome, cnpj, endereco, cidade, estado, telefone").eq("id", (contrato as any).clinica_id ?? "").maybeSingle(),
       supabase.from("pacientes").select("cpf, data_nascimento, telefone, email, logradouro, numero, bairro, cidade, estado, cep").eq("id", (contrato as any).paciente_id ?? "").maybeSingle(),
+      contrato.convenio_id
+        ? supabase.from("cb_convenio_faixas").select("*").eq("convenio_id", contrato.convenio_id).order("vidas_de")
+        : Promise.resolve({ data: [] }),
     ]);
     setMens((m.data ?? []) as Mens[]);
     setDeps(((d.data ?? []) as any[]).map((r) => ({
@@ -544,6 +548,7 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     setConvenio(cv.data ?? null);
     setClinica(cl.data ?? null);
     setPacienteFull(pa.data ?? null);
+    setFaixas(((fx as any).data ?? []) as Faixa[]);
     setLoading(false);
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [contrato.id]);
