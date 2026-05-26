@@ -134,6 +134,43 @@ function Page() {
   const [obsFechamento, setObsFechamento] = useState("");
   const [saving, setSaving] = useState(false);
 
+  // Atalho: 1..5 na modal de cobrança seleciona a forma da última linha
+  useEffect(() => {
+    if (!openCobranca) return;
+    const formas = ["dinheiro", "pix", "debito", "credito"] as const;
+    const onKey = (e: KeyboardEvent) => {
+      const tgt = e.target as HTMLElement | null;
+      if (tgt && (tgt.tagName === "INPUT" || tgt.tagName === "TEXTAREA" || tgt.isContentEditable)) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key >= "1" && e.key <= "4") {
+        e.preventDefault();
+        const forma = formas[Number(e.key) - 1];
+        setCobrancaLinhas(prev => {
+          const next = [...prev];
+          const i = next.length - 1;
+          next[i] = { ...next[i], forma, bandeira: "", parcelas: "1" };
+          return next;
+        });
+      } else if (e.key === "5") {
+        e.preventDefault();
+        setCobrancaLinhas(prev => {
+          if (!openCobranca) return [...prev, linhaVazia()];
+          const next = [...prev];
+          if (prev.length === 1) {
+            const atual = Number(prev[0].valor) || 0;
+            if (Math.abs(atual - openCobranca.valor) < 0.01) {
+              next[0] = { ...prev[0], valor: String(openCobranca.valor_cartao || atual) };
+            }
+          }
+          next.push(linhaVazia());
+          return next;
+        });
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [openCobranca]);
+
   const load = useCallback(async () => {
     if (!clinicaAtual || !user) return;
     setLoading(true);
@@ -780,7 +817,7 @@ function Page() {
             </div>
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => setOpenAbrir(false)}>Cancelar</Button>
-              <Button type="submit" disabled={saving}>Abrir</Button>
+              <Button type="submit" disabled={saving} data-primary>Abrir</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -850,7 +887,7 @@ function Page() {
             )}
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => setOpenMov(null)}>Cancelar</Button>
-              <Button type="submit" disabled={saving}>Lançar</Button>
+              <Button type="submit" disabled={saving} data-primary>Lançar</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -873,7 +910,7 @@ function Page() {
             </div>
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => setOpenFechar(false)}>Cancelar</Button>
-              <Button type="submit" variant="destructive" disabled={saving}>Confirmar fechamento</Button>
+              <Button type="submit" variant="destructive" disabled={saving} data-primary>Confirmar fechamento</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -892,6 +929,9 @@ function Page() {
             )}
           </DialogHeader>
           <form onSubmit={cobrar} className="space-y-3">
+            <p className="text-[11px] text-muted-foreground -mt-2">
+              Atalhos: <kbd className="px-1 border rounded">1</kbd> dinheiro · <kbd className="px-1 border rounded">2</kbd> PIX · <kbd className="px-1 border rounded">3</kbd> débito · <kbd className="px-1 border rounded">4</kbd> crédito · <kbd className="px-1 border rounded">5</kbd> adicionar forma · <kbd className="px-1 border rounded">Enter</kbd> confirmar
+            </p>
             {(() => {
               const total = cobrancaLinhas.reduce((a, l) => a + (Number(l.valor) || 0), 0);
               const multi = cobrancaLinhas.length > 1;
@@ -994,7 +1034,7 @@ function Page() {
             </p>
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => setOpenCobranca(null)}>Cancelar</Button>
-              <Button type="submit" disabled={saving}>Confirmar cobrança</Button>
+              <Button type="submit" disabled={saving} data-primary>Confirmar cobrança</Button>
             </DialogFooter>
           </form>
         </DialogContent>

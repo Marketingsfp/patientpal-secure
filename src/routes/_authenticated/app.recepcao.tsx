@@ -39,6 +39,22 @@ function RecepcaoPage() {
 
   useEffect(() => { localStorage.setItem("guiche", guiche); }, [guiche]);
 
+  // Atalho: C = chamar próxima senha
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tgt = e.target as HTMLElement | null;
+      if (tgt && (tgt.tagName === "INPUT" || tgt.tagName === "TEXTAREA" || tgt.isContentEditable)) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key.toLowerCase() === "c") {
+        e.preventDefault();
+        void chamarProxima();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clinicaAtual?.clinica_id, guiche]);
+
   const carregar = async () => {
     if (!clinicaAtual) return;
     const hoje = new Date().toISOString().slice(0, 10);
@@ -113,8 +129,9 @@ function RecepcaoPage() {
               className="h-10 w-24 px-3 rounded-md border bg-background text-lg font-semibold"
             />
           </div>
-          <Button size="lg" onClick={chamarProxima} disabled={busy}>
+          <Button size="lg" onClick={chamarProxima} disabled={busy} data-primary>
             <Bell className="h-4 w-4 mr-2" /> Chamar próxima
+            <kbd className="ml-2 hidden md:inline-flex h-5 min-w-5 items-center justify-center rounded border bg-background/20 px-1 text-[10px] font-mono">C</kbd>
           </Button>
           <Button variant="outline" asChild>
             <a href="/totem" target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4 mr-2" /> Totem</a>

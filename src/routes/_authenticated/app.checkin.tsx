@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Card } from "@/components/ui/card";
@@ -125,10 +125,29 @@ function CheckinPage() {
 
   useEffect(() => { void load(); }, [load]);
 
+  // Atalhos: Alt+1..9 confirma o N-ésimo paciente da lista visível
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.altKey || e.ctrlKey || e.metaKey) return;
+      if (e.key < "1" || e.key > "9") return;
+      const idx = Number(e.key) - 1;
+      const alvo = filtradosRef.current[idx];
+      if (alvo && estaPendenteCheckin(alvo.fluxo_etapa)) {
+        e.preventDefault();
+        void confirmar(alvo);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const filtrados = useMemo(() => {
     if (buscaAmpla) return items;
     return items.filter((a) => itemCombinaComBuscaPaciente(a, busca));
   }, [items, busca, buscaAmpla]);
+  const filtradosRef = useRef<Item[]>([]);
+  useEffect(() => { filtradosRef.current = filtrados; }, [filtrados]);
 
   const acionarBusca = () => { setBuscaAplicada(busca.trim()); setBuscaAmpla(true); };
   const limparBusca = () => { setBusca(""); setBuscaAplicada(""); setBuscaAmpla(false); };
@@ -180,6 +199,7 @@ function CheckinPage() {
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); acionarBusca(); } }}
                 placeholder="Digite o nome ou CPF..."
                 autoFocus
+                data-quick-search
               />
             </div>
           </div>
@@ -209,8 +229,13 @@ function CheckinPage() {
         </Card>
       ) : (
         <div className="grid gap-2">
-          {filtrados.map((a) => (
+          {filtrados.map((a, idx) => (
             <Card key={a.id} className="p-3 flex items-center gap-3 flex-wrap">
+              {idx < 9 && (
+                <kbd className="hidden md:inline-flex h-7 min-w-7 items-center justify-center rounded border bg-muted px-1.5 text-xs font-mono">
+                  Alt+{idx + 1}
+                </kbd>
+              )}
               {a.paciente?.foto_url ? (
                 <img src={a.paciente.foto_url} alt="" className="h-12 w-12 rounded-full object-cover border" />
               ) : (
