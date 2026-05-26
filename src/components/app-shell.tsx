@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
-import { lazy, Suspense, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet, ChevronLeft, ChevronRight, ChevronDown, Search, HeartPulse, Contact, ConciergeBell, Briefcase, MapPin, Palmtree, GraduationCap, Sparkles, Filter, Send, Megaphone, KeyRound, BadgeCheck, LayoutGrid, Gift } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -125,6 +125,8 @@ export function AppShell() {
   const { isMedicoOnly } = useMedicoContext();
   const location = useLocation();
   const navigate = useNavigate();
+  const navScrollRef = useRef<HTMLElement | null>(null);
+  const lastArrowNavAtRef = useRef(0);
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     if (window.innerWidth < 1024) return true;
@@ -319,31 +321,62 @@ export function AppShell() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+      const navRoot = navScrollRef.current;
       const tgt = e.target as HTMLElement | null;
       if (tgt) {
         const tag = tgt.tagName;
         if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || tgt.isContentEditable) return;
         if (tgt.closest('[role="dialog"], [role="listbox"], [role="menu"], [role="combobox"]')) return;
       }
+      const activeElement = typeof document !== "undefined" ? document.activeElement : null;
+      const isUsingSidebar = !!(
+        navRoot &&
+        ((tgt && navRoot.contains(tgt)) || (activeElement instanceof HTMLElement && navRoot.contains(activeElement)))
+      );
+      if (!isUsingSidebar) return;
       if (flatNavLeaves.length === 0) return;
       const path = location.pathname;
-      let idx = flatNavLeaves.findIndex((to) => path === to || (to !== "/app" && path.startsWith(to)));
+      let idx = flatNavLeaves.reduce((best, to, i) => {
+        const matches = path === to || (to !== "/app" && path.startsWith(`${to}/`));
+        if (!matches) return best;
+        return best < 0 || to.length > flatNavLeaves[best].length ? i : best;
+      }, -1);
       if (idx < 0) return;
       const next = e.key === "ArrowDown"
         ? Math.min(flatNavLeaves.length - 1, idx + 1)
         : Math.max(0, idx - 1);
       if (next === idx) return;
       e.preventDefault();
+      const now = Date.now();
+      if (now - lastArrowNavAtRef.current < 120) return;
+      lastArrowNavAtRef.current = now;
       navigate({ to: flatNavLeaves[next] });
+      window.setTimeout(() => {
+        const nextLink = Array.from(navRoot?.querySelectorAll<HTMLElement>("[data-nav-to]") ?? [])
+          .find((el) => el.dataset.navTo === flatNavLeaves[next]);
+        nextLink?.focus({ preventScroll: true });
+      }, 0);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [flatNavLeaves, location.pathname, navigate]);
 
   useEffect(() => {
-    const el = document.querySelector<HTMLElement>('[data-nav-active="true"]');
-    if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  }, [location.pathname]);
+    const frame = window.requestAnimationFrame(() => {
+      const navRoot = navScrollRef.current;
+      const el = navRoot?.querySelector<HTMLElement>('[data-nav-active="true"]');
+      if (!navRoot || !el) return;
+      const rootRect = navRoot.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+      const gap = 12;
+      if (elRect.top < rootRect.top + gap) {
+        navRoot.scrollTop -= rootRect.top + gap - elRect.top;
+      } else if (elRect.bottom > rootRect.bottom - gap) {
+        navRoot.scrollTop += elRect.bottom - (rootRect.bottom - gap);
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [location.pathname, collapsed, openGroups]);
 
   return (
     <div className="h-screen flex bg-background overflow-hidden">
@@ -380,7 +413,7 @@ export function AppShell() {
             </button>
           </div>
         )}
-        <nav className="flex-1 px-2 py-3 space-y-5 overflow-y-auto">
+        <nav ref={navScrollRef} className="flex-1 px-2 py-3 space-y-5 overflow-y-auto">
           {visibleNavRows.map((row) => {
             const leafIsActive = (to: string) => location.pathname === to || (to !== "/app" && location.pathname.startsWith(to));
             const itemHasActive = (it: NavItem): boolean => isParent(it) ? it.children.some((c) => leafIsActive(c.to)) : leafIsActive(it.to);
@@ -430,6 +463,7 @@ export function AppShell() {
                               key={child.to}
                               to={child.to}
                               title={collapsed ? child.label : undefined}
+                              data-nav-to={child.to}
                               data-nav-active={active ? "true" : undefined}
                               className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "pl-8 pr-3"} py-2 text-sm font-medium transition-all ${
                                 active
@@ -452,6 +486,7 @@ export function AppShell() {
                       key={item.to}
                       to={item.to}
                       title={collapsed ? item.label : undefined}
+                      data-nav-to={item.to}
                       data-nav-active={active ? "true" : undefined}
                       className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "px-3"} py-2 text-sm font-medium transition-all ${
                         active
