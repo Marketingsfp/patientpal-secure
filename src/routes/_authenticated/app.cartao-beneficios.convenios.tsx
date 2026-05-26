@@ -737,14 +737,14 @@ function ConveniosPage() {
                 </div>
                 <style>{`
                   @media print {
-                    @page { size: A4; margin: 12mm; }
+                    @page { size: A4; margin: 0; }
                     body * { visibility: hidden !important; }
                     #convenio-contrato-print, #convenio-contrato-print * { visibility: visible !important; }
                     #convenio-contrato-print { position: absolute; left: 0; top: 0; width: 100%; }
                     #convenio-contrato-print .print\\:hidden { display: none !important; }
                     #convenio-contrato-print .rt-shell { border: 0 !important; border-radius: 0 !important; overflow: visible !important; background: transparent !important; }
                     #convenio-contrato-print .rt-scroll { max-height: none !important; overflow: visible !important; background: transparent !important; }
-                    #convenio-contrato-print .rt-page { width: 100% !important; min-height: 0 !important; margin: 0 !important; padding: 0 !important; box-shadow: none !important; background: transparent !important; }
+                    #convenio-contrato-print .rt-page { width: 210mm !important; min-height: 297mm !important; margin: 0 auto !important; box-shadow: none !important; background: white !important; }
                     #convenio-contrato-print .ProseMirror { min-height: 0 !important; }
                     #convenio-contrato-print table { page-break-inside: auto; }
                     #convenio-contrato-print tr { page-break-inside: avoid; page-break-after: auto; }
@@ -772,7 +772,7 @@ function ConveniosPage() {
                 </div>
                 <style>{`
                   @media print {
-                    @page { size: A4; margin: 12mm; }
+                    @page { size: A4; margin: 0; }
                     body * { visibility: hidden !important; }
                     #convenio-informativo-print, #convenio-informativo-print * { visibility: visible !important; }
                     #convenio-informativo-print { position: absolute; left: 0; top: 0; width: 100%; }
@@ -780,7 +780,7 @@ function ConveniosPage() {
                     /* Neutralize the editor chrome (scroll wrapper + A4 mock page) for print */
                     #convenio-informativo-print .rt-shell { border: 0 !important; border-radius: 0 !important; overflow: visible !important; background: transparent !important; }
                     #convenio-informativo-print .rt-scroll { max-height: none !important; overflow: visible !important; background: transparent !important; }
-                    #convenio-informativo-print .rt-page { width: 100% !important; min-height: 0 !important; margin: 0 !important; padding: 0 !important; box-shadow: none !important; background: transparent !important; }
+                    #convenio-informativo-print .rt-page { width: 210mm !important; min-height: 297mm !important; margin: 0 auto !important; box-shadow: none !important; background: white !important; }
                     #convenio-informativo-print .ProseMirror { min-height: 0 !important; }
                     #convenio-informativo-print table { page-break-inside: auto; }
                     #convenio-informativo-print tr { page-break-inside: avoid; page-break-after: auto; }
@@ -808,14 +808,14 @@ function ConveniosPage() {
                 </div>
                 <style>{`
                   @media print {
-                    @page { size: A4; margin: 12mm; }
+                    @page { size: A4; margin: 0; }
                     body * { visibility: hidden !important; }
                     #convenio-termo-print, #convenio-termo-print * { visibility: visible !important; }
                     #convenio-termo-print { position: absolute; left: 0; top: 0; width: 100%; }
                     #convenio-termo-print .print\\:hidden { display: none !important; }
                     #convenio-termo-print .rt-shell { border: 0 !important; border-radius: 0 !important; overflow: visible !important; background: transparent !important; }
                     #convenio-termo-print .rt-scroll { max-height: none !important; overflow: visible !important; background: transparent !important; }
-                    #convenio-termo-print .rt-page { width: 100% !important; min-height: 0 !important; margin: 0 !important; padding: 0 !important; box-shadow: none !important; background: transparent !important; }
+                    #convenio-termo-print .rt-page { width: 210mm !important; min-height: 297mm !important; margin: 0 auto !important; box-shadow: none !important; background: white !important; }
                     #convenio-termo-print .ProseMirror { min-height: 0 !important; }
                     #convenio-termo-print table { page-break-inside: auto; }
                     #convenio-termo-print tr { page-break-inside: avoid; page-break-after: auto; }
