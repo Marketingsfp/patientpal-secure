@@ -235,7 +235,8 @@ function ConveniosPage() {
     setVigenciaMeses(c.vigencia_meses ?? 12);
     setBeneficiosTxt(c.beneficios ?? "");
     setModeloContrato(c.modelo_contrato ?? "");
-    if (c.informativo_html && c.informativo_html.trim()) {
+    const stripped = (c.informativo_html ?? "").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, "").trim();
+    if (stripped) {
       setInformativoHtml(c.informativo_html);
     } else if (/CART[ÃA]O\s*CONSULTA.*SEGUROS/i.test(c.nome)) {
       setInformativoHtml(INFORMATIVO_CARTAO_CONSULTA_SEGUROS_HTML);
