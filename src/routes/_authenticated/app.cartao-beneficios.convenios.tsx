@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, ShieldCheck, Layers, Lightbulb, ArrowLeft, FileText, Info, Printer, Gift } from "lucide-react";
+import { Plus, Pencil, Trash2, ShieldCheck, Layers, Lightbulb, ArrowLeft, FileText, Info, Printer, Gift, FileSignature } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -64,6 +64,7 @@ type Convenio = {
   beneficios: string | null;
   modelo_contrato: string | null;
   informativo_html: string | null;
+  termo_inclusao_html: string | null;
 };
 
 type Faixa = {
@@ -108,6 +109,7 @@ function ConveniosPage() {
   const [beneficiosTxt, setBeneficiosTxt] = useState("");
   const [modeloContrato, setModeloContrato] = useState("");
   const [informativoHtml, setInformativoHtml] = useState("");
+  const [termoInclusaoHtml, setTermoInclusaoHtml] = useState("");
   const [faixas, setFaixas] = useState<Faixa[]>([{ vidas_de: 1, vidas_ate: null, valor_mensal: 0 }]);
   const [valoresMin, setValoresMin] = useState<Record<string, number>>({});
   const [saving, setSaving] = useState(false);
@@ -214,6 +216,7 @@ function ConveniosPage() {
     setMaxDependentes(0); setFidelidadeMeses(0); setVigenciaMeses(12);
     setBeneficiosTxt(""); setModeloContrato("");
     setInformativoHtml("");
+    setTermoInclusaoHtml("");
     setFaixas([{ vidas_de: 1, vidas_ate: null, valor_mensal: 0 }]);
     setBeneficios([]);
     loadCatalogos();
@@ -239,6 +242,7 @@ function ConveniosPage() {
     } else {
       setInformativoHtml("");
     }
+    setTermoInclusaoHtml(c.termo_inclusao_html ?? "");
     const { data: fs } = await supabase
       .from("cb_convenio_faixas")
       .select("vidas_de, vidas_ate, valor_mensal")
@@ -281,6 +285,7 @@ function ConveniosPage() {
       beneficios: beneficiosTxt.trim() || null,
       modelo_contrato: modeloContrato.trim() || null,
       informativo_html: informativoHtml.trim() || null,
+      termo_inclusao_html: termoInclusaoHtml.trim() || null,
     };
     let convenioId = editing?.id;
     if (editing) {
@@ -422,6 +427,7 @@ function ConveniosPage() {
               <TabsTrigger value="beneficios"><Gift className="h-4 w-4 mr-1" />Benefícios</TabsTrigger>
               <TabsTrigger value="contrato"><FileText className="h-4 w-4 mr-1" />Contrato</TabsTrigger>
               <TabsTrigger value="informativo"><Info className="h-4 w-4 mr-1" />Informativo</TabsTrigger>
+              <TabsTrigger value="termo"><FileSignature className="h-4 w-4 mr-1" />Termo de Inclusão</TabsTrigger>
             </TabsList>
             <TabsContent value="info" className="space-y-3 mt-3">
               <div>
@@ -775,6 +781,41 @@ function ConveniosPage() {
                     #convenio-informativo-print table { page-break-inside: auto; }
                     #convenio-informativo-print tr { page-break-inside: avoid; page-break-after: auto; }
                     #convenio-informativo-print img { max-width: 100% !important; height: auto !important; }
+                  }
+                `}</style>
+              </div>
+            </TabsContent>
+            <TabsContent value="termo" className="mt-3">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 font-medium">
+                    <FileSignature className="h-4 w-4" /> Termo de Inclusão
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => window.print()}>
+                    <Printer className="h-4 w-4 mr-1" /> Imprimir
+                  </Button>
+                </div>
+                <div id="convenio-termo-print">
+                  <RichEditor
+                    value={termoInclusaoHtml}
+                    onChange={setTermoInclusaoHtml}
+                    clinicaId={clinicaAtual.clinica_id}
+                  />
+                </div>
+                <style>{`
+                  @media print {
+                    @page { size: A4; margin: 12mm; }
+                    body * { visibility: hidden !important; }
+                    #convenio-termo-print, #convenio-termo-print * { visibility: visible !important; }
+                    #convenio-termo-print { position: absolute; left: 0; top: 0; width: 100%; }
+                    #convenio-termo-print .print\\:hidden { display: none !important; }
+                    #convenio-termo-print .rt-shell { border: 0 !important; border-radius: 0 !important; overflow: visible !important; background: transparent !important; }
+                    #convenio-termo-print .rt-scroll { max-height: none !important; overflow: visible !important; background: transparent !important; }
+                    #convenio-termo-print .rt-page { width: 100% !important; min-height: 0 !important; margin: 0 !important; padding: 0 !important; box-shadow: none !important; background: transparent !important; }
+                    #convenio-termo-print .ProseMirror { min-height: 0 !important; }
+                    #convenio-termo-print table { page-break-inside: auto; }
+                    #convenio-termo-print tr { page-break-inside: avoid; page-break-after: auto; }
+                    #convenio-termo-print img { max-width: 100% !important; height: auto !important; }
                   }
                 `}</style>
               </div>
