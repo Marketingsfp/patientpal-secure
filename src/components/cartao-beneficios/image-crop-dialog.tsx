@@ -1,9 +1,14 @@
-import { useRef, useState } from "react";
-import ReactCrop, { type Crop, type PixelCrop } from "react-image-crop";
-import "react-image-crop/dist/ReactCrop.css";
+import { lazy, Suspense, useRef, useState } from "react";
+import type { Crop, PixelCrop } from "react-image-crop";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+const ReactCrop = lazy(async () => {
+  await import("react-image-crop/dist/ReactCrop.css");
+  const mod = await import("react-image-crop");
+  return { default: mod.default };
+});
 
 interface Props {
   open: boolean;
