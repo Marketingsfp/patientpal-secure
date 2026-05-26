@@ -820,9 +820,12 @@ h1, h2, h3 { margin: 0 0 6mm; }
   // Recalcula o valor das parcelas em aberto conforme a faixa de vidas do convênio
   const recalcularParcelasAbertas = async (totalVidas: number) => {
     if (!faixas.length) return;
-    const f = faixas.find(
+    const elegiveis = faixas.filter(
       (fx) => totalVidas >= fx.vidas_de && (fx.vidas_ate == null || totalVidas <= fx.vidas_ate)
     );
+    const f = elegiveis.length
+      ? elegiveis.reduce((a, b) => (b.vidas_de > a.vidas_de ? b : a))
+      : null;
     if (!f) return;
     const novoValor = Number(f.valor_mensal);
     if (novoValor !== Number(contrato.valor_mensal)) {
