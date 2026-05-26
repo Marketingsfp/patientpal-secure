@@ -68,9 +68,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
   {
     label: "Cartão Benefícios",
     items: [
-    { to: "/app/cartao-beneficios/contratos", label: "Nova venda", icon: CreditCard },
-    { to: "/app/cartao-beneficios/convenios", label: "Convênio", icon: ShieldCheck },
-    { to: "/app/cartao-beneficios/relatorios", label: "Relatórios", icon: BarChart3 },
+    { to: "/app/cartao-beneficios/contratos", label: "Cartão Benefícios", icon: CreditCard },
     ],
   },
   {
