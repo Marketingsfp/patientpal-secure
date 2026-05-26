@@ -1,22 +1,19 @@
 const NAVY = "#1f3864";
 const RED = "#c00000";
-const LIGHT = "#f2f2f2";
+const FONT = "font-family:'Times New Roman',Times,serif";
 
 export const INFORMATIVO_CARTAO_CONSULTA_SEGUROS_HTML = `
-<table style="border:none">
+<div style="${FONT};font-size:11pt;color:#000">
+<p style="text-align:center;margin:0 0 6px 0">
+  <img src="/cartao-beneficios/logo-policardmed.png" alt="Policardmed" style="height:70px;display:inline-block;vertical-align:middle;margin-right:18px" />
+  <img src="/cartao-beneficios/logo-menino-jesus.png" alt="Policlínica Menino Jesus" style="height:80px;display:inline-block;vertical-align:middle" />
+</p>
+<h2 style="text-align:center;${FONT};margin:8px 0 12px 0"><span style="color:${RED}"><em><strong>*NÃO POSSUI EMERGÊNCIA, SERVIÇOS DE INTERNAÇÃO*</strong></em></span></h2>
+<table style="width:100%;border-collapse:collapse;border:1.5pt solid ${NAVY}">
   <tbody>
     <tr>
-      <td style="border:none;text-align:right;width:50%"><img src="/cartao-beneficios/logo-policardmed.jpg" alt="Policardmed" style="height:70px;display:inline-block" /></td>
-      <td style="border:none;text-align:left;width:50%"><img src="/cartao-beneficios/logo-menino-jesus.jpg" alt="Policlínica Menino Jesus" style="height:75px;display:inline-block" /></td>
-    </tr>
-  </tbody>
-</table>
-<h2 style="text-align:center"><span style="color:${RED}"><em><strong>*NÃO POSSUI EMERGÊNCIA, SERVIÇOS DE INTERNAÇÃO*</strong></em></span></h2>
-<table>
-  <tbody>
-    <tr>
-      <th colspan="2" style="background-color:${NAVY};color:#ffffff;text-align:center"><span style="color:#ffffff"><strong>CARTÃO CONSULTA + SEGUROS</strong></span></th>
-      <th rowspan="8" style="background-color:#ffffff;text-align:center;vertical-align:middle;width:30%"><p><strong>TAXA DE ADESÃO ÚNICA</strong></p><p><span style="font-size:18pt"><strong>R$ 30,00</strong></span></p></th>
+      <th colspan="2" style="background-color:${NAVY};color:#ffffff;text-align:center;border:1pt solid ${NAVY};padding:6px"><span style="color:#ffffff;font-size:14pt"><strong>CARTÃO CONSULTA + SEGUROS</strong></span></th>
+      <th rowspan="8" style="background-color:#ffffff;text-align:center;vertical-align:middle;width:32%;border:1pt solid ${NAVY};padding:8px"><p style="margin:0"><strong>TAXA DE ADESÃO ÚNICA</strong></p><p style="margin:6px 0 0 0"><span style="font-size:14pt"><strong>R$ 30,00</strong></span></p></th>
     </tr>
     <tr>
       <th style="background-color:${LIGHT};text-align:center"><strong>MODALIDADE</strong></th>
