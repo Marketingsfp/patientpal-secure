@@ -475,15 +475,18 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     setLoading(true);
     const [m, d, cv, cl, pa] = await Promise.all([
       supabase.from("contrato_mensalidades").select("*").eq("contrato_id", contrato.id).order("numero_parcela"),
-      supabase.from("contrato_dependentes").select("id, paciente_nome, parentesco, tipo").eq("contrato_id", contrato.id).eq("ativo", true),
+      supabase.from("contrato_dependentes").select("id, paciente_nome, parentesco, tipo, pacientes:paciente_id(cpf)").eq("contrato_id", contrato.id).eq("ativo", true),
       contrato.convenio_id
-        ? supabase.from("cb_convenios").select("nome, modelo_contrato, vigencia_meses, fidelidade_meses").eq("id", contrato.convenio_id).maybeSingle()
+        ? supabase.from("cb_convenios").select("nome, modelo_contrato, vigencia_meses, fidelidade_meses, max_dependentes").eq("id", contrato.convenio_id).maybeSingle()
         : Promise.resolve({ data: null }),
       supabase.from("clinicas").select("nome, cnpj, endereco, cidade, estado, telefone").eq("id", (contrato as any).clinica_id ?? "").maybeSingle(),
       supabase.from("pacientes").select("cpf, data_nascimento, telefone, email, logradouro, numero, bairro, cidade, estado, cep").eq("id", (contrato as any).paciente_id ?? "").maybeSingle(),
     ]);
     setMens((m.data ?? []) as Mens[]);
-    setDeps((d.data ?? []) as Dep[]);
+    setDeps(((d.data ?? []) as any[]).map((r) => ({
+      id: r.id, paciente_nome: r.paciente_nome, parentesco: r.parentesco, tipo: r.tipo,
+      cpf: r.pacientes?.cpf ?? null,
+    })));
     setConvenio(cv.data ?? null);
     setClinica(cl.data ?? null);
     setPacienteFull(pa.data ?? null);
