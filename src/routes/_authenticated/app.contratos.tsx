@@ -270,19 +270,6 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
               <SelectTrigger><SelectValue/></SelectTrigger>
               <SelectContent>{convenios.map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}</SelectContent>
             </Select>
-            {convenio && (beneficios.length > 0 || convenio.beneficios) ? (
-              <div className="mt-2 rounded-md border bg-muted/30 p-3 text-xs space-y-1">
-                <div className="font-semibold text-foreground">Benefícios deste convênio</div>
-                {beneficios.map((b) => (
-                  <div key={b.id}>
-                    • <span className="font-medium">{b.nome}</span>
-                    {b.valor_desconto != null ? ` — ${b.tipo_desconto === "percentual" ? `${b.valor_desconto}% de desconto` : `R$ ${Number(b.valor_desconto).toFixed(2)}`}` : ""}
-                    {` · ${b.pessoa} · ${b.limite_uso === "ilimitado" ? "uso ilimitado" : `${b.limite_uso}x por ${b.periodicidade}`} · libera a partir do mês ${b.inicio_a_partir}`}
-                  </div>
-                ))}
-                {convenio.beneficios ? <div className="text-muted-foreground whitespace-pre-wrap pt-1 border-t mt-1">{convenio.beneficios}</div> : null}
-              </div>
-            ) : null}
             {faixas.length > 0 ? (
               <div className="mt-2 text-xs text-muted-foreground">
                 Valor calculado pela faixa de vidas: <span className="font-semibold text-foreground">{vidas} vida(s)</span>
