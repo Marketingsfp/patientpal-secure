@@ -480,62 +480,73 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
         <ToolbarButton title="Link" active={editor.isActive("link")} onClick={setLink}>
           <LinkIcon className="h-4 w-4" />
         </ToolbarButton>
-        {editor.isActive("image") && (
-          <>
-            <div className="w-px h-6 bg-border mx-1" />
-            <ToolbarButton
-              title="Alinhar imagem à esquerda"
-              active={editor.getAttributes("image").align === "left"}
-              onClick={() => editor.chain().focus().updateAttributes("image", { align: "left" }).run()}
-            >
-              <AlignLeft className="h-4 w-4" />
-            </ToolbarButton>
-            <ToolbarButton
-              title="Centralizar imagem"
-              active={editor.getAttributes("image").align === "center"}
-              onClick={() => editor.chain().focus().updateAttributes("image", { align: "center" }).run()}
-            >
-              <AlignCenter className="h-4 w-4" />
-            </ToolbarButton>
-            <ToolbarButton
-              title="Alinhar imagem à direita"
-              active={editor.getAttributes("image").align === "right"}
-              onClick={() => editor.chain().focus().updateAttributes("image", { align: "right" }).run()}
-            >
-              <AlignRight className="h-4 w-4" />
-            </ToolbarButton>
-            <ToolbarButton
-              title="Cortar imagem"
-              onClick={() => {
-                const src = editor.getAttributes("image").src as string | undefined;
-                if (!src) return;
-                setCropSrc(src);
-                setCropOpen(true);
-              }}
-            >
-              <Crop className="h-4 w-4" />
-            </ToolbarButton>
-            <Select
-              value=""
-              onValueChange={(v) => {
-                editor.chain().focus().updateAttributes("image", {
-                  width: v === "auto" ? null : v,
-                }).run();
-              }}
-            >
-              <SelectTrigger className="h-8 w-[110px] text-xs" title="Largura da imagem">
-                <SelectValue placeholder={(editor.getAttributes("image").width as string) || "Largura"} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="25%">25%</SelectItem>
-                <SelectItem value="50%">50%</SelectItem>
-                <SelectItem value="75%">75%</SelectItem>
-                <SelectItem value="100%">100%</SelectItem>
-                <SelectItem value="auto">Tamanho original</SelectItem>
-              </SelectContent>
-            </Select>
-          </>
-        )}
+        {(() => {
+          const imgActive = editor.isActive("image");
+          return (
+            <>
+              <div className="w-px h-6 bg-border mx-1" />
+              <ToolbarButton
+                title="Alinhar imagem à esquerda"
+                active={imgActive && editor.getAttributes("image").align === "left"}
+                disabled={!imgActive}
+                onClick={() => editor.chain().focus().updateAttributes("image", { align: "left" }).run()}
+              >
+                <AlignLeft className="h-4 w-4" />
+              </ToolbarButton>
+              <ToolbarButton
+                title="Centralizar imagem"
+                active={imgActive && editor.getAttributes("image").align === "center"}
+                disabled={!imgActive}
+                onClick={() => editor.chain().focus().updateAttributes("image", { align: "center" }).run()}
+              >
+                <AlignCenter className="h-4 w-4" />
+              </ToolbarButton>
+              <ToolbarButton
+                title="Alinhar imagem à direita"
+                active={imgActive && editor.getAttributes("image").align === "right"}
+                disabled={!imgActive}
+                onClick={() => editor.chain().focus().updateAttributes("image", { align: "right" }).run()}
+              >
+                <AlignRight className="h-4 w-4" />
+              </ToolbarButton>
+              <ToolbarButton
+                title="Cortar imagem"
+                disabled={!imgActive}
+                onClick={() => {
+                  const src = editor.getAttributes("image").src as string | undefined;
+                  if (!src) {
+                    toast.info("Clique na imagem que deseja cortar e tente novamente.");
+                    return;
+                  }
+                  setCropSrc(src);
+                  setCropOpen(true);
+                }}
+              >
+                <Crop className="h-4 w-4" />
+              </ToolbarButton>
+              <Select
+                value=""
+                disabled={!imgActive}
+                onValueChange={(v) => {
+                  editor.chain().focus().updateAttributes("image", {
+                    width: v === "auto" ? null : v,
+                  }).run();
+                }}
+              >
+                <SelectTrigger className="h-8 w-[110px] text-xs" title="Largura da imagem" disabled={!imgActive}>
+                  <SelectValue placeholder={(editor.getAttributes("image").width as string) || "Largura"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="25%">25%</SelectItem>
+                  <SelectItem value="50%">50%</SelectItem>
+                  <SelectItem value="75%">75%</SelectItem>
+                  <SelectItem value="100%">100%</SelectItem>
+                  <SelectItem value="auto">Tamanho original</SelectItem>
+                </SelectContent>
+              </Select>
+            </>
+          );
+        })()}
         <input
           ref={fileRef} type="file" accept="image/*" multiple className="hidden"
           onChange={(e) => {
