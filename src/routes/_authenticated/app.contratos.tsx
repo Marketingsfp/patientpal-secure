@@ -338,7 +338,14 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
           <div>
             <Label>Valor mensal</Label>
             <div className="h-10 rounded-md border bg-muted/30 px-3 flex items-center font-semibold">{BRL(valor)}</div>
-            <p className="text-xs text-muted-foreground mt-1">Recalculado automaticamente conforme dependentes.</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Recalculado automaticamente conforme dependentes.
+              {forma === "boleto" ? (
+                <span className="block text-amber-600 font-medium">
+                  + {BRL(TAXA_BOLETO)} de taxa de boleto por parcela — total da parcela: {BRL(valor + TAXA_BOLETO)}
+                </span>
+              ) : null}
+            </p>
           </div>
           <div>
             <Label>Taxa de adesão</Label>
@@ -358,11 +365,25 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
             </Select>
           </div>
           <div className="col-span-2 border-t pt-3">
-            <Label>Dependentes {convenio && convenio.max_dependentes > 0 ? `(máx ${convenio.max_dependentes})` : ""}</Label>
+            <Label>
+              Dependentes {convenio ? `(${deps.length}/${convenio.max_dependentes ?? 0})` : ""}
+            </Label>
             <Popover open={depOpen} onOpenChange={setDepOpen}>
               <PopoverTrigger asChild>
-                <Button type="button" variant="outline" role="combobox" className="w-full justify-between font-normal mt-1">
-                  <span className="text-muted-foreground">Adicionar cliente como dependente…</span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  role="combobox"
+                  className="w-full justify-between font-normal mt-1"
+                  disabled={!convenio || deps.length >= (Number(convenio?.max_dependentes ?? 0) || 0)}
+                >
+                  <span className="text-muted-foreground">
+                    {convenio && deps.length >= (Number(convenio.max_dependentes ?? 0) || 0)
+                      ? (convenio.max_dependentes ?? 0) === 0
+                        ? "Convênio sem dependentes"
+                        : `Limite atingido (${deps.length}/${convenio.max_dependentes})`
+                      : "Adicionar cliente como dependente…"}
+                  </span>
                   <ChevronsUpDown className="h-4 w-4 opacity-50"/>
                 </Button>
               </PopoverTrigger>
