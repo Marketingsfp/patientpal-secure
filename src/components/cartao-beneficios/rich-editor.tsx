@@ -24,6 +24,50 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 
+// Extend table cells with a backgroundColor attribute so users can paint cells/rows/columns.
+const ColoredTableCell = TableCell.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      backgroundColor: {
+        default: null,
+        parseHTML: (el) =>
+          (el as HTMLElement).getAttribute("data-bg") ||
+          (el as HTMLElement).style.backgroundColor ||
+          null,
+        renderHTML: (attrs) => {
+          if (!attrs.backgroundColor) return {};
+          return {
+            "data-bg": attrs.backgroundColor,
+            style: `background-color: ${attrs.backgroundColor}`,
+          };
+        },
+      },
+    };
+  },
+});
+const ColoredTableHeader = TableHeader.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      backgroundColor: {
+        default: null,
+        parseHTML: (el) =>
+          (el as HTMLElement).getAttribute("data-bg") ||
+          (el as HTMLElement).style.backgroundColor ||
+          null,
+        renderHTML: (attrs) => {
+          if (!attrs.backgroundColor) return {};
+          return {
+            "data-bg": attrs.backgroundColor,
+            style: `background-color: ${attrs.backgroundColor}`,
+          };
+        },
+      },
+    };
+  },
+});
+
 const FONTS = [
   "Arial", "Calibri", "Times New Roman", "Georgia", "Verdana",
   "Tahoma", "Courier New", "Helvetica", "Garamond", "Trebuchet MS",
@@ -68,7 +112,7 @@ export function RichEditor({ value, onChange, clinicaId }: Props) {
       FontFamily.configure({ types: ["textStyle"] }),
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       Table.configure({ resizable: true, HTMLAttributes: { class: "rt-table" } }),
-      TableRow, TableHeader, TableCell,
+      TableRow, ColoredTableHeader, ColoredTableCell,
       Image.configure({ inline: false, allowBase64: true }),
     ],
     content: value || "<p></p>",
