@@ -185,7 +185,7 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
   const [faixaId, setFaixaId] = useState<string>("");
   const [diaVenc, setDiaVenc] = useState(10);
   const [dataInicio, setDataInicio] = useState(new Date().toISOString().slice(0, 10));
-  const [forma, setForma] = useState("dinheiro");
+  const [tipoCobranca, setTipoCobranca] = useState<"boleto" | "carne">("carne");
   const [obs, setObs] = useState("");
   const [deps, setDeps] = useState<Array<Paciente & { parentesco: string; tipo: string }>>([]);
   const [saving, setSaving] = useState(false);
