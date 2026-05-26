@@ -320,8 +320,16 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
           </div>
           <div><Label>Data início</Label><Input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)}/></div>
           <div><Label>Dia de vencimento</Label><Input type="number" min={1} max={28} value={diaVenc} onChange={(e) => setDiaVenc(Number(e.target.value))}/></div>
-          <div><Label>Valor mensal (R$)</Label><CurrencyInput value={String(valor ?? "")} onChange={(v) => setValor(Number(v) || 0)}/></div>
-          <div><Label>Taxa de adesão (R$)</Label><CurrencyInput value={String(taxa ?? "")} onChange={(v) => setTaxa(Number(v) || 0)}/></div>
+          <div>
+            <Label>Valor mensal</Label>
+            <div className="h-10 rounded-md border bg-muted/30 px-3 flex items-center font-semibold">{BRL(valor)}</div>
+            <p className="text-xs text-muted-foreground mt-1">Recalculado automaticamente conforme dependentes.</p>
+          </div>
+          <div>
+            <Label>Taxa de adesão</Label>
+            <div className="h-10 rounded-md border bg-muted/30 px-3 flex items-center font-semibold">{BRL(taxa)}</div>
+            <p className="text-xs text-muted-foreground mt-1">Cobrança única, definida pelo convênio.</p>
+          </div>
           <div className="col-span-2"><Label>Forma de pagamento</Label>
             <Select value={forma} onValueChange={setForma}>
               <SelectTrigger><SelectValue/></SelectTrigger>
@@ -396,9 +404,9 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
           <Button variant="ghost" onClick={onBack}>Cancelar</Button>
           <Button onClick={salvar} disabled={saving || !titular || !convenio}>Gerar contrato + {convenio?.num_parcelas ?? 12} parcelas</Button>
           </div>
-        {faceOpen ? (
+        {faceOpen !== null ? (
           <FaceCaptureDialog
-            open={!!faceOpen}
+            open={faceOpen !== null}
             onClose={() => setFaceOpen(null)}
             titulo={faceOpen === "titular" ? `Foto — ${titular?.nome ?? "Titular"}` : `Foto — ${deps[faceOpen as number]?.nome ?? "Dependente"}`}
             onCaptured={async (descriptor) => {
