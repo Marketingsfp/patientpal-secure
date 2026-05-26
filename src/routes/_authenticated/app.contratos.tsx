@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChevronsUpDown } from "lucide-react";
 import { printContrato } from "@/lib/print-contrato";
 import { printCartoes } from "@/lib/print-cartao";
@@ -430,16 +431,27 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
 function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () => void }) {
   const [mens, setMens] = useState<Mens[]>([]);
   const [deps, setDeps] = useState<Dep[]>([]);
+  const [convenio, setConvenio] = useState<any>(null);
+  const [clinica, setClinica] = useState<any>(null);
+  const [pacienteFull, setPacienteFull] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
     setLoading(true);
-    const [m, d] = await Promise.all([
+    const [m, d, cv, cl, pa] = await Promise.all([
       supabase.from("contrato_mensalidades").select("*").eq("contrato_id", contrato.id).order("numero_parcela"),
       supabase.from("contrato_dependentes").select("id, paciente_nome, parentesco, tipo").eq("contrato_id", contrato.id).eq("ativo", true),
+      contrato.convenio_id
+        ? supabase.from("cb_convenios").select("nome, modelo_contrato, vigencia_meses, fidelidade_meses").eq("id", contrato.convenio_id).maybeSingle()
+        : Promise.resolve({ data: null }),
+      supabase.from("clinicas").select("nome, cnpj, endereco, cidade, estado, telefone").eq("id", (contrato as any).clinica_id ?? "").maybeSingle(),
+      supabase.from("pacientes").select("cpf, data_nascimento, telefone, email, logradouro, numero, bairro, cidade, estado, cep").eq("id", (contrato as any).paciente_id ?? "").maybeSingle(),
     ]);
     setMens((m.data ?? []) as Mens[]);
     setDeps((d.data ?? []) as Dep[]);
+    setConvenio(cv.data ?? null);
+    setClinica(cl.data ?? null);
+    setPacienteFull(pa.data ?? null);
     setLoading(false);
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [contrato.id]);
@@ -463,6 +475,37 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
   const totalPago = mens.filter((m) => m.status === "pago").reduce((s, m) => s + Number(m.valor), 0);
   const aReceber = mens.filter((m) => m.status !== "pago").reduce((s, m) => s + Number(m.valor), 0);
 
+  const contratoTexto = useMemo(() => {
+    const tpl = convenio?.modelo_contrato ?? "";
+    if (!tpl) return "";
+    const _cl = clinica ?? {};
+    const _pa = pacienteFull ?? {};
+    const dependentesTxt = deps.length
+      ? deps.map((d, i) => `${i + 1}. ${d.paciente_nome} — ${d.parentesco ?? "—"} (${d.tipo})`).join("\n")
+      : "(nenhum)";
+    const enderecoPaciente = [_pa.logradouro, _pa.numero, _pa.bairro, _pa.cidade && _pa.estado ? `${_pa.cidade}-${_pa.estado}` : _pa.cidade].filter(Boolean).join(", ");
+    const vars: Record<string, string> = {
+      CLINICA_NOME: _cl.nome ?? "",
+      CLINICA_CNPJ: _cl.cnpj ?? "",
+      CLINICA_ENDERECO: [_cl.endereco, _cl.cidade, _cl.estado].filter(Boolean).join(", "),
+      CIDADE: _cl.cidade ?? "",
+      PACIENTE_NOME: contrato.paciente_nome ?? "",
+      PACIENTE_CPF: _pa.cpf ?? "",
+      PACIENTE_NASCIMENTO: fmtD(_pa.data_nascimento),
+      PACIENTE_ENDERECO: enderecoPaciente,
+      PACIENTE_TELEFONE: _pa.telefone ?? "",
+      PACIENTE_EMAIL: _pa.email ?? "",
+      VALOR_MENSAL: BRL(Number(contrato.valor_mensal)),
+      TAXA_ADESAO: BRL(Number((contrato as any).taxa_adesao ?? 0)),
+      NUM_PARCELAS: String((contrato as any).num_parcelas ?? mens.length),
+      VIGENCIA_MESES: String(convenio?.vigencia_meses ?? 12),
+      FIDELIDADE_MESES: String(convenio?.fidelidade_meses ?? 0),
+      DATA_HOJE: fmtD(new Date().toISOString().slice(0, 10)),
+      DEPENDENTES: dependentesTxt,
+    };
+    return tpl.replace(/\{\{(\w+)\}\}/g, (_m: string, k: string) => vars[k] ?? "");
+  }, [convenio, clinica, pacienteFull, deps, mens.length, contrato]);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
@@ -474,6 +517,12 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
       </div>
       <Card>
         <CardContent className="p-6 space-y-4">
+        <Tabs defaultValue="resumo">
+          <TabsList>
+            <TabsTrigger value="resumo">Resumo</TabsTrigger>
+            <TabsTrigger value="contrato">Contrato</TabsTrigger>
+          </TabsList>
+          <TabsContent value="resumo" className="space-y-4 mt-4">
           <div className="grid grid-cols-3 gap-3 text-sm">
           <div className="rounded-md border p-3"><div className="text-muted-foreground text-xs">Pagas</div><div className="font-bold text-lg">{pagas}/{mens.length}</div></div>
           <div className="rounded-md border p-3"><div className="text-muted-foreground text-xs">Recebido</div><div className="font-bold text-lg text-green-600">{BRL(totalPago)}</div></div>
@@ -520,6 +569,25 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
             </Table>
           </div>
         </div>
+          </TabsContent>
+          <TabsContent value="contrato" className="mt-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-sm text-muted-foreground">
+                {convenio?.nome ? `Modelo do convênio: ${convenio.nome}` : "Modelo do contrato"}
+              </div>
+              <Button size="sm" onClick={() => printContrato(contrato.id)}>
+                <Printer className="h-4 w-4 mr-1"/>Imprimir A4
+              </Button>
+            </div>
+            {contratoTexto ? (
+              <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed p-4 rounded-md border bg-card">{contratoTexto}</pre>
+            ) : (
+              <div className="rounded-md border bg-muted/40 p-4 text-sm text-muted-foreground">
+                Nenhum modelo cadastrado neste convênio. Configure em <strong>Cartão de Benefícios → Convênio</strong>.
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
         </CardContent>
       </Card>
     </div>
