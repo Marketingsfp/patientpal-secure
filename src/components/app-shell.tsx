@@ -346,10 +346,10 @@ export function AppShell() {
         ? Math.min(flatNavLeaves.length - 1, idx + 1)
         : Math.max(0, idx - 1);
       if (next === idx) return;
-      e.preventDefault();
       const now = Date.now();
       if (now - lastArrowNavAtRef.current < 120) return;
       lastArrowNavAtRef.current = now;
+      e.preventDefault();
       navigate({ to: flatNavLeaves[next] });
       window.setTimeout(() => {
         const nextLink = Array.from(navRoot?.querySelectorAll<HTMLElement>("[data-nav-to]") ?? [])
