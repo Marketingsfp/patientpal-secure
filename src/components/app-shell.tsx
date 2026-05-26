@@ -615,7 +615,7 @@ export function AppShell() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPwOpen(false)} disabled={pwSaving}>Cancelar</Button>
-            <Button onClick={() => void handleChangePassword()} disabled={pwSaving}>{pwSaving ? "Salvando…" : "Salvar"}</Button>
+            <Button data-primary onClick={() => void handleChangePassword()} disabled={pwSaving}>{pwSaving ? "Salvando…" : "Salvar"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
