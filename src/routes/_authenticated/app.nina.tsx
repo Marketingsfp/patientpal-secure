@@ -533,6 +533,8 @@ function ConfiguracaoWhatsApp() {
   const [canal, setCanal] = useState<"evolution" | "oficial" | "instagram" | "facebook" | "site">("oficial");
   const [showToken, setShowToken] = useState(false);
   const [form, setForm] = useState({ display_name: "", phone_number_id: "", waba_id: "", access_token: "" });
+  const [horario, setHorario] = useState({ inicio: "08:00", fim: "18:00" });
+  const [savingHorario, setSavingHorario] = useState(false);
 
   const carregar = useCallback(async () => {
     if (!clinicaAtual) return;
@@ -540,6 +542,10 @@ function ConfiguracaoWhatsApp() {
     try {
       const data = await obter({ data: { clinicaId: clinicaAtual.clinica_id } });
       setCfg(data as WppCfg);
+      setHorario({
+        inicio: (data as WppCfg).horario_inicio || "08:00",
+        fim: (data as WppCfg).horario_fim || "18:00",
+      });
     } catch (e: any) {
       toast.error(e?.message ?? "Erro ao carregar configuração");
     } finally {
