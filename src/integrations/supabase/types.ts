@@ -1122,6 +1122,8 @@ export type Database = {
           assinado_em: string | null
           assinatura_ip: string | null
           assinatura_svg: string | null
+          cancelado_em: string | null
+          cancelamento_motivo: string | null
           clinica_id: string
           convenio_id: string | null
           created_at: string
@@ -1147,6 +1149,8 @@ export type Database = {
           assinado_em?: string | null
           assinatura_ip?: string | null
           assinatura_svg?: string | null
+          cancelado_em?: string | null
+          cancelamento_motivo?: string | null
           clinica_id: string
           convenio_id?: string | null
           created_at?: string
@@ -1172,6 +1176,8 @@ export type Database = {
           assinado_em?: string | null
           assinatura_ip?: string | null
           assinatura_svg?: string | null
+          cancelado_em?: string | null
+          cancelamento_motivo?: string | null
           clinica_id?: string
           convenio_id?: string | null
           created_at?: string

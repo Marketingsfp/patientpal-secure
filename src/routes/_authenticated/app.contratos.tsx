@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { FileSignature, Plus, Printer, Search, Trash2, Link2, Check, ChevronRight, CreditCard, Camera, ArrowLeft } from "lucide-react";
+import { FileSignature, Plus, Printer, Search, Trash2, Link2, Check, ChevronRight, CreditCard, Camera, ArrowLeft, Ban, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -17,7 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import DOMPurify from "dompurify";
 import { ChevronsUpDown } from "lucide-react";
@@ -62,7 +62,7 @@ type Beneficio = {
   pessoa: string;
 };
 type Paciente = { id: string; nome: string; cpf: string | null; telefone: string | null; email: string | null; face_descriptor?: number[] | null };
-type Contrato = { id: string; numero: number; paciente_nome: string; convenio_id: string | null; plano_id: string | null; valor_mensal: number; status: string; data_inicio: string; data_fim: string | null; assinado_em: string | null; token_publico: string; forma_pagamento: string | null; dia_vencimento?: number | null; taxa_adesao?: number | null; num_parcelas?: number | null; paciente_id?: string | null; clinica_id?: string | null; observacoes?: string | null };
+type Contrato = { id: string; numero: number; paciente_nome: string; convenio_id: string | null; plano_id: string | null; valor_mensal: number; status: string; data_inicio: string; data_fim: string | null; assinado_em: string | null; token_publico: string; forma_pagamento: string | null; dia_vencimento?: number | null; taxa_adesao?: number | null; num_parcelas?: number | null; paciente_id?: string | null; clinica_id?: string | null; observacoes?: string | null; cancelado_em?: string | null; cancelamento_motivo?: string | null };
 type Mens = { id: string; numero_parcela: number; vencimento: string; valor: number; status: string; pago_em: string | null; forma_pagamento: string | null };
 type Dep = {
   id: string;
@@ -543,6 +543,36 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
   const [termoMovimento, setTermoMovimento] = useState<"Inclusão" | "Exclusão">("Inclusão");
   const [termoDep, setTermoDep] = useState<Dep | null>(null);
 
+  // Cancelamento do contrato
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelMotivo, setCancelMotivo] = useState("");
+  const [cancelSaving, setCancelSaving] = useState(false);
+  const [canceladoEm, setCanceladoEm] = useState<string | null>(contrato.cancelado_em ?? null);
+  const [cancelMotivoAtual, setCancelMotivoAtual] = useState<string | null>(contrato.cancelamento_motivo ?? null);
+  const cancelado = !!canceladoEm;
+
+  const confirmarCancelamento = async () => {
+    const motivo = cancelMotivo.trim();
+    if (!motivo) { toast.error("Informe o motivo do cancelamento"); return; }
+    setCancelSaving(true);
+    const agora = new Date().toISOString();
+    const { error } = await supabase
+      .from("contratos_assinatura")
+      .update({
+        status: "cancelado",
+        cancelado_em: agora,
+        cancelamento_motivo: motivo,
+      } as any)
+      .eq("id", contrato.id);
+    setCancelSaving(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Contrato cancelado");
+    setCanceladoEm(agora);
+    setCancelMotivoAtual(motivo);
+    setCancelOpen(false);
+    setCancelMotivo("");
+  };
+
   // Diálogo de forma de pagamento (espelha o da agenda)
   const [pagMens, setPagMens] = useState<Mens | null>(null);
   const [formaPagOpen, setFormaPagOpen] = useState(false);
@@ -889,7 +919,15 @@ h1, h2, h3 { margin: 0 0 6mm; }
           <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
         </Button>
         <h1 className="text-2xl font-bold">Contrato #{contrato.numero} — {contrato.paciente_nome}</h1>
-        <div />
+        <div>
+          {!cancelado ? (
+            <Button size="sm" variant="destructive" onClick={() => setCancelOpen(true)}>
+              <Ban className="h-4 w-4 mr-1" /> Cancelar contrato
+            </Button>
+          ) : (
+            <div className="w-[160px]" />
+          )}
+        </div>
       </div>
       <Card>
         <CardContent className="p-6 space-y-4">
@@ -900,6 +938,24 @@ h1, h2, h3 { margin: 0 0 6mm; }
             <TabsTrigger value="contrato">Contrato</TabsTrigger>
           </TabsList>
           <TabsContent value="resumo" className="space-y-4 mt-4">
+          {cancelado ? (
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 flex items-start gap-2">
+              <XCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+              <div className="text-sm">
+                <div className="font-semibold text-destructive">
+                  Contrato Cancelado em {new Date(canceladoEm!).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
+                </div>
+                {cancelMotivoAtual ? (
+                  <div className="text-muted-foreground mt-0.5">
+                    Motivo: {cancelMotivoAtual}
+                  </div>
+                ) : null}
+                <div className="text-muted-foreground mt-0.5">
+                  O plano e todos os benefícios foram cancelados.
+                </div>
+              </div>
+            </div>
+          ) : null}
           <div className="grid grid-cols-3 gap-3 text-sm">
           <div className="rounded-md border p-3"><div className="text-muted-foreground text-xs">Pagas</div><div className="font-bold text-lg">{pagas}/{mens.length}</div></div>
           <div className="rounded-md border p-3"><div className="text-muted-foreground text-xs">Recebido</div><div className="font-bold text-lg text-green-600">{BRL(totalPago)}</div></div>
@@ -938,7 +994,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     <TableCell>
                       {m.status === "pago"
                         ? <Button size="sm" variant="outline" onClick={() => marcarPago(m.id, false)}>Reverter</Button>
-                        : <Button size="sm" onClick={() => abrirFormaPag(m)}><Check className="h-3 w-3 mr-1"/>Pagar</Button>}
+                        : <Button size="sm" disabled={cancelado} onClick={() => abrirFormaPag(m)}><Check className="h-3 w-3 mr-1"/>Pagar</Button>}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -968,7 +1024,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   size="sm"
                   variant="outline"
                   onClick={() => setIncOpen(true)}
-                  disabled={maxDep === 0 || depsAtivos.length >= maxDep}
+                  disabled={cancelado || maxDep === 0 || depsAtivos.length >= maxDep}
                 >
                   <Plus className="h-4 w-4 mr-1" /> Incluir dependente
                 </Button>
@@ -987,7 +1043,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                           ) : null}
                         </div>
                         {d.ativo ? (
-                          <Button size="sm" variant="ghost" onClick={() => setExcAlvo(d)}>
+                          <Button size="sm" variant="ghost" disabled={cancelado} onClick={() => setExcAlvo(d)}>
                             <Trash2 className="h-3 w-3 text-destructive" />
                           </Button>
                         ) : null}
@@ -1196,6 +1252,38 @@ h1, h2, h3 { margin: 0 0 6mm; }
           <DialogFooter>
             <Button variant="ghost" onClick={() => setTermoOpen(false)}>Fechar</Button>
             <Button onClick={printTermoInclusao}><Printer className="h-4 w-4 mr-1" />Imprimir A4</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={cancelOpen} onOpenChange={(v) => { setCancelOpen(v); if (!v) setCancelMotivo(""); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cancelar contrato</DialogTitle>
+            <DialogDescription>
+              Esta ação cancela o plano e todos os benefícios deste contrato. Informe o motivo do cancelamento.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="cancel-motivo">Motivo</Label>
+            <Textarea
+              id="cancel-motivo"
+              rows={4}
+              placeholder="Ex.: solicitado pelo titular, inadimplência, mudança de plano…"
+              value={cancelMotivo}
+              onChange={(e) => setCancelMotivo(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setCancelOpen(false)} disabled={cancelSaving}>Voltar</Button>
+            <Button
+              variant="destructive"
+              onClick={confirmarCancelamento}
+              disabled={cancelSaving || !cancelMotivo.trim()}
+            >
+              {cancelSaving ? "Cancelando…" : "Confirmar cancelamento"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
