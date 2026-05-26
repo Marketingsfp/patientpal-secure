@@ -608,6 +608,7 @@ export function AppShell() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <KeyboardShortcuts />
     </div>
   );
 }
