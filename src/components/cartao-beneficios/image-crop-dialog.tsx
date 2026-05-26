@@ -190,8 +190,14 @@ export function ImageCropDialog({ open, src, onClose, onCropped }: Props) {
         <DialogHeader>
           <DialogTitle>Cortar imagem</DialogTitle>
         </DialogHeader>
-        <div className="w-full bg-muted rounded-md overflow-auto flex items-center justify-center" style={{ maxHeight: 480 }}>
-          <div className="relative inline-block max-w-full cursor-crosshair select-none" onPointerDown={beginDrag("new")}>
+        <div
+          className="w-full bg-muted rounded-md overflow-auto flex items-center justify-center"
+          style={{ maxHeight: 480 }}
+        >
+          <div
+            className="relative inline-block max-w-full cursor-crosshair select-none"
+            onPointerDown={beginDrag("new")}
+          >
             <img
               ref={imgRef}
               src={src}
@@ -205,17 +211,25 @@ export function ImageCropDialog({ open, src, onClose, onCropped }: Props) {
             {crop && (
               <div
                 className="absolute border-2 border-primary bg-primary/10 cursor-move"
-                style={{ left: `${crop.x}%`, top: `${crop.y}%`, width: `${crop.width}%`, height: `${crop.height}%` }}
+                style={{
+                  left: `${crop.x}%`,
+                  top: `${crop.y}%`,
+                  width: `${crop.width}%`,
+                  height: `${crop.height}%`,
+                }}
                 onPointerDown={beginDrag("move")}
               >
                 {(["nw", "ne", "sw", "se"] as const).map((handle) => (
                   <span
                     key={handle}
                     className={`absolute h-3 w-3 rounded-sm border border-primary bg-background ${
-                      handle === "nw" ? "-left-1.5 -top-1.5 cursor-nwse-resize"
-                      : handle === "ne" ? "-right-1.5 -top-1.5 cursor-nesw-resize"
-                      : handle === "sw" ? "-left-1.5 -bottom-1.5 cursor-nesw-resize"
-                      : "-right-1.5 -bottom-1.5 cursor-nwse-resize"
+                      handle === "nw"
+                        ? "-left-1.5 -top-1.5 cursor-nwse-resize"
+                        : handle === "ne"
+                          ? "-right-1.5 -top-1.5 cursor-nesw-resize"
+                          : handle === "sw"
+                            ? "-left-1.5 -bottom-1.5 cursor-nesw-resize"
+                            : "-right-1.5 -bottom-1.5 cursor-nwse-resize"
                     }`}
                     onPointerDown={beginDrag(handle)}
                   />
