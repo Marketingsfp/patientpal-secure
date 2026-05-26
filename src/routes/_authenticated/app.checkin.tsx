@@ -125,6 +125,23 @@ function CheckinPage() {
 
   useEffect(() => { void load(); }, [load]);
 
+  // Atalhos: Alt+1..9 confirma o N-ésimo paciente da lista visível
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.altKey || e.ctrlKey || e.metaKey) return;
+      if (e.key < "1" || e.key > "9") return;
+      const idx = Number(e.key) - 1;
+      const alvo = filtradosRef.current[idx];
+      if (alvo && estaPendenteCheckin(alvo.fluxo_etapa)) {
+        e.preventDefault();
+        void confirmar(alvo);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const filtrados = useMemo(() => {
     if (buscaAmpla) return items;
     return items.filter((a) => itemCombinaComBuscaPaciente(a, busca));
@@ -180,6 +197,7 @@ function CheckinPage() {
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); acionarBusca(); } }}
                 placeholder="Digite o nome ou CPF..."
                 autoFocus
+                data-quick-search
               />
             </div>
           </div>
