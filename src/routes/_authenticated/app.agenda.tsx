@@ -469,9 +469,27 @@ function AgendaPage() {
     const nomes = procNomesPorMedico.get(medicoId);
     const temConfig = (ids && ids.size > 0) || (nomes && nomes.size > 0);
     if (!temConfig) return [];
-    return procedimentosList.filter(
+    const lista = procedimentosList.filter(
       (p) => (ids?.has(p.id) ?? false) || (nomes?.has(normalizar(p.nome)) ?? false),
     );
+    // Top 10 mais usados (últimos 180 dias) vêm primeiro, na ordem do ranking;
+    // o restante segue em ordem alfabética.
+    const ranking = rankingPorMedico.get(medicoId);
+    if (!ranking || ranking.size === 0) {
+      return lista.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+    }
+    const score = (n: string) => ranking.get(normalizar(n)) ?? 0;
+    const ordenadosPorUso = [...lista].sort((a, b) => score(b.nome) - score(a.nome));
+    const topNomes = new Set(
+      ordenadosPorUso.filter((p) => score(p.nome) > 0).slice(0, 10).map((p) => normalizar(p.nome)),
+    );
+    const top = lista
+      .filter((p) => topNomes.has(normalizar(p.nome)))
+      .sort((a, b) => score(b.nome) - score(a.nome));
+    const resto = lista
+      .filter((p) => !topNomes.has(normalizar(p.nome)))
+      .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+    return [...top, ...resto];
   };
 
   // Atualiza inline o procedimento de um agendamento (do badge na coluna Pasta)
