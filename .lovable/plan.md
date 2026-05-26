@@ -1,69 +1,62 @@
-## Mudança na aba "Benefícios" do Convênio
+## Objetivo
+Reduzir a quantidade de itens no menu lateral agrupando cadastros relacionados em **uma única página com abas internas**, sem perder nenhuma funcionalidade nem quebrar URLs existentes (redirecionamentos serão mantidos).
 
-Cada benefício deixa de ser apenas `{nome, descrição}` e passa a representar uma **regra de desconto** vinculada a um **item (procedimento)** ou a uma **especialidade inteira**, com tipo de desconto, gatilho de início, limite/periodicidade de uso e definição de quem usa.
+## Consolidações propostas
 
-## Fluxo de cadastro
+### 1. Cartão Benefícios → 1 item só
+Hoje: Nova venda · Convênio · Relatórios (3 itens)
+Vira: **Cartão Benefícios** (1 item) com abas internas:
+- Nova venda
+- Convênios
+- Relatórios
 
-Ao clicar em **"Adicionar benefício"** na aba Benefícios do convênio, abre um pequeno diálogo de escolha de **escopo**:
+### 2. Marketing → 1 item só
+Hoje: Campanhas · Envios · Landing Pages · Leads · Segmentos (5 itens)
+Vira: **Marketing** (1 item) com abas:
+- Leads
+- Campanhas
+- Envios
+- Segmentos
+- Landing Pages
 
-- **Serviço único** — adiciona uma linha onde o usuário seleciona um **Item** (combo buscável com a lista de `procedimentos` ativos da clínica).
-- **Especialidade** — adiciona uma linha onde o usuário seleciona uma **Especialidade** (combo com `especialidades` ativas).
+### 3. RH → 1 item só
+Hoje: Bater ponto · Cursos (admin) · Férias · Holerites · Treinamentos (5 itens)
+Vira: **RH** (1 item) com abas:
+- Ponto
+- Férias
+- Holerites
+- Treinamentos
+- Cursos (admin)
 
-Depois da escolha, a linha aparece na tabela inline (mesmo padrão atual) com **todos os campos editáveis direto na linha** (sem novo pop-up), seguindo a UX que você já validou nas outras abas.
+### 4. Cadastros → Serviços já é submenu, simplificar
+Hoje (Cadastros): Equipe · Serviços[Especialidades/Tipo/Item] · Horários médicos · Modelos de Prontuário · Perfis · Unidades
+Vira:
+- **Serviços** (1 item) com abas internas: Especialidades · Tipos · Itens (remove o submenu expansível)
+- Restante continua igual
 
-## Campos por benefício (linha da tabela)
+### 5. Gestão → agrupar Segurança & Compliance
+Hoje: Auditoria · Cargos · Financeiro · Funcionários · Integrações · LGPD · Relatórios · Setores (8 itens)
+Vira:
+- **Segurança** (1 item) com abas: Auditoria · LGPD · Integrações
+- Demais continuam separados (Financeiro/Relatórios/Funcionários/Cargos/Setores)
 
-| Campo | Tipo | Opções/Comportamento |
-|---|---|---|
-| Escopo | Badge (read-only) | "Serviço" ou "Especialidade" — definido na criação |
-| Alvo | SearchableSelect | Procedimento OU Especialidade conforme escopo |
-| Tipo de desconto | Select | "Desconto %", "Desconto R$", "Gratuidade" |
-| Valor | Input numérico/moeda | Aparece só se tipo = %, ou R$. Oculto em "Gratuidade" |
-| A partir de | Select | "1ª mensalidade", "2ª mensalidade", "6ª mensalidade" |
-| Limite de uso | Select | "Ilimitado", "1" |
-| Periodicidade | Select | "Por dia", "Por mês", "Por contrato" |
-| Pessoa | Select | "Apenas titular", "Titular + dependentes (somam)", "Titular ou dependentes (um ou outro)" |
-| Ativo | Switch | igual hoje |
-| Ações | Botão lixeira | igual hoje |
+### Inteligência
+Mantém como está — cada item tem natureza muito diferente (IA médica, CRM, Nina, Odontologia, etc.).
 
-A linha fica larga: vou agrupar os campos em duas linhas dentro da mesma row (estilo card por benefício dentro do `<TableRow>`), para caber no viewport e ficar legível.
-
-O campo "Nome" deixa de existir como entrada manual — o nome exibido será derivado automaticamente do alvo escolhido (ex.: "Consulta Cardiologia" ou "Especialidade: Pediatria"). "Descrição" continua opcional como campo livre.
-
-## Persistência (banco)
-
-A tabela atual `cb_beneficios` só tem `nome/descricao/ativo`. Precisa de migração para adicionar as novas colunas:
-
-- `escopo` text — `'servico' | 'especialidade'`
-- `procedimento_id` uuid null — FK para `procedimentos(id)` ON DELETE SET NULL
-- `especialidade_id` uuid null — FK para `especialidades(id)` ON DELETE SET NULL
-- `tipo_desconto` text — `'percentual' | 'valor' | 'gratuidade'`
-- `valor_desconto` numeric(12,2) null — só preenchido em % ou R$
-- `inicio_a_partir` integer — 1, 2 ou 6 (nº da mensalidade)
-- `limite_uso` text — `'ilimitado' | '1'`
-- `periodicidade` text — `'dia' | 'mes' | 'contrato'`
-- `pessoa` text — `'titular' | 'titular_dependentes_soma' | 'titular_ou_dependentes'`
-
-Constraints:
-- CHECK: se `escopo='servico'` → `procedimento_id` not null; se `escopo='especialidade'` → `especialidade_id` not null.
-- CHECK: se `tipo_desconto in ('percentual','valor')` → `valor_desconto` not null e > 0.
-
-`nome` continua na tabela (já é NOT NULL); ele será preenchido automaticamente pelo front com o nome do procedimento/especialidade escolhido, então não quebra registros existentes nem o NOT NULL.
-
-RLS já existente continua valendo.
-
-## Arquivo afetado
-
-- `src/routes/_authenticated/app.cartao-beneficios.convenios.tsx` — UI da aba Benefícios, tipo `Beneficio`, `loadBeneficios`, `save()` (mapeamento dos novos campos), e diálogo de escolha de escopo ao "Adicionar benefício".
+## Resultado
+- **Antes:** ~33 itens visíveis no menu
+- **Depois:** ~22 itens visíveis (redução de ~33%)
 
 ## Detalhes técnicos
-
-- Pequeno `Dialog` modal com dois botões grandes ("Serviço único" / "Especialidade") chamado ao clicar em "Adicionar benefício". Ao escolher, fecha e insere a nova linha vazia com `escopo` já definido.
-- Carregar `procedimentos (id, nome)` ativos e `especialidades (id, nome)` ativas uma vez ao abrir o formulário do convênio, reutilizar em todas as linhas.
-- Usar `SearchableSelect` (já existe em `@/components/ui/searchable-select`) para escolher procedimento/especialidade.
-- Em `save()`, validar por linha antes de inserir: alvo escolhido, valor se aplicável. Continuar usando o padrão "delete + insert" da lista de benefícios.
-- Preencher `nome` no insert como: `escopo='servico' ? procedimentoNome : 'Especialidade: ' + especialidadeNome`.
+- Criar rotas pai com `<Outlet />` + barra de abas (shadcn `Tabs` controlada por URL):
+  - `/app/cartao-beneficios` (já existe como pai, apenas adicionar abas no layout)
+  - `/app/marketing` (novo layout)
+  - `/app/rh` (novo layout)
+  - `/app/servicos` (novo layout para Especialidades/Tipos/Itens)
+  - `/app/seguranca` (novo layout para Auditoria/LGPD/Integrações)
+- Rotas atuais (`/app/mkt-leads`, `/app/hr-ponto`, `/app/especialidades`, etc.) continuam funcionando — vão redirecionar para o novo caminho com a aba correspondente, então links salvos não quebram.
+- Atualizar `navRows` em `src/components/app-shell.tsx` para refletir a nova estrutura.
+- Reaproveitar 100% das páginas existentes (apenas renderizadas dentro do Outlet do novo layout).
 
 ## Confirmação
-
-Posso aplicar a migração e refatorar a aba conforme acima?
+Posso aplicar essa organização? Se preferir, posso ajustar — por exemplo, manter Marketing/RH separados e consolidar só Cartão Benefícios + Serviços + Segurança.
