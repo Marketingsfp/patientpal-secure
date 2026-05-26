@@ -208,6 +208,8 @@
   margin: 0.5rem 0;
   overflow: hidden;
 }
+/* Quando o usuário define uma largura explícita pelo toolbar, respeitar */
+.rt-editor table[data-width] { width: auto; }
 .rt-editor table td,
 .rt-editor table th {
   border: 1px solid #000;
@@ -235,7 +237,8 @@
   bottom: -2px;
   width: 4px;
   background-color: hsl(var(--primary) / 0.6);
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: col-resize;
   z-index: 20;
 }
 .rt-editor .tableWrapper { overflow-x: auto; }
