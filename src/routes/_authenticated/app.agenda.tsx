@@ -363,7 +363,18 @@ function AgendaPage() {
     setPacientes((p.data ?? []) as Paciente[]);
     setEspecialidades((e.data ?? []) as Especialidade[]);
     const todos = (pr.data ?? []) as { id: string; nome: string; tipo: string | null }[];
-    setExames(todos.filter((x) => x.tipo === "exame").map(({ id, nome }) => ({ id, nome })));
+    {
+      const ex = todos.filter((x) => x.tipo === "exame");
+      const vistos = new Set<string>();
+      const unicos: { id: string; nome: string }[] = [];
+      for (const e of ex) {
+        const k = normalizar(e.nome);
+        if (vistos.has(k)) continue;
+        vistos.add(k);
+        unicos.push({ id: e.id, nome: e.nome });
+      }
+      setExames(unicos);
+    }
     setProcedimentosList(todos.map(({ id, nome }) => ({ id, nome })));
     const map = new Map<string, Set<string>>();
     for (const r of (me.data ?? []) as Array<{ medico_id: string; especialidade_id: string }>) {
