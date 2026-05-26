@@ -597,6 +597,7 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
   const [pacienteFull, setPacienteFull] = useState<any>(null);
   const [faixas, setFaixas] = useState<Faixa[]>([]);
   const [loading, setLoading] = useState(true);
+  const gerarBoletosFn = useServerFn(gerarBoletosContrato);
 
   // Inclusão/exclusão de dependentes pós-venda
   const [incOpen, setIncOpen] = useState(false);
