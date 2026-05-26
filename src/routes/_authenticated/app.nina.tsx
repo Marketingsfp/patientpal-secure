@@ -793,6 +793,16 @@ function InboxWhatsapp({ conversas, todasConversas, sel, setSel, busca, setBusca
   const [filtro, setFiltro] = useState<"todas" | "naolidas" | "nina" | "humano">("todas");
   const [painelAberto, setPainelAberto] = useState(true);
   const [notas, setNotas] = useState<Record<string, string>>({});
+  const [isWide, setIsWide] = useState<boolean>(() =>
+    typeof window !== "undefined" ? window.matchMedia("(min-width: 1280px)").matches : true,
+  );
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(min-width: 1280px)");
+    const onChange = () => setIsWide(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const listaFinal = useMemo(() => {
