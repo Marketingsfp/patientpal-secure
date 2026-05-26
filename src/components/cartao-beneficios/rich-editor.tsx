@@ -82,6 +82,9 @@ function ImageNodeView(props: NodeViewProps) {
   const { node, updateAttributes, selected, editor, getPos } = props;
   const width = (node.attrs.width as string) || "";
   const align = (node.attrs.align as string) || "none";
+  const free = Boolean(node.attrs.free);
+  const posX = Number(node.attrs.posX ?? 0);
+  const posY = Number(node.attrs.posY ?? 0);
 
   const startResize = (corner: "nw" | "ne" | "sw" | "se") => (e: React.PointerEvent) => {
     e.preventDefault();
@@ -111,17 +114,54 @@ function ImageNodeView(props: NodeViewProps) {
     window.addEventListener("pointerup", up);
   };
 
+  // Arrastar livremente a imagem dentro da página (quando free=true)
+  const startDrag = (e: React.PointerEvent) => {
+    if (!free || !editor.isEditable) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const wrap = e.currentTarget as HTMLElement;
+    const page = wrap.closest(".rt-page") as HTMLElement | null;
+    if (!page) return;
+    const pageRect = page.getBoundingClientRect();
+    const wrapRect = wrap.getBoundingClientRect();
+    const offsetX = e.clientX - wrapRect.left;
+    const offsetY = e.clientY - wrapRect.top;
+    if (typeof getPos === "function") {
+      const pos = getPos();
+      if (typeof pos === "number") {
+        editor.chain().focus().setNodeSelection(pos).run();
+      }
+    }
+    const move = (ev: PointerEvent) => {
+      const x = ev.clientX - pageRect.left - offsetX;
+      const y = ev.clientY - pageRect.top - offsetY;
+      updateAttributes({ posX: Math.round(x), posY: Math.round(y) });
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+
   const alignClass =
     align === "center" ? "rt-img-block-center"
     : align === "left" ? "rt-img-block-left"
     : align === "right" ? "rt-img-block-right"
     : "";
 
+  const freeStyle: React.CSSProperties | undefined = free
+    ? { position: "absolute", left: posX, top: posY, zIndex: 5, cursor: "move" }
+    : undefined;
+
   return (
     <NodeViewWrapper
       as="span"
-      className={`rt-img-wrap ${alignClass} ${selected ? "is-selected" : ""}`}
+      className={`rt-img-wrap ${free ? "is-free" : alignClass} ${selected ? "is-selected" : ""}`}
       data-drag-handle
+      style={freeStyle}
+      onPointerDown={free ? startDrag : undefined}
     >
       <img
         src={node.attrs.src}
@@ -130,6 +170,7 @@ function ImageNodeView(props: NodeViewProps) {
         style={width ? { width } : undefined}
         draggable={false}
         onMouseDown={(e) => {
+          if (free) return; // dragging handled by wrapper
           // Garante que clicar na imagem cria uma NodeSelection,
           // para que editor.isActive("image") fique true e a toolbar
           // de imagem (alinhar/cortar/largura) habilite.
