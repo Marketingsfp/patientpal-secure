@@ -717,7 +717,11 @@ function AgendaPage() {
     if (new Date(form.fim) <= new Date(form.inicio)) { toast.error("O horário final deve ser após o inicial"); return; }
     if (!form.procedimento.trim()) { toast.error("Selecione o procedimento"); return; }
     // Bloqueia criação/movimentação para um médico sem agenda aberta naquele dia
-    if (form.medico_id) {
+    const mudouHorarioOuMedico = !editing
+      || editing.medico_id !== form.medico_id
+      || new Date(editing.inicio).getTime() !== new Date(form.inicio).getTime()
+      || new Date(editing.fim).getTime() !== new Date(form.fim).getTime();
+    if (form.medico_id && mudouHorarioOuMedico) {
       const di = new Date(form.inicio);
       const df = new Date(form.fim);
       const inicioDia = new Date(di.getFullYear(), di.getMonth(), di.getDate(), 0, 0, 0).toISOString();
