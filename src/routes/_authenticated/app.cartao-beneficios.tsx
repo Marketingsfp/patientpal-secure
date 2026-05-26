@@ -32,7 +32,7 @@ function CartaoBeneficiosLayout() {
             <Link
               key={t.to}
               to={t.to}
-              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors \${
                 active
                   ? "border-primary text-primary"
                   : "border-transparent text-muted-foreground hover:text-foreground"
