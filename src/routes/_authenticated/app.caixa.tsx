@@ -780,7 +780,7 @@ function Page() {
             </div>
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => setOpenAbrir(false)}>Cancelar</Button>
-              <Button type="submit" disabled={saving}>Abrir</Button>
+              <Button type="submit" disabled={saving} data-primary>Abrir</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -850,7 +850,7 @@ function Page() {
             )}
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => setOpenMov(null)}>Cancelar</Button>
-              <Button type="submit" disabled={saving}>Lançar</Button>
+              <Button type="submit" disabled={saving} data-primary>Lançar</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -873,7 +873,7 @@ function Page() {
             </div>
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => setOpenFechar(false)}>Cancelar</Button>
-              <Button type="submit" variant="destructive" disabled={saving}>Confirmar fechamento</Button>
+              <Button type="submit" variant="destructive" disabled={saving} data-primary>Confirmar fechamento</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -994,7 +994,7 @@ function Page() {
             </p>
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => setOpenCobranca(null)}>Cancelar</Button>
-              <Button type="submit" disabled={saving}>Confirmar cobrança</Button>
+              <Button type="submit" disabled={saving} data-primary>Confirmar cobrança</Button>
             </DialogFooter>
           </form>
         </DialogContent>
