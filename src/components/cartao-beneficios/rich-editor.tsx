@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { useEditor, EditorContent } from "@tiptap/react";
+import { useEditor, EditorContent, ReactNodeViewRenderer, NodeViewWrapper } from "@tiptap/react";
+import type { NodeViewProps } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Color } from "@tiptap/extension-color";
 import { TextStyle } from "@tiptap/extension-text-style";
@@ -74,6 +75,100 @@ const FONTS = [
 ];
 const SIZES = ["10px", "12px", "14px", "16px", "18px", "20px", "24px", "28px", "32px", "40px"];
 
+// NodeView React para imagem: contorno quando selecionada + handle para redimensionar.
+function ImageNodeView(props: NodeViewProps) {
+  const { node, updateAttributes, selected, editor } = props;
+  const width = (node.attrs.width as string) || "";
+  const align = (node.attrs.align as string) || "none";
+
+  const startResize = (e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const wrap = (e.currentTarget as HTMLElement).parentElement;
+    const img = wrap?.querySelector("img") as HTMLImageElement | null;
+    if (!img) return;
+    const startX = e.clientX;
+    const startWidth = img.getBoundingClientRect().width;
+    const move = (ev: PointerEvent) => {
+      const next = Math.max(40, Math.round(startWidth + (ev.clientX - startX)));
+      updateAttributes({ width: `${next}px` });
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+
+  const alignClass =
+    align === "center" ? "rt-img-block-center"
+    : align === "left" ? "rt-img-block-left"
+    : align === "right" ? "rt-img-block-right"
+    : "";
+
+  return (
+    <NodeViewWrapper
+      as="span"
+      className={`rt-img-wrap ${alignClass} ${selected ? "is-selected" : ""}`}
+      data-drag-handle
+    >
+      <img
+        src={node.attrs.src}
+        alt={node.attrs.alt || ""}
+        title={node.attrs.title || ""}
+        style={width ? { width } : undefined}
+        draggable={false}
+      />
+      {selected && editor.isEditable && (
+        <span
+          className="rt-img-handle"
+          onPointerDown={startResize}
+          title="Arraste para redimensionar"
+        />
+      )}
+    </NodeViewWrapper>
+  );
+}
+
+// Estende Image para suportar width + align persistidos no HTML.
+const ResizableImage = Image.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      width: {
+        default: null,
+        parseHTML: (el) => {
+          const html = el as HTMLElement;
+          const w = html.style.width || html.getAttribute("width");
+          return w || null;
+        },
+        renderHTML: (attrs) => {
+          if (!attrs.width) return {};
+          return { style: `width: ${attrs.width}` };
+        },
+      },
+      align: {
+        default: "none",
+        parseHTML: (el) => {
+          const cls = (el as HTMLElement).className || "";
+          if (cls.includes("rt-img-center")) return "center";
+          if (cls.includes("rt-img-left")) return "left";
+          if (cls.includes("rt-img-right")) return "right";
+          return "none";
+        },
+        renderHTML: (attrs) => {
+          if (!attrs.align || attrs.align === "none") return {};
+          return { class: `rt-img-${attrs.align}` };
+        },
+      },
+    };
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(ImageNodeView);
+  },
+});
+
 function ToolbarButton({
   active, onClick, title, children, disabled,
 }: {
@@ -141,21 +236,13 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       Table.configure({ resizable: true, HTMLAttributes: { class: "rt-table" } }),
       TableRow, ColoredTableHeader, ColoredTableCell,
-      Image.configure({ inline: false, allowBase64: true }),
+      ResizableImage.configure({ inline: false, allowBase64: true }),
     ],
     content: value || "<p></p>",
     editorProps: {
       attributes: {
         class:
           "rt-editor prose prose-sm max-w-none focus:outline-none min-h-[60vh]",
-      },
-      handleClickOn: (_view, _pos, node, nodePos) => {
-        // Clique em imagem seleciona o node para permitir excluir com Delete/Backspace
-        if (node.type.name === "image") {
-          editor?.chain().focus().setNodeSelection(nodePos).run();
-          return true;
-        }
-        return false;
       },
     },
     onUpdate: ({ editor }) => onChange(editor.getHTML()),
@@ -361,6 +448,51 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
         <ToolbarButton title="Link" active={editor.isActive("link")} onClick={setLink}>
           <LinkIcon className="h-4 w-4" />
         </ToolbarButton>
+        {editor.isActive("image") && (
+          <>
+            <div className="w-px h-6 bg-border mx-1" />
+            <ToolbarButton
+              title="Alinhar imagem à esquerda"
+              active={editor.getAttributes("image").align === "left"}
+              onClick={() => editor.chain().focus().updateAttributes("image", { align: "left" }).run()}
+            >
+              <AlignLeft className="h-4 w-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              title="Centralizar imagem"
+              active={editor.getAttributes("image").align === "center"}
+              onClick={() => editor.chain().focus().updateAttributes("image", { align: "center" }).run()}
+            >
+              <AlignCenter className="h-4 w-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              title="Alinhar imagem à direita"
+              active={editor.getAttributes("image").align === "right"}
+              onClick={() => editor.chain().focus().updateAttributes("image", { align: "right" }).run()}
+            >
+              <AlignRight className="h-4 w-4" />
+            </ToolbarButton>
+            <Select
+              value=""
+              onValueChange={(v) => {
+                editor.chain().focus().updateAttributes("image", {
+                  width: v === "auto" ? null : v,
+                }).run();
+              }}
+            >
+              <SelectTrigger className="h-8 w-[110px] text-xs" title="Largura da imagem">
+                <SelectValue placeholder={(editor.getAttributes("image").width as string) || "Largura"} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="25%">25%</SelectItem>
+                <SelectItem value="50%">50%</SelectItem>
+                <SelectItem value="75%">75%</SelectItem>
+                <SelectItem value="100%">100%</SelectItem>
+                <SelectItem value="auto">Tamanho original</SelectItem>
+              </SelectContent>
+            </Select>
+          </>
+        )}
         <input
           ref={fileRef} type="file" accept="image/*" className="hidden"
           onChange={(e) => {
