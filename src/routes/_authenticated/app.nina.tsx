@@ -17,6 +17,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { NinaMessage, TypingDots } from "@/components/nina/NinaMessage";
+import { formatWhatsappText } from "@/components/nina/formatWhatsappText";
 
 export const Route = createFileRoute("/_authenticated/app/nina")({
   component: NinaPage,
@@ -269,7 +271,7 @@ function NinaPage() {
                       m.from === "nina" ? "bg-emerald-500 text-white rounded-br-sm" : "bg-card border border-border rounded-bl-sm"
                     }`}>
                       {m.tipo === "audio" && <div className="text-xs opacity-70 mb-1 flex items-center gap-1"><Mic className="h-3 w-3" /> transcrito por IA</div>}
-                      <div className="whitespace-pre-wrap">{m.text}</div>
+                      <div className="whitespace-pre-wrap break-words">{formatWhatsappText(m.text)}</div>
                       <div className={`text-[10px] mt-1 flex items-center gap-1 ${m.from === "nina" ? "text-white/80 justify-end" : "text-muted-foreground"}`}>
                         {m.at} {m.from === "nina" && <CheckCheck className="h-3 w-3" />}
                       </div>
@@ -427,20 +429,23 @@ function NinaTreinada() {
           {messages.map((m, i) => (
             <div key={i} className={`flex ${m.role === "assistant" ? "justify-start" : "justify-end"}`}>
               <div
-                className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm shadow-sm whitespace-pre-wrap ${
+                className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm shadow-sm break-words ${
                   m.role === "assistant"
                     ? "bg-card border border-border rounded-bl-sm"
                     : "bg-emerald-500 text-white rounded-br-sm"
                 }`}
               >
-                {m.content}
+                <NinaMessage
+                  content={m.content}
+                  variant={m.role === "assistant" ? "assistant" : "user"}
+                />
               </div>
             </div>
           ))}
           {loading && (
             <div className="flex justify-start">
               <div className="bg-card border border-border rounded-2xl rounded-bl-sm px-4 py-2 text-sm flex items-center gap-2 text-muted-foreground">
-                <Loader2 className="h-3 w-3 animate-spin" /> Nina está digitando…
+                <TypingDots /> <span>Nina está digitando…</span>
               </div>
             </div>
           )}
