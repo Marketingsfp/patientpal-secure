@@ -1,42 +1,40 @@
 const NAVY = "#1f3864";
 const RED = "#c00000";
 const FONT = "font-family:'Times New Roman',Times,serif";
+const BD = `border:1pt solid ${NAVY};padding:6px`;
+const TD = `${BD};text-align:center`;
 
 export const INFORMATIVO_CARTAO_CONSULTA_SEGUROS_HTML = `
 <div style="${FONT};font-size:11pt;color:#000">
 <p style="text-align:center;margin:0 0 6px 0">
-  <img src="/cartao-beneficios/logo-policardmed.png" alt="Policardmed" style="height:70px;display:inline-block;vertical-align:middle;margin-right:18px" />
-  <img src="/cartao-beneficios/logo-menino-jesus.png" alt="Policlínica Menino Jesus" style="height:80px;display:inline-block;vertical-align:middle" />
+  <img src="/cartao-beneficios/logo-policardmed.png" alt="Policardmed" style="height:70px;display:inline-block;vertical-align:middle;margin-right:24px" />
+  <img src="/cartao-beneficios/logo-menino-jesus.png" alt="Policlínica Menino Jesus" style="height:85px;display:inline-block;vertical-align:middle" />
 </p>
-<h2 style="text-align:center;${FONT};margin:8px 0 12px 0"><span style="color:${RED}"><em><strong>*NÃO POSSUI EMERGÊNCIA, SERVIÇOS DE INTERNAÇÃO*</strong></em></span></h2>
-<table style="width:100%;border-collapse:collapse;border:1.5pt solid ${NAVY}">
+<h2 style="text-align:center;${FONT};margin:8px 0 14px 0;font-size:16pt"><span style="color:${RED}"><em><strong>*NÃO POSSUI EMERGÊNCIA, SERVIÇOS DE INTERNAÇÃO*</strong></em></span></h2>
+<table style="width:100%;border-collapse:collapse;border:1.5pt solid ${NAVY};${FONT}">
   <tbody>
     <tr>
-      <th colspan="2" style="background-color:${NAVY};color:#ffffff;text-align:center;border:1pt solid ${NAVY};padding:6px"><span style="color:#ffffff;font-size:14pt"><strong>CARTÃO CONSULTA + SEGUROS</strong></span></th>
-      <th rowspan="8" style="background-color:#ffffff;text-align:center;vertical-align:middle;width:32%;border:1pt solid ${NAVY};padding:8px"><p style="margin:0"><strong>TAXA DE ADESÃO ÚNICA</strong></p><p style="margin:6px 0 0 0"><span style="font-size:14pt"><strong>R$ 30,00</strong></span></p></th>
+      <th colspan="2" style="background-color:${NAVY};${TD}"><span style="color:#ffffff;font-size:14pt"><strong>CARTÃO CONSULTA + SEGUROS</strong></span></th>
+      <th rowspan="8" style="background-color:#ffffff;${TD};vertical-align:middle;width:32%"><p style="margin:0;font-size:13pt"><strong>TAXA DE ADESÃO ÚNICA</strong></p><p style="margin:8px 0 0 0;font-size:14pt"><strong>R$ 30,00</strong></p></th>
     </tr>
     <tr>
-      <th style="background-color:${LIGHT};text-align:center"><strong>MODALIDADE</strong></th>
-      <th style="background-color:${LIGHT};text-align:center"><strong>VALOR</strong></th>
+      <th style="${TD}"><strong>MODALIDADE</strong></th>
+      <th style="${TD}"><strong>VALOR</strong></th>
     </tr>
-    <tr><td>1 PESSOA</td><td>R$ 120,00</td></tr>
-    <tr><td>2 PESSOAS</td><td>R$ 175,00</td></tr>
-    <tr><td>3 PESSOAS</td><td>R$ 210,00</td></tr>
-    <tr><td>4 PESSOAS</td><td>R$ 245,00</td></tr>
-    <tr><td>5 PESSOAS</td><td>R$ 280,00</td></tr>
-    <tr><td>6 PESSOAS</td><td>R$ 295,00</td></tr>
+    <tr><td style="${BD}">1 PESSOA</td><td style="${BD}">R$ 120,00</td></tr>
+    <tr><td style="${BD}">2 PESSOAS</td><td style="${BD}">R$ 175,00</td></tr>
+    <tr><td style="${BD}">3 PESSOAS</td><td style="${BD}">R$ 210,00</td></tr>
+    <tr><td style="${BD}">4 PESSOAS</td><td style="${BD}">R$ 245,00</td></tr>
+    <tr><td style="${BD}">5 PESSOAS</td><td style="${BD}">R$ 280,00</td></tr>
+    <tr><td style="${BD}">6 PESSOAS</td><td style="${BD}">R$ 295,00</td></tr>
   </tbody>
 </table>
-<ul>
+<ul style="margin-top:10px">
   <li><strong>O Contrato é válido por 12 meses, prorrogado automaticamente após o vencimento;</strong></li>
   <li><strong>ASSOCIADO TITULAR somente poderá incluir cônjuges e filhos;</strong></li>
   <li><strong>O valor do cartão poderá ser pago à vista para utilização de um período anual, ou parcelado em 12 vezes no carnê ou boleto bancário (com acréscimo bancário de R$ 3,50 em cada boleto), sendo exclusivo, o pagamento no carnê por cartão de débito ou espécie, ou ainda, por cobrança recorrente no cartão de crédito.</strong></li>
 </ul>
-<table>
-  <tbody>
-    <tr><th style="background-color:${NAVY};color:#ffffff;text-align:left"><span style="color:#ffffff"><strong>CONDIÇÕES E BENEFÍCIOS</strong></span></th></tr>
-  </tbody>
-</table>
+<p style="background-color:${NAVY};color:#ffffff;padding:6px 10px;margin:14px 0 10px 0;border:1pt solid ${NAVY}"><span style="color:#ffffff;font-size:13pt"><strong>CONDIÇÕES E BENEFÍCIOS</strong></span></p>
 <h3><span style="color:${RED}"><strong><u>I. APÓS O PAGAMENTO DA 1ª MENSALIDADE E TAXA DE INSCRIÇÃO</u></strong></span></h3>
 <ul>
   <li><strong>Gratuidade</strong> para verificação de peso e pressão;</li>
@@ -76,4 +74,5 @@ export const INFORMATIVO_CARTAO_CONSULTA_SEGUROS_HTML = `
 <p style="text-align:center"><strong>Para demais informações referente a consultas, exames e o contrato segue os demais contatos:</strong></p>
 <p style="text-align:center"><strong>WhatsApp: (21) 98464-2531 / Site: <span style="color:#0563c1"><u>www.policardmed.com</u></span></strong></p>
 <p style="text-align:center"><span style="color:${RED}"><strong>TRAZER: ORIGINAL E CÓPIA DE RG, CPF, E COMPROVANTE DE RESIDÊNCIA DO TITULAR NO MOMENTO DA CONTRATAÇÃO E CÓPIA DOS DEPENDENTES</strong></span></p>
+</div>
 `.trim();
