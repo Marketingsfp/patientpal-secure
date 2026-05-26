@@ -633,6 +633,30 @@ function ConfiguracaoWhatsApp() {
     }
   };
 
+  const onSalvarHorario = async () => {
+    if (!cfg) return;
+    if (horario.inicio >= horario.fim) {
+      toast.error("O horário inicial deve ser menor que o final");
+      return;
+    }
+    setSavingHorario(true);
+    try {
+      await salvar({
+        data: {
+          clinicaId: cfg.clinica_id,
+          horario_inicio: horario.inicio,
+          horario_fim: horario.fim,
+        },
+      });
+      toast.success("Horário salvo");
+      await carregar();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Erro ao salvar horário");
+    } finally {
+      setSavingHorario(false);
+    }
+  };
+
   const statusBadge = cfg.ultimo_teste_ok
     ? <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100"><CheckCircle2 className="h-3 w-3 mr-1" /> Conectado{cfg.display_phone_number ? ` — ${cfg.display_phone_number}` : ""}</Badge>
     : cfg.ultimo_teste_ok === false
