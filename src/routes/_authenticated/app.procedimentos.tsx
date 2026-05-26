@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { SectionTabs, SERVICOS_TABS, SERVICOS_META } from "@/components/section-tabs";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Plus, Search, Pencil, Trash2, ClipboardList, Sparkles, CreditCard, Download, ArrowUp, ArrowDown, ArrowUpDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { toast } from "sonner";
@@ -26,7 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export const Route = createFileRoute("/_authenticated/app/procedimentos")({
-  component: ProcedimentosPage,
+  component: ProcedimentosPageWithTabs,
   head: () => ({ meta: [{ title: "Item — ClinicaOS" }] }),
 });
 
@@ -995,5 +996,14 @@ function ProcedimentosPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function ProcedimentosPageWithTabs() {
+  return (
+    <>
+      <SectionTabs title={SERVICOS_META.title} icon={SERVICOS_META.icon} tabs={SERVICOS_TABS} />
+      <ProcedimentosPage />
+    </>
   );
 }

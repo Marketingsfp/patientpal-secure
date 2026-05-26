@@ -88,26 +88,14 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
   {
     label: "Marketing",
     items: [
-    { to: "/app/campanhas", label: "Campanhas", icon: Megaphone },
-    { to: "/app/mkt-envios", label: "Envios", icon: Send },
-    { to: "/app/mkt-landing", label: "Landing Pages", icon: Sparkles },
-    { to: "/app/mkt-leads", label: "Leads", icon: Users },
-    { to: "/app/mkt-segmentos", label: "Segmentos", icon: Filter },
+    { to: "/app/mkt-leads", label: "Marketing", icon: Megaphone },
     ],
   },
   {
     label: "Cadastros",
     items: [
     { to: "/app/equipe", label: "Equipe", icon: Users },
-    {
-      label: "Serviços",
-      icon: Stethoscope,
-      children: [
-        { to: "/app/especialidades", label: "Especialidades", icon: HeartPulse },
-        { to: "/app/tipos-servico", label: "Tipo", icon: LayoutGrid },
-        { to: "/app/procedimentos", label: "Item", icon: ClipboardList },
-      ],
-    },
+    { to: "/app/especialidades", label: "Serviços", icon: Stethoscope },
     { to: "/app/disponibilidades", label: "Horários médicos", icon: Clock },
     { to: "/app/prontuario-modelos", label: "Modelos de Prontuário", icon: FileHeart },
     { to: "/app/perfis", label: "Perfis", icon: KeyRound },
@@ -117,23 +105,17 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
   {
     label: "RH",
     items: [
-    { to: "/app/hr-ponto", label: "Bater ponto", icon: Clock },
-    { to: "/app/lms-admin", label: "Cursos (admin)", icon: BookOpen },
-    { to: "/app/hr-ferias", label: "Férias", icon: Palmtree },
-    { to: "/app/hr-holerites", label: "Holerites", icon: FileText },
-    { to: "/app/treinamentos", label: "Treinamentos", icon: GraduationCap },
+    { to: "/app/hr-ponto", label: "RH", icon: Users },
     ],
   },
   {
     label: "Gestão",
     items: [
-    { to: "/app/auditoria", label: "Auditoria", icon: ShieldCheck },
     { to: "/app/cargos", label: "Cargos", icon: Briefcase },
     { to: "/app/financeiro", label: "Financeiro", icon: DollarSign },
     { to: "/app/funcionarios", label: "Funcionários", icon: Users },
-    { to: "/app/integration-secrets", label: "Integrações", icon: KeyRound },
-    { to: "/app/lgpd", label: "LGPD", icon: ShieldCheck },
     { to: "/app/relatorios", label: "Relatórios", icon: BarChart3 },
+    { to: "/app/auditoria", label: "Segurança & Compliance", icon: ShieldCheck },
     { to: "/app/setores", label: "Setores", icon: Building2 },
     ],
   },

@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { SectionTabs, MARKETING_TABS, MARKETING_META } from "@/components/section-tabs";
 import { Filter } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -6,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { SimpleCrud } from "@/components/simple-crud/SimpleCrud";
 
 export const Route = createFileRoute("/_authenticated/app/mkt-segmentos")({
-  component: SegmentosPage,
+  component: SegmentosPageWithTabs,
   head: () => ({ meta: [{ title: "Segmentos — ClinicaOS" }] }),
 });
 
@@ -51,5 +52,13 @@ function SegmentosPage() {
         </div>
       )}
     />
+  );
+}
+function SegmentosPageWithTabs() {
+  return (
+    <>
+      <SectionTabs title={MARKETING_META.title} icon={MARKETING_META.icon} tabs={MARKETING_TABS} />
+      <SegmentosPage />
+    </>
   );
 }

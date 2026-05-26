@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { SectionTabs, SEGURANCA_TABS, SEGURANCA_META } from "@/components/section-tabs";
 import { useEffect, useMemo, useState } from "react";
 import { Download, ShieldCheck, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
@@ -15,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { exportToExcel } from "@/lib/export-csv";
 
 export const Route = createFileRoute("/_authenticated/app/auditoria")({
-  component: Page,
+  component: PageWithTabs,
   head: () => ({ meta: [{ title: "Auditoria — ClinicaOS" }] }),
 });
 
@@ -213,5 +214,14 @@ function Page() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function PageWithTabs() {
+  return (
+    <>
+      <SectionTabs title={SEGURANCA_META.title} icon={SEGURANCA_META.icon} tabs={SEGURANCA_TABS} />
+      <Page />
+    </>
   );
 }

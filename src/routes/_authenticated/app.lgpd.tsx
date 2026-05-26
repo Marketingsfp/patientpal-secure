@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { SectionTabs, SEGURANCA_TABS, SEGURANCA_META } from "@/components/section-tabs";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -15,7 +16,7 @@ import { toast } from "sonner";
 import { formatDateTime } from "@/lib/date-utils";
 
 export const Route = createFileRoute("/_authenticated/app/lgpd")({
-  component: LgpdPage,
+  component: LgpdPageWithTabs,
   head: () => ({ meta: [{ title: "LGPD — ClinicaOS" }] }),
 });
 
@@ -208,5 +209,13 @@ function LgpdPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+function LgpdPageWithTabs() {
+  return (
+    <>
+      <SectionTabs title={SEGURANCA_META.title} icon={SEGURANCA_META.icon} tabs={SEGURANCA_TABS} />
+      <LgpdPage />
+    </>
   );
 }

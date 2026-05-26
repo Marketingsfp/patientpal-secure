@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { SectionTabs, SERVICOS_TABS, SERVICOS_META } from "@/components/section-tabs";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,7 @@ import { LayoutGrid, Plus, Pencil, Search } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/app/tipos-servico")({
-  component: TiposServicoPage,
+  component: TiposServicoPageWithTabs,
   head: () => ({ meta: [{ title: "Tipos de Serviço — ClinicaOS" }] }),
 });
 
@@ -136,5 +137,13 @@ function TiposServicoPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+function TiposServicoPageWithTabs() {
+  return (
+    <>
+      <SectionTabs title={SERVICOS_META.title} icon={SERVICOS_META.icon} tabs={SERVICOS_TABS} />
+      <TiposServicoPage />
+    </>
   );
 }

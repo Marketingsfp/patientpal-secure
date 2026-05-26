@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { SectionTabs, MARKETING_TABS, MARKETING_META } from "@/components/section-tabs";
 import { Sparkles, ExternalLink } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -7,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SimpleCrud } from "@/components/simple-crud/SimpleCrud";
 
 export const Route = createFileRoute("/_authenticated/app/mkt-landing")({
-  component: LandingPagesAdmin,
+  component: LandingPagesAdminWithTabs,
   head: () => ({ meta: [{ title: "Landing Pages — ClinicaOS" }] }),
 });
 
@@ -84,5 +85,13 @@ function LandingPagesAdmin() {
         </div>
       )}
     />
+  );
+}
+function LandingPagesAdminWithTabs() {
+  return (
+    <>
+      <SectionTabs title={MARKETING_META.title} icon={MARKETING_META.icon} tabs={MARKETING_TABS} />
+      <LandingPagesAdmin />
+    </>
   );
 }

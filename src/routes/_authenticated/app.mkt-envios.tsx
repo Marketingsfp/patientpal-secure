@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { SectionTabs, MARKETING_TABS, MARKETING_META } from "@/components/section-tabs";
 import { Send } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -6,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SimpleCrud } from "@/components/simple-crud/SimpleCrud";
 
 export const Route = createFileRoute("/_authenticated/app/mkt-envios")({
-  component: EnviosPage,
+  component: EnviosPageWithTabs,
   head: () => ({ meta: [{ title: "Envios — ClinicaOS" }] }),
 });
 
@@ -74,5 +75,13 @@ function EnviosPage() {
         </div>
       )}
     />
+  );
+}
+function EnviosPageWithTabs() {
+  return (
+    <>
+      <SectionTabs title={MARKETING_META.title} icon={MARKETING_META.icon} tabs={MARKETING_TABS} />
+      <EnviosPage />
+    </>
   );
 }
