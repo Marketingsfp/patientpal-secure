@@ -356,13 +356,13 @@ export function AppShell() {
             const itemHasActive = (it: NavItem): boolean => isParent(it) ? it.children.some((c) => leafIsActive(c.to)) : leafIsActive(it.to);
             const groupHasActive = row.items.some(itemHasActive);
             const hideLabel = subsystem === "gestao-pessoas" && row.label === "RH";
-            const open = collapsed || hideLabel ? true : (openGroups[row.label] ?? groupHasActive);
+            const open = collapsed || hideLabel ? true : (openGroups[row.label] ?? false);
             return (
               <div key={row.label} className="space-y-1">
                 {!collapsed && !hideLabel && (
                   <button
                     type="button"
-                    onClick={() => setOpenGroups((prev) => ({ ...prev, [row.label]: !(prev[row.label] ?? groupHasActive) }))}
+                    onClick={() => setOpenGroups((prev) => ({ ...prev, [row.label]: !(prev[row.label] ?? false) }))}
                     className="w-full flex items-center justify-between px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] opacity-70 hover:opacity-100 transition-opacity rounded-md"
                     aria-expanded={open}
                   >
@@ -374,7 +374,7 @@ export function AppShell() {
                   if (isParent(item)) {
                     const subActive = item.children.some((c) => leafIsActive(c.to));
                     const subKey = `${row.label}::${item.label}`;
-                    const subOpen = collapsed ? true : (openGroups[subKey] ?? subActive);
+                    const subOpen = collapsed ? true : (openGroups[subKey] ?? false);
                     return (
                       <div key={subKey} className="space-y-1">
                         {collapsed ? (
@@ -384,7 +384,7 @@ export function AppShell() {
                         ) : (
                           <button
                             type="button"
-                            onClick={() => setOpenGroups((prev) => ({ ...prev, [subKey]: !(prev[subKey] ?? subActive) }))}
+                            onClick={() => setOpenGroups((prev) => ({ ...prev, [subKey]: !(prev[subKey] ?? false) }))}
                             className={`w-full flex items-center gap-2.5 rounded-full px-3 py-2 text-sm font-medium transition-all ${subActive ? "bg-white/10 text-white" : "text-white/85 hover:bg-white/10 hover:text-white"}`}
                             aria-expanded={subOpen}
                           >
