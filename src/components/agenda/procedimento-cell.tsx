@@ -112,7 +112,7 @@ export function ProcedimentoCell({ valor, opcoes, disabled, onChange }: Props) {
             />
           </div>
           <p className="text-[10px] text-muted-foreground mt-1">
-            {lista.length} procedimento(s) deste médico. Atalho: tecle 1-9 para selecionar.
+            {lista.length} procedimento(s) — mais usados primeiro. Tecle 1-9 para selecionar.
           </p>
         </div>
         <div className="max-h-72 overflow-auto">
