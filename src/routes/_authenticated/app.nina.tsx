@@ -189,12 +189,22 @@ function NinaPage() {
             {/* Lista */}
             <Card className="col-span-4 overflow-hidden flex flex-col">
               <CardHeader className="py-3 border-b">
-                <Input placeholder="Buscar conversa…" className="h-9" />
+                <Input
+                  placeholder="Buscar conversa…"
+                  className="h-9"
+                  value={busca}
+                  onChange={(e) => setBusca(e.target.value)}
+                />
               </CardHeader>
               <div className="flex-1 overflow-auto">
-                {MOCK.map(c => (
+                {conversasFiltradas.length === 0 && (
+                  <div className="p-6 text-sm text-muted-foreground text-center">
+                    {loadingConv ? "Carregando…" : "Nenhuma conversa ainda. Quando um paciente enviar mensagem no WhatsApp, ela aparece aqui."}
+                  </div>
+                )}
+                {conversasFiltradas.map(c => (
                   <button key={c.id} onClick={() => setSel(c)}
-                    className={`w-full text-left px-4 py-3 border-b border-border hover:bg-muted/50 transition-colors ${sel.id === c.id ? "bg-muted" : ""}`}>
+                    className={`w-full text-left px-4 py-3 border-b border-border hover:bg-muted/50 transition-colors ${sel?.id === c.id ? "bg-muted" : ""}`}>
                     <div className="flex justify-between items-start gap-2">
                       <div className="min-w-0 flex-1">
                         <div className="font-medium truncate">{c.nome}</div>
@@ -212,6 +222,8 @@ function NinaPage() {
 
             {/* Chat */}
             <Card className="col-span-8 overflow-hidden flex flex-col">
+             {sel ? (
+              <>
               <CardHeader className="py-3 border-b flex flex-row items-center justify-between space-y-0">
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 rounded-full bg-primary/15 text-primary flex items-center justify-center font-semibold">
@@ -259,6 +271,12 @@ function NinaPage() {
                   <Send className="h-4 w-4" />
                 </Button>
               </div>
+              </>
+             ) : (
+              <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground p-8 text-center">
+                Selecione uma conversa à esquerda para visualizar as mensagens.
+              </div>
+             )}
             </Card>
           </div>
         </TabsContent>
