@@ -26,9 +26,33 @@ export const Route = createFileRoute("/_authenticated/app/contratos")({
 const BRL = (v: number) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtD = (s?: string | null) => (s ? new Date(s + (s.length === 10 ? "T00:00:00" : "")).toLocaleDateString("pt-BR") : "—");
 
-type Plano = { id: string; nome: string; tipo: string; valor_mensal: number; taxa_adesao: number; max_dependentes: number; max_agregados: number; num_parcelas: number; vigencia_meses: number };
+type Convenio = {
+  id: string;
+  nome: string;
+  descricao: string | null;
+  valor_mensal: number;
+  taxa_adesao: number;
+  num_parcelas: number;
+  max_dependentes: number;
+  vigencia_meses: number;
+  beneficios: string | null;
+};
+type Faixa = { id: string; convenio_id: string; vidas_de: number; vidas_ate: number | null; valor_mensal: number };
+type Beneficio = {
+  id: string;
+  convenio_id: string;
+  nome: string;
+  descricao: string | null;
+  escopo: string;
+  tipo_desconto: string;
+  valor_desconto: number | null;
+  inicio_a_partir: number;
+  limite_uso: string;
+  periodicidade: string;
+  pessoa: string;
+};
 type Paciente = { id: string; nome: string; cpf: string | null; telefone: string | null; email: string | null; face_descriptor?: number[] | null };
-type Contrato = { id: string; numero: number; paciente_nome: string; plano_id: string; valor_mensal: number; status: string; data_inicio: string; data_fim: string | null; assinado_em: string | null; token_publico: string; forma_pagamento: string | null };
+type Contrato = { id: string; numero: number; paciente_nome: string; convenio_id: string | null; plano_id: string | null; valor_mensal: number; status: string; data_inicio: string; data_fim: string | null; assinado_em: string | null; token_publico: string; forma_pagamento: string | null };
 type Mens = { id: string; numero_parcela: number; vencimento: string; valor: number; status: string; pago_em: string | null; forma_pagamento: string | null };
 type Dep = { id: string; paciente_nome: string; parentesco: string | null; tipo: string };
 
@@ -36,7 +60,7 @@ export function ContratosPage() {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
   const [list, setList] = useState<Contrato[]>([]);
-  const [planos, setPlanos] = useState<Plano[]>([]);
+  const [convenios, setConvenios] = useState<Convenio[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [view, setView] = useState<"list" | "new">("list");
@@ -45,13 +69,13 @@ export function ContratosPage() {
   const load = async () => {
     if (!clinicaAtual) return;
     setLoading(true);
-    const [cs, ps] = await Promise.all([
+    const [cs, cv] = await Promise.all([
       supabase.from("contratos_assinatura").select("*").eq("clinica_id", clinicaAtual.clinica_id).order("created_at", { ascending: false }).limit(500),
-      supabase.from("planos_assinatura").select("*").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
+      supabase.from("cb_convenios").select("*").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
     ]);
     if (cs.error) toast.error(cs.error.message);
     setList((cs.data ?? []) as Contrato[]);
-    setPlanos((ps.data ?? []) as Plano[]);
+    setConvenios((cv.data ?? []) as Convenio[]);
     setLoading(false);
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [clinicaAtual?.clinica_id]);
@@ -66,7 +90,7 @@ export function ContratosPage() {
     return (
       <NovoContratoForm
         onBack={() => setView("list")}
-        planos={planos}
+        convenios={convenios}
         clinicaId={clinicaAtual!.clinica_id}
         userId={user?.id ?? null}
         onCreated={() => { setView("list"); load(); }}
@@ -82,10 +106,10 @@ export function ContratosPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold flex items-center gap-2"><FileSignature className="h-6 w-6 text-primary"/>Contratos</h1>
-        <Button onClick={() => setView("new")} disabled={planos.length === 0}><Plus className="h-4 w-4 mr-2"/>Nova venda</Button>
+        <Button onClick={() => setView("new")} disabled={convenios.length === 0}><Plus className="h-4 w-4 mr-2"/>Nova venda</Button>
       </div>
-      {planos.length === 0 && !loading ? (
-        <div className="rounded-md border bg-muted/40 p-3 text-sm">Cadastre um plano antes em <strong>Planos de Assinatura</strong>.</div>
+      {convenios.length === 0 && !loading ? (
+        <div className="rounded-md border bg-muted/40 p-3 text-sm">Cadastre um convênio antes em <strong>Cartão de Benefícios → Convênio</strong>.</div>
       ) : null}
       <div className="relative max-w-md">
         <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground"/>
