@@ -24,6 +24,26 @@ import {
 import { RichEditor } from "@/components/cartao-beneficios/rich-editor";
 import { INFORMATIVO_CARTAO_CONSULTA_SEGUROS_HTML } from "@/components/cartao-beneficios/informativo-seed";
 
+const CONTRATO_VARIAVEIS: { label: string; token: string }[] = [
+  { label: "Nome da clínica", token: "CLINICA_NOME" },
+  { label: "CNPJ da clínica", token: "CLINICA_CNPJ" },
+  { label: "Endereço da clínica", token: "CLINICA_ENDERECO" },
+  { label: "Cidade", token: "CIDADE" },
+  { label: "Nome do paciente", token: "PACIENTE_NOME" },
+  { label: "CPF do paciente", token: "PACIENTE_CPF" },
+  { label: "Nascimento do paciente", token: "PACIENTE_NASCIMENTO" },
+  { label: "Endereço do paciente", token: "PACIENTE_ENDERECO" },
+  { label: "Telefone do paciente", token: "PACIENTE_TELEFONE" },
+  { label: "E-mail do paciente", token: "PACIENTE_EMAIL" },
+  { label: "Valor mensal", token: "VALOR_MENSAL" },
+  { label: "Taxa de adesão", token: "TAXA_ADESAO" },
+  { label: "Nº de parcelas", token: "NUM_PARCELAS" },
+  { label: "Vigência (meses)", token: "VIGENCIA_MESES" },
+  { label: "Fidelidade (meses)", token: "FIDELIDADE_MESES" },
+  { label: "Data de hoje", token: "DATA_HOJE" },
+  { label: "Dependentes", token: "DEPENDENTES" },
+];
+
 export const Route = createFileRoute("/_authenticated/app/cartao-beneficios/convenios")({
   component: ConveniosPage,
   head: () => ({ meta: [{ title: "Convênio — Cartão Benefícios" }] }),
@@ -682,21 +702,45 @@ function ConveniosPage() {
             </TabsContent>
             <TabsContent value="contrato" className="mt-3">
               <div className="space-y-3">
-                <div className="flex items-center gap-2 font-medium">
-                  <FileText className="h-4 w-4" /> Modelo do Contrato
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 font-medium">
+                    <FileText className="h-4 w-4" /> Modelo do Contrato
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => window.print()}>
+                    <Printer className="h-4 w-4 mr-1" /> Imprimir
+                  </Button>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Este modelo será usado para gerar o contrato nas novas vendas. Use variáveis como{" "}
+                  Este modelo será usado para gerar o contrato nas novas vendas. Use o seletor
+                  <span className="font-medium"> Inserir variável </span>
+                  na barra de ferramentas para incluir campos como{" "}
                   <code>{"{{PACIENTE_NOME}}"}</code>, <code>{"{{VALOR_MENSAL}}"}</code>,{" "}
-                  <code>{"{{DEPENDENTES}}"}</code>, <code>{"{{CLINICA_NOME}}"}</code> para preenchimento automático.
+                  <code>{"{{DEPENDENTES}}"}</code>, <code>{"{{CLINICA_NOME}}"}</code>.
                 </p>
-                <Textarea
-                  value={modeloContrato}
-                  onChange={(e) => setModeloContrato(e.target.value)}
-                  rows={20}
-                  placeholder="Aguardando modelo do contrato… Cole aqui o texto do contrato."
-                  className="font-mono text-sm"
-                />
+                <div id="convenio-contrato-print">
+                  <RichEditor
+                    value={modeloContrato}
+                    onChange={setModeloContrato}
+                    clinicaId={clinicaAtual.clinica_id}
+                    variables={CONTRATO_VARIAVEIS}
+                  />
+                </div>
+                <style>{`
+                  @media print {
+                    @page { size: A4; margin: 12mm; }
+                    body * { visibility: hidden !important; }
+                    #convenio-contrato-print, #convenio-contrato-print * { visibility: visible !important; }
+                    #convenio-contrato-print { position: absolute; left: 0; top: 0; width: 100%; }
+                    #convenio-contrato-print .print\\:hidden { display: none !important; }
+                    #convenio-contrato-print .rt-shell { border: 0 !important; border-radius: 0 !important; overflow: visible !important; background: transparent !important; }
+                    #convenio-contrato-print .rt-scroll { max-height: none !important; overflow: visible !important; background: transparent !important; }
+                    #convenio-contrato-print .rt-page { width: 100% !important; min-height: 0 !important; margin: 0 !important; padding: 0 !important; box-shadow: none !important; background: transparent !important; }
+                    #convenio-contrato-print .ProseMirror { min-height: 0 !important; }
+                    #convenio-contrato-print table { page-break-inside: auto; }
+                    #convenio-contrato-print tr { page-break-inside: avoid; page-break-after: auto; }
+                    #convenio-contrato-print img { max-width: 100% !important; height: auto !important; }
+                  }
+                `}</style>
               </div>
             </TabsContent>
             <TabsContent value="informativo" className="mt-3">

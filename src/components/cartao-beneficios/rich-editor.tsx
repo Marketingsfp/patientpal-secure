@@ -99,9 +99,10 @@ interface Props {
   value: string;
   onChange: (html: string) => void;
   clinicaId: string;
+  variables?: { label: string; token: string }[];
 }
 
-export function RichEditor({ value, onChange, clinicaId }: Props) {
+export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const editor = useEditor({
@@ -321,6 +322,29 @@ export function RichEditor({ value, onChange, clinicaId }: Props) {
           }}
         />
         <div className="ml-auto" />
+        {variables && variables.length > 0 && (
+          <Select
+            value=""
+            onValueChange={(token) => {
+              if (!token) return;
+              editor.chain().focus().insertContent(`{{${token}}}`).run();
+            }}
+          >
+            <SelectTrigger className="h-8 w-[170px] text-xs" title="Inserir variável">
+              <SelectValue placeholder="Inserir variável" />
+            </SelectTrigger>
+            <SelectContent className="max-h-72">
+              {variables.map((v) => (
+                <SelectItem key={v.token} value={v.token}>
+                  <span className="flex flex-col">
+                    <span className="text-xs">{v.label}</span>
+                    <span className="text-[10px] text-muted-foreground font-mono">{`{{${v.token}}}`}</span>
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <Button
           type="button" variant="ghost" size="sm" className="h-8"
           onClick={() => editor.commands.setContent("<p></p>")}
