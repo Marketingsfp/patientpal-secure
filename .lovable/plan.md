@@ -1,55 +1,21 @@
-## Objetivo
+## Problema
 
-No `RichEditor` (abas Contrato, Informativo, Termo de Inclusão), reproduzir o comportamento do Word mostrado no vídeo: inserir várias imagens lado a lado ou uma embaixo da outra, redimensionar mantendo proporção e cortar.
+O `RichEditor` (abas Contrato, Informativo, Termo de Inclusão) já tem o botão **Cortar imagem** (ícone tesoura) e o `ImageCropDialog` implementados. Mas no print enviado pelo usuário a imagem está visivelmente selecionada (com handles nos 4 cantos) e mesmo assim o botão não aparece — só ficam visíveis ícones de inserir/excluir/link.
 
-Hoje já temos: seleção visual da imagem, alinhar esquerda/centro/direita (float), redimensionar por largura (handle no canto), Select de largura na toolbar e diálogo de corte (`image-crop-dialog.tsx`). Faltam basicamente duas coisas que o vídeo mostra:
+Causa: a linha de controles da imagem na toolbar (alinhar L/C/R, **Cortar**, Select de largura) está envolvida por `{editor.isActive("image") && (...)}`. Como a imagem agora é **inline** e o NodeView usa `<span>` + `data-drag-handle`, clicar na imagem nem sempre cria uma `NodeSelection` no ProseMirror — às vezes vira só uma `TextSelection` adjacente. O `selected` interno do NodeView às vezes vira `true` por hover/drag-handle e desenha os handles, mas `editor.isActive("image")` permanece `false`, então a toolbar não mostra o botão Cortar.
 
-1. Colocar **várias imagens no mesmo parágrafo** (lado a lado) ou em parágrafos seguidos (empilhadas).
-2. Redimensionar **proporcionalmente** a partir dos cantos, como no Word.
+## Mudanças (apenas em `src/components/cartao-beneficios/rich-editor.tsx`)
 
-## Mudanças
+1. **Forçar NodeSelection ao clicar na imagem.** No `ImageNodeView`, adicionar `onMouseDown` no `<img>` que chama `editor.commands.setNodeSelection(getPos())` antes do ProseMirror tratar o clique. Isso garante que toda imagem clicada vire uma `NodeSelection`, o que faz `editor.isActive("image")` retornar `true` de forma confiável.
 
-### 1. Imagem inline por padrão (`rich-editor.tsx`)
+2. **Tornar a linha de controles da imagem sempre visível** (em vez de só quando `isActive("image")`), com cada botão `disabled={!editor.isActive("image")}`. Assim o usuário enxerga o botão **Cortar** mesmo antes de clicar e entende que precisa selecionar a imagem; e quando seleciona, o botão habilita imediatamente. Aplicar o mesmo aos botões de alinhar (L/C/R) e ao `Select` de largura.
 
-- Trocar `ResizableImage.configure({ inline: false, ... })` por `inline: true` e atualizar o `extend` (`inline: true`, `group: "inline"`).
-- Resultado: duas imagens digitadas/inseridas em sequência ficam **lado a lado** no mesmo parágrafo, exatamente como o Word inline. Para empilhar, basta `Enter` entre elas.
-- Compatibilidade: o NodeView já usa `<span>` (`as="span"`), então o HTML continua válido inline. Conteúdo antigo (imagens em parágrafo próprio) continua renderizando — vira inline dentro do `<p>`, sem quebra visual.
+3. **Fallback do botão Cortar.** Se por algum motivo `editor.getAttributes("image").src` voltar vazio no clique, manter um `toast.info("Clique na imagem que deseja cortar e tente novamente.")` em vez de simplesmente não fazer nada (hoje sai silenciosamente com `return`).
 
-### 2. Upload de várias imagens de uma vez
-
-- O `<input type="file">` atual aceita um arquivo. Adicionar `multiple` e, no handler, fazer upload em sequência e inserir cada uma com `editor.chain().focus().setImage({ src }).run()` na mesma posição → ficam lado a lado automaticamente (porque a imagem agora é inline).
-
-### 3. Redimensionar com proporção (cantos)
-
-No `ImageNodeView`:
-- Substituir o único handle do canto inferior-direito por 4 handles (`nw`, `ne`, `sw`, `se`) — visíveis só quando selecionada.
-- Capturar `naturalWidth/naturalHeight` no `pointerdown` para calcular a razão.
-- Por padrão **manter proporção** (atualiza `width` em px; altura segue via `height: auto` no CSS). Se o usuário segurar `Alt`, libera distorção (não é o caso do Word, mas é útil).
-- Manter o atual handle inferior-direito como um dos quatro cantos.
-
-### 4. Estilos (`src/styles.css`)
-
-- Adicionar `.rt-img-handle-nw/.ne/.sw/.se` posicionando cada canto com o cursor correto (`nwse-resize` / `nesw-resize`).
-- Pequeno espaçamento horizontal entre imagens inline: `.rt-img-wrap + .rt-img-wrap { margin-left: 4px; }` para que duas imagens lado a lado não fiquem coladas.
-- Garantir que `.rt-editor p` permita `display: inline-block` das imagens (já permite, é o default).
-
-### 5. Toolbar — pequenos ajustes
-
-- Manter os controles atuais (alinhar L/C/R, Select de largura, botão Cortar) — já cobrem o que o vídeo mostra.
-- O botão "Inserir imagem" agora suporta múltiplos arquivos.
-
-### 6. Corte — sem mudanças funcionais
-
-O `ImageCropDialog` já existe e funciona; só verificar que continua disparando com a imagem selecionada após a mudança para inline (o `editor.getAttributes("image").src` continua válido).
+Nenhuma alteração em `image-crop-dialog.tsx`, CSS ou outras abas — todas as três abas (Contrato, Informativo, Termo de Inclusão) usam o mesmo `RichEditor` e passam a ter o corte funcionando.
 
 ## Resultado
 
-- Usuário clica em "Inserir imagem", seleciona 2+ arquivos → aparecem lado a lado no editor.
-- Para empilhar: pressiona Enter entre elas (ou usa alinhar centro/esquerda como já funciona).
-- Arrasta qualquer canto da imagem selecionada para redimensionar mantendo a proporção.
-- Corta pelo botão "Cortar imagem" (já existente).
-- Funciona nas três abas (Contrato, Informativo, Termo de Inclusão) porque todas usam o mesmo `RichEditor`.
-
-## Arquivos tocados
-- `src/components/cartao-beneficios/rich-editor.tsx` (inline:true, handles dos 4 cantos, upload múltiplo)
-- `src/styles.css` (estilos dos 4 handles + gap entre imagens inline)
+- O botão **Cortar imagem** aparece sempre na toolbar (desabilitado quando nenhuma imagem está selecionada).
+- Clicar em qualquer imagem do editor seleciona-a de forma confiável, habilita os controles de alinhamento, largura e corte, e abre o `ImageCropDialog` ao clicar em Cortar.
+- Funciona nas três abas sem mexer em mais nada.
