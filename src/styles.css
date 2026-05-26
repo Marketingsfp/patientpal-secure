@@ -219,6 +219,10 @@
   resize: vertical;
   overflow: auto;
 }
+.rt-editor table td[data-valign="middle"],
+.rt-editor table th[data-valign="middle"] { vertical-align: middle; }
+.rt-editor table td[data-valign="bottom"],
+.rt-editor table th[data-valign="bottom"] { vertical-align: bottom; }
 .rt-editor table th {
   background: #f3f4f6;
   font-weight: 600;
@@ -238,7 +242,8 @@
 .rt-editor.resize-cursor,
 .rt-editor.resize-cursor * { cursor: col-resize !important; }
 .rt-editor .selectedCell {
-  background: hsl(var(--primary) / 0.12);
+  background: hsl(var(--primary) / 0.35);
+  box-shadow: inset 0 0 0 2px hsl(var(--primary) / 0.65);
 }
 
 /* Imagens dentro do editor: alinhamento + estado selecionado */
