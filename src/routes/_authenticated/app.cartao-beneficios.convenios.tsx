@@ -57,7 +57,7 @@ function buildContratoVariaveis(maxDeps: number): { label: string; token: string
 
 export const Route = createFileRoute("/_authenticated/app/cartao-beneficios/convenios")({
   component: ConveniosPage,
-  head: () => ({ meta: [{ title: "Convênio — Cartão Benefícios" }] }),
+  head: () => ({ meta: [{ title: "Convênios — Cartão Benefícios" }] }),
 });
 
 type Convenio = {

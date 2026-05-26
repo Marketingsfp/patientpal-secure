@@ -991,7 +991,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
               )
             ) : (
               <div className="rounded-md border bg-muted/40 p-4 text-sm text-muted-foreground">
-                Nenhum modelo cadastrado neste convênio. Configure em <strong>Cartão de Benefícios → Convênio</strong>.
+                Nenhum modelo cadastrado neste convênio. Configure em <strong>Cartão de Benefícios → Convênios</strong>.
               </div>
             )}
           </TabsContent>
