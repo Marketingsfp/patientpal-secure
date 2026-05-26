@@ -1,47 +1,81 @@
-# Pagamento de parcelas de convênio com GR
 
-Hoje, na **Agenda**, ao clicar em "Pagar" o sistema executa esta sequência:
+# Layout WhatsApp estilo Hi Platform (3 colunas)
 
-1. Abre o diálogo "Forma de pagamento" (1=Dinheiro, 2=PIX, 3=Débito, 4=Crédito, 5=Mais de uma forma).
-2. Abre o `LancamentoDialog` já preenchido (descrição, valor, forma) — o caixa confirma valor recebido / troco / parcelas.
-3. Ao salvar: cria `fin_lancamentos` (receita), marca o agendamento como pago, avança o fluxo e **imprime a GR** via `printGuiaAtendimento` com os dados do pagamento (forma, valor, parcelas, detalhe misto).
+Reformular a área de WhatsApp da Nina para o padrão de inbox profissional (Hi Platform / WhatsApp Web): **lista de conversas | chat central | painel do contato**, mantendo todas as funcionalidades atuais.
 
-Em **Convênios → Contratos**, ao pagar uma parcela, hoje só atualizamos `contrato_mensalidades.status = pago` (forma direta) ou abrimos o `LancamentoDialog` apenas no caso "Misto". Não há geração de GR e o caminho rápido não registra `fin_lancamentos`. Esta tarefa unifica o fluxo.
+## Estrutura visual nova
 
-## Mudanças
+```text
+┌──────────────────────────────────────────────────────────────────────┐
+│  Header: Nina — WhatsApp  · status online · busca global · filtros   │
+├────────────┬────────────────────────────────────┬────────────────────┤
+│ CONVERSAS  │ CHAT                               │ CONTATO            │
+│ (320px)    │ (flex-1)                           │ (320px)            │
+│            │                                    │                    │
+│ filtros:   │ ┌── header do contato ───────────┐ │ avatar + nome      │
+│ [Todas]    │ │ avatar + nome + tel + status   │ │ telefone           │
+│ [Não lidas]│ │ Nina ON/OFF · ações ⋮          │ │ tags               │
+│ [Nina]     │ └────────────────────────────────┘ │ ─────              │
+│ [Humano]   │                                    │ Paciente vinculado │
+│            │  msgs com bubbles                  │ Última consulta    │
+│ avatar+nome│  separadores por dia               │ Mensalidades       │
+│ prévia     │  status "entregue/lida"            │ ─────              │
+│ hora+badge │                                    │ Notas internas     │
+│ ...        │ ┌── composer ────────────────────┐ │ Histórico de       │
+│            │ │ 📎 emoji │ textarea │ 🎤 │ →  │ │ atendimentos       │
+│            │ └────────────────────────────────┘ │                    │
+└────────────┴────────────────────────────────────┴────────────────────┘
+```
 
-### 1. Banco — preparar `gr_impressoes` para parcelas
-- Tornar `gr_impressoes.agendamento_id` **nullable**.
-- Adicionar coluna `mensalidade_id uuid` (FK → `contrato_mensalidades.id`, `ON DELETE CASCADE`), nullable, com índice.
-- Adicionar `CHECK` garantindo que **exatamente um** dos dois (`agendamento_id` ou `mensalidade_id`) esteja preenchido.
-- Manter políticas RLS atuais (continuam válidas por `clinica_id`).
+A página passa a ocupar `h-[calc(100vh-var(--header))]` sem padding externo, como um app de chat dedicado (não dentro de um Card scrollável).
 
-### 2. `src/lib/print-gr.ts` — nova função `printGuiaMensalidade`
-- Input: `{ mensalidadeId, clinicaId, usuarioNome, usuarioId, reimpressao?, pagamento }`.
-- Carrega dados de `contrato_mensalidades` + `contratos_assinatura` + `planos_assinatura` + `pacientes` + `clinicas` para montar o cabeçalho.
-- Reaproveita o mesmo layout 80mm da GR de atendimento (cabeçalho da clínica, dados do titular, descrição "Mensalidade X/N — Contrato #NNNN — Plano …", bloco de pagamento com forma/parcelas/bandeira/valor/troco/detalhe misto e rodapé com via 1ª/2ª).
-- Controla vias 1ª/2ª por `mensalidade_id` (mesma regra de `agendamento_id`).
-- Exporta também `reimprimirGuiaMensalidade` (atalho com `reimpressao: true`).
+## Mudanças por aba
 
-### 3. `src/routes/_authenticated/app.contratos.tsx` — espelhar fluxo da Agenda
-- Em `abrirFormaPag` continuar exibindo o diálogo de forma de pagamento (1–5).
-- Trocar `escolherForma`: em vez de chamar `marcarPago` direto, abrir o `LancamentoDialog` com:
-  - `tipo="receita"`, `initialDescricao = "Mensalidade X/N — Contrato #NNNN — <titular>"`, `initialValor = pagMens.valor`, `initialFormaPagamento = forma escolhida`.
-- `escolherMisto` já abre o `LancamentoDialog` — passar `initialFormaPagamento="__misto__"` (igual à Agenda).
-- No `onSavedWithData` do `LancamentoDialog`:
-  1. `marcarPago(pagMens.id, true, dados.forma_pagamento ?? "misto")` — atualiza `contrato_mensalidades` (status/pago_em/forma); o `fin_lancamentos` já foi criado pelo próprio `LancamentoDialog`.
-  2. Chamar `printGuiaMensalidade({ mensalidadeId, clinicaId, usuarioNome, usuarioId, pagamento: { valor, forma_pagamento, parcelas, bandeira_cartao, detalhe: pagamentos_detalhe } })`.
-  3. Toast de sucesso "Pagamento registrado e GR enviado para impressão." e fechar o diálogo.
-- "Reverter" continua disponível (mantém comportamento atual).
+A página `/app/nina` mantém as 4 abas (**Nina treinada · Conversas · Automações · Configuração**). Só a aba **Conversas** é reescrita.
+
+### 1. Coluna esquerda — Lista de conversas
+- Topo: input de busca + chips de filtro (Todas / Não lidas / Nina / Humano / Arquivadas).
+- Itens da lista: avatar redondo (iniciais ou foto do paciente), nome, prévia da última mensagem (1 linha), horário e badge de não lidas. Indicador colorido se a Nina está respondendo (●verde) ou aguardando humano (●âmbar).
+- Item selecionado com fundo destacado e barra lateral primary.
+- Scroll independente; lista densa estilo Hi/Intercom.
+
+### 2. Coluna central — Conversa
+- Header fixo com avatar + nome + telefone + último visto + toggle "Nina respondendo" + menu de ações (marcar como resolvida, transferir, arquivar).
+- Mensagens agrupadas por dia (separador "Hoje", "Ontem", data), bubbles arredondados estilo WhatsApp: entrada à esquerda (cinza), saída à direita (verde para Nina, azul/primary para humano), com horário e duplo-check.
+- Suporte a áudio transcrito, imagens e anexos (placeholder visual).
+- Composer com: anexo (📎), emoji (😊), textarea com auto-resize, gravar áudio (🎤), botão enviar verde. Enter envia, Shift+Enter quebra linha.
+
+### 3. Coluna direita — Painel do contato (nova)
+- Avatar grande + nome + telefone formatado.
+- Tags do paciente (VIP, Convênio X, etc).
+- Cards compactos: **Paciente vinculado** (com link para o cadastro), **Última consulta**, **Mensalidades em aberto**, **Próximo agendamento**.
+- Área de **Notas internas** (textarea persistente por conversa).
+- Pode ser colapsada com botão `>` no header do chat (esconde a coluna).
 
 ## Detalhes técnicos
 
-- A migração precisará atualizar a `CHECK` em duas etapas se houver dados antigos (todos têm `agendamento_id` hoje, então o CHECK `((agendamento_id IS NOT NULL) <> (mensalidade_id IS NOT NULL))` valida sem backfill).
-- O `LancamentoDialog` já popula `pagamentos_detalhe` (forma misto) e dispara `onSavedWithData` — sem alterações nele.
-- Não vincular `fin_lancamentos.agendamento_id` (não existe agendamento). Opcionalmente, podemos preencher `contrato_mensalidades.lancamento_id` com o id da receita criada — isso já existe na tabela; pode ficar para uma melhoria futura se o `LancamentoDialog` não devolver o id (não devolve hoje), então **fora deste escopo**.
+**Arquivos alterados**
+- `src/routes/_authenticated/app.nina.tsx` — apenas o `TabsContent value="chat"` é reescrito; abas Treinada/Automações/Configuração ficam intactas. O wrapper externo da página perde `space-y-6` para a aba conversas usar altura total.
+- Criar `src/components/nina/ConversasInbox.tsx` (novo) com 3 sub-componentes: `ListaConversas`, `ChatJanela`, `PainelContato`. Mantém o estado e o `useEffect` de realtime que já existem hoje em `app.nina.tsx` — só extrai a UI.
+- Reaproveitar `formatWhatsappText` para markdown de WhatsApp.
 
-## Arquivos
+**Dados (sem mudança de schema)**
+- Continuamos lendo de `whatsapp_mensagens` e agrupando por `from_number`/`to_number` como já feito hoje.
+- Para o painel direito: lookup do paciente por `telefone` em `pacientes`, e queries leves de `agendamentos` (último/próximo) e `contrato_mensalidades` em aberto. Tudo client-side com `supabase` (RLS já cobre).
 
-- `supabase/migrations/<novo>.sql` — alteração de `gr_impressoes`.
-- `src/lib/print-gr.ts` — adicionar `printGuiaMensalidade` e `reimprimirGuiaMensalidade`.
-- `src/routes/_authenticated/app.contratos.tsx` — novo fluxo de pagamento de parcela.
+**Tokens / cores**
+- Bubble Nina: `bg-emerald-500 text-white` (mantém).
+- Bubble paciente: `bg-card border border-border`.
+- Coluna ativa / hover: `bg-muted` / `bg-muted/50`.
+- Sem cores hardcoded fora das já presentes no projeto.
+
+**Responsivo**
+- `<lg`: mostra só a lista; ao clicar numa conversa abre o chat full-screen com botão voltar; painel do contato vira sheet (drawer).
+- `lg`: 2 colunas (lista + chat), painel toggleável.
+- `xl+`: 3 colunas completas.
+
+## Fora do escopo
+- Configuração WhatsApp (token, número, horário) **mantém o layout atual** dentro da aba "Configuração" — o usuário pediu o mesmo layout do Hi apenas para a área de conversas/inbox.
+- Campanhas (`/app/campanhas`) e Envios (`/app/mkt-envios`) recebem apenas um ajuste leve de header para ficarem visualmente coerentes com a nova inbox (mesma tipografia de título e badges); a estrutura tabular delas permanece.
+- Sem alterações no webhook, no `whatsapp.functions.ts` ou em `whatsapp.server.ts`.
+- Sem alterações nas automações cadastradas.
