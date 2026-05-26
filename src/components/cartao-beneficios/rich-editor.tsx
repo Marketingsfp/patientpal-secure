@@ -99,6 +99,52 @@ const ColoredTableHeader = TableHeader.extend({
   },
 });
 
+// Table com largura customizável (width em % ou px)
+const ResizableTable = Table.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      width: {
+        default: null,
+        parseHTML: (el) =>
+          (el as HTMLElement).getAttribute("data-width") ||
+          (el as HTMLElement).style.width ||
+          null,
+        renderHTML: (attrs) => {
+          if (!attrs.width) return {};
+          return {
+            "data-width": attrs.width,
+            style: `width: ${attrs.width}`,
+          };
+        },
+      },
+    };
+  },
+});
+
+// TableRow com altura customizável
+const ResizableTableRow = TableRow.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      height: {
+        default: null,
+        parseHTML: (el) =>
+          (el as HTMLElement).getAttribute("data-height") ||
+          (el as HTMLElement).style.height ||
+          null,
+        renderHTML: (attrs) => {
+          if (!attrs.height) return {};
+          return {
+            "data-height": attrs.height,
+            style: `height: ${attrs.height}`,
+          };
+        },
+      },
+    };
+  },
+});
+
 const FONTS = [
   "Arial", "Calibri", "Times New Roman", "Georgia", "Verdana",
   "Tahoma", "Courier New", "Helvetica", "Garamond", "Trebuchet MS",
