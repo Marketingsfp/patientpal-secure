@@ -549,10 +549,13 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [contrato.id]);
 
   const marcarPago = async (id: string, paga: boolean, forma?: string | null) => {
-    const patch: Record<string, unknown> = paga
-      ? { status: "pago", pago_em: new Date().toISOString().slice(0, 10) }
+    const patch = paga
+      ? {
+          status: "pago",
+          pago_em: new Date().toISOString().slice(0, 10),
+          ...(forma !== undefined ? { forma_pagamento: forma } : {}),
+        }
       : { status: "pendente", pago_em: null, forma_pagamento: null };
-    if (paga && forma !== undefined) patch.forma_pagamento = forma;
     const { error } = await supabase.from("contrato_mensalidades").update(patch).eq("id", id);
     if (error) return toast.error(error.message);
     load();
