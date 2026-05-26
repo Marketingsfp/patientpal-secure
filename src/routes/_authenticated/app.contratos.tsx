@@ -1007,15 +1007,6 @@ h1, h2, h3 { margin: 0 0 6mm; }
           {contrato.assinado_em ? <Badge variant="default"><Check className="h-3 w-3 mr-1"/>Assinado em {fmtD(contrato.assinado_em)}</Badge> : <Badge variant="outline">Aguardando assinatura</Badge>}
         </div>
 
-        {deps.length > 0 ? (
-          <div>
-            <h3 className="font-semibold text-sm mb-1">Dependentes/Agregados</h3>
-            <div className="rounded-md border bg-muted/30 p-2 text-sm space-y-1">
-              {deps.map((d) => <div key={d.id}>• {d.paciente_nome} <span className="text-muted-foreground">— {d.parentesco ?? "—"} ({d.tipo})</span></div>)}
-            </div>
-          </div>
-        ) : null}
-
         <div>
           <h3 className="font-semibold text-sm mb-1">Mensalidades</h3>
           <div className="rounded-md border">
