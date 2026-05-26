@@ -149,6 +149,14 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
         class:
           "rt-editor prose prose-sm max-w-none focus:outline-none min-h-[60vh]",
       },
+      handleClickOn: (_view, _pos, node, nodePos) => {
+        // Clique em imagem seleciona o node para permitir excluir com Delete/Backspace
+        if (node.type.name === "image") {
+          editor?.chain().focus().setNodeSelection(nodePos).run();
+          return true;
+        }
+        return false;
+      },
     },
     onUpdate: ({ editor }) => onChange(editor.getHTML()),
   });
