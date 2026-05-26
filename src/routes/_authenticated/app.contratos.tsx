@@ -1170,14 +1170,35 @@ h1, h2, h3 { margin: 0 0 6mm; }
 
       <LancamentoDialog
         open={lancOpen}
-        onOpenChange={(v) => { setLancOpen(v); if (!v) setPagMens(null); }}
+        onOpenChange={(v) => { setLancOpen(v); if (!v) { setPagMens(null); setPagInitialForma(""); } }}
         tipo="receita"
         initialDescricao={pagMens ? `Mensalidade ${pagMens.numero_parcela}/${mens.length} — Contrato #${contrato.numero} — ${contrato.paciente_nome}` : ""}
         initialValor={pagMens ? String(pagMens.valor) : ""}
+        initialFormaPagamento={pagInitialForma}
         onSavedWithData={async (dados) => {
-          if (!pagMens) return;
-          await marcarPago(pagMens.id, true, dados.forma_pagamento ?? "misto");
+          if (!pagMens || !clinicaAtual) return;
+          const mensId = pagMens.id;
+          await marcarPago(mensId, true, dados.forma_pagamento ?? "misto");
+          try {
+            await printGuiaMensalidade({
+              mensalidadeId: mensId,
+              clinicaId: clinicaAtual.clinica_id,
+              usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
+              usuarioId: user?.id ?? null,
+              pagamento: {
+                valor: dados.valor,
+                forma_pagamento: dados.forma_pagamento,
+                parcelas: dados.parcelas,
+                bandeira_cartao: dados.bandeira_cartao,
+                detalhe: dados.pagamentos_detalhe,
+              },
+            });
+            toast.success("Pagamento registrado e GR enviado para impressão.");
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Falha ao imprimir GR");
+          }
           setPagMens(null);
+          setPagInitialForma("");
         }}
       />
 
