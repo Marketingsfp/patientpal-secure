@@ -814,9 +814,10 @@ function InboxWhatsapp({ conversas, todasConversas, sel, setSel, busca, setBusca
   const totalNaoLidas = todasConversas.reduce((s, c) => s + c.naoLidas, 0);
 
   return (
-    <div className="grid grid-cols-12 gap-0 h-[calc(100vh-260px)] min-h-[560px] border border-border rounded-lg overflow-hidden bg-card">
+    <div className="h-[calc(100vh-260px)] min-h-[560px] border border-border rounded-lg overflow-hidden bg-card">
+     <ResizablePanelGroup direction="horizontal" className="h-full">
       {/* ============ COLUNA 1 — LISTA DE CONVERSAS ============ */}
-      <aside className={`${painelAberto ? "col-span-3" : "col-span-3"} border-r border-border flex flex-col bg-card min-w-0`}>
+      <ResizablePanel defaultSize={22} minSize={16} maxSize={40} className="flex flex-col bg-card min-w-0">
         <div className="p-3 border-b border-border space-y-2">
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -891,10 +892,11 @@ function InboxWhatsapp({ conversas, todasConversas, sel, setSel, busca, setBusca
             );
           })}
         </div>
-      </aside>
+      </ResizablePanel>
+      <ResizableHandle withHandle />
 
       {/* ============ COLUNA 2 — CHAT ============ */}
-      <section className={`${painelAberto ? "col-span-6" : "col-span-9"} flex flex-col min-w-0 bg-[oklch(0.97_0.005_120)] dark:bg-muted/10`}>
+      <ResizablePanel defaultSize={painelAberto ? 56 : 78} minSize={30} className="flex flex-col min-w-0 bg-[oklch(0.97_0.005_120)] dark:bg-muted/10">
         {sel ? (
           <>
             <header className="py-2.5 px-4 border-b border-border bg-card flex items-center justify-between gap-3">
@@ -965,11 +967,13 @@ function InboxWhatsapp({ conversas, todasConversas, sel, setSel, busca, setBusca
             <div>Selecione uma conversa à esquerda para começar.</div>
           </div>
         )}
-      </section>
+      </ResizablePanel>
 
       {/* ============ COLUNA 3 — PAINEL DO CONTATO ============ */}
       {painelAberto && (
-        <aside className="col-span-3 border-l border-border flex flex-col bg-card min-w-0 overflow-auto">
+       <>
+        <ResizableHandle withHandle />
+        <ResizablePanel defaultSize={22} minSize={16} maxSize={40} className="flex flex-col bg-card min-w-0 overflow-auto">
           {sel ? (
             <div className="p-4 space-y-4">
               <div className="flex flex-col items-center text-center pb-3 border-b border-border">
@@ -1015,8 +1019,10 @@ function InboxWhatsapp({ conversas, todasConversas, sel, setSel, busca, setBusca
               Selecione uma conversa para ver os detalhes do contato.
             </div>
           )}
-        </aside>
+        </ResizablePanel>
+       </>
       )}
+     </ResizablePanelGroup>
     </div>
   );
 }
