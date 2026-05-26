@@ -340,6 +340,11 @@ export function AppShell() {
     return () => window.removeEventListener("keydown", onKey);
   }, [flatNavLeaves, location.pathname, navigate]);
 
+  useEffect(() => {
+    const el = document.querySelector<HTMLElement>('[data-nav-active="true"]');
+    if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [location.pathname]);
+
   return (
     <div className="h-screen flex bg-background overflow-hidden">
       {!isChooser && (
@@ -425,6 +430,7 @@ export function AppShell() {
                               key={child.to}
                               to={child.to}
                               title={collapsed ? child.label : undefined}
+                              data-nav-active={active ? "true" : undefined}
                               className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "pl-8 pr-3"} py-2 text-sm font-medium transition-all ${
                                 active
                                   ? "bg-white text-slate-900 shadow-sm"
@@ -446,6 +452,7 @@ export function AppShell() {
                       key={item.to}
                       to={item.to}
                       title={collapsed ? item.label : undefined}
+                      data-nav-active={active ? "true" : undefined}
                       className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "px-3"} py-2 text-sm font-medium transition-all ${
                         active
                           ? "bg-white text-slate-900 shadow-sm"
