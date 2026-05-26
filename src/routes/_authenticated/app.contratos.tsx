@@ -20,6 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DOMPurify from "dompurify";
 import { ChevronsUpDown } from "lucide-react";
 import { printContrato } from "@/lib/print-contrato";
+import { fmtDataExtenso } from "@/lib/print-contrato";
 import { printCartoes } from "@/lib/print-cartao";
 import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
 
