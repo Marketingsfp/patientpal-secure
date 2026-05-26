@@ -425,6 +425,7 @@ export function AppShell() {
                               key={child.to}
                               to={child.to}
                               title={collapsed ? child.label : undefined}
+                              data-nav-active={active ? "true" : undefined}
                               className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "pl-8 pr-3"} py-2 text-sm font-medium transition-all ${
                                 active
                                   ? "bg-white text-slate-900 shadow-sm"
@@ -446,6 +447,7 @@ export function AppShell() {
                       key={item.to}
                       to={item.to}
                       title={collapsed ? item.label : undefined}
+                      data-nav-active={active ? "true" : undefined}
                       className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "px-3"} py-2 text-sm font-medium transition-all ${
                         active
                           ? "bg-white text-slate-900 shadow-sm"
