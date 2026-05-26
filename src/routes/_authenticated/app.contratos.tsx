@@ -730,7 +730,13 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
   const aReceber = mens.filter((m) => m.status !== "pago").reduce((s, m) => s + Number(m.valor), 0);
 
   // ---- Dados da venda (aba "Dados") ----
-  const faixaAtual = faixas.find((f) => Number(f.valor_mensal) === Number(contrato.valor_mensal)) ?? null;
+  const totalVidasAtual = 1 + deps.filter((d) => d.ativo).length;
+  const faixasElegiveis = faixas.filter(
+    (f) => totalVidasAtual >= f.vidas_de && (f.vidas_ate == null || totalVidasAtual <= f.vidas_ate)
+  );
+  const faixaAtual = faixasElegiveis.length
+    ? faixasElegiveis.reduce((a, b) => (b.vidas_de > a.vidas_de ? b : a))
+    : null;
   const faixaLabel = faixaAtual
     ? (faixaAtual.vidas_ate == null
         ? `${faixaAtual.vidas_de}+ pessoas`
@@ -820,9 +826,12 @@ h1, h2, h3 { margin: 0 0 6mm; }
   // Recalcula o valor das parcelas em aberto conforme a faixa de vidas do convênio
   const recalcularParcelasAbertas = async (totalVidas: number) => {
     if (!faixas.length) return;
-    const f = faixas.find(
+    const elegiveis = faixas.filter(
       (fx) => totalVidas >= fx.vidas_de && (fx.vidas_ate == null || totalVidas <= fx.vidas_ate)
     );
+    const f = elegiveis.length
+      ? elegiveis.reduce((a, b) => (b.vidas_de > a.vidas_de ? b : a))
+      : null;
     if (!f) return;
     const novoValor = Number(f.valor_mensal);
     if (novoValor !== Number(contrato.valor_mensal)) {
