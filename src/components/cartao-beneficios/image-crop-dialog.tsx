@@ -240,16 +240,32 @@ export function ImageCropDialog({ open, src, onClose, onCropped }: Props) {
         </div>
         <div className="flex items-center gap-3 pt-2">
           <span className="text-xs text-muted-foreground">Proporção</span>
-          <Select value={aspect} onValueChange={(v) => { setAspect(v); setCrop(initialCrop(v === "free" ? undefined : Number(v), imgRef.current)); }}>
-            <SelectTrigger className="h-8 w-[110px] text-xs"><SelectValue /></SelectTrigger>
+          <Select
+            value={aspect}
+            onValueChange={(v) => {
+              setAspect(v);
+              setCrop(initialCrop(v === "free" ? undefined : Number(v), imgRef.current));
+            }}
+          >
+            <SelectTrigger className="h-8 w-[110px] text-xs">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
-              {ASPECTS.map((a) => <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>)}
+              {ASPECTS.map((a) => (
+                <SelectItem key={a.value} value={a.value}>
+                  {a.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
-          <span className="text-xs text-muted-foreground ml-2">Arraste sobre a imagem para selecionar a área.</span>
+          <span className="text-xs text-muted-foreground ml-2">
+            Arraste sobre a imagem para selecionar a área.
+          </span>
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button variant="ghost" onClick={onClose}>
+            Cancelar
+          </Button>
           <Button onClick={apply} disabled={busy || !crop || crop.width < 2 || crop.height < 2}>
             {busy ? "Cortando…" : "Aplicar corte"}
           </Button>
