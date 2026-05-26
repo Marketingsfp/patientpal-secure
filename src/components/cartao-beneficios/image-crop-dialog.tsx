@@ -1,7 +1,19 @@
 import { useEffect, useRef, useState } from "react";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Props {
   open: boolean;
@@ -38,7 +50,12 @@ function initialCrop(aspect?: number, img?: HTMLImageElement | null): CropRect {
   return { x: (100 - width) / 2, y: (100 - height) / 2, width, height };
 }
 
-function rectFromPoints(anchor: { x: number; y: number }, point: { x: number; y: number }, aspect?: number, img?: HTMLImageElement | null): CropRect {
+function rectFromPoints(
+  anchor: { x: number; y: number },
+  point: { x: number; y: number },
+  aspect?: number,
+  img?: HTMLImageElement | null,
+): CropRect {
   const box = img?.getBoundingClientRect();
   const displayRatio = box && box.height > 0 ? box.width / box.height : 1;
   const signX = point.x >= anchor.x ? 1 : -1;
@@ -88,7 +105,11 @@ export function ImageCropDialog({ open, src, onClose, onCropped }: Props) {
   const [aspect, setAspect] = useState<string>("free");
   const [busy, setBusy] = useState(false);
   const imgRef = useRef<HTMLImageElement | null>(null);
-  const dragRef = useRef<{ mode: DragMode; start: { x: number; y: number }; crop: CropRect | null } | null>(null);
+  const dragRef = useRef<{
+    mode: DragMode;
+    start: { x: number; y: number };
+    crop: CropRect | null;
+  } | null>(null);
 
   const aspectNum = aspect === "free" ? undefined : Number(aspect);
 
