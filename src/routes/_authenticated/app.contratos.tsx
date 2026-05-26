@@ -24,6 +24,7 @@ import { ChevronsUpDown } from "lucide-react";
 import { printContrato } from "@/lib/print-contrato";
 import { fmtDataExtenso } from "@/lib/print-contrato";
 import { printCartoes } from "@/lib/print-cartao";
+import { printGuiaMensalidade } from "@/lib/print-gr";
 import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
 import type { PatientOption } from "@/components/patient-search-input";
 
@@ -587,6 +588,7 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
   const [pagMens, setPagMens] = useState<Mens | null>(null);
   const [formaPagOpen, setFormaPagOpen] = useState(false);
   const [lancOpen, setLancOpen] = useState(false);
+  const [pagInitialForma, setPagInitialForma] = useState<string>("");
 
   const formaOpcoes: Array<{ forma: string; label: string }> = [
     { forma: "dinheiro", label: "Dinheiro" },
@@ -689,13 +691,18 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     setPagMens(m);
     setFormaPagOpen(true);
   };
-  const escolherForma = async (forma: string) => {
+  // Normaliza para os valores aceitos pelo LancamentoDialog (igual à Agenda)
+  const normalizarForma = (f: string) =>
+    f === "credito" ? "cartao_credito" : f === "debito" ? "cartao_debito" : f;
+
+  const escolherForma = (forma: string) => {
     if (!pagMens) return;
+    setPagInitialForma(normalizarForma(forma));
     setFormaPagOpen(false);
-    await marcarPago(pagMens.id, true, forma);
-    setPagMens(null);
+    setLancOpen(true);
   };
   const escolherMisto = () => {
+    setPagInitialForma("__misto__");
     setFormaPagOpen(false);
     setLancOpen(true);
   };
@@ -708,7 +715,7 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
       if (!Number.isFinite(n)) return;
       if (n >= 1 && n <= formaOpcoes.length) {
         e.preventDefault();
-        void escolherForma(formaOpcoes[n - 1].forma);
+        escolherForma(formaOpcoes[n - 1].forma);
       } else if (n === formaOpcoes.length + 1) {
         e.preventDefault();
         escolherMisto();
