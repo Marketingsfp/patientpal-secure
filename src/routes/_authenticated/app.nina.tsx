@@ -991,8 +991,8 @@ function InboxWhatsapp({ conversas, todasConversas, sel, setSel, busca, setBusca
       </section>
 
       {/* ============ COLUNA 3 — PAINEL DO CONTATO (xl+ inline, menor vira Sheet) ============ */}
-      {painelAberto && sel && (
-        <aside className="hidden xl:flex w-[300px] 2xl:w-[340px] shrink-0 border-l border-border bg-card flex-col overflow-auto">
+      {isWide && painelAberto && sel && (
+        <aside className="flex w-[300px] 2xl:w-[340px] shrink-0 border-l border-border bg-card flex-col overflow-auto">
           <PainelContatoConteudo
             sel={sel}
             notas={notas}
@@ -1001,23 +1001,25 @@ function InboxWhatsapp({ conversas, todasConversas, sel, setSel, busca, setBusca
           />
         </aside>
       )}
-      <Sheet
-        open={painelAberto && !!sel}
-        onOpenChange={(o) => setPainelAberto(o)}
-      >
-        <SheetContent side="right" className="w-[320px] sm:w-[360px] p-0 xl:hidden">
-          {sel && (
-            <div className="h-full overflow-auto">
-              <PainelContatoConteudo
-                sel={sel}
-                notas={notas}
-                setNotas={setNotas}
-                initials={initials}
-              />
-            </div>
-          )}
-        </SheetContent>
-      </Sheet>
+      {!isWide && (
+        <Sheet
+          open={painelAberto && !!sel}
+          onOpenChange={(o) => setPainelAberto(o)}
+        >
+          <SheetContent side="right" className="w-[320px] sm:w-[360px] p-0">
+            {sel && (
+              <div className="h-full overflow-auto">
+                <PainelContatoConteudo
+                  sel={sel}
+                  notas={notas}
+                  setNotas={setNotas}
+                  initials={initials}
+                />
+              </div>
+            )}
+          </SheetContent>
+        </Sheet>
+      )}
     </div>
   );
 }
