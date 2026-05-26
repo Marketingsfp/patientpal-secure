@@ -96,14 +96,14 @@ pre.body { white-space: pre-wrap; font-family: inherit; font-size: 11pt; margin:
 .numero { float:right; font-size:10pt; }
 </style></head><body>
 <div class="head">
-  <strong>${esc(cl.nome)}</strong><br/>
-  ${esc([cl.endereco, cl.cidade, cl.estado].filter(Boolean).join(" — "))}<br/>
-  CNPJ: ${esc(cl.cnpj ?? "")} — Tel.: ${esc(cl.telefone ?? "")}
+<strong>${esc(_cl.nome)}</strong><br/>
+  ${esc([_cl.endereco, _cl.cidade, _cl.estado].filter(Boolean).join(" — "))}<br/>
+  CNPJ: ${esc(_cl.cnpj ?? "")} — Tel.: ${esc(_cl.telefone ?? "")}
   <span class="numero">Contrato Nº ${c.numero}</span>
 </div>
 <pre class="body">${esc(corpo)}</pre>
 <div class="sig">
-  <div>____________________________<br/>${esc(cl.nome)}</div>
+  <div>____________________________<br/>${esc(_cl.nome)}</div>
   <div>${assinatura}<br/>${esc(c.paciente_nome)}</div>
 </div>
 ${(c as any).assinado_em ? `<div class="meta">Assinado digitalmente em ${fmtData((c as any).assinado_em)} — IP: ${esc((c as any).assinatura_ip ?? "—")}</div>` : ""}
