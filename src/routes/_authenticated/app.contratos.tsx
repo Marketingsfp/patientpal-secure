@@ -26,6 +26,7 @@ import { fmtDataExtenso } from "@/lib/print-contrato";
 import { printCartoes } from "@/lib/print-cartao";
 import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
+void PatientSearchInput;
 
 export const Route = createFileRoute("/_authenticated/app/contratos")({
   component: ContratosPage,
