@@ -543,6 +543,36 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
   const [termoMovimento, setTermoMovimento] = useState<"Inclusão" | "Exclusão">("Inclusão");
   const [termoDep, setTermoDep] = useState<Dep | null>(null);
 
+  // Cancelamento do contrato
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelMotivo, setCancelMotivo] = useState("");
+  const [cancelSaving, setCancelSaving] = useState(false);
+  const [canceladoEm, setCanceladoEm] = useState<string | null>(contrato.cancelado_em ?? null);
+  const [cancelMotivoAtual, setCancelMotivoAtual] = useState<string | null>(contrato.cancelamento_motivo ?? null);
+  const cancelado = !!canceladoEm;
+
+  const confirmarCancelamento = async () => {
+    const motivo = cancelMotivo.trim();
+    if (!motivo) { toast.error("Informe o motivo do cancelamento"); return; }
+    setCancelSaving(true);
+    const agora = new Date().toISOString();
+    const { error } = await supabase
+      .from("contratos_assinatura")
+      .update({
+        status: "cancelado",
+        cancelado_em: agora,
+        cancelamento_motivo: motivo,
+      } as any)
+      .eq("id", contrato.id);
+    setCancelSaving(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Contrato cancelado");
+    setCanceladoEm(agora);
+    setCancelMotivoAtual(motivo);
+    setCancelOpen(false);
+    setCancelMotivo("");
+  };
+
   // Diálogo de forma de pagamento (espelha o da agenda)
   const [pagMens, setPagMens] = useState<Mens | null>(null);
   const [formaPagOpen, setFormaPagOpen] = useState(false);
