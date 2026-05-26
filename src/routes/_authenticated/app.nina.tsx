@@ -814,10 +814,11 @@ function InboxWhatsapp({ conversas, todasConversas, sel, setSel, busca, setBusca
   const totalNaoLidas = todasConversas.reduce((s, c) => s + c.naoLidas, 0);
 
   return (
-    <div className="h-[calc(100vh-260px)] min-h-[560px] border border-border rounded-lg overflow-hidden bg-card">
-     <ResizablePanelGroup orientation="horizontal" className="h-full">
+    <div className="h-[calc(100dvh-220px)] min-h-[520px] border border-border rounded-lg overflow-hidden bg-card flex">
       {/* ============ COLUNA 1 — LISTA DE CONVERSAS ============ */}
-      <ResizablePanel defaultSize={22} minSize={16} maxSize={40} className="flex flex-col bg-card min-w-0">
+      <aside
+        className={`${sel ? "hidden sm:flex" : "flex"} w-full sm:w-[280px] lg:w-[320px] xl:w-[340px] sm:shrink-0 flex-col bg-card border-r border-border min-w-0`}
+      >
         <div className="p-3 border-b border-border space-y-2">
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -892,15 +893,25 @@ function InboxWhatsapp({ conversas, todasConversas, sel, setSel, busca, setBusca
             );
           })}
         </div>
-      </ResizablePanel>
-      <ResizableHandle withHandle />
+      </aside>
 
       {/* ============ COLUNA 2 — CHAT ============ */}
-      <ResizablePanel defaultSize={painelAberto ? 56 : 78} minSize={30} className="flex flex-col min-w-0 bg-[oklch(0.97_0.005_120)] dark:bg-muted/10">
+      <section
+        className={`${sel ? "flex" : "hidden sm:flex"} flex-1 min-w-0 flex-col bg-[oklch(0.97_0.005_120)] dark:bg-muted/10`}
+      >
         {sel ? (
           <>
             <header className="py-2.5 px-4 border-b border-border bg-card flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="sm:hidden -ml-2"
+                  onClick={() => setSel(null)}
+                  title="Voltar"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
                 <div className="h-10 w-10 rounded-full bg-primary/15 text-primary flex items-center justify-center font-semibold shrink-0">
                   {initials(sel.nome)}
                 </div>
@@ -967,15 +978,53 @@ function InboxWhatsapp({ conversas, todasConversas, sel, setSel, busca, setBusca
             <div>Selecione uma conversa à esquerda para começar.</div>
           </div>
         )}
-      </ResizablePanel>
+      </section>
 
-      {/* ============ COLUNA 3 — PAINEL DO CONTATO ============ */}
-      {painelAberto && (
-       <>
-        <ResizableHandle withHandle />
-        <ResizablePanel defaultSize={22} minSize={16} maxSize={40} className="flex flex-col bg-card min-w-0 overflow-auto">
-          {sel ? (
-            <div className="p-4 space-y-4">
+      {/* ============ COLUNA 3 — PAINEL DO CONTATO (xl+ inline, menor vira Sheet) ============ */}
+      {painelAberto && sel && (
+        <aside className="hidden xl:flex w-[300px] 2xl:w-[340px] shrink-0 border-l border-border bg-card flex-col overflow-auto">
+          <PainelContatoConteudo
+            sel={sel}
+            notas={notas}
+            setNotas={setNotas}
+            initials={initials}
+          />
+        </aside>
+      )}
+      <Sheet
+        open={painelAberto && !!sel}
+        onOpenChange={(o) => setPainelAberto(o)}
+      >
+        <SheetContent side="right" className="w-[320px] sm:w-[360px] p-0 xl:hidden">
+          {sel && (
+            <div className="h-full overflow-auto">
+              <PainelContatoConteudo
+                sel={sel}
+                notas={notas}
+                setNotas={setNotas}
+                initials={initials}
+              />
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+    </div>
+  );
+}
+
+function PainelContatoConteudo({
+  sel,
+  notas,
+  setNotas,
+  initials,
+}: {
+  sel: Conv;
+  notas: Record<string, string>;
+  setNotas: (n: Record<string, string>) => void;
+  initials: (n: string) => string;
+}) {
+  return (
+    <div className="p-4 space-y-4">
               <div className="flex flex-col items-center text-center pb-3 border-b border-border">
                 <div className="h-20 w-20 rounded-full bg-primary/15 text-primary flex items-center justify-center text-2xl font-semibold mb-2">
                   {initials(sel.nome)}
@@ -1013,16 +1062,6 @@ function InboxWhatsapp({ conversas, todasConversas, sel, setSel, busca, setBusca
                   className="text-xs resize-none"
                 />
               </div>
-            </div>
-          ) : (
-            <div className="p-6 text-xs text-muted-foreground text-center">
-              Selecione uma conversa para ver os detalhes do contato.
-            </div>
-          )}
-        </ResizablePanel>
-       </>
-      )}
-     </ResizablePanelGroup>
     </div>
   );
 }
