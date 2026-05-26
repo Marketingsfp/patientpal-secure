@@ -146,9 +146,11 @@ export function ContratosPage() {
   );
 }
 
-function NovoContratoForm({ onBack, planos, clinicaId, userId, onCreated }: { onBack: () => void; planos: Plano[]; clinicaId: string; userId: string | null; onCreated: () => void }) {
-  const [planoId, setPlanoId] = useState(planos[0]?.id ?? "");
-  const plano = planos.find((p) => p.id === planoId);
+function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: { onBack: () => void; convenios: Convenio[]; clinicaId: string; userId: string | null; onCreated: () => void }) {
+  const [convenioId, setConvenioId] = useState(convenios[0]?.id ?? "");
+  const convenio = convenios.find((c) => c.id === convenioId);
+  const [faixas, setFaixas] = useState<Faixa[]>([]);
+  const [beneficios, setBeneficios] = useState<Beneficio[]>([]);
   const [titular, setTitular] = useState<Paciente | null>(null);
   const [pacBusca, setPacBusca] = useState("");
   const [pacResults, setPacResults] = useState<Paciente[]>([]);
@@ -165,8 +167,30 @@ function NovoContratoForm({ onBack, planos, clinicaId, userId, onCreated }: { on
   const [faceOpen, setFaceOpen] = useState<null | "titular" | number>(null);
 
   useEffect(() => {
-    if (plano) { setValor(Number(plano.valor_mensal)); setTaxa(Number(plano.taxa_adesao)); }
-  }, [planoId]);
+    if (convenio) { setValor(Number(convenio.valor_mensal)); setTaxa(Number(convenio.taxa_adesao)); }
+  }, [convenioId]);
+
+  // Carrega faixas (por vidas) e benefícios do convênio selecionado
+  useEffect(() => {
+    (async () => {
+      if (!convenioId) { setFaixas([]); setBeneficios([]); return; }
+      const [fx, bn] = await Promise.all([
+        supabase.from("cb_convenio_faixas").select("*").eq("convenio_id", convenioId).order("vidas_de"),
+        supabase.from("cb_beneficios").select("*").eq("convenio_id", convenioId).eq("ativo", true).order("nome"),
+      ]);
+      setFaixas((fx.data ?? []) as Faixa[]);
+      setBeneficios((bn.data ?? []) as Beneficio[]);
+    })();
+  }, [convenioId]);
+
+  // Recalcula valor mensal conforme a faixa de vidas (titular + dependentes)
+  const vidas = (titular ? 1 : 0) + deps.length;
+  useEffect(() => {
+    if (!convenio) return;
+    if (faixas.length === 0) { setValor(Number(convenio.valor_mensal)); return; }
+    const faixa = faixas.find((f) => vidas >= f.vidas_de && (f.vidas_ate == null || vidas <= f.vidas_ate));
+    if (faixa) setValor(Number(faixa.valor_mensal));
+  }, [vidas, faixas, convenioId]);
 
   const buscarPac = async (term: string, setRes: (r: Paciente[]) => void) => {
     if (term.trim().length < 2) return setRes([]);
@@ -177,16 +201,16 @@ function NovoContratoForm({ onBack, planos, clinicaId, userId, onCreated }: { on
   };
 
   const addDep = (p: Paciente) => {
-    if (!plano) return;
-    const max = plano.max_dependentes + plano.max_agregados;
-    if (deps.length >= max) return toast.error(`Limite de ${max} dependentes/agregados`);
+    if (!convenio) return;
+    const max = convenio.max_dependentes;
+    if (max > 0 && deps.length >= max) return toast.error(`Limite de ${max} dependentes`);
     if (deps.find((d) => d.id === p.id) || titular?.id === p.id) return;
-    setDeps([...deps, { ...p, parentesco: "", tipo: deps.length < plano.max_dependentes ? "dependente" : "agregado" }]);
+    setDeps([...deps, { ...p, parentesco: "", tipo: "dependente" }]);
     setDepBusca(""); setDepResults([]);
   };
 
   const salvar = async () => {
-    if (!titular || !plano) return toast.error("Selecione paciente e plano");
+    if (!titular || !convenio) return toast.error("Selecione paciente e convênio");
     if (!titular.email) return toast.error("Titular precisa ter e-mail para acessar o app. Cadastre o e-mail no paciente antes de gerar o contrato.");
     if (!titular.face_descriptor || titular.face_descriptor.length === 0) return toast.error("Capture a foto do titular antes de gerar o contrato.");
     const semEmailDeps = deps.filter((d) => !d.email);
@@ -195,9 +219,9 @@ function NovoContratoForm({ onBack, planos, clinicaId, userId, onCreated }: { on
     if (semFotoDeps.length > 0 && !confirm(`${semFotoDeps.length} dependente(s) sem foto facial. Continuar mesmo assim?`)) return;
     setSaving(true);
     const { data: contrato, error } = await supabase.from("contratos_assinatura").insert({
-      clinica_id: clinicaId, plano_id: plano.id, paciente_id: titular.id, paciente_nome: titular.nome,
+      clinica_id: clinicaId, convenio_id: convenio.id, paciente_id: titular.id, paciente_nome: titular.nome,
       data_inicio: dataInicio, dia_vencimento: diaVenc, valor_mensal: valor, taxa_adesao: taxa,
-      num_parcelas: plano.num_parcelas, forma_pagamento: forma, observacoes: obs, criado_por: userId,
+      num_parcelas: convenio.num_parcelas, forma_pagamento: forma, observacoes: obs, criado_por: userId,
     }).select("*").single();
     if (error || !contrato) { setSaving(false); return toast.error(error?.message ?? "Erro"); }
 
@@ -210,7 +234,7 @@ function NovoContratoForm({ onBack, planos, clinicaId, userId, onCreated }: { on
 
     // Gerar 12 parcelas
     const base = new Date(dataInicio + "T00:00:00");
-    const parcelas = Array.from({ length: plano.num_parcelas }, (_, i) => {
+    const parcelas = Array.from({ length: convenio.num_parcelas }, (_, i) => {
       const venc = new Date(base.getFullYear(), base.getMonth() + i, diaVenc);
       return {
         contrato_id: contrato.id, clinica_id: clinicaId,
@@ -221,7 +245,7 @@ function NovoContratoForm({ onBack, planos, clinicaId, userId, onCreated }: { on
     await supabase.from("contrato_mensalidades").insert(parcelas);
 
     setSaving(false);
-    toast.success(`Contrato #${contrato.numero} criado com ${plano.num_parcelas} mensalidades`);
+    toast.success(`Contrato #${contrato.numero} criado com ${convenio.num_parcelas} mensalidades`);
     onCreated();
   };
 
@@ -237,11 +261,29 @@ function NovoContratoForm({ onBack, planos, clinicaId, userId, onCreated }: { on
       <Card>
         <CardContent className="p-6 space-y-4">
           <div className="grid grid-cols-2 gap-3">
-          <div className="col-span-2"><Label>Plano</Label>
-            <Select value={planoId} onValueChange={setPlanoId}>
+          <div className="col-span-2"><Label>Convênio</Label>
+            <Select value={convenioId} onValueChange={setConvenioId}>
               <SelectTrigger><SelectValue/></SelectTrigger>
-              <SelectContent>{planos.map((p) => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}</SelectContent>
+              <SelectContent>{convenios.map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}</SelectContent>
             </Select>
+            {convenio && (beneficios.length > 0 || convenio.beneficios) ? (
+              <div className="mt-2 rounded-md border bg-muted/30 p-3 text-xs space-y-1">
+                <div className="font-semibold text-foreground">Benefícios deste convênio</div>
+                {beneficios.map((b) => (
+                  <div key={b.id}>
+                    • <span className="font-medium">{b.nome}</span>
+                    {b.valor_desconto != null ? ` — ${b.tipo_desconto === "percentual" ? `${b.valor_desconto}% de desconto` : `R$ ${Number(b.valor_desconto).toFixed(2)}`}` : ""}
+                    {` · ${b.pessoa} · ${b.limite_uso === "ilimitado" ? "uso ilimitado" : `${b.limite_uso}x por ${b.periodicidade}`} · libera a partir do mês ${b.inicio_a_partir}`}
+                  </div>
+                ))}
+                {convenio.beneficios ? <div className="text-muted-foreground whitespace-pre-wrap pt-1 border-t mt-1">{convenio.beneficios}</div> : null}
+              </div>
+            ) : null}
+            {faixas.length > 0 ? (
+              <div className="mt-2 text-xs text-muted-foreground">
+                Valor calculado pela faixa de vidas: <span className="font-semibold text-foreground">{vidas} vida(s)</span>
+              </div>
+            ) : null}
           </div>
           <div className="col-span-2"><Label>Paciente titular</Label>
             {titular ? (
@@ -291,7 +333,7 @@ function NovoContratoForm({ onBack, planos, clinicaId, userId, onCreated }: { on
             </Select>
           </div>
           <div className="col-span-2 border-t pt-3">
-            <Label>Dependentes / Agregados {plano ? `(máx ${plano.max_dependentes + plano.max_agregados})` : ""}</Label>
+            <Label>Dependentes {convenio && convenio.max_dependentes > 0 ? `(máx ${convenio.max_dependentes})` : ""}</Label>
             <Input className="mt-1" placeholder="Buscar paciente para incluir…" value={depBusca} onChange={(e) => { setDepBusca(e.target.value); buscarPac(e.target.value, setDepResults); }}/>
             {depResults.length > 0 ? (
               <div className="rounded-md border mt-1 max-h-32 overflow-auto">
@@ -311,10 +353,7 @@ function NovoContratoForm({ onBack, planos, clinicaId, userId, onCreated }: { on
                       {d.face_descriptor && d.face_descriptor.length > 0 ? <Check className="h-3 w-3 text-green-600"/> : null}
                     </span>
                     <Input className="col-span-3 h-8" placeholder="Parentesco" value={d.parentesco} onChange={(e) => setDeps(deps.map((x, j) => j === i ? { ...x, parentesco: e.target.value } : x))}/>
-                    <Select value={d.tipo} onValueChange={(v) => setDeps(deps.map((x, j) => j === i ? { ...x, tipo: v } : x))}>
-                      <SelectTrigger className="col-span-2 h-8"><SelectValue/></SelectTrigger>
-                      <SelectContent><SelectItem value="dependente">Dependente</SelectItem><SelectItem value="agregado">Agregado</SelectItem></SelectContent>
-                    </Select>
+                    <div className="col-span-2 text-xs text-muted-foreground self-center">Dependente</div>
                     <Button size="sm" variant="outline" className="col-span-3 h-8" onClick={() => setFaceOpen(i)}>
                       <Camera className="h-3 w-3 mr-1"/>{d.face_descriptor?.length ? "Refazer" : "Foto"}
                     </Button>
@@ -328,7 +367,7 @@ function NovoContratoForm({ onBack, planos, clinicaId, userId, onCreated }: { on
           </div>
           <div className="flex justify-end gap-2 border-t pt-4">
           <Button variant="ghost" onClick={onBack}>Cancelar</Button>
-          <Button onClick={salvar} disabled={saving || !titular || !plano}>Gerar contrato + {plano?.num_parcelas ?? 12} parcelas</Button>
+          <Button onClick={salvar} disabled={saving || !titular || !convenio}>Gerar contrato + {convenio?.num_parcelas ?? 12} parcelas</Button>
           </div>
         {faceOpen ? (
           <FaceCaptureDialog
