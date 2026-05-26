@@ -14,6 +14,9 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { ChevronsUpDown } from "lucide-react";
 import { printContrato } from "@/lib/print-contrato";
 import { printCartoes } from "@/lib/print-cartao";
 import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
@@ -152,16 +155,15 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
   const [faixas, setFaixas] = useState<Faixa[]>([]);
   const [beneficios, setBeneficios] = useState<Beneficio[]>([]);
   const [titular, setTitular] = useState<Paciente | null>(null);
-  const [pacBusca, setPacBusca] = useState("");
-  const [pacResults, setPacResults] = useState<Paciente[]>([]);
+  const [clientes, setClientes] = useState<Paciente[]>([]);
+  const [titularOpen, setTitularOpen] = useState(false);
+  const [depOpen, setDepOpen] = useState(false);
   const [valor, setValor] = useState(0);
   const [taxa, setTaxa] = useState(0);
   const [diaVenc, setDiaVenc] = useState(10);
   const [dataInicio, setDataInicio] = useState(new Date().toISOString().slice(0, 10));
   const [forma, setForma] = useState("dinheiro");
   const [obs, setObs] = useState("");
-  const [depBusca, setDepBusca] = useState("");
-  const [depResults, setDepResults] = useState<Paciente[]>([]);
   const [deps, setDeps] = useState<Array<Paciente & { parentesco: string; tipo: string }>>([]);
   const [saving, setSaving] = useState(false);
   const [faceOpen, setFaceOpen] = useState<null | "titular" | number>(null);
@@ -169,6 +171,16 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
   useEffect(() => {
     if (convenio) { setValor(Number(convenio.valor_mensal)); setTaxa(Number(convenio.taxa_adesao)); }
   }, [convenioId]);
+
+  // Carrega todos os clientes (pacientes) ativos da clínica
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from("pacientes")
+        .select("id, nome, cpf, telefone, email, face_descriptor")
+        .eq("clinica_id", clinicaId).eq("ativo", true).order("nome");
+      setClientes((data ?? []) as Paciente[]);
+    })();
+  }, [clinicaId]);
 
   // Carrega faixas (por vidas) e benefícios do convênio selecionado
   useEffect(() => {
@@ -192,21 +204,13 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
     if (faixa) setValor(Number(faixa.valor_mensal));
   }, [vidas, faixas, convenioId]);
 
-  const buscarPac = async (term: string, setRes: (r: Paciente[]) => void) => {
-    if (term.trim().length < 2) return setRes([]);
-    const { data } = await supabase.from("pacientes")
-      .select("id, nome, cpf, telefone, email, face_descriptor").eq("clinica_id", clinicaId).eq("ativo", true)
-      .ilike("nome", `%${term}%`).limit(8);
-    setRes((data ?? []) as Paciente[]);
-  };
-
   const addDep = (p: Paciente) => {
     if (!convenio) return;
     const max = convenio.max_dependentes;
     if (max > 0 && deps.length >= max) return toast.error(`Limite de ${max} dependentes`);
     if (deps.find((d) => d.id === p.id) || titular?.id === p.id) return;
     setDeps([...deps, { ...p, parentesco: "", tipo: "dependente" }]);
-    setDepBusca(""); setDepResults([]);
+    setDepOpen(false);
   };
 
   const salvar = async () => {
