@@ -167,7 +167,7 @@ export function RichEditor({ value, onChange, clinicaId }: Props) {
   };
 
   return (
-    <div className="border rounded-md overflow-hidden bg-background">
+    <div className="rt-shell border rounded-md overflow-hidden bg-background">
       <div className="flex flex-wrap items-center gap-1 border-b p-1.5 bg-muted/30 print:hidden">
         <ToolbarButton title="Desfazer" onClick={() => editor.chain().focus().undo().run()}>
           <Undo2 className="h-4 w-4" />
@@ -329,8 +329,8 @@ export function RichEditor({ value, onChange, clinicaId }: Props) {
         </Button>
       </div>
 
-      <div className="bg-muted/40 overflow-auto" style={{ maxHeight: "70vh" }}>
-        <div className="mx-auto my-4 bg-white shadow-md" style={{ width: "210mm", minHeight: "297mm", padding: "12mm 14mm" }}>
+      <div className="rt-scroll bg-muted/40 overflow-auto" style={{ maxHeight: "70vh" }}>
+        <div className="rt-page mx-auto my-4 bg-white shadow-md" style={{ width: "210mm", minHeight: "297mm", padding: "12mm 14mm" }}>
           <EditorContent editor={editor} />
         </div>
       </div>
