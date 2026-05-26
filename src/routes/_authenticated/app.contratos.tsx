@@ -527,6 +527,8 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
 }
 
 function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () => void }) {
+  const { clinicaAtual } = useClinica();
+  const { user } = useAuth();
   const DadosField = ({ label, value }: { label: string; value: React.ReactNode }) => (
     <div className="space-y-1">
       <div className="text-sm font-medium">{label}</div>
