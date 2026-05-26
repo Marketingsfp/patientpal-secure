@@ -27,6 +27,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
+import { ProcedimentoCell } from "@/components/agenda/procedimento-cell";
 import {
   CalendarDays, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X,
   MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, Clock, DollarSign, ShieldCheck, BadgeCheck,
@@ -435,6 +436,36 @@ function AgendaPage() {
     if (isNaN(d.getTime())) return "";
     d.setMinutes(d.getMinutes() + dur);
     return toLocalInput(d.toISOString());
+  };
+
+  // Opções de procedimento disponíveis para um médico específico (cadastro do médico)
+  const opcoesProcedimentoMedico = (medicoId: string | null) => {
+    if (!medicoId) return [] as { id: string; nome: string }[];
+    const ids = procPorMedico.get(medicoId);
+    const nomes = procNomesPorMedico.get(medicoId);
+    const temConfig = (ids && ids.size > 0) || (nomes && nomes.size > 0);
+    if (!temConfig) return [];
+    return procedimentosList.filter(
+      (p) => (ids?.has(p.id) ?? false) || (nomes?.has(normalizar(p.nome)) ?? false),
+    );
+  };
+
+  // Atualiza inline o procedimento de um agendamento (do badge na coluna Pasta)
+  const atualizarProcedimento = async (ag: Agendamento, novoNome: string) => {
+    const nomeFinal = novoNome.trim();
+    if (!nomeFinal || nomeFinal === (ag.procedimento ?? "")) return;
+    const anterior = ag.procedimento;
+    setItems((prev) => prev.map((x) => (x.id === ag.id ? { ...x, procedimento: nomeFinal } : x)));
+    const { error } = await supabase
+      .from("agendamentos")
+      .update({ procedimento: nomeFinal })
+      .eq("id", ag.id);
+    if (error) {
+      setItems((prev) => prev.map((x) => (x.id === ag.id ? { ...x, procedimento: anterior } : x)));
+      toast.error("Não foi possível atualizar o procedimento");
+      return;
+    }
+    toast.success(`Procedimento alterado para ${nomeFinal}`);
   };
 
   const fichaPorId = useMemo(() => {
@@ -1640,7 +1671,12 @@ function AgendaPage() {
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline" className="text-xs">{a.procedimento || "CONSULTA"}</Badge>
+                    <ProcedimentoCell
+                      valor={a.procedimento}
+                      opcoes={opcoesProcedimentoMedico(a.medico_id)}
+                      disabled={normalizar(a.paciente_nome) === "disponivel"}
+                      onChange={(novo) => atualizarProcedimento(a, novo)}
+                    />
                   </TableCell>
                   <TableCell className="text-center">
                     <div className="flex flex-col items-center gap-0.5">
