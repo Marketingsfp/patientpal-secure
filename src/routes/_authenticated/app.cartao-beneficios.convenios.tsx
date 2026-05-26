@@ -21,6 +21,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { InformativoCartaoConsultaSeguros } from "@/components/cartao-beneficios/informativo-cartao-consulta-seguros";
 
 export const Route = createFileRoute("/_authenticated/app/cartao-beneficios/convenios")({
   component: ConveniosPage,
@@ -697,9 +698,13 @@ function ConveniosPage() {
                   </Button>
                 </div>
                 <div id="convenio-informativo-print" className="border rounded-md p-6 bg-muted/30 min-h-[300px]">
-                  <p className="text-sm text-muted-foreground text-center py-12">
-                    Aguardando modelo do informativo. Envie o arquivo Word para que o conteúdo seja exibido aqui para visualização e impressão.
-                  </p>
+                  {/CART[ÃA]O\s*CONSULTA.*SEGUROS/i.test(nome) ? (
+                    <InformativoCartaoConsultaSeguros />
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-12">
+                      Informativo disponível para o convênio "CARTÃO CONSULTA + SEGUROS". Para outros convênios, envie o modelo correspondente.
+                    </p>
+                  )}
                 </div>
               </div>
             </TabsContent>
