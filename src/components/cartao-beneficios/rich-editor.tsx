@@ -289,6 +289,14 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
     editor.chain().focus().setImage({ src: data.publicUrl }).run();
   };
 
+  const handleUploadMany = async (files: File[]) => {
+    for (const f of files) {
+      // sequencial para preservar ordem de inserção (ficam lado a lado)
+      // eslint-disable-next-line no-await-in-loop
+      await handleUpload(f);
+    }
+  };
+
   const setLink = () => {
     const prev = editor.getAttributes("link").href as string | undefined;
     const url = window.prompt("URL do link:", prev || "https://");
