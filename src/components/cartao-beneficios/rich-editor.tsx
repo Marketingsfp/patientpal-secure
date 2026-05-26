@@ -434,6 +434,32 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
     return src ? { src, pos: selection.from } : null;
   };
 
+  // Helpers para encontrar a tabela/linha atuais e atualizar atributos (largura/altura)
+  const findAncestorPos = (typeName: string): { pos: number; attrs: Record<string, unknown> } | null => {
+    const { $from } = editor.state.selection;
+    for (let d = $from.depth; d > 0; d--) {
+      const node = $from.node(d);
+      if (node.type.name === typeName) {
+        return { pos: $from.before(d), attrs: node.attrs };
+      }
+    }
+    return null;
+  };
+  const updateAncestor = (typeName: string, patch: Record<string, unknown>) => {
+    const found = findAncestorPos(typeName);
+    if (!found) return;
+    editor.chain().focus().command(({ tr, dispatch, state }) => {
+      const node = state.doc.nodeAt(found.pos);
+      if (!node) return false;
+      dispatch?.(tr.setNodeMarkup(found.pos, undefined, { ...node.attrs, ...patch }));
+      return true;
+    }).run();
+  };
+  const tableNode = findAncestorPos("table");
+  const rowNode = findAncestorPos("tableRow");
+  const currentTableWidth = (tableNode?.attrs.width as string | null) || "";
+  const currentRowHeight = (rowNode?.attrs.height as string | null) || "";
+
   const replaceCropTarget = (dataUrl: string) => {
     if (cropTargetPos === null) {
       editor.chain().focus().updateAttributes("image", { src: dataUrl }).run();
