@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useRef, useEffect, useCallback } from "react";
-import { MessageCircle, Send, Mic, Bot, CheckCheck, Phone, FileText, DollarSign, Cake, Calendar, Sparkles, Brain, Loader2, Copy, CheckCircle2, AlertCircle, Eye, EyeOff, Smartphone, Instagram, Facebook, Globe, Plus, Pencil, X } from "lucide-react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { MessageCircle, Send, Mic, Bot, CheckCheck, Phone, FileText, DollarSign, Cake, Calendar, Sparkles, Brain, Loader2, Copy, CheckCircle2, AlertCircle, Eye, EyeOff, Smartphone, Instagram, Facebook, Globe, Plus, Pencil, X, Paperclip, Smile, Search, PanelRightClose, PanelRightOpen, MoreVertical, User, Tag, ArrowLeft } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { useClinica } from "@/hooks/use-clinica";
 import { chatNina } from "@/lib/nina.functions";
@@ -206,112 +206,19 @@ function NinaPage() {
 
         {/* ============ CONVERSAS ============ */}
         <TabsContent value="chat">
-          <div className="grid grid-cols-12 gap-4 h-[calc(100vh-280px)] min-h-[500px]">
-            {/* Lista */}
-            <Card className="col-span-4 overflow-hidden flex flex-col">
-              <CardHeader className="py-3 border-b">
-                <Input
-                  placeholder="Buscar conversa…"
-                  className="h-9"
-                  value={busca}
-                  onChange={(e) => setBusca(e.target.value)}
-                />
-              </CardHeader>
-              <div className="flex-1 overflow-auto">
-                {conversasFiltradas.length === 0 && (
-                  <div className="p-6 text-sm text-muted-foreground text-center">
-                    {loadingConv ? "Carregando…" : "Nenhuma conversa ainda. Quando um paciente enviar mensagem no WhatsApp, ela aparece aqui."}
-                  </div>
-                )}
-                {conversasFiltradas.map(c => (
-                  <button key={c.id} onClick={() => setSel(c)}
-                    className={`w-full text-left px-4 py-3 border-b border-border hover:bg-muted/50 transition-colors ${sel?.id === c.id ? "bg-muted" : ""}`}>
-                    <div className="flex justify-between items-start gap-2">
-                      <div className="min-w-0 flex-1">
-                        <div className="font-medium truncate">{c.nome}</div>
-                        <div className="text-xs text-muted-foreground truncate">{c.ultima}</div>
-                      </div>
-                      <div className="text-xs text-muted-foreground shrink-0 flex flex-col items-end gap-1">
-                        <span>{c.quando}</span>
-                        {c.naoLidas > 0 && <Badge className="bg-emerald-500 text-white h-5 min-w-5 px-1.5">{c.naoLidas}</Badge>}
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </Card>
-
-            {/* Chat */}
-            <Card className="col-span-8 overflow-hidden flex flex-col">
-             {sel ? (
-              <>
-              <CardHeader className="py-3 border-b flex flex-row items-center justify-between space-y-0">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-primary/15 text-primary flex items-center justify-center font-semibold">
-                    {sel.nome.split(" ").map(n => n[0]).slice(0, 2).join("")}
-                  </div>
-                  <div>
-                    <div className="font-medium">{sel.nome}</div>
-                    <div className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Phone className="h-3 w-3" /> {sel.telefone}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 text-xs">
-                  <Bot className="h-4 w-4 text-emerald-500" />
-                  <span className="text-muted-foreground">Nina respondendo</span>
-                  <Switch defaultChecked />
-                </div>
-              </CardHeader>
-
-              <div className="flex-1 overflow-auto p-4 space-y-3 bg-muted/20">
-                {sel.msgs.map((m, i) => (
-                  <div key={i} className={`flex ${m.from === "nina" ? "justify-end" : "justify-start"}`}>
-                    <div className={`max-w-[75%] rounded-2xl px-4 py-2 text-sm shadow-sm ${
-                      m.from === "nina" ? "bg-emerald-500 text-white rounded-br-sm" : "bg-card border border-border rounded-bl-sm"
-                    }`}>
-                      {m.tipo === "audio" && <div className="text-xs opacity-70 mb-1 flex items-center gap-1"><Mic className="h-3 w-3" /> transcrito por IA</div>}
-                      <div className="whitespace-pre-wrap break-words">{formatWhatsappText(m.text)}</div>
-                      <div className={`text-[10px] mt-1 flex items-center gap-1 ${m.from === "nina" ? "text-white/80 justify-end" : "text-muted-foreground"}`}>
-                        {m.at} {m.from === "nina" && <CheckCheck className="h-3 w-3" />}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="border-t p-3 flex items-center gap-2">
-                <Button variant="ghost" size="icon" title="Gravar áudio"><Mic className="h-4 w-4" /></Button>
-                <Input
-                  placeholder="Digite uma mensagem… (Nina responde se IA estiver ligada)"
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      enviarMensagem();
-                    }
-                  }}
-                  disabled={enviando}
-                  className="flex-1"
-                />
-                <Button
-                  size="icon"
-                  onClick={enviarMensagem}
-                  disabled={enviando || !draft.trim()}
-                  className="bg-emerald-500 hover:bg-emerald-600"
-                >
-                  {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                </Button>
-              </div>
-              </>
-             ) : (
-              <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground p-8 text-center">
-                Selecione uma conversa à esquerda para visualizar as mensagens.
-              </div>
-             )}
-            </Card>
-          </div>
+          <InboxWhatsapp
+            conversas={conversasFiltradas}
+            todasConversas={conversas}
+            sel={sel}
+            setSel={setSel}
+            busca={busca}
+            setBusca={setBusca}
+            draft={draft}
+            setDraft={setDraft}
+            enviando={enviando}
+            enviarMensagem={enviarMensagem}
+            loadingConv={loadingConv}
+          />
         </TabsContent>
 
         {/* ============ AUTOMAÇÕES ============ */}
@@ -862,5 +769,312 @@ function ConfiguracaoWhatsApp() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+/* ============================ INBOX WHATSAPP (Hi-style) ============================ */
+
+type InboxProps = {
+  conversas: Conv[];
+  todasConversas: Conv[];
+  sel: Conv | null;
+  setSel: (c: Conv | null) => void;
+  busca: string;
+  setBusca: (v: string) => void;
+  draft: string;
+  setDraft: (v: string) => void;
+  enviando: boolean;
+  enviarMensagem: () => Promise<void> | void;
+  loadingConv: boolean;
+};
+
+function InboxWhatsapp({ conversas, todasConversas, sel, setSel, busca, setBusca, draft, setDraft, enviando, enviarMensagem, loadingConv }: InboxProps) {
+  const [filtro, setFiltro] = useState<"todas" | "naolidas" | "nina" | "humano">("todas");
+  const [painelAberto, setPainelAberto] = useState(true);
+  const [notas, setNotas] = useState<Record<string, string>>({});
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  const listaFinal = useMemo(() => {
+    if (filtro === "naolidas") return conversas.filter(c => c.naoLidas > 0);
+    if (filtro === "nina") return conversas.filter(c => c.msgs.at(-1)?.from === "nina");
+    if (filtro === "humano") return conversas.filter(c => c.msgs.at(-1)?.from === "paciente");
+    return conversas;
+  }, [conversas, filtro]);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [sel?.id, sel?.msgs.length]);
+
+  const initials = (nome: string) =>
+    nome.split(" ").filter(Boolean).map(n => n[0]).slice(0, 2).join("").toUpperCase() || "?";
+
+  const totalNaoLidas = todasConversas.reduce((s, c) => s + c.naoLidas, 0);
+
+  return (
+    <div className="grid grid-cols-12 gap-0 h-[calc(100vh-260px)] min-h-[560px] border border-border rounded-lg overflow-hidden bg-card">
+      {/* ============ COLUNA 1 — LISTA DE CONVERSAS ============ */}
+      <aside className={`${painelAberto ? "col-span-3" : "col-span-3"} border-r border-border flex flex-col bg-card min-w-0`}>
+        <div className="p-3 border-b border-border space-y-2">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar conversa…"
+              className="h-9 pl-8"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-1 flex-wrap">
+            {([
+              { k: "todas", label: "Todas", count: todasConversas.length },
+              { k: "naolidas", label: "Não lidas", count: totalNaoLidas },
+              { k: "nina", label: "Nina" },
+              { k: "humano", label: "Aguardando" },
+            ] as const).map(f => (
+              <button
+                key={f.k}
+                onClick={() => setFiltro(f.k)}
+                className={`text-xs px-2.5 py-1 rounded-full transition-colors flex items-center gap-1 ${
+                  filtro === f.k
+                    ? "bg-emerald-500 text-white"
+                    : "bg-muted text-muted-foreground hover:bg-muted/70"
+                }`}
+              >
+                {f.label}
+                {("count" in f && f.count) ? <span className="opacity-80">·{f.count}</span> : null}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="flex-1 overflow-auto">
+          {listaFinal.length === 0 && (
+            <div className="p-8 text-sm text-muted-foreground text-center">
+              {loadingConv ? "Carregando…" : "Nenhuma conversa nesse filtro."}
+            </div>
+          )}
+          {listaFinal.map(c => {
+            const ativo = sel?.id === c.id;
+            const ultimaFromNina = c.msgs.at(-1)?.from === "nina";
+            return (
+              <button
+                key={c.id}
+                onClick={() => setSel(c)}
+                className={`w-full text-left px-3 py-3 border-b border-border/60 hover:bg-muted/50 transition-colors flex gap-3 relative ${
+                  ativo ? "bg-muted" : ""
+                }`}
+              >
+                {ativo && <span className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500" />}
+                <div className="h-10 w-10 rounded-full bg-primary/15 text-primary flex items-center justify-center font-semibold text-sm shrink-0">
+                  {initials(c.nome)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="font-medium truncate text-sm">{c.nome}</div>
+                    <div className="text-[10px] text-muted-foreground shrink-0">{c.quando}</div>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 mt-0.5">
+                    <div className="text-xs text-muted-foreground truncate flex items-center gap-1">
+                      {ultimaFromNina && <CheckCheck className="h-3 w-3 text-emerald-500 shrink-0" />}
+                      <span className="truncate">{c.ultima || "—"}</span>
+                    </div>
+                    {c.naoLidas > 0 && (
+                      <Badge className="bg-emerald-500 text-white h-5 min-w-5 px-1.5 text-[10px]">
+                        {c.naoLidas}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </aside>
+
+      {/* ============ COLUNA 2 — CHAT ============ */}
+      <section className={`${painelAberto ? "col-span-6" : "col-span-9"} flex flex-col min-w-0 bg-[oklch(0.97_0.005_120)] dark:bg-muted/10`}>
+        {sel ? (
+          <>
+            <header className="py-2.5 px-4 border-b border-border bg-card flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="h-10 w-10 rounded-full bg-primary/15 text-primary flex items-center justify-center font-semibold shrink-0">
+                  {initials(sel.nome)}
+                </div>
+                <div className="min-w-0">
+                  <div className="font-medium truncate">{sel.nome}</div>
+                  <div className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Phone className="h-3 w-3" /> {sel.telefone}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                <div className="flex items-center gap-2 text-xs">
+                  <Bot className="h-4 w-4 text-emerald-500" />
+                  <span className="text-muted-foreground hidden md:inline">Nina</span>
+                  <Switch defaultChecked />
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setPainelAberto(v => !v)}
+                  title={painelAberto ? "Fechar painel" : "Abrir painel"}
+                >
+                  {painelAberto ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
+                </Button>
+                <Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button>
+              </div>
+            </header>
+
+            <div ref={scrollRef} className="flex-1 overflow-auto p-4 space-y-1">
+              {renderMensagensAgrupadas(sel.msgs)}
+            </div>
+
+            <div className="border-t border-border bg-card p-2.5 flex items-end gap-2">
+              <Button variant="ghost" size="icon" title="Anexar"><Paperclip className="h-4 w-4" /></Button>
+              <Button variant="ghost" size="icon" title="Emoji"><Smile className="h-4 w-4" /></Button>
+              <Textarea
+                placeholder="Digite uma mensagem…"
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    enviarMensagem();
+                  }
+                }}
+                disabled={enviando}
+                rows={1}
+                className="flex-1 resize-none min-h-9 max-h-32 py-2"
+              />
+              <Button variant="ghost" size="icon" title="Gravar áudio"><Mic className="h-4 w-4" /></Button>
+              <Button
+                size="icon"
+                onClick={() => enviarMensagem()}
+                disabled={enviando || !draft.trim()}
+                className="bg-emerald-500 hover:bg-emerald-600"
+              >
+                {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              </Button>
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center text-sm text-muted-foreground p-8 text-center gap-3">
+            <MessageCircle className="h-12 w-12 opacity-30" />
+            <div>Selecione uma conversa à esquerda para começar.</div>
+          </div>
+        )}
+      </section>
+
+      {/* ============ COLUNA 3 — PAINEL DO CONTATO ============ */}
+      {painelAberto && (
+        <aside className="col-span-3 border-l border-border flex flex-col bg-card min-w-0 overflow-auto">
+          {sel ? (
+            <div className="p-4 space-y-4">
+              <div className="flex flex-col items-center text-center pb-3 border-b border-border">
+                <div className="h-20 w-20 rounded-full bg-primary/15 text-primary flex items-center justify-center text-2xl font-semibold mb-2">
+                  {initials(sel.nome)}
+                </div>
+                <div className="font-semibold">{sel.nome}</div>
+                <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                  <Phone className="h-3 w-3" /> {sel.telefone}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-[10px] font-semibold uppercase text-muted-foreground tracking-wider mb-2 flex items-center gap-1">
+                  <Tag className="h-3 w-3" /> Tags
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  <Badge variant="outline" className="text-[10px]">Paciente</Badge>
+                  <Badge variant="outline" className="text-[10px]">WhatsApp</Badge>
+                </div>
+              </div>
+
+              <PainelInfoCard icon={User} titulo="Paciente vinculado" valor="—" />
+              <PainelInfoCard icon={Calendar} titulo="Próximo agendamento" valor="—" />
+              <PainelInfoCard icon={FileText} titulo="Última consulta" valor="—" />
+              <PainelInfoCard icon={DollarSign} titulo="Mensalidades em aberto" valor="—" />
+
+              <div>
+                <div className="text-[10px] font-semibold uppercase text-muted-foreground tracking-wider mb-2">
+                  Notas internas
+                </div>
+                <Textarea
+                  rows={4}
+                  placeholder="Anotações sobre esse contato…"
+                  value={notas[sel.id] || ""}
+                  onChange={(e) => setNotas({ ...notas, [sel.id]: e.target.value })}
+                  className="text-xs resize-none"
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="p-6 text-xs text-muted-foreground text-center">
+              Selecione uma conversa para ver os detalhes do contato.
+            </div>
+          )}
+        </aside>
+      )}
+    </div>
+  );
+}
+
+function PainelInfoCard({ icon: Icon, titulo, valor }: { icon: any; titulo: string; valor: string }) {
+  return (
+    <div className="rounded-md border border-border p-3 bg-muted/30">
+      <div className="text-[10px] font-semibold uppercase text-muted-foreground tracking-wider flex items-center gap-1 mb-1">
+        <Icon className="h-3 w-3" /> {titulo}
+      </div>
+      <div className="text-sm">{valor}</div>
+    </div>
+  );
+}
+
+function renderMensagensAgrupadas(msgs: Msg[]) {
+  // As mensagens só têm hora ("HH:MM"), sem data. Para um separador útil,
+  // marcamos um único grupo "Hoje" no topo se houver mensagens.
+  if (!msgs.length) {
+    return (
+      <div className="text-center text-xs text-muted-foreground py-8">
+        Nenhuma mensagem ainda.
+      </div>
+    );
+  }
+  return (
+    <>
+      <div className="flex justify-center my-2">
+        <span className="text-[10px] text-muted-foreground bg-card border border-border rounded-full px-3 py-0.5">
+          Hoje
+        </span>
+      </div>
+      {msgs.map((m, i) => (
+        <div key={i} className={`flex ${m.from === "nina" ? "justify-end" : "justify-start"} mb-1`}>
+          <div
+            className={`max-w-[70%] rounded-2xl px-3 py-2 text-sm shadow-sm ${
+              m.from === "nina"
+                ? "bg-emerald-500 text-white rounded-br-sm"
+                : "bg-card border border-border rounded-bl-sm"
+            }`}
+          >
+            {m.tipo === "audio" && (
+              <div className="text-xs opacity-70 mb-1 flex items-center gap-1">
+                <Mic className="h-3 w-3" /> transcrito por IA
+              </div>
+            )}
+            <div className="whitespace-pre-wrap break-words leading-snug">
+              {formatWhatsappText(m.text)}
+            </div>
+            <div
+              className={`text-[10px] mt-1 flex items-center gap-1 ${
+                m.from === "nina" ? "text-white/80 justify-end" : "text-muted-foreground"
+              }`}
+            >
+              {m.at} {m.from === "nina" && <CheckCheck className="h-3 w-3" />}
+            </div>
+          </div>
+        </div>
+      ))}
+    </>
   );
 }
