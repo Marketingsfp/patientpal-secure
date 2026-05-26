@@ -17,7 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import DOMPurify from "dompurify";
 import { ChevronsUpDown } from "lucide-react";
@@ -25,6 +25,7 @@ import { printContrato } from "@/lib/print-contrato";
 import { fmtDataExtenso } from "@/lib/print-contrato";
 import { printCartoes } from "@/lib/print-cartao";
 import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
+import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 
 export const Route = createFileRoute("/_authenticated/app/contratos")({
   component: ContratosPage,
@@ -63,7 +64,17 @@ type Beneficio = {
 type Paciente = { id: string; nome: string; cpf: string | null; telefone: string | null; email: string | null; face_descriptor?: number[] | null };
 type Contrato = { id: string; numero: number; paciente_nome: string; convenio_id: string | null; plano_id: string | null; valor_mensal: number; status: string; data_inicio: string; data_fim: string | null; assinado_em: string | null; token_publico: string; forma_pagamento: string | null; dia_vencimento?: number | null; taxa_adesao?: number | null; num_parcelas?: number | null; paciente_id?: string | null; clinica_id?: string | null; observacoes?: string | null };
 type Mens = { id: string; numero_parcela: number; vencimento: string; valor: number; status: string; pago_em: string | null; forma_pagamento: string | null };
-type Dep = { id: string; paciente_nome: string; parentesco: string | null; tipo: string; cpf?: string | null };
+type Dep = {
+  id: string;
+  paciente_id: string;
+  paciente_nome: string;
+  parentesco: string | null;
+  tipo: string;
+  cpf?: string | null;
+  incluido_em: string | null;
+  excluido_em: string | null;
+  ativo: boolean;
+};
 
 export function ContratosPage() {
   const { clinicaAtual } = useClinica();
@@ -519,6 +530,17 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
   const [faixas, setFaixas] = useState<Faixa[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Inclusão/exclusão de dependentes pós-venda
+  const [incOpen, setIncOpen] = useState(false);
+  const [incPaciente, setIncPaciente] = useState<PatientOption | null>(null);
+  const [incParentesco, setIncParentesco] = useState<string>("");
+  const [incTipo, setIncTipo] = useState<string>("dependente");
+  const [incSaving, setIncSaving] = useState(false);
+  const [excAlvo, setExcAlvo] = useState<Dep | null>(null);
+  const [termoOpen, setTermoOpen] = useState(false);
+  const [termoMovimento, setTermoMovimento] = useState<"Inclusão" | "Exclusão">("Inclusão");
+  const [termoDep, setTermoDep] = useState<Dep | null>(null);
+
   // Diálogo de forma de pagamento (espelha o da agenda)
   const [pagMens, setPagMens] = useState<Mens | null>(null);
   const [formaPagOpen, setFormaPagOpen] = useState(false);
@@ -536,9 +558,16 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     setLoading(true);
     const [m, d, cv, cl, pa, fx] = await Promise.all([
       supabase.from("contrato_mensalidades").select("*").eq("contrato_id", contrato.id).order("numero_parcela"),
-      supabase.from("contrato_dependentes").select("id, paciente_nome, parentesco, tipo, pacientes:paciente_id(cpf)").eq("contrato_id", contrato.id).eq("ativo", true),
+      supabase
+        .from("contrato_dependentes")
+        .select("id, paciente_id, paciente_nome, parentesco, tipo, incluido_em, excluido_em, ativo, pacientes:paciente_id(cpf)")
+        .eq("contrato_id", contrato.id),
       contrato.convenio_id
-        ? supabase.from("cb_convenios").select("nome, modelo_contrato, vigencia_meses, fidelidade_meses, max_dependentes").eq("id", contrato.convenio_id).maybeSingle()
+        ? supabase
+            .from("cb_convenios")
+            .select("nome, modelo_contrato, termo_inclusao_html, vigencia_meses, fidelidade_meses, max_dependentes")
+            .eq("id", contrato.convenio_id)
+            .maybeSingle()
         : Promise.resolve({ data: null }),
       supabase.from("clinicas").select("nome, cnpj, endereco, cidade, estado, telefone").eq("id", (contrato as any).clinica_id ?? "").maybeSingle(),
       supabase.from("pacientes").select("cpf, data_nascimento, telefone, email, logradouro, numero, bairro, cidade, estado, cep").eq("id", (contrato as any).paciente_id ?? "").maybeSingle(),
@@ -547,10 +576,24 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
         : Promise.resolve({ data: [] }),
     ]);
     setMens((m.data ?? []) as Mens[]);
-    setDeps(((d.data ?? []) as any[]).map((r) => ({
-      id: r.id, paciente_nome: r.paciente_nome, parentesco: r.parentesco, tipo: r.tipo,
+    const depsRows = ((d.data ?? []) as any[]).map((r) => ({
+      id: r.id,
+      paciente_id: r.paciente_id,
+      paciente_nome: r.paciente_nome,
+      parentesco: r.parentesco,
+      tipo: r.tipo,
       cpf: r.pacientes?.cpf ?? null,
-    })));
+      incluido_em: r.incluido_em ?? null,
+      excluido_em: r.excluido_em ?? null,
+      ativo: !!r.ativo,
+    })) as Dep[];
+    // Ativos primeiro (por inclusão asc), depois excluídos (por exclusão desc)
+    depsRows.sort((a, b) => {
+      if (a.ativo !== b.ativo) return a.ativo ? -1 : 1;
+      if (a.ativo) return (a.incluido_em ?? "").localeCompare(b.incluido_em ?? "");
+      return (b.excluido_em ?? "").localeCompare(a.excluido_em ?? "");
+    });
+    setDeps(depsRows);
     setConvenio(cv.data ?? null);
     setClinica(cl.data ?? null);
     setPacienteFull(pa.data ?? null);
@@ -631,6 +674,142 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
   };
   const formaLabel = formaLabelMap[contrato.forma_pagamento ?? ""] ?? (contrato.forma_pagamento ?? "—");
   const maxDep = Number(convenio?.max_dependentes ?? 0) || 0;
+  const depsAtivos = deps.filter((d) => d.ativo);
+
+  const renderTermo = (dep: Dep, movimento: "Inclusão" | "Exclusão"): string => {
+    const tpl = convenio?.termo_inclusao_html ?? "";
+    if (!tpl) return "";
+    const _cl = clinica ?? {};
+    const _pa = pacienteFull ?? {};
+    const enderecoPaciente = [_pa.logradouro, _pa.numero, _pa.bairro, _pa.cidade && _pa.estado ? `${_pa.cidade}-${_pa.estado}` : _pa.cidade].filter(Boolean).join(", ");
+    const dataMov = movimento === "Inclusão" ? dep.incluido_em : dep.excluido_em;
+    const vars: Record<string, string> = {
+      CLINICA_NOME: _cl.nome ?? "",
+      CLINICA_CNPJ: _cl.cnpj ?? "",
+      CLINICA_ENDERECO: [_cl.endereco, _cl.cidade, _cl.estado].filter(Boolean).join(", "),
+      CIDADE: _cl.cidade ?? "",
+      CONTRATO_NUMERO: String(contrato.numero),
+      PACIENTE_NOME: contrato.paciente_nome ?? "",
+      PACIENTE_CPF: _pa.cpf ?? "",
+      PACIENTE_NASCIMENTO: fmtD(_pa.data_nascimento),
+      PACIENTE_ENDERECO: enderecoPaciente,
+      PACIENTE_TELEFONE: _pa.telefone ?? "",
+      PACIENTE_EMAIL: _pa.email ?? "",
+      VALOR_MENSAL: BRL(Number(contrato.valor_mensal)),
+      TAXA_ADESAO: BRL(Number((contrato as any).taxa_adesao ?? 0)),
+      DATA_HOJE: fmtDataExtenso(new Date().toISOString()),
+      DEPENDENTE_NOME: dep.paciente_nome,
+      DEPENDENTE_PARENTESCO: dep.parentesco ?? "",
+      DEPENDENTE_CPF: dep.cpf ?? "",
+      DEPENDENTE_TIPO: dep.tipo,
+      TIPO_MOVIMENTO: movimento,
+      DATA_MOVIMENTO: fmtDataExtenso(dataMov ?? new Date().toISOString().slice(0, 10)),
+    };
+    return tpl.replace(/\{\{(\w+)\}\}/g, (_m: string, k: string) => vars[k] ?? "");
+  };
+
+  const printTermoInclusao = () => {
+    if (!termoDep) return;
+    const html = renderTermo(termoDep, termoMovimento);
+    const safe = DOMPurify.sanitize(html);
+    const titulo = `Termo de ${termoMovimento} — Contrato #${contrato.numero}`;
+    const doc = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/>
+<title>${titulo}</title>
+<style>
+@page { size: A4; margin: 18mm; }
+body { font-family: Arial, Helvetica, sans-serif; font-size: 11pt; color:#000; line-height: 1.45; }
+h1, h2, h3 { margin: 0 0 6mm; }
+.head { text-align:center; margin-bottom: 6mm; font-size: 10pt; }
+.sig { margin-top: 14mm; display:flex; justify-content: space-around; gap:10mm; text-align:center; font-size: 10pt; }
+.sig div { width:45%; }
+</style></head><body>
+<div class="head"><strong>${clinica?.nome ?? ""}</strong><br/>${[clinica?.endereco, clinica?.cidade, clinica?.estado].filter(Boolean).join(" — ")}<br/>CNPJ: ${clinica?.cnpj ?? ""}</div>
+<div>${safe}</div>
+<div class="sig">
+  <div>____________________________<br/>${clinica?.nome ?? ""}</div>
+  <div>____________________________<br/>${contrato.paciente_nome}</div>
+</div>
+<script>window.onload=()=>{setTimeout(()=>{window.print();},300);};</script>
+</body></html>`;
+    const w = window.open("", "_blank", "width=900,height=700");
+    if (!w) { toast.error("Bloqueador de pop-up impediu a impressão"); return; }
+    w.document.open(); w.document.write(doc); w.document.close();
+  };
+
+  const abrirTermoSeAssinado = (dep: Dep, movimento: "Inclusão" | "Exclusão") => {
+    if (!contrato.assinado_em) return;
+    if (!convenio?.termo_inclusao_html) {
+      toast.message("Contrato assinado, mas o convênio não possui Termo de Inclusão cadastrado.");
+      return;
+    }
+    setTermoDep(dep);
+    setTermoMovimento(movimento);
+    setTermoOpen(true);
+  };
+
+  const confirmarIncluir = async () => {
+    if (!incPaciente) { toast.error("Selecione um paciente"); return; }
+    if (depsAtivos.length >= maxDep) {
+      toast.error(maxDep === 0 ? "Este convênio não permite dependentes." : `Limite de ${maxDep} dependentes atingido.`);
+      return;
+    }
+    if (depsAtivos.find((d) => d.paciente_id === incPaciente.id)) {
+      toast.error("Esse paciente já é dependente ativo deste contrato");
+      return;
+    }
+    if (incPaciente.id === (contrato as any).paciente_id) {
+      toast.error("O titular não pode ser dependente");
+      return;
+    }
+    setIncSaving(true);
+    const hoje = new Date().toISOString().slice(0, 10);
+    const { data, error } = await supabase
+      .from("contrato_dependentes")
+      .insert({
+        contrato_id: contrato.id,
+        paciente_id: incPaciente.id,
+        paciente_nome: incPaciente.nome,
+        parentesco: incParentesco || null,
+        tipo: incTipo,
+        incluido_em: hoje,
+        ativo: true,
+      })
+      .select("id, paciente_id, paciente_nome, parentesco, tipo, incluido_em, excluido_em, ativo")
+      .maybeSingle();
+    setIncSaving(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Dependente incluído");
+    setIncOpen(false);
+    const novoDep: Dep = {
+      id: data!.id,
+      paciente_id: data!.paciente_id,
+      paciente_nome: data!.paciente_nome,
+      parentesco: data!.parentesco,
+      tipo: data!.tipo,
+      cpf: incPaciente.cpf,
+      incluido_em: data!.incluido_em,
+      excluido_em: data!.excluido_em,
+      ativo: !!data!.ativo,
+    };
+    setIncPaciente(null); setIncParentesco(""); setIncTipo("dependente");
+    await load();
+    abrirTermoSeAssinado(novoDep, "Inclusão");
+  };
+
+  const confirmarExcluir = async () => {
+    if (!excAlvo) return;
+    const hoje = new Date().toISOString().slice(0, 10);
+    const { error } = await supabase
+      .from("contrato_dependentes")
+      .update({ ativo: false, excluido_em: hoje })
+      .eq("id", excAlvo.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Dependente excluído");
+    const alvo = { ...excAlvo, ativo: false, excluido_em: hoje };
+    setExcAlvo(null);
+    await load();
+    abrirTermoSeAssinado(alvo, "Exclusão");
+  };
 
   const contratoTexto = useMemo(() => {
     const tpl = convenio?.modelo_contrato ?? "";
@@ -753,14 +932,35 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
             </div>
             <DadosField label="Forma de pagamento" value={formaLabel} />
             <div className="space-y-1">
-              <div className="text-sm font-medium">Dependentes ({deps.length}/{maxDep})</div>
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-medium">Dependentes ({depsAtivos.length}/{maxDep})</div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIncOpen(true)}
+                  disabled={maxDep === 0 || depsAtivos.length >= maxDep}
+                >
+                  <Plus className="h-4 w-4 mr-1" /> Incluir dependente
+                </Button>
+              </div>
               <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
                 {deps.length === 0 ? "Nenhum dependente" : (
                   <ul className="space-y-1">
                     {deps.map((d) => (
-                      <li key={d.id}>
-                        • {d.paciente_nome}
-                        <span className="text-muted-foreground"> — {d.parentesco ?? "—"} ({d.tipo}){d.cpf ? ` — CPF ${d.cpf}` : ""}</span>
+                      <li key={d.id} className="flex items-center justify-between gap-2">
+                        <div className={d.ativo ? "" : "text-muted-foreground line-through"}>
+                          • {d.paciente_nome}
+                          <span className="text-muted-foreground no-underline"> — {d.parentesco ?? "—"} ({d.tipo}){d.cpf ? ` — CPF ${d.cpf}` : ""}</span>
+                          <span className="text-muted-foreground no-underline"> — Incluído: {fmtD(d.incluido_em)}</span>
+                          {d.excluido_em ? (
+                            <span className="text-destructive no-underline"> — Excluído: {fmtD(d.excluido_em)}</span>
+                          ) : null}
+                        </div>
+                        {d.ativo ? (
+                          <Button size="sm" variant="ghost" onClick={() => setExcAlvo(d)}>
+                            <Trash2 className="h-3 w-3 text-destructive" />
+                          </Button>
+                        ) : null}
                       </li>
                     ))}
                   </ul>
@@ -848,6 +1048,97 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
           setPagMens(null);
         }}
       />
+
+      <Dialog open={incOpen} onOpenChange={setIncOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Incluir dependente</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label>Paciente</Label>
+              <PatientSearchInput value={incPaciente} onSelect={setIncPaciente} placeholder="Buscar paciente por nome ou CPF…" />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label>Parentesco</Label>
+                <Select value={incParentesco} onValueChange={setIncParentesco}>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Filho(a)">Filho(a)</SelectItem>
+                    <SelectItem value="Cônjuge">Cônjuge</SelectItem>
+                    <SelectItem value="Pai">Pai</SelectItem>
+                    <SelectItem value="Mãe">Mãe</SelectItem>
+                    <SelectItem value="Irmão(ã)">Irmão(ã)</SelectItem>
+                    <SelectItem value="Outro">Outro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Tipo</Label>
+                <Select value={incTipo} onValueChange={setIncTipo}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="dependente">Dependente</SelectItem>
+                    <SelectItem value="agregado">Agregado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            {contrato.assinado_em && convenio?.termo_inclusao_html ? (
+              <p className="text-xs text-muted-foreground">
+                Após incluir, será gerado o <strong>Termo de Inclusão</strong> para impressão/assinatura.
+              </p>
+            ) : null}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIncOpen(false)}>Cancelar</Button>
+            <Button onClick={confirmarIncluir} disabled={incSaving || !incPaciente}>
+              {incSaving ? "Incluindo…" : "Incluir"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!excAlvo} onOpenChange={(v) => { if (!v) setExcAlvo(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Excluir dependente</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm">
+            Excluir <strong>{excAlvo?.paciente_nome}</strong> do contrato?
+          </p>
+          {contrato.assinado_em && convenio?.termo_inclusao_html ? (
+            <p className="text-xs text-muted-foreground">
+              Após excluir, será gerado o <strong>Termo de Exclusão</strong> para impressão/assinatura.
+            </p>
+          ) : null}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setExcAlvo(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={confirmarExcluir}>Excluir</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={termoOpen} onOpenChange={setTermoOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Termo de {termoMovimento} — {termoDep?.paciente_nome}</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-auto rounded-md border bg-card p-4">
+            {termoDep ? (
+              <div
+                className="prose prose-sm max-w-none"
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderTermo(termoDep, termoMovimento)) }}
+              />
+            ) : null}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setTermoOpen(false)}>Fechar</Button>
+            <Button onClick={printTermoInclusao}><Printer className="h-4 w-4 mr-1" />Imprimir A4</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
