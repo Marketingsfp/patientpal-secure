@@ -436,7 +436,7 @@ function ConveniosPage() {
             <TabsContent value="info" className="space-y-3 mt-3">
               <div>
                 <Label>Nome *</Label>
-                <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Plano Família" />
+                <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Convênio Família" />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
