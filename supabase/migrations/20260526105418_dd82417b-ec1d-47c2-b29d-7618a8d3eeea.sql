@@ -1,0 +1,1 @@
+ALTER TABLE public.cb_convenios ADD COLUMN IF NOT EXISTS termo_inclusao_html text;

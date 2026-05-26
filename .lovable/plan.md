@@ -1,32 +1,18 @@
-## Diagnóstico
+## Mudanças
 
-Os botões **Imprimir A4** e **Imprimir cartão** em `Cartão de Benefícios → Contratos` falham porque as queries em `src/lib/print-contrato.ts` e `src/lib/print-cartao.ts` usam *embeds* do PostgREST:
+### 1. Migração — `cb_convenios.termo_inclusao_html`
+Adicionar coluna `termo_inclusao_html text NULL` para guardar o HTML do termo (mesmo formato do `informativo_html`).
 
-```ts
-.select(`*, plano:planos_assinatura(*), clinica:clinicas(...), paciente:pacientes(...)`)
-```
+### 2. `src/routes/_authenticated/app.cartao-beneficios.convenios.tsx`
+- Tipo `Convenio`: adicionar `termo_inclusao_html: string | null`.
+- Novo state `const [termoInclusaoHtml, setTermoInclusaoHtml] = useState("")`.
+- `openNew`: resetar para `""`.
+- `openEdit`: carregar `c.termo_inclusao_html ?? ""`.
+- `save`: incluir `termo_inclusao_html: termoInclusaoHtml.trim() || null` no payload.
+- `<TabsList>`: nova `<TabsTrigger value="termo">` com ícone `FileSignature` (ou `ScrollText`).
+- Nova `<TabsContent value="termo">` espelhando exatamente a aba **Informativo**:
+  - Cabeçalho "Termo de Inclusão" + botão **Imprimir**.
+  - `<div id="convenio-termo-print">` envolvendo `<RichEditor value={termoInclusaoHtml} onChange={setTermoInclusaoHtml} clinicaId={clinicaAtual.clinica_id} />`.
+  - Bloco `<style>` com regras `@media print` idênticas às do Informativo, mas usando o id `#convenio-termo-print`.
 
-A tabela `contratos_assinatura` possui as colunas `clinica_id`, `paciente_id`, `plano_id`, mas **apenas `plano_id` tem foreign key**. Sem FK, o PostgREST devolve o erro visto no console:
-
-> Could not find a relationship between 'contratos_assinatura' and 'clinicas' in the schema cache
-
-Como a query inteira falha, nada é impresso.
-
-## Correção
-
-Refatorar as duas funções de impressão para buscar contrato + relações em chamadas separadas (sem depender de FK no schema cache). Sem migração — evita risco de FKs falharem por dados órfãos legados.
-
-### `src/lib/print-contrato.ts`
-- Trocar a query única por:
-  1. `select("*")` em `contratos_assinatura` pelo `id`;
-  2. `select(...)` em `planos_assinatura` por `plano_id`;
-  3. `select(...)` em `clinicas` por `clinica_id`;
-  4. `select(...)` em `pacientes` por `paciente_id` (quando existir).
-- Manter a montagem do HTML idêntica — só muda a forma de obter `cl`, `pl`, `pa`.
-
-### `src/lib/print-cartao.ts`
-- Mesmo padrão: buscar contrato, depois plano, clínica e paciente titular por id, e os dependentes (já é query separada). Manter o restante do código de renderização inalterado.
-
-## Fora do escopo
-- Não vou adicionar FKs via migração (pode falhar por dados antigos órfãos e está além do que o usuário pediu).
-- Não vou tocar nada além das duas funções de impressão.
+Nada mais é alterado.
