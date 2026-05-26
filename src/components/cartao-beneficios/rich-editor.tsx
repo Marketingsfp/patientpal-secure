@@ -200,6 +200,8 @@ interface Props {
 
 export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const [cropOpen, setCropOpen] = useState(false);
+  const [cropSrc, setCropSrc] = useState<string>("");
   // Margens da página em mm (A4: 210 × 297). Persistidas em localStorage por clínica.
   const storageKey = `rt-margins:${clinicaId || "default"}`;
   const readStored = () => {
