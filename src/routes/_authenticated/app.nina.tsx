@@ -17,6 +17,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { NinaMessage, TypingDots } from "@/components/nina/NinaMessage";
+import { formatWhatsappText } from "@/components/nina/formatWhatsappText";
 
 export const Route = createFileRoute("/_authenticated/app/nina")({
   component: NinaPage,
