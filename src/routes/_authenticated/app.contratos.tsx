@@ -210,8 +210,12 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
 
   const addDep = (p: Paciente) => {
     if (!convenio) return;
-    const max = convenio.max_dependentes;
-    if (max > 0 && deps.length >= max) return toast.error(`Limite de ${max} dependentes`);
+    const max = Number(convenio.max_dependentes ?? 0) || 0;
+    if (deps.length >= max) {
+      return toast.error(max === 0
+        ? "Este convênio não permite dependentes."
+        : `Limite de ${max} dependentes atingido.`);
+    }
     if (deps.find((d) => d.id === p.id) || titular?.id === p.id) return;
     setDeps([...deps, { ...p, parentesco: "", tipo: "dependente" }]);
     setDepOpen(false);
@@ -219,6 +223,12 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
 
   const salvar = async () => {
     if (!titular || !convenio) return toast.error("Selecione paciente e convênio");
+    const maxDep = Number(convenio.max_dependentes ?? 0) || 0;
+    if (deps.length > maxDep) {
+      return toast.error(maxDep === 0
+        ? "Este convênio não permite dependentes."
+        : `Limite de ${maxDep} dependentes excedido.`);
+    }
     if (!titular.email) return toast.error("Titular precisa ter e-mail para acessar o app. Cadastre o e-mail no paciente antes de gerar o contrato.");
     if (!titular.face_descriptor || titular.face_descriptor.length === 0) return toast.error("Capture a foto do titular antes de gerar o contrato.");
     const semEmailDeps = deps.filter((d) => !d.email);
@@ -242,12 +252,13 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
 
     // Gerar 12 parcelas
     const base = new Date(dataInicio + "T00:00:00");
+    const valorParcela = valor + (forma === "boleto" ? TAXA_BOLETO : 0);
     const parcelas = Array.from({ length: convenio.num_parcelas }, (_, i) => {
       const venc = new Date(base.getFullYear(), base.getMonth() + i, diaVenc);
       return {
         contrato_id: contrato.id, clinica_id: clinicaId,
         numero_parcela: i + 1, vencimento: venc.toISOString().slice(0, 10),
-        valor, status: "pendente",
+        valor: valorParcela, status: "pendente",
       };
     });
     await supabase.from("contrato_mensalidades").insert(parcelas);
