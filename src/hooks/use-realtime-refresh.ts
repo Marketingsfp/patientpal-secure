@@ -19,8 +19,7 @@ export function useRealtimeRefresh(
     const ch = supabase.channel(channelName);
     for (const t of tables) {
       ch.on(
-        // @ts-expect-error - postgres_changes payload typing
-        "postgres_changes",
+        "postgres_changes" as any,
         { event: "*", schema: "public", table: t },
         () => onChange(),
       );
