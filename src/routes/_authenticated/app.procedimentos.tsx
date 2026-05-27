@@ -664,7 +664,7 @@ function ProcedimentosPage() {
                     preparo: p.preparo ?? "",
                     ativo: p.ativo ? "Sim" : "Não",
                   })),
-                  `procedimentos-${new Date().toISOString().slice(0, 10)}`,
+                  `servicos-${new Date().toISOString().slice(0, 10)}`,
                   [
                     { key: "nome", label: "Nome" },
                     { key: "grupo", label: "Especialidade" },
@@ -709,7 +709,7 @@ function ProcedimentosPage() {
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); aplicarFiltros(); } }}
-                placeholder="Item"
+                placeholder="Serviço"
                 className="pl-9"
               />
             </div>
@@ -733,7 +733,7 @@ function ProcedimentosPage() {
                   </TableHead>
                   <TableHead>
                     <button type="button" onClick={() => toggleSort("nome")} className="inline-flex items-center gap-1 hover:text-foreground">
-                      Item <SortIcon col="nome" />
+                      Serviço <SortIcon col="nome" />
                     </button>
                   </TableHead>
                   <TableHead className="w-24 text-right">Dinheiro</TableHead>
@@ -752,7 +752,7 @@ function ProcedimentosPage() {
                 ) : !clinicaAtual ? (
                   <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
                 ) : filtrados.length === 0 ? (
-                  <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Nenhum item.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Nenhum serviço.</TableCell></TableRow>
                 ) : visiveis.map(p => (
                   <TableRow key={p.id} className="h-8">
                     <TableCell className="text-xs text-muted-foreground">{p.grupo ?? "—"}</TableCell>
@@ -785,7 +785,7 @@ function ProcedimentosPage() {
           {ordenados.length > 0 && (
             <div className="flex flex-wrap items-center justify-between gap-3 px-1">
               <p className="text-xs text-muted-foreground">
-                Mostrando {(paginaAtual - 1) * PAGE_SIZE + 1}–{Math.min(paginaAtual * PAGE_SIZE, ordenados.length)} de {ordenados.length} itens
+                Mostrando {(paginaAtual - 1) * PAGE_SIZE + 1}–{Math.min(paginaAtual * PAGE_SIZE, ordenados.length)} de {ordenados.length} serviços
               </p>
               <div className="flex items-center gap-1">
                 <Button variant="outline" size="icon" className="h-8 w-8" disabled={paginaAtual === 1} onClick={() => setPagina(1)}>
