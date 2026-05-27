@@ -203,21 +203,6 @@ function NinaPage() {
         </TabsContent>
 
         {/* ============ CONVERSAS ============ */}
-        <TabsContent value="chat">
-          <InboxWhatsapp
-            conversas={conversasFiltradas}
-            todasConversas={conversas}
-            sel={sel}
-            setSel={setSel}
-            busca={busca}
-            setBusca={setBusca}
-            draft={draft}
-            setDraft={setDraft}
-            enviando={enviando}
-            enviarMensagem={enviarMensagem}
-            loadingConv={loadingConv}
-          />
-        </TabsContent>
 
         {/* ============ AUTOMAÇÕES ============ */}
         <TabsContent value="automacoes" className="space-y-4">
