@@ -275,9 +275,11 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
         : `Limite de ${maxDep} dependentes excedido.`);
     }
     if (!titular.email) return toast.error("Titular precisa ter e-mail para acessar o app. Cadastre o e-mail no paciente antes de gerar o contrato.");
-    if (!titular.face_descriptor || titular.face_descriptor.length === 0) return toast.error("Capture a foto do titular antes de gerar o contrato.");
     const semEmailDeps = deps.filter((d) => !d.email);
     if (semEmailDeps.length > 0 && !confirm(`${semEmailDeps.length} dependente(s) sem e-mail não conseguirão acessar o app. Continuar mesmo assim?`)) return;
+    if (!titular.face_descriptor || titular.face_descriptor.length === 0) {
+      if (!confirm("Titular sem foto facial. Continuar mesmo assim?")) return;
+    }
     const semFotoDeps = deps.filter((d) => !d.face_descriptor || d.face_descriptor.length === 0);
     if (semFotoDeps.length > 0 && !confirm(`${semFotoDeps.length} dependente(s) sem foto facial. Continuar mesmo assim?`)) return;
     setSaving(true);
