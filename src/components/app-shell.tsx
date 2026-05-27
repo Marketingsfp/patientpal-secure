@@ -87,6 +87,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
         { to: "/app/nina", hash: "chat", label: "Conversas WhatsApp", icon: MessageCircle },
         { to: "/app/nina", hash: "automacoes", label: "Automações", icon: Sparkles },
         { to: "/app/nina", hash: "atend-dashboard", label: "Atendimento — Painel", icon: BarChart3 },
+        { to: "/app/nina", hash: "atend-status", label: "Atendimento — Meu Status (filas + pausa)", icon: Play },
         { to: "/app/nina", hash: "atend-depto", label: "Atendimento — Departamentos", icon: Users },
         { to: "/app/nina", hash: "atend-macros", label: "Atendimento — Macros", icon: Zap },
         { to: "/app/nina", hash: "atend-kb", label: "Atendimento — Base de Conhecimento", icon: BookOpen },
