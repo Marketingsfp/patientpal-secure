@@ -209,15 +209,15 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
         <span class="lab">Convênio</span><span class="val">${esc(convenioNome)}</span>
         <span class="lab" style="margin-top:6px;">Pessoas no convênio</span><span class="val">${pessoasConvenio}</span>
       </div>
+      <div class="cell"><span class="lab">Início</span><span class="val">${fmtD(contrato.data_inicio)}</span></div>
+      <div class="cell">
+        <span class="lab">Dia de vencimento</span><span class="val">${esc(contrato.dia_vencimento ?? "—")}</span>
+      </div>
       <div class="cell">
         <span class="lab">Parcelas</span><span class="val">${(parcelas ?? []).length}</span>
         <span class="lab" style="margin-top:6px;">Valor mensal</span><span class="val">${BRL(Number(contrato.valor_mensal))}</span>
         <span class="lab" style="margin-top:6px;">Total do contrato</span><span class="val">${BRL((parcelas ?? []).reduce((s, p) => s + Number(p.valor), 0))}</span>
       </div>
-    </div>
-    <div class="capa-grid" style="margin-top:10px;">
-      <div class="cell"><span class="lab">Início</span><span class="val">${fmtD(contrato.data_inicio)}</span></div>
-      <div class="cell"><span class="lab">Dia de vencimento</span><span class="val">${esc(contrato.dia_vencimento ?? "—")}</span></div>
     </div>
   </div>
 
