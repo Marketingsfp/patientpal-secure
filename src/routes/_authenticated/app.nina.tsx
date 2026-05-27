@@ -234,6 +234,11 @@ function NinaPage() {
           <ConfiguracaoWhatsApp />
         </TabsContent>
 
+        {/* ============ TEMPLATES (HSM) ============ */}
+        <TabsContent value="templates">
+          <TemplatesWhatsapp />
+        </TabsContent>
+
         {/* ============ ATENDIMENTO — Dashboard ============ */}
         <TabsContent value="atend-dashboard"><AtendDashboard /></TabsContent>
         <TabsContent value="atend-status"><AtendMeuStatus /></TabsContent>
