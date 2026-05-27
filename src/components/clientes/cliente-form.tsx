@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Camera, ChevronDown, CreditCard, FileHeart, History, Loader2, MapPin, Mic, MicOff, ScanFace, Search, UserCheck, Upload, X } from "lucide-react";
+import { Camera, ChevronDown, CreditCard, FileHeart, History, Loader2, MapPin, Mic, MicOff, ScanFace, Search, UserCheck, Upload, X, Check } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { isCPFValido, somenteDigitos } from "@/lib/cpf";
