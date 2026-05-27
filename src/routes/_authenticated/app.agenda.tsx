@@ -1974,9 +1974,12 @@ function AgendaPage() {
               </div>
               {pacInfo.id && (
                 <div className="pt-2">
-                  <a href={`/app/clientes?q=${encodeURIComponent(pacInfo.nome)}`} className="text-xs text-primary hover:underline">
+                  <Button
+                    size="sm"
+                    onClick={() => { window.location.href = `/app/clientes?q=${encodeURIComponent(pacInfo.nome)}`; }}
+                  >
                     Editar
-                  </a>
+                  </Button>
                 </div>
               )}
             </div>
