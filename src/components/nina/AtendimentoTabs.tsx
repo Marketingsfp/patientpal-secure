@@ -22,6 +22,7 @@ import {
   listarMembros, travarMinhaFila,
 } from "@/lib/atendimento.functions";
 import { supabase } from "@/integrations/supabase/client";
+import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 
 /* ============================================================
  * DASHBOARD
@@ -40,7 +41,8 @@ export function AtendDashboard() {
     catch (e: any) { toast.error(e?.message || "Erro ao carregar painel"); }
     finally { setLoading(false); }
   }, [clinicaId, dashFn]);
-  useEffect(() => { carregar(); const t = setInterval(carregar, 30000); return () => clearInterval(t); }, [carregar]);
+  useEffect(() => { carregar(); const t = setInterval(carregar, 15000); return () => clearInterval(t); }, [carregar]);
+  useRealtimeRefresh(["atend_conversas", "atend_pausas_log", "atend_departamento_membros"], carregar, !!clinicaId);
 
   return (
     <Card>
