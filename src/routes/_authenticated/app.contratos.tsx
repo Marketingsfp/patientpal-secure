@@ -751,6 +751,19 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     setPagMens(m);
     setFormaPagOpen(true);
   };
+  // Multa de 10% + juros de 0,33% ao dia para parcelas vencidas
+  const calcValorComJuros = (m: Mens | null): number => {
+    if (!m) return 0;
+    const base = Number(m.valor) || 0;
+    if (m.status === "pago") return base;
+    const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+    const venc = new Date(m.vencimento + "T00:00:00");
+    const diasAtraso = Math.floor((hoje.getTime() - venc.getTime()) / 86400000);
+    if (diasAtraso <= 0) return base;
+    return base * 1.10 + base * 0.0033 * diasAtraso;
+  };
+  const pagValorFinal = calcValorComJuros(pagMens);
+  const pagDiasAtraso = pagMens ? Math.max(0, Math.floor((new Date().setHours(0,0,0,0) - new Date(pagMens.vencimento + "T00:00:00").getTime()) / 86400000)) : 0;
   // Normaliza para os valores aceitos pelo LancamentoDialog (igual à Agenda)
   const normalizarForma = (f: string) =>
     f === "credito" ? "cartao_credito" : f === "debito" ? "cartao_debito" : f;
@@ -1228,6 +1241,14 @@ h1, h2, h3 { margin: 0 0 6mm; }
             {pagMens ? ` · Parcela ${pagMens.numero_parcela}/${mens.length}` : ""}
             <span className="block text-xs mt-1 opacity-70">Dica: use as teclas 1–{formaOpcoes.length + 1} para escolher rapidamente.</span>
           </p>
+          {pagMens && pagDiasAtraso > 0 ? (
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs space-y-0.5">
+              <div className="flex justify-between"><span>Valor original</span><span>{BRL(Number(pagMens.valor))}</span></div>
+              <div className="flex justify-between"><span>Multa (10%)</span><span>{BRL(Number(pagMens.valor) * 0.10)}</span></div>
+              <div className="flex justify-between"><span>Juros (0,33%/dia × {pagDiasAtraso}d)</span><span>{BRL(Number(pagMens.valor) * 0.0033 * pagDiasAtraso)}</span></div>
+              <div className="flex justify-between font-semibold pt-1 border-t border-destructive/30"><span>Total com encargos</span><span>{BRL(pagValorFinal)}</span></div>
+            </div>
+          ) : null}
           <div className="grid gap-2 mt-2">
             {formaOpcoes.map((op, idx) => (
               <Button
@@ -1240,7 +1261,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   <kbd className="inline-flex h-6 w-6 items-center justify-center rounded border bg-muted text-xs font-mono">{idx + 1}</kbd>
                   {op.label}
                 </span>
-                <span className="font-semibold">{BRL(Number(pagMens?.valor ?? 0))}</span>
+                <span className="font-semibold">{BRL(pagValorFinal)}</span>
               </Button>
             ))}
             <Button
@@ -1260,7 +1281,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
         onOpenChange={(v) => { setLancOpen(v); if (!v) { setPagMens(null); setPagInitialForma(""); } }}
         tipo="receita"
         initialDescricao={pagMens ? `Mensalidade ${pagMens.numero_parcela}/${mens.length} — Contrato #${contrato.numero} — ${contrato.paciente_nome}` : ""}
-        initialValor={pagMens ? String(pagMens.valor) : ""}
+        initialValor={pagMens ? pagValorFinal.toFixed(2) : ""}
         initialFormaPagamento={pagInitialForma}
         onSavedWithData={async (dados) => {
           if (!pagMens || !clinicaAtual) return;
