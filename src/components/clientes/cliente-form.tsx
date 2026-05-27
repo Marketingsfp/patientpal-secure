@@ -1190,9 +1190,12 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
                   const somaAtraso = atraso.reduce((s, p) => s + p.valor, 0);
                   const dataFimCalc = c.data_fim
                     ? c.data_fim
-                    : c.vigencia_meses
-                      ? (() => { const d = new Date(c.data_inicio + "T00:00:00"); d.setMonth(d.getMonth() + c.vigencia_meses); return d.toISOString().slice(0, 10); })()
-                      : null;
+                    : (() => {
+                        const meses = c.vigencia_meses || c.parcelas.length || c.num_parcelas || 12;
+                        const d = new Date(c.data_inicio + "T00:00:00");
+                        d.setMonth(d.getMonth() + meses);
+                        return d.toISOString().slice(0, 10);
+                      })();
                   const fmtBRL = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
                   const fmtData = (s: string | null) => s ? new Date(s + "T00:00:00").toLocaleDateString("pt-BR") : "—";
                   const destacar = (nome: string, pid: string) => pid === editing.id ? (
