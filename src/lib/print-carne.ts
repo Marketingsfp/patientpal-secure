@@ -108,8 +108,9 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
 
   const fichas = (parcelas ?? []).map((p) => {
     const total = (parcelas ?? []).length;
-    const fichaInner = `
+    const buildFicha = (viaLabel: string) => `
       <div class="ficha">
+        <div class="via-label">${viaLabel}</div>
         <div class="ficha-header">
           <div class="ficha-titulo">
             <div class="ficha-clinica">${esc(clinica?.nome ?? "Clínica")}</div>
@@ -162,14 +163,8 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
     `;
     return `
       <div class="ficha-par">
-        <div class="ficha-via">
-          <div class="via-label">Via do cliente</div>
-          ${fichaInner}
-        </div>
-        <div class="ficha-via">
-          <div class="via-label">Via da clínica</div>
-          ${fichaInner}
-        </div>
+        <div class="ficha-via">${buildFicha("Via do cliente")}</div>
+        <div class="ficha-via">${buildFicha("Via da clínica")}</div>
       </div>
     `;
   });
@@ -216,11 +211,10 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
   .ficha-via { display: flex; flex-direction: column; gap: 3px; }
   .ficha-via:first-child .ficha { border-right: none; border-top-right-radius: 0; border-bottom-right-radius: 0; }
   .ficha-via:last-child .ficha { border-top-left-radius: 0; border-bottom-left-radius: 0; }
-  .ficha-via:first-child .via-label { border-right: none; }
   .via-label {
     font-size: 9px; font-weight: 700; text-transform: uppercase;
     letter-spacing: .08em; color: #111;
-    padding: 2px 4px; border-bottom: 1px dashed #111;
+    margin-bottom: 2px;
   }
   .ficha-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #ddd; padding-bottom: 6px; }
   .ficha-clinica { font-weight: 700; font-size: 11px; }
