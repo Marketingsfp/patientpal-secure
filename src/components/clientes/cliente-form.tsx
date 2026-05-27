@@ -463,6 +463,95 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
     })();
   }, [editing?.id]);
 
+  // Carrega contratos de Cartão Convênio (titular ou dependente)
+  useEffect(() => {
+    if (!editing) { setConvList([]); return; }
+    setConvLoading(true);
+    void (async () => {
+      // 1) contratos onde paciente é titular
+      const { data: tit } = await supabase
+        .from("contratos_assinatura")
+        .select("id, numero, status, paciente_id, paciente_nome, data_inicio, data_fim, dia_vencimento, valor_mensal, num_parcelas, forma_pagamento, plano_id")
+        .eq("paciente_id", editing.id);
+      // 2) contratos onde paciente é dependente
+      const { data: deps } = await supabase
+        .from("contrato_dependentes")
+        .select("contrato_id")
+        .eq("paciente_id", editing.id)
+        .eq("ativo", true);
+      const contratoIdsDep = Array.from(new Set((deps ?? []).map((d: any) => d.contrato_id)));
+      let depContratos: any[] = [];
+      if (contratoIdsDep.length > 0) {
+        const { data } = await supabase
+          .from("contratos_assinatura")
+          .select("id, numero, status, paciente_id, paciente_nome, data_inicio, data_fim, dia_vencimento, valor_mensal, num_parcelas, forma_pagamento, plano_id")
+          .in("id", contratoIdsDep);
+        depContratos = data ?? [];
+      }
+      const titularIds = new Set((tit ?? []).map((c: any) => c.id));
+      const todos: Array<any & { papel: "titular" | "dependente" }> = [
+        ...(tit ?? []).map((c: any) => ({ ...c, papel: "titular" as const })),
+        ...depContratos
+          .filter((c: any) => !titularIds.has(c.id))
+          .map((c: any) => ({ ...c, papel: "dependente" as const })),
+      ];
+      if (todos.length === 0) {
+        setConvList([]); setConvLoading(false); return;
+      }
+      const allIds = todos.map((c) => c.id);
+      const planoIds = Array.from(new Set(todos.map((c) => c.plano_id).filter(Boolean)));
+      const [planosRes, depsRes, parcelasRes] = await Promise.all([
+        planoIds.length > 0
+          ? supabase.from("planos_assinatura").select("id, nome, vigencia_meses").in("id", planoIds)
+          : Promise.resolve({ data: [] as any[] }),
+        supabase
+          .from("contrato_dependentes")
+          .select("id, contrato_id, paciente_id, paciente_nome, parentesco, ativo")
+          .in("contrato_id", allIds)
+          .eq("ativo", true),
+        supabase
+          .from("contrato_mensalidades")
+          .select("id, contrato_id, numero_parcela, vencimento, valor, status, pago_em, valor_pago")
+          .in("contrato_id", allIds)
+          .order("numero_parcela", { ascending: true }),
+      ]);
+      const planoMap: Record<string, { nome: string; vigencia_meses: number | null }> = Object.fromEntries(
+        ((planosRes.data ?? []) as any[]).map((p) => [p.id, { nome: p.nome, vigencia_meses: p.vigencia_meses }])
+      );
+      const depMap: Record<string, ConvDependente[]> = {};
+      for (const d of (depsRes.data ?? []) as any[]) {
+        (depMap[d.contrato_id] ||= []).push({
+          id: d.id, paciente_id: d.paciente_id, paciente_nome: d.paciente_nome, parentesco: d.parentesco,
+        });
+      }
+      const parcMap: Record<string, ConvParcela[]> = {};
+      for (const p of (parcelasRes.data ?? []) as any[]) {
+        (parcMap[p.contrato_id] ||= []).push({
+          id: p.id, numero_parcela: p.numero_parcela, vencimento: p.vencimento,
+          valor: Number(p.valor) || 0, status: p.status,
+          pago_em: p.pago_em, valor_pago: p.valor_pago != null ? Number(p.valor_pago) : null,
+        });
+      }
+      const lista: ConvContrato[] = todos.map((c) => {
+        const plano = c.plano_id ? planoMap[c.plano_id] : null;
+        return {
+          id: c.id, numero: c.numero, status: c.status,
+          paciente_id: c.paciente_id, paciente_nome: c.paciente_nome,
+          data_inicio: c.data_inicio, data_fim: c.data_fim,
+          dia_vencimento: c.dia_vencimento, valor_mensal: Number(c.valor_mensal) || 0,
+          num_parcelas: c.num_parcelas, forma_pagamento: c.forma_pagamento,
+          plano_nome: plano?.nome ?? null, vigencia_meses: plano?.vigencia_meses ?? null,
+          papel: c.papel,
+          dependentes: depMap[c.id] ?? [],
+          parcelas: parcMap[c.id] ?? [],
+        };
+      });
+      lista.sort((a, b) => (a.data_inicio < b.data_inicio ? 1 : -1));
+      setConvList(lista);
+      setConvLoading(false);
+    })();
+  }, [editing?.id]);
+
   // Carrega procedimentos ativos da clínica para o filtro "Item"
   useEffect(() => {
     if (!clinicaId) return;
