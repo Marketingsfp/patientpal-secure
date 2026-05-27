@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
-import { Plus, Search, Pencil, Trash2, Users, Download } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Plus, Search, Pencil, Trash2, Users, Download, Accessibility, Baby, Smile } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -19,6 +19,40 @@ export const Route = createFileRoute("/_authenticated/app/clientes/")({
   component: ClientesPage,
   head: () => ({ meta: [{ title: "Clientes — ClinicaOS" }] }),
 });
+
+function fmtNasc(d: string | null): string {
+  if (!d) return "—";
+  const [y, m, day] = d.split("-");
+  if (!y || !m || !day) return "—";
+  return `${day}/${m}/${y}`;
+}
+
+function calcIdade(d: string | null): number | null {
+  if (!d) return null;
+  const nasc = new Date(d + "T00:00:00");
+  if (isNaN(nasc.getTime())) return null;
+  const hoje = new Date();
+  let idade = hoje.getFullYear() - nasc.getFullYear();
+  const m = hoje.getMonth() - nasc.getMonth();
+  if (m < 0 || (m === 0 && hoje.getDate() < nasc.getDate())) idade--;
+  return idade;
+}
+
+function IdadeCell({ nascimento }: { nascimento: string | null }) {
+  const idade = calcIdade(nascimento);
+  if (idade === null || idade < 0) return <>—</>;
+  let icon: ReactNode = null;
+  let label = "";
+  if (idade <= 2) { icon = <Baby className="h-4 w-4 text-pink-500" />; label = "Bebê"; }
+  else if (idade <= 10) { icon = <Smile className="h-4 w-4 text-amber-500" />; label = "Criança"; }
+  else if (idade >= 65) { icon = <Accessibility className="h-4 w-4 text-blue-600" />; label = "Idoso"; }
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span>{idade} {idade === 1 ? "ano" : "anos"}</span>
+      {icon && <span title={label} aria-label={label}>{icon}</span>}
+    </span>
+  );
+}
 
 interface Paciente {
   id: string;
@@ -53,7 +87,7 @@ function ClientesPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from("pacientes")
-      .select("id,nome,cpf,telefone,email,ativo,cidade,estado,created_at,foto_url")
+      .select("id,nome,cpf,telefone,email,data_nascimento,ativo,cidade,estado,created_at,foto_url")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("nome")
       .limit(100);
@@ -174,7 +208,9 @@ function ClientesPage() {
           <TableHeader>
             <TableRow className="bg-muted/40">
               <TableHead>Nome</TableHead>
-              <TableHead className="w-48">E-mail</TableHead>
+              <TableHead className="w-36">CPF</TableHead>
+              <TableHead className="w-32">Nascimento</TableHead>
+              <TableHead className="w-28">Idade</TableHead>
               <TableHead className="w-36">Telefone</TableHead>
               <TableHead className="w-40">Cidade/UF</TableHead>
               <TableHead className="w-24">Situação</TableHead>
@@ -183,11 +219,11 @@ function ClientesPage() {
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>
             ) : !clinicaAtual ? (
-              <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
             ) : filtrados.length === 0 ? (
-              <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum cliente encontrado.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Nenhum cliente encontrado.</TableCell></TableRow>
             ) : filtrados.map(p => (
               <TableRow key={p.id}>
                 <TableCell className="font-medium">
@@ -202,7 +238,9 @@ function ClientesPage() {
                     <span>{p.nome}</span>
                   </div>
                 </TableCell>
-                <TableCell className="text-sm text-muted-foreground truncate max-w-[12rem]">{p.email ?? "—"}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">{p.cpf ?? "—"}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">{fmtNasc(p.data_nascimento)}</TableCell>
+                <TableCell className="text-sm text-muted-foreground"><IdadeCell nascimento={p.data_nascimento} /></TableCell>
                 <TableCell className="text-sm text-muted-foreground">{p.telefone ?? "—"}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">
                   {p.cidade ? `${p.cidade}${p.estado ? "/" + p.estado : ""}` : "—"}
