@@ -245,6 +245,13 @@ function NinaPage() {
         <TabsContent value="config">
           <ConfiguracaoWhatsApp />
         </TabsContent>
+
+        {/* ============ ATENDIMENTO — Dashboard ============ */}
+        <TabsContent value="atend-dashboard"><AtendDashboard /></TabsContent>
+        <TabsContent value="atend-depto"><AtendDepartamentos /></TabsContent>
+        <TabsContent value="atend-macros"><AtendMacros /></TabsContent>
+        <TabsContent value="atend-kb"><AtendKb /></TabsContent>
+        <TabsContent value="atend-pausas"><AtendPausas /></TabsContent>
       </Tabs>
     </div>
   );
