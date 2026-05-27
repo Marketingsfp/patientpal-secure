@@ -162,7 +162,7 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
   .capa h1 { font-size: 18px; margin: 0 0 4px; }
   .capa-clinica { font-size: 16px; font-weight: 800; color: #111; margin-bottom: 6px; }
   .capa-clinica .cnpj { font-size: 11px; font-weight: 500; color: #555; margin-left: 6px; }
-  .capa-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 16px; font-size: 12px; align-items: start; }
+  .capa-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 16px; font-size: 12px; align-items: stretch; }
   .capa-grid .cell { display: flex; flex-direction: column; gap: 2px; }
   .capa-grid .lab { font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: .04em; }
   .capa-grid .val { font-weight: 600; }
