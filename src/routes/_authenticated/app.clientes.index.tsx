@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Plus, Search, Pencil, Trash2, Users, Download, Accessibility, Baby, Smile } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -41,7 +41,7 @@ function calcIdade(d: string | null): number | null {
 function IdadeCell({ nascimento }: { nascimento: string | null }) {
   const idade = calcIdade(nascimento);
   if (idade === null || idade < 0) return <>—</>;
-  let icon: React.ReactNode = null;
+  let icon: ReactNode = null;
   let label = "";
   if (idade <= 2) { icon = <Baby className="h-4 w-4 text-pink-500" />; label = "Bebê"; }
   else if (idade <= 10) { icon = <Smile className="h-4 w-4 text-amber-500" />; label = "Criança"; }
