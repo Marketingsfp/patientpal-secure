@@ -4656,6 +4656,7 @@ export type Database = {
           cep: string | null
           cidade: string | null
           clinica_id: string
+          codigo_prontuario: string | null
           complemento: string | null
           consentimento_lgpd_em: string | null
           cpf: string | null
@@ -4687,6 +4688,7 @@ export type Database = {
           cep?: string | null
           cidade?: string | null
           clinica_id: string
+          codigo_prontuario?: string | null
           complemento?: string | null
           consentimento_lgpd_em?: string | null
           cpf?: string | null
@@ -4718,6 +4720,7 @@ export type Database = {
           cep?: string | null
           cidade?: string | null
           clinica_id?: string
+          codigo_prontuario?: string | null
           complemento?: string | null
           consentimento_lgpd_em?: string | null
           cpf?: string | null
