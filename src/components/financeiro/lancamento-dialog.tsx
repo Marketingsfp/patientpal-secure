@@ -316,7 +316,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
                 readOnly={!!initialValor}
               />
               {!!initialValor && (
-                <p className="text-xs text-muted-foreground">Definido pelo procedimento</p>
+                <p className="text-xs text-muted-foreground">Definido pelo serviço</p>
               )}
             </div>
             <div className="space-y-1.5">
