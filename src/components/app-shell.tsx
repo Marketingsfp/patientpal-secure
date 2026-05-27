@@ -425,8 +425,13 @@ export function AppShell() {
         )}
         <nav ref={navScrollRef} className="flex-1 px-2 py-3 space-y-5 overflow-y-auto">
           {visibleNavRows.map((row) => {
-            const leafIsActive = (to: string) => location.pathname === to || (to !== "/app" && location.pathname.startsWith(to));
-            const itemHasActive = (it: NavItem): boolean => isParent(it) ? it.children.some((c) => leafIsActive(c.to)) : leafIsActive(it.to);
+            const leafIsActive = (to: string, hash?: string) => {
+              const pathOk = location.pathname === to || (to !== "/app" && location.pathname.startsWith(to));
+              if (!pathOk) return false;
+              if (!hash) return true;
+              return (location.hash ?? "").replace(/^#/, "") === hash;
+            };
+            const itemHasActive = (it: NavItem): boolean => isParent(it) ? it.children.some((c) => leafIsActive(c.to, c.hash)) : leafIsActive(it.to);
             const groupHasActive = row.items.some(itemHasActive);
             const hideLabel = subsystem === "gestao-pessoas" && row.label === "RH";
             const open = collapsed || hideLabel ? true : (openGroups[row.label] ?? false);
@@ -445,7 +450,7 @@ export function AppShell() {
                 )}
                 {open && row.items.map((item) => {
                   if (isParent(item)) {
-                    const subActive = item.children.some((c) => leafIsActive(c.to));
+                    const subActive = item.children.some((c) => leafIsActive(c.to, c.hash));
                     const subKey = `${row.label}::${item.label}`;
                     const subOpen = collapsed ? true : (openGroups[subKey] ?? false);
                     return (
@@ -467,11 +472,13 @@ export function AppShell() {
                           </button>
                         )}
                         {subOpen && item.children.map((child) => {
-                          const active = leafIsActive(child.to);
+                          const active = leafIsActive(child.to, child.hash);
+                          const linkKey = `${child.to}#${child.hash ?? ""}`;
                           return (
                             <Link
-                              key={child.to}
+                              key={linkKey}
                               to={child.to}
+                              hash={child.hash}
                               title={collapsed ? child.label : undefined}
                               data-nav-to={child.to}
                               data-nav-active={active ? "true" : undefined}
