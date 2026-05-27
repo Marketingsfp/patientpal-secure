@@ -60,6 +60,12 @@ export function AtendInbox() {
   const criarNotaFn = useServerFn(criarNota);
   const listarDeptosFn = useServerFn(listarDepartamentos);
   const listarUsuariosFn = useServerFn(listarUsuariosClinica);
+  const travarFilaFn = useServerFn(travarMinhaFila);
+  const iniciarPausaFn = useServerFn(iniciarPausa);
+  const finalizarPausaFn = useServerFn(finalizarPausa);
+  const pausaAtualFn = useServerFn(pausaAtual);
+  const listarReasonsFn = useServerFn(listarPauseReasons);
+  const meuStatusFn = useServerFn(meuStatusAgente);
 
   const [convs, setConvs] = useState<any[]>([]);
   const [sel, setSel] = useState<any>(null);
@@ -75,6 +81,67 @@ export function AtendInbox() {
   const [novaNota, setNovaNota] = useState("");
   const [transferOpen, setTransferOpen] = useState(false);
   const [fecharOpen, setFecharOpen] = useState(false);
+  const [filaAberta, setFilaAberta] = useState<boolean>(true);
+  const [pausaAtiva, setPausaAtiva] = useState<any>(null);
+  const [pauseReasons, setPauseReasons] = useState<any[]>([]);
+  const [pausaDialogOpen, setPausaDialogOpen] = useState(false);
+  const [pausaReasonSel, setPausaReasonSel] = useState<string>("");
+
+  const carregarStatusAgente = useCallback(async () => {
+    if (!clinicaId) return;
+    try {
+      const [s, p, rs] = await Promise.all([
+        meuStatusFn({ data: { clinicaId } }),
+        pausaAtualFn({ data: { clinicaId } }),
+        listarReasonsFn({ data: { clinicaId } }),
+      ]);
+      setFilaAberta(s.filaAberta);
+      setPausaAtiva(p);
+      setPauseReasons(rs);
+    } catch {}
+  }, [clinicaId, meuStatusFn, pausaAtualFn, listarReasonsFn]);
+
+  useEffect(() => { carregarStatusAgente(); }, [carregarStatusAgente]);
+
+  const alternarFila = async (abrir: boolean) => {
+    if (!clinicaId) return;
+    try {
+      await travarFilaFn({ data: { clinicaId, travada: !abrir } });
+      setFilaAberta(abrir);
+      toast.success(abrir ? "Fila aberta" : "Fila fechada");
+    } catch (e: any) { toast.error(e?.message); }
+  };
+
+  const definirStatus = async (status: "online" | "pausa" | "offline") => {
+    if (!clinicaId) return;
+    try {
+      if (status === "online") {
+        if (pausaAtiva) await finalizarPausaFn({ data: { clinicaId } });
+        await travarFilaFn({ data: { clinicaId, travada: false } });
+        setPausaAtiva(null); setFilaAberta(true);
+        toast.success("Você está online");
+      } else if (status === "offline") {
+        if (pausaAtiva) await finalizarPausaFn({ data: { clinicaId } });
+        await travarFilaFn({ data: { clinicaId, travada: true } });
+        setPausaAtiva(null); setFilaAberta(false);
+        toast.success("Você está offline");
+      } else {
+        if (!pauseReasons.length) { toast.error("Cadastre motivos de pausa em Atendimento — Pausas"); return; }
+        setPausaReasonSel(pauseReasons[0].id);
+        setPausaDialogOpen(true);
+      }
+    } catch (e: any) { toast.error(e?.message); }
+  };
+
+  const confirmarPausa = async () => {
+    if (!clinicaId || !pausaReasonSel) return;
+    try {
+      await iniciarPausaFn({ data: { clinicaId, reasonId: pausaReasonSel } });
+      setPausaDialogOpen(false);
+      await carregarStatusAgente();
+      toast.success("Em pausa");
+    } catch (e: any) { toast.error(e?.message); }
+  };
 
   const carregarConvs = useCallback(async () => {
     if (!clinicaId) return;
