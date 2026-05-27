@@ -495,3 +495,177 @@ export function AtendPausas() {
     </div>
   );
 }
+
+/* ============================================================
+ * MEU STATUS — abrir/fechar filas + pausa rápida
+ * ========================================================== */
+export function AtendMeuStatus() {
+  const { clinicaAtual } = useClinica();
+  const clinicaId = clinicaAtual?.clinica_id;
+  const listarMembrosFn = useServerFn(listarMembros);
+  const travarFn = useServerFn(travarMinhaFila);
+  const listarDeptos = useServerFn(listarDepartamentos);
+  const listarReasons = useServerFn(listarPauseReasons);
+  const iniciar = useServerFn(iniciarPausa);
+  const finalizar = useServerFn(finalizarPausa);
+  const atualFn = useServerFn(pausaAtual);
+
+  const [meusMembros, setMeusMembros] = useState<any[]>([]);
+  const [deptos, setDeptos] = useState<any[]>([]);
+  const [reasons, setReasons] = useState<any[]>([]);
+  const [atual, setAtual] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+
+  const carregar = useCallback(async () => {
+    if (!clinicaId) return;
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const [todos, ds, rs, a] = await Promise.all([
+        listarMembrosFn({ data: { clinicaId } }),
+        listarDeptos({ data: { clinicaId } }),
+        listarReasons({ data: { clinicaId } }),
+        atualFn({ data: { clinicaId } }),
+      ]);
+      setMeusMembros((todos as any[]).filter((m) => m.user_id === user?.id));
+      setDeptos(ds);
+      setReasons(rs);
+      setAtual(a);
+    } catch (e: any) { toast.error(e?.message); }
+    finally { setLoading(false); }
+  }, [clinicaId, listarMembrosFn, listarDeptos, listarReasons, atualFn]);
+  useEffect(() => { carregar(); }, [carregar]);
+
+  const toggleFila = async (travada: boolean) => {
+    if (!clinicaId) return;
+    try {
+      await travarFn({ data: { clinicaId, travada } });
+      toast.success(travada ? "Fila fechada — você não receberá novos atendimentos" : "Fila aberta — pronto para receber");
+      await carregar();
+    } catch (e: any) { toast.error(e?.message); }
+  };
+
+  const deptoNome = (id: string) => deptos.find((d) => d.id === id)?.nome ?? id;
+  const algumaFechada = meusMembros.some((m) => m.queue_locked);
+  const todasFechadas = meusMembros.length > 0 && meusMembros.every((m) => m.queue_locked);
+
+  return (
+    <div className="space-y-4">
+      {/* ============ FILAS ============ */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5" />
+            Minhas filas de atendimento
+          </CardTitle>
+          <Badge variant={todasFechadas ? "destructive" : algumaFechada ? "secondary" : "default"}>
+            {todasFechadas ? "Todas fechadas" : algumaFechada ? "Parcialmente aberta" : "Aberta"}
+          </Badge>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {meusMembros.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Você não está em nenhum departamento. Peça a um gestor para adicioná-lo.
+            </p>
+          ) : (
+            <>
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  size="sm"
+                  variant={algumaFechada ? "default" : "outline"}
+                  onClick={() => toggleFila(false)}
+                  disabled={loading || !algumaFechada}
+                >
+                  <Play className="h-4 w-4 mr-1" /> Abrir todas
+                </Button>
+                <Button
+                  size="sm"
+                  variant={todasFechadas ? "outline" : "destructive"}
+                  onClick={() => toggleFila(true)}
+                  disabled={loading || todasFechadas}
+                >
+                  <PauseIcon className="h-4 w-4 mr-1" /> Fechar todas
+                </Button>
+              </div>
+              <div className="space-y-2">
+                {meusMembros.map((m) => (
+                  <div key={m.id} className="flex items-center justify-between rounded-lg border p-3">
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">{deptoNome(m.departamento_id)}</div>
+                      <div className="text-xs text-muted-foreground">
+                        Papel: {m.role} · {m.queue_locked ? "Fila fechada" : "Recebendo novos"}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={!m.queue_locked}
+                        onCheckedChange={async (open) => {
+                          if (!clinicaId) return;
+                          try {
+                            // Atualiza só este departamento
+                            const { error } = await supabase
+                              .from("atend_departamento_membros" as any)
+                              .update({ queue_locked: !open })
+                              .eq("id", m.id);
+                            if (error) throw error;
+                            toast.success(open ? "Fila aberta" : "Fila fechada");
+                            await carregar();
+                          } catch (e: any) { toast.error(e?.message); }
+                        }}
+                      />
+                      <span className="text-xs text-muted-foreground w-16 text-right">
+                        {m.queue_locked ? "Fechada" : "Aberta"}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ============ PAUSA ============ */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Coffee className="h-5 w-5" /> Minha pausa</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {atual ? (
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="inline-block h-3 w-3 rounded-full" style={{ background: atual.atend_pause_reasons?.cor ?? "#6b7280" }} />
+                  <span className="font-medium">{atual.atend_pause_reasons?.nome ?? "Pausa"}</span>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Iniciada em {new Date(atual.iniciada_em).toLocaleString("pt-BR")}
+                </div>
+              </div>
+              <Button size="sm" variant="outline" onClick={async () => {
+                try { await finalizar({ data: { clinicaId: clinicaId! } }); toast.success("Pausa finalizada"); await carregar(); }
+                catch (e: any) { toast.error(e?.message); }
+              }}><PauseIcon className="h-4 w-4 mr-1" /> Finalizar pausa</Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {reasons.filter((r) => r.ativo).map((r) => (
+                <Button key={r.id} variant="outline" className="justify-start" onClick={async () => {
+                  try { await iniciar({ data: { clinicaId: clinicaId!, reasonId: r.id } }); toast.success("Pausa iniciada"); await carregar(); }
+                  catch (e: any) { toast.error(e?.message); }
+                }}>
+                  <Play className="h-4 w-4 mr-2" style={{ color: r.cor }} />{r.nome}
+                </Button>
+              ))}
+              {reasons.filter((r) => r.ativo).length === 0 && (
+                <p className="text-sm text-muted-foreground col-span-full">
+                  Nenhum motivo de pausa cadastrado. Cadastre em <strong>Atendimento — Pausas</strong>.
+                </p>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
