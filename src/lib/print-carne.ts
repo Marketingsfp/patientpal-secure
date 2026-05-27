@@ -209,11 +209,14 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
   .ficha-par {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 6mm;
+    gap: 0;
     margin-bottom: 6px;
     page-break-inside: avoid;
   }
   .ficha-via { display: flex; flex-direction: column; gap: 3px; }
+  .ficha-via:first-child .ficha { border-right: none; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+  .ficha-via:last-child .ficha { border-top-left-radius: 0; border-bottom-left-radius: 0; }
+  .ficha-via:first-child .via-label { border-right: none; }
   .via-label {
     font-size: 9px; font-weight: 700; text-transform: uppercase;
     letter-spacing: .08em; color: #111;
