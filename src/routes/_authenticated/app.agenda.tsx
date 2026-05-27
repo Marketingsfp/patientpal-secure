@@ -628,7 +628,7 @@ function AgendaPage() {
       totalCredito  += valorCartao;
     }
     const paciente = itens[0].paciente_nome;
-    const desc = `${paciente} — ${itens.map(i => (i.procedimento ?? "CONSULTA")).join(" + ")} (${itens.length} itens)`;
+    const desc = `${paciente} — ${itens.map(i => (i.procedimento ?? "CONSULTA")).join(" + ")} (${itens.length} serviços)`;
     const opcoes: FormaOpcao[] = [
       { forma: "dinheiro", label: "Dinheiro", valor: totalDinheiro },
       { forma: "pix", label: "Pix", valor: totalPix },
