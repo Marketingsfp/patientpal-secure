@@ -539,9 +539,9 @@ export function AtendMeuStatus() {
       setAtual(a);
     } catch (e: any) { toast.error(e?.message); }
     finally { setLoading(false); }
-  useRealtimeRefresh(["atend_pausas_log", "atend_departamento_membros", "atend_pause_reasons", "atend_departamentos"], carregar, !!clinicaId);
   }, [clinicaId, listarMembrosFn, listarDeptos, listarReasons, atualFn]);
   useEffect(() => { carregar(); }, [carregar]);
+  useRealtimeRefresh(["atend_pausas_log", "atend_departamento_membros", "atend_pause_reasons", "atend_departamentos"], carregar, !!clinicaId);
 
   const toggleFila = async (travada: boolean) => {
     if (!clinicaId) return;
