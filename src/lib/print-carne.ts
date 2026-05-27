@@ -106,7 +106,11 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
         dependentes.map((d) => `<span class="val">${esc(d.cpf ?? "—")}</span>`).join("")
       : "");
 
-  const fichas = (parcelas ?? []).map((p) => {
+  const parcelasAbertas = (parcelas ?? []).filter((p) => p.status !== "pago");
+  if (parcelasAbertas.length === 0) {
+    throw new Error("Nenhuma mensalidade em aberto para gerar carnê.");
+  }
+  const fichas = parcelasAbertas.map((p) => {
     const total = (parcelas ?? []).length;
     const buildFicha = (viaLabel: string) => `
       <div class="ficha">
