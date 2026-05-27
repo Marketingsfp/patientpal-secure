@@ -243,6 +243,708 @@ export type Database = {
           },
         ]
       }
+      atend_avaliacoes: {
+        Row: {
+          clinica_id: string
+          comentario: string | null
+          conversa_id: string
+          created_at: string
+          id: string
+          nota: number
+        }
+        Insert: {
+          clinica_id: string
+          comentario?: string | null
+          conversa_id: string
+          created_at?: string
+          id?: string
+          nota: number
+        }
+        Update: {
+          clinica_id?: string
+          comentario?: string | null
+          conversa_id?: string
+          created_at?: string
+          id?: string
+          nota?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atend_avaliacoes_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atend_avaliacoes_conversa_id_fkey"
+            columns: ["conversa_id"]
+            isOneToOne: false
+            referencedRelation: "atend_conversas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      atend_bot_configs: {
+        Row: {
+          ai_model: string | null
+          ai_prompt: string | null
+          ativo: boolean
+          bot_type: string
+          clinica_id: string
+          created_at: string
+          departamento_id: string | null
+          fallback_departamento_id: string | null
+          flow_definition: Json | null
+          id: string
+          max_ai_interactions: number
+          menu_options: Json | null
+          updated_at: string
+          welcome_message: string | null
+        }
+        Insert: {
+          ai_model?: string | null
+          ai_prompt?: string | null
+          ativo?: boolean
+          bot_type?: string
+          clinica_id: string
+          created_at?: string
+          departamento_id?: string | null
+          fallback_departamento_id?: string | null
+          flow_definition?: Json | null
+          id?: string
+          max_ai_interactions?: number
+          menu_options?: Json | null
+          updated_at?: string
+          welcome_message?: string | null
+        }
+        Update: {
+          ai_model?: string | null
+          ai_prompt?: string | null
+          ativo?: boolean
+          bot_type?: string
+          clinica_id?: string
+          created_at?: string
+          departamento_id?: string | null
+          fallback_departamento_id?: string | null
+          flow_definition?: Json | null
+          id?: string
+          max_ai_interactions?: number
+          menu_options?: Json | null
+          updated_at?: string
+          welcome_message?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atend_bot_configs_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atend_bot_configs_departamento_id_fkey"
+            columns: ["departamento_id"]
+            isOneToOne: false
+            referencedRelation: "atend_departamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atend_bot_configs_fallback_departamento_id_fkey"
+            columns: ["fallback_departamento_id"]
+            isOneToOne: false
+            referencedRelation: "atend_departamentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      atend_conversas: {
+        Row: {
+          aguardando_desde: string | null
+          atribuida_user_id: string | null
+          canal: string
+          clinica_id: string
+          closed_at: string | null
+          contato_nome: string | null
+          contato_paciente_id: string | null
+          contato_telefone: string | null
+          created_at: string
+          departamento_id: string | null
+          fila_posicao: number | null
+          id: string
+          janela_24h_em: string | null
+          protocol_number: string | null
+          sentimento: string | null
+          sentimento_score: number | null
+          status: string
+          ultima_msg_em: string
+          ultima_msg_preview: string | null
+          unread_count: number
+          updated_at: string
+        }
+        Insert: {
+          aguardando_desde?: string | null
+          atribuida_user_id?: string | null
+          canal?: string
+          clinica_id: string
+          closed_at?: string | null
+          contato_nome?: string | null
+          contato_paciente_id?: string | null
+          contato_telefone?: string | null
+          created_at?: string
+          departamento_id?: string | null
+          fila_posicao?: number | null
+          id?: string
+          janela_24h_em?: string | null
+          protocol_number?: string | null
+          sentimento?: string | null
+          sentimento_score?: number | null
+          status?: string
+          ultima_msg_em?: string
+          ultima_msg_preview?: string | null
+          unread_count?: number
+          updated_at?: string
+        }
+        Update: {
+          aguardando_desde?: string | null
+          atribuida_user_id?: string | null
+          canal?: string
+          clinica_id?: string
+          closed_at?: string | null
+          contato_nome?: string | null
+          contato_paciente_id?: string | null
+          contato_telefone?: string | null
+          created_at?: string
+          departamento_id?: string | null
+          fila_posicao?: number | null
+          id?: string
+          janela_24h_em?: string | null
+          protocol_number?: string | null
+          sentimento?: string | null
+          sentimento_score?: number | null
+          status?: string
+          ultima_msg_em?: string
+          ultima_msg_preview?: string | null
+          unread_count?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atend_conversas_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atend_conversas_contato_paciente_id_fkey"
+            columns: ["contato_paciente_id"]
+            isOneToOne: false
+            referencedRelation: "pacientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atend_conversas_departamento_id_fkey"
+            columns: ["departamento_id"]
+            isOneToOne: false
+            referencedRelation: "atend_departamentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      atend_departamento_membros: {
+        Row: {
+          clinica_id: string
+          created_at: string
+          departamento_id: string
+          id: string
+          queue_locked: boolean
+          role: string
+          user_id: string
+        }
+        Insert: {
+          clinica_id: string
+          created_at?: string
+          departamento_id: string
+          id?: string
+          queue_locked?: boolean
+          role?: string
+          user_id: string
+        }
+        Update: {
+          clinica_id?: string
+          created_at?: string
+          departamento_id?: string
+          id?: string
+          queue_locked?: boolean
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atend_departamento_membros_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atend_departamento_membros_departamento_id_fkey"
+            columns: ["departamento_id"]
+            isOneToOne: false
+            referencedRelation: "atend_departamentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      atend_departamentos: {
+        Row: {
+          ativo: boolean
+          clinica_id: string
+          created_at: string
+          descricao: string | null
+          distribuicao: string
+          id: string
+          nome: string
+          prioridade: number
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          clinica_id: string
+          created_at?: string
+          descricao?: string | null
+          distribuicao?: string
+          id?: string
+          nome: string
+          prioridade?: number
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          clinica_id?: string
+          created_at?: string
+          descricao?: string | null
+          distribuicao?: string
+          id?: string
+          nome?: string
+          prioridade?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atend_departamentos_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      atend_horarios: {
+        Row: {
+          ativo: boolean
+          canal: string
+          clinica_id: string
+          created_at: string
+          dia_semana: number
+          hora_fim: string
+          hora_inicio: string
+          id: string
+        }
+        Insert: {
+          ativo?: boolean
+          canal?: string
+          clinica_id: string
+          created_at?: string
+          dia_semana: number
+          hora_fim: string
+          hora_inicio: string
+          id?: string
+        }
+        Update: {
+          ativo?: boolean
+          canal?: string
+          clinica_id?: string
+          created_at?: string
+          dia_semana?: number
+          hora_fim?: string
+          hora_inicio?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atend_horarios_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      atend_kb: {
+        Row: {
+          categoria: string | null
+          clinica_id: string
+          conteudo: string
+          created_at: string
+          id: string
+          publicado: boolean
+          tags: string[] | null
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          categoria?: string | null
+          clinica_id: string
+          conteudo: string
+          created_at?: string
+          id?: string
+          publicado?: boolean
+          tags?: string[] | null
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          categoria?: string | null
+          clinica_id?: string
+          conteudo?: string
+          created_at?: string
+          id?: string
+          publicado?: boolean
+          tags?: string[] | null
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atend_kb_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      atend_macros: {
+        Row: {
+          atalho: string
+          ativo: boolean
+          clinica_id: string
+          conteudo: string
+          created_at: string
+          id: string
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          atalho: string
+          ativo?: boolean
+          clinica_id: string
+          conteudo: string
+          created_at?: string
+          id?: string
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          atalho?: string
+          ativo?: boolean
+          clinica_id?: string
+          conteudo?: string
+          created_at?: string
+          id?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atend_macros_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      atend_msg_fora_horario: {
+        Row: {
+          ativo: boolean
+          clinica_id: string
+          mensagem: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          clinica_id: string
+          mensagem?: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          clinica_id?: string
+          mensagem?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atend_msg_fora_horario_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: true
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      atend_notas_internas: {
+        Row: {
+          autor_nome: string | null
+          autor_user_id: string
+          clinica_id: string
+          conteudo: string
+          conversa_id: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          autor_nome?: string | null
+          autor_user_id: string
+          clinica_id: string
+          conteudo: string
+          conversa_id: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          autor_nome?: string | null
+          autor_user_id?: string
+          clinica_id?: string
+          conteudo?: string
+          conversa_id?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atend_notas_internas_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atend_notas_internas_conversa_id_fkey"
+            columns: ["conversa_id"]
+            isOneToOne: false
+            referencedRelation: "atend_conversas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      atend_numeros_autorizados: {
+        Row: {
+          clinica_id: string
+          created_at: string
+          id: string
+          nota: string | null
+          telefone: string
+        }
+        Insert: {
+          clinica_id: string
+          created_at?: string
+          id?: string
+          nota?: string | null
+          telefone: string
+        }
+        Update: {
+          clinica_id?: string
+          created_at?: string
+          id?: string
+          nota?: string | null
+          telefone?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atend_numeros_autorizados_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      atend_pausas_log: {
+        Row: {
+          clinica_id: string
+          finalizada_em: string | null
+          id: string
+          iniciada_em: string
+          reason_id: string | null
+          user_id: string
+        }
+        Insert: {
+          clinica_id: string
+          finalizada_em?: string | null
+          id?: string
+          iniciada_em?: string
+          reason_id?: string | null
+          user_id: string
+        }
+        Update: {
+          clinica_id?: string
+          finalizada_em?: string | null
+          id?: string
+          iniciada_em?: string
+          reason_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atend_pausas_log_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atend_pausas_log_reason_id_fkey"
+            columns: ["reason_id"]
+            isOneToOne: false
+            referencedRelation: "atend_pause_reasons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      atend_pause_reasons: {
+        Row: {
+          ativo: boolean
+          clinica_id: string
+          conta_trabalhado: boolean
+          cor: string | null
+          created_at: string
+          icone: string | null
+          id: string
+          nome: string
+          tolerancia_minutos: number
+        }
+        Insert: {
+          ativo?: boolean
+          clinica_id: string
+          conta_trabalhado?: boolean
+          cor?: string | null
+          created_at?: string
+          icone?: string | null
+          id?: string
+          nome: string
+          tolerancia_minutos?: number
+        }
+        Update: {
+          ativo?: boolean
+          clinica_id?: string
+          conta_trabalhado?: boolean
+          cor?: string | null
+          created_at?: string
+          icone?: string | null
+          id?: string
+          nome?: string
+          tolerancia_minutos?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atend_pause_reasons_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      atend_protocolo_config: {
+        Row: {
+          clinica_id: string
+          formato: string
+          prefixo: string
+          proximo_seq: number
+          updated_at: string
+          zerar_anualmente: boolean
+        }
+        Insert: {
+          clinica_id: string
+          formato?: string
+          prefixo?: string
+          proximo_seq?: number
+          updated_at?: string
+          zerar_anualmente?: boolean
+        }
+        Update: {
+          clinica_id?: string
+          formato?: string
+          prefixo?: string
+          proximo_seq?: number
+          updated_at?: string
+          zerar_anualmente?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atend_protocolo_config_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: true
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      atend_transferencias: {
+        Row: {
+          clinica_id: string
+          conversa_id: string
+          created_at: string
+          de_departamento_id: string | null
+          de_user_id: string | null
+          id: string
+          motivo: string | null
+          para_departamento_id: string | null
+          para_user_id: string | null
+        }
+        Insert: {
+          clinica_id: string
+          conversa_id: string
+          created_at?: string
+          de_departamento_id?: string | null
+          de_user_id?: string | null
+          id?: string
+          motivo?: string | null
+          para_departamento_id?: string | null
+          para_user_id?: string | null
+        }
+        Update: {
+          clinica_id?: string
+          conversa_id?: string
+          created_at?: string
+          de_departamento_id?: string | null
+          de_user_id?: string | null
+          id?: string
+          motivo?: string | null
+          para_departamento_id?: string | null
+          para_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atend_transferencias_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atend_transferencias_conversa_id_fkey"
+            columns: ["conversa_id"]
+            isOneToOne: false
+            referencedRelation: "atend_conversas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_log: {
         Row: {
           action: string
@@ -5073,13 +5775,19 @@ export type Database = {
       whatsapp_mensagens: {
         Row: {
           body: string | null
+          canal: string
           clinica_id: string
+          conversa_id: string | null
           created_at: string
           direction: string
           enviada_por: string | null
           from_number: string | null
           id: string
+          media_mime: string | null
+          media_url: string | null
+          quoted_message_id: string | null
           raw: Json | null
+          read_at: string | null
           recebida_em: string
           status: string | null
           tipo: string
@@ -5088,13 +5796,19 @@ export type Database = {
         }
         Insert: {
           body?: string | null
+          canal?: string
           clinica_id: string
+          conversa_id?: string | null
           created_at?: string
           direction: string
           enviada_por?: string | null
           from_number?: string | null
           id?: string
+          media_mime?: string | null
+          media_url?: string | null
+          quoted_message_id?: string | null
           raw?: Json | null
+          read_at?: string | null
           recebida_em?: string
           status?: string | null
           tipo?: string
@@ -5103,13 +5817,19 @@ export type Database = {
         }
         Update: {
           body?: string | null
+          canal?: string
           clinica_id?: string
+          conversa_id?: string | null
           created_at?: string
           direction?: string
           enviada_por?: string | null
           from_number?: string | null
           id?: string
+          media_mime?: string | null
+          media_url?: string | null
+          quoted_message_id?: string | null
           raw?: Json | null
+          read_at?: string | null
           recebida_em?: string
           status?: string | null
           tipo?: string
@@ -5122,6 +5842,13 @@ export type Database = {
             columns: ["clinica_id"]
             isOneToOne: false
             referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_mensagens_conversa_id_fkey"
+            columns: ["conversa_id"]
+            isOneToOne: false
+            referencedRelation: "atend_conversas"
             referencedColumns: ["id"]
           },
         ]
@@ -5168,6 +5895,7 @@ export type Database = {
         Args: { _assinatura_svg: string; _ip: string; _token: string }
         Returns: string
       }
+      atend_gerar_protocolo: { Args: { _clinica_id: string }; Returns: string }
       can_manage_clinica: {
         Args: { _clinica_id: string; _user_id: string }
         Returns: boolean
