@@ -621,6 +621,9 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
   const [canceladoEm, setCanceladoEm] = useState<string | null>(contrato.cancelado_em ?? null);
   const [cancelMotivoAtual, setCancelMotivoAtual] = useState<string | null>(contrato.cancelamento_motivo ?? null);
   const cancelado = !!canceladoEm;
+  // Valor mensal vigente (atualizado quando recalculamos as parcelas em aberto)
+  const [valorMensalAtual, setValorMensalAtual] = useState<number>(Number(contrato.valor_mensal));
+  useEffect(() => { setValorMensalAtual(Number(contrato.valor_mensal)); }, [contrato.id]);
 
   const confirmarCancelamento = async () => {
     const motivo = cancelMotivo.trim();
@@ -924,11 +927,14 @@ h1, h2, h3 { margin: 0 0 6mm; }
       : null;
     if (!f) return;
     const novoValor = Number(f.valor_mensal);
-    if (novoValor !== Number(contrato.valor_mensal)) {
+    if (novoValor !== Number(valorMensalAtual)) {
       await supabase
         .from("contratos_assinatura")
         .update({ valor_mensal: novoValor })
         .eq("id", contrato.id);
+      setValorMensalAtual(novoValor);
+      // Reflete imediatamente no objeto recebido por prop, para textos derivados
+      (contrato as any).valor_mensal = novoValor;
     }
     const abertas = mens.filter((m) => m.status !== "pago");
     if (abertas.length === 0) return;
@@ -1158,7 +1164,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <DadosField label="Data início" value={fmtD(contrato.data_inicio)} />
               <DadosField label="Dia de vencimento" value={contrato.dia_vencimento ?? "—"} />
-              <DadosField label="Valor mensal" value={BRL(Number(contrato.valor_mensal))} />
+              <DadosField label="Valor mensal" value={BRL(Number(valorMensalAtual))} />
               <DadosField label="Taxa de adesão" value={BRL(Number(contrato.taxa_adesao ?? 0))} />
             </div>
             <DadosField label="Forma de pagamento" value={formaLabel} />
