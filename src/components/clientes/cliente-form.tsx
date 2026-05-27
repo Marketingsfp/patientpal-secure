@@ -161,6 +161,12 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
   };
   const [histList, setHistList] = useState<HistRow[]>([]);
   const [histLoading, setHistLoading] = useState(false);
+  const [histFiltroDataDe, setHistFiltroDataDe] = useState("");
+  const [histFiltroDataAte, setHistFiltroDataAte] = useState("");
+  const [histFiltroMedico, setHistFiltroMedico] = useState("");
+  const [histFiltroItem, setHistFiltroItem] = useState("");
+  const [histFiltered, setHistFiltered] = useState<HistRow[]>([]);
+  const [histFiltroAtivo, setHistFiltroAtivo] = useState(false);
 
   // Foto
   const [fotoFile, setFotoFile] = useState<File | null>(null);
@@ -479,6 +485,36 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
     setFiltroMedico(""); setFiltroItem("");
     setProntFiltered(prontList);
     setFiltroAtivo(false);
+  }
+
+  // Mantém histórico filtrado em sincronia com a lista carregada
+  useEffect(() => {
+    setHistFiltered(histList);
+    setHistFiltroAtivo(false);
+  }, [histList]);
+
+  function aplicarFiltroHistorico() {
+    const de = histFiltroDataDe ? new Date(histFiltroDataDe + "T00:00:00") : null;
+    const ate = histFiltroDataAte ? new Date(histFiltroDataAte + "T23:59:59") : null;
+    const med = histFiltroMedico.trim().toLowerCase();
+    const item = histFiltroItem.trim().toLowerCase();
+    const r = histList.filter((h) => {
+      const d = new Date(h.inicio);
+      if (de && d < de) return false;
+      if (ate && d > ate) return false;
+      if (med && !(h.medico_nome ?? "").toLowerCase().includes(med)) return false;
+      if (item && (h.procedimento ?? "").toLowerCase() !== item) return false;
+      return true;
+    });
+    setHistFiltered(r);
+    setHistFiltroAtivo(true);
+  }
+
+  function limparFiltroHistorico() {
+    setHistFiltroDataDe(""); setHistFiltroDataAte("");
+    setHistFiltroMedico(""); setHistFiltroItem("");
+    setHistFiltered(histList);
+    setHistFiltroAtivo(false);
   }
 
   async function salvarBiometria(descriptor: number[]) {
@@ -928,7 +964,61 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
                 Nenhuma consulta ou exame realizado para este paciente.
               </div>
             ) : (
-              <div className="rounded-lg border border-border bg-card overflow-x-auto">
+              <>
+                <div className="border rounded-lg p-3 bg-muted/30 grid gap-3 md:grid-cols-[1fr_1fr_1fr_1fr_auto] items-end">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Data de</Label>
+                    <Input type="date" value={histFiltroDataDe} onChange={(e) => setHistFiltroDataDe(e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Data até</Label>
+                    <Input type="date" value={histFiltroDataAte} onChange={(e) => setHistFiltroDataAte(e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Médico</Label>
+                    <Input
+                      placeholder="Nome do médico"
+                      value={histFiltroMedico}
+                      onChange={(e) => setHistFiltroMedico(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); aplicarFiltroHistorico(); } }}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Serviço</Label>
+                    <Select
+                      value={histFiltroItem === "" ? "__all__" : histFiltroItem}
+                      onValueChange={(v) => setHistFiltroItem(v === "__all__" ? "" : v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Todos os serviços" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__all__">Todos os serviços</SelectItem>
+                        {procedimentosOpcoes.map((nome) => (
+                          <SelectItem key={nome} value={nome}>{nome}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button type="button" onClick={aplicarFiltroHistorico}>
+                      <Search className="h-4 w-4 mr-2" /> Pesquisar
+                    </Button>
+                    <Button type="button" variant="outline" onClick={limparFiltroHistorico}>
+                      Limpar
+                    </Button>
+                  </div>
+                </div>
+
+                {histFiltered.length === 0 ? (
+                  <div className="py-10 text-center text-muted-foreground text-sm">
+                    <History className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                    {histFiltroAtivo
+                      ? "Nenhum registro encontrado com esses filtros."
+                      : "Nenhuma consulta ou exame realizado para este paciente."}
+                  </div>
+                ) : (
+                <div className="rounded-lg border border-border bg-card overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-muted/40">
                     <tr className="text-left">
@@ -939,7 +1029,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
                     </tr>
                   </thead>
                   <tbody>
-                    {histList.map((h) => (
+                    {histFiltered.map((h) => (
                       <tr key={h.id} className="border-t hover:bg-muted/30">
                         <td className="px-3 py-2 tabular-nums">
                           {new Date(h.inicio).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
@@ -951,7 +1041,9 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
                     ))}
                   </tbody>
                 </table>
-              </div>
+                </div>
+                )}
+              </>
             )}
           </TabsContent>
         </Tabs>
