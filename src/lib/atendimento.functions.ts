@@ -770,14 +770,19 @@ export const listarUsuariosClinica = createServerFn({ method: "POST" })
     await assertMember(context.userId, data.clinicaId);
     const { data: rows, error } = await supabaseAdmin
       .from("clinica_memberships")
-      .select("user_id, role, profiles!inner(nome)")
+      .select("user_id, role")
       .eq("clinica_id", data.clinicaId)
       .eq("ativo", true);
     if (error) throw new Error(error.message);
+    const userIds = (rows ?? []).map((r: any) => r.user_id);
+    const { data: profs } = userIds.length
+      ? await supabaseAdmin.from("profiles").select("id, nome").in("id", userIds)
+      : { data: [] as any[] };
+    const nomeMap = new Map((profs ?? []).map((p: any) => [p.id, p.nome]));
     return (rows ?? []).map((r: any) => ({
       user_id: r.user_id,
       role: r.role,
-      nome: r.profiles?.nome ?? r.user_id,
+      nome: nomeMap.get(r.user_id) ?? r.user_id,
     }));
   });
 
