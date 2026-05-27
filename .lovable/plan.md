@@ -1,41 +1,32 @@
-## Objetivo
+## Aba Prontuário — filtros e destaque dos títulos
 
-Mover os ícones **"Cadastrar biometria facial"** (`ScanFace`) e **"Ver prontuário"** (`FileHeart`) da listagem `/app/clientes` para dentro da página de edição do cliente, transformando cada um em uma aba do formulário.
+Alterações em `src/components/clientes/cliente-form.tsx`, dentro do `TabsContent value="prontuario"`.
 
-## Mudanças
+### 1. Barra de filtros (acima da lista)
 
-### 1. `src/components/clientes/cliente-form.tsx` — adicionar 2 novas abas
+Adicionar uma linha de filtros responsiva com 4 campos + botão:
 
-A `TabsList` passa de 3 para **5 colunas** (`grid-cols-5`):
+- **Data**: dois inputs `type="date"` (De / Até) para intervalo. Vazio = sem filtro.
+- **Nome do médico**: input de texto livre, comparação case-insensitive contra `medico_nome`.
+- **Item**: input de texto que pesquisa em todos os campos textuais do prontuário (queixa principal, história, exame físico, hipótese, conduta, prescrição, observações).
+- **Botão "Pesquisar"** (ícone `Search`): aplica os filtros aos registros já carregados.
+- **Botão "Limpar"** secundário: zera os 4 campos e mostra todos.
 
-```
-Dados | Endereço | Responsável | Biometria | Prontuário
-```
+Os filtros são aplicados **localmente** sobre `prontList` (já carregado do Supabase) — não refaz query. O resultado vai para um estado `prontFiltered` que substitui `prontList` na renderização. Enquanto o usuário digita, nada muda; só ao clicar em "Pesquisar" (ou Enter no input) o filtro é aplicado. Mensagem "Nenhum registro encontrado com esses filtros" quando o filtro zera os resultados (diferente da mensagem atual de "nenhum registro para este paciente").
 
-As abas Biometria e Prontuário só renderizam conteúdo útil em modo edição (`paciente !== null`); em "Novo cliente" mostram aviso "Salve o cadastro para usar este recurso".
+### 2. Destaque dos títulos dos prontuários
 
-**Aba Biometria** (move toda a lógica de `app.clientes.index.tsx`):
-- Estado local: `hasBiometria` (boolean), `consentOpen`, `faceOpen`.
-- Mostra status (Cadastrada / Não cadastrada).
-- Botão "Cadastrar biometria" → abre diálogo de consentimento LGPD (mesmo texto atual) → abre `FaceCaptureDialog`.
-- Se já cadastrada: botão "Remover biometria" (mesma confirmação atual).
-- Reaproveita `FaceCaptureDialog`, mesmas queries em `paciente_biometria`.
+Hoje os rótulos ("Queixa principal", "Exame físico", "Prescrição"...) são `text-xs font-medium text-muted-foreground` — quase invisíveis. Mudar para:
 
-**Aba Prontuário** (move o diálogo atual para conteúdo inline):
-- Carrega a lista de prontuários (mesma query atual em `prontuarios` + join `medicos`) ao montar/quando o paciente muda.
-- Renderiza a mesma lista de cards de atendimentos que hoje aparece no Dialog (sem o Dialog).
-- Estado de loading e mensagem "Nenhum registro" idênticos aos atuais.
+- `text-sm font-semibold text-foreground` com leve `uppercase tracking-wide`
+- Pequena barra de cor `border-l-2 border-primary pl-2` antes do rótulo, ou um separador sutil acima
+- Espaçamento maior entre blocos (`space-y-3` no card)
 
-### 2. `src/routes/_authenticated/app.clientes.index.tsx` — remover o que foi movido
+O cabeçalho do card (data + nome do médico) ganha um peso visual maior: data em `text-base font-semibold`, médico permanece à direita.
 
-- Remover os botões `ScanFace` e `FileHeart` da coluna "Ações" (sobram apenas Editar e Excluir).
-- Remover o estado e funções relacionados: `faceFor`, `consentFor`, `prontFor`, `prontList`, `prontLoading`, `hasBiometria`, `abrirProntuario`, `salvarBiometria`, `revogarBiometria`, e os `useEffect` que carregam biometrias.
-- Remover os Dialogs de consentimento LGPD e de Prontuário, e o `FaceCaptureDialog`.
-- Remover imports não usados (`ScanFace`, `FileHeart`, `FaceCaptureDialog`, `Loader2` se ficar órfão, `DialogFooter` se ficar órfão).
-- A coluna "Ações" pode estreitar (de `w-40` para `w-24`).
+### Detalhes técnicos
 
-## Fora do escopo
-
-- Não muda o diálogo de "Novo cliente" (continua sem essas abas funcionais — apenas com o aviso de "salve primeiro").
-- Não muda fluxo de captura facial (`FaceCaptureDialog`) nem o conteúdo do termo LGPD.
-- Não cria página separada de prontuário — fica embutida como aba dentro de "Editar cliente".
+- Novo estado: `filtroDataDe`, `filtroDataAte`, `filtroMedico`, `filtroItem`, `prontFiltered`.
+- `useEffect` reseta `prontFiltered = prontList` sempre que `prontList` muda (ao trocar de paciente).
+- Função `aplicarFiltro()` filtra por intervalo de data (comparando `new Date(r.data)`), substring no nome do médico e substring em qualquer campo textual.
+- Sem mudanças no backend, sem novas migrations.
