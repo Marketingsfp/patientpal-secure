@@ -342,6 +342,42 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
       });
   }, [editing?.id]);
 
+  // Mantém a lista filtrada em sincronia com a lista carregada
+  useEffect(() => {
+    setProntFiltered(prontList);
+    setFiltroAtivo(false);
+  }, [prontList]);
+
+  function aplicarFiltroProntuario() {
+    const de = filtroDataDe ? new Date(filtroDataDe + "T00:00:00") : null;
+    const ate = filtroDataAte ? new Date(filtroDataAte + "T23:59:59") : null;
+    const med = filtroMedico.trim().toLowerCase();
+    const item = filtroItem.trim().toLowerCase();
+    const r = prontList.filter((p) => {
+      const d = new Date(p.data);
+      if (de && d < de) return false;
+      if (ate && d > ate) return false;
+      if (med && !(p.medico_nome ?? "").toLowerCase().includes(med)) return false;
+      if (item) {
+        const blob = [
+          p.queixa_principal, p.historia_doenca, p.exame_fisico,
+          p.hipotese_diagnostica, p.conduta, p.prescricao, p.observacoes,
+        ].filter(Boolean).join(" ").toLowerCase();
+        if (!blob.includes(item)) return false;
+      }
+      return true;
+    });
+    setProntFiltered(r);
+    setFiltroAtivo(true);
+  }
+
+  function limparFiltroProntuario() {
+    setFiltroDataDe(""); setFiltroDataAte("");
+    setFiltroMedico(""); setFiltroItem("");
+    setProntFiltered(prontList);
+    setFiltroAtivo(false);
+  }
+
   async function salvarBiometria(descriptor: number[]) {
     if (!editing) return;
     setBioLoading(true);
