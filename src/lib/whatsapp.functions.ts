@@ -167,3 +167,86 @@ export const enviarMensagemWhatsapp = createServerFn({ method: "POST" })
     });
     return { ok: true, wa_message_id };
   });
+
+/* =========================================================================
+ * Templates (HSM) — listar / criar / excluir na Meta
+ * ========================================================================= */
+async function getWabaCreds(clinicaId: string) {
+  const cfg = await loadWhatsAppConfig(clinicaId);
+  if (!cfg?.waba_id) throw new Error("WABA ID não configurado. Preencha em Configuração.");
+  if (!cfg?.access_token) throw new Error("Access Token não configurado. Preencha em Configuração.");
+  return { wabaId: cfg.waba_id, accessToken: cfg.access_token };
+}
+
+export const listarTemplatesWhatsapp = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ clinicaId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertManager(context.userId, data.clinicaId);
+    const { wabaId, accessToken } = await getWabaCreds(data.clinicaId);
+    return { templates: await metaListTemplates(wabaId, accessToken) };
+  });
+
+const ComponentSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("HEADER"),
+    format: z.literal("TEXT"),
+    text: z.string().trim().min(1).max(60),
+    example: z.object({ header_text: z.array(z.string()).optional() }).optional(),
+  }),
+  z.object({
+    type: z.literal("BODY"),
+    text: z.string().trim().min(1).max(1024),
+    example: z.object({ body_text: z.array(z.array(z.string())).optional() }).optional(),
+  }),
+  z.object({
+    type: z.literal("FOOTER"),
+    text: z.string().trim().min(1).max(60),
+  }),
+]);
+
+export const criarTemplateWhatsapp = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        name: z
+          .string()
+          .trim()
+          .min(1)
+          .max(512)
+          .regex(/^[a-z0-9_]+$/, "Use apenas minúsculas, números e _ (underline)"),
+        language: z.string().trim().min(2).max(10).default("pt_BR"),
+        category: z.enum(["MARKETING", "UTILITY", "AUTHENTICATION"]),
+        components: z.array(ComponentSchema).min(1).max(4),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertManager(context.userId, data.clinicaId);
+    const { wabaId, accessToken } = await getWabaCreds(data.clinicaId);
+    const res = await metaCreateTemplate(wabaId, accessToken, {
+      name: data.name,
+      language: data.language,
+      category: data.category,
+      components: data.components as WaTemplateComponent[],
+    });
+    return res;
+  });
+
+export const excluirTemplateWhatsapp = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({
+      clinicaId: z.string().uuid(),
+      name: z.string().trim().min(1).max(512),
+    }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertManager(context.userId, data.clinicaId);
+    const { wabaId, accessToken } = await getWabaCreds(data.clinicaId);
+    return await metaDeleteTemplate(wabaId, accessToken, data.name);
+  });
