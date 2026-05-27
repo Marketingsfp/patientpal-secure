@@ -332,16 +332,46 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
         const rows = data ?? [];
         const medicoIds = Array.from(new Set(rows.map((r: any) => r.medico_id).filter(Boolean)));
         let medicosMap: Record<string, string> = {};
+        let medEspMap: Record<string, string | null> = {};
+        let espNomeMap: Record<string, string> = {};
         if (medicoIds.length > 0) {
           const { data: meds } = await supabase
             .from("medicos")
-            .select("id, nome")
+            .select("id, nome, especialidade_id")
             .in("id", medicoIds);
           medicosMap = Object.fromEntries((meds ?? []).map((m: any) => [m.id, m.nome]));
+          medEspMap = Object.fromEntries((meds ?? []).map((m: any) => [m.id, m.especialidade_id ?? null]));
+          const espIds = Array.from(new Set((meds ?? []).map((m: any) => m.especialidade_id).filter(Boolean)));
+          if (espIds.length > 0) {
+            const { data: esps } = await supabase
+              .from("especialidades").select("id, nome").in("id", espIds);
+            espNomeMap = Object.fromEntries((esps ?? []).map((e: any) => [e.id, e.nome]));
+          }
         }
+        // Busca agendamentos do paciente para casar serviço por dia + médico
+        const { data: ags } = await supabase
+          .from("agendamentos")
+          .select("inicio, medico_id, procedimento")
+          .eq("paciente_id", editing.id);
+        const agList = (ags ?? []) as Array<{ inicio: string; medico_id: string | null; procedimento: string | null }>;
+        const findProc = (dataIso: string, medicoId: string | null): string | null => {
+          const d = new Date(dataIso);
+          const sameDay = agList.filter((a) => {
+            const ad = new Date(a.inicio);
+            return ad.getFullYear() === d.getFullYear()
+              && ad.getMonth() === d.getMonth()
+              && ad.getDate() === d.getDate()
+              && (medicoId ? a.medico_id === medicoId : true);
+          });
+          if (sameDay.length === 0) return null;
+          sameDay.sort((a, b) => Math.abs(new Date(a.inicio).getTime() - d.getTime()) - Math.abs(new Date(b.inicio).getTime() - d.getTime()));
+          return sameDay[0].procedimento ?? null;
+        };
         setProntList(rows.map((r: any) => ({
           id: r.id, data: r.data,
           medico_nome: r.medico_id ? medicosMap[r.medico_id] ?? null : null,
+          especialidade: r.medico_id && medEspMap[r.medico_id] ? espNomeMap[medEspMap[r.medico_id] as string] ?? null : null,
+          procedimento: findProc(r.data, r.medico_id),
           queixa_principal: r.queixa_principal,
           hipotese_diagnostica: r.hipotese_diagnostica,
           conduta: r.conduta, prescricao: r.prescricao,
