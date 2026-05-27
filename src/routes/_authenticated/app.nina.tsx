@@ -94,13 +94,15 @@ function NinaPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const hashAba = (location.hash ?? "").replace(/^#/, "");
-  const abaAtiva = ["treinada", "chat", "automacoes", "config", "atend-status", "atend-dashboard", "atend-depto", "atend-macros", "atend-kb", "atend-pausas", "atend-inbox", "atend-supervisor", "atend-relatorios", "atend-roteamento"].includes(hashAba) ? hashAba : "chat";
+  const abaAtiva = ["treinada", "chat", "automacoes", "config", "atend-status", "atend-dashboard", "atend-depto", "atend-macros", "atend-kb", "atend-pausas", "atend-inbox", "atend-supervisor", "atend-relatorios", "atend-roteamento"].includes(hashAba) ? (hashAba === "chat" ? "atend-inbox" : hashAba) : "atend-inbox";
   const setAbaAtiva = (v: string) => {
     navigate({ to: "/app/nina", hash: v, replace: true });
   };
   useEffect(() => {
     if (!hashAba) {
-      navigate({ to: "/app/nina", hash: "chat", replace: true });
+      navigate({ to: "/app/nina", hash: "atend-inbox", replace: true });
+    } else if (hashAba === "chat") {
+      navigate({ to: "/app/nina", hash: "atend-inbox", replace: true });
     }
   }, [hashAba, navigate]);
   const [draft, setDraft] = useState("");
