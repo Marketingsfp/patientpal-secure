@@ -152,6 +152,14 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
   const [filtroAtivo, setFiltroAtivo] = useState(false);
   const [procedimentosOpcoes, setProcedimentosOpcoes] = useState<string[]>([]);
 
+  // Histórico de atendimentos
+  type HistRow = {
+    id: string; inicio: string; procedimento: string | null;
+    medico_nome: string | null; especialidade: string | null;
+  };
+  const [histList, setHistList] = useState<HistRow[]>([]);
+  const [histLoading, setHistLoading] = useState(false);
+
   // Foto
   const [fotoFile, setFotoFile] = useState<File | null>(null);
   const [fotoPreview, setFotoPreview] = useState<string | null>(null);
