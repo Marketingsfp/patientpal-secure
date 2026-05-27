@@ -55,6 +55,19 @@ function IdadeCell({ nascimento }: { nascimento: string | null }) {
 }
 
 interface Paciente {
+  id: string;
+  nome: string;
+  cpf: string | null;
+  numero_pasta: string | null;
+  telefone: string | null;
+  email: string | null;
+  data_nascimento: string | null;
+  ativo: boolean;
+  cidade: string | null;
+  estado: string | null;
+  created_at: string;
+  foto_url?: string | null;
+}
 
 function ElderlyCaneIcon({ className }: { className?: string }) {
   return (
@@ -78,19 +91,6 @@ function ElderlyCaneIcon({ className }: { className?: string }) {
       <path d="M13.5 11.5 Q14.5 10.3 15.3 11.2" />
     </svg>
   );
-}
-  id: string;
-  nome: string;
-  cpf: string | null;
-  numero_pasta: string | null;
-  telefone: string | null;
-  email: string | null;
-  data_nascimento: string | null;
-  ativo: boolean;
-  cidade: string | null;
-  estado: string | null;
-  created_at: string;
-  foto_url?: string | null;
 }
 
 function ClientesPage() {
