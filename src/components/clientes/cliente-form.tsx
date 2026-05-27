@@ -357,6 +357,52 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
     setFiltroAtivo(false);
   }, [prontList]);
 
+  // Carrega histórico de atendimentos realizados do paciente
+  useEffect(() => {
+    if (!editing) { setHistList([]); return; }
+    setHistLoading(true);
+    void (async () => {
+      const { data, error } = await supabase
+        .from("agendamentos")
+        .select("id, inicio, procedimento, medico_id, status")
+        .eq("paciente_id", editing.id)
+        .eq("status", "realizado")
+        .order("inicio", { ascending: false });
+      if (error) {
+        toast.error("Não foi possível carregar o histórico.");
+        setHistLoading(false); return;
+      }
+      const rows = (data ?? []) as Array<{ id: string; inicio: string; procedimento: string | null; medico_id: string | null }>;
+      const medicoIds = Array.from(new Set(rows.map((r) => r.medico_id).filter((x): x is string => !!x)));
+      let medMap: Record<string, { nome: string; especialidade_id: string | null }> = {};
+      let espMap: Record<string, string> = {};
+      if (medicoIds.length > 0) {
+        const { data: meds } = await supabase
+          .from("medicos")
+          .select("id, nome, especialidade_id")
+          .in("id", medicoIds);
+        medMap = Object.fromEntries((meds ?? []).map((m: any) => [m.id, { nome: m.nome, especialidade_id: m.especialidade_id }]));
+        const espIds = Array.from(new Set((meds ?? []).map((m: any) => m.especialidade_id).filter(Boolean)));
+        if (espIds.length > 0) {
+          const { data: esps } = await supabase
+            .from("especialidades")
+            .select("id, nome")
+            .in("id", espIds);
+          espMap = Object.fromEntries((esps ?? []).map((e: any) => [e.id, e.nome]));
+        }
+      }
+      setHistList(rows.map((r) => {
+        const med = r.medico_id ? medMap[r.medico_id] : null;
+        return {
+          id: r.id, inicio: r.inicio, procedimento: r.procedimento,
+          medico_nome: med?.nome ?? null,
+          especialidade: med?.especialidade_id ? espMap[med.especialidade_id] ?? null : null,
+        };
+      }));
+      setHistLoading(false);
+    })();
+  }, [editing?.id]);
+
   // Carrega procedimentos ativos da clínica para o filtro "Item"
   useEffect(() => {
     if (!clinicaId) return;
