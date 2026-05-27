@@ -197,8 +197,8 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
   .ficha-parcela { text-align: right; }
   .ficha-parcela .lab { font-size: 9px; text-transform: uppercase; color: #666; }
   .ficha-parcela .val { font-size: 18px; font-weight: 800; }
-  .ficha-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 22px; font-size: 11px; }
-  .ficha-grid > div { display: flex; flex-direction: column; gap: 2px; }
+  .ficha-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px 22px; font-size: 11px; }
+  .ficha-grid > div { display: flex; flex-direction: column; gap: 4px; }
   .ficha-grid .lab { display:block; font-size: 9px; color: #666; text-transform: uppercase; letter-spacing: .04em; }
   .ficha-grid .val { font-weight: 600; }
   .ficha-grid .val.destaque { font-size: 14px; }
