@@ -407,19 +407,26 @@ export function AtendInbox() {
                 );
               })}
             </div>
-            <div className="border-t p-3 flex gap-2">
-              <Textarea
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar(); } }}
-                placeholder="Mensagem… (Enter envia, Shift+Enter quebra linha)"
-                rows={1}
-                className="resize-none min-h-9"
-                disabled={enviando}
-              />
-              <Button onClick={enviar} disabled={enviando || !draft.trim()} className="bg-emerald-500 hover:bg-emerald-600">
-                {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              </Button>
+            <div className="border-t p-3 space-y-2">
+              {motivoBloqueio && (
+                <div className="text-xs rounded-md border border-amber-300 bg-amber-50 text-amber-900 px-2 py-1.5">
+                  {motivoBloqueio}
+                </div>
+              )}
+              <div className="flex gap-2">
+                <Textarea
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar(); } }}
+                  placeholder={motivoBloqueio ? "Envio bloqueado" : "Mensagem… (Enter envia, Shift+Enter quebra linha)"}
+                  rows={1}
+                  className="resize-none min-h-9"
+                  disabled={enviando || !!motivoBloqueio}
+                />
+                <Button onClick={enviar} disabled={enviando || !draft.trim() || !!motivoBloqueio} className="bg-emerald-500 hover:bg-emerald-600">
+                  {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                </Button>
+              </div>
             </div>
           </>
         )}
