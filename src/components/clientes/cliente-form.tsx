@@ -687,28 +687,82 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
                 <FileHeart className="h-6 w-6 mx-auto mb-2 opacity-50" />
                 Nenhum registro de prontuário para este paciente.
               </div>
-            ) : prontList.map((r) => (
-              <div key={r.id} className="border rounded-lg p-4 bg-card space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="font-semibold">{new Date(r.data).toLocaleString("pt-BR")}</span>
-                  <span className="text-muted-foreground uppercase text-xs">{r.medico_nome ?? "—"}</span>
+            ) : (
+              <>
+                <div className="border rounded-lg p-3 bg-muted/30 grid gap-3 md:grid-cols-[1fr_1fr_1fr_1fr_auto] items-end">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Data de</Label>
+                    <Input type="date" value={filtroDataDe} onChange={(e) => setFiltroDataDe(e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Data até</Label>
+                    <Input type="date" value={filtroDataAte} onChange={(e) => setFiltroDataAte(e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Médico</Label>
+                    <Input
+                      placeholder="Nome do médico"
+                      value={filtroMedico}
+                      onChange={(e) => setFiltroMedico(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); aplicarFiltroProntuario(); } }}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Item</Label>
+                    <Input
+                      placeholder="Queixa, prescrição, etc."
+                      value={filtroItem}
+                      onChange={(e) => setFiltroItem(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); aplicarFiltroProntuario(); } }}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button type="button" onClick={aplicarFiltroProntuario}>
+                      <Search className="h-4 w-4 mr-2" /> Pesquisar
+                    </Button>
+                    <Button type="button" variant="outline" onClick={limparFiltroProntuario}>
+                      Limpar
+                    </Button>
+                  </div>
                 </div>
-                {([
-                  ["Queixa principal", r.queixa_principal],
-                  ["História da doença", r.historia_doenca],
-                  ["Exame físico", r.exame_fisico],
-                  ["Hipótese diagnóstica", r.hipotese_diagnostica],
-                  ["Conduta", r.conduta],
-                  ["Prescrição", r.prescricao],
-                  ["Observações", r.observacoes],
-                ] as const).filter(([, v]) => v && v.trim()).map(([label, v]) => (
-                  <div key={label} className="text-sm">
-                    <div className="text-xs font-medium text-muted-foreground">{label}</div>
-                    <div className="whitespace-pre-wrap">{v}</div>
+
+                {prontFiltered.length === 0 ? (
+                  <div className="py-10 text-center text-muted-foreground text-sm">
+                    <FileHeart className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                    {filtroAtivo
+                      ? "Nenhum registro encontrado com esses filtros."
+                      : "Nenhum registro de prontuário para este paciente."}
+                  </div>
+                ) : prontFiltered.map((r) => (
+                  <div key={r.id} className="border rounded-lg p-4 bg-card space-y-3">
+                    <div className="flex items-center justify-between border-b pb-2">
+                      <span className="text-base font-semibold text-foreground">
+                        {new Date(r.data).toLocaleString("pt-BR")}
+                      </span>
+                      <span className="text-muted-foreground uppercase text-xs font-medium tracking-wide">
+                        {r.medico_nome ?? "—"}
+                      </span>
+                    </div>
+                    {([
+                      ["Queixa principal", r.queixa_principal],
+                      ["História da doença", r.historia_doenca],
+                      ["Exame físico", r.exame_fisico],
+                      ["Hipótese diagnóstica", r.hipotese_diagnostica],
+                      ["Conduta", r.conduta],
+                      ["Prescrição", r.prescricao],
+                      ["Observações", r.observacoes],
+                    ] as const).filter(([, v]) => v && v.trim()).map(([label, v]) => (
+                      <div key={label} className="text-sm border-l-2 border-primary pl-3">
+                        <div className="text-sm font-semibold text-foreground uppercase tracking-wide mb-1">
+                          {label}
+                        </div>
+                        <div className="whitespace-pre-wrap text-foreground/90">{v}</div>
+                      </div>
+                    ))}
                   </div>
                 ))}
-              </div>
-            ))}
+              </>
+            )}
           </TabsContent>
         </Tabs>
 
