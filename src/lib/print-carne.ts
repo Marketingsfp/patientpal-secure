@@ -51,7 +51,7 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
     { data: clinica },
     { data: convenio },
     { data: planoFallback },
-    { count: depCount },
+    { data: dependentesRows },
   ] = await Promise.all([
       supabase
         .from("contrato_mensalidades")
@@ -76,13 +76,34 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
         : Promise.resolve({ data: null as { nome: string | null } | null }),
       supabase
         .from("contrato_dependentes")
-        .select("id", { count: "exact", head: true })
+        .select("paciente_id, paciente_nome, pacientes:paciente_id(cpf)")
         .eq("contrato_id", contratoId)
         .eq("ativo", true),
     ]);
 
   const convenioNome = convenio?.nome ?? planoFallback?.nome ?? "—";
-  const pessoasConvenio = 1 + (depCount ?? 0);
+  const dependentes = (dependentesRows ?? []).map((d: any) => ({
+    nome: d.paciente_nome as string,
+    cpf: (d.pacientes?.cpf as string | null) ?? null,
+  }));
+  const pessoasConvenio = 1 + dependentes.length;
+
+  const titularesRows = [
+    `<div class="dep-row dep-row-head">
+       <span class="lab">Titular / Dependentes</span>
+       <span class="lab">CPF</span>
+     </div>`,
+    `<div class="dep-row">
+       <span class="val">${esc(contrato.paciente_nome)}</span>
+       <span class="val">${esc(paciente?.cpf ?? "—")}</span>
+     </div>`,
+    ...dependentes.map(
+      (d) => `<div class="dep-row">
+        <span class="val">${esc(d.nome)}</span>
+        <span class="val">${esc(d.cpf ?? "—")}</span>
+      </div>`,
+    ),
+  ].join("");
 
   const fichas = (parcelas ?? []).map((p) => {
     const total = (parcelas ?? []).length;
@@ -138,10 +159,15 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
     page-break-inside: avoid;
   }
   .capa h1 { font-size: 18px; margin: 0 0 4px; }
-  .capa .sub { font-size: 12px; color: #444; margin-bottom: 10px; }
-  .capa-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 16px; font-size: 12px; }
-  .capa-grid .lab { display:block; font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: .04em; }
-  .capa-grid .val { font-weight: 600; }
+  .capa-clinica { font-size: 15px; font-weight: 800; color: #111; margin-bottom: 6px; }
+  .capa-clinica .cnpj { font-size: 11px; font-weight: 500; color: #555; margin-left: 6px; }
+  .capa-cols { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 8px 16px; font-size: 12px; }
+  .capa-col { display: flex; flex-direction: column; gap: 6px; }
+  .capa-col .lab { display:block; font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: .04em; }
+  .capa-col .val { font-weight: 600; }
+  .dep-table { display: flex; flex-direction: column; gap: 2px; }
+  .dep-row { display: grid; grid-template-columns: 1.4fr 1fr; gap: 8px; align-items: baseline; }
+  .dep-row-head { border-bottom: 1px solid #ddd; padding-bottom: 2px; margin-bottom: 2px; }
 
   .ficha {
     border: 1px dashed #111;
@@ -177,18 +203,23 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
 <body>
   <div class="capa">
     <h1>Carnê de pagamento — Contrato #${esc(contrato.numero)}</h1>
-    <div class="sub">${esc(clinica?.nome ?? "")}${clinica?.cnpj ? ` — CNPJ ${esc(clinica.cnpj)}` : ""}</div>
-    <div class="capa-grid">
-      <div><span class="lab">Titular</span><span class="val">${esc(contrato.paciente_nome)}</span></div>
-      <div><span class="lab">CPF</span><span class="val">${esc(paciente?.cpf ?? "—")}</span></div>
-      <div><span class="lab">Convênio</span><span class="val">${esc(convenioNome)}</span></div>
-      <div><span class="lab">Pessoas no convênio</span><span class="val">${pessoasConvenio}</span></div>
-      <div><span class="lab">Início</span><span class="val">${fmtD(contrato.data_inicio)}</span></div>
-      <div><span class="lab">Dia de vencimento</span><span class="val">${esc(contrato.dia_vencimento ?? "—")}</span></div>
-      <div><span class="lab">Valor mensal</span><span class="val">${BRL(Number(contrato.valor_mensal))}</span></div>
-      <div><span class="lab">Parcelas</span><span class="val">${(parcelas ?? []).length}</span></div>
-      <div><span class="lab">Total do contrato</span><span class="val">${BRL((parcelas ?? []).reduce((s, p) => s + Number(p.valor), 0))}</span></div>
-      <div><span class="lab">Emitido em</span><span class="val">${fmtD(new Date().toISOString().slice(0, 10))}</span></div>
+    <div class="capa-clinica">${esc(clinica?.nome ?? "")}${clinica?.cnpj ? `<span class="cnpj">CNPJ ${esc(clinica.cnpj)}</span>` : ""}</div>
+    <div class="capa-cols">
+      <div class="capa-col">
+        <div class="dep-table">${titularesRows}</div>
+        <div><span class="lab">Início</span><span class="val">${fmtD(contrato.data_inicio)}</span></div>
+        <div><span class="lab">Parcelas</span><span class="val">${(parcelas ?? []).length}</span></div>
+        <div><span class="lab">Emitido em</span><span class="val">${fmtD(new Date().toISOString().slice(0, 10))}</span></div>
+      </div>
+      <div class="capa-col">
+        <div><span class="lab">Convênio</span><span class="val">${esc(convenioNome)}</span></div>
+        <div><span class="lab">Pessoas no convênio</span><span class="val">${pessoasConvenio}</span></div>
+      </div>
+      <div class="capa-col">
+        <div><span class="lab">Dia de vencimento</span><span class="val">${esc(contrato.dia_vencimento ?? "—")}</span></div>
+        <div><span class="lab">Valor mensal</span><span class="val">${BRL(Number(contrato.valor_mensal))}</span></div>
+        <div><span class="lab">Total do contrato</span><span class="val">${BRL((parcelas ?? []).reduce((s, p) => s + Number(p.valor), 0))}</span></div>
+      </div>
     </div>
   </div>
 
