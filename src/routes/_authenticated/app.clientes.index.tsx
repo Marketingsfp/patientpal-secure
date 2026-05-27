@@ -16,7 +16,7 @@ import {
 import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
 import { ClienteForm } from "@/components/clientes/cliente-form";
 
-export const Route = createFileRoute("/_authenticated/app/clientes")({
+export const Route = createFileRoute("/_authenticated/app/clientes/")({
   component: ClientesPage,
   head: () => ({ meta: [{ title: "Clientes — ClinicaOS" }] }),
 });
