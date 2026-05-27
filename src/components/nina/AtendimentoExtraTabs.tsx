@@ -18,7 +18,7 @@ import { useClinica } from "@/hooks/use-clinica";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import {
   listarConversas, listarMensagensConversa, enviarMensagemConversa,
-  obterDadosContato, atribuirConversa, transferirConversa, fecharConversa,
+  obterDadosContato, transferirConversa, fecharConversa,
   listarNotas, criarNota,
   listarDepartamentos, listarMembros, listarUsuariosClinica,
   supervisaoLive, relatorioAtendimento,
@@ -51,7 +51,6 @@ export function AtendInbox() {
   const listarMsgs = useServerFn(listarMensagensConversa);
   const enviarMsg = useServerFn(enviarMensagemConversa);
   const obterContato = useServerFn(obterDadosContato);
-  const atribuirFn = useServerFn(atribuirConversa);
   const transferirFn = useServerFn(transferirConversa);
   const fecharFn = useServerFn(fecharConversa);
   const listarNotasFn = useServerFn(listarNotas);
