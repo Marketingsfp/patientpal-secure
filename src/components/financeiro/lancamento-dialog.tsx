@@ -513,7 +513,14 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
-          <Button onClick={handleSave} disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button>
+          <Button onClick={handleSave} disabled={saving} className="gap-2">
+            {saving ? "Salvando..." : (
+              <>
+                <Printer className="h-4 w-4" />
+                Salvar e imprimir
+              </>
+            )}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
