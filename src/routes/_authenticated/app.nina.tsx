@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useLocation, useNavigate } from "@tanstack/react-router";
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { MessageCircle, Send, Mic, Bot, CheckCheck, Phone, FileText, DollarSign, Cake, Calendar, Sparkles, Brain, Loader2, Copy, CheckCircle2, AlertCircle, Eye, EyeOff, Smartphone, Instagram, Facebook, Globe, Plus, Pencil, X, Paperclip, Smile, Search, PanelRightClose, PanelRightOpen, MoreVertical, User, Tag, ArrowLeft } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
@@ -11,8 +11,7 @@ import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -90,7 +89,18 @@ function NinaPage() {
   const clinicaId = clinicaAtual?.clinica_id;
   const [conversas, setConversas] = useState<Conv[]>([]);
   const [sel, setSel] = useState<Conv | null>(null);
-  const [abaAtiva, setAbaAtiva] = useState<string>("chat");
+  const location = useLocation();
+  const navigate = useNavigate();
+  const hashAba = (location.hash ?? "").replace(/^#/, "");
+  const abaAtiva = ["treinada", "chat", "automacoes", "config"].includes(hashAba) ? hashAba : "chat";
+  const setAbaAtiva = (v: string) => {
+    navigate({ to: "/app/nina", hash: v, replace: true });
+  };
+  useEffect(() => {
+    if (!hashAba) {
+      navigate({ to: "/app/nina", hash: "chat", replace: true });
+    }
+  }, [hashAba, navigate]);
   const [draft, setDraft] = useState("");
   const [busca, setBusca] = useState("");
   const [loadingConv, setLoadingConv] = useState(false);
