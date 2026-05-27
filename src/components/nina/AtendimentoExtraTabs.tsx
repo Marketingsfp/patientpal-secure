@@ -182,7 +182,6 @@ export function AtendInbox() {
   useRealtimeRefresh(["atend_conversas", "whatsapp_mensagens"], carregarConvs, !!clinicaId);
   useRealtimeRefresh(["whatsapp_mensagens", "atend_notas_internas"], carregarConversa, !!clinicaId && !!sel?.id);
 
-  const statusAgenteOk = !pausaAtiva && filaAberta;
   const janela24hExpirada = (() => {
     if (!sel || sel.canal !== "whatsapp") return false;
     const j = sel.janela_24h_em ? new Date(sel.janela_24h_em).getTime() : 0;
