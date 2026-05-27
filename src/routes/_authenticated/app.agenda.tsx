@@ -1975,7 +1975,7 @@ function AgendaPage() {
               {pacInfo.id && (
                 <div className="pt-2">
                   <a href={`/app/clientes?q=${encodeURIComponent(pacInfo.nome)}`} className="text-xs text-primary hover:underline">
-                    Abrir ficha completa →
+                    Editar
                   </a>
                 </div>
               )}
