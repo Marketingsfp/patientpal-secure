@@ -82,7 +82,7 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
     ]);
 
   const convenioNome = convenio?.nome ?? planoFallback?.nome ?? "—";
-  const dependentes = depCount ?? [];
+  const dependentes = (depRows ?? []) as { paciente_id: string; paciente_nome: string }[];
   const pessoasConvenio = 1 + dependentes.length;
 
   const depIds = dependentes.map((d) => d.paciente_id).filter(Boolean) as string[];
