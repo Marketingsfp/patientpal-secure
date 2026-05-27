@@ -46,7 +46,7 @@ import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
 
 const VoiceInput = lazy(() => import("@/components/voice-input").then((m) => ({ default: m.VoiceInput })));
 
-type NavLeaf = { to: string; label: string; icon: typeof LayoutDashboard };
+type NavLeaf = { to: string; label: string; icon: typeof LayoutDashboard; hash?: string };
 type NavParent = { label: string; icon: typeof LayoutDashboard; children: ReadonlyArray<NavLeaf> };
 type NavItem = NavLeaf | NavParent;
 const isParent = (it: NavItem): it is NavParent => "children" in it;
@@ -79,7 +79,16 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     { to: "/app/crm", label: "CRM", icon: Target },
     { to: "/app/alertas-enfermagem", label: "Enfermeira IA — Alertas", icon: BellRing },
     { to: "/app/consulta-rapida", label: "Informações rápidas", icon: BookOpen },
-    { to: "/app/nina", label: "Nina — WhatsApp", icon: MessageCircle },
+    {
+      label: "Nina — WhatsApp",
+      icon: MessageCircle,
+      children: [
+        { to: "/app/nina", hash: "treinada", label: "Nina treinada", icon: Brain },
+        { to: "/app/nina", hash: "chat", label: "Conversas WhatsApp", icon: MessageCircle },
+        { to: "/app/nina", hash: "automacoes", label: "Automações", icon: Sparkles },
+        { to: "/app/nina", hash: "config", label: "Configuração", icon: KeyRound },
+      ],
+    },
     { to: "/app/odontologia", label: "Odontologia", icon: HeartPulse },
     { to: "/app/exames-resultados", label: "Resultados de Exames", icon: FlaskConical },
     ],
