@@ -88,14 +88,16 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
   }));
   const pessoasConvenio = 1 + dependentes.length;
 
-  const titularNomes = [
-    `<span class="val">${esc(contrato.paciente_nome)}</span>`,
-    ...dependentes.map((d) => `<span class="val">${esc(d.nome)}</span>`),
-  ].join("");
-  const titularCpfs = [
-    `<span class="val">${esc(paciente?.cpf ?? "—")}</span>`,
-    ...dependentes.map((d) => `<span class="val">${esc(d.cpf ?? "—")}</span>`),
-  ].join("");
+  const titularNomes = `<span class="val">${esc(contrato.paciente_nome)}</span>` +
+    (dependentes.length
+      ? `<span class="lab" style="margin-top:6px;">Dependentes</span>` +
+        dependentes.map((d) => `<span class="val">${esc(d.nome)}</span>`).join("")
+      : "");
+  const titularCpfs = `<span class="val">${esc(paciente?.cpf ?? "—")}</span>` +
+    (dependentes.length
+      ? `<span class="lab" style="margin-top:6px;">&nbsp;</span>` +
+        dependentes.map((d) => `<span class="val">${esc(d.cpf ?? "—")}</span>`).join("")
+      : "");
 
   const fichas = (parcelas ?? []).map((p) => {
     const total = (parcelas ?? []).length;
