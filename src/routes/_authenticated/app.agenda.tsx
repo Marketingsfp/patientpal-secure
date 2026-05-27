@@ -628,7 +628,7 @@ function AgendaPage() {
       totalCredito  += valorCartao;
     }
     const paciente = itens[0].paciente_nome;
-    const desc = `${paciente} — ${itens.map(i => (i.procedimento ?? "CONSULTA")).join(" + ")} (${itens.length} itens)`;
+    const desc = `${paciente} — ${itens.map(i => (i.procedimento ?? "CONSULTA")).join(" + ")} (${itens.length} serviços)`;
     const opcoes: FormaOpcao[] = [
       { forma: "dinheiro", label: "Dinheiro", valor: totalDinheiro },
       { forma: "pix", label: "Pix", valor: totalPix },
@@ -650,7 +650,7 @@ function AgendaPage() {
     if (itens.length === 0) { toast.info("Selecione ao menos um horário."); return; }
     const bloqueados = itens.filter(i => pagosSet.has(i.id) || (i.paciente_nome !== "DISPONÍVEL" && i.status !== "agendado"));
     if (bloqueados.length > 0) {
-      toast.error(`${bloqueados.length} item(ns) não podem ser excluídos (já pagos ou em atendimento). Desmarque-os.`);
+      toast.error(`${bloqueados.length} agendamento(s) não podem ser excluídos (já pagos ou em atendimento). Desmarque-os.`);
       return;
     }
     if (!confirm(`Excluir ${ids.length} horário(s)? Esta ação não pode ser desfeita.`)) return;

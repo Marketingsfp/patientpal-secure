@@ -325,7 +325,7 @@ function ConveniosPage() {
     const bensToInsert: any[] = [];
     for (const b of beneficios) {
       if (b.escopo === "servico" && !b.procedimento_id) {
-        setSaving(false); toast.error("Selecione o item em todos os benefícios de serviço único."); return;
+        setSaving(false); toast.error("Selecione o serviço em todos os benefícios de serviço único."); return;
       }
       if (b.escopo === "especialidade" && !b.especialidade_id) {
         setSaving(false); toast.error("Selecione a especialidade em todos os benefícios."); return;
@@ -615,13 +615,13 @@ function ConveniosPage() {
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                             <div className="md:col-span-2">
-                              <Label className="text-xs">{b.escopo === "servico" ? "Item" : "Especialidade"}</Label>
+                              <Label className="text-xs">{b.escopo === "servico" ? "Serviço" : "Especialidade"}</Label>
                               {b.escopo === "servico" ? (
                                 <SearchableSelect
                                   options={procOpts}
                                   value={b.procedimento_id ?? ""}
                                   onChange={(v) => update({ procedimento_id: v })}
-                                  placeholder="Selecione o item"
+                                  placeholder="Selecione o serviço"
                                 />
                               ) : (
                                 <SearchableSelect

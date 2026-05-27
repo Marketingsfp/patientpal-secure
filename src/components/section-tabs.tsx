@@ -65,7 +65,7 @@ export const RH_TABS: ReadonlyArray<SectionTab> = [
 export const SERVICOS_TABS: ReadonlyArray<SectionTab> = [
   { to: "/app/especialidades", label: "Especialidades", icon: HeartPulse },
   { to: "/app/tipos-servico", label: "Tipos", icon: LayoutGrid },
-  { to: "/app/procedimentos", label: "Itens", icon: ClipboardList },
+  { to: "/app/procedimentos", label: "Serviços", icon: ClipboardList },
 ];
 
 export const SEGURANCA_TABS: ReadonlyArray<SectionTab> = [

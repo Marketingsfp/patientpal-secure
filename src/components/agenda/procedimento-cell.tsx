@@ -36,7 +36,7 @@ export function ProcedimentoCell({ valor, opcoes, disabled, onChange }: Props) {
   const filtrada = useMemo(() => {
     const qn = norm(q.trim());
     if (!qn) return lista;
-    // Permite buscar por número (ex: "3" filtra pelo 3º item)
+    // Permite buscar por número (ex: "3" filtra pelo 3º serviço)
     if (/^\d+$/.test(qn)) {
       const idx = parseInt(qn, 10) - 1;
       if (idx >= 0 && idx < lista.length) return [lista[idx]];

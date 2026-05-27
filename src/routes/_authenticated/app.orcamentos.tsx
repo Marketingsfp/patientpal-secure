@@ -433,7 +433,7 @@ function NovoOrcamentoDialog({
 
   const salvar = async () => {
     if (!pacienteNome.trim()) return toast.error("Informe o nome do paciente");
-    if (itens.length === 0) return toast.error("Adicione ao menos um procedimento");
+    if (itens.length === 0) return toast.error("Adicione ao menos um serviço");
     if (formasPagamento.length === 0) return toast.error("Selecione ao menos uma forma de pagamento");
     const valoresPag: Record<string, number> | null =
       formasPagamento.length > 1 ? { ...totaisPorForma } : null;
@@ -560,7 +560,7 @@ function NovoOrcamentoDialog({
               </div>
               {formasPagamento.length > 1 && (
                 <p className="text-xs text-muted-foreground">
-                  Cada item mostra o valor por forma; o total por forma é calculado automaticamente.
+                  Cada serviço mostra o valor por forma; o total por forma é calculado automaticamente.
                 </p>
               )}
             </div>
@@ -568,10 +568,10 @@ function NovoOrcamentoDialog({
           </div>
 
           <div className="space-y-2 border-t pt-3">
-            <Label>Adicionar procedimento</Label>
+            <Label>Adicionar serviço</Label>
             <div className="relative">
               <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <Input className="pl-9" placeholder="Buscar procedimento da tabela…" value={procQuery} onChange={(e) => setProcQuery(e.target.value)} />
+              <Input className="pl-9" placeholder="Buscar serviço da tabela…" value={procQuery} onChange={(e) => setProcQuery(e.target.value)} />
               {procResults.length > 0 && (
                 <div className="absolute z-10 top-full mt-1 left-0 right-0 bg-popover border rounded-md shadow-lg max-h-64 overflow-y-auto">
                   {procResults.map((p) => (
@@ -599,7 +599,7 @@ function NovoOrcamentoDialog({
               )}
               {searchingProc && <div className="text-xs text-muted-foreground mt-1">Buscando…</div>}
             </div>
-            <Button type="button" variant="outline" size="sm" onClick={adicionarManual} className="gap-1"><Plus className="h-3 w-3" /> Item manual</Button>
+            <Button type="button" variant="outline" size="sm" onClick={adicionarManual} className="gap-1"><Plus className="h-3 w-3" /> Serviço manual</Button>
           </div>
 
           {itens.length > 0 && (
