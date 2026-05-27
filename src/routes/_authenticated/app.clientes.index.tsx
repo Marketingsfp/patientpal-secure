@@ -46,46 +46,7 @@ function ClientesPage() {
   const [loading, setLoading] = useState(false);
   const [openNovo, setOpenNovo] = useState(false);
 
-  // Biometria facial
-  const [faceFor, setFaceFor] = useState<Paciente | null>(null);
-  const [consentFor, setConsentFor] = useState<Paciente | null>(null);
-  const [prontFor, setProntFor] = useState<Paciente | null>(null);
-  const [prontList, setProntList] = useState<Array<{
-    id: string; data: string; medico_nome: string | null;
-    queixa_principal: string | null; hipotese_diagnostica: string | null;
-    conduta: string | null; prescricao: string | null;
-    historia_doenca: string | null; exame_fisico: string | null; observacoes: string | null;
-  }>>([]);
-  const [prontLoading, setProntLoading] = useState(false);
-  const [hasBiometria, setHasBiometria] = useState<Record<string, boolean>>({});
   const [fotoSigned, setFotoSigned] = useState<Record<string, string>>({});
-
-  const abrirProntuario = async (p: Paciente) => {
-    setProntFor(p);
-    setProntLoading(true);
-    setProntList([]);
-    const { data, error } = await supabase
-      .from("prontuarios")
-      .select("id, data, medico_id, queixa_principal, hipotese_diagnostica, conduta, prescricao, historia_doenca, exame_fisico, observacoes, medicos(nome)")
-      .eq("paciente_id", p.id)
-      .order("data", { ascending: false });
-    if (error) {
-      toast.error("Não foi possível carregar o prontuário.");
-      setProntLoading(false);
-      return;
-    }
-    setProntList((data ?? []).map((r: any) => ({
-      id: r.id, data: r.data,
-      medico_nome: r.medicos?.nome ?? null,
-      queixa_principal: r.queixa_principal,
-      hipotese_diagnostica: r.hipotese_diagnostica,
-      conduta: r.conduta, prescricao: r.prescricao,
-      historia_doenca: r.historia_doenca,
-      exame_fisico: r.exame_fisico,
-      observacoes: r.observacoes,
-    })));
-    setProntLoading(false);
-  };
 
   const load = async () => {
     if (!clinicaAtual) return;
