@@ -162,7 +162,7 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
   .ficha-grid .lab { display:block; font-size: 9px; color: #666; text-transform: uppercase; letter-spacing: .04em; }
   .ficha-grid .val { font-weight: 600; }
   .ficha-grid .val.destaque { font-size: 14px; }
-  .ficha-rodape { margin-top: auto; display: grid; grid-template-columns: 1fr 1fr 1.4fr; gap: 8px; align-items: end; }
+  .ficha-rodape { margin-top: auto; display: grid; grid-template-columns: 1fr; gap: 8px; align-items: end; }
   .campo-manual .lab { display:block; font-size: 9px; color: #666; text-transform: uppercase; letter-spacing: .04em; }
   .campo-manual .linha { display:block; border-bottom: 1px solid #111; height: 16px; }
   .campo-manual.assinatura .linha-assin { display:block; border-bottom: 1px solid #111; height: 28px; }
