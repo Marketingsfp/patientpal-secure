@@ -617,7 +617,6 @@ function ProcedimentosPage() {
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="procedimentos">Serviço</TabsTrigger>
-          <TabsTrigger value="cartoes">Cartões de convênio</TabsTrigger>
         </TabsList>
 
         {/* ============ PROCEDIMENTOS ============ */}
@@ -806,52 +805,6 @@ function ProcedimentosPage() {
           )}
         </TabsContent>
 
-        {/* ============ CARTÕES ============ */}
-        <TabsContent value="cartoes" className="space-y-4 pt-4 pb-16">
-          <div className="flex flex-wrap gap-2 justify-end">
-            <Button variant="outline" onClick={seedCartoesPadrao}>
-              <Sparkles className="h-4 w-4 mr-2" />Cadastrar Cartão Consulta e Desconto
-            </Button>
-            <Button onClick={openNewCartao}><Plus className="h-4 w-4 mr-2" /> Novo cartão</Button>
-          </div>
-
-          <div className="rounded-lg border border-border bg-card overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/40">
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Descrição</TableHead>
-                  <TableHead className="w-32 text-right">Desconto %</TableHead>
-                  <TableHead className="w-24">Situação</TableHead>
-                  <TableHead className="w-28 text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {cartoes.length === 0 ? (
-                  <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Nenhum cartão cadastrado.</TableCell></TableRow>
-                ) : cartoes.map(c => (
-                  <TableRow key={c.id}>
-                    <TableCell className="font-medium flex items-center gap-2"><CreditCard className="h-4 w-4 text-primary" />{c.nome}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{c.descricao ?? "—"}</TableCell>
-                    <TableCell className="text-right text-sm">{Number(c.percentual_desconto)}%</TableCell>
-                    <TableCell>
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${c.ativo ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}>
-                        {c.ativo ? "Ativo" : "Inativo"}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => openEditCartao(c)}><Pencil className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => onDeleteCartao(c)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Os cartões aparecem como forma de pagamento. O valor cobrado vem da coluna correspondente do procedimento (C. Consulta / C. Desconto).
-          </p>
-        </TabsContent>
       </Tabs>
 
       {/* ============ DIALOG PROCEDIMENTO ============ */}
