@@ -150,6 +150,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
   const [filtroItem, setFiltroItem] = useState("");
   const [prontFiltered, setProntFiltered] = useState<ProntRow[]>([]);
   const [filtroAtivo, setFiltroAtivo] = useState(false);
+  const [procedimentosOpcoes, setProcedimentosOpcoes] = useState<string[]>([]);
 
   // Foto
   const [fotoFile, setFotoFile] = useState<File | null>(null);
@@ -347,6 +348,22 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
     setProntFiltered(prontList);
     setFiltroAtivo(false);
   }, [prontList]);
+
+  // Carrega procedimentos ativos da clínica para o filtro "Item"
+  useEffect(() => {
+    if (!clinicaId) return;
+    void supabase
+      .from("procedimentos")
+      .select("nome")
+      .eq("clinica_id", clinicaId)
+      .eq("ativo", true)
+      .order("nome")
+      .limit(5000)
+      .then(({ data }) => {
+        const nomes = Array.from(new Set((data ?? []).map((p: any) => (p.nome ?? "").trim()).filter(Boolean)));
+        setProcedimentosOpcoes(nomes);
+      });
+  }, [clinicaId]);
 
   function aplicarFiltroProntuario() {
     const de = filtroDataDe ? new Date(filtroDataDe + "T00:00:00") : null;
@@ -709,12 +726,20 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Item</Label>
-                    <Input
-                      placeholder="Queixa, prescrição, etc."
-                      value={filtroItem}
-                      onChange={(e) => setFiltroItem(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); aplicarFiltroProntuario(); } }}
-                    />
+                    <Select
+                      value={filtroItem === "" ? "__all__" : filtroItem}
+                      onValueChange={(v) => setFiltroItem(v === "__all__" ? "" : v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Todos os procedimentos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__all__">Todos os procedimentos</SelectItem>
+                        {procedimentosOpcoes.map((nome) => (
+                          <SelectItem key={nome} value={nome}>{nome}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="flex gap-2">
                     <Button type="button" onClick={aplicarFiltroProntuario}>
