@@ -1177,7 +1177,7 @@ export const relatorioAtendimento = createServerFn({ method: "POST" })
       const row = porAgente.get(uid) ?? { user_id: uid, nome: profMap.get(uid) ?? uid, conversas: 0, fechadas: 0, sla_seg: [] };
       row.conversas += 1;
       if ((c as any).status === "closed") row.fechadas += 1;
-      if ((c as any).sla_first_response_seg != null) row.sla_seg.push((c as any).sla_first_response_seg);
+      if ((c as any).sla_first_response_seg != null) row.sla_seg.push((c as any).sla_first_response_seg as number);
       porAgente.set(uid, row);
     }
     const agentes = Array.from(porAgente.values()).map((r) => ({
