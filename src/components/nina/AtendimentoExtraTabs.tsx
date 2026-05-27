@@ -20,7 +20,7 @@ import {
   listarConversas, listarMensagensConversa, enviarMensagemConversa,
   obterDadosContato, transferirConversa, fecharConversa,
   listarNotas, criarNota,
-  listarDepartamentos, listarMembros, listarUsuariosClinica,
+  listarDepartamentos, listarUsuariosClinica,
   supervisaoLive, relatorioAtendimento,
   listarRoutingRules, salvarRoutingRule, excluirRoutingRule,
 } from "@/lib/atendimento.functions";
