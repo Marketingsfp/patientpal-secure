@@ -76,13 +76,32 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
         : Promise.resolve({ data: null as { nome: string | null } | null }),
       supabase
         .from("contrato_dependentes")
-        .select("id", { count: "exact", head: true })
+        .select("paciente_id, paciente_nome")
         .eq("contrato_id", contratoId)
         .eq("ativo", true),
     ]);
 
   const convenioNome = convenio?.nome ?? planoFallback?.nome ?? "—";
-  const pessoasConvenio = 1 + (depCount ?? 0);
+  const dependentes = depCount ?? [];
+  const pessoasConvenio = 1 + dependentes.length;
+
+  const depIds = dependentes.map((d) => d.paciente_id).filter(Boolean) as string[];
+  const { data: depPacientes } = depIds.length
+    ? await supabase.from("pacientes").select("id, cpf").in("id", depIds)
+    : { data: [] as { id: string; cpf: string | null }[] };
+  const cpfById = new Map((depPacientes ?? []).map((p) => [p.id, p.cpf ?? "—"]));
+  const depList = dependentes.map((d) => ({
+    nome: d.paciente_nome,
+    cpf: cpfById.get(d.paciente_id) ?? "—",
+  }));
+  const dependentesHtml = depList.length
+    ? `<div class="dep-list">${depList
+        .map(
+          (d) =>
+            `<div class="dep-item"><span class="dep-nome">${esc(d.nome)}</span><span class="dep-cpf">CPF: ${esc(d.cpf)}</span></div>`,
+        )
+        .join("")}</div>`
+    : "";
 
   const fichas = (parcelas ?? []).map((p) => {
     const total = (parcelas ?? []).length;
@@ -96,16 +115,29 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
           <div class="ficha-parcela">
             <div class="lab">Parcela</div>
             <div class="val">${p.numero_parcela}/${total}</div>
+            <div class="lab" style="margin-top:4px;">Mês de referência</div>
+            <div class="val" style="font-size:13px;">${fmtMesAno(p.vencimento)}</div>
           </div>
         </div>
         <div class="ficha-grid">
-          <div><span class="lab">Titular</span><span class="val">${esc(contrato.paciente_nome)}</span></div>
+          <div>
+            <span class="lab">Titular</span>
+            <span class="val">${esc(contrato.paciente_nome)}</span>
+            ${dependentesHtml}
+          </div>
           <div><span class="lab">CPF</span><span class="val">${esc(paciente?.cpf ?? "—")}</span></div>
-          <div><span class="lab">Convênio</span><span class="val">${esc(convenioNome)}</span></div>
-          <div><span class="lab">Pessoas no convênio</span><span class="val">${pessoasConvenio}</span></div>
-          <div><span class="lab">Mês de referência</span><span class="val">${fmtMesAno(p.vencimento)}</span></div>
-          <div><span class="lab">Vencimento</span><span class="val destaque">${fmtD(p.vencimento)}</span></div>
-          <div><span class="lab">Valor</span><span class="val destaque">${BRL(Number(p.valor))}</span></div>
+          <div>
+            <span class="lab">Convênio</span>
+            <span class="val">${esc(convenioNome)}</span>
+            <span class="lab" style="margin-top:6px;">Pessoas no convênio</span>
+            <span class="val">${pessoasConvenio}</span>
+          </div>
+          <div>
+            <span class="lab">Vencimento</span>
+            <span class="val destaque">${fmtD(p.vencimento)}</span>
+            <span class="lab" style="margin-top:6px;">Valor</span>
+            <span class="val destaque">${BRL(Number(p.valor))}</span>
+          </div>
           <div>
             <span class="lab">Data de pagamento</span>
             ${p.status === "pago"
