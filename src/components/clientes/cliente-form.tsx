@@ -161,6 +161,12 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
   };
   const [histList, setHistList] = useState<HistRow[]>([]);
   const [histLoading, setHistLoading] = useState(false);
+  const [histFiltroDataDe, setHistFiltroDataDe] = useState("");
+  const [histFiltroDataAte, setHistFiltroDataAte] = useState("");
+  const [histFiltroMedico, setHistFiltroMedico] = useState("");
+  const [histFiltroItem, setHistFiltroItem] = useState("");
+  const [histFiltered, setHistFiltered] = useState<HistRow[]>([]);
+  const [histFiltroAtivo, setHistFiltroAtivo] = useState(false);
 
   // Foto
   const [fotoFile, setFotoFile] = useState<File | null>(null);
