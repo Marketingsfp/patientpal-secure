@@ -67,7 +67,11 @@ export const atribuirConversa = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.userId, data.clinicaId);
-    const patch: Record<string, unknown> = {
+    const patch: {
+      atribuida_user_id: string | null;
+      status: "active" | "waiting";
+      departamento_id?: string | null;
+    } = {
       atribuida_user_id: data.userId,
       status: data.userId ? "active" : "waiting",
     };
