@@ -1281,7 +1281,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
         onOpenChange={(v) => { setLancOpen(v); if (!v) { setPagMens(null); setPagInitialForma(""); } }}
         tipo="receita"
         initialDescricao={pagMens ? `Mensalidade ${pagMens.numero_parcela}/${mens.length} — Contrato #${contrato.numero} — ${contrato.paciente_nome}` : ""}
-        initialValor={pagMens ? String(pagMens.valor) : ""}
+        initialValor={pagMens ? pagValorFinal.toFixed(2) : ""}
         initialFormaPagamento={pagInitialForma}
         onSavedWithData={async (dados) => {
           if (!pagMens || !clinicaAtual) return;
