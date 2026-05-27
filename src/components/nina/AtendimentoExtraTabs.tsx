@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -132,16 +132,6 @@ export function AtendInbox() {
       await criarNotaFn({ data: { clinicaId, conversaId: sel.id, conteudo: t } });
       setNovaNota("");
       await carregarConversa();
-    } catch (e: any) { toast.error(e?.message); }
-  };
-
-  const pegarPraMim = async () => {
-    if (!sel || !clinicaId) return;
-    try {
-      await atribuirFn({ data: { clinicaId, conversaId: sel.id, userId: null } });
-      // backend troca para mim via UPDATE? na verdade null = waiting. Vamos enviar uma msg vazia? Não. Vamos usar transferir para si:
-      toast.success("Conversa liberada para fila");
-      await carregarConvs();
     } catch (e: any) { toast.error(e?.message); }
   };
 
