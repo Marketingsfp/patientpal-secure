@@ -192,18 +192,6 @@ function NinaPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <MessageCircle className="h-6 w-6 text-emerald-500" /> Nina — WhatsApp Business
-          </h1>
-          <p className="text-sm text-muted-foreground">Atendimento automático com IA via WhatsApp oficial</p>
-        </div>
-        <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30">
-          <span className="h-2 w-2 rounded-full bg-emerald-500 mr-2 animate-pulse" /> Nina online
-        </Badge>
-      </div>
-
       <Tabs value={abaAtiva} onValueChange={setAbaAtiva} className="space-y-4">
         {/* ============ NINA TREINADA ============ */}
         <TabsContent value="treinada">
