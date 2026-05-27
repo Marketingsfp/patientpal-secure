@@ -244,7 +244,54 @@ export function AtendInbox() {
   };
 
   return (
-    <div className="grid grid-cols-12 gap-3 h-[calc(100vh-220px)] min-h-[560px]">
+    <div className="flex flex-col gap-3">
+      {/* TOOLBAR — status do agente */}
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card px-3 py-2">
+        <span className="text-xs font-medium text-muted-foreground mr-1">Meu status:</span>
+        <Button
+          size="sm"
+          variant={!pausaAtiva && filaAberta ? "default" : "outline"}
+          className={!pausaAtiva && filaAberta ? "bg-emerald-600 hover:bg-emerald-600/90 text-white" : ""}
+          onClick={() => definirStatus("online")}
+        >
+          <Circle className="h-3 w-3 mr-1 fill-current" /> Online
+        </Button>
+        <Button
+          size="sm"
+          variant={pausaAtiva ? "default" : "outline"}
+          className={pausaAtiva ? "bg-amber-500 hover:bg-amber-500/90 text-white" : ""}
+          onClick={() => definirStatus("pausa")}
+        >
+          <Coffee className="h-3.5 w-3.5 mr-1" /> Em pausa
+          {pausaAtiva?.atend_pause_reasons?.nome && (
+            <span className="ml-1 text-[10px] opacity-90">· {pausaAtiva.atend_pause_reasons.nome}</span>
+          )}
+        </Button>
+        <Button
+          size="sm"
+          variant={!pausaAtiva && !filaAberta ? "default" : "outline"}
+          className={!pausaAtiva && !filaAberta ? "bg-slate-600 hover:bg-slate-600/90 text-white" : ""}
+          onClick={() => definirStatus("offline")}
+        >
+          <PowerOff className="h-3.5 w-3.5 mr-1" /> Offline
+        </Button>
+        {pausaAtiva && (
+          <Button size="sm" variant="ghost" onClick={async () => { if (!clinicaId) return; await finalizarPausaFn({ data: { clinicaId } }); await carregarStatusAgente(); toast.success("Pausa finalizada"); }}>
+            Encerrar pausa
+          </Button>
+        )}
+        <div className="mx-2 h-5 w-px bg-border" />
+        <span className="text-xs font-medium text-muted-foreground">Fila:</span>
+        <Button size="sm" variant="outline" onClick={() => alternarFila(!filaAberta)}>
+          {filaAberta ? (
+            <><Unlock className="h-3.5 w-3.5 mr-1 text-emerald-600" /> Aberta — clique para fechar</>
+          ) : (
+            <><Lock className="h-3.5 w-3.5 mr-1 text-rose-600" /> Fechada — clique para abrir</>
+          )}
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-12 gap-3 h-[calc(100vh-260px)] min-h-[520px]">
       {/* COLUNA 1 — LISTA */}
       <Card className="col-span-12 md:col-span-4 lg:col-span-3 flex flex-col overflow-hidden">
         <CardHeader className="py-3 space-y-2">
@@ -486,6 +533,28 @@ export function AtendInbox() {
               <Button type="submit">Encerrar</Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+      </div>
+
+      <Dialog open={pausaDialogOpen} onOpenChange={setPausaDialogOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Entrar em pausa</DialogTitle></DialogHeader>
+          <div className="space-y-2">
+            <Label>Motivo</Label>
+            <Select value={pausaReasonSel} onValueChange={setPausaReasonSel}>
+              <SelectTrigger><SelectValue placeholder="Selecione o motivo" /></SelectTrigger>
+              <SelectContent>
+                {pauseReasons.map((r) => (
+                  <SelectItem key={r.id} value={r.id}>{r.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPausaDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={confirmarPausa}>Entrar em pausa</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
