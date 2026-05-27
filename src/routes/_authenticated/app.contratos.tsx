@@ -439,7 +439,7 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
             <p className="text-xs text-muted-foreground mt-1">Cobrança única, definida pelo convênio.</p>
           </div>
           <div className="col-span-2">
-            <Label>Tipo de cobrança</Label>
+            <Label>Tipo de cobrança <span className="text-muted-foreground font-normal">(opcional)</span></Label>
             <div className="grid grid-cols-2 gap-3 mt-1">
               {([
                 {
