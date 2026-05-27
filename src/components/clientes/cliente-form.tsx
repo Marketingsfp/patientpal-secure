@@ -587,6 +587,77 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
                 placeholder="Ex.: Mãe, Pai, Filho(a), Cuidador" />
             </div>
           </TabsContent>
+
+          <TabsContent value="biometria" className="space-y-4 pt-4 pb-16">
+            {!editing ? (
+              <p className="text-sm text-muted-foreground">
+                Salve o cadastro do paciente antes de cadastrar a biometria facial.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <ScanFace className={`h-6 w-6 ${hasBiometria ? "text-emerald-600" : "text-muted-foreground"}`} />
+                  <div>
+                    <p className="font-medium">
+                      {hasBiometria ? "Biometria cadastrada" : "Biometria não cadastrada"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Usada para identificação na recepção e no totem de auto-atendimento.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  {hasBiometria ? (
+                    <Button type="button" variant="outline" onClick={revogarBiometria} disabled={bioLoading}>
+                      Remover biometria
+                    </Button>
+                  ) : (
+                    <Button type="button" onClick={() => setConsentOpen(true)} disabled={bioLoading}>
+                      <ScanFace className="h-4 w-4 mr-2" /> Cadastrar biometria
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="prontuario" className="space-y-3 pt-4 pb-16">
+            {!editing ? (
+              <p className="text-sm text-muted-foreground">
+                Salve o cadastro do paciente para visualizar o prontuário.
+              </p>
+            ) : prontLoading ? (
+              <div className="py-10 text-center text-muted-foreground flex items-center justify-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
+              </div>
+            ) : prontList.length === 0 ? (
+              <div className="py-10 text-center text-muted-foreground text-sm">
+                <FileHeart className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                Nenhum registro de prontuário para este paciente.
+              </div>
+            ) : prontList.map((r) => (
+              <div key={r.id} className="border rounded-lg p-4 bg-card space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-semibold">{new Date(r.data).toLocaleString("pt-BR")}</span>
+                  <span className="text-muted-foreground uppercase text-xs">{r.medico_nome ?? "—"}</span>
+                </div>
+                {([
+                  ["Queixa principal", r.queixa_principal],
+                  ["História da doença", r.historia_doenca],
+                  ["Exame físico", r.exame_fisico],
+                  ["Hipótese diagnóstica", r.hipotese_diagnostica],
+                  ["Conduta", r.conduta],
+                  ["Prescrição", r.prescricao],
+                  ["Observações", r.observacoes],
+                ] as const).filter(([, v]) => v && v.trim()).map(([label, v]) => (
+                  <div key={label} className="text-sm">
+                    <div className="text-xs font-medium text-muted-foreground">{label}</div>
+                    <div className="whitespace-pre-wrap">{v}</div>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </TabsContent>
         </Tabs>
 
         <div className={footerClass}>
@@ -610,6 +681,39 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Consentimento LGPD para biometria facial */}
+      <Dialog open={consentOpen} onOpenChange={setConsentOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Consentimento — Biometria facial</DialogTitle>
+            <DialogDescription>
+              Termo obrigatório (LGPD — Lei 13.709/2018, art. 11).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="text-sm space-y-2 max-h-72 overflow-auto rounded-md border bg-muted/30 p-3">
+            <p><strong>Paciente:</strong> {editing?.nome}</p>
+            <p><strong>Finalidade:</strong> identificação na recepção, totem de auto-atendimento e confirmação de identidade em atendimentos, evitando troca de prontuários.</p>
+            <p><strong>O que é armazenado:</strong> apenas um vetor matemático (descritor) do seu rosto — <em>não</em> guardamos a foto. O vetor não permite reconstruir a imagem original.</p>
+            <p><strong>Compartilhamento:</strong> os dados ficam restritos à clínica e não são compartilhados com terceiros.</p>
+            <p><strong>Direitos do titular:</strong> você pode revogar o consentimento e solicitar a exclusão da biometria a qualquer momento, pela equipe da recepção.</p>
+            <p><strong>Base legal:</strong> consentimento específico e destacado (art. 11, I).</p>
+          </div>
+          <DialogFooter className="sticky bottom-0 bg-background border-t -mx-6 -mb-6 px-6 py-3 z-10">
+            <Button variant="ghost" onClick={() => setConsentOpen(false)}>Não concordo</Button>
+            <Button onClick={() => { setConsentOpen(false); setFaceOpen(true); }}>
+              Concordo e autorizo a captura
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <FaceCaptureDialog
+        open={faceOpen}
+        onClose={() => setFaceOpen(false)}
+        onCaptured={async (d) => { await salvarBiometria(d); setFaceOpen(false); }}
+        titulo={`Biometria — ${editing?.nome ?? ""}`}
+      />
     </>
   );
 }
