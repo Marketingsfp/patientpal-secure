@@ -1976,7 +1976,7 @@ function AgendaPage() {
                 <div className="pt-2">
                   <Button
                     size="sm"
-                    onClick={() => { window.location.href = `/app/clientes?q=${encodeURIComponent(pacInfo.nome)}`; }}
+                    onClick={() => { window.location.href = `/app/clientes/${pacInfo.id}/editar`; }}
                   >
                     Editar
                   </Button>
