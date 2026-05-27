@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Camera, Loader2, MapPin, Mic, MicOff, Upload, X } from "lucide-react";
+import { Camera, FileHeart, Loader2, MapPin, Mic, MicOff, ScanFace, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { isCPFValido, somenteDigitos } from "@/lib/cpf";
@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
 
 export interface Paciente {
   id: string;
@@ -127,6 +128,22 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
   const [tab, setTab] = useState("dados");
   const [saving, setSaving] = useState(false);
   const [cepLoading, setCepLoading] = useState(false);
+
+  // Biometria
+  const [hasBiometria, setHasBiometria] = useState(false);
+  const [bioLoading, setBioLoading] = useState(false);
+  const [consentOpen, setConsentOpen] = useState(false);
+  const [faceOpen, setFaceOpen] = useState(false);
+
+  // Prontuário
+  type ProntRow = {
+    id: string; data: string; medico_nome: string | null;
+    queixa_principal: string | null; hipotese_diagnostica: string | null;
+    conduta: string | null; prescricao: string | null;
+    historia_doenca: string | null; exame_fisico: string | null; observacoes: string | null;
+  };
+  const [prontList, setProntList] = useState<ProntRow[]>([]);
+  const [prontLoading, setProntLoading] = useState(false);
 
   // Foto
   const [fotoFile, setFotoFile] = useState<File | null>(null);
@@ -269,6 +286,81 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
 
   useEffect(() => () => { stopVoice(); fecharCamera(); }, []); // cleanup
 
+  // Carrega biometria do paciente (edição)
+  useEffect(() => {
+    if (!editing) { setHasBiometria(false); return; }
+    (async () => {
+      const { data } = await supabase
+        .from("paciente_biometria")
+        .select("id")
+        .eq("paciente_id", editing.id)
+        .eq("clinica_id", clinicaId)
+        .is("revogado_em", null)
+        .limit(1);
+      setHasBiometria((data ?? []).length > 0);
+    })();
+  }, [editing?.id, clinicaId]);
+
+  // Carrega prontuários do paciente
+  useEffect(() => {
+    if (!editing) { setProntList([]); return; }
+    setProntLoading(true);
+    void supabase
+      .from("prontuarios")
+      .select("id, data, medico_id, queixa_principal, hipotese_diagnostica, conduta, prescricao, historia_doenca, exame_fisico, observacoes, medicos(nome)")
+      .eq("paciente_id", editing.id)
+      .order("data", { ascending: false })
+      .then(({ data, error }) => {
+        if (error) { toast.error("Não foi possível carregar o prontuário."); setProntLoading(false); return; }
+        setProntList((data ?? []).map((r: any) => ({
+          id: r.id, data: r.data,
+          medico_nome: r.medicos?.nome ?? null,
+          queixa_principal: r.queixa_principal,
+          hipotese_diagnostica: r.hipotese_diagnostica,
+          conduta: r.conduta, prescricao: r.prescricao,
+          historia_doenca: r.historia_doenca,
+          exame_fisico: r.exame_fisico,
+          observacoes: r.observacoes,
+        })));
+        setProntLoading(false);
+      });
+  }, [editing?.id]);
+
+  async function salvarBiometria(descriptor: number[]) {
+    if (!editing) return;
+    setBioLoading(true);
+    await supabase.from("paciente_biometria")
+      .update({ revogado_em: new Date().toISOString() })
+      .eq("paciente_id", editing.id)
+      .eq("clinica_id", clinicaId)
+      .is("revogado_em", null);
+    const { error } = await supabase.from("paciente_biometria").insert({
+      paciente_id: editing.id,
+      clinica_id: clinicaId,
+      descriptor: descriptor as any,
+      consentimento_em: new Date().toISOString(),
+    });
+    setBioLoading(false);
+    if (error) { toast.error(error.message); return; }
+    setHasBiometria(true);
+    toast.success("Biometria facial cadastrada");
+  }
+
+  async function revogarBiometria() {
+    if (!editing) return;
+    if (!confirm(`Remover a biometria facial de ${editing.nome}? (direito de exclusão — LGPD)`)) return;
+    setBioLoading(true);
+    const { error } = await supabase.from("paciente_biometria")
+      .update({ revogado_em: new Date().toISOString() })
+      .eq("paciente_id", editing.id)
+      .eq("clinica_id", clinicaId)
+      .is("revogado_em", null);
+    setBioLoading(false);
+    if (error) { toast.error(error.message); return; }
+    setHasBiometria(false);
+    toast.success("Biometria removida");
+  }
+
   const idade = calcIdade(form.data_nascimento);
   const sugerirResponsavel = idade !== null && (idade < 18 || idade >= 70);
 
@@ -357,12 +449,14 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
     <>
       <form onSubmit={onSubmit} className="space-y-4">
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="grid grid-cols-3 w-full">
+          <TabsList className="grid grid-cols-5 w-full">
             <TabsTrigger value="dados">Dados</TabsTrigger>
             <TabsTrigger value="endereco">Endereço</TabsTrigger>
             <TabsTrigger value="responsavel">
               Responsável{sugerirResponsavel ? " •" : ""}
             </TabsTrigger>
+            <TabsTrigger value="biometria">Biometria</TabsTrigger>
+            <TabsTrigger value="prontuario">Prontuário</TabsTrigger>
           </TabsList>
 
           <TabsContent value="dados" className="space-y-4 pt-4 pb-16">
