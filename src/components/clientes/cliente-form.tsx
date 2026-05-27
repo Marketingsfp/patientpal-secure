@@ -487,6 +487,36 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
     setFiltroAtivo(false);
   }
 
+  // Mantém histórico filtrado em sincronia com a lista carregada
+  useEffect(() => {
+    setHistFiltered(histList);
+    setHistFiltroAtivo(false);
+  }, [histList]);
+
+  function aplicarFiltroHistorico() {
+    const de = histFiltroDataDe ? new Date(histFiltroDataDe + "T00:00:00") : null;
+    const ate = histFiltroDataAte ? new Date(histFiltroDataAte + "T23:59:59") : null;
+    const med = histFiltroMedico.trim().toLowerCase();
+    const item = histFiltroItem.trim().toLowerCase();
+    const r = histList.filter((h) => {
+      const d = new Date(h.inicio);
+      if (de && d < de) return false;
+      if (ate && d > ate) return false;
+      if (med && !(h.medico_nome ?? "").toLowerCase().includes(med)) return false;
+      if (item && (h.procedimento ?? "").toLowerCase() !== item) return false;
+      return true;
+    });
+    setHistFiltered(r);
+    setHistFiltroAtivo(true);
+  }
+
+  function limparFiltroHistorico() {
+    setHistFiltroDataDe(""); setHistFiltroDataAte("");
+    setHistFiltroMedico(""); setHistFiltroItem("");
+    setHistFiltered(histList);
+    setHistFiltroAtivo(false);
+  }
+
   async function salvarBiometria(descriptor: number[]) {
     if (!editing) return;
     setBioLoading(true);
