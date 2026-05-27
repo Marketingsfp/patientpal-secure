@@ -207,7 +207,6 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
       </div>
       <div class="cell"><span class="lab">Parcelas</span><span class="val">${(parcelas ?? []).length}</span></div>
       <div class="cell"><span class="lab">Total do contrato</span><span class="val">${BRL((parcelas ?? []).reduce((s, p) => s + Number(p.valor), 0))}</span></div>
-      <div class="cell"><span class="lab">Emitido em</span><span class="val">${fmtD(new Date().toISOString().slice(0, 10))}</span></div>
     </div>
   </div>
 
