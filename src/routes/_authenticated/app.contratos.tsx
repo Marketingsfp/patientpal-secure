@@ -558,7 +558,14 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
           </div>
           <div className="flex justify-end gap-2 border-t pt-4">
           <Button variant="ghost" onClick={onBack}>Cancelar</Button>
-          <Button onClick={salvar} disabled={saving || !titular || !convenio}>Gerar contrato + {convenio?.num_parcelas ?? 12} parcelas</Button>
+          <Button onClick={salvar} disabled={saving || !titular || !convenio}>
+            {saving ? "Salvando..." : (
+              <>
+                <Printer className="h-4 w-4 mr-2" />
+                Salvar e imprimir
+              </>
+            )}
+          </Button>
           </div>
         {faceOpen !== null ? (
           <FaceCaptureDialog
