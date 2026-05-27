@@ -726,12 +726,20 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Item</Label>
-                    <Input
-                      placeholder="Queixa, prescrição, etc."
-                      value={filtroItem}
-                      onChange={(e) => setFiltroItem(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); aplicarFiltroProntuario(); } }}
-                    />
+                    <Select
+                      value={filtroItem === "" ? "__all__" : filtroItem}
+                      onValueChange={(v) => setFiltroItem(v === "__all__" ? "" : v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Todos os procedimentos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__all__">Todos os procedimentos</SelectItem>
+                        {procedimentosOpcoes.map((nome) => (
+                          <SelectItem key={nome} value={nome}>{nome}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="flex gap-2">
                     <Button type="button" onClick={aplicarFiltroProntuario}>
