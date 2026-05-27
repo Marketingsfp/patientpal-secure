@@ -1,32 +1,23 @@
-Atualizar `src/lib/print-carne.ts` (modelo do carnê):
+# Unificar os dois inboxes de WhatsApp
 
-**Correção do Convênio**
-- Hoje o código busca o nome do convênio em `planos_assinatura`, mas `convenio_id` referencia a tabela `cb_convenios`. Por isso o nome vem vazio.
-- Trocar a consulta para `cb_convenios` (id, nome). Manter fallback para `planos_assinatura` apenas se `convenio_id` for nulo.
+Hoje existem dois itens no menu apontando para inboxes diferentes:
 
-**Contagem de pessoas no convênio**
-- Buscar `contrato_dependentes` (count, filtrando `ativo = true`) para o `contrato_id`.
-- Total = 1 (titular) + dependentes ativos. Exibir como "Pessoas no convênio".
+- `Conversas WhatsApp` → aba `#chat` (componente `InboxWhatsapp`, chat simples)
+- `Atendimento — Inbox Central` → aba `#atend-inbox` (componente `AtendInbox`, com filas/departamentos, atribuição, transferência e protocolo)
 
-**Campos por parcela (ficha)**
-Grid passa a ter:
-1. Titular
-2. CPF
-3. Convênio
-4. Pessoas no convênio
-5. Mês de referência — derivado do `vencimento` da parcela, formato `MM/AAAA` em português (ex.: `05/2026`)
-6. Vencimento
-7. Valor
-8. Data de pagamento — campo manual (linha em branco para preencher à mão); quando a parcela já estiver `pago`, mostra `fmtD(pago_em)` no lugar da linha
+Vou manter apenas o **Inbox Central** e remover o item duplicado.
 
-**Remover do rodapé**
-- "Recebido em"
-- "Forma de pagamento"
-- "Status" (do grid)
-- Mantém apenas a "Assinatura / Carimbo do recebedor"
+## Mudanças
 
-**Capa (página inicial)**
-- Também substituir o card "Convênio" pela fonte correta (`cb_convenios.nome`).
-- Acrescentar "Pessoas no convênio" no grid da capa.
+1. **`src/components/app-shell.tsx`**
+   - Remover a entrada de menu `{ to: "/app/nina", hash: "chat", label: "Conversas WhatsApp", icon: MessageCircle }`.
+   - Renomear o item `"Atendimento — Inbox Central"` para `"Conversas WhatsApp"` (mantendo o `hash: "atend-inbox"` e o ícone `Inbox`), para preservar o rótulo familiar do usuário.
 
-Nada mais é alterado (layout, CSS, fluxo de impressão permanecem iguais).
+2. **`src/routes/_authenticated/app.nina.tsx`**
+   - Remover a `<TabsContent value="chat">` que renderiza `InboxWhatsapp`.
+   - Se a aba ativa default for `"chat"`, trocar para `"atend-inbox"` (assim quem entrar em `/app/nina` sem hash cai direto no inbox central).
+   - Remover o componente `InboxWhatsapp` e suas props/estado relacionados que ficarem órfãos (`conversas`, `sel`, `setSel`, `draft`, `enviarMensagem`, `loadingConv`, subscription realtime de `whatsapp_mensagens` se não for usada por outra aba). Verificar se o `useEffect` de realtime ainda é necessário para outra coisa — se não, remover também.
+
+## Fora de escopo
+
+- Não vou apagar o componente `InboxWhatsapp` do arquivo apenas se isso exigir refatoração extensa; nesse caso, deixo só sem ser renderizado e marco para limpeza futura. A meta principal é que o usuário veja **um único item de menu** abrindo o Inbox Central.
