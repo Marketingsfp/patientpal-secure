@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Camera, ChevronDown, CreditCard, FileHeart, History, Loader2, MapPin, Mic, MicOff, ScanFace, Search, UserCheck, Upload, X } from "lucide-react";
+import { Camera, ChevronDown, CreditCard, FileHeart, History, Loader2, MapPin, Mic, MicOff, ScanFace, Search, UserCheck, Upload, X, Check } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { isCPFValido, somenteDigitos } from "@/lib/cpf";
@@ -1189,9 +1190,12 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
                   const somaAtraso = atraso.reduce((s, p) => s + p.valor, 0);
                   const dataFimCalc = c.data_fim
                     ? c.data_fim
-                    : c.vigencia_meses
-                      ? (() => { const d = new Date(c.data_inicio + "T00:00:00"); d.setMonth(d.getMonth() + c.vigencia_meses); return d.toISOString().slice(0, 10); })()
-                      : null;
+                    : (() => {
+                        const meses = c.vigencia_meses || c.parcelas.length || c.num_parcelas || 12;
+                        const d = new Date(c.data_inicio + "T00:00:00");
+                        d.setMonth(d.getMonth() + meses);
+                        return d.toISOString().slice(0, 10);
+                      })();
                   const fmtBRL = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
                   const fmtData = (s: string | null) => s ? new Date(s + "T00:00:00").toLocaleDateString("pt-BR") : "—";
                   const destacar = (nome: string, pid: string) => pid === editing.id ? (
@@ -1309,11 +1313,12 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
                               <th className="px-3 py-2">Status</th>
                               <th className="px-3 py-2">Pago em</th>
                               <th className="px-3 py-2">Valor pago</th>
+                              <th className="px-3 py-2 w-28"></th>
                             </tr>
                           </thead>
                           <tbody>
                             {c.parcelas.length === 0 ? (
-                              <tr><td colSpan={6} className="px-3 py-4 text-center text-muted-foreground">Sem parcelas registradas.</td></tr>
+                              <tr><td colSpan={7} className="px-3 py-4 text-center text-muted-foreground">Sem parcelas registradas.</td></tr>
                             ) : c.parcelas.map((p) => {
                               const paga = isPaga(p);
                               const atras = isAtraso(p);
@@ -1328,6 +1333,20 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
                                   <td className={`px-3 py-2 font-medium ${labelCls}`}>{label}</td>
                                   <td className="px-3 py-2 tabular-nums">{fmtData(p.pago_em)}</td>
                                   <td className="px-3 py-2 tabular-nums">{p.valor_pago != null ? fmtBRL(p.valor_pago) : "—"}</td>
+                                  <td className="px-3 py-2 text-right">
+                                    {paga ? (
+                                      <span className="text-xs text-muted-foreground">—</span>
+                                    ) : (
+                                      <Link
+                                        to="/app/cartao-beneficios/contratos"
+                                        search={{ contratoId: c.id }}
+                                        className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                                        title="Abrir contrato no Cartão Benefícios para registrar pagamento"
+                                      >
+                                        <Check className="h-3 w-3" /> Pagar
+                                      </Link>
+                                    )}
+                                  </td>
                                 </tr>
                               );
                             })}

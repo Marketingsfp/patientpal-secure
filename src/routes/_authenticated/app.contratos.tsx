@@ -81,7 +81,7 @@ type Dep = {
   ativo: boolean;
 };
 
-export function ContratosPage() {
+export function ContratosPage({ initialContratoId }: { initialContratoId?: string } = {}) {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
   const [list, setList] = useState<Contrato[]>([]);
@@ -104,6 +104,13 @@ export function ContratosPage() {
     setLoading(false);
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [clinicaAtual?.clinica_id]);
+
+  // Deep-link: abrir automaticamente um contrato específico (ex.: vindo da aba Convênio no cadastro do cliente)
+  useEffect(() => {
+    if (!initialContratoId || loading || detail) return;
+    const c = list.find((x) => x.id === initialContratoId);
+    if (c) setDetail(c);
+  }, [initialContratoId, loading, list, detail]);
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
