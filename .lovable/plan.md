@@ -1,39 +1,41 @@
 ## Objetivo
 
-Transformar a edição de cliente em uma página dedicada (em vez do pop-up atual), acessada pelo ícone de lápis na listagem `/app/clientes`. A criação de novo cliente continua no diálogo atual (não foi solicitada mudança).
+Mover os ícones **"Cadastrar biometria facial"** (`ScanFace`) e **"Ver prontuário"** (`FileHeart`) da listagem `/app/clientes` para dentro da página de edição do cliente, transformando cada um em uma aba do formulário.
 
 ## Mudanças
 
-### 1. Nova rota `/app/clientes/$pacienteId/editar`
-Arquivo: `src/routes/_authenticated/app.clientes.$pacienteId.editar.tsx`
+### 1. `src/components/clientes/cliente-form.tsx` — adicionar 2 novas abas
 
-- Carrega os dados do paciente pelo `pacienteId` da URL via `supabase.from("pacientes").select(...).eq("id", ...).single()`.
-- Renderiza o mesmo formulário hoje existente no diálogo (abas Dados / Endereço / Responsável, foto, busca por CEP, ditado por voz, validações de CPF, sugestão de responsável por idade).
-- Botão **"Voltar"** no topo (ícone `ArrowLeft`) que faz `navigate({ to: "/app/clientes" })` preservando o `?q=` da busca anterior se houver (via `search` param).
-- Botões "Cancelar" / "Salvar" no rodapé; após salvar com sucesso, volta para a listagem.
-- Cabeçalho com o nome do paciente e título "Editar cliente".
+A `TabsList` passa de 3 para **5 colunas** (`grid-cols-5`):
 
-### 2. Extrair o formulário para componente reutilizável
-Arquivo novo: `src/components/clientes/cliente-form.tsx`
+```
+Dados | Endereço | Responsável | Biometria | Prontuário
+```
 
-- Move toda a UI/lógica do form (abas, foto, voz, CEP, responsável, submit) hoje embutida em `app.clientes.tsx` para esse componente.
-- Props: `clinicaId`, `paciente` (existente para editar, ou `null` para novo), `onSaved(pacienteId)`, `onCancel`.
-- Reutilizado tanto pela nova rota de edição quanto pelo diálogo de "Novo cliente" que permanece na listagem.
+As abas Biometria e Prontuário só renderizam conteúdo útil em modo edição (`paciente !== null`); em "Novo cliente" mostram aviso "Salve o cadastro para usar este recurso".
 
-### 3. Ajustes em `src/routes/_authenticated/app.clientes.tsx`
-- Botão do lápis muda de `onClick={() => openEdit(p)}` para `<Link to="/app/clientes/$pacienteId/editar" params={{ pacienteId: p.id }}>` (mantendo o estilo de botão ghost).
-- Remove o estado `editing`, `openEdit`, e toda a lógica/JSX do diálogo de edição.
-- Mantém apenas o diálogo de **Novo cliente** (botão "+ Novo cliente"), agora usando `<ClienteForm />` internamente.
-- Mantém intactos os outros diálogos (biometria, consentimento LGPD, prontuário, câmera).
+**Aba Biometria** (move toda a lógica de `app.clientes.index.tsx`):
+- Estado local: `hasBiometria` (boolean), `consentOpen`, `faceOpen`.
+- Mostra status (Cadastrada / Não cadastrada).
+- Botão "Cadastrar biometria" → abre diálogo de consentimento LGPD (mesmo texto atual) → abre `FaceCaptureDialog`.
+- Se já cadastrada: botão "Remover biometria" (mesma confirmação atual).
+- Reaproveita `FaceCaptureDialog`, mesmas queries em `paciente_biometria`.
 
-## Detalhes técnicos
+**Aba Prontuário** (move o diálogo atual para conteúdo inline):
+- Carrega a lista de prontuários (mesma query atual em `prontuarios` + join `medicos`) ao montar/quando o paciente muda.
+- Renderiza a mesma lista de cards de atendimentos que hoje aparece no Dialog (sem o Dialog).
+- Estado de loading e mensagem "Nenhum registro" idênticos aos atuais.
 
-- Filename ↔ rota: `app.clientes.$pacienteId.editar.tsx` → `createFileRoute("/_authenticated/app/clientes/$pacienteId/editar")`.
-- Acesso ao param: `const { pacienteId } = Route.useParams()`.
-- Loader opcional via TanStack Query; para minimizar mudanças, fazer fetch dentro do componente via `useEffect` + `supabase` (padrão usado em `app.clientes.tsx`).
-- Estados de loading e "paciente não encontrado" tratados com mensagens simples.
-- Não alterar lógica de negócio (payload de update, upload de foto, etc.) — só reorganização de UI.
+### 2. `src/routes/_authenticated/app.clientes.index.tsx` — remover o que foi movido
+
+- Remover os botões `ScanFace` e `FileHeart` da coluna "Ações" (sobram apenas Editar e Excluir).
+- Remover o estado e funções relacionados: `faceFor`, `consentFor`, `prontFor`, `prontList`, `prontLoading`, `hasBiometria`, `abrirProntuario`, `salvarBiometria`, `revogarBiometria`, e os `useEffect` que carregam biometrias.
+- Remover os Dialogs de consentimento LGPD e de Prontuário, e o `FaceCaptureDialog`.
+- Remover imports não usados (`ScanFace`, `FileHeart`, `FaceCaptureDialog`, `Loader2` se ficar órfão, `DialogFooter` se ficar órfão).
+- A coluna "Ações" pode estreitar (de `w-40` para `w-24`).
 
 ## Fora do escopo
-- Não muda o fluxo de "Novo cliente" (continua em diálogo).
-- Não muda os outros ícones da linha (biometria, prontuário, excluir).
+
+- Não muda o diálogo de "Novo cliente" (continua sem essas abas funcionais — apenas com o aviso de "salve primeiro").
+- Não muda fluxo de captura facial (`FaceCaptureDialog`) nem o conteúdo do termo LGPD.
+- Não cria página separada de prontuário — fica embutida como aba dentro de "Editar cliente".
