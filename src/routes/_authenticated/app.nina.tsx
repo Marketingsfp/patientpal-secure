@@ -5,7 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useClinica } from "@/hooks/use-clinica";
 import { chatNina } from "@/lib/nina.functions";
 import { obterWhatsappConfig, salvarWhatsappConfig, testarConexaoWhatsapp } from "@/lib/whatsapp.functions";
-import { enviarMensagemWhatsapp } from "@/lib/whatsapp.functions";
+import { enviarMensagemWhatsapp, listarTemplatesWhatsapp, criarTemplateWhatsapp, excluirTemplateWhatsapp } from "@/lib/whatsapp.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -94,7 +94,7 @@ function NinaPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const hashAba = (location.hash ?? "").replace(/^#/, "");
-  const abaAtiva = ["treinada", "chat", "automacoes", "config", "atend-status", "atend-dashboard", "atend-depto", "atend-macros", "atend-kb", "atend-pausas", "atend-inbox", "atend-supervisor", "atend-relatorios", "atend-roteamento"].includes(hashAba) ? (hashAba === "chat" ? "atend-inbox" : hashAba) : "atend-inbox";
+  const abaAtiva = ["treinada", "chat", "automacoes", "config", "templates", "atend-status", "atend-dashboard", "atend-depto", "atend-macros", "atend-kb", "atend-pausas", "atend-inbox", "atend-supervisor", "atend-relatorios", "atend-roteamento"].includes(hashAba) ? (hashAba === "chat" ? "atend-inbox" : hashAba) : "atend-inbox";
   const setAbaAtiva = (v: string) => {
     navigate({ to: "/app/nina", hash: v, replace: true });
   };
@@ -232,6 +232,11 @@ function NinaPage() {
         {/* ============ CONFIGURAÇÃO ============ */}
         <TabsContent value="config">
           <ConfiguracaoWhatsApp />
+        </TabsContent>
+
+        {/* ============ TEMPLATES (HSM) ============ */}
+        <TabsContent value="templates">
+          <TemplatesWhatsapp />
         </TabsContent>
 
         {/* ============ ATENDIMENTO — Dashboard ============ */}
@@ -1128,5 +1133,307 @@ function renderMensagensAgrupadas(msgs: Msg[]) {
         </div>
       ))}
     </>
+  );
+}
+
+/* ============================ TEMPLATES (HSM) ============================ */
+type TplStatus = "APPROVED" | "PENDING" | "REJECTED" | "PAUSED" | "DISABLED" | string;
+interface TplRow {
+  id: string;
+  name: string;
+  status: TplStatus;
+  category: string;
+  language: string;
+  components: any[];
+  rejected_reason?: string;
+}
+
+function TemplatesWhatsapp() {
+  const { clinicaAtual } = useClinica();
+  const clinicaId = clinicaAtual?.clinica_id;
+  const listar = useServerFn(listarTemplatesWhatsapp);
+  const criar = useServerFn(criarTemplateWhatsapp);
+  const excluir = useServerFn(excluirTemplateWhatsapp);
+
+  const [items, setItems] = useState<TplRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Formulário
+  const [name, setName] = useState("");
+  const [category, setCategory] = useState<"MARKETING" | "UTILITY" | "AUTHENTICATION">("UTILITY");
+  const [language, setLanguage] = useState("pt_BR");
+  const [headerText, setHeaderText] = useState("");
+  const [body, setBody] = useState("Olá {{1}}, sua consulta está confirmada para {{2}}.");
+  const [footer, setFooter] = useState("");
+  const [examples, setExamples] = useState<string[]>(["Maria", "20/05 às 14h"]);
+
+  // Detecta {{n}} variáveis no body e mantém array de exemplos sincronizado
+  const varCount = useMemo(() => {
+    const matches = body.match(/\{\{\s*(\d+)\s*\}\}/g) ?? [];
+    const nums = matches.map((m) => Number(m.replace(/\D/g, ""))).filter((n) => n > 0);
+    return nums.length ? Math.max(...nums) : 0;
+  }, [body]);
+
+  useEffect(() => {
+    setExamples((prev) => {
+      const next = [...prev];
+      while (next.length < varCount) next.push("");
+      return next.slice(0, varCount);
+    });
+  }, [varCount]);
+
+  const carregar = useCallback(async () => {
+    if (!clinicaId) return;
+    setLoading(true);
+    try {
+      const r = await listar({ data: { clinicaId } });
+      setItems((r.templates as TplRow[]) ?? []);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Erro ao listar templates");
+    } finally {
+      setLoading(false);
+    }
+  }, [clinicaId, listar]);
+
+  useEffect(() => { void carregar(); }, [carregar]);
+
+  const resetForm = () => {
+    setName(""); setCategory("UTILITY"); setLanguage("pt_BR");
+    setHeaderText(""); setBody("Olá {{1}}, sua consulta está confirmada para {{2}}.");
+    setFooter(""); setExamples(["Maria", "20/05 às 14h"]);
+  };
+
+  const submeter = async () => {
+    if (!clinicaId) return;
+    if (!/^[a-z0-9_]+$/.test(name)) {
+      toast.error("Nome inválido. Use apenas minúsculas, números e _ (underline). Ex: confirmacao_consulta");
+      return;
+    }
+    if (!body.trim()) { toast.error("Corpo da mensagem é obrigatório"); return; }
+    if (varCount > 0 && examples.some((e) => !e.trim())) {
+      toast.error("Preencha um exemplo para cada variável {{n}}");
+      return;
+    }
+
+    const components: any[] = [];
+    if (headerText.trim()) {
+      components.push({ type: "HEADER", format: "TEXT", text: headerText.trim() });
+    }
+    const bodyComp: any = { type: "BODY", text: body.trim() };
+    if (varCount > 0) bodyComp.example = { body_text: [examples] };
+    components.push(bodyComp);
+    if (footer.trim()) components.push({ type: "FOOTER", text: footer.trim() });
+
+    setSaving(true);
+    try {
+      const r = await criar({ data: { clinicaId, name, category, language, components } });
+      toast.success(`Template enviado — status: ${r.status}`);
+      setOpen(false);
+      resetForm();
+      await carregar();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Erro ao criar template");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const remover = async (n: TplRow) => {
+    if (!clinicaId) return;
+    if (!confirm(`Excluir o template "${n.name}"? Esta ação não pode ser desfeita.`)) return;
+    try {
+      await excluir({ data: { clinicaId, name: n.name } });
+      toast.success("Template excluído");
+      await carregar();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Erro ao excluir");
+    }
+  };
+
+  const statusBadge = (s: TplStatus) => {
+    const map: Record<string, string> = {
+      APPROVED: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30",
+      PENDING: "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30",
+      REJECTED: "bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30",
+      PAUSED: "bg-muted text-muted-foreground border-border",
+      DISABLED: "bg-muted text-muted-foreground border-border",
+    };
+    return <Badge variant="outline" className={map[s] ?? ""}>{s}</Badge>;
+  };
+
+  const bodyOf = (t: TplRow) =>
+    (t.components ?? []).find((c) => c.type === "BODY")?.text ?? "";
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold">Templates aprovados pela Meta</h2>
+          <p className="text-sm text-muted-foreground">
+            Mensagens iniciadas pela clínica (fora da janela de 24h) só podem usar templates aprovados pela Meta.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={carregar} disabled={loading}>
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Atualizar"}
+          </Button>
+          <Button onClick={() => { resetForm(); setOpen(true); }} disabled={!clinicaId}>
+            <Plus className="h-4 w-4 mr-2" /> Novo template
+          </Button>
+        </div>
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="py-12 text-center text-muted-foreground flex items-center justify-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" /> Carregando templates…
+            </div>
+          ) : items.length === 0 ? (
+            <div className="py-12 text-center text-muted-foreground">
+              <FileText className="h-10 w-10 mx-auto mb-2 opacity-50" />
+              Nenhum template encontrado. Crie um para enviar mensagens iniciadas pela clínica.
+            </div>
+          ) : (
+            <div className="divide-y">
+              {items.map((t) => (
+                <div key={t.id} className="p-4 flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium">{t.name}</span>
+                      {statusBadge(t.status)}
+                      <Badge variant="secondary" className="text-[10px]">{t.category}</Badge>
+                      <Badge variant="outline" className="text-[10px]">{t.language}</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap line-clamp-3">
+                      {bodyOf(t) || "—"}
+                    </p>
+                    {t.status === "REJECTED" && t.rejected_reason && (
+                      <p className="text-xs text-red-600 mt-1">Motivo: {t.rejected_reason}</p>
+                    )}
+                  </div>
+                  <Button variant="ghost" size="icon" onClick={() => remover(t)} title="Excluir">
+                    <X className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Novo template</DialogTitle>
+            <DialogDescription>
+              O template será enviado para aprovação da Meta. Pode levar de alguns minutos a 24h para ser aprovado.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="space-y-2 md:col-span-1">
+                <Label>Nome (id) *</Label>
+                <Input
+                  value={name}
+                  onChange={(e) => setName(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_"))}
+                  placeholder="confirmacao_consulta"
+                />
+                <p className="text-[11px] text-muted-foreground">Minúsculas, números e _</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Categoria *</Label>
+                <select
+                  className="w-full h-10 rounded-md border bg-background px-3 text-sm"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value as any)}
+                >
+                  <option value="UTILITY">Utilidade (transacional)</option>
+                  <option value="MARKETING">Marketing</option>
+                  <option value="AUTHENTICATION">Autenticação</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label>Idioma *</Label>
+                <select
+                  className="w-full h-10 rounded-md border bg-background px-3 text-sm"
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value)}
+                >
+                  <option value="pt_BR">Português (BR)</option>
+                  <option value="pt_PT">Português (PT)</option>
+                  <option value="en">Inglês</option>
+                  <option value="es">Espanhol</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Cabeçalho (opcional)</Label>
+              <Input
+                value={headerText}
+                onChange={(e) => setHeaderText(e.target.value)}
+                maxLength={60}
+                placeholder="Ex: Sua consulta na ClinicaOS"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Corpo da mensagem * <span className="text-muted-foreground">— use {"{{1}}"}, {"{{2}}"} para variáveis</span></Label>
+              <Textarea
+                rows={5}
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                maxLength={1024}
+                placeholder="Olá {{1}}, sua consulta está marcada para {{2}}."
+              />
+              <p className="text-[11px] text-muted-foreground">{body.length}/1024 — {varCount} variável(is) detectada(s)</p>
+            </div>
+
+            {varCount > 0 && (
+              <div className="space-y-2">
+                <Label>Exemplos das variáveis *</Label>
+                <p className="text-[11px] text-muted-foreground">A Meta exige um valor de exemplo para cada {"{{n}}"}.</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {examples.map((v, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground w-10">{`{{${i + 1}}}`}</span>
+                      <Input
+                        value={v}
+                        onChange={(e) => {
+                          const next = [...examples]; next[i] = e.target.value; setExamples(next);
+                        }}
+                        placeholder={`Exemplo para {{${i + 1}}}`}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>Rodapé (opcional)</Label>
+              <Input
+                value={footer}
+                onChange={(e) => setFooter(e.target.value)}
+                maxLength={60}
+                placeholder="Ex: Responda PARAR para não receber mais."
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Cancelar</Button>
+            <Button onClick={submeter} disabled={saving}>
+              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
+              Enviar para aprovação
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }

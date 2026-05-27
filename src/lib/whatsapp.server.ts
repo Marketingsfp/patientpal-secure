@@ -2,6 +2,64 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const META_VERSION = "v22.0";
 
+/* =========================================================================
+ * Templates (HSM) — Meta Cloud API
+ * ========================================================================= */
+export type WaTemplateComponent =
+  | { type: "HEADER"; format: "TEXT"; text: string; example?: { header_text?: string[] } }
+  | { type: "BODY"; text: string; example?: { body_text?: string[][] } }
+  | { type: "FOOTER"; text: string };
+
+export interface WaTemplatePayload {
+  name: string;
+  language: string;
+  category: "MARKETING" | "UTILITY" | "AUTHENTICATION";
+  components: WaTemplateComponent[];
+}
+
+export async function metaListTemplates(wabaId: string, accessToken: string) {
+  const url = `https://graph.facebook.com/${META_VERSION}/${wabaId}/message_templates?limit=100&fields=name,status,category,language,components,id,rejected_reason`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((json as any)?.error?.message ?? `HTTP ${res.status}`);
+  return ((json as any)?.data ?? []) as Array<{
+    id: string;
+    name: string;
+    status: string;
+    category: string;
+    language: string;
+    components: WaTemplateComponent[];
+    rejected_reason?: string;
+  }>;
+}
+
+export async function metaCreateTemplate(
+  wabaId: string,
+  accessToken: string,
+  payload: WaTemplatePayload,
+) {
+  const url = `https://graph.facebook.com/${META_VERSION}/${wabaId}/message_templates`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((json as any)?.error?.error_user_msg ?? (json as any)?.error?.message ?? `HTTP ${res.status}`);
+  return json as { id: string; status: string; category: string };
+}
+
+export async function metaDeleteTemplate(wabaId: string, accessToken: string, name: string) {
+  const url = `https://graph.facebook.com/${META_VERSION}/${wabaId}/message_templates?name=${encodeURIComponent(name)}`;
+  const res = await fetch(url, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((json as any)?.error?.message ?? `HTTP ${res.status}`);
+  return json as { success: boolean };
+}
+
 export interface WhatsAppConfigRow {
   clinica_id: string;
   phone_number_id: string | null;
