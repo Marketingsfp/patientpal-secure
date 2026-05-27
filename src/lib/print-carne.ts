@@ -235,6 +235,8 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
   .ficha-grid .val { font-weight: 600; }
   .ficha-grid .val.destaque { font-size: 13px; }
   .ficha-rodape { margin-top: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: end; }
+  .ficha-rodape .campo-manual { display: flex; flex-direction: column; justify-content: flex-end; }
+  .ficha-rodape .campo-manual .lab { min-height: 20px; }
   .campo-manual .lab { display:block; font-size: 8px; color: #666; text-transform: uppercase; letter-spacing: .04em; }
   .campo-manual .linha { display:block; border-bottom: 1px solid #111; height: 16px; }
   .campo-manual .linha-assin { display:block; border-bottom: 1px solid #111; height: 20px; }
