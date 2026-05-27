@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Plus, Search, Pencil, Trash2, Users, Download, Baby, Smile } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Users, Download } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -14,6 +14,9 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { ClienteForm } from "@/components/clientes/cliente-form";
+import iconBebe from "@/assets/icon-bebe.png";
+import iconCriancas from "@/assets/icon-criancas.png";
+import iconIdoso from "@/assets/icon-idoso.png";
 
 export const Route = createFileRoute("/_authenticated/app/clientes/")({
   component: ClientesPage,
@@ -43,9 +46,9 @@ function IdadeCell({ nascimento }: { nascimento: string | null }) {
   if (idade === null || idade < 0) return <>—</>;
   let icon: ReactNode = null;
   let label = "";
-  if (idade <= 2) { icon = <Baby className="h-4 w-4 text-pink-500" />; label = "Bebê"; }
-  else if (idade <= 10) { icon = <Smile className="h-4 w-4 text-amber-500" />; label = "Criança"; }
-  else if (idade >= 65) { icon = <ElderlyCaneIcon className="h-4 w-4 text-blue-600" />; label = "Idoso"; }
+  if (idade <= 2) { icon = <img src={iconBebe} alt="" width={20} height={20} loading="lazy" className="h-5 w-5 object-contain" />; label = "Bebê"; }
+  else if (idade <= 10) { icon = <img src={iconCriancas} alt="" width={20} height={20} loading="lazy" className="h-5 w-5 object-contain" />; label = "Criança"; }
+  else if (idade >= 65) { icon = <img src={iconIdoso} alt="" width={20} height={20} loading="lazy" className="h-5 w-5 object-contain" />; label = "Idoso"; }
   return (
     <span className="inline-flex items-center gap-1.5">
       <span>{idade} {idade === 1 ? "ano" : "anos"}</span>
@@ -69,29 +72,7 @@ interface Paciente {
   foto_url?: string | null;
 }
 
-function ElderlyCaneIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-      aria-hidden="true"
-    >
-      <circle cx="10" cy="3.5" r="1.6" />
-      <path d="M10 5.5 L9 13" />
-      <path d="M9 9 L13 11" />
-      <path d="M9 13 L7 21" />
-      <path d="M9 13 L11 21" />
-      <path d="M14 21 L13.5 11.5" />
-      <path d="M13.5 11.5 Q14.5 10.3 15.3 11.2" />
-    </svg>
-  );
-}
+
 
 function ClientesPage() {
   const { clinicaAtual } = useClinica();
