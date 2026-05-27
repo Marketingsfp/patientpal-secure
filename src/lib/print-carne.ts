@@ -88,21 +88,13 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
   }));
   const pessoasConvenio = 1 + dependentes.length;
 
-  const titularesRows = [
-    `<div class="dep-row dep-row-head">
-       <span class="lab">Titular / Dependentes</span>
-       <span class="lab">CPF</span>
-     </div>`,
-    `<div class="dep-row">
-       <span class="val">${esc(contrato.paciente_nome)}</span>
-       <span class="val">${esc(paciente?.cpf ?? "—")}</span>
-     </div>`,
-    ...dependentes.map(
-      (d) => `<div class="dep-row">
-        <span class="val">${esc(d.nome)}</span>
-        <span class="val">${esc(d.cpf ?? "—")}</span>
-      </div>`,
-    ),
+  const titularNomes = [
+    `<span class="val">${esc(contrato.paciente_nome)}</span>`,
+    ...dependentes.map((d) => `<span class="val">${esc(d.nome)}</span>`),
+  ].join("");
+  const titularCpfs = [
+    `<span class="val">${esc(paciente?.cpf ?? "—")}</span>`,
+    ...dependentes.map((d) => `<span class="val">${esc(d.cpf ?? "—")}</span>`),
   ].join("");
 
   const fichas = (parcelas ?? []).map((p) => {
@@ -159,15 +151,12 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
     page-break-inside: avoid;
   }
   .capa h1 { font-size: 18px; margin: 0 0 4px; }
-  .capa-clinica { font-size: 15px; font-weight: 800; color: #111; margin-bottom: 6px; }
+  .capa-clinica { font-size: 16px; font-weight: 800; color: #111; margin-bottom: 6px; }
   .capa-clinica .cnpj { font-size: 11px; font-weight: 500; color: #555; margin-left: 6px; }
-  .capa-cols { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 8px 16px; font-size: 12px; }
-  .capa-col { display: flex; flex-direction: column; gap: 6px; }
-  .capa-col .lab { display:block; font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: .04em; }
-  .capa-col .val { font-weight: 600; }
-  .dep-table { display: flex; flex-direction: column; gap: 2px; }
-  .dep-row { display: grid; grid-template-columns: 1.4fr 1fr; gap: 8px; align-items: baseline; }
-  .dep-row-head { border-bottom: 1px solid #ddd; padding-bottom: 2px; margin-bottom: 2px; }
+  .capa-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 16px; font-size: 12px; align-items: start; }
+  .capa-grid .cell { display: flex; flex-direction: column; gap: 2px; }
+  .capa-grid .lab { font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: .04em; }
+  .capa-grid .val { font-weight: 600; }
 
   .ficha {
     border: 1px dashed #111;
@@ -204,22 +193,21 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
   <div class="capa">
     <h1>Carnê de pagamento — Contrato #${esc(contrato.numero)}</h1>
     <div class="capa-clinica">${esc(clinica?.nome ?? "")}${clinica?.cnpj ? `<span class="cnpj">CNPJ ${esc(clinica.cnpj)}</span>` : ""}</div>
-    <div class="capa-cols">
-      <div class="capa-col">
-        <div class="dep-table">${titularesRows}</div>
-        <div><span class="lab">Início</span><span class="val">${fmtD(contrato.data_inicio)}</span></div>
-        <div><span class="lab">Parcelas</span><span class="val">${(parcelas ?? []).length}</span></div>
-        <div><span class="lab">Emitido em</span><span class="val">${fmtD(new Date().toISOString().slice(0, 10))}</span></div>
+    <div class="capa-grid">
+      <div class="cell"><span class="lab">Titular</span>${titularNomes}</div>
+      <div class="cell"><span class="lab">CPF</span>${titularCpfs}</div>
+      <div class="cell">
+        <span class="lab">Convênio</span><span class="val">${esc(convenioNome)}</span>
+        <span class="lab" style="margin-top:6px;">Pessoas no convênio</span><span class="val">${pessoasConvenio}</span>
       </div>
-      <div class="capa-col">
-        <div><span class="lab">Convênio</span><span class="val">${esc(convenioNome)}</span></div>
-        <div><span class="lab">Pessoas no convênio</span><span class="val">${pessoasConvenio}</span></div>
+      <div class="cell"><span class="lab">Início</span><span class="val">${fmtD(contrato.data_inicio)}</span></div>
+      <div class="cell">
+        <span class="lab">Dia de vencimento</span><span class="val">${esc(contrato.dia_vencimento ?? "—")}</span>
+        <span class="lab" style="margin-top:6px;">Valor mensal</span><span class="val">${BRL(Number(contrato.valor_mensal))}</span>
       </div>
-      <div class="capa-col">
-        <div><span class="lab">Dia de vencimento</span><span class="val">${esc(contrato.dia_vencimento ?? "—")}</span></div>
-        <div><span class="lab">Valor mensal</span><span class="val">${BRL(Number(contrato.valor_mensal))}</span></div>
-        <div><span class="lab">Total do contrato</span><span class="val">${BRL((parcelas ?? []).reduce((s, p) => s + Number(p.valor), 0))}</span></div>
-      </div>
+      <div class="cell"><span class="lab">Parcelas</span><span class="val">${(parcelas ?? []).length}</span></div>
+      <div class="cell"><span class="lab">Total do contrato</span><span class="val">${BRL((parcelas ?? []).reduce((s, p) => s + Number(p.valor), 0))}</span></div>
+      <div class="cell"><span class="lab">Emitido em</span><span class="val">${fmtD(new Date().toISOString().slice(0, 10))}</span></div>
     </div>
   </div>
 
