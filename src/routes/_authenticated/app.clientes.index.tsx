@@ -65,21 +65,6 @@ function ClientesPage() {
   useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clinicaAtual?.clinica_id]);
 
   useEffect(() => {
-    if (!clinicaAtual || items.length === 0) { setHasBiometria({}); return; }
-    (async () => {
-      const { data } = await supabase
-        .from("paciente_biometria")
-        .select("paciente_id")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .is("revogado_em", null)
-        .in("paciente_id", items.map(p => p.id));
-      const map: Record<string, boolean> = {};
-      (data ?? []).forEach((b: any) => { map[b.paciente_id] = true; });
-      setHasBiometria(map);
-    })();
-  }, [items, clinicaAtual?.clinica_id]);
-
-  useEffect(() => {
     const paths = items.filter(p => p.foto_url).map(p => p.foto_url as string);
     if (paths.length === 0) { setFotoSigned({}); return; }
     (async () => {
@@ -93,37 +78,6 @@ function ClientesPage() {
       setFotoSigned(map);
     })();
   }, [items]);
-
-  async function salvarBiometria(descriptor: number[]) {
-    if (!faceFor || !clinicaAtual) return;
-    await supabase.from("paciente_biometria")
-      .update({ revogado_em: new Date().toISOString() })
-      .eq("paciente_id", faceFor.id)
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .is("revogado_em", null);
-    const { error } = await supabase.from("paciente_biometria").insert({
-      paciente_id: faceFor.id,
-      clinica_id: clinicaAtual.clinica_id,
-      descriptor: descriptor as any,
-      consentimento_em: new Date().toISOString(),
-    });
-    if (error) throw error;
-    setHasBiometria(prev => ({ ...prev, [faceFor.id]: true }));
-    toast.success("Biometria facial cadastrada");
-  }
-
-  async function revogarBiometria(p: Paciente) {
-    if (!clinicaAtual) return;
-    if (!confirm(`Remover a biometria facial de ${p.nome}? (direito de exclusão — LGPD)`)) return;
-    const { error } = await supabase.from("paciente_biometria")
-      .update({ revogado_em: new Date().toISOString() })
-      .eq("paciente_id", p.id)
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .is("revogado_em", null);
-    if (error) { toast.error(error.message); return; }
-    setHasBiometria(prev => { const c = { ...prev }; delete c[p.id]; return c; });
-    toast.success("Biometria removida");
-  }
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase();
