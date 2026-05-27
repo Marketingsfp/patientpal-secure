@@ -127,7 +127,11 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
           </div>
         </div>
         <div class="ficha-grid">
-          <div><span class="lab">Titular</span><span class="val">${esc(contrato.paciente_nome)}</span></div>
+          <div>
+            <span class="lab">Titular</span><span class="val">${esc(contrato.paciente_nome)}</span>
+            <span class="lab" style="margin-top:6px;">Observação</span>
+            <span class="val" style="font-weight:500;font-size:10px;line-height:1.35;">Após o vencimento será cobrado 10% de multa e juros de 0,33% ao dia.</span>
+          </div>
           <div><span class="lab">CPF</span><span class="val">${esc(paciente?.cpf ?? "—")}</span></div>
           <div>
             <span class="lab">Convênio</span><span class="val">${esc(convenioNome)}</span>
@@ -194,7 +198,8 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
   .ficha-parcela { text-align: right; }
   .ficha-parcela .lab { font-size: 9px; text-transform: uppercase; color: #666; }
   .ficha-parcela .val { font-size: 18px; font-weight: 800; }
-  .ficha-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 14px; font-size: 11px; }
+  .ficha-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 22px; font-size: 11px; }
+  .ficha-grid > div { display: flex; flex-direction: column; gap: 2px; }
   .ficha-grid .lab { display:block; font-size: 9px; color: #666; text-transform: uppercase; letter-spacing: .04em; }
   .ficha-grid .val { font-weight: 600; }
   .ficha-grid .val.destaque { font-size: 14px; }
