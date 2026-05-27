@@ -223,7 +223,14 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
         <span class="lab">Convênio</span><span class="val">${esc(convenioNome)}</span>
         <span class="lab" style="margin-top:6px;">Pessoas no convênio</span><span class="val">${pessoasConvenio}</span>
       </div>
-      <div class="cell" style="display:flex;flex-direction:column;justify-content:flex-end;"><span class="lab">Início</span><span class="val">${fmtD(contrato.data_inicio)}</span></div>
+      <div class="cell" style="display:flex;flex-direction:column;justify-content:flex-end;"><span class="lab">Vigência</span><span class="val">${(() => {
+        const ini = contrato.data_inicio ? new Date(contrato.data_inicio) : null;
+        if (!ini || isNaN(ini.getTime())) return "—";
+        const fim = new Date(ini);
+        fim.setMonth(fim.getMonth() + ((parcelas ?? []).length || 12));
+        const f = (d: Date) => `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
+        return `${f(ini)} à ${f(fim)}`;
+      })()}</span></div>
       <div class="cell" style="display:flex;flex-direction:column;justify-content:flex-end;">
         <span class="lab">Dia de vencimento</span><span class="val">${esc(contrato.dia_vencimento ?? "—")}</span>
       </div>
