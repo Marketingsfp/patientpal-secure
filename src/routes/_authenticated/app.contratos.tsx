@@ -185,7 +185,7 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
   const [faixaId, setFaixaId] = useState<string>("");
   const [diaVenc, setDiaVenc] = useState(10);
   const [dataInicio, setDataInicio] = useState(new Date().toISOString().slice(0, 10));
-  const [tipoCobranca, setTipoCobranca] = useState<"boleto" | "carne">("carne");
+  const [tipoCobranca, setTipoCobranca] = useState<"boleto" | "carne" | null>(null);
   const [obs, setObs] = useState("");
   const [deps, setDeps] = useState<Array<Paciente & { parentesco: string; tipo: string }>>([]);
   const [saving, setSaving] = useState(false);
@@ -286,7 +286,7 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
     const { data: contrato, error } = await supabase.from("contratos_assinatura").insert({
       clinica_id: clinicaId, convenio_id: convenio.id, paciente_id: titular.id, paciente_nome: titular.nome,
       data_inicio: dataInicio, dia_vencimento: diaVenc, valor_mensal: valor, taxa_adesao: taxa,
-      num_parcelas: convenio.num_parcelas, forma_pagamento: tipoCobranca, observacoes: obs, criado_por: userId,
+      num_parcelas: convenio.num_parcelas, forma_pagamento: tipoCobranca ?? null, observacoes: obs, criado_por: userId,
     }).select("*").single();
     if (error || !contrato) { setSaving(false); return toast.error(error?.message ?? "Erro"); }
 
@@ -320,7 +320,7 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Falha ao gerar carnê");
       }
-    } else {
+    } else if (tipoCobranca === "boleto") {
       try {
         const res = await gerarBoletosFn({ data: { contratoId: contrato.id } });
         toast.info(res.mensagem);
@@ -461,7 +461,7 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
                   <button
                     type="button"
                     key={opt.v}
-                    onClick={() => setTipoCobranca(opt.v)}
+                    onClick={() => setTipoCobranca(ativo ? null : opt.v)}
                     className={`text-left rounded-md border p-3 transition flex gap-3 items-start ${
                       ativo
                         ? "border-primary ring-2 ring-primary/30 bg-primary/5"
