@@ -309,7 +309,6 @@ function NovoOrcamentoDialog({
     if (p) {
       setPacienteNome(p.nome ?? "");
       setPacienteTelefone(p.telefone ?? "");
-      setPacienteCpf(p.cpf ?? "");
     }
   };
 
