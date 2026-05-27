@@ -20,6 +20,40 @@ export const Route = createFileRoute("/_authenticated/app/clientes/")({
   head: () => ({ meta: [{ title: "Clientes — ClinicaOS" }] }),
 });
 
+function fmtNasc(d: string | null): string {
+  if (!d) return "—";
+  const [y, m, day] = d.split("-");
+  if (!y || !m || !day) return "—";
+  return `${day}/${m}/${y}`;
+}
+
+function calcIdade(d: string | null): number | null {
+  if (!d) return null;
+  const nasc = new Date(d + "T00:00:00");
+  if (isNaN(nasc.getTime())) return null;
+  const hoje = new Date();
+  let idade = hoje.getFullYear() - nasc.getFullYear();
+  const m = hoje.getMonth() - nasc.getMonth();
+  if (m < 0 || (m === 0 && hoje.getDate() < nasc.getDate())) idade--;
+  return idade;
+}
+
+function IdadeCell({ nascimento }: { nascimento: string | null }) {
+  const idade = calcIdade(nascimento);
+  if (idade === null || idade < 0) return <>—</>;
+  let icon: JSX.Element | null = null;
+  let label = "";
+  if (idade <= 2) { icon = <Baby className="h-4 w-4 text-pink-500" />; label = "Bebê"; }
+  else if (idade <= 10) { icon = <Smile className="h-4 w-4 text-amber-500" />; label = "Criança"; }
+  else if (idade >= 65) { icon = <Accessibility className="h-4 w-4 text-blue-600" />; label = "Idoso"; }
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span>{idade} {idade === 1 ? "ano" : "anos"}</span>
+      {icon && <span title={label} aria-label={label}>{icon}</span>}
+    </span>
+  );
+}
+
 interface Paciente {
   id: string;
   nome: string;
@@ -185,9 +219,9 @@ function ClientesPage() {
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>
             ) : !clinicaAtual ? (
-              <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
             ) : filtrados.length === 0 ? (
               <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Nenhum cliente encontrado.</TableCell></TableRow>
             ) : filtrados.map(p => (
