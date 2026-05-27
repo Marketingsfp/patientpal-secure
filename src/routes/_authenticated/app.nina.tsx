@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { NinaMessage, TypingDots } from "@/components/nina/NinaMessage";
 import { formatWhatsappText } from "@/components/nina/formatWhatsappText";
+import { AtendDashboard, AtendDepartamentos, AtendMacros, AtendKb, AtendPausas } from "@/components/nina/AtendimentoTabs";
 
 export const Route = createFileRoute("/_authenticated/app/nina")({
   component: NinaPage,
@@ -92,7 +93,7 @@ function NinaPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const hashAba = (location.hash ?? "").replace(/^#/, "");
-  const abaAtiva = ["treinada", "chat", "automacoes", "config"].includes(hashAba) ? hashAba : "chat";
+  const abaAtiva = ["treinada", "chat", "automacoes", "config", "atend-dashboard", "atend-depto", "atend-macros", "atend-kb", "atend-pausas"].includes(hashAba) ? hashAba : "chat";
   const setAbaAtiva = (v: string) => {
     navigate({ to: "/app/nina", hash: v, replace: true });
   };
@@ -244,6 +245,13 @@ function NinaPage() {
         <TabsContent value="config">
           <ConfiguracaoWhatsApp />
         </TabsContent>
+
+        {/* ============ ATENDIMENTO — Dashboard ============ */}
+        <TabsContent value="atend-dashboard"><AtendDashboard /></TabsContent>
+        <TabsContent value="atend-depto"><AtendDepartamentos /></TabsContent>
+        <TabsContent value="atend-macros"><AtendMacros /></TabsContent>
+        <TabsContent value="atend-kb"><AtendKb /></TabsContent>
+        <TabsContent value="atend-pausas"><AtendPausas /></TabsContent>
       </Tabs>
     </div>
   );
