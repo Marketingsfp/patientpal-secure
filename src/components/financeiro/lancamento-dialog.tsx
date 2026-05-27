@@ -154,12 +154,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       return;
     }
     if (!pagamentoMisto && formaPagamento === "dinheiro") {
-      if (!valorRecebido || recebidoNum <= 0) {
-        toast.error(`Informe o valor recebido em dinheiro (≥ ${formatBRL(valorNum)})`);
-        setSaving(false);
-        return;
-      }
-      if (recebidoNum + 0.005 < valorNum) {
+      if (valorRecebido && recebidoNum > 0 && recebidoNum + 0.005 < valorNum) {
         toast.error(`Valor recebido (${formatBRL(recebidoNum)}) é menor que o total (${formatBRL(valorNum)})`);
         setSaving(false);
         return;
