@@ -92,6 +92,7 @@ export function AtendDepartamentos() {
     catch (e: any) { toast.error(e?.message); }
   }, [clinicaId, listar]);
   useEffect(() => { carregar(); }, [carregar]);
+  useRealtimeRefresh(["atend_departamentos", "atend_departamento_membros"], carregar, !!clinicaId);
 
   const handleSalvar = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -194,6 +195,7 @@ export function AtendMacros() {
     catch (e: any) { toast.error(e?.message); }
   }, [clinicaId, listar]);
   useEffect(() => { carregar(); }, [carregar]);
+  useRealtimeRefresh(["atend_macros"], carregar, !!clinicaId);
 
   const handleSalvar = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -285,6 +287,7 @@ export function AtendKb() {
     catch (e: any) { toast.error(e?.message); }
   }, [clinicaId, listar]);
   useEffect(() => { carregar(); }, [carregar]);
+  useRealtimeRefresh(["atend_kb"], carregar, !!clinicaId);
 
   const handleSalvar = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -387,6 +390,7 @@ export function AtendPausas() {
     } catch (e: any) { toast.error(e?.message); }
   }, [clinicaId, listar, atualFn]);
   useEffect(() => { carregar(); }, [carregar]);
+  useRealtimeRefresh(["atend_pause_reasons", "atend_pausas_log"], carregar, !!clinicaId);
 
   const handleSalvar = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -535,6 +539,7 @@ export function AtendMeuStatus() {
       setAtual(a);
     } catch (e: any) { toast.error(e?.message); }
     finally { setLoading(false); }
+  useRealtimeRefresh(["atend_pausas_log", "atend_departamento_membros", "atend_pause_reasons", "atend_departamentos"], carregar, !!clinicaId);
   }, [clinicaId, listarMembrosFn, listarDeptos, listarReasons, atualFn]);
   useEffect(() => { carregar(); }, [carregar]);
 
