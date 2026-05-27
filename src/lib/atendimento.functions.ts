@@ -812,7 +812,7 @@ export const dashboardAtendimento = createServerFn({ method: "POST" })
       fechadas_hoje: fechadas ?? 0,
       csat_hoje: csat,
     };
-  });  });
+  });
 
 /* =========================================================
  *  INBOX — mensagens, envio, contato
@@ -1197,5 +1197,4 @@ export const relatorioAtendimento = createServerFn({ method: "POST" })
     const departamentos = Array.from(porDept.values()).sort((a, b) => b.conversas - a.conversas);
 
     return { totais, agentes, departamentos };
-// trailing brace fix
   });
