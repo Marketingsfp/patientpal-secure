@@ -23,6 +23,8 @@ type Senha = {
   status: string;
   guiche: string | null;
   chamada_em: string | null;
+  paciente_id?: string | null;
+  paciente_nome?: string | null;
 };
 
 function PainelPage() {
@@ -38,13 +40,16 @@ function PainelPage() {
       const hoje = new Date().toISOString().slice(0, 10);
       const { data } = await supabase
         .from("senhas")
-        .select("id, codigo, tipo, status, guiche, chamada_em")
+        .select("id, codigo, tipo, status, guiche, chamada_em, paciente_id, pacientes(nome)")
         .eq("clinica_id", clinicaId)
         .eq("data_dia", hoje)
         .in("status", ["chamada", "atendida"])
         .order("chamada_em", { ascending: false })
         .limit(6);
-      const lista = (data ?? []) as Senha[];
+      const lista = ((data ?? []) as Array<Senha & { pacientes?: { nome: string } | null }>).map((s) => ({
+        ...s,
+        paciente_nome: s.pacientes?.nome ?? null,
+      })) as Senha[];
       setAtual(lista[0] ?? null);
       setHistorico(lista.slice(1));
     };
@@ -56,14 +61,23 @@ function PainelPage() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "senhas", filter: `clinica_id=eq.${clinicaId}` },
-        (payload) => {
+        async (payload) => {
           void carregar();
           const novo = payload.new as Senha | undefined;
           if (
             (payload.eventType === "UPDATE" || payload.eventType === "INSERT") &&
             novo?.status === "chamada"
           ) {
-            falar(novo);
+            let nome: string | null = null;
+            if (novo.paciente_id) {
+              const { data: p } = await supabase
+                .from("pacientes")
+                .select("nome")
+                .eq("id", novo.paciente_id)
+                .maybeSingle();
+              nome = p?.nome ?? null;
+            }
+            falar({ ...novo, paciente_nome: nome });
           }
         },
       )
@@ -80,7 +94,8 @@ function PainelPage() {
       texto = `${s.codigo}${s.guiche ? `, ${s.guiche}` : ""}`;
     } else {
       const tipoNome = { N: "Comum", P: "Preferencial", E: "Prioridade", R: "Retorno" }[s.tipo];
-      texto = `Senha ${tipoNome} ${s.codigo.replace("-", " ")}${s.guiche ? `, guichê ${s.guiche}` : ""}`;
+      const nomePart = s.paciente_nome ? `, ${s.paciente_nome}` : "";
+      texto = `Senha ${tipoNome} ${s.codigo.replace("-", " ")}${nomePart}${s.guiche ? `, guichê ${s.guiche}` : ""}`;
     }
     window.speechSynthesis.cancel();
     const utter = new SpeechSynthesisUtterance(texto);
@@ -127,6 +142,11 @@ function PainelPage() {
                     <div className={`${fonte} font-black leading-none text-primary text-center break-words max-w-full`}>
                       {atual.codigo}
                     </div>
+                    {!ehNome && atual.paciente_nome && (
+                      <div className="text-5xl font-bold mt-4 text-center text-white break-words max-w-full">
+                        {atual.paciente_nome}
+                      </div>
+                    )}
                     <div className="text-4xl mt-6 text-center">
                       {ehNome ? (
                         <span className="font-bold">{atual.guiche ?? "—"}</span>
