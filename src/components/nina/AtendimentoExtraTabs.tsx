@@ -182,6 +182,23 @@ export function AtendInbox() {
   useRealtimeRefresh(["atend_conversas", "whatsapp_mensagens"], carregarConvs, !!clinicaId);
   useRealtimeRefresh(["whatsapp_mensagens", "atend_notas_internas"], carregarConversa, !!clinicaId && !!sel?.id);
 
+  const statusAgenteOk = !pausaAtiva && filaAberta;
+  const janela24hExpirada = (() => {
+    if (!sel || sel.canal !== "whatsapp") return false;
+    const j = sel.janela_24h_em ? new Date(sel.janela_24h_em).getTime() : 0;
+    if (!j) return true;
+    return Date.now() - j > 24 * 60 * 60 * 1000;
+  })();
+  const motivoBloqueio = !sel
+    ? null
+    : pausaAtiva
+      ? "Você está em pausa. Encerre a pausa para enviar mensagens."
+      : !filaAberta
+        ? "Você está offline. Fique online para enviar mensagens."
+        : janela24hExpirada
+          ? "Janela de 24h do WhatsApp expirada. Envie um template para reabrir."
+          : null;
+
   const enviar = async () => {
     const t = draft.trim();
     if (!t || !sel || !clinicaId || enviando) return;
