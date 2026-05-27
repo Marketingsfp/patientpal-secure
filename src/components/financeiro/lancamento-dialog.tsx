@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Printer } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -512,7 +513,14 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
-          <Button onClick={handleSave} disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button>
+          <Button onClick={handleSave} disabled={saving} className="gap-2">
+            {saving ? "Salvando..." : (
+              <>
+                <Printer className="h-4 w-4" />
+                Salvar e imprimir
+              </>
+            )}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
