@@ -115,9 +115,15 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
             <div class="ficha-clinica">${esc(clinica?.nome ?? "Clínica")}</div>
             <div class="ficha-doc">CARNÊ DE PAGAMENTO — Contrato #${esc(contrato.numero)}</div>
           </div>
-          <div class="ficha-parcela">
-            <div class="lab">Parcela</div>
-            <div class="val">${p.numero_parcela}/${total}</div>
+          <div style="display:flex;gap:18px;align-items:flex-start;">
+            <div class="ficha-parcela">
+              <div class="lab">Parcela</div>
+              <div class="val">${p.numero_parcela}/${total}</div>
+            </div>
+            <div class="ficha-parcela">
+              <div class="lab">Mês de referência</div>
+              <div class="val">${fmtMesAno(p.vencimento)}</div>
+            </div>
           </div>
         </div>
         <div class="ficha-grid">
@@ -125,7 +131,6 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
           <div><span class="lab">CPF</span><span class="val">${esc(paciente?.cpf ?? "—")}</span></div>
           <div><span class="lab">Convênio</span><span class="val">${esc(convenioNome)}</span></div>
           <div><span class="lab">Pessoas no convênio</span><span class="val">${pessoasConvenio}</span></div>
-          <div><span class="lab">Mês de referência</span><span class="val">${fmtMesAno(p.vencimento)}</span></div>
           <div><span class="lab">Vencimento</span><span class="val destaque">${fmtD(p.vencimento)}</span></div>
           <div><span class="lab">Valor</span><span class="val destaque">${BRL(Number(p.valor))}</span></div>
           <div>
