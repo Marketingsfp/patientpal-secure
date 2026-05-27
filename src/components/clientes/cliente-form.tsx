@@ -1313,11 +1313,12 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
                               <th className="px-3 py-2">Status</th>
                               <th className="px-3 py-2">Pago em</th>
                               <th className="px-3 py-2">Valor pago</th>
+                              <th className="px-3 py-2 w-28"></th>
                             </tr>
                           </thead>
                           <tbody>
                             {c.parcelas.length === 0 ? (
-                              <tr><td colSpan={6} className="px-3 py-4 text-center text-muted-foreground">Sem parcelas registradas.</td></tr>
+                              <tr><td colSpan={7} className="px-3 py-4 text-center text-muted-foreground">Sem parcelas registradas.</td></tr>
                             ) : c.parcelas.map((p) => {
                               const paga = isPaga(p);
                               const atras = isAtraso(p);
@@ -1332,6 +1333,20 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
                                   <td className={`px-3 py-2 font-medium ${labelCls}`}>{label}</td>
                                   <td className="px-3 py-2 tabular-nums">{fmtData(p.pago_em)}</td>
                                   <td className="px-3 py-2 tabular-nums">{p.valor_pago != null ? fmtBRL(p.valor_pago) : "—"}</td>
+                                  <td className="px-3 py-2 text-right">
+                                    {paga ? (
+                                      <span className="text-xs text-muted-foreground">—</span>
+                                    ) : (
+                                      <Link
+                                        to="/app/cartao-beneficios/contratos"
+                                        search={{ contratoId: c.id }}
+                                        className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                                        title="Abrir contrato no Cartão Benefícios para registrar pagamento"
+                                      >
+                                        <Check className="h-3 w-3" /> Pagar
+                                      </Link>
+                                    )}
+                                  </td>
                                 </tr>
                               );
                             })}
