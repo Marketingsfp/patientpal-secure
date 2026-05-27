@@ -1102,23 +1102,19 @@ h1, h2, h3 { margin: 0 0 6mm; }
         <div className="flex gap-2 flex-wrap">
           <Button size="sm" onClick={() => printContrato(contrato.id)}><Printer className="h-4 w-4 mr-1"/>Imprimir A4</Button>
           <Button size="sm" variant="secondary" onClick={() => printCartoes(contrato.id)}><CreditCard className="h-4 w-4 mr-1"/>Imprimir cartão{deps.length > 0 ? `(${deps.length + 1})` : ""}</Button>
-          {contrato.forma_pagamento === "carne" ? (
-            <Button size="sm" variant="outline" onClick={async () => {
-              try { await gerarCarnePDF(contrato.id); } catch (e) { toast.error(e instanceof Error ? e.message : "Falha ao gerar carnê"); }
-            }}>
-              <FileText className="h-4 w-4 mr-1"/>Reimprimir carnê
-            </Button>
-          ) : null}
-          {contrato.forma_pagamento === "boleto" ? (
-            <Button size="sm" variant="outline" onClick={async () => {
-              try {
-                const res = await gerarBoletosFn({ data: { contratoId: contrato.id } });
-                if (res.erro) toast.error(res.mensagem); else toast.info(res.mensagem);
-              } catch (e) { toast.error(e instanceof Error ? e.message : "Falha ao gerar boletos"); }
-            }}>
-              <Barcode className="h-4 w-4 mr-1"/>Reemitir boletos
-            </Button>
-          ) : null}
+          <Button size="sm" variant="outline" onClick={async () => {
+            try { await gerarCarnePDF(contrato.id); } catch (e) { toast.error(e instanceof Error ? e.message : "Falha ao gerar carnê"); }
+          }}>
+            <FileText className="h-4 w-4 mr-1"/>Gerar carnê (parcelas em aberto)
+          </Button>
+          <Button size="sm" variant="outline" onClick={async () => {
+            try {
+              const res = await gerarBoletosFn({ data: { contratoId: contrato.id } });
+              if (res.erro) toast.error(res.mensagem); else toast.info(res.mensagem);
+            } catch (e) { toast.error(e instanceof Error ? e.message : "Falha ao gerar boletos"); }
+          }}>
+            <Barcode className="h-4 w-4 mr-1"/>Gerar boletos (parcelas em aberto)
+          </Button>
           <Button size="sm" variant="outline" onClick={copiarLink}><Link2 className="h-4 w-4 mr-1"/>Link de assinatura</Button>
           {contrato.assinado_em ? <Badge variant="default"><Check className="h-3 w-3 mr-1"/>Assinado em {fmtD(contrato.assinado_em)}</Badge> : <Badge variant="outline">Aguardando assinatura</Badge>}
         </div>
