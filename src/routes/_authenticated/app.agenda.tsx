@@ -1073,7 +1073,7 @@ function AgendaPage() {
                   { key: "fim", label: "Fim" },
                   { key: "profissional", label: "Profissional" },
                   { key: "paciente", label: "Cliente" },
-                  { key: "procedimento", label: "Procedimento" },
+                  { key: "procedimento", label: "Serviço" },
                   { key: "status", label: "Status" },
                   { key: "observacoes", label: "Observações" },
                 ],
@@ -1189,7 +1189,7 @@ function AgendaPage() {
                 </p>
               </div>
               <div className="space-y-1">
-                <Label>Procedimento</Label>
+                <Label>Serviço</Label>
                 {form.medico_id && (procPorMedico.get(form.medico_id)?.size || procNomesPorMedico.get(form.medico_id)?.size) ? (
                   <p className="text-xs text-muted-foreground">Mostrando apenas procedimentos configurados para este médico.</p>
                 ) : null}

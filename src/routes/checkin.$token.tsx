@@ -41,7 +41,7 @@ function CheckinPage() {
           {state === "ok" && data && (
             <>
               <p><span className="text-muted-foreground">Paciente:</span> <span className="font-medium">{data.paciente}</span></p>
-              <p><span className="text-muted-foreground">Procedimento:</span> {data.procedimento ?? "—"}</p>
+              <p><span className="text-muted-foreground">Serviço:</span> {data.procedimento ?? "—"}</p>
               <p><span className="text-muted-foreground">Horário:</span> {data.inicio ? new Date(data.inicio).toLocaleString("pt-BR") : "—"}</p>
               <p className="pt-2 text-muted-foreground">Aguarde ser chamado na recepção.</p>
             </>

@@ -28,7 +28,7 @@ import {
 
 export const Route = createFileRoute("/_authenticated/app/procedimentos")({
   component: ProcedimentosPageWithTabs,
-  head: () => ({ meta: [{ title: "Item — ClinicaOS" }] }),
+  head: () => ({ meta: [{ title: "Serviços — ClinicaOS" }] }),
 });
 
 type Tipo = string;

@@ -259,7 +259,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     <table>
       <tr class="bold">
         <td style="width:14mm">QTD</td>
-        <td>PROCEDIMENTO</td>
+        <td>SERVIÇO</td>
       </tr>
       <tr>
         <td>1</td>
@@ -605,7 +605,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
         <table>
           <tr class="bold">
             <td style="width:14mm">QTD</td>
-            <td>PROCEDIMENTO</td>
+            <td>SERVIÇO</td>
           </tr>
           ${linhas}
         </table>

@@ -104,7 +104,7 @@ export async function printOrcamento(orcamentoId: string, clinicaId: string) {
     ${o.medico_nome ? `<div class="sm">PROFISSIONAL: ${esc(o.medico_nome)}</div>` : ""}
 
     <div class="sep"></div>
-    <div class="bold">PROCEDIMENTOS</div>
+    <div class="bold">SERVIÇOS</div>
     ${its.map((i) => `
       <div class="item-linha">
         <div class="item-nome">${esc(i.descricao)}</div>
