@@ -108,7 +108,7 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
 
   const fichas = (parcelas ?? []).map((p) => {
     const total = (parcelas ?? []).length;
-    return `
+    const fichaInner = `
       <div class="ficha">
         <div class="ficha-header">
           <div class="ficha-titulo">
@@ -160,6 +160,18 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
         </div>
       </div>
     `;
+    return `
+      <div class="ficha-par">
+        <div class="ficha-via">
+          <div class="via-label">Via do cliente</div>
+          ${fichaInner}
+        </div>
+        <div class="ficha-via">
+          <div class="via-label">Via da clínica</div>
+          ${fichaInner}
+        </div>
+      </div>
+    `;
   });
 
   const html = `<!doctype html>
@@ -187,29 +199,42 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
   .ficha {
     border: 1px dashed #111;
     border-radius: 6px;
-    padding: 10px 12px;
-    margin-bottom: 8px;
+    padding: 8px 10px;
     page-break-inside: avoid;
-    height: 85mm;
+    height: 80mm;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
+  }
+  .ficha-par {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6mm;
+    margin-bottom: 6px;
+    page-break-inside: avoid;
+  }
+  .ficha-via { display: flex; flex-direction: column; gap: 3px; }
+  .via-label {
+    font-size: 9px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .08em; color: #111;
+    padding: 2px 4px; border-bottom: 1px dashed #111;
   }
   .ficha-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #ddd; padding-bottom: 6px; }
-  .ficha-clinica { font-weight: 700; font-size: 13px; }
-  .ficha-doc { font-size: 10px; color: #555; letter-spacing: .04em; text-transform: uppercase; }
+  .ficha-clinica { font-weight: 700; font-size: 11px; }
+  .ficha-doc { font-size: 8px; color: #555; letter-spacing: .04em; text-transform: uppercase; }
   .ficha-parcela { text-align: right; }
-  .ficha-parcela .lab { font-size: 9px; text-transform: uppercase; color: #666; }
-  .ficha-parcela .val { font-size: 18px; font-weight: 800; }
-  .ficha-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px 22px; font-size: 11px; }
+  .ficha-parcela .lab { font-size: 8px; text-transform: uppercase; color: #666; }
+  .ficha-parcela .val { font-size: 12px; font-weight: 800; }
+  .ficha-header > div:last-child { gap: 8px !important; }
+  .ficha-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 12px; font-size: 10px; }
   .ficha-grid > div { display: flex; flex-direction: column; gap: 4px; }
-  .ficha-grid .lab { display:block; font-size: 9px; color: #666; text-transform: uppercase; letter-spacing: .04em; }
+  .ficha-grid .lab { display:block; font-size: 8px; color: #666; text-transform: uppercase; letter-spacing: .04em; }
   .ficha-grid .val { font-weight: 600; }
-  .ficha-grid .val.destaque { font-size: 14px; }
-  .ficha-rodape { margin-top: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 22px; align-items: end; }
-  .campo-manual .lab { display:block; font-size: 9px; color: #666; text-transform: uppercase; letter-spacing: .04em; }
+  .ficha-grid .val.destaque { font-size: 13px; }
+  .ficha-rodape { margin-top: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: end; }
+  .campo-manual .lab { display:block; font-size: 8px; color: #666; text-transform: uppercase; letter-spacing: .04em; }
   .campo-manual .linha { display:block; border-bottom: 1px solid #111; height: 16px; }
-  .campo-manual .linha-assin { display:block; border-bottom: 1px solid #111; height: 28px; }
+  .campo-manual .linha-assin { display:block; border-bottom: 1px solid #111; height: 20px; }
 
   .footer-imprime { text-align: center; margin: 8px 0 0; }
   .footer-imprime button { padding: 8px 14px; font-size: 14px; cursor: pointer; }
