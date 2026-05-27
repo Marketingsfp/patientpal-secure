@@ -213,18 +213,6 @@ function ClientesPage() {
                   </span>
                 </TableCell>
                 <TableCell className="text-right">
-                  {hasBiometria[p.id] ? (
-                    <Button variant="ghost" size="icon" onClick={() => revogarBiometria(p)} title="Biometria cadastrada — clique para remover">
-                      <ScanFace className="h-4 w-4 text-emerald-600" />
-                    </Button>
-                  ) : (
-                    <Button variant="ghost" size="icon" onClick={() => setConsentFor(p)} title="Cadastrar biometria facial">
-                      <ScanFace className="h-4 w-4 text-muted-foreground" />
-                    </Button>
-                  )}
-                  <Button variant="ghost" size="icon" onClick={() => abrirProntuario(p)} title="Ver prontuário">
-                    <FileHeart className="h-4 w-4 text-primary" />
-                  </Button>
                   <Button asChild variant="ghost" size="icon" title="Editar cliente">
                     <Link to="/app/clientes/$pacienteId/editar" params={{ pacienteId: p.id }}>
                       <Pencil className="h-4 w-4" />
@@ -256,89 +244,6 @@ function ClientesPage() {
               onSaved={() => { setOpenNovo(false); void load(); }}
             />
           )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Consentimento LGPD para biometria facial */}
-      <Dialog open={!!consentFor} onOpenChange={(o) => { if (!o) setConsentFor(null); }}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Consentimento — Biometria facial</DialogTitle>
-            <DialogDescription>
-              Termo obrigatório (LGPD — Lei 13.709/2018, art. 11).
-            </DialogDescription>
-          </DialogHeader>
-          <div className="text-sm space-y-2 max-h-72 overflow-auto rounded-md border bg-muted/30 p-3">
-            <p><strong>Paciente:</strong> {consentFor?.nome}</p>
-            <p><strong>Finalidade:</strong> identificação na recepção, totem de auto-atendimento e confirmação de identidade em atendimentos, evitando troca de prontuários.</p>
-            <p><strong>O que é armazenado:</strong> apenas um vetor matemático (descritor) do seu rosto — <em>não</em> guardamos a foto. O vetor não permite reconstruir a imagem original.</p>
-            <p><strong>Compartilhamento:</strong> os dados ficam restritos à clínica e não são compartilhados com terceiros.</p>
-            <p><strong>Direitos do titular:</strong> você pode revogar o consentimento e solicitar a exclusão da biometria a qualquer momento, pela equipe da recepção.</p>
-            <p><strong>Base legal:</strong> consentimento específico e destacado (art. 11, I).</p>
-          </div>
-          <DialogFooter className="sticky bottom-0 bg-background border-t -mx-6 -mb-6 px-6 py-3 z-10">
-            <Button variant="ghost" onClick={() => setConsentFor(null)}>Não concordo</Button>
-            <Button onClick={() => { setFaceFor(consentFor); setConsentFor(null); }}>
-              Concordo e autorizo a captura
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <FaceCaptureDialog
-        open={!!faceFor}
-        onClose={() => setFaceFor(null)}
-        onCaptured={salvarBiometria}
-        titulo={`Biometria — ${faceFor?.nome ?? ""}`}
-      />
-
-      {/* Prontuário do paciente */}
-      <Dialog open={!!prontFor} onOpenChange={(o) => { if (!o) setProntFor(null); }}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <FileHeart className="h-5 w-5 text-primary" />
-              Prontuário — {prontFor?.nome}
-            </DialogTitle>
-            <DialogDescription>
-              Histórico de atendimentos registrados para este paciente.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            {prontLoading ? (
-              <div className="py-10 text-center text-muted-foreground flex items-center justify-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
-              </div>
-            ) : prontList.length === 0 ? (
-              <div className="py-10 text-center text-muted-foreground text-sm">
-                Nenhum registro de prontuário para este paciente.
-              </div>
-            ) : prontList.map((r) => (
-              <div key={r.id} className="border rounded-lg p-4 bg-card space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="font-semibold">{new Date(r.data).toLocaleString("pt-BR")}</span>
-                  <span className="text-muted-foreground uppercase text-xs">{r.medico_nome ?? "—"}</span>
-                </div>
-                {([
-                  ["Queixa principal", r.queixa_principal],
-                  ["História da doença", r.historia_doenca],
-                  ["Exame físico", r.exame_fisico],
-                  ["Hipótese diagnóstica", r.hipotese_diagnostica],
-                  ["Conduta", r.conduta],
-                  ["Prescrição", r.prescricao],
-                  ["Observações", r.observacoes],
-                ] as const).filter(([, v]) => v && v.trim()).map(([label, v]) => (
-                  <div key={label} className="text-sm">
-                    <div className="text-xs font-medium text-muted-foreground">{label}</div>
-                    <div className="whitespace-pre-wrap">{v}</div>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setProntFor(null)}>Fechar</Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
