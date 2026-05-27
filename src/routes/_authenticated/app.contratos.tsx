@@ -751,6 +751,19 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     setPagMens(m);
     setFormaPagOpen(true);
   };
+  // Multa de 10% + juros de 0,33% ao dia para parcelas vencidas
+  const calcValorComJuros = (m: Mens | null): number => {
+    if (!m) return 0;
+    const base = Number(m.valor) || 0;
+    if (m.status === "pago") return base;
+    const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+    const venc = new Date(m.vencimento + "T00:00:00");
+    const diasAtraso = Math.floor((hoje.getTime() - venc.getTime()) / 86400000);
+    if (diasAtraso <= 0) return base;
+    return base * 1.10 + base * 0.0033 * diasAtraso;
+  };
+  const pagValorFinal = calcValorComJuros(pagMens);
+  const pagDiasAtraso = pagMens ? Math.max(0, Math.floor((new Date().setHours(0,0,0,0) - new Date(pagMens.vencimento + "T00:00:00").getTime()) / 86400000)) : 0;
   // Normaliza para os valores aceitos pelo LancamentoDialog (igual à Agenda)
   const normalizarForma = (f: string) =>
     f === "credito" ? "cartao_credito" : f === "debito" ? "cartao_debito" : f;
