@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Camera, FileHeart, Loader2, MapPin, Mic, MicOff, ScanFace, Upload, X } from "lucide-react";
+import { Camera, FileHeart, Loader2, MapPin, Mic, MicOff, ScanFace, Search, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { isCPFValido, somenteDigitos } from "@/lib/cpf";
