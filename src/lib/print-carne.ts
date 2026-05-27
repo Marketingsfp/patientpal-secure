@@ -108,8 +108,9 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
 
   const fichas = (parcelas ?? []).map((p) => {
     const total = (parcelas ?? []).length;
-    const fichaInner = `
+    const buildFicha = (viaLabel: string) => `
       <div class="ficha">
+        <div class="via-label">${viaLabel}</div>
         <div class="ficha-header">
           <div class="ficha-titulo">
             <div class="ficha-clinica">${esc(clinica?.nome ?? "Clínica")}</div>
@@ -162,14 +163,8 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
     `;
     return `
       <div class="ficha-par">
-        <div class="ficha-via">
-          <div class="via-label">Via do cliente</div>
-          ${fichaInner}
-        </div>
-        <div class="ficha-via">
-          <div class="via-label">Via da clínica</div>
-          ${fichaInner}
-        </div>
+        <div class="ficha-via">${buildFicha("Via do cliente")}</div>
+        <div class="ficha-via">${buildFicha("Via da clínica")}</div>
       </div>
     `;
   });
