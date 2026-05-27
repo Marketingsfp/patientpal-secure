@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Camera, FileHeart, Loader2, MapPin, Mic, MicOff, ScanFace, Upload, X } from "lucide-react";
+import { Camera, FileHeart, Loader2, MapPin, Mic, MicOff, ScanFace, Search, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { isCPFValido, somenteDigitos } from "@/lib/cpf";
@@ -144,6 +144,12 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
   };
   const [prontList, setProntList] = useState<ProntRow[]>([]);
   const [prontLoading, setProntLoading] = useState(false);
+  const [filtroDataDe, setFiltroDataDe] = useState("");
+  const [filtroDataAte, setFiltroDataAte] = useState("");
+  const [filtroMedico, setFiltroMedico] = useState("");
+  const [filtroItem, setFiltroItem] = useState("");
+  const [prontFiltered, setProntFiltered] = useState<ProntRow[]>([]);
+  const [filtroAtivo, setFiltroAtivo] = useState(false);
 
   // Foto
   const [fotoFile, setFotoFile] = useState<File | null>(null);
@@ -335,6 +341,42 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
         setProntLoading(false);
       });
   }, [editing?.id]);
+
+  // Mantém a lista filtrada em sincronia com a lista carregada
+  useEffect(() => {
+    setProntFiltered(prontList);
+    setFiltroAtivo(false);
+  }, [prontList]);
+
+  function aplicarFiltroProntuario() {
+    const de = filtroDataDe ? new Date(filtroDataDe + "T00:00:00") : null;
+    const ate = filtroDataAte ? new Date(filtroDataAte + "T23:59:59") : null;
+    const med = filtroMedico.trim().toLowerCase();
+    const item = filtroItem.trim().toLowerCase();
+    const r = prontList.filter((p) => {
+      const d = new Date(p.data);
+      if (de && d < de) return false;
+      if (ate && d > ate) return false;
+      if (med && !(p.medico_nome ?? "").toLowerCase().includes(med)) return false;
+      if (item) {
+        const blob = [
+          p.queixa_principal, p.historia_doenca, p.exame_fisico,
+          p.hipotese_diagnostica, p.conduta, p.prescricao, p.observacoes,
+        ].filter(Boolean).join(" ").toLowerCase();
+        if (!blob.includes(item)) return false;
+      }
+      return true;
+    });
+    setProntFiltered(r);
+    setFiltroAtivo(true);
+  }
+
+  function limparFiltroProntuario() {
+    setFiltroDataDe(""); setFiltroDataAte("");
+    setFiltroMedico(""); setFiltroItem("");
+    setProntFiltered(prontList);
+    setFiltroAtivo(false);
+  }
 
   async function salvarBiometria(descriptor: number[]) {
     if (!editing) return;
@@ -645,28 +687,82 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
                 <FileHeart className="h-6 w-6 mx-auto mb-2 opacity-50" />
                 Nenhum registro de prontuário para este paciente.
               </div>
-            ) : prontList.map((r) => (
-              <div key={r.id} className="border rounded-lg p-4 bg-card space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="font-semibold">{new Date(r.data).toLocaleString("pt-BR")}</span>
-                  <span className="text-muted-foreground uppercase text-xs">{r.medico_nome ?? "—"}</span>
+            ) : (
+              <>
+                <div className="border rounded-lg p-3 bg-muted/30 grid gap-3 md:grid-cols-[1fr_1fr_1fr_1fr_auto] items-end">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Data de</Label>
+                    <Input type="date" value={filtroDataDe} onChange={(e) => setFiltroDataDe(e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Data até</Label>
+                    <Input type="date" value={filtroDataAte} onChange={(e) => setFiltroDataAte(e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Médico</Label>
+                    <Input
+                      placeholder="Nome do médico"
+                      value={filtroMedico}
+                      onChange={(e) => setFiltroMedico(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); aplicarFiltroProntuario(); } }}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Item</Label>
+                    <Input
+                      placeholder="Queixa, prescrição, etc."
+                      value={filtroItem}
+                      onChange={(e) => setFiltroItem(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); aplicarFiltroProntuario(); } }}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button type="button" onClick={aplicarFiltroProntuario}>
+                      <Search className="h-4 w-4 mr-2" /> Pesquisar
+                    </Button>
+                    <Button type="button" variant="outline" onClick={limparFiltroProntuario}>
+                      Limpar
+                    </Button>
+                  </div>
                 </div>
-                {([
-                  ["Queixa principal", r.queixa_principal],
-                  ["História da doença", r.historia_doenca],
-                  ["Exame físico", r.exame_fisico],
-                  ["Hipótese diagnóstica", r.hipotese_diagnostica],
-                  ["Conduta", r.conduta],
-                  ["Prescrição", r.prescricao],
-                  ["Observações", r.observacoes],
-                ] as const).filter(([, v]) => v && v.trim()).map(([label, v]) => (
-                  <div key={label} className="text-sm">
-                    <div className="text-xs font-medium text-muted-foreground">{label}</div>
-                    <div className="whitespace-pre-wrap">{v}</div>
+
+                {prontFiltered.length === 0 ? (
+                  <div className="py-10 text-center text-muted-foreground text-sm">
+                    <FileHeart className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                    {filtroAtivo
+                      ? "Nenhum registro encontrado com esses filtros."
+                      : "Nenhum registro de prontuário para este paciente."}
+                  </div>
+                ) : prontFiltered.map((r) => (
+                  <div key={r.id} className="border rounded-lg p-4 bg-card space-y-3">
+                    <div className="flex items-center justify-between border-b pb-2">
+                      <span className="text-base font-semibold text-foreground">
+                        {new Date(r.data).toLocaleString("pt-BR")}
+                      </span>
+                      <span className="text-muted-foreground uppercase text-xs font-medium tracking-wide">
+                        {r.medico_nome ?? "—"}
+                      </span>
+                    </div>
+                    {([
+                      ["Queixa principal", r.queixa_principal],
+                      ["História da doença", r.historia_doenca],
+                      ["Exame físico", r.exame_fisico],
+                      ["Hipótese diagnóstica", r.hipotese_diagnostica],
+                      ["Conduta", r.conduta],
+                      ["Prescrição", r.prescricao],
+                      ["Observações", r.observacoes],
+                    ] as const).filter(([, v]) => v && v.trim()).map(([label, v]) => (
+                      <div key={label} className="text-sm border-l-2 border-primary pl-3">
+                        <div className="text-sm font-semibold text-foreground uppercase tracking-wide mb-1">
+                          {label}
+                        </div>
+                        <div className="whitespace-pre-wrap text-foreground/90">{v}</div>
+                      </div>
+                    ))}
                   </div>
                 ))}
-              </div>
-            ))}
+              </>
+            )}
           </TabsContent>
         </Tabs>
 
