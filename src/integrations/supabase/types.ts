@@ -6138,6 +6138,7 @@ export type Database = {
         Args: { _clinica_id: string }
         Returns: undefined
       }
+      strip_accents: { Args: { _text: string }; Returns: string }
       user_is_any_manager: { Args: { _user_id: string }; Returns: boolean }
       verificar_certificado: { Args: { _codigo: string }; Returns: Json }
     }
