@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Camera, ChevronDown, FileHeart, History, Loader2, MapPin, Mic, MicOff, ScanFace, Search, Upload, X } from "lucide-react";
+import { Camera, ChevronDown, CreditCard, FileHeart, History, Loader2, MapPin, Mic, MicOff, ScanFace, Search, UserCheck, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { isCPFValido, somenteDigitos } from "@/lib/cpf";
@@ -161,6 +161,28 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
   };
   const [histList, setHistList] = useState<HistRow[]>([]);
   const [histLoading, setHistLoading] = useState(false);
+
+  // Convênio (Cartão Convênio)
+  type ConvParcela = {
+    id: string; numero_parcela: number; vencimento: string; valor: number;
+    status: string; pago_em: string | null; valor_pago: number | null;
+  };
+  type ConvDependente = {
+    id: string; paciente_id: string; paciente_nome: string; parentesco: string | null;
+  };
+  type ConvContrato = {
+    id: string; numero: number; status: string;
+    paciente_id: string; paciente_nome: string;
+    data_inicio: string; data_fim: string | null;
+    dia_vencimento: number; valor_mensal: number; num_parcelas: number;
+    forma_pagamento: string | null;
+    plano_nome: string | null; vigencia_meses: number | null;
+    papel: "titular" | "dependente";
+    dependentes: ConvDependente[];
+    parcelas: ConvParcela[];
+  };
+  const [convList, setConvList] = useState<ConvContrato[]>([]);
+  const [convLoading, setConvLoading] = useState(false);
   const [histFiltroDataDe, setHistFiltroDataDe] = useState("");
   const [histFiltroDataAte, setHistFiltroDataAte] = useState("");
   const [histFiltroMedico, setHistFiltroMedico] = useState("");
@@ -441,6 +463,95 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
     })();
   }, [editing?.id]);
 
+  // Carrega contratos de Cartão Convênio (titular ou dependente)
+  useEffect(() => {
+    if (!editing) { setConvList([]); return; }
+    setConvLoading(true);
+    void (async () => {
+      // 1) contratos onde paciente é titular
+      const { data: tit } = await supabase
+        .from("contratos_assinatura")
+        .select("id, numero, status, paciente_id, paciente_nome, data_inicio, data_fim, dia_vencimento, valor_mensal, num_parcelas, forma_pagamento, plano_id")
+        .eq("paciente_id", editing.id);
+      // 2) contratos onde paciente é dependente
+      const { data: deps } = await supabase
+        .from("contrato_dependentes")
+        .select("contrato_id")
+        .eq("paciente_id", editing.id)
+        .eq("ativo", true);
+      const contratoIdsDep = Array.from(new Set((deps ?? []).map((d: any) => d.contrato_id)));
+      let depContratos: any[] = [];
+      if (contratoIdsDep.length > 0) {
+        const { data } = await supabase
+          .from("contratos_assinatura")
+          .select("id, numero, status, paciente_id, paciente_nome, data_inicio, data_fim, dia_vencimento, valor_mensal, num_parcelas, forma_pagamento, plano_id")
+          .in("id", contratoIdsDep);
+        depContratos = data ?? [];
+      }
+      const titularIds = new Set((tit ?? []).map((c: any) => c.id));
+      const todos: Array<any & { papel: "titular" | "dependente" }> = [
+        ...(tit ?? []).map((c: any) => ({ ...c, papel: "titular" as const })),
+        ...depContratos
+          .filter((c: any) => !titularIds.has(c.id))
+          .map((c: any) => ({ ...c, papel: "dependente" as const })),
+      ];
+      if (todos.length === 0) {
+        setConvList([]); setConvLoading(false); return;
+      }
+      const allIds = todos.map((c) => c.id);
+      const planoIds = Array.from(new Set(todos.map((c) => c.plano_id).filter(Boolean)));
+      const [planosRes, depsRes, parcelasRes] = await Promise.all([
+        planoIds.length > 0
+          ? supabase.from("planos_assinatura").select("id, nome, vigencia_meses").in("id", planoIds)
+          : Promise.resolve({ data: [] as any[] }),
+        supabase
+          .from("contrato_dependentes")
+          .select("id, contrato_id, paciente_id, paciente_nome, parentesco, ativo")
+          .in("contrato_id", allIds)
+          .eq("ativo", true),
+        supabase
+          .from("contrato_mensalidades")
+          .select("id, contrato_id, numero_parcela, vencimento, valor, status, pago_em, valor_pago")
+          .in("contrato_id", allIds)
+          .order("numero_parcela", { ascending: true }),
+      ]);
+      const planoMap: Record<string, { nome: string; vigencia_meses: number | null }> = Object.fromEntries(
+        ((planosRes.data ?? []) as any[]).map((p) => [p.id, { nome: p.nome, vigencia_meses: p.vigencia_meses }])
+      );
+      const depMap: Record<string, ConvDependente[]> = {};
+      for (const d of (depsRes.data ?? []) as any[]) {
+        (depMap[d.contrato_id] ||= []).push({
+          id: d.id, paciente_id: d.paciente_id, paciente_nome: d.paciente_nome, parentesco: d.parentesco,
+        });
+      }
+      const parcMap: Record<string, ConvParcela[]> = {};
+      for (const p of (parcelasRes.data ?? []) as any[]) {
+        (parcMap[p.contrato_id] ||= []).push({
+          id: p.id, numero_parcela: p.numero_parcela, vencimento: p.vencimento,
+          valor: Number(p.valor) || 0, status: p.status,
+          pago_em: p.pago_em, valor_pago: p.valor_pago != null ? Number(p.valor_pago) : null,
+        });
+      }
+      const lista: ConvContrato[] = todos.map((c) => {
+        const plano = c.plano_id ? planoMap[c.plano_id] : null;
+        return {
+          id: c.id, numero: c.numero, status: c.status,
+          paciente_id: c.paciente_id, paciente_nome: c.paciente_nome,
+          data_inicio: c.data_inicio, data_fim: c.data_fim,
+          dia_vencimento: c.dia_vencimento, valor_mensal: Number(c.valor_mensal) || 0,
+          num_parcelas: c.num_parcelas, forma_pagamento: c.forma_pagamento,
+          plano_nome: plano?.nome ?? null, vigencia_meses: plano?.vigencia_meses ?? null,
+          papel: c.papel,
+          dependentes: depMap[c.id] ?? [],
+          parcelas: parcMap[c.id] ?? [],
+        };
+      });
+      lista.sort((a, b) => (a.data_inicio < b.data_inicio ? 1 : -1));
+      setConvList(lista);
+      setConvLoading(false);
+    })();
+  }, [editing?.id]);
+
   // Carrega procedimentos ativos da clínica para o filtro "Item"
   useEffect(() => {
     if (!clinicaId) return;
@@ -640,7 +751,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
     <>
       <form onSubmit={onSubmit} className="space-y-4">
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="grid grid-cols-6 w-full">
+          <TabsList className="grid grid-cols-7 w-full">
             <TabsTrigger value="dados">Dados</TabsTrigger>
             <TabsTrigger value="endereco">Endereço</TabsTrigger>
             <TabsTrigger value="responsavel">
@@ -649,6 +760,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
             <TabsTrigger value="biometria">Biometria</TabsTrigger>
             <TabsTrigger value="prontuario">Prontuário</TabsTrigger>
             <TabsTrigger value="historico">Histórico</TabsTrigger>
+            <TabsTrigger value="convenio">Convênio</TabsTrigger>
           </TabsList>
 
           <TabsContent value="dados" className="space-y-4 pt-4 pb-16">
@@ -1044,6 +1156,185 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
                 </div>
                 )}
               </>
+            )}
+          </TabsContent>
+
+          <TabsContent value="convenio" className="space-y-3 pt-4 pb-16">
+            {!editing ? (
+              <p className="text-sm text-muted-foreground">
+                Salve o cadastro do paciente para visualizar os contratos de convênio.
+              </p>
+            ) : convLoading ? (
+              <div className="py-10 text-center text-muted-foreground flex items-center justify-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
+              </div>
+            ) : convList.length === 0 ? (
+              <div className="py-10 text-center text-muted-foreground text-sm">
+                <CreditCard className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                Este cliente ainda não possui contratos de convênio.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {convList.map((c) => {
+                  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+                  const isAtraso = (p: ConvParcela) =>
+                    ["pendente", "aberto", "atrasado"].includes(p.status) && new Date(p.vencimento + "T00:00:00") < hoje;
+                  const isPaga = (p: ConvParcela) => p.status === "pago" || p.status === "paga";
+                  const pagas = c.parcelas.filter(isPaga);
+                  const atraso = c.parcelas.filter(isAtraso);
+                  const pendentes = c.parcelas.filter((p) => !isPaga(p) && !isAtraso(p));
+                  const totalContrato = c.parcelas.reduce((s, p) => s + p.valor, 0);
+                  const somaPagas = pagas.reduce((s, p) => s + (p.valor_pago ?? p.valor), 0);
+                  const somaPendentes = pendentes.reduce((s, p) => s + p.valor, 0);
+                  const somaAtraso = atraso.reduce((s, p) => s + p.valor, 0);
+                  const dataFimCalc = c.data_fim
+                    ? c.data_fim
+                    : c.vigencia_meses
+                      ? (() => { const d = new Date(c.data_inicio + "T00:00:00"); d.setMonth(d.getMonth() + c.vigencia_meses); return d.toISOString().slice(0, 10); })()
+                      : null;
+                  const fmtBRL = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+                  const fmtData = (s: string | null) => s ? new Date(s + "T00:00:00").toLocaleDateString("pt-BR") : "—";
+                  const destacar = (nome: string, pid: string) => pid === editing.id ? (
+                    <span className="inline-flex items-center gap-1 font-semibold text-primary">
+                      <UserCheck className="h-3.5 w-3.5" /> {nome}
+                    </span>
+                  ) : <span>{nome}</span>;
+                  const statusBadge = (() => {
+                    const map: Record<string, string> = {
+                      ativo: "bg-green-100 text-green-800 border-green-200",
+                      pendente_assinatura: "bg-amber-100 text-amber-800 border-amber-200",
+                      cancelado: "bg-red-100 text-red-800 border-red-200",
+                      encerrado: "bg-muted text-muted-foreground border-border",
+                    };
+                    return map[c.status] ?? "bg-muted text-muted-foreground border-border";
+                  })();
+                  return (
+                    <div key={c.id} className="border rounded-lg bg-card overflow-hidden">
+                      <div className="px-4 py-3 border-b bg-muted/30 flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="h-4 w-4 text-primary" />
+                          <div>
+                            <div className="font-semibold text-foreground">
+                              {c.plano_nome ?? "Plano"} <span className="text-muted-foreground font-normal">· Contrato #{c.numero}</span>
+                            </div>
+                            <div className="text-xs text-muted-foreground capitalize">{c.status.replace(/_/g, " ")}</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full border uppercase tracking-wide ${statusBadge}`}>
+                            {c.status.replace(/_/g, " ")}
+                          </span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full border uppercase tracking-wide bg-primary/10 text-primary border-primary/20">
+                            {c.papel}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="px-4 py-3 grid gap-3 md:grid-cols-4 text-sm">
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Vigência</div>
+                          <div className="font-medium tabular-nums">{fmtData(c.data_inicio)} → {fmtData(dataFimCalc)}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Vencimento</div>
+                          <div className="font-medium">Todo dia {c.dia_vencimento}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Valor mensal</div>
+                          <div className="font-medium tabular-nums">{fmtBRL(c.valor_mensal)}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Parcelas</div>
+                          <div className="font-medium">{c.num_parcelas}× {c.forma_pagamento ? `· ${c.forma_pagamento}` : ""}</div>
+                        </div>
+                      </div>
+
+                      <div className="px-4 pb-3 grid gap-3 md:grid-cols-2 text-sm">
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Titular</div>
+                          <div>{destacar(c.paciente_nome, c.paciente_id)}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
+                            Dependentes ({c.dependentes.length})
+                          </div>
+                          {c.dependentes.length === 0 ? (
+                            <div className="text-muted-foreground">—</div>
+                          ) : (
+                            <ul className="space-y-0.5">
+                              {c.dependentes.map((d) => (
+                                <li key={d.id} className="flex flex-wrap items-center gap-1">
+                                  {destacar(d.paciente_nome, d.paciente_id)}
+                                  {d.parentesco && <span className="text-xs text-muted-foreground">· {d.parentesco}</span>}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="px-4 pb-3 grid gap-2 md:grid-cols-4">
+                        <div className="rounded-md border bg-card p-2">
+                          <div className="text-[10px] uppercase text-muted-foreground">Pagas</div>
+                          <div className="text-base font-semibold text-green-700">{pagas.length}</div>
+                          <div className="text-xs tabular-nums text-muted-foreground">{fmtBRL(somaPagas)}</div>
+                        </div>
+                        <div className="rounded-md border bg-card p-2">
+                          <div className="text-[10px] uppercase text-muted-foreground">Pendentes</div>
+                          <div className="text-base font-semibold">{pendentes.length}</div>
+                          <div className="text-xs tabular-nums text-muted-foreground">{fmtBRL(somaPendentes)}</div>
+                        </div>
+                        <div className="rounded-md border bg-card p-2">
+                          <div className="text-[10px] uppercase text-muted-foreground">Em atraso</div>
+                          <div className="text-base font-semibold text-red-700">{atraso.length}</div>
+                          <div className="text-xs tabular-nums text-muted-foreground">{fmtBRL(somaAtraso)}</div>
+                        </div>
+                        <div className="rounded-md border bg-muted/40 p-2">
+                          <div className="text-[10px] uppercase text-muted-foreground">Total do contrato</div>
+                          <div className="text-base font-semibold">{c.parcelas.length}</div>
+                          <div className="text-xs tabular-nums text-muted-foreground">{fmtBRL(totalContrato)}</div>
+                        </div>
+                      </div>
+
+                      <div className="border-t overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className="bg-muted/30">
+                            <tr className="text-left">
+                              <th className="px-3 py-2 w-12">Nº</th>
+                              <th className="px-3 py-2">Vencimento</th>
+                              <th className="px-3 py-2">Valor</th>
+                              <th className="px-3 py-2">Status</th>
+                              <th className="px-3 py-2">Pago em</th>
+                              <th className="px-3 py-2">Valor pago</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {c.parcelas.length === 0 ? (
+                              <tr><td colSpan={6} className="px-3 py-4 text-center text-muted-foreground">Sem parcelas registradas.</td></tr>
+                            ) : c.parcelas.map((p) => {
+                              const paga = isPaga(p);
+                              const atras = isAtraso(p);
+                              const cls = paga ? "bg-green-50/50" : atras ? "bg-red-50/60" : "";
+                              const label = paga ? "Paga" : atras ? "Em atraso" : "Pendente";
+                              const labelCls = paga ? "text-green-700" : atras ? "text-red-700" : "text-foreground";
+                              return (
+                                <tr key={p.id} className={`border-t ${cls}`}>
+                                  <td className="px-3 py-2 tabular-nums">{p.numero_parcela}</td>
+                                  <td className="px-3 py-2 tabular-nums">{fmtData(p.vencimento)}</td>
+                                  <td className="px-3 py-2 tabular-nums">{fmtBRL(p.valor)}</td>
+                                  <td className={`px-3 py-2 font-medium ${labelCls}`}>{label}</td>
+                                  <td className="px-3 py-2 tabular-nums">{fmtData(p.pago_em)}</td>
+                                  <td className="px-3 py-2 tabular-nums">{p.valor_pago != null ? fmtBRL(p.valor_pago) : "—"}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </TabsContent>
         </Tabs>
