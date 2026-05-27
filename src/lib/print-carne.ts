@@ -196,7 +196,7 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
     border-radius: 6px;
     padding: 8px 10px;
     page-break-inside: avoid;
-    height: 88mm;
+    height: 89mm;
     display: flex;
     flex-direction: column;
     gap: 6px;
