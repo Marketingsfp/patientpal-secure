@@ -150,6 +150,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
   const [filtroItem, setFiltroItem] = useState("");
   const [prontFiltered, setProntFiltered] = useState<ProntRow[]>([]);
   const [filtroAtivo, setFiltroAtivo] = useState(false);
+  const [procedimentosOpcoes, setProcedimentosOpcoes] = useState<string[]>([]);
 
   // Foto
   const [fotoFile, setFotoFile] = useState<File | null>(null);
