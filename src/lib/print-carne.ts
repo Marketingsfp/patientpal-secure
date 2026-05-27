@@ -144,13 +144,15 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
           <div></div>
           <div>
             <span class="lab">Valor</span><span class="val destaque">${BRL(Number(p.valor))}</span>
-            <span class="lab" style="margin-top:10px;">Data de pagamento</span>
-            ${p.status === "pago"
-              ? `<span class="val">${fmtD(p.pago_em)}</span>`
-              : `<span class="linha" style="display:block;border-bottom:1px solid #111;height:16px;margin-top:4px;"></span>`}
           </div>
         </div>
         <div class="ficha-rodape">
+          <div class="campo-manual">
+            <span class="lab">Data de pagamento</span>
+            ${p.status === "pago"
+              ? `<span class="val" style="font-weight:600;font-size:11px;">${fmtD(p.pago_em)}</span>`
+              : `<span class="linha-assin"></span>`}
+          </div>
           <div class="campo-manual assinatura">
             <span class="linha-assin"></span>
             <span class="lab" style="text-align:center;display:block;margin-top:2px;">Assinatura / Carimbo do recebedor</span>
@@ -204,7 +206,7 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
   .ficha-grid .lab { display:block; font-size: 9px; color: #666; text-transform: uppercase; letter-spacing: .04em; }
   .ficha-grid .val { font-weight: 600; }
   .ficha-grid .val.destaque { font-size: 14px; }
-  .ficha-rodape { margin-top: auto; display: grid; grid-template-columns: 1fr; gap: 8px; align-items: end; }
+  .ficha-rodape { margin-top: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 22px; align-items: end; }
   .campo-manual .lab { display:block; font-size: 9px; color: #666; text-transform: uppercase; letter-spacing: .04em; }
   .campo-manual .linha { display:block; border-bottom: 1px solid #111; height: 16px; }
   .campo-manual.assinatura .linha-assin { display:block; border-bottom: 1px solid #111; height: 28px; }
