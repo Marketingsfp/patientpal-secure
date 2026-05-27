@@ -5,7 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useClinica } from "@/hooks/use-clinica";
 import { chatNina } from "@/lib/nina.functions";
 import { obterWhatsappConfig, salvarWhatsappConfig, testarConexaoWhatsapp } from "@/lib/whatsapp.functions";
-import { enviarMensagemWhatsapp } from "@/lib/whatsapp.functions";
+import { enviarMensagemWhatsapp, listarTemplatesWhatsapp, criarTemplateWhatsapp, excluirTemplateWhatsapp } from "@/lib/whatsapp.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -94,7 +94,7 @@ function NinaPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const hashAba = (location.hash ?? "").replace(/^#/, "");
-  const abaAtiva = ["treinada", "chat", "automacoes", "config", "atend-status", "atend-dashboard", "atend-depto", "atend-macros", "atend-kb", "atend-pausas", "atend-inbox", "atend-supervisor", "atend-relatorios", "atend-roteamento"].includes(hashAba) ? (hashAba === "chat" ? "atend-inbox" : hashAba) : "atend-inbox";
+  const abaAtiva = ["treinada", "chat", "automacoes", "config", "templates", "atend-status", "atend-dashboard", "atend-depto", "atend-macros", "atend-kb", "atend-pausas", "atend-inbox", "atend-supervisor", "atend-relatorios", "atend-roteamento"].includes(hashAba) ? (hashAba === "chat" ? "atend-inbox" : hashAba) : "atend-inbox";
   const setAbaAtiva = (v: string) => {
     navigate({ to: "/app/nina", hash: v, replace: true });
   };
