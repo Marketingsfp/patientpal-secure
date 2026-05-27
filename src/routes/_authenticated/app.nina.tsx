@@ -205,19 +205,6 @@ function NinaPage() {
       </div>
 
       <Tabs value={abaAtiva} onValueChange={setAbaAtiva} className="space-y-4">
-        <Select value={abaAtiva} onValueChange={setAbaAtiva}>
-          <SelectTrigger className="w-full sm:w-[280px] bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-400 font-medium">
-            <MessageCircle className="h-4 w-4 mr-2 text-emerald-500" />
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="treinada">Nina treinada</SelectItem>
-            <SelectItem value="chat">Conversas WhatsApp</SelectItem>
-            <SelectItem value="automacoes">Automações</SelectItem>
-            <SelectItem value="config">Configuração</SelectItem>
-          </SelectContent>
-        </Select>
-
         {/* ============ NINA TREINADA ============ */}
         <TabsContent value="treinada">
           <NinaTreinada />
