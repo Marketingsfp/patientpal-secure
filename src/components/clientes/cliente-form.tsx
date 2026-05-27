@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Camera, FileHeart, History, Loader2, MapPin, Mic, MicOff, ScanFace, Search, Upload, X } from "lucide-react";
+import { Camera, ChevronDown, FileHeart, History, Loader2, MapPin, Mic, MicOff, ScanFace, Search, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { isCPFValido, somenteDigitos } from "@/lib/cpf";
@@ -138,12 +138,14 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
   // Prontuário
   type ProntRow = {
     id: string; data: string; medico_nome: string | null;
+    especialidade: string | null; procedimento: string | null;
     queixa_principal: string | null; hipotese_diagnostica: string | null;
     conduta: string | null; prescricao: string | null;
     historia_doenca: string | null; exame_fisico: string | null; observacoes: string | null;
   };
   const [prontList, setProntList] = useState<ProntRow[]>([]);
   const [prontLoading, setProntLoading] = useState(false);
+  const [prontExpanded, setProntExpanded] = useState<Set<string>>(new Set());
   const [filtroDataDe, setFiltroDataDe] = useState("");
   const [filtroDataAte, setFiltroDataAte] = useState("");
   const [filtroMedico, setFiltroMedico] = useState("");
@@ -330,16 +332,46 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
         const rows = data ?? [];
         const medicoIds = Array.from(new Set(rows.map((r: any) => r.medico_id).filter(Boolean)));
         let medicosMap: Record<string, string> = {};
+        let medEspMap: Record<string, string | null> = {};
+        let espNomeMap: Record<string, string> = {};
         if (medicoIds.length > 0) {
           const { data: meds } = await supabase
             .from("medicos")
-            .select("id, nome")
+            .select("id, nome, especialidade_id")
             .in("id", medicoIds);
           medicosMap = Object.fromEntries((meds ?? []).map((m: any) => [m.id, m.nome]));
+          medEspMap = Object.fromEntries((meds ?? []).map((m: any) => [m.id, m.especialidade_id ?? null]));
+          const espIds = Array.from(new Set((meds ?? []).map((m: any) => m.especialidade_id).filter(Boolean)));
+          if (espIds.length > 0) {
+            const { data: esps } = await supabase
+              .from("especialidades").select("id, nome").in("id", espIds);
+            espNomeMap = Object.fromEntries((esps ?? []).map((e: any) => [e.id, e.nome]));
+          }
         }
+        // Busca agendamentos do paciente para casar serviço por dia + médico
+        const { data: ags } = await supabase
+          .from("agendamentos")
+          .select("inicio, medico_id, procedimento")
+          .eq("paciente_id", editing.id);
+        const agList = (ags ?? []) as Array<{ inicio: string; medico_id: string | null; procedimento: string | null }>;
+        const findProc = (dataIso: string, medicoId: string | null): string | null => {
+          const d = new Date(dataIso);
+          const sameDay = agList.filter((a) => {
+            const ad = new Date(a.inicio);
+            return ad.getFullYear() === d.getFullYear()
+              && ad.getMonth() === d.getMonth()
+              && ad.getDate() === d.getDate()
+              && (medicoId ? a.medico_id === medicoId : true);
+          });
+          if (sameDay.length === 0) return null;
+          sameDay.sort((a, b) => Math.abs(new Date(a.inicio).getTime() - d.getTime()) - Math.abs(new Date(b.inicio).getTime() - d.getTime()));
+          return sameDay[0].procedimento ?? null;
+        };
         setProntList(rows.map((r: any) => ({
           id: r.id, data: r.data,
           medico_nome: r.medico_id ? medicosMap[r.medico_id] ?? null : null,
+          especialidade: r.medico_id && medEspMap[r.medico_id] ? espNomeMap[medEspMap[r.medico_id] as string] ?? null : null,
+          procedimento: findProc(r.data, r.medico_id),
           queixa_principal: r.queixa_principal,
           hipotese_diagnostica: r.hipotese_diagnostica,
           conduta: r.conduta, prescricao: r.prescricao,
@@ -813,34 +845,70 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
                       ? "Nenhum registro encontrado com esses filtros."
                       : "Nenhum registro de prontuário para este paciente."}
                   </div>
-                ) : prontFiltered.map((r) => (
-                  <div key={r.id} className="border rounded-lg p-4 bg-card space-y-3">
-                    <div className="flex items-center justify-between border-b pb-2">
-                      <span className="text-base font-semibold text-foreground">
-                        {new Date(r.data).toLocaleString("pt-BR")}
-                      </span>
-                      <span className="text-muted-foreground uppercase text-xs font-medium tracking-wide">
-                        {r.medico_nome ?? "—"}
-                      </span>
-                    </div>
-                    {([
-                      ["Queixa principal", r.queixa_principal],
-                      ["História da doença", r.historia_doenca],
-                      ["Exame físico", r.exame_fisico],
-                      ["Hipótese diagnóstica", r.hipotese_diagnostica],
-                      ["Conduta", r.conduta],
-                      ["Prescrição", r.prescricao],
-                      ["Observações", r.observacoes],
-                    ] as const).filter(([, v]) => v && v.trim()).map(([label, v]) => (
-                      <div key={label} className="text-sm border-l-2 border-primary pl-3">
-                        <div className="text-sm font-semibold text-foreground uppercase tracking-wide mb-1">
-                          {label}
+                ) : prontFiltered.map((r) => {
+                  const open = prontExpanded.has(r.id);
+                  const toggle = () => {
+                    setProntExpanded((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(r.id)) next.delete(r.id); else next.add(r.id);
+                      return next;
+                    });
+                  };
+                  return (
+                    <div key={r.id} className="border rounded-lg bg-card overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={toggle}
+                        aria-expanded={open}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/40 transition-colors"
+                      >
+                        <ChevronDown
+                          className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
+                        />
+                        <div className="flex-1 grid gap-x-4 gap-y-1 md:grid-cols-4 text-sm">
+                          <div>
+                            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Data</div>
+                            <div className="font-semibold text-foreground tabular-nums">
+                              {new Date(r.data).toLocaleString("pt-BR")}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Especialidade</div>
+                            <div className="font-medium text-foreground truncate">{r.especialidade ?? "—"}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Serviço</div>
+                            <div className="font-medium text-foreground truncate">{r.procedimento ?? "—"}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Médico</div>
+                            <div className="font-medium text-foreground truncate">{r.medico_nome ?? "—"}</div>
+                          </div>
                         </div>
-                        <div className="whitespace-pre-wrap text-foreground/90">{v}</div>
-                      </div>
-                    ))}
-                  </div>
-                ))}
+                      </button>
+                      {open && (
+                        <div className="px-4 pb-4 pt-1 space-y-3 border-t bg-muted/10">
+                          {([
+                            ["Queixa principal", r.queixa_principal],
+                            ["História da doença", r.historia_doenca],
+                            ["Exame físico", r.exame_fisico],
+                            ["Hipótese diagnóstica", r.hipotese_diagnostica],
+                            ["Conduta", r.conduta],
+                            ["Prescrição", r.prescricao],
+                            ["Observações", r.observacoes],
+                          ] as const).filter(([, v]) => v && v.trim()).map(([label, v]) => (
+                            <div key={label} className="text-sm border-l-2 border-primary pl-3">
+                              <div className="text-sm font-semibold text-foreground uppercase tracking-wide mb-1">
+                                {label}
+                              </div>
+                              <div className="whitespace-pre-wrap text-foreground/90">{v}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </>
             )}
           </TabsContent>
