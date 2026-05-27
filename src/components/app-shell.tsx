@@ -64,11 +64,6 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     { to: "/app/orcamentos", label: "Orçamentos", icon: FileText },
     { to: "/app/recepcao", label: "Recepção / Filas", icon: ConciergeBell },
     { to: "/app/triagem-enfermagem", label: "Triagem - Enfermagem", icon: HeartPulse },
-    ],
-  },
-  {
-    label: "Cartão Benefícios",
-    items: [
     { to: "/app/cartao-beneficios/contratos", label: "Cartão Benefícios", icon: CreditCard },
     ],
   },
