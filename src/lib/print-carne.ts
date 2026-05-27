@@ -129,15 +129,20 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
         <div class="ficha-grid">
           <div><span class="lab">Titular</span><span class="val">${esc(contrato.paciente_nome)}</span></div>
           <div><span class="lab">CPF</span><span class="val">${esc(paciente?.cpf ?? "—")}</span></div>
-          <div><span class="lab">Convênio</span><span class="val">${esc(convenioNome)}</span></div>
-          <div><span class="lab">Pessoas no convênio</span><span class="val">${pessoasConvenio}</span></div>
-          <div><span class="lab">Vencimento</span><span class="val destaque">${fmtD(p.vencimento)}</span></div>
-          <div><span class="lab">Valor</span><span class="val destaque">${BRL(Number(p.valor))}</span></div>
+          <div>
+            <span class="lab">Convênio</span><span class="val">${esc(convenioNome)}</span>
+            <span class="lab" style="margin-top:6px;">Pessoas no convênio</span><span class="val">${pessoasConvenio}</span>
+          </div>
           <div>
             <span class="lab">Data de pagamento</span>
             ${p.status === "pago"
               ? `<span class="val">${fmtD(p.pago_em)}</span>`
               : `<span class="linha" style="display:block;border-bottom:1px solid #111;height:16px;"></span>`}
+          </div>
+          <div></div>
+          <div>
+            <span class="lab">Valor</span><span class="val destaque">${BRL(Number(p.valor))}</span>
+            <span class="lab" style="margin-top:6px;">Vencimento</span><span class="val destaque">${fmtD(p.vencimento)}</span>
           </div>
         </div>
         <div class="ficha-rodape">
