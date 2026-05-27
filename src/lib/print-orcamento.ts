@@ -101,7 +101,6 @@ export async function printOrcamento(orcamentoId: string, clinicaId: string) {
     <div class="bold">PACIENTE</div>
     <div>${esc(o.paciente_nome)}</div>
     ${o.paciente_telefone ? `<div class="sm">FONE: ${esc(o.paciente_telefone)}</div>` : ""}
-    ${o.paciente_cpf ? `<div class="sm">CPF: ${esc(o.paciente_cpf)}</div>` : ""}
     ${o.medico_nome ? `<div class="sm">PROFISSIONAL: ${esc(o.medico_nome)}</div>` : ""}
 
     <div class="sep"></div>

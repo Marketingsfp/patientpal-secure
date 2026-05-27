@@ -218,7 +218,6 @@ function NovoOrcamentoDialog({
 }) {
   const [pacienteNome, setPacienteNome] = useState("");
   const [pacienteTelefone, setPacienteTelefone] = useState("");
-  const [pacienteCpf, setPacienteCpf] = useState("");
   const [medicoNome, setMedicoNome] = useState("");
   const [pacienteId, setPacienteId] = useState<string>("");
   const [pacientes, setPacientes] = useState<PacienteOpt[]>([]);
@@ -310,7 +309,6 @@ function NovoOrcamentoDialog({
     if (p) {
       setPacienteNome(p.nome ?? "");
       setPacienteTelefone(p.telefone ?? "");
-      setPacienteCpf(p.cpf ?? "");
     }
   };
 
@@ -448,7 +446,6 @@ function NovoOrcamentoDialog({
         numero: 0,
         paciente_nome: pacienteNome.trim(),
         paciente_telefone: pacienteTelefone.trim() || null,
-        paciente_cpf: pacienteCpf.trim() || null,
         medico_nome: medicoNome.trim() || null,
         medico_externo: medicoExterno,
         clinica_solicitante: medicoExterno ? (clinicaSolicitante.trim() || null) : null,
@@ -504,7 +501,6 @@ function NovoOrcamentoDialog({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1"><Label>Paciente *</Label><Input value={pacienteNome} onChange={(e) => setPacienteNome(e.target.value)} /></div>
             <div className="space-y-1"><Label>Telefone</Label><Input value={pacienteTelefone} onChange={(e) => setPacienteTelefone(e.target.value)} /></div>
-            <div className="space-y-1"><Label>CPF</Label><Input value={pacienteCpf} onChange={(e) => setPacienteCpf(e.target.value)} /></div>
             <div className="space-y-1 md:col-span-2">
               <Label>Médico solicitante</Label>
               <div className="flex gap-1 rounded-md border p-1 w-fit">
