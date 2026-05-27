@@ -51,7 +51,7 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
     { data: clinica },
     { data: convenio },
     { data: planoFallback },
-    { count: depCount },
+    { data: depRows },
   ] = await Promise.all([
       supabase
         .from("contrato_mensalidades")
