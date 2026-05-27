@@ -1233,7 +1233,10 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
                       <div className="px-4 py-3 grid gap-3 md:grid-cols-4 text-sm">
                         <div>
                           <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Vigência</div>
-                          <div className="font-medium tabular-nums">{fmtData(c.data_inicio)} → {fmtData(dataFimCalc)}</div>
+                          <div className="font-medium tabular-nums">
+                            <span className="text-muted-foreground">De:</span> {fmtData(c.data_inicio)}
+                            {" "}<span className="text-muted-foreground">Até:</span> {fmtData(dataFimCalc)}
+                          </div>
                         </div>
                         <div>
                           <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Vencimento</div>
@@ -1245,7 +1248,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
                         </div>
                         <div>
                           <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Parcelas</div>
-                          <div className="font-medium">{c.num_parcelas}× {c.forma_pagamento ? `· ${c.forma_pagamento}` : ""}</div>
+                          <div className="font-medium">{c.num_parcelas}×</div>
                         </div>
                       </div>
 
