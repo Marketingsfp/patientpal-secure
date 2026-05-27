@@ -182,9 +182,26 @@ export function AtendInbox() {
   useRealtimeRefresh(["atend_conversas", "whatsapp_mensagens"], carregarConvs, !!clinicaId);
   useRealtimeRefresh(["whatsapp_mensagens", "atend_notas_internas"], carregarConversa, !!clinicaId && !!sel?.id);
 
+  const janela24hExpirada = (() => {
+    if (!sel || sel.canal !== "whatsapp") return false;
+    const j = sel.janela_24h_em ? new Date(sel.janela_24h_em).getTime() : 0;
+    if (!j) return true;
+    return Date.now() - j > 24 * 60 * 60 * 1000;
+  })();
+  const motivoBloqueio = !sel
+    ? null
+    : pausaAtiva
+      ? "Você está em pausa. Encerre a pausa para enviar mensagens."
+      : !filaAberta
+        ? "Você está offline. Fique online para enviar mensagens."
+        : janela24hExpirada
+          ? "Janela de 24h do WhatsApp expirada. Envie um template para reabrir."
+          : null;
+
   const enviar = async () => {
     const t = draft.trim();
     if (!t || !sel || !clinicaId || enviando) return;
+    if (motivoBloqueio) { toast.error(motivoBloqueio); return; }
     setEnviando(true);
     try {
       await enviarMsg({ data: { clinicaId, conversaId: sel.id, text: t } });
@@ -389,19 +406,26 @@ export function AtendInbox() {
                 );
               })}
             </div>
-            <div className="border-t p-3 flex gap-2">
-              <Textarea
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar(); } }}
-                placeholder="Mensagem… (Enter envia, Shift+Enter quebra linha)"
-                rows={1}
-                className="resize-none min-h-9"
-                disabled={enviando}
-              />
-              <Button onClick={enviar} disabled={enviando || !draft.trim()} className="bg-emerald-500 hover:bg-emerald-600">
-                {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              </Button>
+            <div className="border-t p-3 space-y-2">
+              {motivoBloqueio && (
+                <div className="text-xs rounded-md border border-amber-300 bg-amber-50 text-amber-900 px-2 py-1.5">
+                  {motivoBloqueio}
+                </div>
+              )}
+              <div className="flex gap-2">
+                <Textarea
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar(); } }}
+                  placeholder={motivoBloqueio ? "Envio bloqueado" : "Mensagem… (Enter envia, Shift+Enter quebra linha)"}
+                  rows={1}
+                  className="resize-none min-h-9"
+                  disabled={enviando || !!motivoBloqueio}
+                />
+                <Button onClick={enviar} disabled={enviando || !draft.trim() || !!motivoBloqueio} className="bg-emerald-500 hover:bg-emerald-600">
+                  {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                </Button>
+              </div>
             </div>
           </>
         )}
