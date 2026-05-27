@@ -26,7 +26,15 @@ const esc = (s: string | null | undefined) =>
   (s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!);
 
 function applyTemplate(tpl: string, vars: Record<string, string>): string {
-  return tpl.replace(/\{\{(\w+)\}\}/g, (_, k) => esc(vars[k] ?? ""));
+  // Blocos condicionais: {{#KEY}}...{{/KEY}} (renderiza apenas se vars[KEY] tiver valor)
+  // e {{^KEY}}...{{/KEY}} (renderiza apenas se vars[KEY] estiver vazio)
+  let out = tpl.replace(/\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (_, key, body) =>
+    vars[key] && String(vars[key]).trim() ? body : ""
+  );
+  out = out.replace(/\{\{\^(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (_, key, body) =>
+    vars[key] && String(vars[key]).trim() ? "" : body
+  );
+  return out.replace(/\{\{(\w+)\}\}/g, (_, k) => esc(vars[k] ?? ""));
 }
 
 export async function printContrato(contratoId: string) {

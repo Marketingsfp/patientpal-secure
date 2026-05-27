@@ -848,7 +848,17 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
       TIPO_MOVIMENTO: movimento,
       DATA_MOVIMENTO: fmtDataExtenso(dataMov ?? new Date().toISOString().slice(0, 10)),
     };
-    return tpl.replace(/\{\{(\w+)\}\}/g, (_m: string, k: string) => vars[k] ?? "");
+    let out = tpl.replace(
+      /\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g,
+      (_m: string, key: string, body: string) =>
+        vars[key] && String(vars[key]).trim() ? body : ""
+    );
+    out = out.replace(
+      /\{\{\^(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g,
+      (_m: string, key: string, body: string) =>
+        vars[key] && String(vars[key]).trim() ? "" : body
+    );
+    return out.replace(/\{\{(\w+)\}\}/g, (_m: string, k: string) => vars[k] ?? "");
   };
 
   const printTermoInclusao = () => {
