@@ -373,9 +373,11 @@ export type Database = {
           fila_posicao: number | null
           id: string
           janela_24h_em: string | null
+          primeiro_resp_em: string | null
           protocol_number: string | null
           sentimento: string | null
           sentimento_score: number | null
+          sla_first_response_seg: number | null
           status: string
           ultima_msg_em: string
           ultima_msg_preview: string | null
@@ -396,9 +398,11 @@ export type Database = {
           fila_posicao?: number | null
           id?: string
           janela_24h_em?: string | null
+          primeiro_resp_em?: string | null
           protocol_number?: string | null
           sentimento?: string | null
           sentimento_score?: number | null
+          sla_first_response_seg?: number | null
           status?: string
           ultima_msg_em?: string
           ultima_msg_preview?: string | null
@@ -419,9 +423,11 @@ export type Database = {
           fila_posicao?: number | null
           id?: string
           janela_24h_em?: string | null
+          primeiro_resp_em?: string | null
           protocol_number?: string | null
           sentimento?: string | null
           sentimento_score?: number | null
+          sla_first_response_seg?: number | null
           status?: string
           ultima_msg_em?: string
           ultima_msg_preview?: string | null
@@ -458,6 +464,7 @@ export type Database = {
           created_at: string
           departamento_id: string
           id: string
+          max_simultaneas: number
           queue_locked: boolean
           role: string
           user_id: string
@@ -467,6 +474,7 @@ export type Database = {
           created_at?: string
           departamento_id: string
           id?: string
+          max_simultaneas?: number
           queue_locked?: boolean
           role?: string
           user_id: string
@@ -476,6 +484,7 @@ export type Database = {
           created_at?: string
           departamento_id?: string
           id?: string
+          max_simultaneas?: number
           queue_locked?: boolean
           role?: string
           user_id?: string
@@ -890,6 +899,72 @@ export type Database = {
             columns: ["clinica_id"]
             isOneToOne: true
             referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      atend_routing_rules: {
+        Row: {
+          ativo: boolean
+          canal: string | null
+          clinica_id: string
+          created_at: string
+          departamento_id: string | null
+          dias_semana: number[]
+          horario_fim: string | null
+          horario_inicio: string | null
+          id: string
+          mensagem_auto: string | null
+          nome: string
+          ordem: number
+          palavras_chave: string[]
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          canal?: string | null
+          clinica_id: string
+          created_at?: string
+          departamento_id?: string | null
+          dias_semana?: number[]
+          horario_fim?: string | null
+          horario_inicio?: string | null
+          id?: string
+          mensagem_auto?: string | null
+          nome: string
+          ordem?: number
+          palavras_chave?: string[]
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          canal?: string | null
+          clinica_id?: string
+          created_at?: string
+          departamento_id?: string | null
+          dias_semana?: number[]
+          horario_fim?: string | null
+          horario_inicio?: string | null
+          id?: string
+          mensagem_auto?: string | null
+          nome?: string
+          ordem?: number
+          palavras_chave?: string[]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atend_routing_rules_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atend_routing_rules_departamento_id_fkey"
+            columns: ["departamento_id"]
+            isOneToOne: false
+            referencedRelation: "atend_departamentos"
             referencedColumns: ["id"]
           },
         ]
