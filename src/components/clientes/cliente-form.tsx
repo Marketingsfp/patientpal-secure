@@ -349,6 +349,22 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
     setFiltroAtivo(false);
   }, [prontList]);
 
+  // Carrega procedimentos ativos da clínica para o filtro "Item"
+  useEffect(() => {
+    if (!clinicaId) return;
+    void supabase
+      .from("procedimentos")
+      .select("nome")
+      .eq("clinica_id", clinicaId)
+      .eq("ativo", true)
+      .order("nome")
+      .limit(5000)
+      .then(({ data }) => {
+        const nomes = Array.from(new Set((data ?? []).map((p: any) => (p.nome ?? "").trim()).filter(Boolean)));
+        setProcedimentosOpcoes(nomes);
+      });
+  }, [clinicaId]);
+
   function aplicarFiltroProntuario() {
     const de = filtroDataDe ? new Date(filtroDataDe + "T00:00:00") : null;
     const ate = filtroDataAte ? new Date(filtroDataAte + "T23:59:59") : null;
