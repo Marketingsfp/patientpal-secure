@@ -339,6 +339,22 @@ export const travarMinhaFila = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const meuStatusAgente = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => clinIdSchema.parse(i))
+  .handler(async ({ data, context }) => {
+    await assertMember(context.userId, data.clinicaId);
+    const { data: rows } = await supabaseAdmin
+      .from("atend_departamento_membros")
+      .select("queue_locked")
+      .eq("clinica_id", data.clinicaId)
+      .eq("user_id", context.userId);
+    // se está em algum departamento e em ao menos um a fila está aberta, considera aberta
+    const total = rows?.length ?? 0;
+    const abertas = (rows ?? []).filter((r: any) => !r.queue_locked).length;
+    return { isMember: total > 0, filaAberta: abertas > 0, totalDeptos: total };
+  });
+
 /* =========================================================
  *  BASE DE CONHECIMENTO
  * ======================================================= */
