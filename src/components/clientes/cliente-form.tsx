@@ -845,34 +845,70 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
                       ? "Nenhum registro encontrado com esses filtros."
                       : "Nenhum registro de prontuário para este paciente."}
                   </div>
-                ) : prontFiltered.map((r) => (
-                  <div key={r.id} className="border rounded-lg p-4 bg-card space-y-3">
-                    <div className="flex items-center justify-between border-b pb-2">
-                      <span className="text-base font-semibold text-foreground">
-                        {new Date(r.data).toLocaleString("pt-BR")}
-                      </span>
-                      <span className="text-muted-foreground uppercase text-xs font-medium tracking-wide">
-                        {r.medico_nome ?? "—"}
-                      </span>
-                    </div>
-                    {([
-                      ["Queixa principal", r.queixa_principal],
-                      ["História da doença", r.historia_doenca],
-                      ["Exame físico", r.exame_fisico],
-                      ["Hipótese diagnóstica", r.hipotese_diagnostica],
-                      ["Conduta", r.conduta],
-                      ["Prescrição", r.prescricao],
-                      ["Observações", r.observacoes],
-                    ] as const).filter(([, v]) => v && v.trim()).map(([label, v]) => (
-                      <div key={label} className="text-sm border-l-2 border-primary pl-3">
-                        <div className="text-sm font-semibold text-foreground uppercase tracking-wide mb-1">
-                          {label}
+                ) : prontFiltered.map((r) => {
+                  const open = prontExpanded.has(r.id);
+                  const toggle = () => {
+                    setProntExpanded((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(r.id)) next.delete(r.id); else next.add(r.id);
+                      return next;
+                    });
+                  };
+                  return (
+                    <div key={r.id} className="border rounded-lg bg-card overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={toggle}
+                        aria-expanded={open}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/40 transition-colors"
+                      >
+                        <ChevronDown
+                          className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
+                        />
+                        <div className="flex-1 grid gap-x-4 gap-y-1 md:grid-cols-4 text-sm">
+                          <div>
+                            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Data</div>
+                            <div className="font-semibold text-foreground tabular-nums">
+                              {new Date(r.data).toLocaleString("pt-BR")}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Especialidade</div>
+                            <div className="font-medium text-foreground truncate">{r.especialidade ?? "—"}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Serviço</div>
+                            <div className="font-medium text-foreground truncate">{r.procedimento ?? "—"}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Médico</div>
+                            <div className="font-medium text-foreground truncate">{r.medico_nome ?? "—"}</div>
+                          </div>
                         </div>
-                        <div className="whitespace-pre-wrap text-foreground/90">{v}</div>
-                      </div>
-                    ))}
-                  </div>
-                ))}
+                      </button>
+                      {open && (
+                        <div className="px-4 pb-4 pt-1 space-y-3 border-t bg-muted/10">
+                          {([
+                            ["Queixa principal", r.queixa_principal],
+                            ["História da doença", r.historia_doenca],
+                            ["Exame físico", r.exame_fisico],
+                            ["Hipótese diagnóstica", r.hipotese_diagnostica],
+                            ["Conduta", r.conduta],
+                            ["Prescrição", r.prescricao],
+                            ["Observações", r.observacoes],
+                          ] as const).filter(([, v]) => v && v.trim()).map(([label, v]) => (
+                            <div key={label} className="text-sm border-l-2 border-primary pl-3">
+                              <div className="text-sm font-semibold text-foreground uppercase tracking-wide mb-1">
+                                {label}
+                              </div>
+                              <div className="whitespace-pre-wrap text-foreground/90">{v}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </>
             )}
           </TabsContent>
