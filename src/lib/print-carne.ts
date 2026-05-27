@@ -124,6 +124,10 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
               <div class="lab">Mês de referência</div>
               <div class="val">${fmtMesAno(p.vencimento)}</div>
             </div>
+            <div class="ficha-parcela">
+              <div class="lab">Vencimento</div>
+              <div class="val">${fmtD(p.vencimento)}</div>
+            </div>
           </div>
         </div>
         <div class="ficha-grid">
@@ -138,15 +142,13 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
             <span class="val" style="font-weight:500;font-size:10px;line-height:1.45;">Após o vencimento será cobrado 10% de multa e juros de 0,33% ao dia.</span>
           </div>
           <div></div>
-          <div><span class="lab">Valor</span><span class="val destaque">${BRL(Number(p.valor))}</span></div>
           <div>
-            <span class="lab">Data de pagamento</span>
+            <span class="lab">Valor</span><span class="val destaque">${BRL(Number(p.valor))}</span>
+            <span class="lab" style="margin-top:10px;">Data de pagamento</span>
             ${p.status === "pago"
               ? `<span class="val">${fmtD(p.pago_em)}</span>`
-              : `<span class="linha" style="display:block;border-bottom:1px solid #111;height:16px;"></span>`}
+              : `<span class="linha" style="display:block;border-bottom:1px solid #111;height:16px;margin-top:4px;"></span>`}
           </div>
-          <div></div>
-          <div><span class="lab">Vencimento</span><span class="val destaque">${fmtD(p.vencimento)}</span></div>
         </div>
         <div class="ficha-rodape">
           <div class="campo-manual assinatura">
