@@ -1,50 +1,39 @@
 ## Objetivo
-Transformar cada ficha de mensalidade do carnê em duas vias lado a lado (cliente + clínica) numa única linha A4, mantendo 3 mensalidades por página.
 
-## Mudanças em `src/lib/print-carne.ts`
+Transformar a edição de cliente em uma página dedicada (em vez do pop-up atual), acessada pelo ícone de lápis na listagem `/app/clientes`. A criação de novo cliente continua no diálogo atual (não foi solicitada mudança).
 
-### 1. Estrutura HTML de cada parcela
-Hoje cada parcela gera um `<div class="ficha">`. Vou envolver em um wrapper que renderiza **duas fichas idênticas** lado a lado, cada uma com um cabeçalho identificando a via:
+## Mudanças
 
-```text
-┌─────────── A4 (paisagem do par, lado a lado) ───────────┐
-│ Via do cliente          │ Via da clínica                │
-│ ┌─────────────────────┐ │ ┌─────────────────────────┐   │
-│ │   ficha completa    │ │ │   ficha completa        │   │
-│ └─────────────────────┘ │ └─────────────────────────┘   │
-└─────────────────────────────────────────────────────────┘
-```
+### 1. Nova rota `/app/clientes/$pacienteId/editar`
+Arquivo: `src/routes/_authenticated/app.clientes.$pacienteId.editar.tsx`
 
-Wrapper novo:
-```html
-<div class="ficha-par">
-  <div class="ficha-via">
-    <div class="via-label">Via do cliente</div>
-    <div class="ficha">…conteúdo atual…</div>
-  </div>
-  <div class="ficha-via">
-    <div class="via-label">Via da clínica</div>
-    <div class="ficha">…mesmo conteúdo…</div>
-  </div>
-</div>
-```
+- Carrega os dados do paciente pelo `pacienteId` da URL via `supabase.from("pacientes").select(...).eq("id", ...).single()`.
+- Renderiza o mesmo formulário hoje existente no diálogo (abas Dados / Endereço / Responsável, foto, busca por CEP, ditado por voz, validações de CPF, sugestão de responsável por idade).
+- Botão **"Voltar"** no topo (ícone `ArrowLeft`) que faz `navigate({ to: "/app/clientes" })` preservando o `?q=` da busca anterior se houver (via `search` param).
+- Botões "Cancelar" / "Salvar" no rodapé; após salvar com sucesso, volta para a listagem.
+- Cabeçalho com o nome do paciente e título "Editar cliente".
 
-### 2. CSS
-- A página continua `A4 portrait` (210mm × 297mm). Cada par fica numa linha horizontal com `grid-template-columns: 1fr 1fr; gap: 6mm;`.
-- Reduzir a altura de cada ficha de `85mm` para caber 3 pares por página: manter `~85mm` por linha (ficha + label da via), mantendo o total ≤ ~270mm úteis. A altura interna da ficha cai para ~80mm; o label da via ocupa ~5mm.
-- Como cada ficha agora tem metade da largura, ajustar tipografia interna:
-  - `.ficha-grid` muda de `repeat(3, 1fr)` para `repeat(2, 1fr)` para não espremer.
-  - `.ficha-header` continua flex, mas o bloco de 3 "parcelas" (Parcela / Mês ref. / Vencimento) vira coluna vertical compacta ou reduz tamanho de fonte de 18px para 13–14px.
-  - `.ficha-rodape` continua `1fr 1fr` (data de pagamento + assinatura).
-- `.via-label`: pequeno, uppercase, ~9px, alinhado à esquerda, com `border-bottom: 1px dashed` separando do conteúdo da ficha. Marca claramente "Via do cliente" / "Via do clínica".
-- `page-break-inside: avoid` no `.ficha-par` (não na `.ficha` individual), para o par nunca quebrar entre páginas.
+### 2. Extrair o formulário para componente reutilizável
+Arquivo novo: `src/components/clientes/cliente-form.tsx`
 
-### 3. Capa
-A capa (primeira página com dados do contrato) permanece intacta — é apenas resumo, não precisa de duas vias.
+- Move toda a UI/lógica do form (abas, foto, voz, CEP, responsável, submit) hoje embutida em `app.clientes.tsx` para esse componente.
+- Props: `clinicaId`, `paciente` (existente para editar, ou `null` para novo), `onSaved(pacienteId)`, `onCancel`.
+- Reutilizado tanto pela nova rota de edição quanto pelo diálogo de "Novo cliente" que permanece na listagem.
 
-### 4. Conteúdo das duas vias
-Idêntico nas duas — mesmos dados, mesmos campos de "Data de pagamento" e "Assinatura/Carimbo". Quando a parcela já está paga, a data preenchida aparece nas duas vias (igual ao comportamento atual).
+### 3. Ajustes em `src/routes/_authenticated/app.clientes.tsx`
+- Botão do lápis muda de `onClick={() => openEdit(p)}` para `<Link to="/app/clientes/$pacienteId/editar" params={{ pacienteId: p.id }}>` (mantendo o estilo de botão ghost).
+- Remove o estado `editing`, `openEdit`, e toda a lógica/JSX do diálogo de edição.
+- Mantém apenas o diálogo de **Novo cliente** (botão "+ Novo cliente"), agora usando `<ClienteForm />` internamente.
+- Mantém intactos os outros diálogos (biometria, consentimento LGPD, prontuário, câmera).
 
-## Fora de escopo
-- Não altero `print-contrato.ts`, comprovante 80mm, nem nenhuma rota/lógica de pagamento.
-- Não mudo regras de multa/juros nem dados exibidos.
+## Detalhes técnicos
+
+- Filename ↔ rota: `app.clientes.$pacienteId.editar.tsx` → `createFileRoute("/_authenticated/app/clientes/$pacienteId/editar")`.
+- Acesso ao param: `const { pacienteId } = Route.useParams()`.
+- Loader opcional via TanStack Query; para minimizar mudanças, fazer fetch dentro do componente via `useEffect` + `supabase` (padrão usado em `app.clientes.tsx`).
+- Estados de loading e "paciente não encontrado" tratados com mensagens simples.
+- Não alterar lógica de negócio (payload de update, upload de foto, etc.) — só reorganização de UI.
+
+## Fora do escopo
+- Não muda o fluxo de "Novo cliente" (continua em diálogo).
+- Não muda os outros ícones da linha (biometria, prontuário, excluir).
