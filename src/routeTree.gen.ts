@@ -71,7 +71,6 @@ import { Route as AuthenticatedAppCrmRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedAppContratosRouteImport } from './routes/_authenticated/app.contratos'
 import { Route as AuthenticatedAppConsultaRapidaRouteImport } from './routes/_authenticated/app.consulta-rapida'
 import { Route as AuthenticatedAppClinicasRouteImport } from './routes/_authenticated/app.clinicas'
-import { Route as AuthenticatedAppClientesRouteImport } from './routes/_authenticated/app.clientes'
 import { Route as AuthenticatedAppCheckinRouteImport } from './routes/_authenticated/app.checkin'
 import { Route as AuthenticatedAppChatRouteImport } from './routes/_authenticated/app.chat'
 import { Route as AuthenticatedAppCartaoBeneficiosRouteImport } from './routes/_authenticated/app.cartao-beneficios'
@@ -85,6 +84,7 @@ import { Route as AuthenticatedAppAnamnesesRouteImport } from './routes/_authent
 import { Route as AuthenticatedAppAlertasEnfermagemRouteImport } from './routes/_authenticated/app.alertas-enfermagem'
 import { Route as AuthenticatedAppAgendaRouteImport } from './routes/_authenticated/app.agenda'
 import { Route as AuthenticatedAppFinanceiroIndexRouteImport } from './routes/_authenticated/app.financeiro.index'
+import { Route as AuthenticatedAppClientesIndexRouteImport } from './routes/_authenticated/app.clientes.index'
 import { Route as AuthenticatedAppAtendimentoIaIndexRouteImport } from './routes/_authenticated/app.atendimento-ia.index'
 import { Route as ApiPublicWhatsappClinicaIdRouteImport } from './routes/api/public/whatsapp.$clinicaId'
 import { Route as AuthenticatedAppMedicoMedicoIdRouteImport } from './routes/_authenticated/app.medico.$medicoId'
@@ -450,12 +450,6 @@ const AuthenticatedAppClinicasRoute =
     path: '/clinicas',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
-const AuthenticatedAppClientesRoute =
-  AuthenticatedAppClientesRouteImport.update({
-    id: '/clientes',
-    path: '/clientes',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
 const AuthenticatedAppCheckinRoute = AuthenticatedAppCheckinRouteImport.update({
   id: '/checkin',
   path: '/checkin',
@@ -527,6 +521,12 @@ const AuthenticatedAppFinanceiroIndexRoute =
     id: '/',
     path: '/',
     getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
+const AuthenticatedAppClientesIndexRoute =
+  AuthenticatedAppClientesIndexRouteImport.update({
+    id: '/clientes/',
+    path: '/clientes/',
+    getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppAtendimentoIaIndexRoute =
   AuthenticatedAppAtendimentoIaIndexRouteImport.update({
@@ -674,9 +674,9 @@ const AuthenticatedAppAtendimentoIaAgendamentoIdRoute =
   } as any)
 const AuthenticatedAppClientesPacienteIdEditarRoute =
   AuthenticatedAppClientesPacienteIdEditarRouteImport.update({
-    id: '/$pacienteId/editar',
-    path: '/$pacienteId/editar',
-    getParentRoute: () => AuthenticatedAppClientesRoute,
+    id: '/clientes/$pacienteId/editar',
+    path: '/clientes/$pacienteId/editar',
+    getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -708,7 +708,6 @@ export interface FileRoutesByFullPath {
   '/app/cartao-beneficios': typeof AuthenticatedAppCartaoBeneficiosRouteWithChildren
   '/app/chat': typeof AuthenticatedAppChatRoute
   '/app/checkin': typeof AuthenticatedAppCheckinRoute
-  '/app/clientes': typeof AuthenticatedAppClientesRouteWithChildren
   '/app/clinicas': typeof AuthenticatedAppClinicasRoute
   '/app/consulta-rapida': typeof AuthenticatedAppConsultaRapidaRoute
   '/app/contratos': typeof AuthenticatedAppContratosRoute
@@ -778,6 +777,7 @@ export interface FileRoutesByFullPath {
   '/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/app/atendimento-ia/': typeof AuthenticatedAppAtendimentoIaIndexRoute
+  '/app/clientes/': typeof AuthenticatedAppClientesIndexRoute
   '/app/financeiro/': typeof AuthenticatedAppFinanceiroIndexRoute
   '/app/clientes/$pacienteId/editar': typeof AuthenticatedAppClientesPacienteIdEditarRoute
 }
@@ -808,7 +808,6 @@ export interface FileRoutesByTo {
   '/app/cartao-beneficios': typeof AuthenticatedAppCartaoBeneficiosRouteWithChildren
   '/app/chat': typeof AuthenticatedAppChatRoute
   '/app/checkin': typeof AuthenticatedAppCheckinRoute
-  '/app/clientes': typeof AuthenticatedAppClientesRouteWithChildren
   '/app/clinicas': typeof AuthenticatedAppClinicasRoute
   '/app/consulta-rapida': typeof AuthenticatedAppConsultaRapidaRoute
   '/app/contratos': typeof AuthenticatedAppContratosRoute
@@ -877,6 +876,7 @@ export interface FileRoutesByTo {
   '/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaIndexRoute
+  '/app/clientes': typeof AuthenticatedAppClientesIndexRoute
   '/app/financeiro': typeof AuthenticatedAppFinanceiroIndexRoute
   '/app/clientes/$pacienteId/editar': typeof AuthenticatedAppClientesPacienteIdEditarRoute
 }
@@ -911,7 +911,6 @@ export interface FileRoutesById {
   '/_authenticated/app/cartao-beneficios': typeof AuthenticatedAppCartaoBeneficiosRouteWithChildren
   '/_authenticated/app/chat': typeof AuthenticatedAppChatRoute
   '/_authenticated/app/checkin': typeof AuthenticatedAppCheckinRoute
-  '/_authenticated/app/clientes': typeof AuthenticatedAppClientesRouteWithChildren
   '/_authenticated/app/clinicas': typeof AuthenticatedAppClinicasRoute
   '/_authenticated/app/consulta-rapida': typeof AuthenticatedAppConsultaRapidaRoute
   '/_authenticated/app/contratos': typeof AuthenticatedAppContratosRoute
@@ -981,6 +980,7 @@ export interface FileRoutesById {
   '/_authenticated/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/_authenticated/app/atendimento-ia/': typeof AuthenticatedAppAtendimentoIaIndexRoute
+  '/_authenticated/app/clientes/': typeof AuthenticatedAppClientesIndexRoute
   '/_authenticated/app/financeiro/': typeof AuthenticatedAppFinanceiroIndexRoute
   '/_authenticated/app/clientes/$pacienteId/editar': typeof AuthenticatedAppClientesPacienteIdEditarRoute
 }
@@ -1015,7 +1015,6 @@ export interface FileRouteTypes {
     | '/app/cartao-beneficios'
     | '/app/chat'
     | '/app/checkin'
-    | '/app/clientes'
     | '/app/clinicas'
     | '/app/consulta-rapida'
     | '/app/contratos'
@@ -1085,6 +1084,7 @@ export interface FileRouteTypes {
     | '/app/medico/$medicoId'
     | '/api/public/whatsapp/$clinicaId'
     | '/app/atendimento-ia/'
+    | '/app/clientes/'
     | '/app/financeiro/'
     | '/app/clientes/$pacienteId/editar'
   fileRoutesByTo: FileRoutesByTo
@@ -1115,7 +1115,6 @@ export interface FileRouteTypes {
     | '/app/cartao-beneficios'
     | '/app/chat'
     | '/app/checkin'
-    | '/app/clientes'
     | '/app/clinicas'
     | '/app/consulta-rapida'
     | '/app/contratos'
@@ -1184,6 +1183,7 @@ export interface FileRouteTypes {
     | '/app/medico/$medicoId'
     | '/api/public/whatsapp/$clinicaId'
     | '/app/atendimento-ia'
+    | '/app/clientes'
     | '/app/financeiro'
     | '/app/clientes/$pacienteId/editar'
   id:
@@ -1217,7 +1217,6 @@ export interface FileRouteTypes {
     | '/_authenticated/app/cartao-beneficios'
     | '/_authenticated/app/chat'
     | '/_authenticated/app/checkin'
-    | '/_authenticated/app/clientes'
     | '/_authenticated/app/clinicas'
     | '/_authenticated/app/consulta-rapida'
     | '/_authenticated/app/contratos'
@@ -1287,6 +1286,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/medico/$medicoId'
     | '/api/public/whatsapp/$clinicaId'
     | '/_authenticated/app/atendimento-ia/'
+    | '/_authenticated/app/clientes/'
     | '/_authenticated/app/financeiro/'
     | '/_authenticated/app/clientes/$pacienteId/editar'
   fileRoutesById: FileRoutesById
@@ -1748,13 +1748,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppClinicasRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
-    '/_authenticated/app/clientes': {
-      id: '/_authenticated/app/clientes'
-      path: '/clientes'
-      fullPath: '/app/clientes'
-      preLoaderRoute: typeof AuthenticatedAppClientesRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
     '/_authenticated/app/checkin': {
       id: '/_authenticated/app/checkin'
       path: '/checkin'
@@ -1845,6 +1838,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/app/financeiro/'
       preLoaderRoute: typeof AuthenticatedAppFinanceiroIndexRouteImport
       parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
+    '/_authenticated/app/clientes/': {
+      id: '/_authenticated/app/clientes/'
+      path: '/clientes'
+      fullPath: '/app/clientes/'
+      preLoaderRoute: typeof AuthenticatedAppClientesIndexRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/atendimento-ia/': {
       id: '/_authenticated/app/atendimento-ia/'
@@ -2016,10 +2016,10 @@ declare module '@tanstack/react-router' {
     }
     '/_authenticated/app/clientes/$pacienteId/editar': {
       id: '/_authenticated/app/clientes/$pacienteId/editar'
-      path: '/$pacienteId/editar'
+      path: '/clientes/$pacienteId/editar'
       fullPath: '/app/clientes/$pacienteId/editar'
       preLoaderRoute: typeof AuthenticatedAppClientesPacienteIdEditarRouteImport
-      parentRoute: typeof AuthenticatedAppClientesRoute
+      parentRoute: typeof AuthenticatedAppRoute
     }
   }
 }
@@ -2067,21 +2067,6 @@ const AuthenticatedAppCartaoBeneficiosRouteChildren: AuthenticatedAppCartaoBenef
 const AuthenticatedAppCartaoBeneficiosRouteWithChildren =
   AuthenticatedAppCartaoBeneficiosRoute._addFileChildren(
     AuthenticatedAppCartaoBeneficiosRouteChildren,
-  )
-
-interface AuthenticatedAppClientesRouteChildren {
-  AuthenticatedAppClientesPacienteIdEditarRoute: typeof AuthenticatedAppClientesPacienteIdEditarRoute
-}
-
-const AuthenticatedAppClientesRouteChildren: AuthenticatedAppClientesRouteChildren =
-  {
-    AuthenticatedAppClientesPacienteIdEditarRoute:
-      AuthenticatedAppClientesPacienteIdEditarRoute,
-  }
-
-const AuthenticatedAppClientesRouteWithChildren =
-  AuthenticatedAppClientesRoute._addFileChildren(
-    AuthenticatedAppClientesRouteChildren,
   )
 
 interface AuthenticatedAppFinanceiroRouteChildren {
@@ -2148,7 +2133,6 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppCartaoBeneficiosRoute: typeof AuthenticatedAppCartaoBeneficiosRouteWithChildren
   AuthenticatedAppChatRoute: typeof AuthenticatedAppChatRoute
   AuthenticatedAppCheckinRoute: typeof AuthenticatedAppCheckinRoute
-  AuthenticatedAppClientesRoute: typeof AuthenticatedAppClientesRouteWithChildren
   AuthenticatedAppClinicasRoute: typeof AuthenticatedAppClinicasRoute
   AuthenticatedAppConsultaRapidaRoute: typeof AuthenticatedAppConsultaRapidaRoute
   AuthenticatedAppContratosRoute: typeof AuthenticatedAppContratosRoute
@@ -2196,6 +2180,8 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppFuncionarioUserIdRoute: typeof AuthenticatedAppFuncionarioUserIdRoute
   AuthenticatedAppImprimirAgendamentoIdRoute: typeof AuthenticatedAppImprimirAgendamentoIdRoute
   AuthenticatedAppMedicoMedicoIdRoute: typeof AuthenticatedAppMedicoMedicoIdRoute
+  AuthenticatedAppClientesIndexRoute: typeof AuthenticatedAppClientesIndexRoute
+  AuthenticatedAppClientesPacienteIdEditarRoute: typeof AuthenticatedAppClientesPacienteIdEditarRoute
 }
 
 const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
@@ -2214,7 +2200,6 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
     AuthenticatedAppCartaoBeneficiosRouteWithChildren,
   AuthenticatedAppChatRoute: AuthenticatedAppChatRoute,
   AuthenticatedAppCheckinRoute: AuthenticatedAppCheckinRoute,
-  AuthenticatedAppClientesRoute: AuthenticatedAppClientesRouteWithChildren,
   AuthenticatedAppClinicasRoute: AuthenticatedAppClinicasRoute,
   AuthenticatedAppConsultaRapidaRoute: AuthenticatedAppConsultaRapidaRoute,
   AuthenticatedAppContratosRoute: AuthenticatedAppContratosRoute,
@@ -2268,6 +2253,9 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppImprimirAgendamentoIdRoute:
     AuthenticatedAppImprimirAgendamentoIdRoute,
   AuthenticatedAppMedicoMedicoIdRoute: AuthenticatedAppMedicoMedicoIdRoute,
+  AuthenticatedAppClientesIndexRoute: AuthenticatedAppClientesIndexRoute,
+  AuthenticatedAppClientesPacienteIdEditarRoute:
+    AuthenticatedAppClientesPacienteIdEditarRoute,
 }
 
 const AuthenticatedAppRouteWithChildren =
@@ -2308,3 +2296,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
