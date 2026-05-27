@@ -133,7 +133,9 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
   * { box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #111; margin: 0; }
   .capa {
-    border: 1px solid #111; padding: 14px 16px; margin-bottom: 12px; border-radius: 6px;
+    border: 1px dashed #111; padding: 10px 12px; margin-bottom: 8px; border-radius: 6px;
+    height: 85mm; display: flex; flex-direction: column; gap: 8px;
+    page-break-inside: avoid;
   }
   .capa h1 { font-size: 18px; margin: 0 0 4px; }
   .capa .sub { font-size: 12px; color: #444; margin-bottom: 10px; }
