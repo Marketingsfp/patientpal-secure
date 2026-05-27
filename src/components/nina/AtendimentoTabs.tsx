@@ -19,7 +19,9 @@ import {
   listarPauseReasons, salvarPauseReason, excluirPauseReason,
   iniciarPausa, finalizarPausa, pausaAtual,
   dashboardAtendimento,
+  listarMembros, travarMinhaFila,
 } from "@/lib/atendimento.functions";
+import { supabase } from "@/integrations/supabase/client";
 
 /* ============================================================
  * DASHBOARD
