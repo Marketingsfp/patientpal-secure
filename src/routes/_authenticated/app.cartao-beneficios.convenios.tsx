@@ -325,7 +325,7 @@ function ConveniosPage() {
     const bensToInsert: any[] = [];
     for (const b of beneficios) {
       if (b.escopo === "servico" && !b.procedimento_id) {
-        setSaving(false); toast.error("Selecione o item em todos os benefícios de serviço único."); return;
+        setSaving(false); toast.error("Selecione o serviço em todos os benefícios de serviço único."); return;
       }
       if (b.escopo === "especialidade" && !b.especialidade_id) {
         setSaving(false); toast.error("Selecione a especialidade em todos os benefícios."); return;
