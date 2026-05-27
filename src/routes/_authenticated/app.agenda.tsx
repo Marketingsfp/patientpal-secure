@@ -38,6 +38,7 @@ import { exportToExcel } from "@/lib/export-csv";
 import { useAuth } from "@/hooks/use-auth";
 import { useServerFn } from "@tanstack/react-start";
 import { listarEquipe } from "@/lib/equipe.functions";
+import { IdadeIcon } from "@/components/idade-icon";
 
 export const Route = createFileRoute("/_authenticated/app/agenda")({
   component: AgendaPage,
@@ -125,6 +126,7 @@ function AgendaPage() {
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [items, setItems] = useState<Agendamento[]>([]);
   const [pagosSet, setPagosSet] = useState<Set<string>>(new Set());
+  const [nascMap, setNascMap] = useState<Map<string, string | null>>(new Map());
   const [etapaMap, setEtapaMap] = useState<Map<string, string>>(new Map());
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [exames, setExames] = useState<{ id: string; nome: string }[]>([]);
@@ -331,6 +333,23 @@ function AgendaPage() {
     setSelecionados(new Set());
     setEtapaMap(new Map(((data ?? []) as Array<{ id: string; fluxo_etapa?: string | null }>)
       .map((r) => [r.id, r.fluxo_etapa ?? "aguardando_recepcao"] as [string, string])));
+    // Busca data_nascimento dos pacientes para exibir ícone de idade
+    const pacIds = Array.from(new Set(
+      (data ?? [])
+        .map((a: any) => a.paciente_id as string | null)
+        .filter((x): x is string => !!x),
+    ));
+    if (pacIds.length) {
+      const { data: nasc } = await supabase
+        .from("pacientes")
+        .select("id,data_nascimento")
+        .in("id", pacIds);
+      const map = new Map<string, string | null>();
+      (nasc ?? []).forEach((p: any) => map.set(p.id, p.data_nascimento ?? null));
+      setNascMap(map);
+    } else {
+      setNascMap(new Map());
+    }
     // Marca agendamentos pagos (receita vinculada em fin_lancamentos)
     const ids = (data ?? []).map((a) => a.id);
     if (ids.length) {
@@ -1758,6 +1777,7 @@ function AgendaPage() {
                         className="inline-flex items-center gap-1 text-xs uppercase font-medium text-foreground hover:text-primary hover:underline"
                       >
                         {a.status === "confirmado" && <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />}
+                        {a.paciente_id && <IdadeIcon nascimento={nascMap.get(a.paciente_id) ?? null} size={18} />}
                         {a.paciente_nome}
                       </button>
                     )}

@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, Search, Pencil, Trash2, Users, Download } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,9 +14,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { ClienteForm } from "@/components/clientes/cliente-form";
-import iconBebe from "@/assets/icon-bebe.png";
-import iconCriancas from "@/assets/icon-criancas.png";
-import iconIdoso from "@/assets/icon-idoso.png";
+import { IdadeIcon, calcIdadeAnos } from "@/components/idade-icon";
 
 export const Route = createFileRoute("/_authenticated/app/clientes/")({
   component: ClientesPage,
@@ -30,29 +28,13 @@ function fmtNasc(d: string | null): string {
   return `${day}/${m}/${y}`;
 }
 
-function calcIdade(d: string | null): number | null {
-  if (!d) return null;
-  const nasc = new Date(d + "T00:00:00");
-  if (isNaN(nasc.getTime())) return null;
-  const hoje = new Date();
-  let idade = hoje.getFullYear() - nasc.getFullYear();
-  const m = hoje.getMonth() - nasc.getMonth();
-  if (m < 0 || (m === 0 && hoje.getDate() < nasc.getDate())) idade--;
-  return idade;
-}
-
 function IdadeCell({ nascimento }: { nascimento: string | null }) {
-  const idade = calcIdade(nascimento);
+  const idade = calcIdadeAnos(nascimento);
   if (idade === null || idade < 0) return <>—</>;
-  let icon: ReactNode = null;
-  let label = "";
-  if (idade <= 2) { icon = <img src={iconBebe} alt="" width={20} height={20} loading="lazy" className="h-5 w-5 object-contain" />; label = "Bebê"; }
-  else if (idade <= 10) { icon = <img src={iconCriancas} alt="" width={20} height={20} loading="lazy" className="h-5 w-5 object-contain" />; label = "Criança"; }
-  else if (idade >= 65) { icon = <img src={iconIdoso} alt="" width={20} height={20} loading="lazy" className="h-5 w-5 object-contain" />; label = "Idoso"; }
   return (
     <span className="inline-flex items-center gap-1.5">
       <span>{idade} {idade === 1 ? "ano" : "anos"}</span>
-      {icon && <span title={label} aria-label={label}>{icon}</span>}
+      <IdadeIcon nascimento={nascimento} size={20} />
     </span>
   );
 }
