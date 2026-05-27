@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Camera, ChevronDown, FileHeart, History, Loader2, MapPin, Mic, MicOff, ScanFace, Search, Upload, X } from "lucide-react";
+import { Camera, ChevronDown, CreditCard, FileHeart, History, Loader2, MapPin, Mic, MicOff, ScanFace, Search, UserCheck, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { isCPFValido, somenteDigitos } from "@/lib/cpf";
@@ -161,6 +161,28 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
   };
   const [histList, setHistList] = useState<HistRow[]>([]);
   const [histLoading, setHistLoading] = useState(false);
+
+  // Convênio (Cartão Convênio)
+  type ConvParcela = {
+    id: string; numero_parcela: number; vencimento: string; valor: number;
+    status: string; pago_em: string | null; valor_pago: number | null;
+  };
+  type ConvDependente = {
+    id: string; paciente_id: string; paciente_nome: string; parentesco: string | null;
+  };
+  type ConvContrato = {
+    id: string; numero: number; status: string;
+    paciente_id: string; paciente_nome: string;
+    data_inicio: string; data_fim: string | null;
+    dia_vencimento: number; valor_mensal: number; num_parcelas: number;
+    forma_pagamento: string | null;
+    plano_nome: string | null; vigencia_meses: number | null;
+    papel: "titular" | "dependente";
+    dependentes: ConvDependente[];
+    parcelas: ConvParcela[];
+  };
+  const [convList, setConvList] = useState<ConvContrato[]>([]);
+  const [convLoading, setConvLoading] = useState(false);
   const [histFiltroDataDe, setHistFiltroDataDe] = useState("");
   const [histFiltroDataAte, setHistFiltroDataAte] = useState("");
   const [histFiltroMedico, setHistFiltroMedico] = useState("");
