@@ -844,6 +844,48 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
               </>
             )}
           </TabsContent>
+
+          <TabsContent value="historico" className="space-y-3 pt-4 pb-16">
+            {!editing ? (
+              <p className="text-sm text-muted-foreground">
+                Salve o cadastro do paciente para visualizar o histórico de atendimentos.
+              </p>
+            ) : histLoading ? (
+              <div className="py-10 text-center text-muted-foreground flex items-center justify-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
+              </div>
+            ) : histList.length === 0 ? (
+              <div className="py-10 text-center text-muted-foreground text-sm">
+                <History className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                Nenhuma consulta ou exame realizado para este paciente.
+              </div>
+            ) : (
+              <div className="rounded-lg border border-border bg-card overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/40">
+                    <tr className="text-left">
+                      <th className="px-3 py-2 w-36">Data</th>
+                      <th className="px-3 py-2">Especialidade</th>
+                      <th className="px-3 py-2">Serviço</th>
+                      <th className="px-3 py-2">Médico</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {histList.map((h) => (
+                      <tr key={h.id} className="border-t hover:bg-muted/30">
+                        <td className="px-3 py-2 tabular-nums">
+                          {new Date(h.inicio).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
+                        </td>
+                        <td className="px-3 py-2">{h.especialidade ?? "—"}</td>
+                        <td className="px-3 py-2 font-medium uppercase">{h.procedimento ?? "CONSULTA"}</td>
+                        <td className="px-3 py-2 uppercase">{h.medico_nome ?? "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </TabsContent>
         </Tabs>
 
         <div className={footerClass}>
