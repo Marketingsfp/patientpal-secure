@@ -64,7 +64,7 @@ function LoginPage() {
               <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 backdrop-blur">
                 <Users className="h-4 w-4" />
               </span>
-              <span className="text-white/90">Cadastro de pacientes, procedimentos e equipe</span>
+              <span className="text-white/90">Cadastro de pacientes, serviços e equipe</span>
             </li>
             <li className="flex items-center gap-3">
               <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 backdrop-blur">

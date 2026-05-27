@@ -86,7 +86,7 @@ export function ProcedimentoCell({ valor, opcoes, disabled, onChange }: Props) {
       <PopoverTrigger asChild>
         <button
           type="button"
-          title="Clique para trocar o procedimento"
+          title="Clique para trocar o serviço"
           className="group inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-0.5 text-xs uppercase font-medium hover:bg-muted hover:border-primary"
         >
           <span className="truncate max-w-[180px]">{textoAtual}</span>
@@ -112,13 +112,13 @@ export function ProcedimentoCell({ valor, opcoes, disabled, onChange }: Props) {
             />
           </div>
           <p className="text-[10px] text-muted-foreground mt-1">
-            {lista.length} procedimento(s) — mais usados primeiro. Tecle 1-9 para selecionar.
+            {lista.length} serviço(s) — mais usados primeiro. Tecle 1-9 para selecionar.
           </p>
         </div>
         <div className="max-h-72 overflow-auto">
           {filtrada.length === 0 ? (
             <div className="p-3 text-xs text-muted-foreground text-center">
-              Nenhum procedimento encontrado.
+              Nenhum serviço encontrado.
             </div>
           ) : (
             filtrada.map((p) => {

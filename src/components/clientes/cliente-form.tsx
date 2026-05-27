@@ -725,16 +725,16 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs">Item</Label>
+                    <Label className="text-xs">Serviço</Label>
                     <Select
                       value={filtroItem === "" ? "__all__" : filtroItem}
                       onValueChange={(v) => setFiltroItem(v === "__all__" ? "" : v)}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Todos os procedimentos" />
+                        <SelectValue placeholder="Todos os serviços" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="__all__">Todos os procedimentos</SelectItem>
+                        <SelectItem value="__all__">Todos os serviços</SelectItem>
                         {procedimentosOpcoes.map((nome) => (
                           <SelectItem key={nome} value={nome}>{nome}</SelectItem>
                         ))}

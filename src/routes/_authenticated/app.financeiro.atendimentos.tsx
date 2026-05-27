@@ -369,7 +369,7 @@ function Page() {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div><h1 className="text-lg font-semibold leading-tight">Atendimentos</h1>
-          <p className="text-xs text-muted-foreground">{isMedicoOnly ? "Seus atendimentos e o repasse devido por procedimento" : "Procedimentos realizados com repasse automático (inclui pagamentos da agenda)"}</p></div>
+          <p className="text-xs text-muted-foreground">{isMedicoOnly ? "Seus atendimentos e o repasse devido por serviço" : "Serviços realizados com repasse automático (inclui pagamentos da agenda)"}</p></div>
         <div className="flex gap-2">
         <Button
           variant="outline"
@@ -391,14 +391,14 @@ function Page() {
               isMedicoOnly ? [
                 { key: "data", label: "Data" },
                 { key: "paciente", label: "Paciente" },
-                { key: "procedimento", label: "Procedimento" },
+                { key: "procedimento", label: "Serviço" },
                 { key: "valor_medico", label: "Repasse (R$)" },
                 { key: "status", label: "Status" },
               ] : [
                 { key: "data", label: "Data" },
                 { key: "medico", label: "Médico" },
                 { key: "paciente", label: "Paciente" },
-                { key: "procedimento", label: "Procedimento" },
+                { key: "procedimento", label: "Serviço" },
                 { key: "valor_total", label: "Valor total (R$)" },
                 { key: "valor_medico", label: "Repasse médico (R$)" },
                 { key: "valor_clinica", label: "Clínica (R$)" },
@@ -451,7 +451,7 @@ function Page() {
                     {pacientes.map((p) => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}
                   </SelectContent>
                 </Select></div>
-              <div className="space-y-2"><Label>Procedimento</Label>
+              <div className="space-y-2"><Label>Serviço</Label>
                 <Input value={form.procedimento} onChange={(e) => setForm({ ...form, procedimento: e.target.value })} /></div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2"><Label>Valor total *</Label>
@@ -539,7 +539,7 @@ function Page() {
                 </TableHead>
               )}
               <TableHead>Data</TableHead><TableHead>Médico</TableHead><TableHead>Paciente</TableHead>
-              <TableHead>Procedimento</TableHead>
+              <TableHead>Serviço</TableHead>
               {!isMedicoOnly && <TableHead className="text-right">Total</TableHead>}
               <TableHead className="text-right">{isMedicoOnly ? "Repasse" : "Médico"}</TableHead>
               {!isMedicoOnly && <TableHead className="text-right">Clínica</TableHead>}

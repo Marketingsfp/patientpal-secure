@@ -235,7 +235,7 @@ function AtendimentoIaPage() {
                     <TableHead className="w-10">#</TableHead>
                     <TableHead className="w-20">Hora</TableHead>
                     <TableHead>Paciente</TableHead>
-                    <TableHead className="hidden md:table-cell">Procedimento</TableHead>
+                    <TableHead className="hidden md:table-cell">Serviço</TableHead>
                     <TableHead className="w-24 text-center">Triagem</TableHead>
                     <TableHead className="w-28">Prioridade</TableHead>
                     <TableHead className="w-32 text-right">Ação</TableHead>

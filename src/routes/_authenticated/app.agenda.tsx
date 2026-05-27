@@ -518,7 +518,7 @@ function AgendaPage() {
       toast.error("Não foi possível atualizar o procedimento");
       return;
     }
-    toast.success(`Procedimento alterado para ${nomeFinal}`);
+    toast.success(`Serviço alterado para ${nomeFinal}`);
   };
 
   const fichaPorId = useMemo(() => {
@@ -1073,7 +1073,7 @@ function AgendaPage() {
                   { key: "fim", label: "Fim" },
                   { key: "profissional", label: "Profissional" },
                   { key: "paciente", label: "Cliente" },
-                  { key: "procedimento", label: "Procedimento" },
+                  { key: "procedimento", label: "Serviço" },
                   { key: "status", label: "Status" },
                   { key: "observacoes", label: "Observações" },
                 ],
@@ -1189,15 +1189,15 @@ function AgendaPage() {
                 </p>
               </div>
               <div className="space-y-1">
-                <Label>Procedimento</Label>
+                <Label>Serviço</Label>
                 {form.medico_id && (procPorMedico.get(form.medico_id)?.size || procNomesPorMedico.get(form.medico_id)?.size) ? (
-                  <p className="text-xs text-muted-foreground">Mostrando apenas procedimentos configurados para este médico.</p>
+                  <p className="text-xs text-muted-foreground">Mostrando apenas serviços configurados para este médico.</p>
                 ) : null}
                 <SearchableSelect
                   value={form.procedimento || "none"}
                   onChange={(v) => setForm(f => ({ ...f, procedimento: v === "none" ? "" : v }))}
                   placeholder="Selecione o procedimento"
-                  searchPlaceholder="Buscar procedimento..."
+                  searchPlaceholder="Buscar serviço..."
                   options={[
                     { value: "none", label: "— Selecione —" },
                     ...(() => {
