@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { FileSignature, Plus, Printer, Search, Trash2, Link2, Check, ChevronRight, CreditCard, Camera, ArrowLeft, Ban, XCircle } from "lucide-react";
+import { FileSignature, Plus, Printer, Search, Trash2, Link2, Check, ChevronRight, CreditCard, Camera, ArrowLeft, Ban, XCircle, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -1005,6 +1005,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
     toast.success("Dependente excluído");
     const alvo = { ...excAlvo, ativo: false, excluido_em: hoje };
     setExcAlvo(null);
+    // Recalcula valor das parcelas em aberto conforme nova qtd de vidas
+    // (titular + dependentes ativos restantes, ou seja, atual - 1)
+    await recalcularParcelasAbertas(depsAtivos.length /* já exclui o alvo */ + 0);
     await load();
     abrirTermoSeAssinado(alvo, "Exclusão");
   };
@@ -1162,14 +1165,28 @@ h1, h2, h3 { margin: 0 0 6mm; }
             <div className="space-y-1">
               <div className="flex items-center justify-between">
                 <div className="text-sm font-medium">Dependentes ({depsAtivos.length}/{maxDep})</div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setIncOpen(true)}
-                  disabled={cancelado || maxDep === 0 || depsAtivos.length >= maxDep}
-                >
-                  <Plus className="h-4 w-4 mr-1" /> Incluir dependente
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={async () => {
+                      await recalcularParcelasAbertas(totalVidasAtual);
+                      await load();
+                    }}
+                    disabled={cancelado}
+                    title="Recalcula o valor mensal das parcelas em aberto conforme a quantidade atual de vidas (titular + dependentes ativos)"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-1" /> Atualizar contrato
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setIncOpen(true)}
+                    disabled={cancelado || maxDep === 0 || depsAtivos.length >= maxDep}
+                  >
+                    <Plus className="h-4 w-4 mr-1" /> Incluir dependente
+                  </Button>
+                </div>
               </div>
               <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
                 {deps.length === 0 ? "Nenhum dependente" : (
