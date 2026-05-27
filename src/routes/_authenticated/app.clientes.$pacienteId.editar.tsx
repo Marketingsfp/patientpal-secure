@@ -52,7 +52,14 @@ function EditarClientePage() {
             <Users className="h-6 w-6 text-primary" /> Editar cliente
           </h1>
           {paciente && (
-            <p className="text-sm text-muted-foreground">{paciente.nome}</p>
+            <p className="text-sm text-muted-foreground">
+              {paciente.nome}
+              {(paciente as any).codigo_prontuario && (
+                <span className="ml-2 font-mono text-xs px-1.5 py-0.5 rounded bg-muted">
+                  Prontuário {(paciente as any).codigo_prontuario}
+                </span>
+              )}
+            </p>
           )}
         </div>
       </div>
