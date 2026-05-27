@@ -1340,10 +1340,10 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
                                       <Link
                                         to="/app/cartao-beneficios/contratos"
                                         search={{ contratoId: c.id }}
-                                        className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                                        className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors"
                                         title="Abrir contrato no Cartão Benefícios para registrar pagamento"
                                       >
-                                        <Check className="h-3 w-3" /> Pagar
+                                        <Check className="h-3.5 w-3.5" /> Pagar
                                       </Link>
                                     )}
                                   </td>
