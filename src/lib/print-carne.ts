@@ -122,7 +122,7 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
               <div class="val">${p.numero_parcela}/${total}</div>
             </div>
             <div class="ficha-parcela">
-              <div class="lab">Mês de referência</div>
+              <div class="lab">Mês Ref.</div>
               <div class="val">${fmtMesAno(p.vencimento)}</div>
             </div>
             <div class="ficha-parcela">
