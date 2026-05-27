@@ -148,10 +148,10 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
         </div>
         <div class="ficha-rodape">
           <div class="campo-manual">
-            <span class="lab">Data de pagamento</span>
             ${p.status === "pago"
               ? `<span class="val" style="font-weight:600;font-size:11px;">${fmtD(p.pago_em)}</span>`
               : `<span class="linha-assin"></span>`}
+            <span class="lab" style="text-align:center;display:block;margin-top:2px;">Data de pagamento</span>
           </div>
           <div class="campo-manual assinatura">
             <span class="linha-assin"></span>
