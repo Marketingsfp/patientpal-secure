@@ -2,7 +2,15 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { z } from "zod";
-import { loadWhatsAppConfig, metaFetchPhoneInfo, metaSendText } from "./whatsapp.server";
+import {
+  loadWhatsAppConfig,
+  metaFetchPhoneInfo,
+  metaSendText,
+  metaListTemplates,
+  metaCreateTemplate,
+  metaDeleteTemplate,
+  type WaTemplateComponent,
+} from "./whatsapp.server";
 
 async function assertManager(userId: string, clinicaId: string) {
   const { data, error } = await supabaseAdmin.rpc("can_manage_clinica", {
