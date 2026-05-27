@@ -243,7 +243,7 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
 <body>
   <div class="capa">
     <h1>Carnê de pagamento — Contrato #${esc(contrato.numero)}</h1>
-    <div class="capa-clinica">${esc(clinica?.nome ?? "")}${clinica?.cnpj ? `<span class="cnpj">CNPJ ${esc(clinica.cnpj)}</span>` : ""}</div>
+    <div class="capa-clinica">POLICARDMED - CNPJ: 27.045.917/0001-69 ${esc(clinica?.nome ?? "")}${clinica?.cnpj ? `<span class="cnpj">CNPJ ${esc(clinica.cnpj)}</span>` : ""}</div>
     <div class="capa-grid">
       <div class="cell"><span class="lab">Titular</span>${titularNomes}</div>
       <div class="cell"><span class="lab">CPF</span>${titularCpfs}</div>
@@ -265,7 +265,6 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
       <div class="cell">
         <span class="lab">Parcelas</span><span class="val">${(parcelas ?? []).length}</span>
         <span class="lab" style="margin-top:6px;">Valor mensal</span><span class="val">${BRL(Number(contrato.valor_mensal))}</span>
-        <span class="lab" style="margin-top:6px;">Total do contrato</span><span class="val">${BRL((parcelas ?? []).reduce((s, p) => s + Number(p.valor), 0))}</span>
       </div>
     </div>
   </div>
