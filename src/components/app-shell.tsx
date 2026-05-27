@@ -95,6 +95,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
         { to: "/app/nina", hash: "atend-macros", label: "Atendimento — Macros", icon: Zap },
         { to: "/app/nina", hash: "atend-kb", label: "Atendimento — Base de Conhecimento", icon: BookOpen },
         { to: "/app/nina", hash: "atend-pausas", label: "Atendimento — Pausas", icon: Coffee },
+        { to: "/app/nina", hash: "templates", label: "Templates aprovados (Meta)", icon: FileText },
         { to: "/app/nina", hash: "config", label: "Configuração", icon: KeyRound },
       ],
     },
