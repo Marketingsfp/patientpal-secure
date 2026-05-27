@@ -21,6 +21,14 @@ const fmtD = (iso: string | null | undefined) => {
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
 };
 
+const fmtMesAno = (iso: string | null | undefined) => {
+  if (!iso) return "—";
+  const s = iso.length === 10 ? `${iso}T00:00:00` : iso;
+  const d = new Date(s);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+};
+
 const esc = (s: unknown) =>
   String(s ?? "")
     .replace(/&/g, "&amp;")
@@ -37,8 +45,14 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
     .single();
   if (error || !contrato) throw new Error(error?.message ?? "Contrato não encontrado");
 
-  const [{ data: parcelas }, { data: paciente }, { data: clinica }, { data: convenio }] =
-    await Promise.all([
+  const [
+    { data: parcelas },
+    { data: paciente },
+    { data: clinica },
+    { data: convenio },
+    { data: planoFallback },
+    { count: depCount },
+  ] = await Promise.all([
       supabase
         .from("contrato_mensalidades")
         .select("id, numero_parcela, vencimento, valor, status, pago_em, forma_pagamento")
@@ -54,13 +68,21 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
         .select("nome, cnpj, telefone, endereco, cidade, estado")
         .eq("id", contrato.clinica_id as string)
         .maybeSingle(),
-      // Tabela "convenios" pode não existir em alguns ambientes — fallback para planos_assinatura
+      contrato.convenio_id
+        ? supabase.from("cb_convenios").select("nome").eq("id", contrato.convenio_id as string).maybeSingle()
+        : Promise.resolve({ data: null as { nome: string | null } | null }),
+      contrato.plano_id
+        ? supabase.from("planos_assinatura").select("nome").eq("id", contrato.plano_id as string).maybeSingle()
+        : Promise.resolve({ data: null as { nome: string | null } | null }),
       supabase
-        .from("planos_assinatura")
-        .select("nome")
-        .eq("id", (contrato.convenio_id ?? contrato.plano_id) as string)
-        .maybeSingle(),
+        .from("contrato_dependentes")
+        .select("id", { count: "exact", head: true })
+        .eq("contrato_id", contratoId)
+        .eq("ativo", true),
     ]);
+
+  const convenioNome = convenio?.nome ?? planoFallback?.nome ?? "—";
+  const pessoasConvenio = 1 + (depCount ?? 0);
 
   const fichas = (parcelas ?? []).map((p) => {
     const total = (parcelas ?? []).length;
@@ -79,20 +101,19 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
         <div class="ficha-grid">
           <div><span class="lab">Titular</span><span class="val">${esc(contrato.paciente_nome)}</span></div>
           <div><span class="lab">CPF</span><span class="val">${esc(paciente?.cpf ?? "—")}</span></div>
-          <div><span class="lab">Convênio</span><span class="val">${esc(convenio?.nome ?? "—")}</span></div>
+          <div><span class="lab">Convênio</span><span class="val">${esc(convenioNome)}</span></div>
+          <div><span class="lab">Pessoas no convênio</span><span class="val">${pessoasConvenio}</span></div>
+          <div><span class="lab">Mês de referência</span><span class="val">${fmtMesAno(p.vencimento)}</span></div>
           <div><span class="lab">Vencimento</span><span class="val destaque">${fmtD(p.vencimento)}</span></div>
           <div><span class="lab">Valor</span><span class="val destaque">${BRL(Number(p.valor))}</span></div>
-          <div><span class="lab">Status</span><span class="val">${p.status === "pago" ? `Pago em ${fmtD(p.pago_em)}` : "Em aberto"}</span></div>
+          <div>
+            <span class="lab">Data de pagamento</span>
+            ${p.status === "pago"
+              ? `<span class="val">${fmtD(p.pago_em)}</span>`
+              : `<span class="linha" style="display:block;border-bottom:1px solid #111;height:16px;"></span>`}
+          </div>
         </div>
         <div class="ficha-rodape">
-          <div class="campo-manual">
-            <span class="lab">Recebido em</span>
-            <span class="linha"></span>
-          </div>
-          <div class="campo-manual">
-            <span class="lab">Forma de pagamento</span>
-            <span class="linha"></span>
-          </div>
           <div class="campo-manual assinatura">
             <span class="linha-assin"></span>
             <span class="lab" style="text-align:center;display:block;margin-top:2px;">Assinatura / Carimbo do recebedor</span>
@@ -141,7 +162,7 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
   .ficha-grid .lab { display:block; font-size: 9px; color: #666; text-transform: uppercase; letter-spacing: .04em; }
   .ficha-grid .val { font-weight: 600; }
   .ficha-grid .val.destaque { font-size: 14px; }
-  .ficha-rodape { margin-top: auto; display: grid; grid-template-columns: 1fr 1fr 1.4fr; gap: 8px; align-items: end; }
+  .ficha-rodape { margin-top: auto; display: grid; grid-template-columns: 1fr; gap: 8px; align-items: end; }
   .campo-manual .lab { display:block; font-size: 9px; color: #666; text-transform: uppercase; letter-spacing: .04em; }
   .campo-manual .linha { display:block; border-bottom: 1px solid #111; height: 16px; }
   .campo-manual.assinatura .linha-assin { display:block; border-bottom: 1px solid #111; height: 28px; }
@@ -158,7 +179,8 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
     <div class="capa-grid">
       <div><span class="lab">Titular</span><span class="val">${esc(contrato.paciente_nome)}</span></div>
       <div><span class="lab">CPF</span><span class="val">${esc(paciente?.cpf ?? "—")}</span></div>
-      <div><span class="lab">Convênio</span><span class="val">${esc(convenio?.nome ?? "—")}</span></div>
+      <div><span class="lab">Convênio</span><span class="val">${esc(convenioNome)}</span></div>
+      <div><span class="lab">Pessoas no convênio</span><span class="val">${pessoasConvenio}</span></div>
       <div><span class="lab">Início</span><span class="val">${fmtD(contrato.data_inicio)}</span></div>
       <div><span class="lab">Dia de vencimento</span><span class="val">${esc(contrato.dia_vencimento ?? "—")}</span></div>
       <div><span class="lab">Valor mensal</span><span class="val">${BRL(Number(contrato.valor_mensal))}</span></div>
