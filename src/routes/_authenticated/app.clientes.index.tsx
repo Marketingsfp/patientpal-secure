@@ -44,6 +44,7 @@ interface Paciente {
   nome: string;
   cpf: string | null;
   numero_pasta: string | null;
+  codigo_prontuario: string | null;
   telefone: string | null;
   email: string | null;
   data_nascimento: string | null;
@@ -74,7 +75,7 @@ function ClientesPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from("pacientes")
-      .select("id,nome,cpf,telefone,email,data_nascimento,ativo,cidade,estado,created_at,foto_url")
+      .select("id,nome,cpf,telefone,email,data_nascimento,ativo,cidade,estado,created_at,foto_url,codigo_prontuario")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("nome")
       .limit(100);
@@ -109,6 +110,7 @@ function ClientesPage() {
       (p.telefone ?? "").toLowerCase().includes(q) ||
       (p.email ?? "").toLowerCase().includes(q) ||
       (p.numero_pasta ?? "").toLowerCase().includes(q) ||
+      (p.codigo_prontuario ?? "").toLowerCase().includes(q) ||
       (p.data_nascimento ?? "").toLowerCase().includes(q) ||
       (p.data_nascimento ? p.data_nascimento.split("-").reverse().join("/") : "").includes(q)
     );
@@ -194,6 +196,7 @@ function ClientesPage() {
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40">
+              <TableHead className="w-28">Prontuário</TableHead>
               <TableHead>Nome</TableHead>
               <TableHead className="w-36">CPF</TableHead>
               <TableHead className="w-32">Nascimento</TableHead>
@@ -206,13 +209,14 @@ function ClientesPage() {
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>
             ) : !clinicaAtual ? (
-              <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
             ) : filtrados.length === 0 ? (
-              <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Nenhum cliente encontrado.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Nenhum cliente encontrado.</TableCell></TableRow>
             ) : filtrados.map(p => (
               <TableRow key={p.id}>
+                <TableCell className="font-mono text-xs text-muted-foreground">{p.codigo_prontuario ?? "—"}</TableCell>
                 <TableCell className="font-medium">
                   <div className="flex items-center gap-2">
                     <div className="h-8 w-8 rounded-full overflow-hidden border bg-muted flex items-center justify-center shrink-0">
