@@ -370,7 +370,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
           {!pagamentoMisto && formaPagamento === "dinheiro" && (
             <div className="grid grid-cols-2 gap-3 rounded-md border bg-muted/30 p-3">
               <div className="space-y-1.5">
-                <Label>Valor recebido <span className="text-destructive">*</span></Label>
+                <Label>Valor recebido</Label>
                 <CurrencyInput value={valorRecebido} onChange={setValorRecebido} />
               </div>
               <div className="space-y-1.5">
