@@ -76,15 +76,22 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
         : Promise.resolve({ data: null as { nome: string | null } | null }),
       supabase
         .from("contrato_dependentes")
-        .select("paciente_id, paciente_nome, pacientes:paciente_id(cpf)")
+        .select("paciente_id, paciente_nome")
         .eq("contrato_id", contratoId)
         .eq("ativo", true),
     ]);
 
   const convenioNome = convenio?.nome ?? planoFallback?.nome ?? "—";
+  const depPacienteIds = (dependentesRows ?? [])
+    .map((d: any) => d.paciente_id as string | null)
+    .filter((id): id is string => !!id);
+  const { data: depPacientes } = depPacienteIds.length
+    ? await supabase.from("pacientes").select("id, cpf").in("id", depPacienteIds)
+    : { data: [] as { id: string; cpf: string | null }[] };
+  const cpfMap = new Map((depPacientes ?? []).map((p: any) => [p.id, p.cpf as string | null]));
   const dependentes = (dependentesRows ?? []).map((d: any) => ({
     nome: d.paciente_nome as string,
-    cpf: (d.pacientes?.cpf as string | null) ?? null,
+    cpf: d.paciente_id ? cpfMap.get(d.paciente_id) ?? null : null,
   }));
   const pessoasConvenio = 1 + dependentes.length;
 
