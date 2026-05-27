@@ -307,14 +307,24 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
     setProntLoading(true);
     void supabase
       .from("prontuarios")
-      .select("id, data, medico_id, queixa_principal, hipotese_diagnostica, conduta, prescricao, historia_doenca, exame_fisico, observacoes, medicos(nome)")
+      .select("id, data, medico_id, queixa_principal, hipotese_diagnostica, conduta, prescricao, historia_doenca, exame_fisico, observacoes")
       .eq("paciente_id", editing.id)
       .order("data", { ascending: false })
-      .then(({ data, error }) => {
+      .then(async ({ data, error }) => {
         if (error) { toast.error("Não foi possível carregar o prontuário."); setProntLoading(false); return; }
-        setProntList((data ?? []).map((r: any) => ({
+        const rows = data ?? [];
+        const medicoIds = Array.from(new Set(rows.map((r: any) => r.medico_id).filter(Boolean)));
+        let medicosMap: Record<string, string> = {};
+        if (medicoIds.length > 0) {
+          const { data: meds } = await supabase
+            .from("medicos")
+            .select("id, nome")
+            .in("id", medicoIds);
+          medicosMap = Object.fromEntries((meds ?? []).map((m: any) => [m.id, m.nome]));
+        }
+        setProntList(rows.map((r: any) => ({
           id: r.id, data: r.data,
-          medico_nome: r.medicos?.nome ?? null,
+          medico_nome: r.medico_id ? medicosMap[r.medico_id] ?? null : null,
           queixa_principal: r.queixa_principal,
           hipotese_diagnostica: r.hipotese_diagnostica,
           conduta: r.conduta, prescricao: r.prescricao,
