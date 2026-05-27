@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Camera, FileHeart, History, Loader2, MapPin, Mic, MicOff, ScanFace, Search, Upload, X } from "lucide-react";
+import { Camera, ChevronDown, FileHeart, History, Loader2, MapPin, Mic, MicOff, ScanFace, Search, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { isCPFValido, somenteDigitos } from "@/lib/cpf";
@@ -138,12 +138,14 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
   // Prontuário
   type ProntRow = {
     id: string; data: string; medico_nome: string | null;
+    especialidade: string | null; procedimento: string | null;
     queixa_principal: string | null; hipotese_diagnostica: string | null;
     conduta: string | null; prescricao: string | null;
     historia_doenca: string | null; exame_fisico: string | null; observacoes: string | null;
   };
   const [prontList, setProntList] = useState<ProntRow[]>([]);
   const [prontLoading, setProntLoading] = useState(false);
+  const [prontExpanded, setProntExpanded] = useState<Set<string>>(new Set());
   const [filtroDataDe, setFiltroDataDe] = useState("");
   const [filtroDataAte, setFiltroDataAte] = useState("");
   const [filtroMedico, setFiltroMedico] = useState("");
