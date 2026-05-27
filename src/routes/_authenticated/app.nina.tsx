@@ -21,6 +21,7 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { NinaMessage, TypingDots } from "@/components/nina/NinaMessage";
 import { formatWhatsappText } from "@/components/nina/formatWhatsappText";
 import { AtendDashboard, AtendDepartamentos, AtendMacros, AtendKb, AtendPausas, AtendMeuStatus } from "@/components/nina/AtendimentoTabs";
+import { AtendInbox, AtendSupervisor, AtendRelatorios, AtendRoteamento } from "@/components/nina/AtendimentoExtraTabs";
 
 export const Route = createFileRoute("/_authenticated/app/nina")({
   component: NinaPage,
@@ -93,7 +94,7 @@ function NinaPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const hashAba = (location.hash ?? "").replace(/^#/, "");
-  const abaAtiva = ["treinada", "chat", "automacoes", "config", "atend-status", "atend-dashboard", "atend-depto", "atend-macros", "atend-kb", "atend-pausas"].includes(hashAba) ? hashAba : "chat";
+  const abaAtiva = ["treinada", "chat", "automacoes", "config", "atend-status", "atend-dashboard", "atend-depto", "atend-macros", "atend-kb", "atend-pausas", "atend-inbox", "atend-supervisor", "atend-relatorios", "atend-roteamento"].includes(hashAba) ? hashAba : "chat";
   const setAbaAtiva = (v: string) => {
     navigate({ to: "/app/nina", hash: v, replace: true });
   };
@@ -253,6 +254,10 @@ function NinaPage() {
         <TabsContent value="atend-macros"><AtendMacros /></TabsContent>
         <TabsContent value="atend-kb"><AtendKb /></TabsContent>
         <TabsContent value="atend-pausas"><AtendPausas /></TabsContent>
+        <TabsContent value="atend-inbox"><AtendInbox /></TabsContent>
+        <TabsContent value="atend-supervisor"><AtendSupervisor /></TabsContent>
+        <TabsContent value="atend-relatorios"><AtendRelatorios /></TabsContent>
+        <TabsContent value="atend-roteamento"><AtendRoteamento /></TabsContent>
       </Tabs>
     </div>
   );
