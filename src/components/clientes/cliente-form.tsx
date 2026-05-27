@@ -572,7 +572,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
     <>
       <form onSubmit={onSubmit} className="space-y-4">
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="grid grid-cols-5 w-full">
+          <TabsList className="grid grid-cols-6 w-full">
             <TabsTrigger value="dados">Dados</TabsTrigger>
             <TabsTrigger value="endereco">Endereço</TabsTrigger>
             <TabsTrigger value="responsavel">
@@ -580,6 +580,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
             </TabsTrigger>
             <TabsTrigger value="biometria">Biometria</TabsTrigger>
             <TabsTrigger value="prontuario">Prontuário</TabsTrigger>
+            <TabsTrigger value="historico">Histórico</TabsTrigger>
           </TabsList>
 
           <TabsContent value="dados" className="space-y-4 pt-4 pb-16">
