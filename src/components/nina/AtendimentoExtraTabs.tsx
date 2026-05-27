@@ -185,6 +185,7 @@ export function AtendInbox() {
   const enviar = async () => {
     const t = draft.trim();
     if (!t || !sel || !clinicaId || enviando) return;
+    if (motivoBloqueio) { toast.error(motivoBloqueio); return; }
     setEnviando(true);
     try {
       await enviarMsg({ data: { clinicaId, conversaId: sel.id, text: t } });
