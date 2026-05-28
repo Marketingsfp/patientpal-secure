@@ -222,19 +222,14 @@ export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUs
         .eq("id", targetUserId);
     }
     toast.success(editingContratoId || prefillUserId ? "Funcionário atualizado" : "Funcionário cadastrado");
-    onOpenChange(false);
     onSaved?.();
+    close();
   }
 
   const isEditingExisting = !!editingUserId;
+  const titleText = isEditingExisting ? "Editar funcionário" : "Novo funcionário";
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>{isEditingExisting ? "Editar funcionário" : "Novo funcionário"}</DialogTitle>
-        </DialogHeader>
-        {loading ? (
+  const body = loading ? (
           <div className="py-10 text-center text-sm text-muted-foreground">Carregando…</div>
         ) : (
           <Tabs defaultValue="dados" className="w-full">
