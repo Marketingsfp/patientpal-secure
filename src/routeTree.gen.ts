@@ -60,6 +60,7 @@ import { Route as AuthenticatedAppHrHoleritesRouteImport } from './routes/_authe
 import { Route as AuthenticatedAppHrFeriasRouteImport } from './routes/_authenticated/app.hr-ferias'
 import { Route as AuthenticatedAppHrContratosRouteImport } from './routes/_authenticated/app.hr-contratos'
 import { Route as AuthenticatedAppFuncionariosRouteImport } from './routes/_authenticated/app.funcionarios'
+import { Route as AuthenticatedAppFuncionarioNovoRouteImport } from './routes/_authenticated/app.funcionario-novo'
 import { Route as AuthenticatedAppFluxoRouteImport } from './routes/_authenticated/app.fluxo'
 import { Route as AuthenticatedAppFinanceiroRouteImport } from './routes/_authenticated/app.financeiro'
 import { Route as AuthenticatedAppExamesResultadosRouteImport } from './routes/_authenticated/app.exames-resultados'
@@ -388,6 +389,12 @@ const AuthenticatedAppFuncionariosRoute =
   AuthenticatedAppFuncionariosRouteImport.update({
     id: '/funcionarios',
     path: '/funcionarios',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppFuncionarioNovoRoute =
+  AuthenticatedAppFuncionarioNovoRouteImport.update({
+    id: '/funcionario-novo',
+    path: '/funcionario-novo',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppFluxoRoute = AuthenticatedAppFluxoRouteImport.update({
@@ -734,6 +741,7 @@ export interface FileRoutesByFullPath {
   '/app/exames-resultados': typeof AuthenticatedAppExamesResultadosRoute
   '/app/financeiro': typeof AuthenticatedAppFinanceiroRouteWithChildren
   '/app/fluxo': typeof AuthenticatedAppFluxoRoute
+  '/app/funcionario-novo': typeof AuthenticatedAppFuncionarioNovoRoute
   '/app/funcionarios': typeof AuthenticatedAppFuncionariosRoute
   '/app/hr-contratos': typeof AuthenticatedAppHrContratosRoute
   '/app/hr-ferias': typeof AuthenticatedAppHrFeriasRoute
@@ -835,6 +843,7 @@ export interface FileRoutesByTo {
   '/app/estoque': typeof AuthenticatedAppEstoqueRoute
   '/app/exames-resultados': typeof AuthenticatedAppExamesResultadosRoute
   '/app/fluxo': typeof AuthenticatedAppFluxoRoute
+  '/app/funcionario-novo': typeof AuthenticatedAppFuncionarioNovoRoute
   '/app/funcionarios': typeof AuthenticatedAppFuncionariosRoute
   '/app/hr-contratos': typeof AuthenticatedAppHrContratosRoute
   '/app/hr-ferias': typeof AuthenticatedAppHrFeriasRoute
@@ -941,6 +950,7 @@ export interface FileRoutesById {
   '/_authenticated/app/exames-resultados': typeof AuthenticatedAppExamesResultadosRoute
   '/_authenticated/app/financeiro': typeof AuthenticatedAppFinanceiroRouteWithChildren
   '/_authenticated/app/fluxo': typeof AuthenticatedAppFluxoRoute
+  '/_authenticated/app/funcionario-novo': typeof AuthenticatedAppFuncionarioNovoRoute
   '/_authenticated/app/funcionarios': typeof AuthenticatedAppFuncionariosRoute
   '/_authenticated/app/hr-contratos': typeof AuthenticatedAppHrContratosRoute
   '/_authenticated/app/hr-ferias': typeof AuthenticatedAppHrFeriasRoute
@@ -1047,6 +1057,7 @@ export interface FileRouteTypes {
     | '/app/exames-resultados'
     | '/app/financeiro'
     | '/app/fluxo'
+    | '/app/funcionario-novo'
     | '/app/funcionarios'
     | '/app/hr-contratos'
     | '/app/hr-ferias'
@@ -1148,6 +1159,7 @@ export interface FileRouteTypes {
     | '/app/estoque'
     | '/app/exames-resultados'
     | '/app/fluxo'
+    | '/app/funcionario-novo'
     | '/app/funcionarios'
     | '/app/hr-contratos'
     | '/app/hr-ferias'
@@ -1253,6 +1265,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/exames-resultados'
     | '/_authenticated/app/financeiro'
     | '/_authenticated/app/fluxo'
+    | '/_authenticated/app/funcionario-novo'
     | '/_authenticated/app/funcionarios'
     | '/_authenticated/app/hr-contratos'
     | '/_authenticated/app/hr-ferias'
@@ -1695,6 +1708,13 @@ declare module '@tanstack/react-router' {
       path: '/funcionarios'
       fullPath: '/app/funcionarios'
       preLoaderRoute: typeof AuthenticatedAppFuncionariosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/funcionario-novo': {
+      id: '/_authenticated/app/funcionario-novo'
+      path: '/funcionario-novo'
+      fullPath: '/app/funcionario-novo'
+      preLoaderRoute: typeof AuthenticatedAppFuncionarioNovoRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/fluxo': {
@@ -2200,6 +2220,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppExamesResultadosRoute: typeof AuthenticatedAppExamesResultadosRoute
   AuthenticatedAppFinanceiroRoute: typeof AuthenticatedAppFinanceiroRouteWithChildren
   AuthenticatedAppFluxoRoute: typeof AuthenticatedAppFluxoRoute
+  AuthenticatedAppFuncionarioNovoRoute: typeof AuthenticatedAppFuncionarioNovoRoute
   AuthenticatedAppFuncionariosRoute: typeof AuthenticatedAppFuncionariosRoute
   AuthenticatedAppHrContratosRoute: typeof AuthenticatedAppHrContratosRoute
   AuthenticatedAppHrFeriasRoute: typeof AuthenticatedAppHrFeriasRoute
@@ -2268,6 +2289,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppExamesResultadosRoute: AuthenticatedAppExamesResultadosRoute,
   AuthenticatedAppFinanceiroRoute: AuthenticatedAppFinanceiroRouteWithChildren,
   AuthenticatedAppFluxoRoute: AuthenticatedAppFluxoRoute,
+  AuthenticatedAppFuncionarioNovoRoute: AuthenticatedAppFuncionarioNovoRoute,
   AuthenticatedAppFuncionariosRoute: AuthenticatedAppFuncionariosRoute,
   AuthenticatedAppHrContratosRoute: AuthenticatedAppHrContratosRoute,
   AuthenticatedAppHrFeriasRoute: AuthenticatedAppHrFeriasRoute,
