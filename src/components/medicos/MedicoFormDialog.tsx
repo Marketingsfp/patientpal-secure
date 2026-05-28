@@ -1023,12 +1023,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
 
   if (asPage) {
     return (
-      <div className="max-w-5xl mx-auto space-y-4">
-        <div className="border-b pb-3">
-          <h1 className="text-2xl font-semibold">{title}</h1>
-        </div>
-        {inner}
-      </div>
+      <div className="space-y-4">{inner}</div>
     );
   }
 

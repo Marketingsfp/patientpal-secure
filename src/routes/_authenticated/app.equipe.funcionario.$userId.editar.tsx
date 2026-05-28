@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { useClinica } from "@/hooks/use-clinica";
 import { FuncionarioFormDialog } from "@/components/funcionarios/FuncionarioFormDialog";
 
@@ -20,19 +21,26 @@ function EditarFuncionarioPage() {
 
   return (
     <div className="space-y-4">
-      <Button variant="ghost" size="sm" asChild>
-        <Link to="/app/equipe" search={{ tab: "funcionarios" }}>
-          <ArrowLeft className="h-4 w-4 mr-2" /> Voltar para Equipe
-        </Link>
-      </Button>
-      <FuncionarioFormDialog
-        asPage
-        open
-        onOpenChange={(o) => { if (!o) voltar(); }}
-        clinicaId={clinicaAtual.clinica_id}
-        editingUserId={userId}
-        onSaved={voltar}
-      />
+      <div className="flex items-center gap-3">
+        <Button variant="ghost" size="sm" asChild>
+          <Link to="/app/equipe" search={{ tab: "funcionarios" }}>
+            <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
+          </Link>
+        </Button>
+        <h1 className="text-2xl font-bold text-foreground">Editar funcionário</h1>
+      </div>
+      <Card>
+        <CardContent className="p-6">
+          <FuncionarioFormDialog
+            asPage
+            open
+            onOpenChange={(o) => { if (!o) voltar(); }}
+            clinicaId={clinicaAtual.clinica_id}
+            editingUserId={userId}
+            onSaved={voltar}
+          />
+        </CardContent>
+      </Card>
     </div>
   );
 }
