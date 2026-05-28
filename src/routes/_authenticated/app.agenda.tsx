@@ -1691,16 +1691,20 @@ function AgendaPage() {
           </div>
           <div className="space-y-0.5">
             <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Situação</Label>
-            <Select value={filtroStatus} onValueChange={setFiltroStatus}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">TODOS</SelectItem>
-                <SelectItem value="livres">Livres</SelectItem>
-                {(Object.keys(STATUS_LABEL) as Status[]).map(s => (
-                  <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex gap-1.5">
+              <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+                <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">TODOS</SelectItem>
+                  <SelectItem value="livres">Livres</SelectItem>
+                  {(Object.keys(STATUS_LABEL) as Status[]).map(s => (
+                    <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button variant="outline" size="sm" onClick={limparFiltros} className="h-7 text-xs shrink-0"><X className="h-3.5 w-3.5 mr-1.5" /> Limpar</Button>
+              <Button size="sm" onClick={load} className="h-7 text-xs shrink-0"><Search className="h-3.5 w-3.5 mr-1.5" /> Exibir</Button>
+            </div>
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-1.5">
@@ -1709,10 +1713,6 @@ function AgendaPage() {
               <Checkbox checked={apenasData} onCheckedChange={(v) => setApenasData(!!v)} />
               Exibir apenas a data selecionada
             </label>
-          </div>
-          <div className="flex gap-1.5">
-            <Button variant="outline" size="sm" onClick={limparFiltros} className="h-7 text-xs"><X className="h-3.5 w-3.5 mr-1.5" /> Limpar</Button>
-            <Button size="sm" onClick={load} className="h-7 text-xs"><Search className="h-3.5 w-3.5 mr-1.5" /> Exibir</Button>
           </div>
         </div>
       </div>
