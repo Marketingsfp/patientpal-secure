@@ -314,6 +314,11 @@ function AgendaPage() {
       data_pagamento: origem.data_pagamento ?? null,
     } as never).eq("id", slot.id);
     if (e2) { setReagSalvando(false); toast.error(e2.message); return; }
+    // 3) Transfere lançamentos financeiros (pagamento) da ficha de origem para a de destino,
+    //    para que o ícone de "pago" continue aparecendo na nova ficha.
+    await supabase.from("fin_lancamentos")
+      .update({ agendamento_id: slot.id } as never)
+      .eq("agendamento_id", origem.id);
     setReagSalvando(false);
     setReagendandoAg(null);
     toast.success(`Reagendado para ${new Date(slot.inicio).toLocaleString("pt-BR")}.`);
@@ -954,6 +959,10 @@ function AgendaPage() {
         data_pagamento: origem.data_pagamento ?? null,
       } as never).eq("id", alvo.id);
       if (e2) { toast.error(`Falha ao mover para destino: ${e2.message}`); continue; }
+      // 3) Transfere lançamentos financeiros (pagamento) da ficha de origem para a de destino
+      await supabase.from("fin_lancamentos")
+        .update({ agendamento_id: alvo.id } as never)
+        .eq("agendamento_id", origem.id);
       okCount++;
     }
     setReagLoteSalvando(false);
