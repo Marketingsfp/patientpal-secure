@@ -78,14 +78,22 @@ const emptyForm = () => ({
 });
 
 interface Props {
-  open: boolean;
-  onOpenChange: (o: boolean) => void;
+  open?: boolean;
+  onOpenChange?: (o: boolean) => void;
   clinicaId: string;
   editingMedicoId?: string | null;
   onSaved?: () => void;
+  /** "dialog" (default) renders inside a modal; "page" renders inline as a full page. */
+  mode?: "dialog" | "page";
+  /** Called when the form should close (page mode). */
+  onClose?: () => void;
 }
 
-export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoId, onSaved }: Props) {
+export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoId, onSaved, mode = "dialog", onClose }: Props) {
+  const close = () => {
+    if (mode === "page") onClose?.();
+    else onOpenChange?.(false);
+  };
   const cadastrarUsuarioFn = useServerFn(cadastrarUsuario);
   const getLoginFn = useServerFn(getFuncionarioLogin);
   const definirSenhaFn = useServerFn(definirSenhaFuncionario);
