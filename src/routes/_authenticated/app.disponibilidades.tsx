@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Trash2, Plus, CalendarRange } from "lucide-react";
+import { Trash2, Plus, CalendarRange, Pencil, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export const Route = createFileRoute("/_authenticated/app/disponibilidades")({
   component: Page,
@@ -49,6 +50,7 @@ function Page() {
   const em30Iso = (() => { const d = new Date(); d.setDate(d.getDate() + 29); return d.toISOString().slice(0, 10); })();
   const [gerar, setGerar] = useState({ medico_id: "all", duracao: "5", dias: "30", data_inicio: hojeIso, data_fim: em30Iso, limite_fichas: "" });
   const [gerando, setGerando] = useState(false);
+  const [medicoEditando, setMedicoEditando] = useState<string | null>(null);
 
   const load = async () => {
     if (!clinicaAtual) return;
