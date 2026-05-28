@@ -1043,31 +1043,31 @@ function AgendaPage() {
           </h1>
           <p className="text-sm text-muted-foreground">Filtre e gerencie os agendamentos da clínica.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-1.5">
           <div className="inline-flex rounded-full border bg-card p-0.5">
             <button
               type="button"
               onClick={() => setViewMode("dia")}
-              className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${viewMode === "dia" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              className={`px-2 py-1 text-[11px] font-medium rounded-full transition-colors ${viewMode === "dia" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
             >
               Lista
             </button>
             <button
               type="button"
               onClick={() => setViewMode("medico")}
-              className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${viewMode === "medico" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              className={`px-2 py-1 text-[11px] font-medium rounded-full transition-colors ${viewMode === "medico" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
             >
               Por médico
             </button>
           </div>
-          <Button asChild variant="outline" title="Cadastrar horários semanais e gerar slots da agenda">
+          <Button asChild variant="outline" size="sm" className="h-7 text-[11px] px-2" title="Cadastrar horários semanais e gerar slots da agenda">
             <Link to="/app/disponibilidades">
-              <Clock className="h-4 w-4 mr-2" /> Criar/gerar horários
+              <Clock className="h-3 w-3 mr-1.5" /> Criar/gerar horários
             </Link>
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" disabled={selecionados.size === 0}>
+              <Button variant="outline" size="sm" className="h-7 text-[11px] px-2" disabled={selecionados.size === 0}>
                 Opções ({selecionados.size})
               </Button>
             </DropdownMenuTrigger>
@@ -1090,6 +1090,8 @@ function AgendaPage() {
           </DropdownMenu>
           <Button
             variant="outline"
+            size="sm"
+            className="h-7 text-[11px] px-2"
             onClick={() => {
               if (!filtrados.length) { toast.info("Sem dados para exportar."); return; }
               exportToExcel(
@@ -1119,12 +1121,12 @@ function AgendaPage() {
               );
             }}
           >
-            <Download className="h-4 w-4 mr-2" /> Exportar Excel
+            <Download className="h-3 w-3 mr-1.5" /> Exportar Excel
           </Button>
           <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button onClick={openNew} disabled={!clinicaAtual} className="bg-primary hover:bg-primary/90 text-primary-foreground">
-              <Plus className="h-4 w-4 mr-2" /> Adicionar Encaixe
+            <Button size="sm" onClick={openNew} disabled={!clinicaAtual} className="h-7 text-[11px] px-2 bg-primary hover:bg-primary/90 text-primary-foreground">
+              <Plus className="h-3 w-3 mr-1.5" /> Adicionar Encaixe
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-lg">
