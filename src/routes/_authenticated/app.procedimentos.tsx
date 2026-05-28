@@ -399,7 +399,7 @@ function ProcedimentosPage() {
     const q = norm(buscaAplicada.trim());
     return items.filter(p => {
       if (tipoAplicado !== "todos" && p.tipo !== tipoAplicado) return false;
-      if (grupoAplicado !== "todos" && (p.grupo ?? "") !== grupoAplicado) return false;
+      if (grupoAplicado !== "todos" && norm(p.grupo ?? "") !== norm(grupoAplicado)) return false;
       if (q && !norm(p.nome).includes(q) && !norm(p.codigo ?? "").includes(q) && !norm(p.grupo ?? "").includes(q)) return false;
       return true;
     });
