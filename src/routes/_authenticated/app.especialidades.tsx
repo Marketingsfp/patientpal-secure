@@ -98,14 +98,22 @@ function EspecialidadesPage() {
     setDeleting(true);
     const { data: vinculos, error: countError } = await supabase
       .from("procedimentos")
-      .select("clinica_id, clinicas(nome)")
+      .select("clinica_id")
       .ilike("grupo", toDelete.nome);
     if (countError) { setDeleting(false); toast.error(countError.message); return; }
     if ((vinculos?.length ?? 0) > 0) {
       setDeleting(false);
-      const nomes = Array.from(new Set(
-        (vinculos ?? []).map((v: any) => v.clinicas?.nome).filter(Boolean)
+      const clinicaIds = Array.from(new Set(
+        (vinculos ?? []).map((v: any) => v.clinica_id).filter(Boolean)
       ));
+      let nomes: string[] = [];
+      if (clinicaIds.length > 0) {
+        const { data: clins } = await supabase
+          .from("clinicas")
+          .select("nome")
+          .in("id", clinicaIds);
+        nomes = (clins ?? []).map((c: any) => c.nome).filter(Boolean);
+      }
       const detalhe = nomes.length
         ? ` (clínica(s): ${nomes.join(", ")})`
         : "";
