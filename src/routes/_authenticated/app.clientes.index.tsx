@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Search, Pencil, Trash2, Users, Download } from "lucide-react";
+import { Plus, Search, Pencil, Users, Download } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -77,7 +77,7 @@ function ClientesPage() {
       .from("pacientes")
       .select("id,nome,cpf,telefone,email,data_nascimento,ativo,cidade,estado,created_at,foto_url,codigo_prontuario")
       .eq("clinica_id", clinicaAtual.clinica_id)
-      .order("nome")
+      .order("codigo_prontuario", { ascending: false, nullsFirst: false })
       .limit(100);
     setLoading(false);
     if (error) { toast.error(error.message); return; }
@@ -115,14 +115,6 @@ function ClientesPage() {
       (p.data_nascimento ? p.data_nascimento.split("-").reverse().join("/") : "").includes(q)
     );
   }, [items, busca]);
-
-  const onDelete = async (p: Paciente) => {
-    if (!confirm(`Excluir ${p.nome}?`)) return;
-    const { error } = await supabase.from("pacientes").delete().eq("id", p.id);
-    if (error) { toast.error(error.message); return; }
-    toast.success("Cliente excluído.");
-    void load();
-  };
 
   return (
     <div className="space-y-6">
@@ -243,7 +235,6 @@ function ClientesPage() {
                       <Pencil className="h-4 w-4" />
                     </Link>
                   </Button>
-                  <Button variant="ghost" size="icon" onClick={() => onDelete(p)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                 </TableCell>
               </TableRow>
             ))}
