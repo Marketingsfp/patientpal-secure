@@ -47,7 +47,7 @@ function Page() {
   const [novo, setNovo] = useState({ medico_id: "", dia_semana: "1", hora_inicio: "08:00", hora_fim: "12:00", limite_pacientes: "" });
   const hojeIso = new Date().toISOString().slice(0, 10);
   const em30Iso = (() => { const d = new Date(); d.setDate(d.getDate() + 29); return d.toISOString().slice(0, 10); })();
-  const [gerar, setGerar] = useState({ medico_id: "all", duracao: "5", dias: "30", data_inicio: hojeIso, data_fim: em30Iso });
+  const [gerar, setGerar] = useState({ medico_id: "all", duracao: "5", dias: "30", data_inicio: hojeIso, data_fim: em30Iso, limite_fichas: "" });
   const [gerando, setGerando] = useState(false);
 
   const load = async () => {
@@ -85,7 +85,10 @@ function Page() {
 
   if (!clinicaAtual) return <p className="text-muted-foreground">Selecione uma clínica.</p>;
 
-  const medicosFiltrados = medicos.filter((m) => !filtro || m.nome.toLowerCase().includes(filtro.toLowerCase()));
+  const medicosFiltrados = medicos
+    .filter((m) => !filtro || m.nome.toLowerCase().includes(filtro.toLowerCase()))
+    .slice()
+    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" }));
 
   // Pré-visualização dos slots gerados
   const slotsPreview = useMemo(() => {
@@ -103,9 +106,15 @@ function Page() {
       const dow = d.getDay();
       for (const m of alvo) {
         const ds = disps.filter((x) => x.medico_id === m.id && x.dia_semana === dow);
-        // Limite di rio: soma os limites das janelas do dia (se algum estiver definido)
-        const limitesDoDia = ds.map((x) => x.limite_pacientes).filter((n): n is number => typeof n === "number" && n > 0);
-        const limiteDia = limitesDoDia.length > 0 ? limitesDoDia.reduce((a, b) => a + b, 0) : Infinity;
+        // Limite diário: override manual do formulário; senão soma das janelas cadastradas
+        const overrideLimite = gerar.limite_fichas ? parseInt(gerar.limite_fichas) : 0;
+        let limiteDia: number;
+        if (overrideLimite > 0) {
+          limiteDia = overrideLimite;
+        } else {
+          const limitesDoDia = ds.map((x) => x.limite_pacientes).filter((n): n is number => typeof n === "number" && n > 0);
+          limiteDia = limitesDoDia.length > 0 ? limitesDoDia.reduce((a, b) => a + b, 0) : Infinity;
+        }
         let criadosNoDia = 0;
         for (const disp of ds) {
           const [hi, mi] = disp.hora_inicio.split(":").map(Number);
@@ -209,6 +218,17 @@ function Page() {
                 <div>
                   <label className="text-xs text-muted-foreground">Até</label>
                   <Input type="date" className="w-40" value={gerar.data_fim} onChange={(e) => setGerar({ ...gerar, data_fim: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Nº de fichas</label>
+                  <Input
+                    type="number"
+                    min={1}
+                    placeholder="padrão do médico"
+                    className="w-36"
+                    value={gerar.limite_fichas}
+                    onChange={(e) => setGerar({ ...gerar, limite_fichas: e.target.value })}
+                  />
                 </div>
                 <Button onClick={gerarAgenda} disabled={gerando || slotsPreview.length === 0}>
                   <CalendarRange className="h-4 w-4 mr-1" />
