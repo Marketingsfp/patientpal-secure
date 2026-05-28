@@ -22,11 +22,15 @@ const PERFIS = [
 interface Ref { id: string; nome: string }
 
 interface Props {
-  open: boolean;
-  onOpenChange: (o: boolean) => void;
+  open?: boolean;
+  onOpenChange?: (o: boolean) => void;
   clinicaId: string;
   editingUserId?: string | null;
   onSaved?: () => void;
+  /** Render mode. "dialog" (default) renders inside a modal; "page" renders inline as a full page. */
+  mode?: "dialog" | "page";
+  /** Called when the form should close (page mode). */
+  onClose?: () => void;
 }
 
 const emptyForm = (clinicaId: string) => ({
@@ -40,7 +44,11 @@ const emptyForm = (clinicaId: string) => ({
   criar_login: false, email: "", senha: "", perfil: "recepcao",
 });
 
-export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUserId, onSaved }: Props) {
+export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUserId, onSaved, mode = "dialog", onClose }: Props) {
+  const close = () => {
+    if (mode === "page") onClose?.();
+    else onOpenChange?.(false);
+  };
   const cadastrarUsuarioFn = useServerFn(cadastrarUsuario);
   const getLoginFn = useServerFn(getFuncionarioLogin);
   const definirSenhaFn = useServerFn(definirSenhaFuncionario);
