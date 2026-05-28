@@ -83,9 +83,10 @@ interface Props {
   clinicaId: string;
   editingMedicoId?: string | null;
   onSaved?: () => void;
+  asPage?: boolean;
 }
 
-export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoId, onSaved }: Props) {
+export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoId, onSaved, asPage = false }: Props) {
   const cadastrarUsuarioFn = useServerFn(cadastrarUsuario);
   const getLoginFn = useServerFn(getFuncionarioLogin);
   const definirSenhaFn = useServerFn(definirSenhaFuncionario);
@@ -420,18 +421,14 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
 
   const hasLogin = !!medicoUserId;
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl w-[calc(100vw-2rem)] max-h-[95vh] overflow-y-auto overflow-x-hidden">
-        <DialogHeader className="sticky top-0 z-20 bg-background -mx-6 px-6 pt-6 -mt-6 pb-2 border-b">
-          <DialogTitle>{editId ? "Editar médico" : "Novo médico"}</DialogTitle>
-        </DialogHeader>
-        {loading ? (
+  const title = editId ? "Editar médico" : "Novo médico";
+
+  const inner = loading ? (
           <div className="py-10 text-center text-sm text-muted-foreground">Carregando…</div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <Tabs defaultValue="dados">
-              <TabsList className="grid grid-cols-5 w-full sticky top-[3.25rem] z-10">
+              <TabsList className={asPage ? "grid grid-cols-5 w-full" : "grid grid-cols-5 w-full sticky top-[3.25rem] z-10"}>
                 <TabsTrigger value="dados">Dados</TabsTrigger>
                 <TabsTrigger value="especialidades">Especialidades</TabsTrigger>
                 <TabsTrigger value="banco">Banco</TabsTrigger>
@@ -1010,12 +1007,38 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                 )}
               </TabsContent>
             </Tabs>
-            <DialogFooter className="sticky bottom-0 bg-background border-t -mx-6 -mb-6 px-6 py-3 z-10">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-              <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button>
-            </DialogFooter>
+            {asPage ? (
+              <div className="flex justify-end gap-2 border-t pt-3">
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+                <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button>
+              </div>
+            ) : (
+              <DialogFooter className="sticky bottom-0 bg-background border-t -mx-6 -mb-6 px-6 py-3 z-10">
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+                <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button>
+              </DialogFooter>
+            )}
           </form>
-        )}
+        );
+
+  if (asPage) {
+    return (
+      <div className="max-w-5xl mx-auto space-y-4">
+        <div className="border-b pb-3">
+          <h1 className="text-2xl font-semibold">{title}</h1>
+        </div>
+        {inner}
+      </div>
+    );
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-4xl w-[calc(100vw-2rem)] max-h-[95vh] overflow-y-auto overflow-x-hidden">
+        <DialogHeader className="sticky top-0 z-20 bg-background -mx-6 px-6 pt-6 -mt-6 pb-2 border-b">
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+        {inner}
       </DialogContent>
     </Dialog>
   );

@@ -1,25 +1,49 @@
 ## Objetivo
 
-Preencher o campo **Sexo** no cadastro dos médicos da clínica POLICLINICA MENINO JESUS conforme a planilha enviada (`Lista de médicos e Sexo_MJ.xlsx`).
+Trocar o clique do lápis (em Equipe → Funcionários e Médicos) por uma navegação para uma **página de edição em tela cheia**, no lugar do diálogo (pop-up) atual.
 
-## O que será feito
+## O que muda
 
-- Para cada médico listado na planilha, atualizar a coluna `sexo` do registro correspondente na tabela `medicos` (clínica POLICLINICA MENINO JESUS) para `feminino` ou `masculino`.
-- Todos os 58 nomes da planilha já existem cadastrados na clínica e serão atualizados (hoje quase todos estão como "Não informar").
-- O item **TESTE ERGOMETRICO** será ignorado (não é um médico real).
-- Médicos cadastrados na clínica que **não** aparecem na planilha (ex.: TESTE LOVABLE já excluído) ficam intocados.
+### 1. Extrair o corpo dos formulários (refactor)
+Hoje, `FuncionarioFormDialog` e `MedicoFormDialog` misturam o `<Dialog>` com toda a lógica do formulário. Vou separar em dois componentes:
 
-## Resumo da divisão
+- `src/components/funcionarios/FuncionarioForm.tsx` — só o conteúdo do formulário (campos, tabs, ações, save).
+- `src/components/medicos/MedicoForm.tsx` — idem para médico (incluindo tabs Dados, Especialidades, Serviços, Repasse).
 
-- **Feminino (28):** ADRIANA CRISTHIAN CARDOSO SOBRINHO, ALINE DE ANDRADE FERREIRA, ANA CRISTINA LOPES DE OLIVEIRA, BARBARA OLIVEIRA, CINTIA BRAGA NUNES, CLAUDIA MARIA RODRIGUES DOS SANTOS, CONCEICAO DA SILVA MARTINS, DAIANE HELENA DE ALMEIDA, ELAIR DE MAGALHAES ALVES NUNES, ELIANE CRISTINA ALVES SOUZA, ENEIDA DE OLIVEIRA RODRIGUES, FERNANDA, IAMILA, IARA CAMELLO RODRIGUES, IARMILA RUZENA KRASNY, ISIS SERRANO DUARTE, KAREN DA MOTTA SILVA, KARINA RUIZ CARDOSO DE OLIVEIRA, KETLEN VITORINO PEREIRA, MARIA DA PENHA CONDADO TANUS TAYAR, MARIANA PORTUGAL, PRISCILA ANA BRAGA DA SILVA ROCHA, QUEDIMA SOARES, RAIANI NIEDZIELSKI GOMES, ROBERTA DA FONSECA CORREDEIRA, ROSANGELA SCHMITZ RIOLINO, SUELY MARTINS DA SILVA, VALERIA SILVEIRA LIMA TEIXEIRA.
-- **Masculino (30):** ALEX LOUZA MACEDO, ALEXANDRE DE FIGUEIREDO QUEIROZ, ANDERSON LUIS ELOY AMARAL, ANDRE LUIS LIMA DA SILVA, ANTONIO CARLOS SIQUEIRA COBUCCI, ARMANDO JOSE DA SILVA JUNIOR, CARLOS ALBERTO OLIVERO VARILLAS, CARLOS EDUARDO GONCALVES MONTEIRO, DIOGO DEL CIMA, EUGENIO CESAR SOLON CAPOBIANCO, FELIPE MOURA CORREA, JEAN FERREIRA CAMPOS, JOAO HELIO, JOAO HELIO VALENTIM CONSULTA, JOAO HELIO VALENTIM EXAMES, JORGE RIBEIRO, JOSE ROBERTO PINTO BARBOSA, MARCELE LOURENCO FREITAS, MARCELO BARRETO FRANCO DA SILVEIRA, MARCILIO QUINTAO DE SOUZA, MAURICIO ALBUQUERQUE DE PAULA, MILTON PIRES GUIMARAES, PAULO GUILHERME NADER DAMASCENO, PAULO ROBERTO L MONTEIRO, SAMUEL JOSE, SANDRO DA SILVA PRINSCESWAL, SERGIO ANTONIO PALERMO DE ALMEIDA, SERGIO MENDES MANOEL, SERGIO SATOSHI OKUDA, THIAGO DE OLIVEIRA GUIMARAES.
+Os `*FormDialog` atuais continuam existindo e passam apenas a embrulhar esses componentes em `<Dialog>`, para não quebrar o botão **"Novo cadastro"** (que continua como pop-up de criação rápida).
 
-## Observação
+### 2. Novas rotas de edição em página inteira
 
-Na planilha, **MARCELE LOURENCO FREITAS** está marcada como Masculino. Vou aplicar exatamente como veio na planilha. Se for engano, é só me avisar depois para corrigir.
+- `src/routes/_authenticated/app.equipe.funcionario.$userId.editar.tsx`
+  → renderiza `<FuncionarioForm editingUserId={userId} />` com header "Editar funcionário" e botão "Voltar" para `/app/equipe`.
+- `src/routes/_authenticated/app.equipe.medico.$medicoId.editar.tsx`
+  → renderiza `<MedicoForm editingMedicoId={medicoId} />` com header "Editar médico" e botão "Voltar" para `/app/equipe`.
 
-## Fora do escopo
+Cada rota define seu próprio `head()` (title específico). Após salvar, volta para `/app/equipe` com a aba correta.
 
-- Nenhuma mudança de código.
-- Nenhuma alteração de estrutura do banco.
-- Outros campos do cadastro do médico permanecem inalterados.
+### 3. Ajuste no `app.equipe.tsx`
+
+Os botões de lápis hoje chamam `setFuncDialog({ open: true, userId })` / `setMedicoDialog({ open: true, id })`. Vão passar a usar `<Link to="...">` (ou `useNavigate`) para as novas rotas. Os diálogos de edição não são mais montados na página — só fica o diálogo de "Novo cadastro".
+
+A rota `/app/equipe` aceita um search param opcional `tab=funcionarios|medicos` para que, ao voltar da edição, a aba correta fique selecionada.
+
+## O que NÃO muda
+
+- O botão **"Novo cadastro"** continua abrindo o seletor + diálogo (pop-up) — só edição vira página. Se você preferir que "Novo" também vire página, me diga.
+- As rotas existentes `/app/medico/$medicoId` e `/app/funcionario/$userId` (telas de **perfil** somente leitura, com agenda/contratos/etc.) continuam intocadas.
+- Páginas `/app/medicos` e `/app/funcionarios` continuam usando os mesmos diálogos (sem mudança para esta tarefa).
+
+## Resumo técnico
+
+```text
+src/components/funcionarios/
+  FuncionarioForm.tsx        (novo — corpo extraído)
+  FuncionarioFormDialog.tsx  (passa a usar FuncionarioForm)
+src/components/medicos/
+  MedicoForm.tsx             (novo — corpo extraído)
+  MedicoFormDialog.tsx       (passa a usar MedicoForm)
+src/routes/_authenticated/
+  app.equipe.tsx                                  (pencil → navigate)
+  app.equipe.funcionario.$userId.editar.tsx      (novo)
+  app.equipe.medico.$medicoId.editar.tsx         (novo)
+```
