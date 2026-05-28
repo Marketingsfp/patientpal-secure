@@ -948,6 +948,7 @@ function AgendaPage() {
   };
   const openSlot = (a: Agendamento) => {
     if (reagendandoAg) { void confirmarReagendamentoNoSlot(a); return; }
+    if (reagLoteIds) { void confirmarReagLoteNoSlot(a); return; }
     setEditing(a);
     setForm({
       paciente_nome: "",
