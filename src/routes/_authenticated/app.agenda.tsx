@@ -1816,9 +1816,9 @@ function AgendaPage() {
                               size="icon"
                               title="Confirmar presença (check-in)"
                               onClick={() => confirmarPresenca(a)}
-                              className="h-6 w-6 border-2 rounded-md text-emerald-700 border-emerald-600 hover:bg-emerald-50"
+                              className="h-5 w-5 border rounded-md text-emerald-700 border-emerald-600 hover:bg-emerald-50"
                             >
-                              <BadgeCheck className="h-3 w-3" />
+                              <BadgeCheck className="h-2.5 w-2.5" />
                             </Button>
                           );
                         }
@@ -1829,9 +1829,9 @@ function AgendaPage() {
                               size="icon"
                               disabled
                               title="Check-in já realizado"
-                              className="h-6 w-6 border-2 rounded-md bg-emerald-600 text-white border-emerald-600 disabled:opacity-100"
+                              className="h-5 w-5 border rounded-md bg-emerald-600 text-white border-emerald-600 disabled:opacity-100"
                             >
-                              <BadgeCheck className="h-3 w-3" />
+                              <BadgeCheck className="h-2.5 w-2.5" />
                             </Button>
                           );
                         }
@@ -1842,11 +1842,11 @@ function AgendaPage() {
                         size="icon"
                         title={pagosSet.has(a.id) ? "Pago" : "Pagamento pendente"}
                         onClick={() => cobrarAgendamento(a)}
-                        className={`h-6 w-6 border-2 rounded-md ${pagosSet.has(a.id)
+                        className={`h-5 w-5 border rounded-md ${pagosSet.has(a.id)
                           ? "text-emerald-600 border-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
                           : "text-rose-600 border-rose-600 hover:text-rose-700 hover:bg-rose-50"}`}
                       >
-                        <DollarSign className="h-3 w-3" />
+                        <DollarSign className="h-2.5 w-2.5" />
                       </Button>
                       <DropdownMenu>
                       <DropdownMenuTrigger asChild>
