@@ -3956,6 +3956,7 @@ export type Database = {
           crm: string
           crm_uf: string
           data_nascimento: string | null
+          duracao_consulta_min: number
           email: string | null
           especialidade_id: string | null
           estado: string | null
@@ -3998,6 +3999,7 @@ export type Database = {
           crm: string
           crm_uf: string
           data_nascimento?: string | null
+          duracao_consulta_min?: number
           email?: string | null
           especialidade_id?: string | null
           estado?: string | null
@@ -4040,6 +4042,7 @@ export type Database = {
           crm?: string
           crm_uf?: string
           data_nascimento?: string | null
+          duracao_consulta_min?: number
           email?: string | null
           especialidade_id?: string | null
           estado?: string | null
