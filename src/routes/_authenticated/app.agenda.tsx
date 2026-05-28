@@ -1053,7 +1053,7 @@ function AgendaPage() {
     }
     if (!form.inicio || !form.fim) { toast.error("Defina início e fim"); return; }
     if (new Date(form.fim) <= new Date(form.inicio)) { toast.error("O horário final deve ser após o inicial"); return; }
-    if (!form.procedimento.trim()) { toast.error("Selecione o procedimento"); return; }
+    if (!form.procedimento.trim()) { toast.error("Selecione o serviço"); return; }
     // Bloqueia criação/movimentação para um médico sem agenda aberta naquele dia
     const mudouHorarioOuMedico = !editing
       || editing.medico_id !== form.medico_id
@@ -1636,7 +1636,7 @@ function AgendaPage() {
                 <SearchableSelect
                   value={form.procedimento || "none"}
                   onChange={(v) => setForm(f => ({ ...f, procedimento: v === "none" ? "" : v }))}
-                  placeholder="Selecione o procedimento"
+                  placeholder="Selecione o serviço"
                   searchPlaceholder="Buscar serviço..."
                   options={[
                     { value: "none", label: "— Selecione —" },
