@@ -99,7 +99,7 @@ function EspecialidadesPage() {
     const { count, error: countError } = await supabase
       .from("procedimentos")
       .select("id", { count: "exact", head: true })
-      .eq("grupo", toDelete.nome);
+      .ilike("grupo", toDelete.nome);
     if (countError) { setDeleting(false); toast.error(countError.message); return; }
     if ((count ?? 0) > 0) {
       setDeleting(false);
@@ -107,9 +107,16 @@ function EspecialidadesPage() {
       setToDelete(null);
       return;
     }
-    const { error } = await supabase.from("especialidades").delete().eq("id", toDelete.id);
+    const { error, count: delCount } = await supabase
+      .from("especialidades")
+      .delete({ count: "exact" })
+      .eq("id", toDelete.id);
     setDeleting(false);
     if (error) { toast.error(error.message); return; }
+    if (!delCount) {
+      toast.error("Não foi possível excluir. Verifique se você tem permissão.");
+      return;
+    }
     toast.success("Especialidade excluída");
     setToDelete(null);
     void load();
