@@ -286,24 +286,32 @@ function AgendaPage() {
     const origem = reagendandoAg;
     if (!origem || reagSalvando) return;
     if (slot.id === origem.id) { toast.info("Esse já é o horário atual."); return; }
+    if (normalizar(slot.paciente_nome) !== "disponivel") {
+      toast.error("Esse horário não está disponível. Escolha um slot DISPONÍVEL.");
+      return;
+    }
     setReagSalvando(true);
     const obsAnt = origem.observacoes ?? "";
     const trilha = `[Reagendado em ${new Date().toLocaleString("pt-BR")}] de ${new Date(origem.inicio).toLocaleString("pt-BR")} para ${new Date(slot.inicio).toLocaleString("pt-BR")}`;
     const novasObs = obsAnt ? `${obsAnt}\n${trilha}` : trilha;
-    // 1) Move o agendamento para o novo horário/médico
+    // 1) Libera a ficha de origem (vira DISPONÍVEL no horário atual)
     const { error: e1 } = await supabase.from("agendamentos").update({
-      inicio: slot.inicio,
-      fim: slot.fim,
-      medico_id: slot.medico_id ?? null,
-      status: "agendado",
-      observacoes: novasObs,
-    } as never).eq("id", origem.id);
-    if (e1) { setReagSalvando(false); toast.error(e1.message); return; }
-    // 2) Libera o slot escolhido (que era "DISPONÍVEL")
-    const { error: e2 } = await supabase.from("agendamentos").update({
       paciente_id: null,
       paciente_nome: "DISPONÍVEL",
       status: "agendado",
+      procedimento: null,
+      observacoes: null,
+      data_pagamento: null,
+    } as never).eq("id", origem.id);
+    if (e1) { setReagSalvando(false); toast.error(e1.message); return; }
+    // 2) Coloca a paciente na ficha de destino (slot escolhido), preservando o horário do slot
+    const { error: e2 } = await supabase.from("agendamentos").update({
+      paciente_id: origem.paciente_id ?? null,
+      paciente_nome: origem.paciente_nome,
+      procedimento: origem.procedimento ?? null,
+      status: "agendado",
+      observacoes: novasObs,
+      data_pagamento: origem.data_pagamento ?? null,
     } as never).eq("id", slot.id);
     if (e2) { setReagSalvando(false); toast.error(e2.message); return; }
     setReagSalvando(false);
@@ -910,20 +918,26 @@ function AgendaPage() {
       const alvo = alvos[i];
       const trilha = `[Reagendado em lote em ${agora}] de ${new Date(origem.inicio).toLocaleString("pt-BR")} para ${new Date(alvo.inicio).toLocaleString("pt-BR")}`;
       const novasObs = origem.observacoes ? `${origem.observacoes}\n${trilha}` : trilha;
+      // 1) Libera a ficha de origem
       const { error: e1 } = await supabase.from("agendamentos").update({
-        inicio: alvo.inicio,
-        fim: alvo.fim,
-        medico_id: alvo.medico_id ?? slot.medico_id,
-        status: "agendado",
-        observacoes: novasObs,
-      } as never).eq("id", origem.id);
-      if (e1) { toast.error(`Falha em ${origem.paciente_nome}: ${e1.message}`); continue; }
-      const { error: e2 } = await supabase.from("agendamentos").update({
         paciente_id: null,
         paciente_nome: "DISPONÍVEL",
         status: "agendado",
+        procedimento: null,
+        observacoes: null,
+        data_pagamento: null,
+      } as never).eq("id", origem.id);
+      if (e1) { toast.error(`Falha em ${origem.paciente_nome}: ${e1.message}`); continue; }
+      // 2) Coloca a paciente na ficha de destino (mantendo o horário do alvo)
+      const { error: e2 } = await supabase.from("agendamentos").update({
+        paciente_id: origem.paciente_id ?? null,
+        paciente_nome: origem.paciente_nome,
+        procedimento: origem.procedimento ?? null,
+        status: "agendado",
+        observacoes: novasObs,
+        data_pagamento: origem.data_pagamento ?? null,
       } as never).eq("id", alvo.id);
-      if (e2) { toast.error(`Falha ao liberar slot: ${e2.message}`); continue; }
+      if (e2) { toast.error(`Falha ao mover para destino: ${e2.message}`); continue; }
       okCount++;
     }
     setReagLoteSalvando(false);
