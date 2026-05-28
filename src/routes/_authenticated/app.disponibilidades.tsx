@@ -38,7 +38,7 @@ function isFeriadoOuDomingo(d: Date): boolean {
 }
 
 interface Disp { id: string; medico_id: string; dia_semana: number; hora_inicio: string; hora_fim: string; observacoes: string | null; limite_pacientes: number | null }
-interface Medico { id: string; nome: string }
+interface Medico { id: string; nome: string; duracao_consulta_min: number | null }
 
 function Page() {
   const { clinicaAtual } = useClinica();
@@ -48,7 +48,7 @@ function Page() {
   const [novo, setNovo] = useState({ medico_id: "", dia_semana: "1", hora_inicio: "08:00", hora_fim: "12:00", limite_pacientes: "" });
   const hojeIso = new Date().toISOString().slice(0, 10);
   const em30Iso = (() => { const d = new Date(); d.setDate(d.getDate() + 29); return d.toISOString().slice(0, 10); })();
-  const [gerar, setGerar] = useState({ medico_id: "all", duracao: "5", dias: "30", data_inicio: hojeIso, data_fim: em30Iso, limite_fichas: "" });
+  const [gerar, setGerar] = useState({ medico_id: "all", dias: "30", data_inicio: hojeIso, data_fim: em30Iso, limite_fichas: "" });
   const [gerando, setGerando] = useState(false);
   const [medicoEditando, setMedicoEditando] = useState<string | null>(null);
   const [dispEditando, setDispEditando] = useState<string | null>(null);
@@ -56,10 +56,10 @@ function Page() {
   const load = async () => {
     if (!clinicaAtual) return;
     const [m, d] = await Promise.all([
-      supabase.from("medicos").select("id, nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
+      supabase.from("medicos").select("id, nome, duracao_consulta_min").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("medico_disponibilidades").select("id, medico_id, dia_semana, hora_inicio, hora_fim, observacoes, limite_pacientes" as never).eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("dia_semana").order("hora_inicio"),
     ]);
-    setMedicos(m.data ?? []);
+    setMedicos(((m.data as unknown) as Medico[]) ?? []);
     setDisps(((d.data as unknown) as Disp[]) ?? []);
   };
 
