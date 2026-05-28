@@ -1620,12 +1620,12 @@ function AgendaPage() {
 
       {/* Filtros */}
       <div
-        className="rounded-lg border bg-card p-2.5 space-y-2 [--clinic:theme(colors.border)]"
+        className="rounded-lg border bg-card p-2 space-y-1.5 text-xs [&_input]:h-7 [&_input]:text-xs [&_button[role=combobox]]:h-7 [&_button[role=combobox]]:text-xs [--clinic:theme(colors.border)]"
         style={{ ["--clinic" as never]: corClinica }}
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-1.5">
           <div className="space-y-0.5">
-            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Profissional</Label>
+            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Profissional</Label>
             <MedicoFiltroInput
               medicos={medicos}
               value={filtroMedico}
@@ -1635,7 +1635,7 @@ function AgendaPage() {
             />
           </div>
           <div className="space-y-0.5">
-            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Data Ref.</Label>
+            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Data Ref.</Label>
             <DataRefField
               dataRef={dataRef}
               dataFim={dataFim}
@@ -1645,7 +1645,7 @@ function AgendaPage() {
             />
           </div>
           <div className="space-y-0.5">
-            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Dia Semana</Label>
+            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Dia Semana</Label>
             <Select value={filtroDiaSemana} onValueChange={setFiltroDiaSemana}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -1655,7 +1655,7 @@ function AgendaPage() {
             </Select>
           </div>
           <div className="space-y-0.5">
-            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Cliente</Label>
+            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Cliente</Label>
             <div className="flex gap-1">
               <Input data-quick-search value={filtroCliente} onChange={(e) => setFiltroCliente(e.target.value)} placeholder="Buscar paciente…" />
               <Button
@@ -1667,17 +1667,18 @@ function AgendaPage() {
                   setNovoPac({ nome: filtroCliente.trim(), cpf: "", telefone: "", data_nascimento: "", email: "" });
                   setNovoPacOpen(true);
                 }}
+                className="h-7 w-7"
               >
-                <UserPlus className="h-4 w-4" />
+                <UserPlus className="h-3.5 w-3.5" />
               </Button>
             </div>
           </div>
           <div className="space-y-0.5">
-            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Nº Ficha</Label>
+            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Nº Ficha</Label>
             <Input value={filtroFicha} onChange={(e) => setFiltroFicha(e.target.value.replace(/\D/g, ""))} placeholder="Ex.: 001" inputMode="numeric" />
           </div>
           <div className="space-y-0.5">
-            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Especialidade</Label>
+            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Especialidade</Label>
             <Select value={filtroEspecialidade} onValueChange={setFiltroEspecialidade}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -1687,7 +1688,7 @@ function AgendaPage() {
             </Select>
           </div>
           <div className="space-y-0.5">
-            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Situação</Label>
+            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Situação</Label>
             <Select value={filtroStatus} onValueChange={setFiltroStatus}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -1700,16 +1701,16 @@ function AgendaPage() {
             </Select>
           </div>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-1.5">
           <div className="flex flex-wrap items-center gap-4">
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <label className="flex items-center gap-2 text-xs cursor-pointer">
               <Checkbox checked={apenasData} onCheckedChange={(v) => setApenasData(!!v)} />
               Exibir apenas a data selecionada
             </label>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={limparFiltros}><X className="h-4 w-4 mr-2" /> Limpar</Button>
-            <Button onClick={load}><Search className="h-4 w-4 mr-2" /> Exibir</Button>
+          <div className="flex gap-1.5">
+            <Button variant="outline" size="sm" onClick={limparFiltros} className="h-7 text-xs"><X className="h-3.5 w-3.5 mr-1.5" /> Limpar</Button>
+            <Button size="sm" onClick={load} className="h-7 text-xs"><Search className="h-3.5 w-3.5 mr-1.5" /> Exibir</Button>
           </div>
         </div>
       </div>
