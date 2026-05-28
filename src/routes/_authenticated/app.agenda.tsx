@@ -796,6 +796,20 @@ function AgendaPage() {
       toast.info("Há atendimentos já pagos na seleção. Desmarque-os antes de cobrar.");
       return;
     }
+    // Verificação fresca: bloqueia se algum item já tiver lançamento no banco
+    const { data: jaPagosLote } = await supabase
+      .from("fin_lancamentos")
+      .select("agendamento_id")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("tipo", "receita")
+      .in("agendamento_id", ids);
+    if ((jaPagosLote ?? []).length > 0) {
+      const pagos = new Set(((jaPagosLote ?? []) as Array<{ agendamento_id: string | null }>)
+        .map((r) => r.agendamento_id).filter((x): x is string => !!x));
+      setPagosSet((prev) => { const n = new Set(prev); pagos.forEach((id) => n.add(id)); return n; });
+      toast.info("Há atendimentos já pagos na seleção. Desmarque-os antes de cobrar.");
+      return;
+    }
     // busca valores dos procedimentos pelo nome (todas as formas de pagamento)
     const { data: procs } = await supabase
       .from("procedimentos")
