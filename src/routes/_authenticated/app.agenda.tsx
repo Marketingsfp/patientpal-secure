@@ -1798,6 +1798,15 @@ function AgendaPage() {
                       >
                         {a.status === "confirmado" && <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />}
                         {a.paciente_id && <IdadeIcon nascimento={nascMap.get(a.paciente_id) ?? null} size={18} />}
+                        {a.paciente_id && convenioMap.has(a.paciente_id) && (
+                          <span
+                            title={`Convênio: ${convenioMap.get(a.paciente_id)}`}
+                            className="inline-flex items-center gap-0.5 rounded-sm border border-sky-500/40 bg-sky-50 px-1 py-0 text-[9px] font-semibold uppercase text-sky-700"
+                          >
+                            <ShieldCheck className="h-3 w-3" />
+                            Convênio
+                          </span>
+                        )}
                         {a.paciente_nome}
                       </button>
                     )}
