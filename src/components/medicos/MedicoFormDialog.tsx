@@ -831,7 +831,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                           ))}
                       </select>
                     </div>
-                    <div className="max-h-48 overflow-y-auto space-y-1">
+                  <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-1">
                       {procs.length === 0 && (
                         <p className="text-xs text-muted-foreground text-center py-3">
                           Nenhum serviço cadastrado. Cadastre em "Serviços".
@@ -843,7 +843,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                         .map((p) => {
                           const checked = convenios.some((c) => c.nome.trim().toLowerCase() === p.nome.toLowerCase());
                           return (
-                            <label key={p.id} className="flex items-center gap-2 text-sm py-1 px-1 hover:bg-background rounded cursor-pointer">
+                          <label key={p.id} className="flex items-center gap-2 text-sm py-1 px-1 hover:bg-background rounded cursor-pointer w-full min-w-0">
                               <Checkbox
                                 checked={checked}
                                 onCheckedChange={(v) => {
@@ -859,8 +859,8 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                                   }
                                 }}
                               />
-                              <span className="flex-1 truncate">{p.nome}</span>
-                              {p.grupo && <span className="text-xs text-muted-foreground">{p.grupo}</span>}
+                            <span className="flex-1 min-w-0 truncate">{p.nome}</span>
+                            {p.grupo && <span className="text-xs text-muted-foreground truncate max-w-[40%]">{p.grupo}</span>}
                             </label>
                           );
                         })}
