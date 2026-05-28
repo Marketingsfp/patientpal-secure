@@ -987,7 +987,7 @@ function AgendaPage() {
   const fmtHora = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   const fmtData = (iso: string) => {
     const d = new Date(iso);
-    return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+    return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getFullYear()).slice(-2)}`;
   };
   const fmtDiaSemana = (iso: string) => DIAS_SEMANA[new Date(iso).getDay()];
 
