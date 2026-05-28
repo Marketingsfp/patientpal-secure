@@ -47,7 +47,7 @@ function Page() {
   const [novo, setNovo] = useState({ medico_id: "", dia_semana: "1", hora_inicio: "08:00", hora_fim: "12:00", limite_pacientes: "" });
   const hojeIso = new Date().toISOString().slice(0, 10);
   const em30Iso = (() => { const d = new Date(); d.setDate(d.getDate() + 29); return d.toISOString().slice(0, 10); })();
-  const [gerar, setGerar] = useState({ medico_id: "all", duracao: "5", dias: "30", data_inicio: hojeIso, data_fim: em30Iso });
+  const [gerar, setGerar] = useState({ medico_id: "all", duracao: "5", dias: "30", data_inicio: hojeIso, data_fim: em30Iso, limite_fichas: "" });
   const [gerando, setGerando] = useState(false);
 
   const load = async () => {
@@ -103,9 +103,15 @@ function Page() {
       const dow = d.getDay();
       for (const m of alvo) {
         const ds = disps.filter((x) => x.medico_id === m.id && x.dia_semana === dow);
-        // Limite di rio: soma os limites das janelas do dia (se algum estiver definido)
-        const limitesDoDia = ds.map((x) => x.limite_pacientes).filter((n): n is number => typeof n === "number" && n > 0);
-        const limiteDia = limitesDoDia.length > 0 ? limitesDoDia.reduce((a, b) => a + b, 0) : Infinity;
+        // Limite diário: override manual do formulário; senão soma das janelas cadastradas
+        const overrideLimite = gerar.limite_fichas ? parseInt(gerar.limite_fichas) : 0;
+        let limiteDia: number;
+        if (overrideLimite > 0) {
+          limiteDia = overrideLimite;
+        } else {
+          const limitesDoDia = ds.map((x) => x.limite_pacientes).filter((n): n is number => typeof n === "number" && n > 0);
+          limiteDia = limitesDoDia.length > 0 ? limitesDoDia.reduce((a, b) => a + b, 0) : Infinity;
+        }
         let criadosNoDia = 0;
         for (const disp of ds) {
           const [hi, mi] = disp.hora_inicio.split(":").map(Number);
