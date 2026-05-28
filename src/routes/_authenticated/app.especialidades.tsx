@@ -9,7 +9,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Stethoscope, Plus, Pencil, Search } from "lucide-react";
+import { Stethoscope, Plus, Pencil, Search, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/app/especialidades")({
@@ -27,6 +37,8 @@ function EspecialidadesPage() {
   const [editing, setEditing] = useState<Esp | null>(null);
   const [form, setForm] = useState({ nome: "", descricao: "", ativo: true });
   const [saving, setSaving] = useState(false);
+  const [toDelete, setToDelete] = useState<Esp | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -81,6 +93,28 @@ function EspecialidadesPage() {
 
   const filtered = rows.filter(r => r.nome.toLowerCase().includes(q.toLowerCase()));
 
+  async function confirmarExclusao() {
+    if (!toDelete) return;
+    setDeleting(true);
+    const { count, error: countError } = await supabase
+      .from("procedimentos")
+      .select("id", { count: "exact", head: true })
+      .eq("grupo", toDelete.nome);
+    if (countError) { setDeleting(false); toast.error(countError.message); return; }
+    if ((count ?? 0) > 0) {
+      setDeleting(false);
+      toast.error(`Não é possível excluir: existem ${count} serviço(s) vinculados a esta especialidade.`);
+      setToDelete(null);
+      return;
+    }
+    const { error } = await supabase.from("especialidades").delete().eq("id", toDelete.id);
+    setDeleting(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Especialidade excluída");
+    setToDelete(null);
+    void load();
+  }
+
   return (
     <div className="p-6 space-y-4">
       <div className="flex items-center gap-3">
@@ -105,7 +139,7 @@ function EspecialidadesPage() {
             <TableRow>
               <TableHead>Nome</TableHead>
               <TableHead className="w-32">Situação</TableHead>
-              <TableHead className="w-20 text-right">Ações</TableHead>
+              <TableHead className="w-28 text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -123,6 +157,9 @@ function EspecialidadesPage() {
                 </TableCell>
                 <TableCell className="text-right">
                   <Button variant="ghost" size="icon" onClick={() => openEdit(r)}><Pencil className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" onClick={() => setToDelete(r)} aria-label="Excluir">
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}
@@ -153,6 +190,23 @@ function EspecialidadesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!toDelete} onOpenChange={(o) => !o && setToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir especialidade</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir <strong>{toDelete?.nome}</strong>? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); void confirmarExclusao(); }} disabled={deleting}>
+              {deleting ? "Excluindo…" : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
