@@ -1,0 +1,1 @@
+DELETE FROM public.medicos WHERE id = '0bc89220-a89c-498d-913e-fd190bb7d9c1';
