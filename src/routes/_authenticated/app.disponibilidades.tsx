@@ -125,8 +125,7 @@ function Page() {
 
   // Pré-visualização dos slots gerados
   const slotsPreview = useMemo(() => {
-    const dur = parseInt(gerar.duracao);
-    if (!dur || !gerar.data_inicio || !gerar.data_fim) return [] as { data: string; medico: string; inicio: string; fim: string }[];
+    if (!gerar.data_inicio || !gerar.data_fim) return [] as { data: string; medico: string; inicio: string; fim: string }[];
     const ini = new Date(`${gerar.data_inicio}T00:00:00`);
     const fimD = new Date(`${gerar.data_fim}T00:00:00`);
     if (fimD < ini) return [];
@@ -138,6 +137,7 @@ function Page() {
       if (isFeriadoOuDomingo(d)) continue;
       const dow = d.getDay();
       for (const m of alvo) {
+        const dur = m.duracao_consulta_min && m.duracao_consulta_min > 0 ? m.duracao_consulta_min : 15;
         const ds = disps.filter((x) => x.medico_id === m.id && x.dia_semana === dow);
         // Limite diário: override manual do formulário; senão soma das janelas cadastradas
         const overrideLimite = gerar.limite_fichas ? parseInt(gerar.limite_fichas) : 0;
