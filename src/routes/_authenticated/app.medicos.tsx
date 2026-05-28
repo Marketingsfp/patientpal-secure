@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Plus, Stethoscope, Pencil, Download } from "lucide-react";
 import { toast } from "sonner";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { MedicoFormDialog } from "@/components/medicos/MedicoFormDialog";
 
 export const Route = createFileRoute("/_authenticated/app/medicos")({
   component: MedicosPage,
@@ -40,6 +41,7 @@ function MedicosPage() {
   const navigate = useNavigate();
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [busca, setBusca] = useState("");
+  const [dialog, setDialog] = useState<{ open: boolean; id: string | null }>({ open: false, id: null });
 
   const load = async () => {
     if (!clinicaAtual) return;
@@ -68,14 +70,16 @@ function MedicosPage() {
 
   useEffect(() => {
     if (autoNew === "1") {
-      void navigate({ to: "/app/medico-novo", replace: true });
+      setDialog({ open: true, id: null });
+      void navigate({ to: "/app/medicos", search: {}, replace: true });
     }
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [autoNew]);
 
   useEffect(() => {
     if (autoEdit) {
-      void navigate({ to: "/app/medico/$medicoId/editar", params: { medicoId: autoEdit }, replace: true });
+      setDialog({ open: true, id: autoEdit });
+      void navigate({ to: "/app/medicos", search: {}, replace: true });
     }
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [autoEdit]);
@@ -134,8 +138,8 @@ function MedicosPage() {
           <Button variant="outline" onClick={handleExport}>
             <Download className="h-4 w-4 mr-2" /> Exportar Excel
           </Button>
-          <Button asChild>
-            <Link to="/app/medico-novo"><Plus className="h-4 w-4 mr-2" /> Novo médico</Link>
+          <Button onClick={() => setDialog({ open: true, id: null })}>
+            <Plus className="h-4 w-4 mr-2" /> Novo médico
           </Button>
         </div>
       </div>
@@ -173,10 +177,8 @@ function MedicosPage() {
                   <TableCell>{m.medico_especialidades?.map((me) => me.especialidade?.nome).filter(Boolean).join(", ") || "—"}</TableCell>
                   <TableCell className="text-right">{fmtRepasse(m)}</TableCell>
                   <TableCell className="text-right">
-                    <Button asChild size="icon" variant="ghost" aria-label="Editar">
-                      <Link to="/app/medico/$medicoId/editar" params={{ medicoId: m.id }}>
-                        <Pencil className="h-4 w-4" />
-                      </Link>
+                    <Button size="icon" variant="ghost" onClick={() => setDialog({ open: true, id: m.id })} aria-label="Editar">
+                      <Pencil className="h-4 w-4" />
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -186,6 +188,13 @@ function MedicosPage() {
         </Card>
       )}
 
+      <MedicoFormDialog
+        open={dialog.open}
+        onOpenChange={(o) => setDialog((s) => ({ ...s, open: o }))}
+        clinicaId={clinicaAtual.clinica_id}
+        editingMedicoId={dialog.id}
+        onSaved={() => void load()}
+      />
     </div>
   );
 }

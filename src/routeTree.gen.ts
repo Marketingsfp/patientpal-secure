@@ -51,7 +51,6 @@ import { Route as AuthenticatedAppMktLeadsRouteImport } from './routes/_authenti
 import { Route as AuthenticatedAppMktLandingRouteImport } from './routes/_authenticated/app.mkt-landing'
 import { Route as AuthenticatedAppMktEnviosRouteImport } from './routes/_authenticated/app.mkt-envios'
 import { Route as AuthenticatedAppMedicosRouteImport } from './routes/_authenticated/app.medicos'
-import { Route as AuthenticatedAppMedicoNovoRouteImport } from './routes/_authenticated/app.medico-novo'
 import { Route as AuthenticatedAppLmsAdminRouteImport } from './routes/_authenticated/app.lms-admin'
 import { Route as AuthenticatedAppLgpdRouteImport } from './routes/_authenticated/app.lgpd'
 import { Route as AuthenticatedAppIntegrationSecretsRouteImport } from './routes/_authenticated/app.integration-secrets'
@@ -60,7 +59,6 @@ import { Route as AuthenticatedAppHrHoleritesRouteImport } from './routes/_authe
 import { Route as AuthenticatedAppHrFeriasRouteImport } from './routes/_authenticated/app.hr-ferias'
 import { Route as AuthenticatedAppHrContratosRouteImport } from './routes/_authenticated/app.hr-contratos'
 import { Route as AuthenticatedAppFuncionariosRouteImport } from './routes/_authenticated/app.funcionarios'
-import { Route as AuthenticatedAppFuncionarioNovoRouteImport } from './routes/_authenticated/app.funcionario-novo'
 import { Route as AuthenticatedAppFluxoRouteImport } from './routes/_authenticated/app.fluxo'
 import { Route as AuthenticatedAppFinanceiroRouteImport } from './routes/_authenticated/app.financeiro'
 import { Route as AuthenticatedAppExamesResultadosRouteImport } from './routes/_authenticated/app.exames-resultados'
@@ -111,8 +109,6 @@ import { Route as AuthenticatedAppCartaoBeneficiosConveniosRouteImport } from '.
 import { Route as AuthenticatedAppCartaoBeneficiosContratosRouteImport } from './routes/_authenticated/app.cartao-beneficios.contratos'
 import { Route as AuthenticatedAppCartaoBeneficiosBeneficiosRouteImport } from './routes/_authenticated/app.cartao-beneficios.beneficios'
 import { Route as AuthenticatedAppAtendimentoIaAgendamentoIdRouteImport } from './routes/_authenticated/app.atendimento-ia.$agendamentoId'
-import { Route as AuthenticatedAppMedicoMedicoIdEditarRouteImport } from './routes/_authenticated/app.medico.$medicoId.editar'
-import { Route as AuthenticatedAppFuncionarioUserIdEditarRouteImport } from './routes/_authenticated/app.funcionario.$userId.editar'
 import { Route as AuthenticatedAppClientesPacienteIdEditarRouteImport } from './routes/_authenticated/app.clientes.$pacienteId.editar'
 
 const TotemRoute = TotemRouteImport.update({
@@ -340,12 +336,6 @@ const AuthenticatedAppMedicosRoute = AuthenticatedAppMedicosRouteImport.update({
   path: '/medicos',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
-const AuthenticatedAppMedicoNovoRoute =
-  AuthenticatedAppMedicoNovoRouteImport.update({
-    id: '/medico-novo',
-    path: '/medico-novo',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
 const AuthenticatedAppLmsAdminRoute =
   AuthenticatedAppLmsAdminRouteImport.update({
     id: '/lms-admin',
@@ -390,12 +380,6 @@ const AuthenticatedAppFuncionariosRoute =
   AuthenticatedAppFuncionariosRouteImport.update({
     id: '/funcionarios',
     path: '/funcionarios',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppFuncionarioNovoRoute =
-  AuthenticatedAppFuncionarioNovoRouteImport.update({
-    id: '/funcionario-novo',
-    path: '/funcionario-novo',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppFluxoRoute = AuthenticatedAppFluxoRouteImport.update({
@@ -688,18 +672,6 @@ const AuthenticatedAppAtendimentoIaAgendamentoIdRoute =
     path: '/$agendamentoId',
     getParentRoute: () => AuthenticatedAppAtendimentoIaRoute,
   } as any)
-const AuthenticatedAppMedicoMedicoIdEditarRoute =
-  AuthenticatedAppMedicoMedicoIdEditarRouteImport.update({
-    id: '/editar',
-    path: '/editar',
-    getParentRoute: () => AuthenticatedAppMedicoMedicoIdRoute,
-  } as any)
-const AuthenticatedAppFuncionarioUserIdEditarRoute =
-  AuthenticatedAppFuncionarioUserIdEditarRouteImport.update({
-    id: '/editar',
-    path: '/editar',
-    getParentRoute: () => AuthenticatedAppFuncionarioUserIdRoute,
-  } as any)
 const AuthenticatedAppClientesPacienteIdEditarRoute =
   AuthenticatedAppClientesPacienteIdEditarRouteImport.update({
     id: '/clientes/$pacienteId/editar',
@@ -748,7 +720,6 @@ export interface FileRoutesByFullPath {
   '/app/exames-resultados': typeof AuthenticatedAppExamesResultadosRoute
   '/app/financeiro': typeof AuthenticatedAppFinanceiroRouteWithChildren
   '/app/fluxo': typeof AuthenticatedAppFluxoRoute
-  '/app/funcionario-novo': typeof AuthenticatedAppFuncionarioNovoRoute
   '/app/funcionarios': typeof AuthenticatedAppFuncionariosRoute
   '/app/hr-contratos': typeof AuthenticatedAppHrContratosRoute
   '/app/hr-ferias': typeof AuthenticatedAppHrFeriasRoute
@@ -757,7 +728,6 @@ export interface FileRoutesByFullPath {
   '/app/integration-secrets': typeof AuthenticatedAppIntegrationSecretsRoute
   '/app/lgpd': typeof AuthenticatedAppLgpdRoute
   '/app/lms-admin': typeof AuthenticatedAppLmsAdminRoute
-  '/app/medico-novo': typeof AuthenticatedAppMedicoNovoRoute
   '/app/medicos': typeof AuthenticatedAppMedicosRoute
   '/app/mkt-envios': typeof AuthenticatedAppMktEnviosRoute
   '/app/mkt-landing': typeof AuthenticatedAppMktLandingRoute
@@ -802,16 +772,14 @@ export interface FileRoutesByFullPath {
   '/app/financeiro/notas': typeof AuthenticatedAppFinanceiroNotasRoute
   '/app/financeiro/regras-ia': typeof AuthenticatedAppFinanceiroRegrasIaRoute
   '/app/financeiro/relatorios': typeof AuthenticatedAppFinanceiroRelatoriosRoute
-  '/app/funcionario/$userId': typeof AuthenticatedAppFuncionarioUserIdRouteWithChildren
+  '/app/funcionario/$userId': typeof AuthenticatedAppFuncionarioUserIdRoute
   '/app/imprimir/$agendamentoId': typeof AuthenticatedAppImprimirAgendamentoIdRoute
-  '/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRouteWithChildren
+  '/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/app/atendimento-ia/': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/app/clientes/': typeof AuthenticatedAppClientesIndexRoute
   '/app/financeiro/': typeof AuthenticatedAppFinanceiroIndexRoute
   '/app/clientes/$pacienteId/editar': typeof AuthenticatedAppClientesPacienteIdEditarRoute
-  '/app/funcionario/$userId/editar': typeof AuthenticatedAppFuncionarioUserIdEditarRoute
-  '/app/medico/$medicoId/editar': typeof AuthenticatedAppMedicoMedicoIdEditarRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -851,7 +819,6 @@ export interface FileRoutesByTo {
   '/app/estoque': typeof AuthenticatedAppEstoqueRoute
   '/app/exames-resultados': typeof AuthenticatedAppExamesResultadosRoute
   '/app/fluxo': typeof AuthenticatedAppFluxoRoute
-  '/app/funcionario-novo': typeof AuthenticatedAppFuncionarioNovoRoute
   '/app/funcionarios': typeof AuthenticatedAppFuncionariosRoute
   '/app/hr-contratos': typeof AuthenticatedAppHrContratosRoute
   '/app/hr-ferias': typeof AuthenticatedAppHrFeriasRoute
@@ -860,7 +827,6 @@ export interface FileRoutesByTo {
   '/app/integration-secrets': typeof AuthenticatedAppIntegrationSecretsRoute
   '/app/lgpd': typeof AuthenticatedAppLgpdRoute
   '/app/lms-admin': typeof AuthenticatedAppLmsAdminRoute
-  '/app/medico-novo': typeof AuthenticatedAppMedicoNovoRoute
   '/app/medicos': typeof AuthenticatedAppMedicosRoute
   '/app/mkt-envios': typeof AuthenticatedAppMktEnviosRoute
   '/app/mkt-landing': typeof AuthenticatedAppMktLandingRoute
@@ -905,16 +871,14 @@ export interface FileRoutesByTo {
   '/app/financeiro/notas': typeof AuthenticatedAppFinanceiroNotasRoute
   '/app/financeiro/regras-ia': typeof AuthenticatedAppFinanceiroRegrasIaRoute
   '/app/financeiro/relatorios': typeof AuthenticatedAppFinanceiroRelatoriosRoute
-  '/app/funcionario/$userId': typeof AuthenticatedAppFuncionarioUserIdRouteWithChildren
+  '/app/funcionario/$userId': typeof AuthenticatedAppFuncionarioUserIdRoute
   '/app/imprimir/$agendamentoId': typeof AuthenticatedAppImprimirAgendamentoIdRoute
-  '/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRouteWithChildren
+  '/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/app/clientes': typeof AuthenticatedAppClientesIndexRoute
   '/app/financeiro': typeof AuthenticatedAppFinanceiroIndexRoute
   '/app/clientes/$pacienteId/editar': typeof AuthenticatedAppClientesPacienteIdEditarRoute
-  '/app/funcionario/$userId/editar': typeof AuthenticatedAppFuncionarioUserIdEditarRoute
-  '/app/medico/$medicoId/editar': typeof AuthenticatedAppMedicoMedicoIdEditarRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -959,7 +923,6 @@ export interface FileRoutesById {
   '/_authenticated/app/exames-resultados': typeof AuthenticatedAppExamesResultadosRoute
   '/_authenticated/app/financeiro': typeof AuthenticatedAppFinanceiroRouteWithChildren
   '/_authenticated/app/fluxo': typeof AuthenticatedAppFluxoRoute
-  '/_authenticated/app/funcionario-novo': typeof AuthenticatedAppFuncionarioNovoRoute
   '/_authenticated/app/funcionarios': typeof AuthenticatedAppFuncionariosRoute
   '/_authenticated/app/hr-contratos': typeof AuthenticatedAppHrContratosRoute
   '/_authenticated/app/hr-ferias': typeof AuthenticatedAppHrFeriasRoute
@@ -968,7 +931,6 @@ export interface FileRoutesById {
   '/_authenticated/app/integration-secrets': typeof AuthenticatedAppIntegrationSecretsRoute
   '/_authenticated/app/lgpd': typeof AuthenticatedAppLgpdRoute
   '/_authenticated/app/lms-admin': typeof AuthenticatedAppLmsAdminRoute
-  '/_authenticated/app/medico-novo': typeof AuthenticatedAppMedicoNovoRoute
   '/_authenticated/app/medicos': typeof AuthenticatedAppMedicosRoute
   '/_authenticated/app/mkt-envios': typeof AuthenticatedAppMktEnviosRoute
   '/_authenticated/app/mkt-landing': typeof AuthenticatedAppMktLandingRoute
@@ -1013,16 +975,14 @@ export interface FileRoutesById {
   '/_authenticated/app/financeiro/notas': typeof AuthenticatedAppFinanceiroNotasRoute
   '/_authenticated/app/financeiro/regras-ia': typeof AuthenticatedAppFinanceiroRegrasIaRoute
   '/_authenticated/app/financeiro/relatorios': typeof AuthenticatedAppFinanceiroRelatoriosRoute
-  '/_authenticated/app/funcionario/$userId': typeof AuthenticatedAppFuncionarioUserIdRouteWithChildren
+  '/_authenticated/app/funcionario/$userId': typeof AuthenticatedAppFuncionarioUserIdRoute
   '/_authenticated/app/imprimir/$agendamentoId': typeof AuthenticatedAppImprimirAgendamentoIdRoute
-  '/_authenticated/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRouteWithChildren
+  '/_authenticated/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/_authenticated/app/atendimento-ia/': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/_authenticated/app/clientes/': typeof AuthenticatedAppClientesIndexRoute
   '/_authenticated/app/financeiro/': typeof AuthenticatedAppFinanceiroIndexRoute
   '/_authenticated/app/clientes/$pacienteId/editar': typeof AuthenticatedAppClientesPacienteIdEditarRoute
-  '/_authenticated/app/funcionario/$userId/editar': typeof AuthenticatedAppFuncionarioUserIdEditarRoute
-  '/_authenticated/app/medico/$medicoId/editar': typeof AuthenticatedAppMedicoMedicoIdEditarRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -1067,7 +1027,6 @@ export interface FileRouteTypes {
     | '/app/exames-resultados'
     | '/app/financeiro'
     | '/app/fluxo'
-    | '/app/funcionario-novo'
     | '/app/funcionarios'
     | '/app/hr-contratos'
     | '/app/hr-ferias'
@@ -1076,7 +1035,6 @@ export interface FileRouteTypes {
     | '/app/integration-secrets'
     | '/app/lgpd'
     | '/app/lms-admin'
-    | '/app/medico-novo'
     | '/app/medicos'
     | '/app/mkt-envios'
     | '/app/mkt-landing'
@@ -1129,8 +1087,6 @@ export interface FileRouteTypes {
     | '/app/clientes/'
     | '/app/financeiro/'
     | '/app/clientes/$pacienteId/editar'
-    | '/app/funcionario/$userId/editar'
-    | '/app/medico/$medicoId/editar'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -1170,7 +1126,6 @@ export interface FileRouteTypes {
     | '/app/estoque'
     | '/app/exames-resultados'
     | '/app/fluxo'
-    | '/app/funcionario-novo'
     | '/app/funcionarios'
     | '/app/hr-contratos'
     | '/app/hr-ferias'
@@ -1179,7 +1134,6 @@ export interface FileRouteTypes {
     | '/app/integration-secrets'
     | '/app/lgpd'
     | '/app/lms-admin'
-    | '/app/medico-novo'
     | '/app/medicos'
     | '/app/mkt-envios'
     | '/app/mkt-landing'
@@ -1232,8 +1186,6 @@ export interface FileRouteTypes {
     | '/app/clientes'
     | '/app/financeiro'
     | '/app/clientes/$pacienteId/editar'
-    | '/app/funcionario/$userId/editar'
-    | '/app/medico/$medicoId/editar'
   id:
     | '__root__'
     | '/'
@@ -1277,7 +1229,6 @@ export interface FileRouteTypes {
     | '/_authenticated/app/exames-resultados'
     | '/_authenticated/app/financeiro'
     | '/_authenticated/app/fluxo'
-    | '/_authenticated/app/funcionario-novo'
     | '/_authenticated/app/funcionarios'
     | '/_authenticated/app/hr-contratos'
     | '/_authenticated/app/hr-ferias'
@@ -1286,7 +1237,6 @@ export interface FileRouteTypes {
     | '/_authenticated/app/integration-secrets'
     | '/_authenticated/app/lgpd'
     | '/_authenticated/app/lms-admin'
-    | '/_authenticated/app/medico-novo'
     | '/_authenticated/app/medicos'
     | '/_authenticated/app/mkt-envios'
     | '/_authenticated/app/mkt-landing'
@@ -1339,8 +1289,6 @@ export interface FileRouteTypes {
     | '/_authenticated/app/clientes/'
     | '/_authenticated/app/financeiro/'
     | '/_authenticated/app/clientes/$pacienteId/editar'
-    | '/_authenticated/app/funcionario/$userId/editar'
-    | '/_authenticated/app/medico/$medicoId/editar'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1660,13 +1608,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppMedicosRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
-    '/_authenticated/app/medico-novo': {
-      id: '/_authenticated/app/medico-novo'
-      path: '/medico-novo'
-      fullPath: '/app/medico-novo'
-      preLoaderRoute: typeof AuthenticatedAppMedicoNovoRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
     '/_authenticated/app/lms-admin': {
       id: '/_authenticated/app/lms-admin'
       path: '/lms-admin'
@@ -1721,13 +1662,6 @@ declare module '@tanstack/react-router' {
       path: '/funcionarios'
       fullPath: '/app/funcionarios'
       preLoaderRoute: typeof AuthenticatedAppFuncionariosRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/funcionario-novo': {
-      id: '/_authenticated/app/funcionario-novo'
-      path: '/funcionario-novo'
-      fullPath: '/app/funcionario-novo'
-      preLoaderRoute: typeof AuthenticatedAppFuncionarioNovoRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/fluxo': {
@@ -2080,20 +2014,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppAtendimentoIaAgendamentoIdRouteImport
       parentRoute: typeof AuthenticatedAppAtendimentoIaRoute
     }
-    '/_authenticated/app/medico/$medicoId/editar': {
-      id: '/_authenticated/app/medico/$medicoId/editar'
-      path: '/editar'
-      fullPath: '/app/medico/$medicoId/editar'
-      preLoaderRoute: typeof AuthenticatedAppMedicoMedicoIdEditarRouteImport
-      parentRoute: typeof AuthenticatedAppMedicoMedicoIdRoute
-    }
-    '/_authenticated/app/funcionario/$userId/editar': {
-      id: '/_authenticated/app/funcionario/$userId/editar'
-      path: '/editar'
-      fullPath: '/app/funcionario/$userId/editar'
-      preLoaderRoute: typeof AuthenticatedAppFuncionarioUserIdEditarRouteImport
-      parentRoute: typeof AuthenticatedAppFuncionarioUserIdRoute
-    }
     '/_authenticated/app/clientes/$pacienteId/editar': {
       id: '/_authenticated/app/clientes/$pacienteId/editar'
       path: '/clientes/$pacienteId/editar'
@@ -2200,36 +2120,6 @@ const AuthenticatedAppFinanceiroRouteWithChildren =
     AuthenticatedAppFinanceiroRouteChildren,
   )
 
-interface AuthenticatedAppFuncionarioUserIdRouteChildren {
-  AuthenticatedAppFuncionarioUserIdEditarRoute: typeof AuthenticatedAppFuncionarioUserIdEditarRoute
-}
-
-const AuthenticatedAppFuncionarioUserIdRouteChildren: AuthenticatedAppFuncionarioUserIdRouteChildren =
-  {
-    AuthenticatedAppFuncionarioUserIdEditarRoute:
-      AuthenticatedAppFuncionarioUserIdEditarRoute,
-  }
-
-const AuthenticatedAppFuncionarioUserIdRouteWithChildren =
-  AuthenticatedAppFuncionarioUserIdRoute._addFileChildren(
-    AuthenticatedAppFuncionarioUserIdRouteChildren,
-  )
-
-interface AuthenticatedAppMedicoMedicoIdRouteChildren {
-  AuthenticatedAppMedicoMedicoIdEditarRoute: typeof AuthenticatedAppMedicoMedicoIdEditarRoute
-}
-
-const AuthenticatedAppMedicoMedicoIdRouteChildren: AuthenticatedAppMedicoMedicoIdRouteChildren =
-  {
-    AuthenticatedAppMedicoMedicoIdEditarRoute:
-      AuthenticatedAppMedicoMedicoIdEditarRoute,
-  }
-
-const AuthenticatedAppMedicoMedicoIdRouteWithChildren =
-  AuthenticatedAppMedicoMedicoIdRoute._addFileChildren(
-    AuthenticatedAppMedicoMedicoIdRouteChildren,
-  )
-
 interface AuthenticatedAppRouteChildren {
   AuthenticatedAppAgendaRoute: typeof AuthenticatedAppAgendaRoute
   AuthenticatedAppAlertasEnfermagemRoute: typeof AuthenticatedAppAlertasEnfermagemRoute
@@ -2255,7 +2145,6 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppExamesResultadosRoute: typeof AuthenticatedAppExamesResultadosRoute
   AuthenticatedAppFinanceiroRoute: typeof AuthenticatedAppFinanceiroRouteWithChildren
   AuthenticatedAppFluxoRoute: typeof AuthenticatedAppFluxoRoute
-  AuthenticatedAppFuncionarioNovoRoute: typeof AuthenticatedAppFuncionarioNovoRoute
   AuthenticatedAppFuncionariosRoute: typeof AuthenticatedAppFuncionariosRoute
   AuthenticatedAppHrContratosRoute: typeof AuthenticatedAppHrContratosRoute
   AuthenticatedAppHrFeriasRoute: typeof AuthenticatedAppHrFeriasRoute
@@ -2264,7 +2153,6 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppIntegrationSecretsRoute: typeof AuthenticatedAppIntegrationSecretsRoute
   AuthenticatedAppLgpdRoute: typeof AuthenticatedAppLgpdRoute
   AuthenticatedAppLmsAdminRoute: typeof AuthenticatedAppLmsAdminRoute
-  AuthenticatedAppMedicoNovoRoute: typeof AuthenticatedAppMedicoNovoRoute
   AuthenticatedAppMedicosRoute: typeof AuthenticatedAppMedicosRoute
   AuthenticatedAppMktEnviosRoute: typeof AuthenticatedAppMktEnviosRoute
   AuthenticatedAppMktLandingRoute: typeof AuthenticatedAppMktLandingRoute
@@ -2289,9 +2177,9 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppTriagemEnfermagemRoute: typeof AuthenticatedAppTriagemEnfermagemRoute
   AuthenticatedAppUnidadesRoute: typeof AuthenticatedAppUnidadesRoute
   AuthenticatedAppIndexRoute: typeof AuthenticatedAppIndexRoute
-  AuthenticatedAppFuncionarioUserIdRoute: typeof AuthenticatedAppFuncionarioUserIdRouteWithChildren
+  AuthenticatedAppFuncionarioUserIdRoute: typeof AuthenticatedAppFuncionarioUserIdRoute
   AuthenticatedAppImprimirAgendamentoIdRoute: typeof AuthenticatedAppImprimirAgendamentoIdRoute
-  AuthenticatedAppMedicoMedicoIdRoute: typeof AuthenticatedAppMedicoMedicoIdRouteWithChildren
+  AuthenticatedAppMedicoMedicoIdRoute: typeof AuthenticatedAppMedicoMedicoIdRoute
   AuthenticatedAppClientesIndexRoute: typeof AuthenticatedAppClientesIndexRoute
   AuthenticatedAppClientesPacienteIdEditarRoute: typeof AuthenticatedAppClientesPacienteIdEditarRoute
 }
@@ -2324,7 +2212,6 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppExamesResultadosRoute: AuthenticatedAppExamesResultadosRoute,
   AuthenticatedAppFinanceiroRoute: AuthenticatedAppFinanceiroRouteWithChildren,
   AuthenticatedAppFluxoRoute: AuthenticatedAppFluxoRoute,
-  AuthenticatedAppFuncionarioNovoRoute: AuthenticatedAppFuncionarioNovoRoute,
   AuthenticatedAppFuncionariosRoute: AuthenticatedAppFuncionariosRoute,
   AuthenticatedAppHrContratosRoute: AuthenticatedAppHrContratosRoute,
   AuthenticatedAppHrFeriasRoute: AuthenticatedAppHrFeriasRoute,
@@ -2334,7 +2221,6 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
     AuthenticatedAppIntegrationSecretsRoute,
   AuthenticatedAppLgpdRoute: AuthenticatedAppLgpdRoute,
   AuthenticatedAppLmsAdminRoute: AuthenticatedAppLmsAdminRoute,
-  AuthenticatedAppMedicoNovoRoute: AuthenticatedAppMedicoNovoRoute,
   AuthenticatedAppMedicosRoute: AuthenticatedAppMedicosRoute,
   AuthenticatedAppMktEnviosRoute: AuthenticatedAppMktEnviosRoute,
   AuthenticatedAppMktLandingRoute: AuthenticatedAppMktLandingRoute,
@@ -2363,11 +2249,10 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppUnidadesRoute: AuthenticatedAppUnidadesRoute,
   AuthenticatedAppIndexRoute: AuthenticatedAppIndexRoute,
   AuthenticatedAppFuncionarioUserIdRoute:
-    AuthenticatedAppFuncionarioUserIdRouteWithChildren,
+    AuthenticatedAppFuncionarioUserIdRoute,
   AuthenticatedAppImprimirAgendamentoIdRoute:
     AuthenticatedAppImprimirAgendamentoIdRoute,
-  AuthenticatedAppMedicoMedicoIdRoute:
-    AuthenticatedAppMedicoMedicoIdRouteWithChildren,
+  AuthenticatedAppMedicoMedicoIdRoute: AuthenticatedAppMedicoMedicoIdRoute,
   AuthenticatedAppClientesIndexRoute: AuthenticatedAppClientesIndexRoute,
   AuthenticatedAppClientesPacienteIdEditarRoute:
     AuthenticatedAppClientesPacienteIdEditarRoute,
@@ -2411,13 +2296,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

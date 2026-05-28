@@ -78,22 +78,14 @@ const emptyForm = () => ({
 });
 
 interface Props {
-  open?: boolean;
-  onOpenChange?: (o: boolean) => void;
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
   clinicaId: string;
   editingMedicoId?: string | null;
   onSaved?: () => void;
-  /** "dialog" (default) renders inside a modal; "page" renders inline as a full page. */
-  mode?: "dialog" | "page";
-  /** Called when the form should close (page mode). */
-  onClose?: () => void;
 }
 
-export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoId, onSaved, mode = "dialog", onClose }: Props) {
-  const close = () => {
-    if (mode === "page") onClose?.();
-    else onOpenChange?.(false);
-  };
+export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoId, onSaved }: Props) {
   const cadastrarUsuarioFn = useServerFn(cadastrarUsuario);
   const getLoginFn = useServerFn(getFuncionarioLogin);
   const definirSenhaFn = useServerFn(definirSenhaFuncionario);
@@ -422,18 +414,22 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
     }
 
     setSaving(false);
+    onOpenChange(false);
     onSaved?.();
-    close();
   };
 
   const hasLogin = !!medicoUserId;
-  const titleText = editId ? "Editar médico" : "Novo médico";
-  const isPage = mode === "page";
 
-  const innerForm = loading ? (
-    <div className="py-10 text-center text-sm text-muted-foreground">Carregando…</div>
-  ) : (
-    <form onSubmit={handleSubmit} className="space-y-4">
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-4xl w-[calc(100vw-2rem)] max-h-[95vh] overflow-y-auto overflow-x-hidden">
+        <DialogHeader className="sticky top-0 z-20 bg-background -mx-6 px-6 pt-6 -mt-6 pb-2 border-b">
+          <DialogTitle>{editId ? "Editar médico" : "Novo médico"}</DialogTitle>
+        </DialogHeader>
+        {loading ? (
+          <div className="py-10 text-center text-sm text-muted-foreground">Carregando…</div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
             <Tabs defaultValue="dados">
               <TabsList className="grid grid-cols-5 w-full sticky top-[3.25rem] z-10">
                 <TabsTrigger value="dados">Dados</TabsTrigger>
@@ -1014,36 +1010,12 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                 )}
               </TabsContent>
             </Tabs>
-            {isPage ? (
-              <div className="flex justify-end gap-2 border-t pt-3">
-                <Button type="button" variant="outline" onClick={close}>Voltar</Button>
-                <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button>
-              </div>
-            ) : (
-              <DialogFooter className="sticky bottom-0 bg-background border-t -mx-6 -mb-6 px-6 py-3 z-10">
-                <Button type="button" variant="outline" onClick={close}>Cancelar</Button>
-                <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button>
-              </DialogFooter>
-            )}
+            <DialogFooter className="sticky bottom-0 bg-background border-t -mx-6 -mb-6 px-6 py-3 z-10">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+              <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button>
+            </DialogFooter>
           </form>
-        );
-
-  if (isPage) {
-    return (
-      <div className="space-y-4">
-        <h1 className="text-2xl font-semibold">{titleText}</h1>
-        {innerForm}
-      </div>
-    );
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl w-[calc(100vw-2rem)] max-h-[95vh] overflow-y-auto overflow-x-hidden">
-        <DialogHeader className="sticky top-0 z-20 bg-background -mx-6 px-6 pt-6 -mt-6 pb-2 border-b">
-          <DialogTitle>{titleText}</DialogTitle>
-        </DialogHeader>
-        {innerForm}
+        )}
       </DialogContent>
     </Dialog>
   );
