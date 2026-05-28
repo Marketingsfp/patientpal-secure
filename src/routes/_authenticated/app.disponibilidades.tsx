@@ -368,20 +368,32 @@ function Page() {
                     {ds.length === 0 ? (
                       <p className="text-xs text-muted-foreground">Sem horários cadastrados.</p>
                     ) : (
-                      <div className="flex flex-wrap gap-2">
-                        {ds.map((d) => (
-                          <div key={d.id} className="flex items-center gap-2 border rounded-md px-2 py-1 text-sm bg-muted/40">
-                            <span className="font-medium">{DIAS[d.dia_semana]}</span>
-                            <span>{d.hora_inicio.slice(0, 5)}–{d.hora_fim.slice(0, 5)}</span>
-                            {d.limite_pacientes ? (
-                              <span className="text-xs text-primary font-medium">· {d.limite_pacientes} pac/dia</span>
-                            ) : null}
-                            <button onClick={() => remover(d.id)} className="text-destructive hover:opacity-70" aria-label="Remover">
-                              <Trash2 className="h-3 w-3" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Dia</TableHead>
+                            <TableHead>Início</TableHead>
+                            <TableHead>Fim</TableHead>
+                            <TableHead>Pacientes/dia</TableHead>
+                            <TableHead className="w-20 text-right">Ações</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {ds.map((d) => (
+                            <TableRow key={d.id}>
+                              <TableCell className="font-medium">{DIAS[d.dia_semana]}</TableCell>
+                              <TableCell>{d.hora_inicio.slice(0, 5)}</TableCell>
+                              <TableCell>{d.hora_fim.slice(0, 5)}</TableCell>
+                              <TableCell>{d.limite_pacientes ?? <span className="text-muted-foreground">—</span>}</TableCell>
+                              <TableCell className="text-right">
+                                <button onClick={() => remover(d.id)} className="text-destructive hover:opacity-70" aria-label="Remover">
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
                     )}
                   </CardContent>
                 </Card>
