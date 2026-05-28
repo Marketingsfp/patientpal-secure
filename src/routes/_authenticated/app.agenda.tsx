@@ -2215,11 +2215,7 @@ function AgendaPage() {
                       ) : (
                         <Badge className={STATUS_COR[a.status]}>{STATUS_LABEL[a.status]}</Badge>
                       )}
-                      {pagosSet.has(a.id) && (
-                        <Badge className="bg-emerald-600 text-white border border-emerald-700 hover:bg-emerald-600">
-                          Pago
-                        </Badge>
-                      )}
+                      {/* Badge "Pago" removida — destaque fica apenas no ícone $ na coluna Ações */}
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
@@ -2260,11 +2256,11 @@ function AgendaPage() {
                         size="icon"
                         title={pagosSet.has(a.id) ? "Pago" : "Pagamento pendente"}
                         onClick={() => cobrarAgendamento(a)}
-                        className={`h-5 w-5 border rounded-md ${pagosSet.has(a.id)
-                          ? "text-emerald-600 border-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                        className={`h-7 w-7 border-2 rounded-md shadow-sm ${pagosSet.has(a.id)
+                          ? "bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-700 hover:text-white ring-2 ring-emerald-200"
                           : "text-rose-600 border-rose-600 hover:text-rose-700 hover:bg-rose-50"}`}
                       >
-                        <DollarSign className="h-2.5 w-2.5" />
+                        <DollarSign className="h-4 w-4" strokeWidth={pagosSet.has(a.id) ? 3 : 2.5} />
                       </Button>
                       <DropdownMenu>
                       <DropdownMenuTrigger asChild>
