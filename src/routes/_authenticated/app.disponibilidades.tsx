@@ -216,6 +216,17 @@ function Page() {
                   <label className="text-xs text-muted-foreground">Até</label>
                   <Input type="date" className="w-40" value={gerar.data_fim} onChange={(e) => setGerar({ ...gerar, data_fim: e.target.value })} />
                 </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Nº de fichas</label>
+                  <Input
+                    type="number"
+                    min={1}
+                    placeholder="padrão do médico"
+                    className="w-36"
+                    value={gerar.limite_fichas}
+                    onChange={(e) => setGerar({ ...gerar, limite_fichas: e.target.value })}
+                  />
+                </div>
                 <Button onClick={gerarAgenda} disabled={gerando || slotsPreview.length === 0}>
                   <CalendarRange className="h-4 w-4 mr-1" />
                   {gerando ? "Gerando..." : `Gerar ${slotsPreview.length} slots`}
