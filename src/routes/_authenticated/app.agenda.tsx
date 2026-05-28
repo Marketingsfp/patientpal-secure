@@ -843,35 +843,42 @@ function AgendaPage() {
       toast.error(`${bloqueados.length} item(ns) não podem ser reagendados (já atendidos ou slot vazio). Desmarque-os.`);
       return;
     }
-    setReagLoteMedico("");
-    setReagLoteData(dataRef);
-    setReagLoteFicha("1");
-    setReagLoteOpen(true);
+    // Mesmo fluxo do reagendamento individual: ativa modo lote e aguarda o clique num slot DISPONÍVEL
+    const idsOrdenados = itens
+      .slice()
+      .sort((a, b) => new Date(a.inicio).getTime() - new Date(b.inicio).getTime())
+      .map(i => i.id);
+    setReagendandoAg(null);
+    setReagLoteIds(idsOrdenados);
+    toast.info(`Selecione um horário disponível na agenda para reagendar os ${idsOrdenados.length} paciente(s) selecionado(s).`);
   };
 
-  const confirmarReagLote = async () => {
-    if (!clinicaAtual) return;
-    if (!reagLoteMedico) { toast.error("Escolha o médico de destino."); return; }
-    if (!reagLoteData) { toast.error("Escolha a data de destino."); return; }
-    const fichaInicial = Number(reagLoteFicha);
-    if (!Number.isFinite(fichaInicial) || fichaInicial < 1) {
-      toast.error("Informe um número de ficha válido (>= 1)."); return;
-    }
+  const cancelarReagLote = () => setReagLoteIds(null);
 
-    const ids = Array.from(selecionados);
+  // Confirma o reagendamento em lote ao clicar num slot DISPONÍVEL (a partir desse slot, ocupa os próximos N livres)
+  const confirmarReagLoteNoSlot = async (slot: Agendamento) => {
+    if (!clinicaAtual) return;
+    const ids = reagLoteIds ?? [];
+    if (ids.length === 0 || reagLoteSalvando) return;
+    if (!slot.medico_id) { toast.error("Slot sem médico definido."); return; }
+    if (normalizar(slot.paciente_nome) !== "disponivel") {
+      toast.error("Esse horário não está disponível. Escolha um slot DISPONÍVEL.");
+      return;
+    }
     const fontes = items
       .filter(a => ids.includes(a.id))
       .sort((a, b) => new Date(a.inicio).getTime() - new Date(b.inicio).getTime());
     if (fontes.length === 0) { toast.error("Nenhum paciente selecionado."); return; }
 
-    // Carrega a agenda de destino (todos os agendamentos do médico no dia)
-    const di = new Date(`${reagLoteData}T00:00:00`);
-    const df = new Date(`${reagLoteData}T23:59:59`);
+    // Carrega a agenda de destino (mesmo médico/dia do slot clicado)
+    const dataAlvo = new Date(slot.inicio);
+    const di = new Date(dataAlvo); di.setHours(0, 0, 0, 0);
+    const df = new Date(dataAlvo); df.setHours(23, 59, 59, 999);
     const { data: destinoRaw, error: eDest } = await supabase
       .from("agendamentos")
       .select("id,paciente_id,paciente_nome,inicio,fim,medico_id,status")
       .eq("clinica_id", clinicaAtual.clinica_id)
-      .eq("medico_id", reagLoteMedico)
+      .eq("medico_id", slot.medico_id)
       .gte("inicio", di.toISOString())
       .lte("inicio", df.toISOString())
       .order("inicio", { ascending: true })
@@ -881,14 +888,8 @@ function AgendaPage() {
       id: string; paciente_id: string | null; paciente_nome: string;
       inicio: string; fim: string; medico_id: string | null; status: string;
     }>;
-    if (destino.length === 0) {
-      toast.error("Não há agenda aberta para esse médico nessa data. Gere os horários antes.");
-      return;
-    }
-    if (fichaInicial > destino.length) {
-      toast.error(`A agenda de destino tem apenas ${destino.length} fichas.`);
-      return;
-    }
+    const fichaInicial = destino.findIndex(s => s.id === slot.id) + 1;
+    if (fichaInicial <= 0) { toast.error("Não foi possível localizar a ficha do slot escolhido."); return; }
 
     // Slots disponíveis a partir da ficha inicial, excluindo as próprias fontes
     const idsFonte = new Set(fontes.map(f => f.id));
@@ -910,13 +911,13 @@ function AgendaPage() {
     let okCount = 0;
     for (let i = 0; i < fontes.length; i++) {
       const origem = fontes[i];
-      const slot = alvos[i];
-      const trilha = `[Reagendado em lote em ${agora}] de ${new Date(origem.inicio).toLocaleString("pt-BR")} para ${new Date(slot.inicio).toLocaleString("pt-BR")}`;
+      const alvo = alvos[i];
+      const trilha = `[Reagendado em lote em ${agora}] de ${new Date(origem.inicio).toLocaleString("pt-BR")} para ${new Date(alvo.inicio).toLocaleString("pt-BR")}`;
       const novasObs = origem.observacoes ? `${origem.observacoes}\n${trilha}` : trilha;
       const { error: e1 } = await supabase.from("agendamentos").update({
-        inicio: slot.inicio,
-        fim: slot.fim,
-        medico_id: slot.medico_id ?? reagLoteMedico,
+        inicio: alvo.inicio,
+        fim: alvo.fim,
+        medico_id: alvo.medico_id ?? slot.medico_id,
         status: "agendado",
         observacoes: novasObs,
       } as never).eq("id", origem.id);
@@ -925,12 +926,12 @@ function AgendaPage() {
         paciente_id: null,
         paciente_nome: "DISPONÍVEL",
         status: "agendado",
-      } as never).eq("id", slot.id);
+      } as never).eq("id", alvo.id);
       if (e2) { toast.error(`Falha ao liberar slot: ${e2.message}`); continue; }
       okCount++;
     }
     setReagLoteSalvando(false);
-    setReagLoteOpen(false);
+    setReagLoteIds(null);
     setSelecionados(new Set());
     toast.success(`${okCount} paciente(s) reagendado(s) a partir da ficha ${String(fichaInicial).padStart(3, "0")}.`);
     await load();
