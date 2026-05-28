@@ -371,10 +371,7 @@ export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUs
 
   if (asPage) {
     return (
-      <div className="max-w-3xl mx-auto space-y-4">
-        <div className="border-b pb-3">
-          <h1 className="text-2xl font-semibold">{title}</h1>
-        </div>
+      <div className="space-y-4">
         {body}
         <div className="flex justify-end gap-2 border-t pt-3">{footer}</div>
       </div>
