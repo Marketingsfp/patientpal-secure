@@ -965,6 +965,7 @@ function AgendaPage() {
 
   const openEdit = (a: Agendamento) => {
     if (reagendandoAg) { toast.error("Esse horário já está ocupado. Escolha um slot disponível."); return; }
+    if (reagLoteIds) { toast.error("Esse horário já está ocupado. Escolha um slot DISPONÍVEL."); return; }
     setEditing(a);
     setForm({
       paciente_nome: a.paciente_nome,
