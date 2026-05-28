@@ -268,11 +268,9 @@ function AgendaPage() {
   const [reagendandoAg, setReagendandoAg] = useState<Agendamento | null>(null);
   const [reagSalvando, setReagSalvando] = useState(false);
   // Reagendamento em lote (vários pacientes para outra agenda)
-  const [reagLoteOpen, setReagLoteOpen] = useState(false);
-  const [reagLoteMedico, setReagLoteMedico] = useState<string>("");
-  const [reagLoteData, setReagLoteData] = useState<string>("");
-  const [reagLoteFicha, setReagLoteFicha] = useState<string>("1");
   const [reagLoteSalvando, setReagLoteSalvando] = useState(false);
+  // Ids dos pacientes selecionados em modo de reagendamento em lote (mesmo fluxo do individual: clicar num slot DISPONÍVEL)
+  const [reagLoteIds, setReagLoteIds] = useState<string[] | null>(null);
 
   const iniciarReagendamento = (a: Agendamento) => {
     if (a.status === "realizado") {
@@ -841,35 +839,42 @@ function AgendaPage() {
       toast.error(`${bloqueados.length} item(ns) não podem ser reagendados (já atendidos ou slot vazio). Desmarque-os.`);
       return;
     }
-    setReagLoteMedico("");
-    setReagLoteData(dataRef);
-    setReagLoteFicha("1");
-    setReagLoteOpen(true);
+    // Mesmo fluxo do reagendamento individual: ativa modo lote e aguarda o clique num slot DISPONÍVEL
+    const idsOrdenados = itens
+      .slice()
+      .sort((a, b) => new Date(a.inicio).getTime() - new Date(b.inicio).getTime())
+      .map(i => i.id);
+    setReagendandoAg(null);
+    setReagLoteIds(idsOrdenados);
+    toast.info(`Selecione um horário disponível na agenda para reagendar os ${idsOrdenados.length} paciente(s) selecionado(s).`);
   };
 
-  const confirmarReagLote = async () => {
-    if (!clinicaAtual) return;
-    if (!reagLoteMedico) { toast.error("Escolha o médico de destino."); return; }
-    if (!reagLoteData) { toast.error("Escolha a data de destino."); return; }
-    const fichaInicial = Number(reagLoteFicha);
-    if (!Number.isFinite(fichaInicial) || fichaInicial < 1) {
-      toast.error("Informe um número de ficha válido (>= 1)."); return;
-    }
+  const cancelarReagLote = () => setReagLoteIds(null);
 
-    const ids = Array.from(selecionados);
+  // Confirma o reagendamento em lote ao clicar num slot DISPONÍVEL (a partir desse slot, ocupa os próximos N livres)
+  const confirmarReagLoteNoSlot = async (slot: Agendamento) => {
+    if (!clinicaAtual) return;
+    const ids = reagLoteIds ?? [];
+    if (ids.length === 0 || reagLoteSalvando) return;
+    if (!slot.medico_id) { toast.error("Slot sem médico definido."); return; }
+    if (normalizar(slot.paciente_nome) !== "disponivel") {
+      toast.error("Esse horário não está disponível. Escolha um slot DISPONÍVEL.");
+      return;
+    }
     const fontes = items
       .filter(a => ids.includes(a.id))
       .sort((a, b) => new Date(a.inicio).getTime() - new Date(b.inicio).getTime());
     if (fontes.length === 0) { toast.error("Nenhum paciente selecionado."); return; }
 
-    // Carrega a agenda de destino (todos os agendamentos do médico no dia)
-    const di = new Date(`${reagLoteData}T00:00:00`);
-    const df = new Date(`${reagLoteData}T23:59:59`);
+    // Carrega a agenda de destino (mesmo médico/dia do slot clicado)
+    const dataAlvo = new Date(slot.inicio);
+    const di = new Date(dataAlvo); di.setHours(0, 0, 0, 0);
+    const df = new Date(dataAlvo); df.setHours(23, 59, 59, 999);
     const { data: destinoRaw, error: eDest } = await supabase
       .from("agendamentos")
       .select("id,paciente_id,paciente_nome,inicio,fim,medico_id,status")
       .eq("clinica_id", clinicaAtual.clinica_id)
-      .eq("medico_id", reagLoteMedico)
+      .eq("medico_id", slot.medico_id)
       .gte("inicio", di.toISOString())
       .lte("inicio", df.toISOString())
       .order("inicio", { ascending: true })
@@ -879,14 +884,8 @@ function AgendaPage() {
       id: string; paciente_id: string | null; paciente_nome: string;
       inicio: string; fim: string; medico_id: string | null; status: string;
     }>;
-    if (destino.length === 0) {
-      toast.error("Não há agenda aberta para esse médico nessa data. Gere os horários antes.");
-      return;
-    }
-    if (fichaInicial > destino.length) {
-      toast.error(`A agenda de destino tem apenas ${destino.length} fichas.`);
-      return;
-    }
+    const fichaInicial = destino.findIndex(s => s.id === slot.id) + 1;
+    if (fichaInicial <= 0) { toast.error("Não foi possível localizar a ficha do slot escolhido."); return; }
 
     // Slots disponíveis a partir da ficha inicial, excluindo as próprias fontes
     const idsFonte = new Set(fontes.map(f => f.id));
@@ -908,13 +907,13 @@ function AgendaPage() {
     let okCount = 0;
     for (let i = 0; i < fontes.length; i++) {
       const origem = fontes[i];
-      const slot = alvos[i];
-      const trilha = `[Reagendado em lote em ${agora}] de ${new Date(origem.inicio).toLocaleString("pt-BR")} para ${new Date(slot.inicio).toLocaleString("pt-BR")}`;
+      const alvo = alvos[i];
+      const trilha = `[Reagendado em lote em ${agora}] de ${new Date(origem.inicio).toLocaleString("pt-BR")} para ${new Date(alvo.inicio).toLocaleString("pt-BR")}`;
       const novasObs = origem.observacoes ? `${origem.observacoes}\n${trilha}` : trilha;
       const { error: e1 } = await supabase.from("agendamentos").update({
-        inicio: slot.inicio,
-        fim: slot.fim,
-        medico_id: slot.medico_id ?? reagLoteMedico,
+        inicio: alvo.inicio,
+        fim: alvo.fim,
+        medico_id: alvo.medico_id ?? slot.medico_id,
         status: "agendado",
         observacoes: novasObs,
       } as never).eq("id", origem.id);
@@ -923,12 +922,12 @@ function AgendaPage() {
         paciente_id: null,
         paciente_nome: "DISPONÍVEL",
         status: "agendado",
-      } as never).eq("id", slot.id);
+      } as never).eq("id", alvo.id);
       if (e2) { toast.error(`Falha ao liberar slot: ${e2.message}`); continue; }
       okCount++;
     }
     setReagLoteSalvando(false);
-    setReagLoteOpen(false);
+    setReagLoteIds(null);
     setSelecionados(new Set());
     toast.success(`${okCount} paciente(s) reagendado(s) a partir da ficha ${String(fichaInicial).padStart(3, "0")}.`);
     await load();
@@ -945,6 +944,7 @@ function AgendaPage() {
   };
   const openSlot = (a: Agendamento) => {
     if (reagendandoAg) { void confirmarReagendamentoNoSlot(a); return; }
+    if (reagLoteIds) { void confirmarReagLoteNoSlot(a); return; }
     setEditing(a);
     setForm({
       paciente_nome: "",
@@ -961,6 +961,7 @@ function AgendaPage() {
 
   const openEdit = (a: Agendamento) => {
     if (reagendandoAg) { toast.error("Esse horário já está ocupado. Escolha um slot disponível."); return; }
+    if (reagLoteIds) { toast.error("Esse horário já está ocupado. Escolha um slot DISPONÍVEL."); return; }
     setEditing(a);
     setForm({
       paciente_nome: a.paciente_nome,
@@ -1321,6 +1322,27 @@ function AgendaPage() {
           </div>
         </div>
       )}
+      {reagLoteIds && reagLoteIds.length > 0 && (
+        <div className="sticky top-0 z-30 -mx-4 px-4 py-2 border-b bg-primary text-primary-foreground shadow-sm">
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <CalendarDays className="h-4 w-4 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <span className="font-semibold uppercase">Reagendando · {reagLoteIds.length} paciente(s) selecionado(s)</span>
+              <span className="ml-2 opacity-90 italic">
+                Clique em um horário DISPONÍVEL na agenda. Os pacientes serão alocados em sequência a partir dessa ficha.
+              </span>
+            </div>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={cancelarReagLote}
+              disabled={reagLoteSalvando}
+            >
+              {reagLoteSalvando ? "Salvando…" : "Cancelar reagendamento"}
+            </Button>
+          </div>
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
@@ -1646,67 +1668,6 @@ function AgendaPage() {
               💰 Mais de uma forma de pagamento
             </Button>
           </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Reagendamento em lote para outra agenda */}
-      <Dialog open={reagLoteOpen} onOpenChange={setReagLoteOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Reagendar {selecionados.size} paciente(s) em outra agenda</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <p className="text-xs text-muted-foreground">
-              Os pacientes serão movidos em sequência para os horários da agenda de destino,
-              começando na ficha informada (preservando a ordem atual).
-            </p>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Médico de destino *</Label>
-              <Select value={reagLoteMedico} onValueChange={setReagLoteMedico}>
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder="Selecione o médico" />
-                </SelectTrigger>
-                <SelectContent>
-                  {medicos.map(m => (
-                    <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Data da agenda *</Label>
-                <Input
-                  type="date"
-                  value={reagLoteData}
-                  onChange={(e) => setReagLoteData(e.target.value)}
-                  className="h-9"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Ficha inicial *</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={reagLoteFicha}
-                  onChange={(e) => setReagLoteFicha(e.target.value)}
-                  className="h-9"
-                  placeholder="Ex.: 5"
-                />
-              </div>
-            </div>
-            <p className="text-[11px] text-muted-foreground">
-              Ex.: 10 pacientes a partir da ficha 005 → ocuparão as fichas 005 a 014 (se livres).
-            </p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setReagLoteOpen(false)} disabled={reagLoteSalvando}>
-              Cancelar
-            </Button>
-            <Button onClick={confirmarReagLote} disabled={reagLoteSalvando}>
-              {reagLoteSalvando ? "Reagendando..." : "Confirmar reagendamento"}
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 
