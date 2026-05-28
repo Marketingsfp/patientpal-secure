@@ -243,15 +243,6 @@ function Page() {
                   </Select>
                 </div>
                 <div>
-                  <label className="text-xs text-muted-foreground">Duração (min)</label>
-                  <Select value={gerar.duracao} onValueChange={(v) => setGerar({ ...gerar, duracao: v })}>
-                    <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {["5", "10", "15", "20", "30", "40", "45", "60"].map((v) => <SelectItem key={v} value={v}>{v} min</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
                   <label className="text-xs text-muted-foreground">De</label>
                   <Input type="date" className="w-40" value={gerar.data_inicio} onChange={(e) => setGerar({ ...gerar, data_inicio: e.target.value })} />
                 </div>
