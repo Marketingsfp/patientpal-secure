@@ -83,13 +83,6 @@ function Page() {
     setDisps((xs) => xs.filter((x) => x.id !== id));
   };
 
-  if (!clinicaAtual) return <p className="text-muted-foreground">Selecione uma clínica.</p>;
-
-  const medicosFiltrados = medicos
-    .filter((m) => !filtro || m.nome.toLowerCase().includes(filtro.toLowerCase()))
-    .slice()
-    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" }));
-
   // Pré-visualização dos slots gerados
   const slotsPreview = useMemo(() => {
     const dur = parseInt(gerar.duracao);
@@ -134,6 +127,13 @@ function Page() {
     }
     return out;
   }, [gerar, medicos, disps]);
+
+  if (!clinicaAtual) return <p className="text-muted-foreground">Selecione uma clínica.</p>;
+
+  const medicosFiltrados = medicos
+    .filter((m) => !filtro || m.nome.toLowerCase().includes(filtro.toLowerCase()))
+    .slice()
+    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" }));
 
   const gerarAgenda = async () => {
     if (!clinicaAtual) return;
