@@ -956,14 +956,39 @@ function AgendaPage() {
       const vPix = valorCartao;
       const vDebito = valorCartao;
       const vCredito = valorCartao;
-      const opcoes: FormaOpcao[] = [
+      let opcoes: FormaOpcao[] = [
         { forma: "dinheiro", label: "Dinheiro", valor: vDinheiro },
         { forma: "pix", label: "Pix", valor: vPix },
         { forma: "cartao_debito", label: "Cartão de Débito", valor: vDebito },
         { forma: "cartao_credito", label: "Cartão de Crédito", valor: vCredito },
       ];
+      let descSuffix = "";
+      const info = await obterInfoConvenioPaciente({
+        clinicaId: clinicaAtual.clinica_id,
+        pacienteId: payload.paciente_id,
+        medicoId: payload.medico_id,
+        procedimentoNome: payload.procedimento ?? "",
+      });
+      if (info) {
+        if (!info.emDia) {
+          toast.error(`Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.`);
+          descSuffix = ` — ${info.convenioNome} EM ATRASO`;
+        } else if (info.desconto) {
+          opcoes = opcoes.map((o) => ({ ...o, valor: aplicarDesconto(o.valor, info.desconto!) }));
+          const rotulo =
+            info.desconto.tipo === "gratuidade"
+              ? "GRATUIDADE"
+              : info.desconto.tipo === "percentual"
+                ? `-${info.desconto.valor}%`
+                : `-R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+          descSuffix = ` — Convênio ${info.convenioNome} (${rotulo})`;
+          toast.success(`Desconto do convênio ${info.convenioNome} aplicado (${rotulo}).`);
+        } else {
+          toast.info(`Cliente possui convênio ${info.convenioNome}, mas sem benefício para este procedimento.`);
+        }
+      }
       setFormaPagOpcoes(opcoes);
-      setFormaPagCtx({ agId: novoId, desc: `${payload.paciente_nome} — ${payload.procedimento ?? "CONSULTA"}` });
+      setFormaPagCtx({ agId: novoId, desc: `${payload.paciente_nome} — ${payload.procedimento ?? "CONSULTA"}${descSuffix}` });
       setFormaPagOpen(true);
     }
   };
@@ -1002,14 +1027,39 @@ function AgendaPage() {
     const vPix = valorCartao;
     const vDebito = valorCartao;
     const vCredito = valorCartao;
-    const opcoes: FormaOpcao[] = [
+    let opcoes: FormaOpcao[] = [
       { forma: "dinheiro", label: "Dinheiro", valor: vDinheiro },
       { forma: "pix", label: "Pix", valor: vPix },
       { forma: "cartao_debito", label: "Cartão de Débito", valor: vDebito },
       { forma: "cartao_credito", label: "Cartão de Crédito", valor: vCredito },
     ];
+    let descSuffix = "";
+    const info = await obterInfoConvenioPaciente({
+      clinicaId: clinicaAtual.clinica_id,
+      pacienteId: a.paciente_id,
+      medicoId: a.medico_id,
+      procedimentoNome: a.procedimento ?? "",
+    });
+    if (info) {
+      if (!info.emDia) {
+        toast.error(`Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.`);
+        descSuffix = ` — ${info.convenioNome} EM ATRASO`;
+      } else if (info.desconto) {
+        opcoes = opcoes.map((o) => ({ ...o, valor: aplicarDesconto(o.valor, info.desconto!) }));
+        const rotulo =
+          info.desconto.tipo === "gratuidade"
+            ? "GRATUIDADE"
+            : info.desconto.tipo === "percentual"
+              ? `-${info.desconto.valor}%`
+              : `-R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+        descSuffix = ` — Convênio ${info.convenioNome} (${rotulo})`;
+        toast.success(`Desconto do convênio ${info.convenioNome} aplicado (${rotulo}).`);
+      } else {
+        toast.info(`Cliente possui convênio ${info.convenioNome}, mas sem benefício para este procedimento.`);
+      }
+    }
     setFormaPagOpcoes(opcoes);
-    setFormaPagCtx({ agId: a.id, desc: `${a.paciente_nome} — ${a.procedimento ?? "CONSULTA"}` });
+    setFormaPagCtx({ agId: a.id, desc: `${a.paciente_nome} — ${a.procedimento ?? "CONSULTA"}${descSuffix}` });
     setFormaPagOpen(true);
   };
 
