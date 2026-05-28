@@ -1,0 +1,1 @@
+INSERT INTO public.especialidades (nome, ativo) VALUES ('BIOPSIA', true) ON CONFLICT DO NOTHING;
