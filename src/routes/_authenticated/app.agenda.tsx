@@ -1675,67 +1675,6 @@ function AgendaPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Reagendamento em lote para outra agenda */}
-      <Dialog open={reagLoteOpen} onOpenChange={setReagLoteOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Reagendar {selecionados.size} paciente(s) em outra agenda</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <p className="text-xs text-muted-foreground">
-              Os pacientes serão movidos em sequência para os horários da agenda de destino,
-              começando na ficha informada (preservando a ordem atual).
-            </p>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Médico de destino *</Label>
-              <Select value={reagLoteMedico} onValueChange={setReagLoteMedico}>
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder="Selecione o médico" />
-                </SelectTrigger>
-                <SelectContent>
-                  {medicos.map(m => (
-                    <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Data da agenda *</Label>
-                <Input
-                  type="date"
-                  value={reagLoteData}
-                  onChange={(e) => setReagLoteData(e.target.value)}
-                  className="h-9"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Ficha inicial *</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={reagLoteFicha}
-                  onChange={(e) => setReagLoteFicha(e.target.value)}
-                  className="h-9"
-                  placeholder="Ex.: 5"
-                />
-              </div>
-            </div>
-            <p className="text-[11px] text-muted-foreground">
-              Ex.: 10 pacientes a partir da ficha 005 → ocuparão as fichas 005 a 014 (se livres).
-            </p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setReagLoteOpen(false)} disabled={reagLoteSalvando}>
-              Cancelar
-            </Button>
-            <Button onClick={confirmarReagLote} disabled={reagLoteSalvando}>
-              {reagLoteSalvando ? "Reagendando..." : "Confirmar reagendamento"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       <LancamentoDialog
         open={pagamentoOpen}
         onOpenChange={(v) => { setPagamentoOpen(v); if (!v) { setPagamentoAgId(null); setPagamentoExtraIds([]); } }}
