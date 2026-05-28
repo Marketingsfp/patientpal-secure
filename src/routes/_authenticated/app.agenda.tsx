@@ -1326,6 +1326,27 @@ function AgendaPage() {
           </div>
         </div>
       )}
+      {reagLoteIds && reagLoteIds.length > 0 && (
+        <div className="sticky top-0 z-30 -mx-4 px-4 py-2 border-b bg-primary text-primary-foreground shadow-sm">
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <CalendarDays className="h-4 w-4 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <span className="font-semibold uppercase">Reagendando · {reagLoteIds.length} paciente(s) selecionado(s)</span>
+              <span className="ml-2 opacity-90 italic">
+                Clique em um horário DISPONÍVEL na agenda. Os pacientes serão alocados em sequência a partir dessa ficha.
+              </span>
+            </div>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={cancelarReagLote}
+              disabled={reagLoteSalvando}
+            >
+              {reagLoteSalvando ? "Salvando…" : "Cancelar reagendamento"}
+            </Button>
+          </div>
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
