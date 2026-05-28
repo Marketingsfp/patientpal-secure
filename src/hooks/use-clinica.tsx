@@ -38,17 +38,31 @@ interface ClinicaContextValue {
 const ClinicaContext = createContext<ClinicaContextValue | undefined>(undefined);
 const STORAGE_KEY = "clinica_atual_id";
 const TODAS_KEY = "clinica_modo_todas";
+const MEMBERSHIPS_CACHE_KEY = "clinica_memberships_cache_v1";
+
+function readCachedMemberships(): ClinicaMembership[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(MEMBERSHIPS_CACHE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as ClinicaMembership[]) : [];
+  } catch {
+    return [];
+  }
+}
 
 export function ClinicaProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const [memberships, setMemberships] = useState<ClinicaMembership[]>([]);
+  const [memberships, setMemberships] = useState<ClinicaMembership[]>(() => readCachedMemberships());
   const [clinicaAtualId, setClinicaAtualId] = useState<string | null>(
     typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null,
   );
   const [modoTodas, setModoTodasState] = useState<boolean>(
     typeof window !== "undefined" ? localStorage.getItem(TODAS_KEY) === "1" : false,
   );
-  const [loading, setLoading] = useState(true);
+  // Se já há cache, não bloqueamos a UI — apenas revalidamos em background.
+  const [loading, setLoading] = useState(() => readCachedMemberships().length === 0);
 
   const load = async () => {
     if (!user) {
@@ -56,13 +70,20 @@ export function ClinicaProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       return;
     }
-    setLoading(true);
+    // Só mostra "loading" se ainda não há dados em cache.
+    setLoading((prev) => (memberships.length === 0 ? true : prev));
     const { data, error } = await supabase
       .from("clinica_memberships")
       .select("id, clinica_id, role, clinica:clinicas(id, nome, cidade, estado, branding)")
       .eq("user_id", user.id)
       .eq("ativo", true);
-    if (!error && data) setMemberships(data as unknown as ClinicaMembership[]);
+    if (!error && data) {
+      const next = data as unknown as ClinicaMembership[];
+      setMemberships(next);
+      try {
+        window.localStorage.setItem(MEMBERSHIPS_CACHE_KEY, JSON.stringify(next));
+      } catch { /* ignore quota */ }
+    }
     setLoading(false);
   };
 
