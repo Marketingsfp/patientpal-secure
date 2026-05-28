@@ -522,7 +522,7 @@ function AgendaPage() {
     return [...top, ...resto];
   };
 
-  // Atualiza inline o procedimento de um agendamento (do badge na coluna Pasta)
+  // Atualiza inline o procedimento de um agendamento (do badge na coluna Serviço)
   const atualizarProcedimento = async (ag: Agendamento, novoNome: string) => {
     const nomeFinal = novoNome.trim();
     if (!nomeFinal || nomeFinal === (ag.procedimento ?? "")) return;
@@ -1726,7 +1726,7 @@ function AgendaPage() {
               <TableHead className="w-32">Intervalo</TableHead>
               <TableHead className="min-w-[200px]">Profissional</TableHead>
               <TableHead className="min-w-[200px]">Cliente</TableHead>
-              <TableHead className="w-40">Pasta</TableHead>
+              <TableHead className="w-40">Serviço</TableHead>
               <TableHead className="w-28 text-center">Alertas</TableHead>
               <TableHead className="w-32 text-right">Ações</TableHead>
             </TableRow>
@@ -1961,7 +1961,7 @@ function AgendaPage() {
                 <div>
                   <div className="font-semibold uppercase">{pacInfo.nome}</div>
                   {pacInfo.numero_pasta && (
-                    <div className="text-xs text-muted-foreground">Pasta nº {pacInfo.numero_pasta}</div>
+                    <div className="text-xs text-muted-foreground">Serviço nº {pacInfo.numero_pasta}</div>
                   )}
                 </div>
               </div>
