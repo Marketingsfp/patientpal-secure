@@ -267,6 +267,12 @@ function AgendaPage() {
   // Reagendamento
   const [reagendandoAg, setReagendandoAg] = useState<Agendamento | null>(null);
   const [reagSalvando, setReagSalvando] = useState(false);
+  // Reagendamento em lote (vários pacientes para outra agenda)
+  const [reagLoteOpen, setReagLoteOpen] = useState(false);
+  const [reagLoteMedico, setReagLoteMedico] = useState<string>("");
+  const [reagLoteData, setReagLoteData] = useState<string>("");
+  const [reagLoteFicha, setReagLoteFicha] = useState<string>("1");
+  const [reagLoteSalvando, setReagLoteSalvando] = useState(false);
 
   const iniciarReagendamento = (a: Agendamento) => {
     if (a.status === "realizado") {
