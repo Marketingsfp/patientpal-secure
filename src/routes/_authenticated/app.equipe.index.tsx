@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { FuncionarioFormDialog } from "@/components/funcionarios/FuncionarioFormDialog";
 import { MedicoFormDialog } from "@/components/medicos/MedicoFormDialog";
 
-export const Route = createFileRoute("/_authenticated/app/equipe")({
+export const Route = createFileRoute("/_authenticated/app/equipe/")({
   component: EquipePage,
   head: () => ({ meta: [{ title: "Equipe — ClinicaOS" }] }),
   validateSearch: z.object({
