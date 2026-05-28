@@ -96,14 +96,23 @@ function EspecialidadesPage() {
   async function confirmarExclusao() {
     if (!toDelete) return;
     setDeleting(true);
-    const { count, error: countError } = await supabase
+    const { data: vinculos, error: countError } = await supabase
       .from("procedimentos")
-      .select("id", { count: "exact", head: true })
+      .select("clinica_id, clinicas(nome)")
       .ilike("grupo", toDelete.nome);
     if (countError) { setDeleting(false); toast.error(countError.message); return; }
-    if ((count ?? 0) > 0) {
+    if ((vinculos?.length ?? 0) > 0) {
       setDeleting(false);
-      toast.error(`Não é possível excluir: existem ${count} serviço(s) vinculados a esta especialidade.`);
+      const nomes = Array.from(new Set(
+        (vinculos ?? []).map((v: any) => v.clinicas?.nome).filter(Boolean)
+      ));
+      const detalhe = nomes.length
+        ? ` (clínica(s): ${nomes.join(", ")})`
+        : "";
+      toast.error(
+        `Não é possível excluir: existem ${vinculos!.length} serviço(s) vinculados a esta especialidade${detalhe}. Especialidades são globais — remova os serviços em todas as clínicas antes.`,
+        { duration: 8000 }
+      );
       setToDelete(null);
       return;
     }
