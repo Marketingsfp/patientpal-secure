@@ -834,12 +834,11 @@ function AgendaPage() {
     const itens = items.filter(a => ids.includes(a.id));
     if (itens.length === 0) { toast.info("Selecione ao menos um paciente para reagendar."); return; }
     const bloqueados = itens.filter(i =>
-      pagosSet.has(i.id) ||
       i.status === "realizado" ||
       normalizar(i.paciente_nome) === "disponivel",
     );
     if (bloqueados.length > 0) {
-      toast.error(`${bloqueados.length} item(ns) não podem ser reagendados (já pago, realizado ou slot vazio). Desmarque-os.`);
+      toast.error(`${bloqueados.length} item(ns) não podem ser reagendados (já atendidos ou slot vazio). Desmarque-os.`);
       return;
     }
     setReagLoteMedico("");
