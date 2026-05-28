@@ -1,58 +1,27 @@
-Adicionar uma nova aba **Convênio** ao formulário de edição do cliente (`src/components/clientes/cliente-form.tsx`) listando todos os contratos de Cartão Convênio em que o paciente aparece — como titular ou dependente — com os detalhes do plano, dependentes e parcelas.
+## Problemas identificados
 
-## O que aparece na aba
+**1. "Nenhum paciente selecionado" ao trocar de agenda:** após selecionar os 6 pacientes do Dr. Alex (01/06) e mudar o filtro para Dr. Eugenio (03/06), a lista `items` em memória é recarregada e passa a conter só os agendamentos do Dr. Eugenio. Quando você clica em um slot disponível, `confirmarReagLoteNoSlot` faz `items.filter(a => ids.includes(a.id))` — como os IDs originais (Dr. Alex) não estão mais em `items`, o resultado fica vazio e dispara o toast de erro. Os IDs ficam guardados em `reagLoteIds` mas a "fonte de verdade" dos dados depende da lista filtrada na tela.
 
-Para cada contrato encontrado, um card com:
+**2. Fichas vazias bloqueando seleção:** hoje `abrirReagLote` bloqueia toda a operação se algum item selecionado for slot vazio (`DISPONÍVEL`). O comportamento desejado é simplesmente ignorar esses itens vazios e seguir com o restante. A ordem sequencial no destino já funciona corretamente: a partir do slot clicado, ocupa os próximos `N` slots livres em sequência.
 
-**Cabeçalho do contrato**
-- Nome do convênio/plano (de `planos_assinatura.nome`)
-- Número do contrato e status (ativo / pendente / cancelado)
-- Papel do paciente atual: "Titular" ou "Dependente" (badge destacado)
+## Mudanças em `src/routes/_authenticated/app.agenda.tsx`
 
-**Dados do contrato**
-- Vigência: `data_inicio` → `data_fim` (ou `data_inicio + vigencia_meses` quando `data_fim` for nula)
-- Dia de vencimento
-- Valor mensal
-- Forma de pagamento, número de parcelas
+### Em `abrirReagLote`
 
-**Titular e dependentes**
-- Nome do titular (de `contratos_assinatura.paciente_nome`)
-- Lista de dependentes ativos com parentesco (de `contrato_dependentes`)
-- O nome do paciente que está sendo editado fica **destacado** (negrito + cor primária + ícone) onde quer que apareça
+- Remover slots vazios (`DISPONÍVEL`) da seleção em vez de bloquear; manter o bloqueio apenas para itens com status `realizado`.
+- Se a seleção, depois de descartar os vazios, ficar com 0 pacientes válidos, mostrar toast informativo e abortar.
 
-**Resumo das parcelas** (4 cards de KPI)
-- Pagas (qtd + soma)
-- Pendentes / em aberto (qtd + soma)
-- Em atraso — pendentes com `vencimento < hoje` (qtd + soma)
-- Total do contrato
+### Em `confirmarReagLoteNoSlot`
 
-**Tabela de parcelas**
-Colunas: nº, vencimento, valor, status (paga / pendente / em atraso), pago em, valor pago. Linhas em atraso destacadas em vermelho, pagas em verde.
+- Não depender mais de `items` para reconstruir as fontes. Buscar os agendamentos de origem direto no Supabase pelos IDs guardados em `reagLoteIds` (campos: `id, paciente_id, paciente_nome, inicio, fim, medico_id, status, procedimento, observacoes, data_pagamento`), filtrando novamente quem for `realizado` ou já tiver virado `DISPONÍVEL` desde a seleção.
+- Continuar ordenando por `inicio` ascendente para preservar a ordem original das fichas.
+- O resto da lógica (achar a ficha clicada no destino, pegar os próximos N slots livres a partir dela, mover paciente e liberar a origem) permanece igual — já é exatamente o "seguir ordem sequencial" descrito no exemplo (fichas 001 e 004 do origem → fichas 007 e 008 do destino, ignorando lacunas no destino se houver slots ocupados no meio).
 
-**Estados vazios**
-- Sem contratos: ícone + mensagem "Este cliente ainda não possui contratos de convênio."
-- Paciente não salvo ainda: mensagem orientando a salvar antes.
+### Faixa azul de status
 
-## Como busca os dados
+- Atualizar a contagem mostrada (`reagLoteIds.length`) para refletir só os pacientes válidos depois do filtro de `abrirReagLote` (já é o caso, mas precisa continuar consistente).
 
-Um único `useEffect` disparado por `editing?.id`, fazendo em série:
+## Fora do escopo
 
-1. `contratos_assinatura` onde `paciente_id = editing.id` (papel = titular)
-2. `contrato_dependentes` onde `paciente_id = editing.id AND ativo = true`, então `contratos_assinatura` dos `contrato_id` retornados (papel = dependente)
-3. União dos contratos, carrega em paralelo:
-   - `planos_assinatura` pelos `plano_id`
-   - `contrato_dependentes` (ativos) de todos os contratos
-   - `contrato_mensalidades` de todos os contratos, ordenadas por `numero_parcela`
-
-Status "em atraso" é derivado no cliente: `status IN ('pendente','aberto') AND vencimento < hoje` — segue a mesma regra usada em `pendencias_paciente`.
-
-## Arquivos alterados
-
-- `src/components/clientes/cliente-form.tsx`
-  - Importar ícone `CreditCard` (lucide-react)
-  - Adicionar `TabsTrigger value="convenio"` e alterar `TabsList` de `grid-cols-6` para `grid-cols-7`
-  - Novos estados: `convList`, `convLoading`, tipo `ConvContrato`
-  - Novo `useEffect` de carregamento
-  - Novo `TabsContent value="convenio"` com a UI descrita
-
-Nenhuma mudança de schema, RLS, função SQL ou outra rota — apenas leitura das tabelas existentes via SDK do Supabase, que já respeitam as policies da clínica.
+- Não mexer na lógica de reagendamento individual.
+- Não alterar a UI de filtros nem o comportamento da seleção em si.

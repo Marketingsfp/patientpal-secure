@@ -839,16 +839,19 @@ function AgendaPage() {
     const ids = Array.from(selecionados);
     const itens = items.filter(a => ids.includes(a.id));
     if (itens.length === 0) { toast.info("Selecione ao menos um paciente para reagendar."); return; }
-    const bloqueados = itens.filter(i =>
-      i.status === "realizado" ||
-      normalizar(i.paciente_nome) === "disponivel",
-    );
-    if (bloqueados.length > 0) {
-      toast.error(`${bloqueados.length} item(ns) não podem ser reagendados (já atendidos ou slot vazio). Desmarque-os.`);
+    // Ignora silenciosamente fichas vazias; bloqueia apenas pacientes já atendidos
+    const atendidos = itens.filter(i => i.status === "realizado");
+    if (atendidos.length > 0) {
+      toast.error(`${atendidos.length} paciente(s) já atendido(s) não podem ser reagendados. Desmarque-os.`);
+      return;
+    }
+    const validos = itens.filter(i => normalizar(i.paciente_nome) !== "disponivel");
+    if (validos.length === 0) {
+      toast.info("Nenhum paciente válido para reagendar (todas as fichas selecionadas estão vazias).");
       return;
     }
     // Mesmo fluxo do reagendamento individual: ativa modo lote e aguarda o clique num slot DISPONÍVEL
-    const idsOrdenados = itens
+    const idsOrdenados = validos
       .slice()
       .sort((a, b) => new Date(a.inicio).getTime() - new Date(b.inicio).getTime())
       .map(i => i.id);
