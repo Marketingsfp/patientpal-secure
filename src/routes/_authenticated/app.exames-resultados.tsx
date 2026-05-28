@@ -267,7 +267,7 @@ function ExamesResultadosPage() {
               value={pacienteId}
               onChange={setPacienteId}
               placeholder="Selecione o paciente..."
-              searchPlaceholder="Buscar por nome, CPF, pasta, nascimento ou telefone..."
+              searchPlaceholder="Buscar por nome, CPF, serviço, nascimento ou telefone..."
               emptyText="Nenhum paciente encontrado."
             />
           </div>

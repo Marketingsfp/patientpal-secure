@@ -802,7 +802,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
               </div>
             </div>
             <div className="space-y-1"><Label>Nome *</Label><InputVoz {...fieldProps("nome")} required /></div>
-            <div className="space-y-1"><Label>Número de pasta</Label><InputVoz {...fieldProps("numero_pasta")} placeholder="Ex.: 1234" /></div>
+            <div className="space-y-1"><Label>Número de serviço</Label><InputVoz {...fieldProps("numero_pasta")} placeholder="Ex.: 1234" /></div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1"><Label>CPF</Label><InputVoz {...fieldProps("cpf")} /></div>
               <div className="space-y-1"><Label>Telefone *</Label><InputVoz {...fieldProps("telefone")} /></div>

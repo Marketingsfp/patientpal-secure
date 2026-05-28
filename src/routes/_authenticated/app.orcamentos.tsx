@@ -491,7 +491,7 @@ function NovoOrcamentoDialog({
               options={pacienteOptions}
               value={pacienteId}
               onChange={selecionarPaciente}
-              placeholder="Buscar por nome, CPF, pasta, nascimento ou telefone..."
+              placeholder="Buscar por nome, CPF, serviço, nascimento ou telefone..."
               searchPlaceholder="Digite para buscar..."
               emptyText="Nenhum paciente encontrado."
             />
