@@ -64,6 +64,35 @@ function Page() {
 
   useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clinicaAtual?.clinica_id]);
 
+  // Recarrega ao voltar para a aba/janela e quando o foco retorna,
+  // garantindo que médicos recém cadastrados em outra tela apareçam aqui.
+  useEffect(() => {
+    const onFocus = () => { void load(); };
+    const onVisibility = () => { if (document.visibilityState === "visible") void load(); };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [clinicaAtual?.clinica_id]);
+
+  // Realtime: atualiza a lista quando um médico é inserido/alterado/removido.
+  useEffect(() => {
+    if (!clinicaAtual) return;
+    const ch = supabase
+      .channel(`disp-medicos-${clinicaAtual.clinica_id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "medicos", filter: `clinica_id=eq.${clinicaAtual.clinica_id}` },
+        () => { void load(); },
+      )
+      .subscribe();
+    return () => { void supabase.removeChannel(ch); };
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [clinicaAtual?.clinica_id]);
+
   const adicionar = async () => {
     if (!clinicaAtual || !novo.medico_id) { toast.error("Selecione um médico"); return; }
     const { error } = await supabase.from("medico_disponibilidades").insert({
