@@ -710,13 +710,15 @@ function AgendaPage() {
 
   const fichaPorId = useMemo(() => {
     const m = new Map<string, string>();
-    // Numeração sequencial por dia (reinicia a cada data) na ordem do horário
+    // Numeração sequencial por dia e por médico (reinicia a cada data/médico)
+    // na ordem do horário. Assim cada agenda do médico fica 001, 002, 003...
     const contadores = new Map<string, number>();
     const ordenados = [...items].sort((a, b) => a.inicio.localeCompare(b.inicio));
     ordenados.forEach((a) => {
       const dia = a.inicio.slice(0, 10);
-      const n = (contadores.get(dia) ?? 0) + 1;
-      contadores.set(dia, n);
+      const chave = `${dia}__${a.medico_id ?? "sem-medico"}`;
+      const n = (contadores.get(chave) ?? 0) + 1;
+      contadores.set(chave, n);
       m.set(a.id, String(n).padStart(3, "0"));
     });
     return m;
