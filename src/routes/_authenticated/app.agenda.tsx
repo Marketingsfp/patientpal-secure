@@ -86,6 +86,126 @@ const primeiroValorValido = (...valores: unknown[]) => {
 const valorCartaoProcedimento = (proc: any) =>
   primeiroValorValido(proc?.valor_cartao_credito, proc?.valor_cartao_debito, proc?.valor_cartao, proc?.valor_padrao);
 
+type DescontoConvenio =
+  | { tipo: "percentual"; valor: number }
+  | { tipo: "valor"; valor: number }
+  | { tipo: "gratuidade"; valor: 0 };
+
+type ConvenioInfo = {
+  convenioNome: string;
+  emDia: boolean;
+  parcelasAtrasadas: number;
+  desconto: DescontoConvenio | null;
+};
+
+function aplicarDesconto(valor: number, d: DescontoConvenio): number {
+  if (d.tipo === "gratuidade") return 0;
+  if (d.tipo === "percentual") return Math.max(0, valor * (1 - Number(d.valor) / 100));
+  return Math.max(0, valor - Number(d.valor));
+}
+
+async function obterInfoConvenioPaciente(params: {
+  clinicaId: string;
+  pacienteId: string | null | undefined;
+  medicoId: string | null | undefined;
+  procedimentoNome: string;
+}): Promise<ConvenioInfo | null> {
+  const { clinicaId, pacienteId, medicoId, procedimentoNome } = params;
+  if (!pacienteId) return null;
+
+  // 1) Contrato ativo: paciente como titular OU dependente ativo
+  const { data: titularContratos } = await supabase
+    .from("contratos_assinatura")
+    .select("id,convenio_id,cb_convenios(nome)")
+    .eq("clinica_id", clinicaId)
+    .eq("status", "ativo")
+    .eq("paciente_id", pacienteId)
+    .limit(5);
+  let contrato: { id: string; convenio_id: string | null; cb_convenios: { nome: string } | null } | null =
+    (titularContratos ?? [])[0] as any ?? null;
+
+  if (!contrato) {
+    const { data: deps } = await supabase
+      .from("contrato_dependentes")
+      .select("contrato_id,ativo,contratos_assinatura!inner(id,clinica_id,status,convenio_id,cb_convenios(nome))")
+      .eq("paciente_id", pacienteId)
+      .eq("ativo", true)
+      .limit(5);
+    const cand = ((deps ?? []) as any[])
+      .map((d) => d.contratos_assinatura)
+      .find((c: any) => c && c.clinica_id === clinicaId && c.status === "ativo");
+    if (cand) contrato = cand;
+  }
+  if (!contrato || !contrato.convenio_id) return null;
+
+  const convenioNome = contrato.cb_convenios?.nome ?? "Convênio";
+
+  // 2) Verifica mensalidades em atraso do contrato
+  const hojeStr = new Date().toISOString().slice(0, 10);
+  const { data: mens } = await supabase
+    .from("contrato_mensalidades")
+    .select("status,vencimento")
+    .eq("contrato_id", contrato.id)
+    .in("status", ["pendente", "aberto", "atrasado"])
+    .lte("vencimento", hojeStr);
+  const parcelasAtrasadas = (mens ?? []).length;
+  const emDia = parcelasAtrasadas === 0;
+
+  // 3) Busca procedimento_id e especialidade do médico
+  const procNorm = (procedimentoNome ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  const { data: procs } = await supabase
+    .from("procedimentos")
+    .select("id,nome")
+    .eq("clinica_id", clinicaId)
+    .eq("ativo", true)
+    .limit(5000);
+  const procRow = (procs ?? []).find(
+    (p: any) => (p.nome ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() === procNorm,
+  ) ?? (procs ?? []).find(
+    (p: any) => (p.nome ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().includes(procNorm),
+  );
+  const procedimentoId = (procRow as any)?.id ?? null;
+
+  let especialidadeId: string | null = null;
+  if (medicoId) {
+    const { data: med } = await supabase
+      .from("medicos")
+      .select("especialidade_id")
+      .eq("id", medicoId)
+      .maybeSingle();
+    especialidadeId = (med as any)?.especialidade_id ?? null;
+  }
+
+  // 4) Benefícios aplicáveis para o convênio
+  const { data: beneficios } = await supabase
+    .from("cb_beneficios")
+    .select("escopo,procedimento_id,especialidade_id,tipo_desconto,valor_desconto,ativo")
+    .eq("clinica_id", clinicaId)
+    .eq("convenio_id", contrato.convenio_id)
+    .eq("ativo", true);
+  const aplicaveis = ((beneficios ?? []) as any[]).filter((b) => {
+    if (b.escopo === "servico") return procedimentoId && b.procedimento_id === procedimentoId;
+    if (b.escopo === "especialidade") return especialidadeId && b.especialidade_id === especialidadeId;
+    return false;
+  });
+
+  // Prioridade: gratuidade > maior percentual > maior valor absoluto
+  let desconto: DescontoConvenio | null = null;
+  const grat = aplicaveis.find((b) => b.tipo_desconto === "gratuidade");
+  if (grat) {
+    desconto = { tipo: "gratuidade", valor: 0 };
+  } else {
+    const perc = aplicaveis.filter((b) => b.tipo_desconto === "percentual");
+    const vals = aplicaveis.filter((b) => b.tipo_desconto === "valor");
+    const maiorPerc = perc.reduce((m, b) => Math.max(m, Number(b.valor_desconto) || 0), 0);
+    const maiorVal = vals.reduce((m, b) => Math.max(m, Number(b.valor_desconto) || 0), 0);
+    if (maiorPerc > 0) desconto = { tipo: "percentual", valor: maiorPerc };
+    else if (maiorVal > 0) desconto = { tipo: "valor", valor: maiorVal };
+  }
+
+  return { convenioNome, emDia, parcelasAtrasadas, desconto };
+}
+
 const toLocalInput = (iso: string) => {
   const d = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -836,14 +956,39 @@ function AgendaPage() {
       const vPix = valorCartao;
       const vDebito = valorCartao;
       const vCredito = valorCartao;
-      const opcoes: FormaOpcao[] = [
+      let opcoes: FormaOpcao[] = [
         { forma: "dinheiro", label: "Dinheiro", valor: vDinheiro },
         { forma: "pix", label: "Pix", valor: vPix },
         { forma: "cartao_debito", label: "Cartão de Débito", valor: vDebito },
         { forma: "cartao_credito", label: "Cartão de Crédito", valor: vCredito },
       ];
+      let descSuffix = "";
+      const info = await obterInfoConvenioPaciente({
+        clinicaId: clinicaAtual.clinica_id,
+        pacienteId: payload.paciente_id,
+        medicoId: payload.medico_id,
+        procedimentoNome: payload.procedimento ?? "",
+      });
+      if (info) {
+        if (!info.emDia) {
+          toast.error(`Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.`);
+          descSuffix = ` — ${info.convenioNome} EM ATRASO`;
+        } else if (info.desconto) {
+          opcoes = opcoes.map((o) => ({ ...o, valor: aplicarDesconto(o.valor, info.desconto!) }));
+          const rotulo =
+            info.desconto.tipo === "gratuidade"
+              ? "GRATUIDADE"
+              : info.desconto.tipo === "percentual"
+                ? `-${info.desconto.valor}%`
+                : `-R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+          descSuffix = ` — Convênio ${info.convenioNome} (${rotulo})`;
+          toast.success(`Desconto do convênio ${info.convenioNome} aplicado (${rotulo}).`);
+        } else {
+          toast.info(`Cliente possui convênio ${info.convenioNome}, mas sem benefício para este procedimento.`);
+        }
+      }
       setFormaPagOpcoes(opcoes);
-      setFormaPagCtx({ agId: novoId, desc: `${payload.paciente_nome} — ${payload.procedimento ?? "CONSULTA"}` });
+      setFormaPagCtx({ agId: novoId, desc: `${payload.paciente_nome} — ${payload.procedimento ?? "CONSULTA"}${descSuffix}` });
       setFormaPagOpen(true);
     }
   };
@@ -882,14 +1027,39 @@ function AgendaPage() {
     const vPix = valorCartao;
     const vDebito = valorCartao;
     const vCredito = valorCartao;
-    const opcoes: FormaOpcao[] = [
+    let opcoes: FormaOpcao[] = [
       { forma: "dinheiro", label: "Dinheiro", valor: vDinheiro },
       { forma: "pix", label: "Pix", valor: vPix },
       { forma: "cartao_debito", label: "Cartão de Débito", valor: vDebito },
       { forma: "cartao_credito", label: "Cartão de Crédito", valor: vCredito },
     ];
+    let descSuffix = "";
+    const info = await obterInfoConvenioPaciente({
+      clinicaId: clinicaAtual.clinica_id,
+      pacienteId: a.paciente_id,
+      medicoId: a.medico_id,
+      procedimentoNome: a.procedimento ?? "",
+    });
+    if (info) {
+      if (!info.emDia) {
+        toast.error(`Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.`);
+        descSuffix = ` — ${info.convenioNome} EM ATRASO`;
+      } else if (info.desconto) {
+        opcoes = opcoes.map((o) => ({ ...o, valor: aplicarDesconto(o.valor, info.desconto!) }));
+        const rotulo =
+          info.desconto.tipo === "gratuidade"
+            ? "GRATUIDADE"
+            : info.desconto.tipo === "percentual"
+              ? `-${info.desconto.valor}%`
+              : `-R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+        descSuffix = ` — Convênio ${info.convenioNome} (${rotulo})`;
+        toast.success(`Desconto do convênio ${info.convenioNome} aplicado (${rotulo}).`);
+      } else {
+        toast.info(`Cliente possui convênio ${info.convenioNome}, mas sem benefício para este procedimento.`);
+      }
+    }
     setFormaPagOpcoes(opcoes);
-    setFormaPagCtx({ agId: a.id, desc: `${a.paciente_nome} — ${a.procedimento ?? "CONSULTA"}` });
+    setFormaPagCtx({ agId: a.id, desc: `${a.paciente_nome} — ${a.procedimento ?? "CONSULTA"}${descSuffix}` });
     setFormaPagOpen(true);
   };
 
