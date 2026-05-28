@@ -422,22 +422,18 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
     }
 
     setSaving(false);
-    onOpenChange(false);
     onSaved?.();
+    close();
   };
 
   const hasLogin = !!medicoUserId;
+  const titleText = editId ? "Editar médico" : "Novo médico";
+  const isPage = mode === "page";
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl w-[calc(100vw-2rem)] max-h-[95vh] overflow-y-auto overflow-x-hidden">
-        <DialogHeader className="sticky top-0 z-20 bg-background -mx-6 px-6 pt-6 -mt-6 pb-2 border-b">
-          <DialogTitle>{editId ? "Editar médico" : "Novo médico"}</DialogTitle>
-        </DialogHeader>
-        {loading ? (
-          <div className="py-10 text-center text-sm text-muted-foreground">Carregando…</div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
+  const innerForm = loading ? (
+    <div className="py-10 text-center text-sm text-muted-foreground">Carregando…</div>
+  ) : (
+    <form onSubmit={handleSubmit} className="space-y-4">
             <Tabs defaultValue="dados">
               <TabsList className="grid grid-cols-5 w-full sticky top-[3.25rem] z-10">
                 <TabsTrigger value="dados">Dados</TabsTrigger>
