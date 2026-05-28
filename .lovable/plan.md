@@ -1,22 +1,25 @@
-## Problema
+## Objetivo
 
-No filtro **Situação**, ao selecionar **"Agendado"**, hoje só aparecem agendamentos cujo `status` é exatamente `agendado`. Pacientes com status `confirmado`, `realizado`, `cancelado` ou `faltou` são excluídos — mesmo que tenham sido agendados (têm cliente na coluna).
+Preencher o campo **Sexo** no cadastro dos médicos da clínica POLICLINICA MENINO JESUS conforme a planilha enviada (`Lista de médicos e Sexo_MJ.xlsx`).
 
-O usuário quer que **"Agendado"** mostre **todos os horários que têm paciente alocado** (qualquer linha cuja coluna *Cliente* não esteja vazia / não seja `DISPONÍVEL`), independente do status atual.
+## O que será feito
 
-## Mudança em `src/routes/_authenticated/app.agenda.tsx`
+- Para cada médico listado na planilha, atualizar a coluna `sexo` do registro correspondente na tabela `medicos` (clínica POLICLINICA MENINO JESUS) para `feminino` ou `masculino`.
+- Todos os 58 nomes da planilha já existem cadastrados na clínica e serão atualizados (hoje quase todos estão como "Não informar").
+- O item **TESTE ERGOMETRICO** será ignorado (não é um médico real).
+- Médicos cadastrados na clínica que **não** aparecem na planilha (ex.: TESTE LOVABLE já excluído) ficam intocados.
 
-No `useMemo` `filtrados` (linhas 709–736), ajustar o bloco do `filtroStatus`:
+## Resumo da divisão
 
-- `"livres"` → continua mostrando só slots `DISPONÍVEL` (sem mudança).
-- `"agendado"` → mostrar todas as fichas que **têm paciente** (qualquer status), ou seja, excluir apenas slots `DISPONÍVEL`. Equivale a "qualquer ficha com cliente".
-- `"confirmado"`, `"realizado"`, `"cancelado"`, `"faltou"` → continuam filtrando por `a.status === filtroStatus` exatamente como hoje.
-- `"todos"` → sem mudança.
+- **Feminino (28):** ADRIANA CRISTHIAN CARDOSO SOBRINHO, ALINE DE ANDRADE FERREIRA, ANA CRISTINA LOPES DE OLIVEIRA, BARBARA OLIVEIRA, CINTIA BRAGA NUNES, CLAUDIA MARIA RODRIGUES DOS SANTOS, CONCEICAO DA SILVA MARTINS, DAIANE HELENA DE ALMEIDA, ELAIR DE MAGALHAES ALVES NUNES, ELIANE CRISTINA ALVES SOUZA, ENEIDA DE OLIVEIRA RODRIGUES, FERNANDA, IAMILA, IARA CAMELLO RODRIGUES, IARMILA RUZENA KRASNY, ISIS SERRANO DUARTE, KAREN DA MOTTA SILVA, KARINA RUIZ CARDOSO DE OLIVEIRA, KETLEN VITORINO PEREIRA, MARIA DA PENHA CONDADO TANUS TAYAR, MARIANA PORTUGAL, PRISCILA ANA BRAGA DA SILVA ROCHA, QUEDIMA SOARES, RAIANI NIEDZIELSKI GOMES, ROBERTA DA FONSECA CORREDEIRA, ROSANGELA SCHMITZ RIOLINO, SUELY MARTINS DA SILVA, VALERIA SILVEIRA LIMA TEIXEIRA.
+- **Masculino (30):** ALEX LOUZA MACEDO, ALEXANDRE DE FIGUEIREDO QUEIROZ, ANDERSON LUIS ELOY AMARAL, ANDRE LUIS LIMA DA SILVA, ANTONIO CARLOS SIQUEIRA COBUCCI, ARMANDO JOSE DA SILVA JUNIOR, CARLOS ALBERTO OLIVERO VARILLAS, CARLOS EDUARDO GONCALVES MONTEIRO, DIOGO DEL CIMA, EUGENIO CESAR SOLON CAPOBIANCO, FELIPE MOURA CORREA, JEAN FERREIRA CAMPOS, JOAO HELIO, JOAO HELIO VALENTIM CONSULTA, JOAO HELIO VALENTIM EXAMES, JORGE RIBEIRO, JOSE ROBERTO PINTO BARBOSA, MARCELE LOURENCO FREITAS, MARCELO BARRETO FRANCO DA SILVEIRA, MARCILIO QUINTAO DE SOUZA, MAURICIO ALBUQUERQUE DE PAULA, MILTON PIRES GUIMARAES, PAULO GUILHERME NADER DAMASCENO, PAULO ROBERTO L MONTEIRO, SAMUEL JOSE, SANDRO DA SILVA PRINSCESWAL, SERGIO ANTONIO PALERMO DE ALMEIDA, SERGIO MENDES MANOEL, SERGIO SATOSHI OKUDA, THIAGO DE OLIVEIRA GUIMARAES.
 
-Também ajustar a busca no Supabase em `load()` (linha ~445–447): hoje, quando `filtroStatus` é um status específico, faz `q.eq("status", filtroStatus)`. Para `"agendado"`, **não** aplicar esse `eq`, deixando vir todos os agendamentos (e o filtro de cliente-presente é feito no `filtrados` em memória). Para os demais status específicos, mantém o `eq`.
+## Observação
+
+Na planilha, **MARCELE LOURENCO FREITAS** está marcada como Masculino. Vou aplicar exatamente como veio na planilha. Se for engano, é só me avisar depois para corrigir.
 
 ## Fora do escopo
 
-- Não mexer em outros filtros (médico, especialidade, dia da semana, cliente, ficha).
-- Não alterar a lógica de reagendamento.
-- Não mudar os rótulos do dropdown.
+- Nenhuma mudança de código.
+- Nenhuma alteração de estrutura do banco.
+- Outros campos do cadastro do médico permanecem inalterados.
