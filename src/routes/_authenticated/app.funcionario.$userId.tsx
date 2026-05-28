@@ -5,7 +5,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
 import { getFuncionarioLogin } from "@/lib/equipe.functions";
 import { useClinica } from "@/hooks/use-clinica";
-import { FuncionarioFormDialog } from "@/components/funcionarios/FuncionarioFormDialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -45,8 +44,7 @@ function PerfilFuncionarioPage() {
   const [ferias, setFerias] = useState<Ferias[]>([]);
   const [holerites, setHolerites] = useState<Holerite[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editOpen, setEditOpen] = useState(false);
-  const [reloadKey, setReloadKey] = useState(0);
+  const reloadKey = 0;
 
   useEffect(() => {
     let cancel = false;
@@ -181,8 +179,10 @@ function PerfilFuncionarioPage() {
             </div>
             {clinicaAtual && (
               <div className="pt-2">
-                <Button onClick={() => setEditOpen(true)} variant="outline" size="sm">
-                  <Pencil className="h-4 w-4 mr-1" /> Editar cadastro
+                <Button asChild variant="outline" size="sm">
+                  <Link to="/app/funcionario/$userId/editar" params={{ userId }}>
+                    <Pencil className="h-4 w-4 mr-1" /> Editar cadastro
+                  </Link>
                 </Button>
               </div>
             )}
@@ -255,16 +255,6 @@ function PerfilFuncionarioPage() {
           </CardContent></Card>
         </TabsContent>
       </Tabs>
-
-      {clinicaAtual && (
-        <FuncionarioFormDialog
-          open={editOpen}
-          onOpenChange={setEditOpen}
-          clinicaId={clinicaAtual.clinica_id}
-          editingUserId={userId}
-          onSaved={() => setReloadKey((k) => k + 1)}
-        />
-      )}
     </div>
   );
 }

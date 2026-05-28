@@ -22,11 +22,15 @@ const PERFIS = [
 interface Ref { id: string; nome: string }
 
 interface Props {
-  open: boolean;
-  onOpenChange: (o: boolean) => void;
+  open?: boolean;
+  onOpenChange?: (o: boolean) => void;
   clinicaId: string;
   editingUserId?: string | null;
   onSaved?: () => void;
+  /** Render mode. "dialog" (default) renders inside a modal; "page" renders inline as a full page. */
+  mode?: "dialog" | "page";
+  /** Called when the form should close (page mode). */
+  onClose?: () => void;
 }
 
 const emptyForm = (clinicaId: string) => ({
@@ -40,7 +44,11 @@ const emptyForm = (clinicaId: string) => ({
   criar_login: false, email: "", senha: "", perfil: "recepcao",
 });
 
-export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUserId, onSaved }: Props) {
+export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUserId, onSaved, mode = "dialog", onClose }: Props) {
+  const close = () => {
+    if (mode === "page") onClose?.();
+    else onOpenChange?.(false);
+  };
   const cadastrarUsuarioFn = useServerFn(cadastrarUsuario);
   const getLoginFn = useServerFn(getFuncionarioLogin);
   const definirSenhaFn = useServerFn(definirSenhaFuncionario);
@@ -214,19 +222,14 @@ export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUs
         .eq("id", targetUserId);
     }
     toast.success(editingContratoId || prefillUserId ? "Funcionário atualizado" : "Funcionário cadastrado");
-    onOpenChange(false);
     onSaved?.();
+    close();
   }
 
   const isEditingExisting = !!editingUserId;
+  const titleText = isEditingExisting ? "Editar funcionário" : "Novo funcionário";
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>{isEditingExisting ? "Editar funcionário" : "Novo funcionário"}</DialogTitle>
-        </DialogHeader>
-        {loading ? (
+  const body = loading ? (
           <div className="py-10 text-center text-sm text-muted-foreground">Carregando…</div>
         ) : (
           <Tabs defaultValue="dados" className="w-full">
@@ -360,11 +363,35 @@ export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUs
               )}
             </TabsContent>
           </Tabs>
-        )}
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={salvar} disabled={saving || loading}>{saving ? "Salvando…" : "Salvar"}</Button>
-        </DialogFooter>
+        );
+
+  const footer = (
+    <>
+      <Button variant="outline" onClick={close}>{mode === "page" ? "Voltar" : "Cancelar"}</Button>
+      <Button onClick={salvar} disabled={saving || loading}>{saving ? "Salvando…" : "Salvar"}</Button>
+    </>
+  );
+
+  if (mode === "page") {
+    return (
+      <div className="space-y-4">
+        <div>
+          <h1 className="text-2xl font-semibold">{titleText}</h1>
+        </div>
+        <div>{body}</div>
+        <div className="flex justify-end gap-2 border-t pt-4">{footer}</div>
+      </div>
+    );
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{titleText}</DialogTitle>
+        </DialogHeader>
+        {body}
+        <DialogFooter>{footer}</DialogFooter>
       </DialogContent>
     </Dialog>
   );
