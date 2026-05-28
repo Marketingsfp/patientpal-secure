@@ -51,6 +51,7 @@ import { Route as AuthenticatedAppMktLeadsRouteImport } from './routes/_authenti
 import { Route as AuthenticatedAppMktLandingRouteImport } from './routes/_authenticated/app.mkt-landing'
 import { Route as AuthenticatedAppMktEnviosRouteImport } from './routes/_authenticated/app.mkt-envios'
 import { Route as AuthenticatedAppMedicosRouteImport } from './routes/_authenticated/app.medicos'
+import { Route as AuthenticatedAppMedicoNovoRouteImport } from './routes/_authenticated/app.medico-novo'
 import { Route as AuthenticatedAppLmsAdminRouteImport } from './routes/_authenticated/app.lms-admin'
 import { Route as AuthenticatedAppLgpdRouteImport } from './routes/_authenticated/app.lgpd'
 import { Route as AuthenticatedAppIntegrationSecretsRouteImport } from './routes/_authenticated/app.integration-secrets'
@@ -336,6 +337,12 @@ const AuthenticatedAppMedicosRoute = AuthenticatedAppMedicosRouteImport.update({
   path: '/medicos',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
+const AuthenticatedAppMedicoNovoRoute =
+  AuthenticatedAppMedicoNovoRouteImport.update({
+    id: '/medico-novo',
+    path: '/medico-novo',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppLmsAdminRoute =
   AuthenticatedAppLmsAdminRouteImport.update({
     id: '/lms-admin',
@@ -728,6 +735,7 @@ export interface FileRoutesByFullPath {
   '/app/integration-secrets': typeof AuthenticatedAppIntegrationSecretsRoute
   '/app/lgpd': typeof AuthenticatedAppLgpdRoute
   '/app/lms-admin': typeof AuthenticatedAppLmsAdminRoute
+  '/app/medico-novo': typeof AuthenticatedAppMedicoNovoRoute
   '/app/medicos': typeof AuthenticatedAppMedicosRoute
   '/app/mkt-envios': typeof AuthenticatedAppMktEnviosRoute
   '/app/mkt-landing': typeof AuthenticatedAppMktLandingRoute
@@ -827,6 +835,7 @@ export interface FileRoutesByTo {
   '/app/integration-secrets': typeof AuthenticatedAppIntegrationSecretsRoute
   '/app/lgpd': typeof AuthenticatedAppLgpdRoute
   '/app/lms-admin': typeof AuthenticatedAppLmsAdminRoute
+  '/app/medico-novo': typeof AuthenticatedAppMedicoNovoRoute
   '/app/medicos': typeof AuthenticatedAppMedicosRoute
   '/app/mkt-envios': typeof AuthenticatedAppMktEnviosRoute
   '/app/mkt-landing': typeof AuthenticatedAppMktLandingRoute
@@ -931,6 +940,7 @@ export interface FileRoutesById {
   '/_authenticated/app/integration-secrets': typeof AuthenticatedAppIntegrationSecretsRoute
   '/_authenticated/app/lgpd': typeof AuthenticatedAppLgpdRoute
   '/_authenticated/app/lms-admin': typeof AuthenticatedAppLmsAdminRoute
+  '/_authenticated/app/medico-novo': typeof AuthenticatedAppMedicoNovoRoute
   '/_authenticated/app/medicos': typeof AuthenticatedAppMedicosRoute
   '/_authenticated/app/mkt-envios': typeof AuthenticatedAppMktEnviosRoute
   '/_authenticated/app/mkt-landing': typeof AuthenticatedAppMktLandingRoute
@@ -1035,6 +1045,7 @@ export interface FileRouteTypes {
     | '/app/integration-secrets'
     | '/app/lgpd'
     | '/app/lms-admin'
+    | '/app/medico-novo'
     | '/app/medicos'
     | '/app/mkt-envios'
     | '/app/mkt-landing'
@@ -1134,6 +1145,7 @@ export interface FileRouteTypes {
     | '/app/integration-secrets'
     | '/app/lgpd'
     | '/app/lms-admin'
+    | '/app/medico-novo'
     | '/app/medicos'
     | '/app/mkt-envios'
     | '/app/mkt-landing'
@@ -1237,6 +1249,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/integration-secrets'
     | '/_authenticated/app/lgpd'
     | '/_authenticated/app/lms-admin'
+    | '/_authenticated/app/medico-novo'
     | '/_authenticated/app/medicos'
     | '/_authenticated/app/mkt-envios'
     | '/_authenticated/app/mkt-landing'
@@ -1606,6 +1619,13 @@ declare module '@tanstack/react-router' {
       path: '/medicos'
       fullPath: '/app/medicos'
       preLoaderRoute: typeof AuthenticatedAppMedicosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/medico-novo': {
+      id: '/_authenticated/app/medico-novo'
+      path: '/medico-novo'
+      fullPath: '/app/medico-novo'
+      preLoaderRoute: typeof AuthenticatedAppMedicoNovoRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/lms-admin': {
@@ -2153,6 +2173,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppIntegrationSecretsRoute: typeof AuthenticatedAppIntegrationSecretsRoute
   AuthenticatedAppLgpdRoute: typeof AuthenticatedAppLgpdRoute
   AuthenticatedAppLmsAdminRoute: typeof AuthenticatedAppLmsAdminRoute
+  AuthenticatedAppMedicoNovoRoute: typeof AuthenticatedAppMedicoNovoRoute
   AuthenticatedAppMedicosRoute: typeof AuthenticatedAppMedicosRoute
   AuthenticatedAppMktEnviosRoute: typeof AuthenticatedAppMktEnviosRoute
   AuthenticatedAppMktLandingRoute: typeof AuthenticatedAppMktLandingRoute
@@ -2221,6 +2242,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
     AuthenticatedAppIntegrationSecretsRoute,
   AuthenticatedAppLgpdRoute: AuthenticatedAppLgpdRoute,
   AuthenticatedAppLmsAdminRoute: AuthenticatedAppLmsAdminRoute,
+  AuthenticatedAppMedicoNovoRoute: AuthenticatedAppMedicoNovoRoute,
   AuthenticatedAppMedicosRoute: AuthenticatedAppMedicosRoute,
   AuthenticatedAppMktEnviosRoute: AuthenticatedAppMktEnviosRoute,
   AuthenticatedAppMktLandingRoute: AuthenticatedAppMktLandingRoute,
