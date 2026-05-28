@@ -85,7 +85,10 @@ function Page() {
 
   if (!clinicaAtual) return <p className="text-muted-foreground">Selecione uma clínica.</p>;
 
-  const medicosFiltrados = medicos.filter((m) => !filtro || m.nome.toLowerCase().includes(filtro.toLowerCase()));
+  const medicosFiltrados = medicos
+    .filter((m) => !filtro || m.nome.toLowerCase().includes(filtro.toLowerCase()))
+    .slice()
+    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" }));
 
   // Pré-visualização dos slots gerados
   const slotsPreview = useMemo(() => {
