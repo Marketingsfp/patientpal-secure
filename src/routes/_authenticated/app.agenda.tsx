@@ -512,6 +512,14 @@ function AgendaPage() {
     }
     // Marca agendamentos pagos (receita vinculada em fin_lancamentos)
     const ids = (data ?? []).map((a) => a.id);
+    // Fichas DISPONÍVEIS não podem ser exibidas como "Pago" — ignoramos
+    // qualquer lançamento órfão que tenha ficado vinculado a uma ficha
+    // que foi posteriormente liberada por um reagendamento.
+    const idsComPaciente = new Set(
+      ((data ?? []) as Array<{ id: string; paciente_nome: string }>)
+        .filter((a) => normalizar(a.paciente_nome) !== "disponivel")
+        .map((a) => a.id),
+    );
     if (ids.length) {
       const { data: pg } = await supabase
         .from("fin_lancamentos")
@@ -521,7 +529,7 @@ function AgendaPage() {
         .in("agendamento_id", ids);
       setPagosSet(new Set(((pg ?? []) as Array<{ agendamento_id: string | null }>)
         .map((r) => r.agendamento_id)
-        .filter((x): x is string => !!x)));
+        .filter((x): x is string => !!x && idsComPaciente.has(x))));
     } else {
       setPagosSet(new Set());
     }
