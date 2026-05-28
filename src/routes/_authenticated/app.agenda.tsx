@@ -127,6 +127,7 @@ function AgendaPage() {
   const [items, setItems] = useState<Agendamento[]>([]);
   const [pagosSet, setPagosSet] = useState<Set<string>>(new Set());
   const [nascMap, setNascMap] = useState<Map<string, string | null>>(new Map());
+  const [convenioMap, setConvenioMap] = useState<Map<string, string>>(new Map());
   const [etapaMap, setEtapaMap] = useState<Map<string, string>>(new Map());
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [exames, setExames] = useState<{ id: string; nome: string }[]>([]);
@@ -349,6 +350,25 @@ function AgendaPage() {
       setNascMap(map);
     } else {
       setNascMap(new Map());
+    }
+    // Busca contratos de convênio (cartão benefícios) ativos para sinalizar na agenda
+    if (pacIds.length) {
+      const { data: contratos } = await supabase
+        .from("contratos_assinatura")
+        .select("paciente_id,status,cb_convenios(nome)")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("status", "ativo")
+        .in("paciente_id", pacIds);
+      const cmap = new Map<string, string>();
+      ((contratos ?? []) as Array<{ paciente_id: string; cb_convenios: { nome: string } | null }>)
+        .forEach((c) => {
+          if (c.paciente_id && !cmap.has(c.paciente_id)) {
+            cmap.set(c.paciente_id, c.cb_convenios?.nome ?? "Convênio");
+          }
+        });
+      setConvenioMap(cmap);
+    } else {
+      setConvenioMap(new Map());
     }
     // Marca agendamentos pagos (receita vinculada em fin_lancamentos)
     const ids = (data ?? []).map((a) => a.id);
@@ -1778,6 +1798,15 @@ function AgendaPage() {
                       >
                         {a.status === "confirmado" && <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />}
                         {a.paciente_id && <IdadeIcon nascimento={nascMap.get(a.paciente_id) ?? null} size={18} />}
+                        {a.paciente_id && convenioMap.has(a.paciente_id) && (
+                          <span
+                            title={`Convênio: ${convenioMap.get(a.paciente_id)}`}
+                            className="inline-flex items-center gap-0.5 rounded-sm border border-sky-500/40 bg-sky-50 px-1 py-0 text-[9px] font-semibold uppercase text-sky-700"
+                          >
+                            <ShieldCheck className="h-3 w-3" />
+                            Convênio
+                          </span>
+                        )}
                         {a.paciente_nome}
                       </button>
                     )}
