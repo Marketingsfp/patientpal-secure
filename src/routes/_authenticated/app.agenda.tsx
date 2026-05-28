@@ -2134,8 +2134,8 @@ function AgendaPage() {
               <TableHead className="w-14">Dia</TableHead>
               <TableHead className="w-24">Data</TableHead>
               <TableHead className="w-24">Intervalo</TableHead>
-              <TableHead className="min-w-[200px]">Profissional</TableHead>
-              <TableHead className="min-w-[200px]">Cliente</TableHead>
+              <TableHead className="w-[220px] max-w-[220px]">Profissional</TableHead>
+              <TableHead className="w-[220px] max-w-[220px]">Cliente</TableHead>
               <TableHead className="w-40">Serviço</TableHead>
               <TableHead className="w-28 text-center">Alertas</TableHead>
               <TableHead className="w-32 text-right">Ações</TableHead>
@@ -2162,12 +2162,15 @@ function AgendaPage() {
                   <TableCell>
                      <span className="text-emerald-600 font-medium">{fmtHora(a.inicio)} - {fmtHora(a.fim)}</span>
                   </TableCell>
-                  <TableCell className="pr-1 align-middle">
-                    <span className="text-xs uppercase font-medium text-foreground">
+                  <TableCell className="pr-1 align-middle max-w-[220px]">
+                    <div
+                      className="text-xs uppercase font-medium text-foreground truncate"
+                      title={`Dr(a). ${medicos.find((m) => m.id === a.medico_id)?.nome ?? "—"}`}
+                    >
                       Dr(a). {medicos.find((m) => m.id === a.medico_id)?.nome ?? "—"}
-                    </span>
+                    </div>
                   </TableCell>
-                  <TableCell className="pr-1 align-middle">
+                  <TableCell className="pr-1 align-middle max-w-[220px]">
                     {normalizar(a.paciente_nome) === "disponivel" ? (
                       <Button
                         variant="ghost"
@@ -2184,7 +2187,7 @@ function AgendaPage() {
                         type="button"
                         onClick={() => abrirInfoPaciente(a.paciente_id, a.paciente_nome)}
                         title="Ver informações do cliente"
-                        className="inline-flex items-center gap-1 text-xs uppercase font-medium text-foreground hover:text-primary hover:underline"
+                        className="inline-flex items-center gap-1 text-xs uppercase font-medium text-foreground hover:text-primary hover:underline max-w-full overflow-hidden"
                       >
                         {a.status === "confirmado" && <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />}
                         {a.paciente_id && <IdadeIcon nascimento={nascMap.get(a.paciente_id) ?? null} size={18} />}
@@ -2196,7 +2199,7 @@ function AgendaPage() {
                             <IdCard className="h-3.5 w-3.5" strokeWidth={2} />
                           </span>
                         )}
-                        {a.paciente_nome}
+                        <span className="truncate min-w-0">{a.paciente_nome}</span>
                       </button>
                     )}
                   </TableCell>
