@@ -286,24 +286,32 @@ function AgendaPage() {
     const origem = reagendandoAg;
     if (!origem || reagSalvando) return;
     if (slot.id === origem.id) { toast.info("Esse já é o horário atual."); return; }
+    if (normalizar(slot.paciente_nome) !== "disponivel") {
+      toast.error("Esse horário não está disponível. Escolha um slot DISPONÍVEL.");
+      return;
+    }
     setReagSalvando(true);
     const obsAnt = origem.observacoes ?? "";
     const trilha = `[Reagendado em ${new Date().toLocaleString("pt-BR")}] de ${new Date(origem.inicio).toLocaleString("pt-BR")} para ${new Date(slot.inicio).toLocaleString("pt-BR")}`;
     const novasObs = obsAnt ? `${obsAnt}\n${trilha}` : trilha;
-    // 1) Move o agendamento para o novo horário/médico
+    // 1) Libera a ficha de origem (vira DISPONÍVEL no horário atual)
     const { error: e1 } = await supabase.from("agendamentos").update({
-      inicio: slot.inicio,
-      fim: slot.fim,
-      medico_id: slot.medico_id ?? null,
-      status: "agendado",
-      observacoes: novasObs,
-    } as never).eq("id", origem.id);
-    if (e1) { setReagSalvando(false); toast.error(e1.message); return; }
-    // 2) Libera o slot escolhido (que era "DISPONÍVEL")
-    const { error: e2 } = await supabase.from("agendamentos").update({
       paciente_id: null,
       paciente_nome: "DISPONÍVEL",
       status: "agendado",
+      procedimento: null,
+      observacoes: null,
+      data_pagamento: null,
+    } as never).eq("id", origem.id);
+    if (e1) { setReagSalvando(false); toast.error(e1.message); return; }
+    // 2) Coloca a paciente na ficha de destino (slot escolhido), preservando o horário do slot
+    const { error: e2 } = await supabase.from("agendamentos").update({
+      paciente_id: origem.paciente_id ?? null,
+      paciente_nome: origem.paciente_nome,
+      procedimento: origem.procedimento ?? null,
+      status: "agendado",
+      observacoes: novasObs,
+      data_pagamento: origem.data_pagamento ?? null,
     } as never).eq("id", slot.id);
     if (e2) { setReagSalvando(false); toast.error(e2.message); return; }
     setReagSalvando(false);
