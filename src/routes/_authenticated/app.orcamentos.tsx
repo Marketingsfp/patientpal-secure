@@ -268,7 +268,7 @@ function NovoOrcamentoDialog({
         value: p.id,
         label: [
           p.nome,
-          p.numero_pasta != null ? `Pasta ${p.numero_pasta}` : null,
+          p.numero_pasta != null ? `Serviço ${p.numero_pasta}` : null,
           p.cpf ? `CPF ${p.cpf}` : null,
           p.data_nascimento ? `Nasc. ${p.data_nascimento}` : null,
           p.telefone,

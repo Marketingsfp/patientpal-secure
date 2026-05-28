@@ -106,7 +106,7 @@ function ExamesResultadosPage() {
   const pacienteOptions = useMemo(() => {
     return pacientes.map((p) => {
       const partes: string[] = [p.nome];
-      if (p.numero_pasta) partes.push(`Pasta ${p.numero_pasta}`);
+      if (p.numero_pasta) partes.push(`Serviço ${p.numero_pasta}`);
       if (p.cpf) partes.push(`CPF ${p.cpf}`);
       if (p.data_nascimento) {
         const d = new Date(p.data_nascimento + "T00:00:00");
