@@ -828,7 +828,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                           ))}
                       </select>
                     </div>
-                  <div className={`${asPage ? "" : "max-h-48 overflow-y-auto"} overflow-x-hidden space-y-1`}>
+                  <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-1">
                       {procs.length === 0 && (
                         <p className="text-xs text-muted-foreground text-center py-3">
                           Nenhum serviço cadastrado. Cadastre em "Serviços".
@@ -863,7 +863,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                         })}
                     </div>
                   </div>
-                  <div className={`space-y-2 ${asPage ? "" : "max-h-80 overflow-y-auto"} pr-1`}>
+                  <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
                     {convenios.map((c, i) => (
                       <div key={i} className="grid grid-cols-12 gap-2 items-end border rounded-md p-2 min-w-0">
                         <div className="col-span-5 space-y-1 min-w-0">
