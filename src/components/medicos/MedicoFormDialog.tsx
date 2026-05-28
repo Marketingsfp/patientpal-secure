@@ -239,6 +239,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       percentual_repasse_padrao: form.tipo_repasse === "percentual" ? parseFloat(form.percentual || "0") : 0,
       valor_repasse_padrao: form.tipo_repasse === "valor" ? parseFloat(form.valor || "0") : null,
       aceita_cartao_beneficios: form.aceita_cartao_beneficios,
+      duracao_consulta_min: parseInt(form.duracao_consulta_min || "15") || 15,
       cpf: form.cpf || null,
       rg: form.rg || null,
       data_nascimento: form.data_nascimento || null,
