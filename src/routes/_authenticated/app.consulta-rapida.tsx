@@ -216,7 +216,7 @@ function ConsultaRapidaPage() {
           </p>
         </div>
         <Badge variant="outline" className="text-xs">
-          {medicos.length} médicos · {procs.length} procedimentos
+          {medicos.length} médicos · {procs.length} serviços
         </Badge>
       </div>
 
@@ -242,7 +242,7 @@ function ConsultaRapidaPage() {
             <Badge variant="secondary" className="ml-1">{medicosFiltrados.length}</Badge>
           </TabsTrigger>
           <TabsTrigger value="procs" className="gap-2">
-            <ClipboardList className="h-4 w-4" /> Exames & valores
+            <ClipboardList className="h-4 w-4" /> Serviços & valores
             <Badge variant="secondary" className="ml-1">{procsFiltrados.length}</Badge>
           </TabsTrigger>
         </TabsList>
@@ -307,7 +307,7 @@ function ConsultaRapidaPage() {
         <TabsContent value="procs" className="mt-4">
           <div className="mb-3 flex justify-end">
             <Button size="sm" onClick={openNovoProc} className="gap-1">
-              <Plus className="h-4 w-4" /> Novo procedimento
+              <Plus className="h-4 w-4" /> Novo serviço
             </Button>
           </div>
           {loading ? (
@@ -364,7 +364,7 @@ function ConsultaRapidaPage() {
       <Dialog open={procOpen} onOpenChange={setProcOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>{procForm.id ? "Editar procedimento" : "Novo procedimento"}</DialogTitle>
+            <DialogTitle>{procForm.id ? "Editar serviço" : "Novo serviço"}</DialogTitle>
             <DialogDescription>Nome, grupo, valores e duração.</DialogDescription>
           </DialogHeader>
           <form onSubmit={saveProc} className="space-y-3">
@@ -384,7 +384,7 @@ function ConsultaRapidaPage() {
                   <SelectContent>
                     <SelectItem value="consulta">Consulta</SelectItem>
                     <SelectItem value="exame">Exame</SelectItem>
-                    <SelectItem value="procedimento">Procedimento</SelectItem>
+                    <SelectItem value="procedimento">Serviço</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

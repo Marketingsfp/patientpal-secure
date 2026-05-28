@@ -223,7 +223,7 @@ export function AppShell() {
       /fluxo|kanban|triagem/.test(t) ? "/app/fluxo" :
       /recep|fila/.test(t) ? "/app/recepcao" :
       /cliente|paciente/.test(t) ? "/app/clientes" :
-      /procediment|exame/.test(t) ? "/app/procedimentos" :
+      /servico|procediment|exame/.test(t) ? "/app/procedimentos" :
       /or[çc]amento/.test(t) ? "/app/orcamentos" :
       /plano|assinatura|cart[ãa]o|benef[ií]cio|contrato/.test(t) ? "/app/cartao-beneficios/contratos" :
       /modelo|template/.test(t) ? "/app/cartao-beneficios/modelos" :

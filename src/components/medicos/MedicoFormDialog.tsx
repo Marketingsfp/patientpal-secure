@@ -647,8 +647,8 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                 <div className="border rounded-md p-3 space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <Label className="text-sm font-medium">Procedimentos</Label>
-                      <p className="text-xs text-muted-foreground">Adicione os procedimentos que o médico realiza (cadastrados no menu "Procedimentos").</p>
+                      <Label className="text-sm font-medium">Serviços</Label>
+                      <p className="text-xs text-muted-foreground">Adicione os serviços que o médico realiza (cadastrados no menu "Serviços").</p>
                     </div>
                     <Button
                       type="button"
@@ -656,13 +656,13 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                       variant="outline"
                       onClick={() => setForm({ ...form, procedimentos: [...form.procedimentos, ""] })}
                     >
-                      <Plus className="h-4 w-4 mr-1" /> Adicionar procedimento
+                      <Plus className="h-4 w-4 mr-1" /> Adicionar serviço
                     </Button>
                   </div>
                   {procs.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">Nenhum procedimento cadastrado na clínica.</p>
+                    <p className="text-xs text-muted-foreground">Nenhum serviço cadastrado na clínica.</p>
                   ) : form.procedimentos.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">Nenhum procedimento selecionado.</p>
+                    <p className="text-xs text-muted-foreground">Nenhum serviço selecionado.</p>
                   ) : (
                     <div className="space-y-2">
                       {form.procedimentos.map((pid, idx) => (
@@ -681,7 +681,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                               });
                             }}
                             placeholder="Selecione"
-                            searchPlaceholder="Buscar procedimento..."
+                            searchPlaceholder="Buscar serviço..."
                           />
                           <Button
                             type="button"
@@ -693,7 +693,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                                 procedimentos: form.procedimentos.filter((_, i) => i !== idx),
                               })
                             }
-                            aria-label="Remover procedimento"
+                            aria-label="Remover serviço"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -771,8 +771,8 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                 <div className="pt-4 border-t space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <Label>Convênios / Procedimentos</Label>
-                      <p className="text-xs text-muted-foreground">Selecione procedimentos cadastrados ou adicione manualmente (ex: Cartão Consulta).</p>
+                      <Label>Convênios / Serviços</Label>
+                      <p className="text-xs text-muted-foreground">Selecione serviços cadastrados ou adicione manualmente (ex: Cartão Consulta).</p>
                     </div>
                     <Button type="button" size="sm" variant="outline"
                       onClick={() => setConvenios((cs) => [...cs, { nome: "", tipo_repasse: "percentual", percentual: "50", valor: "", ativo: true }])}>
@@ -782,7 +782,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                   <div className="rounded-md border p-2 space-y-2 bg-muted/30">
                     <div className="grid grid-cols-2 gap-2">
                       <Input
-                        placeholder="Filtrar procedimento..."
+                        placeholder="Filtrar serviço..."
                         value={procFilter}
                         onChange={(e) => setProcFilter(e.target.value)}
                         className="h-8"
@@ -803,7 +803,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                     <div className="max-h-48 overflow-y-auto space-y-1">
                       {procs.length === 0 && (
                         <p className="text-xs text-muted-foreground text-center py-3">
-                          Nenhum procedimento cadastrado. Cadastre em "Procedimentos".
+                          Nenhum serviço cadastrado. Cadastre em "Serviços".
                         </p>
                       )}
                       {procs

@@ -51,7 +51,7 @@ const RELATORIOS: Relatorio[] = [
       return (data ?? []).map((r: any) => ({
         Inicio: r.inicio, Fim: r.fim, Status: r.status,
         Paciente: r.pacientes?.nome ?? "", Medico: r.medicos?.nome ?? "",
-        Procedimento: r.procedimentos?.nome ?? "", Observacao: r.observacao ?? "",
+        "Serviço": r.procedimentos?.nome ?? "", Observacao: r.observacao ?? "",
       }));
     },
   },
@@ -69,8 +69,8 @@ const RELATORIOS: Relatorio[] = [
   },
   {
     id: "procedimentos",
-    titulo: "Procedimentos",
-    descricao: "Catálogo de procedimentos e valores.",
+    titulo: "Serviços",
+    descricao: "Catálogo de serviços e valores.",
     icon: ClipboardList, cor: "#fb923c",
     carregar: async ({ clinicaId }) => {
       const { data } = await supabase.from("procedimentos")
@@ -313,7 +313,7 @@ const RELATORIOS: Relatorio[] = [
         Paciente: r.pacientes?.nome ?? "",
         CPF: r.pacientes?.cpf ?? "",
         Agendamento: r.agendamentos?.inicio ?? "",
-        Procedimento: r.agendamentos?.procedimento ?? "",
+        "Serviço": r.agendamentos?.procedimento ?? "",
         Enfermeira: r.enfermeira_nome ?? "",
         "Peso (kg)": r.peso_kg ?? "",
         "Altura (cm)": r.altura_cm ?? "",
