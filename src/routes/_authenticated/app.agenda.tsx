@@ -959,6 +959,10 @@ function AgendaPage() {
         data_pagamento: origem.data_pagamento ?? null,
       } as never).eq("id", alvo.id);
       if (e2) { toast.error(`Falha ao mover para destino: ${e2.message}`); continue; }
+      // 3) Transfere lançamentos financeiros (pagamento) da ficha de origem para a de destino
+      await supabase.from("fin_lancamentos")
+        .update({ agendamento_id: alvo.id } as never)
+        .eq("agendamento_id", origem.id);
       okCount++;
     }
     setReagLoteSalvando(false);
