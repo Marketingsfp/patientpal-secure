@@ -110,6 +110,7 @@ import { Route as AuthenticatedAppCartaoBeneficiosContratosRouteImport } from '.
 import { Route as AuthenticatedAppCartaoBeneficiosBeneficiosRouteImport } from './routes/_authenticated/app.cartao-beneficios.beneficios'
 import { Route as AuthenticatedAppAtendimentoIaAgendamentoIdRouteImport } from './routes/_authenticated/app.atendimento-ia.$agendamentoId'
 import { Route as AuthenticatedAppClientesPacienteIdEditarRouteImport } from './routes/_authenticated/app.clientes.$pacienteId.editar'
+import { Route as AuthenticatedAppEquipeMedicoMedicoIdEditarRouteImport } from './routes/_authenticated/app.equipe.medico.$medicoId.editar'
 import { Route as AuthenticatedAppEquipeFuncionarioUserIdEditarRouteImport } from './routes/_authenticated/app.equipe.funcionario.$userId.editar'
 
 const TotemRoute = TotemRouteImport.update({
@@ -679,6 +680,12 @@ const AuthenticatedAppClientesPacienteIdEditarRoute =
     path: '/clientes/$pacienteId/editar',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
+const AuthenticatedAppEquipeMedicoMedicoIdEditarRoute =
+  AuthenticatedAppEquipeMedicoMedicoIdEditarRouteImport.update({
+    id: '/medico/$medicoId/editar',
+    path: '/medico/$medicoId/editar',
+    getParentRoute: () => AuthenticatedAppEquipeRoute,
+  } as any)
 const AuthenticatedAppEquipeFuncionarioUserIdEditarRoute =
   AuthenticatedAppEquipeFuncionarioUserIdEditarRouteImport.update({
     id: '/funcionario/$userId/editar',
@@ -788,6 +795,7 @@ export interface FileRoutesByFullPath {
   '/app/financeiro/': typeof AuthenticatedAppFinanceiroIndexRoute
   '/app/clientes/$pacienteId/editar': typeof AuthenticatedAppClientesPacienteIdEditarRoute
   '/app/equipe/funcionario/$userId/editar': typeof AuthenticatedAppEquipeFuncionarioUserIdEditarRoute
+  '/app/equipe/medico/$medicoId/editar': typeof AuthenticatedAppEquipeMedicoMedicoIdEditarRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -888,6 +896,7 @@ export interface FileRoutesByTo {
   '/app/financeiro': typeof AuthenticatedAppFinanceiroIndexRoute
   '/app/clientes/$pacienteId/editar': typeof AuthenticatedAppClientesPacienteIdEditarRoute
   '/app/equipe/funcionario/$userId/editar': typeof AuthenticatedAppEquipeFuncionarioUserIdEditarRoute
+  '/app/equipe/medico/$medicoId/editar': typeof AuthenticatedAppEquipeMedicoMedicoIdEditarRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -993,6 +1002,7 @@ export interface FileRoutesById {
   '/_authenticated/app/financeiro/': typeof AuthenticatedAppFinanceiroIndexRoute
   '/_authenticated/app/clientes/$pacienteId/editar': typeof AuthenticatedAppClientesPacienteIdEditarRoute
   '/_authenticated/app/equipe/funcionario/$userId/editar': typeof AuthenticatedAppEquipeFuncionarioUserIdEditarRoute
+  '/_authenticated/app/equipe/medico/$medicoId/editar': typeof AuthenticatedAppEquipeMedicoMedicoIdEditarRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -1098,6 +1108,7 @@ export interface FileRouteTypes {
     | '/app/financeiro/'
     | '/app/clientes/$pacienteId/editar'
     | '/app/equipe/funcionario/$userId/editar'
+    | '/app/equipe/medico/$medicoId/editar'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -1198,6 +1209,7 @@ export interface FileRouteTypes {
     | '/app/financeiro'
     | '/app/clientes/$pacienteId/editar'
     | '/app/equipe/funcionario/$userId/editar'
+    | '/app/equipe/medico/$medicoId/editar'
   id:
     | '__root__'
     | '/'
@@ -1302,6 +1314,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/financeiro/'
     | '/_authenticated/app/clientes/$pacienteId/editar'
     | '/_authenticated/app/equipe/funcionario/$userId/editar'
+    | '/_authenticated/app/equipe/medico/$medicoId/editar'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -2034,6 +2047,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppClientesPacienteIdEditarRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/app/equipe/medico/$medicoId/editar': {
+      id: '/_authenticated/app/equipe/medico/$medicoId/editar'
+      path: '/medico/$medicoId/editar'
+      fullPath: '/app/equipe/medico/$medicoId/editar'
+      preLoaderRoute: typeof AuthenticatedAppEquipeMedicoMedicoIdEditarRouteImport
+      parentRoute: typeof AuthenticatedAppEquipeRoute
+    }
     '/_authenticated/app/equipe/funcionario/$userId/editar': {
       id: '/_authenticated/app/equipe/funcionario/$userId/editar'
       path: '/funcionario/$userId/editar'
@@ -2091,12 +2111,15 @@ const AuthenticatedAppCartaoBeneficiosRouteWithChildren =
 
 interface AuthenticatedAppEquipeRouteChildren {
   AuthenticatedAppEquipeFuncionarioUserIdEditarRoute: typeof AuthenticatedAppEquipeFuncionarioUserIdEditarRoute
+  AuthenticatedAppEquipeMedicoMedicoIdEditarRoute: typeof AuthenticatedAppEquipeMedicoMedicoIdEditarRoute
 }
 
 const AuthenticatedAppEquipeRouteChildren: AuthenticatedAppEquipeRouteChildren =
   {
     AuthenticatedAppEquipeFuncionarioUserIdEditarRoute:
       AuthenticatedAppEquipeFuncionarioUserIdEditarRoute,
+    AuthenticatedAppEquipeMedicoMedicoIdEditarRoute:
+      AuthenticatedAppEquipeMedicoMedicoIdEditarRoute,
   }
 
 const AuthenticatedAppEquipeRouteWithChildren =

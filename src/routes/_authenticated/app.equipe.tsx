@@ -1,4 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { z } from "zod";
 import { useEffect, useState } from "react";
 import { Plus, Pencil, Users, Stethoscope } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
@@ -16,6 +17,9 @@ import { MedicoFormDialog } from "@/components/medicos/MedicoFormDialog";
 export const Route = createFileRoute("/_authenticated/app/equipe")({
   component: EquipePage,
   head: () => ({ meta: [{ title: "Equipe — ClinicaOS" }] }),
+  validateSearch: z.object({
+    tab: z.enum(["funcionarios", "medicos"]).optional(),
+  }),
 });
 
 interface Funcionario {
@@ -41,7 +45,9 @@ const limparPrefixoMedico = (nome: string) =>
 
 function EquipePage() {
   const { clinicaAtual } = useClinica();
-  const [tab, setTab] = useState<"funcionarios" | "medicos">("funcionarios");
+  const { tab: tabFromUrl } = Route.useSearch();
+  const [tab, setTab] = useState<"funcionarios" | "medicos">(tabFromUrl ?? "funcionarios");
+  useEffect(() => { if (tabFromUrl) setTab(tabFromUrl); }, [tabFromUrl]);
   const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [loading, setLoading] = useState(false);
@@ -168,8 +174,10 @@ function EquipePage() {
                         <Badge variant={f.ativo ? "default" : "outline"}>{f.ativo ? "Ativo" : "Inativo"}</Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button size="icon" variant="ghost" onClick={() => setFuncDialog({ open: true, userId: f.user_id })}>
-                          <Pencil className="h-4 w-4" />
+                        <Button size="icon" variant="ghost" asChild>
+                          <Link to="/app/equipe/funcionario/$userId/editar" params={{ userId: f.user_id }}>
+                            <Pencil className="h-4 w-4" />
+                          </Link>
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -207,8 +215,10 @@ function EquipePage() {
                       <TableCell className="text-sm text-muted-foreground">{m.telefone ?? "—"}</TableCell>
                       <TableCell>{m.ativo ? <Badge>Ativo</Badge> : <Badge variant="outline">Inativo</Badge>}</TableCell>
                       <TableCell className="text-right">
-                        <Button size="icon" variant="ghost" onClick={() => setMedicoDialog({ open: true, id: m.id })}>
-                          <Pencil className="h-4 w-4" />
+                        <Button size="icon" variant="ghost" asChild>
+                          <Link to="/app/equipe/medico/$medicoId/editar" params={{ medicoId: m.id }}>
+                            <Pencil className="h-4 w-4" />
+                          </Link>
                         </Button>
                       </TableCell>
                     </TableRow>
