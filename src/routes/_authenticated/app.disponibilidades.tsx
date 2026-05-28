@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Trash2, Plus, CalendarRange } from "lucide-react";
+import { Trash2, Plus, CalendarRange, Pencil, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export const Route = createFileRoute("/_authenticated/app/disponibilidades")({
   component: Page,
@@ -49,6 +50,7 @@ function Page() {
   const em30Iso = (() => { const d = new Date(); d.setDate(d.getDate() + 29); return d.toISOString().slice(0, 10); })();
   const [gerar, setGerar] = useState({ medico_id: "all", duracao: "5", dias: "30", data_inicio: hojeIso, data_fim: em30Iso, limite_fichas: "" });
   const [gerando, setGerando] = useState(false);
+  const [medicoEditando, setMedicoEditando] = useState<string | null>(null);
 
   const load = async () => {
     if (!clinicaAtual) return;
@@ -246,76 +248,117 @@ function Page() {
         </TabsContent>
 
         <TabsContent value="medicos" className="space-y-6">
-          <Card>
-        <CardContent className="py-4 flex flex-wrap gap-2 items-end">
-          <div className="flex-1 min-w-48">
-            <label className="text-xs text-muted-foreground">Médico</label>
-            <Select value={novo.medico_id} onValueChange={(v) => setNovo({ ...novo, medico_id: v })}>
-              <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-              <SelectContent>
-                {medicos.map((m) => <SelectItem key={m.id} value={m.id} className="uppercase">{m.nome}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <label className="text-xs text-muted-foreground">Dia</label>
-            <Select value={novo.dia_semana} onValueChange={(v) => setNovo({ ...novo, dia_semana: v })}>
-              <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
-              <SelectContent>{DIAS.map((d, i) => <SelectItem key={i} value={String(i)}>{d}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
-          <div>
-            <label className="text-xs text-muted-foreground">Início</label>
-            <Input type="time" className="w-28" value={novo.hora_inicio} onChange={(e) => setNovo({ ...novo, hora_inicio: e.target.value })} />
-          </div>
-          <div>
-            <label className="text-xs text-muted-foreground">Fim</label>
-            <Input type="time" className="w-28" value={novo.hora_fim} onChange={(e) => setNovo({ ...novo, hora_fim: e.target.value })} />
-          </div>
-          <div>
-            <label className="text-xs text-muted-foreground">Pacientes/dia</label>
-            <Input type="number" min={1} placeholder="sem limite" className="w-32" value={novo.limite_pacientes} onChange={(e) => setNovo({ ...novo, limite_pacientes: e.target.value })} />
-          </div>
-          <Button onClick={adicionar}><Plus className="h-4 w-4 mr-1" /> Adicionar</Button>
-        </CardContent>
-      </Card>
-
-      <Input placeholder="Filtrar médicos..." value={filtro} onChange={(e) => setFiltro(e.target.value)} className="max-w-sm" />
-
-      <div className="space-y-3">
-        {medicosFiltrados.map((m) => {
-          const ds = disps.filter((d) => d.medico_id === m.id);
-          if (ds.length === 0 && filtro) return null;
-          return (
-            <Card key={m.id}>
-              <CardContent className="py-3">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-medium uppercase">{m.nome}</h3>
-                  <span className="text-xs text-muted-foreground">{ds.length} horário(s)</span>
+          {medicoEditando === null ? (
+            <>
+              <Input placeholder="Filtrar médicos..." value={filtro} onChange={(e) => setFiltro(e.target.value)} className="max-w-sm" />
+              <Card>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Médico</TableHead>
+                        <TableHead className="w-32 text-center">Horários</TableHead>
+                        <TableHead className="w-24 text-right">Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {medicosFiltrados.map((m) => {
+                        const ds = disps.filter((d) => d.medico_id === m.id);
+                        return (
+                          <TableRow key={m.id}>
+                            <TableCell className="font-medium uppercase">{m.nome}</TableCell>
+                            <TableCell className="text-center text-sm text-muted-foreground">{ds.length}</TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => { setMedicoEditando(m.id); setNovo({ ...novo, medico_id: m.id }); }}
+                                aria-label="Editar horários"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                      {medicosFiltrados.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={3} className="text-center text-sm text-muted-foreground py-6">
+                            Nenhum médico encontrado.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </>
+          ) : (() => {
+            const m = medicos.find((x) => x.id === medicoEditando);
+            if (!m) { setMedicoEditando(null); return null; }
+            const ds = disps.filter((d) => d.medico_id === m.id);
+            return (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <Button variant="ghost" size="sm" onClick={() => setMedicoEditando(null)}>
+                    <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
+                  </Button>
+                  <h2 className="text-lg font-semibold uppercase">{m.nome}</h2>
+                  <span className="text-xs text-muted-foreground">· {ds.length} horário(s)</span>
                 </div>
-                {ds.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">Sem horários cadastrados.</p>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {ds.map((d) => (
-                      <div key={d.id} className="flex items-center gap-2 border rounded-md px-2 py-1 text-sm bg-muted/40">
-                        <span className="font-medium">{DIAS[d.dia_semana]}</span>
-                        <span>{d.hora_inicio.slice(0, 5)}–{d.hora_fim.slice(0, 5)}</span>
-                        {d.limite_pacientes ? (
-                          <span className="text-xs text-primary font-medium">· {d.limite_pacientes} pac/dia</span>
-                        ) : null}
-                        <button onClick={() => remover(d.id)} className="text-destructive hover:opacity-70" aria-label="Remover">
-                          <Trash2 className="h-3 w-3" />
-                        </button>
+
+                <Card>
+                  <CardContent className="py-4 flex flex-wrap gap-2 items-end">
+                    <div>
+                      <label className="text-xs text-muted-foreground">Dia</label>
+                      <Select value={novo.dia_semana} onValueChange={(v) => setNovo({ ...novo, dia_semana: v })}>
+                        <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+                        <SelectContent>{DIAS.map((d, i) => <SelectItem key={i} value={String(i)}>{d}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Início</label>
+                      <Input type="time" className="w-28" value={novo.hora_inicio} onChange={(e) => setNovo({ ...novo, hora_inicio: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Fim</label>
+                      <Input type="time" className="w-28" value={novo.hora_fim} onChange={(e) => setNovo({ ...novo, hora_fim: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Pacientes/dia</label>
+                      <Input type="number" min={1} placeholder="sem limite" className="w-32" value={novo.limite_pacientes} onChange={(e) => setNovo({ ...novo, limite_pacientes: e.target.value })} />
+                    </div>
+                    <Button onClick={() => { setNovo({ ...novo, medico_id: m.id }); void adicionar(); }}>
+                      <Plus className="h-4 w-4 mr-1" /> Adicionar
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="py-3">
+                    {ds.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">Sem horários cadastrados.</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {ds.map((d) => (
+                          <div key={d.id} className="flex items-center gap-2 border rounded-md px-2 py-1 text-sm bg-muted/40">
+                            <span className="font-medium">{DIAS[d.dia_semana]}</span>
+                            <span>{d.hora_inicio.slice(0, 5)}–{d.hora_fim.slice(0, 5)}</span>
+                            {d.limite_pacientes ? (
+                              <span className="text-xs text-primary font-medium">· {d.limite_pacientes} pac/dia</span>
+                            ) : null}
+                            <button onClick={() => remover(d.id)} className="text-destructive hover:opacity-70" aria-label="Remover">
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            );
+          })()}
         </TabsContent>
       </Tabs>
     </div>
