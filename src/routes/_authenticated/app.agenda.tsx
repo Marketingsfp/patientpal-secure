@@ -1364,6 +1364,10 @@ function AgendaPage() {
               {isManager && (
                 <>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={abrirReagLote}>
+                    🔁 Reagendar selecionados em outra agenda
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={excluirSelecionados}
                     className="text-destructive focus:text-destructive"
