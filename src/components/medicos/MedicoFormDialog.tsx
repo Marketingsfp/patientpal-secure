@@ -42,6 +42,7 @@ const emptyForm = () => ({
   percentual: "50",
   valor: "",
   aceita_cartao_beneficios: true,
+  duracao_consulta_min: "15",
   cpf: "", rg: "", data_nascimento: "", email: "", telefone: "", telefone2: "",
   nacionalidade: "Brasileira", estado_civil: "",
   sexo: "nao_informar",
