@@ -124,6 +124,23 @@ function EspecialidadesPage() {
       setToDelete(null);
       return;
     }
+    // Verificar médicos vinculados
+    const { data: medVinc, error: medErr } = await supabase
+      .from("medicos")
+      .select("nome")
+      .eq("especialidade_id", toDelete.id);
+    if (medErr) { setDeleting(false); toast.error(medErr.message); return; }
+    if ((medVinc?.length ?? 0) > 0) {
+      setDeleting(false);
+      const nomes = (medVinc ?? []).map((m: any) => m.nome).filter(Boolean).slice(0, 5);
+      const extra = (medVinc!.length > 5) ? ` e mais ${medVinc!.length - 5}` : "";
+      toast.error(
+        `Não é possível excluir: ${medVinc!.length} médico(s) vinculado(s) a esta especialidade (${nomes.join(", ")}${extra}). Altere a especialidade desses médicos antes.`,
+        { duration: 8000 }
+      );
+      setToDelete(null);
+      return;
+    }
     const { error, count: delCount } = await supabase
       .from("especialidades")
       .delete({ count: "exact" })
