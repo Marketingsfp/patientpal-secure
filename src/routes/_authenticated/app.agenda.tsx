@@ -351,6 +351,25 @@ function AgendaPage() {
     } else {
       setNascMap(new Map());
     }
+    // Busca contratos de convênio (cartão benefícios) ativos para sinalizar na agenda
+    if (pacIds.length) {
+      const { data: contratos } = await supabase
+        .from("contratos_assinatura")
+        .select("paciente_id,status,cb_convenios(nome)")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("status", "ativo")
+        .in("paciente_id", pacIds);
+      const cmap = new Map<string, string>();
+      ((contratos ?? []) as Array<{ paciente_id: string; cb_convenios: { nome: string } | null }>)
+        .forEach((c) => {
+          if (c.paciente_id && !cmap.has(c.paciente_id)) {
+            cmap.set(c.paciente_id, c.cb_convenios?.nome ?? "Convênio");
+          }
+        });
+      setConvenioMap(cmap);
+    } else {
+      setConvenioMap(new Map());
+    }
     // Marca agendamentos pagos (receita vinculada em fin_lancamentos)
     const ids = (data ?? []).map((a) => a.id);
     if (ids.length) {
