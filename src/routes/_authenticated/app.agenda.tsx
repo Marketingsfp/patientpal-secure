@@ -30,7 +30,7 @@ import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import { ProcedimentoCell } from "@/components/agenda/procedimento-cell";
 import {
   CalendarDays, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X,
-  MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, Clock, DollarSign, ShieldCheck, BadgeCheck,
+  MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, Clock, DollarSign, ShieldCheck, BadgeCheck, IdCard,
 } from "lucide-react";
 import { printGuiaAtendimento, printGuiaAtendimentoAgrupada } from "@/lib/print-gr";
 import { VoiceInput } from "@/components/voice-input";
@@ -1804,10 +1804,9 @@ function AgendaPage() {
                         {a.paciente_id && convenioMap.has(a.paciente_id) && (
                           <span
                             title={`Convênio: ${convenioMap.get(a.paciente_id)}`}
-                            className="inline-flex items-center gap-0.5 rounded-sm border border-sky-500/40 bg-sky-50 px-1 py-0 text-[9px] font-semibold uppercase text-sky-700"
+                            className="inline-flex items-center justify-center rounded-[3px] border border-sky-500/50 bg-sky-50 p-0.5 text-sky-700"
                           >
-                            <ShieldCheck className="h-3 w-3" />
-                            Convênio
+                            <IdCard className="h-3.5 w-3.5" strokeWidth={2} />
                           </span>
                         )}
                         {a.paciente_nome}
