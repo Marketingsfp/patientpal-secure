@@ -202,18 +202,17 @@ function ClientesPage() {
               <TableHead className="w-32">Nascimento</TableHead>
               <TableHead className="w-28">Idade</TableHead>
               <TableHead className="w-36">Telefone</TableHead>
-              <TableHead className="w-40">Cidade/UF</TableHead>
               <TableHead className="w-24">Situação</TableHead>
               <TableHead className="w-40 text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>
             ) : !clinicaAtual ? (
-              <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
             ) : filtrados.length === 0 ? (
-              <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Nenhum cliente encontrado.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Nenhum cliente encontrado.</TableCell></TableRow>
             ) : filtrados.map(p => (
               <TableRow key={p.id}>
                 <TableCell className="font-mono text-xs text-muted-foreground">{p.codigo_prontuario ?? "—"}</TableCell>
@@ -233,9 +232,6 @@ function ClientesPage() {
                 <TableCell className="text-sm text-muted-foreground">{fmtNasc(p.data_nascimento)}</TableCell>
                 <TableCell className="text-sm text-muted-foreground"><IdadeCell nascimento={p.data_nascimento} /></TableCell>
                 <TableCell className="text-sm text-muted-foreground">{p.telefone ?? "—"}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">
-                  {p.cidade ? `${p.cidade}${p.estado ? "/" + p.estado : ""}` : "—"}
-                </TableCell>
                 <TableCell>
                   <span className={`text-xs px-2 py-0.5 rounded-full ${p.ativo ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}>
                     {p.ativo ? "Ativo" : "Inativo"}
