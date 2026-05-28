@@ -1043,31 +1043,31 @@ function AgendaPage() {
           </h1>
           <p className="text-sm text-muted-foreground">Filtre e gerencie os agendamentos da clínica.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-1.5">
           <div className="inline-flex rounded-full border bg-card p-0.5">
             <button
               type="button"
               onClick={() => setViewMode("dia")}
-              className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${viewMode === "dia" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              className={`px-2 py-1 text-[11px] font-medium rounded-full transition-colors ${viewMode === "dia" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
             >
               Lista
             </button>
             <button
               type="button"
               onClick={() => setViewMode("medico")}
-              className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${viewMode === "medico" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              className={`px-2 py-1 text-[11px] font-medium rounded-full transition-colors ${viewMode === "medico" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
             >
               Por médico
             </button>
           </div>
-          <Button asChild variant="outline" title="Cadastrar horários semanais e gerar slots da agenda">
+          <Button asChild variant="outline" size="sm" className="h-7 text-[11px] px-2" title="Cadastrar horários semanais e gerar slots da agenda">
             <Link to="/app/disponibilidades">
-              <Clock className="h-4 w-4 mr-2" /> Criar/gerar horários
+              <Clock className="h-3 w-3 mr-1.5" /> Criar/gerar horários
             </Link>
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" disabled={selecionados.size === 0}>
+              <Button variant="outline" size="sm" className="h-7 text-[11px] px-2" disabled={selecionados.size === 0}>
                 Opções ({selecionados.size})
               </Button>
             </DropdownMenuTrigger>
@@ -1090,6 +1090,8 @@ function AgendaPage() {
           </DropdownMenu>
           <Button
             variant="outline"
+            size="sm"
+            className="h-7 text-[11px] px-2"
             onClick={() => {
               if (!filtrados.length) { toast.info("Sem dados para exportar."); return; }
               exportToExcel(
@@ -1119,12 +1121,12 @@ function AgendaPage() {
               );
             }}
           >
-            <Download className="h-4 w-4 mr-2" /> Exportar Excel
+            <Download className="h-3 w-3 mr-1.5" /> Exportar Excel
           </Button>
           <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button onClick={openNew} disabled={!clinicaAtual} className="bg-primary hover:bg-primary/90 text-primary-foreground">
-              <Plus className="h-4 w-4 mr-2" /> Adicionar Encaixe
+            <Button size="sm" onClick={openNew} disabled={!clinicaAtual} className="h-7 text-[11px] px-2 bg-primary hover:bg-primary/90 text-primary-foreground">
+              <Plus className="h-3 w-3 mr-1.5" /> Adicionar Encaixe
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-lg">
@@ -1689,16 +1691,20 @@ function AgendaPage() {
           </div>
           <div className="space-y-0.5">
             <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Situação</Label>
-            <Select value={filtroStatus} onValueChange={setFiltroStatus}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">TODOS</SelectItem>
-                <SelectItem value="livres">Livres</SelectItem>
-                {(Object.keys(STATUS_LABEL) as Status[]).map(s => (
-                  <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex gap-1.5">
+              <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+                <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">TODOS</SelectItem>
+                  <SelectItem value="livres">Livres</SelectItem>
+                  {(Object.keys(STATUS_LABEL) as Status[]).map(s => (
+                    <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button variant="outline" size="sm" onClick={limparFiltros} className="h-7 text-xs shrink-0"><X className="h-3.5 w-3.5 mr-1.5" /> Limpar</Button>
+              <Button size="sm" onClick={load} className="h-7 text-xs shrink-0"><Search className="h-3.5 w-3.5 mr-1.5" /> Exibir</Button>
+            </div>
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-1.5">
@@ -1707,10 +1713,6 @@ function AgendaPage() {
               <Checkbox checked={apenasData} onCheckedChange={(v) => setApenasData(!!v)} />
               Exibir apenas a data selecionada
             </label>
-          </div>
-          <div className="flex gap-1.5">
-            <Button variant="outline" size="sm" onClick={limparFiltros} className="h-7 text-xs"><X className="h-3.5 w-3.5 mr-1.5" /> Limpar</Button>
-            <Button size="sm" onClick={load} className="h-7 text-xs"><Search className="h-3.5 w-3.5 mr-1.5" /> Exibir</Button>
           </div>
         </div>
       </div>
