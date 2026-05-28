@@ -273,6 +273,8 @@ function AgendaPage() {
   const [reagLoteData, setReagLoteData] = useState<string>("");
   const [reagLoteFicha, setReagLoteFicha] = useState<string>("1");
   const [reagLoteSalvando, setReagLoteSalvando] = useState(false);
+  // Ids dos pacientes selecionados em modo de reagendamento em lote (mesmo fluxo do individual: clicar num slot DISPONÍVEL)
+  const [reagLoteIds, setReagLoteIds] = useState<string[] | null>(null);
 
   const iniciarReagendamento = (a: Agendamento) => {
     if (a.status === "realizado") {
