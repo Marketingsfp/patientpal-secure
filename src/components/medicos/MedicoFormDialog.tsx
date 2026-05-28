@@ -42,6 +42,7 @@ const emptyForm = () => ({
   percentual: "50",
   valor: "",
   aceita_cartao_beneficios: true,
+  duracao_consulta_min: "15",
   cpf: "", rg: "", data_nascimento: "", email: "", telefone: "", telefone2: "",
   nacionalidade: "Brasileira", estado_civil: "",
   sexo: "nao_informar",
@@ -115,7 +116,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       setLoading(true);
       const { data: m } = await supabase
         .from("medicos")
-        .select("id, user_id, nome, crm, crm_uf, email, telefone, telefone2, nacionalidade, estado_civil, sexo, cep, logradouro, numero, complemento, bairro, cidade, estado, medico_especialidades(especialidade_id, tem_rqe, rqe_numero, especialidade:especialidades(id, nome))")
+        .select("id, user_id, nome, crm, crm_uf, email, telefone, telefone2, nacionalidade, estado_civil, sexo, duracao_consulta_min, cep, logradouro, numero, complemento, bairro, cidade, estado, medico_especialidades(especialidade_id, tem_rqe, rqe_numero, especialidade:especialidades(id, nome))")
         .eq("id", editingMedicoId)
         .maybeSingle();
       if (cancelled) return;
@@ -175,6 +176,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         percentual: sens.percentual_repasse_padrao != null ? String(sens.percentual_repasse_padrao) : "",
         valor: sens.valor_repasse_padrao != null ? String(sens.valor_repasse_padrao) : "",
         aceita_cartao_beneficios: sens.aceita_cartao_beneficios !== false,
+        duracao_consulta_min: med.duracao_consulta_min != null ? String(med.duracao_consulta_min) : "15",
         cpf: sens.cpf ?? "", rg: sens.rg ?? "", data_nascimento: sens.data_nascimento ?? "",
         email: med.email ?? "", telefone: med.telefone ?? "", telefone2: med.telefone2 ?? "",
         nacionalidade: med.nacionalidade ?? "Brasileira", estado_civil: med.estado_civil ?? "",
@@ -237,6 +239,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       percentual_repasse_padrao: form.tipo_repasse === "percentual" ? parseFloat(form.percentual || "0") : 0,
       valor_repasse_padrao: form.tipo_repasse === "valor" ? parseFloat(form.valor || "0") : null,
       aceita_cartao_beneficios: form.aceita_cartao_beneficios,
+      duracao_consulta_min: parseInt(form.duracao_consulta_min || "15") || 15,
       cpf: form.cpf || null,
       rg: form.rg || null,
       data_nascimento: form.data_nascimento || null,
@@ -454,6 +457,15 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                         <SelectItem value="feminino">Feminino</SelectItem>
                         <SelectItem value="outro">Outro</SelectItem>
                         <SelectItem value="nao_informar">Prefiro não informar</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Duração da consulta (min)</Label>
+                    <Select value={form.duracao_consulta_min} onValueChange={(v) => setForm({ ...form, duracao_consulta_min: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {["5","10","15","20","30","40","45","60"].map((v) => <SelectItem key={v} value={v}>{v} min</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>

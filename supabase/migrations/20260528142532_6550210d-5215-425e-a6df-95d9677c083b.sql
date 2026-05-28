@@ -1,0 +1,1 @@
+ALTER TABLE public.medicos ADD COLUMN IF NOT EXISTS duracao_consulta_min integer NOT NULL DEFAULT 15 CHECK (duracao_consulta_min >= 1 AND duracao_consulta_min <= 240);

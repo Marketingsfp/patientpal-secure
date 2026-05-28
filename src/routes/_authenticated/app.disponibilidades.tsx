@@ -38,7 +38,7 @@ function isFeriadoOuDomingo(d: Date): boolean {
 }
 
 interface Disp { id: string; medico_id: string; dia_semana: number; hora_inicio: string; hora_fim: string; observacoes: string | null; limite_pacientes: number | null }
-interface Medico { id: string; nome: string }
+interface Medico { id: string; nome: string; duracao_consulta_min: number | null }
 
 function Page() {
   const { clinicaAtual } = useClinica();
@@ -48,7 +48,7 @@ function Page() {
   const [novo, setNovo] = useState({ medico_id: "", dia_semana: "1", hora_inicio: "08:00", hora_fim: "12:00", limite_pacientes: "" });
   const hojeIso = new Date().toISOString().slice(0, 10);
   const em30Iso = (() => { const d = new Date(); d.setDate(d.getDate() + 29); return d.toISOString().slice(0, 10); })();
-  const [gerar, setGerar] = useState({ medico_id: "all", duracao: "5", dias: "30", data_inicio: hojeIso, data_fim: em30Iso, limite_fichas: "" });
+  const [gerar, setGerar] = useState({ medico_id: "all", dias: "30", data_inicio: hojeIso, data_fim: em30Iso, limite_fichas: "" });
   const [gerando, setGerando] = useState(false);
   const [medicoEditando, setMedicoEditando] = useState<string | null>(null);
   const [dispEditando, setDispEditando] = useState<string | null>(null);
@@ -56,10 +56,10 @@ function Page() {
   const load = async () => {
     if (!clinicaAtual) return;
     const [m, d] = await Promise.all([
-      supabase.from("medicos").select("id, nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
+      supabase.from("medicos").select("id, nome, duracao_consulta_min").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("medico_disponibilidades").select("id, medico_id, dia_semana, hora_inicio, hora_fim, observacoes, limite_pacientes" as never).eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("dia_semana").order("hora_inicio"),
     ]);
-    setMedicos(m.data ?? []);
+    setMedicos(((m.data as unknown) as Medico[]) ?? []);
     setDisps(((d.data as unknown) as Disp[]) ?? []);
   };
 
@@ -125,8 +125,7 @@ function Page() {
 
   // Pré-visualização dos slots gerados
   const slotsPreview = useMemo(() => {
-    const dur = parseInt(gerar.duracao);
-    if (!dur || !gerar.data_inicio || !gerar.data_fim) return [] as { data: string; medico: string; inicio: string; fim: string }[];
+    if (!gerar.data_inicio || !gerar.data_fim) return [] as { data: string; medico: string; inicio: string; fim: string }[];
     const ini = new Date(`${gerar.data_inicio}T00:00:00`);
     const fimD = new Date(`${gerar.data_fim}T00:00:00`);
     if (fimD < ini) return [];
@@ -138,6 +137,7 @@ function Page() {
       if (isFeriadoOuDomingo(d)) continue;
       const dow = d.getDay();
       for (const m of alvo) {
+        const dur = m.duracao_consulta_min && m.duracao_consulta_min > 0 ? m.duracao_consulta_min : 15;
         const ds = disps.filter((x) => x.medico_id === m.id && x.dia_semana === dow);
         // Limite diário: override manual do formulário; senão soma das janelas cadastradas
         const overrideLimite = gerar.limite_fichas ? parseInt(gerar.limite_fichas) : 0;
@@ -239,15 +239,6 @@ function Page() {
                     <SelectContent>
                       <SelectItem value="all">Todos os médicos</SelectItem>
                       {medicos.map((m) => <SelectItem key={m.id} value={m.id} className="uppercase">{m.nome}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">Duração (min)</label>
-                  <Select value={gerar.duracao} onValueChange={(v) => setGerar({ ...gerar, duracao: v })}>
-                    <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {["5", "10", "15", "20", "30", "40", "45", "60"].map((v) => <SelectItem key={v} value={v}>{v} min</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
