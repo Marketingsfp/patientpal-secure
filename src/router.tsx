@@ -8,8 +8,10 @@ export const getRouter = () => {
       queries: {
         // Cache padr o: dados frescos por 1 min, mantidos em mem ria por 10 min.
         // Evita refetch a cada navega o entre telas (agenda, financeiro, m dicos).
-        staleTime: 60_000,
-        gcTime: 10 * 60_000,
+        // Dados ficam frescos por 5 min e em memória por 30 min.
+        // Reduz drasticamente refetches ao navegar entre telas.
+        staleTime: 5 * 60_000,
+        gcTime: 30 * 60_000,
         refetchOnWindowFocus: false,
         refetchOnMount: false,
         retry: 1,

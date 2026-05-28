@@ -39,12 +39,12 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
 
 const VoiceInput = lazy(() => import("@/components/voice-input").then((m) => ({ default: m.VoiceInput })));
+const ChangePasswordDialog = lazy(() =>
+  import("@/components/change-password-dialog").then((m) => ({ default: m.ChangePasswordDialog }))
+);
 
 type NavLeaf = { to: string; label: string; icon: typeof LayoutDashboard; hash?: string };
 type NavParent = { label: string; icon: typeof LayoutDashboard; children: ReadonlyArray<NavLeaf> };
@@ -173,31 +173,6 @@ export function AppShell() {
 
   const [profileName, setProfileName] = useState<string>("");
   const [pwOpen, setPwOpen] = useState(false);
-  const [pwNew, setPwNew] = useState("");
-  const [pwConfirm, setPwConfirm] = useState("");
-  const [pwSaving, setPwSaving] = useState(false);
-
-  const handleChangePassword = async () => {
-    if (pwNew.length < 6) {
-      toast.error("A senha deve ter pelo menos 6 caracteres.");
-      return;
-    }
-    if (pwNew !== pwConfirm) {
-      toast.error("As senhas não conferem.");
-      return;
-    }
-    setPwSaving(true);
-    const { error } = await supabase.auth.updateUser({ password: pwNew });
-    setPwSaving(false);
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-    toast.success("Senha alterada com sucesso.");
-    setPwOpen(false);
-    setPwNew("");
-    setPwConfirm("");
-  };
   useEffect(() => {
     if (!user?.id) { setProfileName(""); return; }
     let cancelled = false;
@@ -619,27 +594,11 @@ export function AppShell() {
           <Outlet />
         </main>
       </div>
-      <Dialog open={pwOpen} onOpenChange={(o) => { setPwOpen(o); if (!o) { setPwNew(""); setPwConfirm(""); } }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Alterar senha</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <Label htmlFor="pw-new">Nova senha</Label>
-              <Input id="pw-new" type="password" value={pwNew} onChange={(e) => setPwNew(e.target.value)} autoComplete="new-password" />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="pw-confirm">Confirmar nova senha</Label>
-              <Input id="pw-confirm" type="password" value={pwConfirm} onChange={(e) => setPwConfirm(e.target.value)} autoComplete="new-password" />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setPwOpen(false)} disabled={pwSaving}>Cancelar</Button>
-            <Button data-primary onClick={() => void handleChangePassword()} disabled={pwSaving}>{pwSaving ? "Salvando…" : "Salvar"}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {pwOpen && (
+        <Suspense fallback={null}>
+          <ChangePasswordDialog open={pwOpen} onOpenChange={setPwOpen} />
+        </Suspense>
+      )}
       <KeyboardShortcuts />
     </div>
   );
