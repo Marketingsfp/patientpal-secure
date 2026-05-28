@@ -1177,6 +1177,21 @@ function AgendaPage() {
       toast.info("Este agendamento já foi pago.");
       return;
     }
+    // Verificação fresca no banco: impede faturar duas vezes mesmo se o cache
+    // local estiver desatualizado (ex.: outro usuário pagou em outra aba, ou
+    // o pagamento foi transferido de uma ficha reagendada).
+    const { data: jaPagos } = await supabase
+      .from("fin_lancamentos")
+      .select("id")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("tipo", "receita")
+      .eq("agendamento_id", a.id)
+      .limit(1);
+    if ((jaPagos ?? []).length > 0) {
+      toast.info("Este agendamento já foi pago.");
+      setPagosSet((prev) => { const n = new Set(prev); n.add(a.id); return n; });
+      return;
+    }
     const nomeBusca = normalizar((a.procedimento ?? "CONSULTA").trim());
     const { data: lista } = await supabase
       .from("procedimentos")
