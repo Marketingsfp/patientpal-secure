@@ -512,6 +512,14 @@ function AgendaPage() {
     }
     // Marca agendamentos pagos (receita vinculada em fin_lancamentos)
     const ids = (data ?? []).map((a) => a.id);
+    // Fichas DISPONÍVEIS não podem ser exibidas como "Pago" — ignoramos
+    // qualquer lançamento órfão que tenha ficado vinculado a uma ficha
+    // que foi posteriormente liberada por um reagendamento.
+    const idsComPaciente = new Set(
+      ((data ?? []) as Array<{ id: string; paciente_nome: string }>)
+        .filter((a) => normalizar(a.paciente_nome) !== "disponivel")
+        .map((a) => a.id),
+    );
     if (ids.length) {
       const { data: pg } = await supabase
         .from("fin_lancamentos")
@@ -521,7 +529,7 @@ function AgendaPage() {
         .in("agendamento_id", ids);
       setPagosSet(new Set(((pg ?? []) as Array<{ agendamento_id: string | null }>)
         .map((r) => r.agendamento_id)
-        .filter((x): x is string => !!x)));
+        .filter((x): x is string => !!x && idsComPaciente.has(x))));
     } else {
       setPagosSet(new Set());
     }
@@ -785,6 +793,20 @@ function AgendaPage() {
     }
     const algumPago = itens.some(i => pagosSet.has(i.id));
     if (algumPago) {
+      toast.info("Há atendimentos já pagos na seleção. Desmarque-os antes de cobrar.");
+      return;
+    }
+    // Verificação fresca: bloqueia se algum item já tiver lançamento no banco
+    const { data: jaPagosLote } = await supabase
+      .from("fin_lancamentos")
+      .select("agendamento_id")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("tipo", "receita")
+      .in("agendamento_id", ids);
+    if ((jaPagosLote ?? []).length > 0) {
+      const pagos = new Set(((jaPagosLote ?? []) as Array<{ agendamento_id: string | null }>)
+        .map((r) => r.agendamento_id).filter((x): x is string => !!x));
+      setPagosSet((prev) => { const n = new Set(prev); pagos.forEach((id) => n.add(id)); return n; });
       toast.info("Há atendimentos já pagos na seleção. Desmarque-os antes de cobrar.");
       return;
     }
@@ -1167,6 +1189,21 @@ function AgendaPage() {
     if (!clinicaAtual) return;
     if (pagosSet.has(a.id)) {
       toast.info("Este agendamento já foi pago.");
+      return;
+    }
+    // Verificação fresca no banco: impede faturar duas vezes mesmo se o cache
+    // local estiver desatualizado (ex.: outro usuário pagou em outra aba, ou
+    // o pagamento foi transferido de uma ficha reagendada).
+    const { data: jaPagos } = await supabase
+      .from("fin_lancamentos")
+      .select("id")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("tipo", "receita")
+      .eq("agendamento_id", a.id)
+      .limit(1);
+    if ((jaPagos ?? []).length > 0) {
+      toast.info("Este agendamento já foi pago.");
+      setPagosSet((prev) => { const n = new Set(prev); n.add(a.id); return n; });
       return;
     }
     const nomeBusca = normalizar((a.procedimento ?? "CONSULTA").trim());
