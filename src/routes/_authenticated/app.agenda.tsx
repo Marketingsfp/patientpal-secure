@@ -442,7 +442,10 @@ function AgendaPage() {
       .select("id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("inicio", { ascending: false });
-    const statusEspecifico = filtroStatus !== "todos" && filtroStatus !== "livres";
+    // "agendado" agora significa "qualquer ficha com paciente alocado",
+    // então não restringe por status no servidor — filtra em memória.
+    const statusEspecifico =
+      filtroStatus !== "todos" && filtroStatus !== "livres" && filtroStatus !== "agendado";
     if (statusEspecifico) {
       q = q.eq("status", filtroStatus as Status).limit(1000);
     }
@@ -713,6 +716,8 @@ function AgendaPage() {
       const ehLivre = normalizar(a.paciente_nome) === "disponivel";
       if (filtroStatus === "livres") {
         if (!ehLivre) return false;
+      } else if (filtroStatus === "agendado") {
+        if (ehLivre) return false;
       } else if (filtroStatus !== "todos") {
         if (ehLivre) return false;
         if (a.status !== filtroStatus) return false;
