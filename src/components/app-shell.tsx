@@ -529,7 +529,7 @@ export function AppShell() {
       )}
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="sticky top-0 z-30 h-14 bg-card/80 backdrop-blur border-b flex items-center gap-3 px-3 sm:px-6">
+        <header className="sticky top-0 z-30 h-[50px] bg-card/80 backdrop-blur border-b flex items-center gap-2 px-3 sm:px-5">
           <div className="flex items-center gap-2 min-w-0">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -574,7 +574,7 @@ export function AppShell() {
                 else setClinicaAtual(v);
               }}
             >
-              <SelectTrigger className="w-[220px] h-9">
+              <SelectTrigger className="w-[260px] h-8 text-xs">
                 <SelectValue placeholder="Selecione a clínica" />
               </SelectTrigger>
               <SelectContent>
