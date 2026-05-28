@@ -34,6 +34,30 @@ const CONVENIOS_PADRAO: ConvenioRow[] = [
 const limparPrefixoMedico = (nome: string) =>
   nome.replace(/^(\s*(dr|dra)\.?\s+)+/i, "").trim();
 
+const fetchProcedimentosAtivos = async (clinicaId: string) => {
+  const pageSize = 1000;
+  const all: Procedimento[] = [];
+
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from("procedimentos")
+      .select("id, nome, grupo, tipo, valor_padrao")
+      .eq("clinica_id", clinicaId)
+      .eq("ativo", true)
+      .order("nome")
+      .range(from, from + pageSize - 1);
+
+    if (error) throw error;
+
+    const rows = (data as Procedimento[]) ?? [];
+    all.push(...rows);
+
+    if (rows.length < pageSize) break;
+  }
+
+  return all;
+};
+
 const emptyForm = () => ({
   nome: "", crm: "", crm_uf: "",
   especialidades: [] as EspecialidadeRow[],
@@ -86,15 +110,22 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
   // Load reference data
   useEffect(() => {
     if (!open || !clinicaId) return;
+    let cancelled = false;
     void supabase.from("especialidades").select("id, nome").order("nome").then(({ data }) => setEsps(data ?? []));
-    void supabase
-      .from("procedimentos")
-      .select("id, nome, grupo, tipo, valor_padrao")
-      .eq("clinica_id", clinicaId)
-      .eq("ativo", true)
-      .order("nome")
-      .limit(5000)
-      .then(({ data }) => setProcs((data as Procedimento[]) ?? []));
+    void fetchProcedimentosAtivos(clinicaId)
+      .then((data) => {
+        if (!cancelled) setProcs(data);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setProcs([]);
+          toast.error("Não foi possível carregar os serviços.");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [open, clinicaId]);
 
   // Load medico when editing
