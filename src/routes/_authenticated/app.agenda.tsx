@@ -2173,12 +2173,18 @@ function AgendaPage() {
                      <span className="text-emerald-600 font-medium">{fmtHora(a.inicio)} - {fmtHora(a.fim)}</span>
                   </TableCell>
                   <TableCell className="pr-1 align-middle max-w-[220px]">
-                    <div
-                      className="text-xs uppercase font-medium text-foreground truncate"
-                      title={`Dr(a). ${medicos.find((m) => m.id === a.medico_id)?.nome ?? "—"}`}
-                    >
-                      Dr(a). {medicos.find((m) => m.id === a.medico_id)?.nome ?? "—"}
-                    </div>
+                    {(() => {
+                      const m = medicos.find((x) => x.id === a.medico_id);
+                      const label = m ? `${prefixoMedico(m.sexo)} ${m.nome}` : "—";
+                      return (
+                        <div
+                          className="text-xs uppercase font-medium text-foreground truncate"
+                          title={label}
+                        >
+                          {label}
+                        </div>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell className="pr-1 align-middle max-w-[220px]">
                     {normalizar(a.paciente_nome) === "disponivel" ? (
