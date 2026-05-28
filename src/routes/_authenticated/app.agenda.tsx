@@ -872,8 +872,16 @@ function AgendaPage() {
       toast.error("Esse horário não está disponível. Escolha um slot DISPONÍVEL.");
       return;
     }
-    const fontes = items
-      .filter(a => ids.includes(a.id))
+    // Busca os agendamentos de origem direto no banco (os IDs podem não estar em `items`
+    // se o usuário trocou os filtros da tela depois de selecionar).
+    const { data: fontesRaw, error: eFontes } = await supabase
+      .from("agendamentos")
+      .select("id,paciente_id,paciente_nome,inicio,fim,medico_id,status,procedimento,observacoes,data_pagamento")
+      .in("id", ids)
+      .limit(1000);
+    if (eFontes) { toast.error(eFontes.message); return; }
+    const fontes = ((fontesRaw ?? []) as Array<Agendamento>)
+      .filter(a => a.status !== "realizado" && normalizar(a.paciente_nome) !== "disponivel")
       .sort((a, b) => new Date(a.inicio).getTime() - new Date(b.inicio).getTime());
     if (fontes.length === 0) { toast.error("Nenhum paciente selecionado."); return; }
 
