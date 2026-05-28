@@ -1365,7 +1365,7 @@ function AgendaPage() {
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={abrirReagLote}>
-                    🔁 Reagendar selecionados em outra agenda
+                    🔁 Reagendar selecionados
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
