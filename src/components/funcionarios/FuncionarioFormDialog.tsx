@@ -363,11 +363,35 @@ export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUs
               )}
             </TabsContent>
           </Tabs>
-        )}
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={salvar} disabled={saving || loading}>{saving ? "Salvando…" : "Salvar"}</Button>
-        </DialogFooter>
+        );
+
+  const footer = (
+    <>
+      <Button variant="outline" onClick={close}>{mode === "page" ? "Voltar" : "Cancelar"}</Button>
+      <Button onClick={salvar} disabled={saving || loading}>{saving ? "Salvando…" : "Salvar"}</Button>
+    </>
+  );
+
+  if (mode === "page") {
+    return (
+      <div className="space-y-4">
+        <div>
+          <h1 className="text-2xl font-semibold">{titleText}</h1>
+        </div>
+        <div>{body}</div>
+        <div className="flex justify-end gap-2 border-t pt-4">{footer}</div>
+      </div>
+    );
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{titleText}</DialogTitle>
+        </DialogHeader>
+        {body}
+        <DialogFooter>{footer}</DialogFooter>
       </DialogContent>
     </Dialog>
   );
