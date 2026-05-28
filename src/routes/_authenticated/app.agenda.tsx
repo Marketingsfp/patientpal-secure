@@ -839,16 +839,19 @@ function AgendaPage() {
     const ids = Array.from(selecionados);
     const itens = items.filter(a => ids.includes(a.id));
     if (itens.length === 0) { toast.info("Selecione ao menos um paciente para reagendar."); return; }
-    const bloqueados = itens.filter(i =>
-      i.status === "realizado" ||
-      normalizar(i.paciente_nome) === "disponivel",
-    );
-    if (bloqueados.length > 0) {
-      toast.error(`${bloqueados.length} item(ns) não podem ser reagendados (já atendidos ou slot vazio). Desmarque-os.`);
+    // Ignora silenciosamente fichas vazias; bloqueia apenas pacientes já atendidos
+    const atendidos = itens.filter(i => i.status === "realizado");
+    if (atendidos.length > 0) {
+      toast.error(`${atendidos.length} paciente(s) já atendido(s) não podem ser reagendados. Desmarque-os.`);
+      return;
+    }
+    const validos = itens.filter(i => normalizar(i.paciente_nome) !== "disponivel");
+    if (validos.length === 0) {
+      toast.info("Nenhum paciente válido para reagendar (todas as fichas selecionadas estão vazias).");
       return;
     }
     // Mesmo fluxo do reagendamento individual: ativa modo lote e aguarda o clique num slot DISPONÍVEL
-    const idsOrdenados = itens
+    const idsOrdenados = validos
       .slice()
       .sort((a, b) => new Date(a.inicio).getTime() - new Date(b.inicio).getTime())
       .map(i => i.id);
@@ -869,8 +872,16 @@ function AgendaPage() {
       toast.error("Esse horário não está disponível. Escolha um slot DISPONÍVEL.");
       return;
     }
-    const fontes = items
-      .filter(a => ids.includes(a.id))
+    // Busca os agendamentos de origem direto no banco (os IDs podem não estar em `items`
+    // se o usuário trocou os filtros da tela depois de selecionar).
+    const { data: fontesRaw, error: eFontes } = await supabase
+      .from("agendamentos")
+      .select("id,paciente_id,paciente_nome,inicio,fim,medico_id,status,procedimento,observacoes,data_pagamento")
+      .in("id", ids)
+      .limit(1000);
+    if (eFontes) { toast.error(eFontes.message); return; }
+    const fontes = ((fontesRaw ?? []) as Array<Agendamento>)
+      .filter(a => a.status !== "realizado" && normalizar(a.paciente_nome) !== "disponivel")
       .sort((a, b) => new Date(a.inicio).getTime() - new Date(b.inicio).getTime());
     if (fontes.length === 0) { toast.error("Nenhum paciente selecionado."); return; }
 
