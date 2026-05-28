@@ -166,7 +166,67 @@ function Page() {
         <p className="text-sm text-muted-foreground">Disponibilidade semanal por médico — {clinicaAtual.clinica.nome}</p>
       </div>
 
-      <Card>
+      <Tabs defaultValue="agendas" className="w-full">
+        <TabsList>
+          <TabsTrigger value="agendas">Agendas</TabsTrigger>
+          <TabsTrigger value="medicos">Médicos</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="agendas" className="space-y-6">
+          <Card className="border-primary/30">
+            <CardContent className="py-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <CalendarRange className="h-5 w-5 text-primary" />
+                <h2 className="font-semibold">Gerar agenda</h2>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Cria automaticamente slots de horários disponíveis com base na disponibilidade semanal dos médicos.
+              </p>
+              <div className="flex flex-wrap gap-2 items-end">
+                <div className="flex-1 min-w-48">
+                  <label className="text-xs text-muted-foreground">Médico</label>
+                  <Select value={gerar.medico_id} onValueChange={(v) => setGerar({ ...gerar, medico_id: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os médicos</SelectItem>
+                      {medicos.map((m) => <SelectItem key={m.id} value={m.id} className="uppercase">{m.nome}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Duração (min)</label>
+                  <Select value={gerar.duracao} onValueChange={(v) => setGerar({ ...gerar, duracao: v })}>
+                    <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {["5", "10", "15", "20", "30", "40", "45", "60"].map((v) => <SelectItem key={v} value={v}>{v} min</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">De</label>
+                  <Input type="date" className="w-40" value={gerar.data_inicio} onChange={(e) => setGerar({ ...gerar, data_inicio: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Até</label>
+                  <Input type="date" className="w-40" value={gerar.data_fim} onChange={(e) => setGerar({ ...gerar, data_fim: e.target.value })} />
+                </div>
+                <Button onClick={gerarAgenda} disabled={gerando || slotsPreview.length === 0}>
+                  <CalendarRange className="h-4 w-4 mr-1" />
+                  {gerando ? "Gerando..." : `Gerar ${slotsPreview.length} slots`}
+                </Button>
+              </div>
+              {slotsPreview.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Serão criados <strong>{slotsPreview.length}</strong> horários disponíveis na agenda
+                  {gerar.medico_id === "all" ? ` (${medicos.length} médicos)` : ""}.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="medicos" className="space-y-6">
+          <Card>
         <CardContent className="py-4 flex flex-wrap gap-2 items-end">
           <div className="flex-1 min-w-48">
             <label className="text-xs text-muted-foreground">Médico</label>
@@ -197,57 +257,6 @@ function Page() {
             <Input type="number" min={1} placeholder="sem limite" className="w-32" value={novo.limite_pacientes} onChange={(e) => setNovo({ ...novo, limite_pacientes: e.target.value })} />
           </div>
           <Button onClick={adicionar}><Plus className="h-4 w-4 mr-1" /> Adicionar</Button>
-        </CardContent>
-      </Card>
-
-      <Card className="border-primary/30">
-        <CardContent className="py-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <CalendarRange className="h-5 w-5 text-primary" />
-            <h2 className="font-semibold">Gerar agenda</h2>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Cria automaticamente slots de horários disponíveis com base na disponibilidade semanal dos médicos.
-          </p>
-          <div className="flex flex-wrap gap-2 items-end">
-            <div className="flex-1 min-w-48">
-              <label className="text-xs text-muted-foreground">Médico</label>
-              <Select value={gerar.medico_id} onValueChange={(v) => setGerar({ ...gerar, medico_id: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os médicos</SelectItem>
-                  {medicos.map((m) => <SelectItem key={m.id} value={m.id} className="uppercase">{m.nome}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground">Duração (min)</label>
-              <Select value={gerar.duracao} onValueChange={(v) => setGerar({ ...gerar, duracao: v })}>
-                <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {["5", "10", "15", "20", "30", "40", "45", "60"].map((v) => <SelectItem key={v} value={v}>{v} min</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground">De</label>
-              <Input type="date" className="w-40" value={gerar.data_inicio} onChange={(e) => setGerar({ ...gerar, data_inicio: e.target.value })} />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground">Até</label>
-              <Input type="date" className="w-40" value={gerar.data_fim} onChange={(e) => setGerar({ ...gerar, data_fim: e.target.value })} />
-            </div>
-            <Button onClick={gerarAgenda} disabled={gerando || slotsPreview.length === 0}>
-              <CalendarRange className="h-4 w-4 mr-1" />
-              {gerando ? "Gerando..." : `Gerar ${slotsPreview.length} slots`}
-            </Button>
-          </div>
-          {slotsPreview.length > 0 && (
-            <p className="text-xs text-muted-foreground">
-              Serão criados <strong>{slotsPreview.length}</strong> horários disponíveis na agenda
-              {gerar.medico_id === "all" ? ` (${medicos.length} médicos)` : ""}.
-            </p>
-          )}
         </CardContent>
       </Card>
 
@@ -287,6 +296,8 @@ function Page() {
           );
         })}
       </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
