@@ -51,6 +51,7 @@ function Page() {
   const [gerar, setGerar] = useState({ medico_id: "all", duracao: "5", dias: "30", data_inicio: hojeIso, data_fim: em30Iso, limite_fichas: "" });
   const [gerando, setGerando] = useState(false);
   const [medicoEditando, setMedicoEditando] = useState<string | null>(null);
+  const [dispEditando, setDispEditando] = useState<string | null>(null);
 
   const load = async () => {
     if (!clinicaAtual) return;
@@ -95,16 +96,24 @@ function Page() {
 
   const adicionar = async () => {
     if (!clinicaAtual || !novo.medico_id) { toast.error("Selecione um médico"); return; }
-    const { error } = await supabase.from("medico_disponibilidades").insert({
+    const payload = {
       clinica_id: clinicaAtual.clinica_id,
       medico_id: novo.medico_id,
       dia_semana: parseInt(novo.dia_semana),
       hora_inicio: novo.hora_inicio,
       hora_fim: novo.hora_fim,
       limite_pacientes: novo.limite_pacientes ? parseInt(novo.limite_pacientes) : null,
-    } as never);
-    if (error) { toast.error(error.message); return; }
-    toast.success("Horário adicionado");
+    };
+    if (dispEditando) {
+      const { error } = await supabase.from("medico_disponibilidades").update(payload as never).eq("id", dispEditando);
+      if (error) { toast.error(error.message); return; }
+      toast.success("Horário atualizado");
+      setDispEditando(null);
+    } else {
+      const { error } = await supabase.from("medico_disponibilidades").insert(payload as never);
+      if (error) { toast.error(error.message); return; }
+      toast.success("Horário adicionado");
+    }
     void load();
   };
 
