@@ -116,7 +116,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       setLoading(true);
       const { data: m } = await supabase
         .from("medicos")
-        .select("id, user_id, nome, crm, crm_uf, email, telefone, telefone2, nacionalidade, estado_civil, sexo, cep, logradouro, numero, complemento, bairro, cidade, estado, medico_especialidades(especialidade_id, tem_rqe, rqe_numero, especialidade:especialidades(id, nome))")
+        .select("id, user_id, nome, crm, crm_uf, email, telefone, telefone2, nacionalidade, estado_civil, sexo, duracao_consulta_min, cep, logradouro, numero, complemento, bairro, cidade, estado, medico_especialidades(especialidade_id, tem_rqe, rqe_numero, especialidade:especialidades(id, nome))")
         .eq("id", editingMedicoId)
         .maybeSingle();
       if (cancelled) return;
@@ -176,6 +176,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         percentual: sens.percentual_repasse_padrao != null ? String(sens.percentual_repasse_padrao) : "",
         valor: sens.valor_repasse_padrao != null ? String(sens.valor_repasse_padrao) : "",
         aceita_cartao_beneficios: sens.aceita_cartao_beneficios !== false,
+        duracao_consulta_min: med.duracao_consulta_min != null ? String(med.duracao_consulta_min) : "15",
         cpf: sens.cpf ?? "", rg: sens.rg ?? "", data_nascimento: sens.data_nascimento ?? "",
         email: med.email ?? "", telefone: med.telefone ?? "", telefone2: med.telefone2 ?? "",
         nacionalidade: med.nacionalidade ?? "Brasileira", estado_civil: med.estado_civil ?? "",
