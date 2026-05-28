@@ -57,7 +57,7 @@ type Agendamento = {
   observacoes: string | null;
   data_pagamento?: string | null;
 };
-type Medico = { id: string; nome: string };
+type Medico = { id: string; nome: string; sexo?: string | null };
 type Especialidade = { id: string; nome: string };
 type Paciente = { id: string; nome: string };
 
@@ -538,7 +538,7 @@ function AgendaPage() {
   const loadRef = async () => {
     if (!clinicaAtual) return;
     const [m, p, e, me, pr, sr, mc] = await Promise.all([
-      supabase.from("medicos").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
+      supabase.from("medicos").select("id,nome,sexo").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("pacientes").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome").limit(500),
       supabase.from("especialidades").select("id,nome").order("nome"),
       supabase.from("medico_especialidades").select("medico_id,especialidade_id"),
@@ -1365,7 +1365,17 @@ function AgendaPage() {
     setDataRef(d.toISOString().slice(0, 10));
   };
 
-  const medicoNome = (id: string | null) => medicos.find(m => m.id === id)?.nome ?? "—";
+  const prefixoMedico = (sexo?: string | null) => {
+    const s = (sexo ?? "").toString().trim().toUpperCase();
+    if (s.startsWith("F")) return "Dra.";
+    if (s.startsWith("M")) return "Dr.";
+    return "Dr(a).";
+  };
+  const medicoNome = (id: string | null) => {
+    const m = medicos.find(x => x.id === id);
+    if (!m) return "—";
+    return `${prefixoMedico(m.sexo)} ${m.nome}`;
+  };
   const fmtHora = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   const fmtData = (iso: string) => {
     const d = new Date(iso);
@@ -2163,12 +2173,18 @@ function AgendaPage() {
                      <span className="text-emerald-600 font-medium">{fmtHora(a.inicio)} - {fmtHora(a.fim)}</span>
                   </TableCell>
                   <TableCell className="pr-1 align-middle max-w-[220px]">
-                    <div
-                      className="text-xs uppercase font-medium text-foreground truncate"
-                      title={`Dr(a). ${medicos.find((m) => m.id === a.medico_id)?.nome ?? "—"}`}
-                    >
-                      Dr(a). {medicos.find((m) => m.id === a.medico_id)?.nome ?? "—"}
-                    </div>
+                    {(() => {
+                      const m = medicos.find((x) => x.id === a.medico_id);
+                      const label = m ? `${prefixoMedico(m.sexo)} ${m.nome}` : "—";
+                      return (
+                        <div
+                          className="text-xs uppercase font-medium text-foreground truncate"
+                          title={label}
+                        >
+                          {label}
+                        </div>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell className="pr-1 align-middle max-w-[220px]">
                     {normalizar(a.paciente_nome) === "disponivel" ? (
