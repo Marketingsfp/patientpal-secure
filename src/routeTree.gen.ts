@@ -84,6 +84,7 @@ import { Route as AuthenticatedAppAnamnesesRouteImport } from './routes/_authent
 import { Route as AuthenticatedAppAlertasEnfermagemRouteImport } from './routes/_authenticated/app.alertas-enfermagem'
 import { Route as AuthenticatedAppAgendaRouteImport } from './routes/_authenticated/app.agenda'
 import { Route as AuthenticatedAppFinanceiroIndexRouteImport } from './routes/_authenticated/app.financeiro.index'
+import { Route as AuthenticatedAppEquipeIndexRouteImport } from './routes/_authenticated/app.equipe.index'
 import { Route as AuthenticatedAppClientesIndexRouteImport } from './routes/_authenticated/app.clientes.index'
 import { Route as AuthenticatedAppAtendimentoIaIndexRouteImport } from './routes/_authenticated/app.atendimento-ia.index'
 import { Route as ApiPublicWhatsappClinicaIdRouteImport } from './routes/api/public/whatsapp.$clinicaId'
@@ -524,6 +525,12 @@ const AuthenticatedAppFinanceiroIndexRoute =
     path: '/',
     getParentRoute: () => AuthenticatedAppFinanceiroRoute,
   } as any)
+const AuthenticatedAppEquipeIndexRoute =
+  AuthenticatedAppEquipeIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedAppEquipeRoute,
+  } as any)
 const AuthenticatedAppClientesIndexRoute =
   AuthenticatedAppClientesIndexRouteImport.update({
     id: '/clientes/',
@@ -792,6 +799,7 @@ export interface FileRoutesByFullPath {
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/app/atendimento-ia/': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/app/clientes/': typeof AuthenticatedAppClientesIndexRoute
+  '/app/equipe/': typeof AuthenticatedAppEquipeIndexRoute
   '/app/financeiro/': typeof AuthenticatedAppFinanceiroIndexRoute
   '/app/clientes/$pacienteId/editar': typeof AuthenticatedAppClientesPacienteIdEditarRoute
   '/app/equipe/funcionario/$userId/editar': typeof AuthenticatedAppEquipeFuncionarioUserIdEditarRoute
@@ -830,7 +838,6 @@ export interface FileRoutesByTo {
   '/app/crm': typeof AuthenticatedAppCrmRoute
   '/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
   '/app/documentos': typeof AuthenticatedAppDocumentosRoute
-  '/app/equipe': typeof AuthenticatedAppEquipeRouteWithChildren
   '/app/especialidades': typeof AuthenticatedAppEspecialidadesRoute
   '/app/estoque': typeof AuthenticatedAppEstoqueRoute
   '/app/exames-resultados': typeof AuthenticatedAppExamesResultadosRoute
@@ -893,6 +900,7 @@ export interface FileRoutesByTo {
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/app/clientes': typeof AuthenticatedAppClientesIndexRoute
+  '/app/equipe': typeof AuthenticatedAppEquipeIndexRoute
   '/app/financeiro': typeof AuthenticatedAppFinanceiroIndexRoute
   '/app/clientes/$pacienteId/editar': typeof AuthenticatedAppClientesPacienteIdEditarRoute
   '/app/equipe/funcionario/$userId/editar': typeof AuthenticatedAppEquipeFuncionarioUserIdEditarRoute
@@ -999,6 +1007,7 @@ export interface FileRoutesById {
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/_authenticated/app/atendimento-ia/': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/_authenticated/app/clientes/': typeof AuthenticatedAppClientesIndexRoute
+  '/_authenticated/app/equipe/': typeof AuthenticatedAppEquipeIndexRoute
   '/_authenticated/app/financeiro/': typeof AuthenticatedAppFinanceiroIndexRoute
   '/_authenticated/app/clientes/$pacienteId/editar': typeof AuthenticatedAppClientesPacienteIdEditarRoute
   '/_authenticated/app/equipe/funcionario/$userId/editar': typeof AuthenticatedAppEquipeFuncionarioUserIdEditarRoute
@@ -1105,6 +1114,7 @@ export interface FileRouteTypes {
     | '/api/public/whatsapp/$clinicaId'
     | '/app/atendimento-ia/'
     | '/app/clientes/'
+    | '/app/equipe/'
     | '/app/financeiro/'
     | '/app/clientes/$pacienteId/editar'
     | '/app/equipe/funcionario/$userId/editar'
@@ -1143,7 +1153,6 @@ export interface FileRouteTypes {
     | '/app/crm'
     | '/app/disponibilidades'
     | '/app/documentos'
-    | '/app/equipe'
     | '/app/especialidades'
     | '/app/estoque'
     | '/app/exames-resultados'
@@ -1206,6 +1215,7 @@ export interface FileRouteTypes {
     | '/api/public/whatsapp/$clinicaId'
     | '/app/atendimento-ia'
     | '/app/clientes'
+    | '/app/equipe'
     | '/app/financeiro'
     | '/app/clientes/$pacienteId/editar'
     | '/app/equipe/funcionario/$userId/editar'
@@ -1311,6 +1321,7 @@ export interface FileRouteTypes {
     | '/api/public/whatsapp/$clinicaId'
     | '/_authenticated/app/atendimento-ia/'
     | '/_authenticated/app/clientes/'
+    | '/_authenticated/app/equipe/'
     | '/_authenticated/app/financeiro/'
     | '/_authenticated/app/clientes/$pacienteId/editar'
     | '/_authenticated/app/equipe/funcionario/$userId/editar'
@@ -1865,6 +1876,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppFinanceiroIndexRouteImport
       parentRoute: typeof AuthenticatedAppFinanceiroRoute
     }
+    '/_authenticated/app/equipe/': {
+      id: '/_authenticated/app/equipe/'
+      path: '/'
+      fullPath: '/app/equipe/'
+      preLoaderRoute: typeof AuthenticatedAppEquipeIndexRouteImport
+      parentRoute: typeof AuthenticatedAppEquipeRoute
+    }
     '/_authenticated/app/clientes/': {
       id: '/_authenticated/app/clientes/'
       path: '/clientes'
@@ -2110,12 +2128,14 @@ const AuthenticatedAppCartaoBeneficiosRouteWithChildren =
   )
 
 interface AuthenticatedAppEquipeRouteChildren {
+  AuthenticatedAppEquipeIndexRoute: typeof AuthenticatedAppEquipeIndexRoute
   AuthenticatedAppEquipeFuncionarioUserIdEditarRoute: typeof AuthenticatedAppEquipeFuncionarioUserIdEditarRoute
   AuthenticatedAppEquipeMedicoMedicoIdEditarRoute: typeof AuthenticatedAppEquipeMedicoMedicoIdEditarRoute
 }
 
 const AuthenticatedAppEquipeRouteChildren: AuthenticatedAppEquipeRouteChildren =
   {
+    AuthenticatedAppEquipeIndexRoute: AuthenticatedAppEquipeIndexRoute,
     AuthenticatedAppEquipeFuncionarioUserIdEditarRoute:
       AuthenticatedAppEquipeFuncionarioUserIdEditarRoute,
     AuthenticatedAppEquipeMedicoMedicoIdEditarRoute:
