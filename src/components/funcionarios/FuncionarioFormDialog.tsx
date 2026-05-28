@@ -27,6 +27,7 @@ interface Props {
   clinicaId: string;
   editingUserId?: string | null;
   onSaved?: () => void;
+  asPage?: boolean;
 }
 
 const emptyForm = (clinicaId: string) => ({
@@ -40,7 +41,7 @@ const emptyForm = (clinicaId: string) => ({
   criar_login: false, email: "", senha: "", perfil: "recepcao",
 });
 
-export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUserId, onSaved }: Props) {
+export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUserId, onSaved, asPage = false }: Props) {
   const cadastrarUsuarioFn = useServerFn(cadastrarUsuario);
   const getLoginFn = useServerFn(getFuncionarioLogin);
   const definirSenhaFn = useServerFn(definirSenhaFuncionario);
@@ -220,13 +221,10 @@ export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUs
 
   const isEditingExisting = !!editingUserId;
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>{isEditingExisting ? "Editar funcionário" : "Novo funcionário"}</DialogTitle>
-        </DialogHeader>
-        {loading ? (
+  const title = isEditingExisting ? "Editar funcionário" : "Novo funcionário";
+  const body = (
+    <>
+      {loading ? (
           <div className="py-10 text-center text-sm text-muted-foreground">Carregando…</div>
         ) : (
           <Tabs defaultValue="dados" className="w-full">
@@ -234,7 +232,7 @@ export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUs
               <TabsTrigger value="dados">Dados</TabsTrigger>
               <TabsTrigger value="login">Login e perfil</TabsTrigger>
             </TabsList>
-            <TabsContent value="dados" className="space-y-3 min-h-[480px] max-h-[70vh] overflow-y-auto pr-1">
+            <TabsContent value="dados" className={asPage ? "space-y-3 pt-4" : "space-y-3 min-h-[480px] max-h-[70vh] overflow-y-auto pr-1"}>
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
                   <Label>Nome do funcionário *</Label>
@@ -294,7 +292,7 @@ export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUs
                 </div>
               </div>
             </TabsContent>
-            <TabsContent value="login" className="space-y-3 min-h-[480px] max-h-[70vh] overflow-y-auto pr-1">
+            <TabsContent value="login" className={asPage ? "space-y-3 pt-4" : "space-y-3 min-h-[480px] max-h-[70vh] overflow-y-auto pr-1"}>
               {isEditingExisting ? (
                 <div className="space-y-4 py-2 text-sm">
                   {existingEmail ? (
@@ -360,11 +358,37 @@ export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUs
               )}
             </TabsContent>
           </Tabs>
-        )}
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={salvar} disabled={saving || loading}>{saving ? "Salvando…" : "Salvar"}</Button>
-        </DialogFooter>
+      )}
+    </>
+  );
+
+  const footer = (
+    <>
+      <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+      <Button onClick={salvar} disabled={saving || loading}>{saving ? "Salvando…" : "Salvar"}</Button>
+    </>
+  );
+
+  if (asPage) {
+    return (
+      <div className="max-w-3xl mx-auto space-y-4">
+        <div className="border-b pb-3">
+          <h1 className="text-2xl font-semibold">{title}</h1>
+        </div>
+        {body}
+        <div className="flex justify-end gap-2 border-t pt-3">{footer}</div>
+      </div>
+    );
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+        {body}
+        <DialogFooter>{footer}</DialogFooter>
       </DialogContent>
     </Dialog>
   );
