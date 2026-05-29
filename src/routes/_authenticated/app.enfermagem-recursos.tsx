@@ -17,6 +17,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
+import { SectionTabs, SERVICOS_TABS, SERVICOS_META } from "@/components/section-tabs";
 
 export const Route = createFileRoute("/_authenticated/app/enfermagem-recursos")({
   component: EnfermagemRecursosPage,
@@ -189,6 +190,7 @@ function EnfermagemRecursosPage() {
 
   return (
     <div className="space-y-6">
+      <SectionTabs title={SERVICOS_META.title} icon={SERVICOS_META.icon} tabs={SERVICOS_TABS} />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold flex items-center gap-2">
