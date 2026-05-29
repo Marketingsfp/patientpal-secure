@@ -547,7 +547,7 @@ function AgendaPage() {
       supabase.from("procedimentos").select("id,nome,tipo").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome").limit(5000),
       supabase.from("procedimento_split_regras").select("medico_id,procedimento_id").eq("clinica_id", clinicaAtual.clinica_id).not("medico_id", "is", null),
       supabase.from("medico_convenios").select("medico_id,nome,ativo").eq("ativo", true),
-      supabase.from("medico_procedimentos").select("medico_id,procedimento_id,created_at").order("created_at", { ascending: true }),
+      supabase.from("medico_procedimentos").select("medico_id,procedimento_id,created_at"),
     ]);
     setMedicos((m.data ?? []) as Medico[]);
     setPacientes((p.data ?? []) as Paciente[]);
