@@ -61,6 +61,7 @@ type Agendamento = {
 type Medico = { id: string; nome: string; sexo?: string | null };
 type Especialidade = { id: string; nome: string };
 type Paciente = { id: string; nome: string };
+type ProcedimentoRef = { id: string; nome: string; tipo: string | null };
 
 const STATUS_LABEL: Record<Status, string> = {
   agendado: "Agendado", confirmado: "Confirmado", realizado: "Realizado",
@@ -86,6 +87,28 @@ const primeiroValorValido = (...valores: unknown[]) => {
 
 const valorCartaoProcedimento = (proc: any) =>
   primeiroValorValido(proc?.valor_cartao_credito, proc?.valor_cartao_debito, proc?.valor_cartao, proc?.valor_padrao);
+
+async function fetchProcedimentosAgenda(clinicaId: string): Promise<ProcedimentoRef[]> {
+  const pageSize = 1000;
+  const rows: ProcedimentoRef[] = [];
+
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from("procedimentos")
+      .select("id,nome,tipo")
+      .eq("clinica_id", clinicaId)
+      .eq("ativo", true)
+      .order("nome")
+      .range(from, from + pageSize - 1);
+
+    if (error) throw error;
+    const page = (data ?? []) as ProcedimentoRef[];
+    rows.push(...page);
+    if (page.length < pageSize) break;
+  }
+
+  return rows;
+}
 
 type DescontoConvenio =
   | { tipo: "percentual"; valor: number }
