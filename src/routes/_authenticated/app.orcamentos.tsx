@@ -391,6 +391,12 @@ function NovoOrcamentoDialog({
   }, [formasPagamento.join("|"), itens.length]);
 
   const adicionarProc = (p: Procedimento) => {
+    if (itens.some((it) => it.procedimento_id === p.id)) {
+      toast.warning(`${p.nome} já foi adicionado ao orçamento`);
+      setProcQuery("");
+      setProcResults([]);
+      return;
+    }
     const formas = formasPagamento.length ? formasPagamento : ["Dinheiro"];
     const valores: Record<string, number> = {};
     for (const f of formas) valores[f] = valorPorForma(p, f);
