@@ -536,14 +536,36 @@ function ProcedimentosPage() {
       preparo: form.preparo.trim() || null,
       ativo: form.ativo,
     };
-    const { error } = editing
-      ? await supabase.from("procedimentos").update(payload).eq("id", editing.id)
-      : await supabase.from("procedimentos").insert(payload);
+    let procId = editing?.id;
+    if (editing) {
+      const { error } = await supabase.from("procedimentos").update(payload).eq("id", editing.id);
+      if (error) { setSaving(false); toast.error(error.message); return; }
+    } else {
+      const { data, error } = await supabase.from("procedimentos").insert(payload).select("id").single();
+      if (error) { setSaving(false); toast.error(error.message); return; }
+      procId = data?.id;
+    }
+    // Sincroniza vínculos N:N de especialidades (apenas quando tipo === 'consulta')
+    if (procId && form.tipo === "consulta") {
+      await supabase.from("procedimento_especialidades").delete().eq("procedimento_id", procId);
+      if (formEspIds.length > 0) {
+        const rows = formEspIds.map(eid => ({
+          procedimento_id: procId!,
+          especialidade_id: eid,
+          clinica_id: clinicaAtual.clinica_id,
+        }));
+        const { error: errVinc } = await supabase.from("procedimento_especialidades").insert(rows);
+        if (errVinc) { setSaving(false); toast.error(errVinc.message); return; }
+      }
+    } else if (procId && form.tipo !== "consulta") {
+      // se o tipo deixou de ser consulta, limpa vínculos extras
+      await supabase.from("procedimento_especialidades").delete().eq("procedimento_id", procId);
+    }
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
     toast.success(editing ? "Atualizado." : "Cadastrado.");
     setOpen(false);
     void load();
+    void loadVincEsp();
   };
 
   const onDelete = async (p: Procedimento) => {
