@@ -425,7 +425,11 @@ function ProcedimentosPage() {
     return items.filter(p => {
       if (tab === "consultas") {
         if (norm(p.tipo ?? "") !== "consulta") return false;
-      } else if (tipoEffective !== "todos" && p.tipo !== tipoEffective) return false;
+      } else {
+        // Aba "Serviço" não deve mostrar consultas (elas têm aba própria)
+        if (norm(p.tipo ?? "") === "consulta") return false;
+        if (tipoEffective !== "todos" && p.tipo !== tipoEffective) return false;
+      }
       if (grupoAplicado !== "todos") {
         const matchGrupo = norm(p.grupo ?? "") === norm(grupoAplicado);
         const extras = vincEspMap.get(p.id);
