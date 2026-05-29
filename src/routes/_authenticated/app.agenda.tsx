@@ -592,8 +592,9 @@ function AgendaPage() {
       if (!procOpcoesMap.has(r.medico_id)) procOpcoesMap.set(r.medico_id, []);
       if (!procOpcoesVistos.has(r.medico_id)) procOpcoesVistos.set(r.medico_id, new Set());
       const vistos = procOpcoesVistos.get(r.medico_id)!;
-      if (vistos.has(proc.id)) continue;
-      vistos.add(proc.id);
+      const chave = normalizar(proc.nome);
+      if (vistos.has(chave)) continue;
+      vistos.add(chave);
       procOpcoesMap.get(r.medico_id)!.push(proc);
     }
     setProcPorMedico(pm);
