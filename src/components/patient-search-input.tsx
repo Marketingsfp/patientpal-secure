@@ -127,10 +127,22 @@ export function PatientSearchInput({
             >
               <User className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
               <div className="min-w-0 flex-1">
-                <div className="font-medium truncate">{p.nome}</div>
-                <div className="text-xs text-muted-foreground truncate">
-                  {p.cpf ?? "Sem CPF"} {p.telefone ? `• ${p.telefone}` : ""}
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                  <span className="font-medium truncate">{p.nome}</span>
+                  <span className="text-xs text-muted-foreground">
+                    CPF: {p.cpf ?? "—"}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    Nasc.: {p.data_nascimento
+                      ? p.data_nascimento.split("-").reverse().join("/")
+                      : "—"}
+                  </span>
                 </div>
+                {p.telefone && (
+                  <div className="text-xs text-muted-foreground truncate">
+                    {p.telefone}
+                  </div>
+                )}
               </div>
             </button>
           ))}
