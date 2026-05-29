@@ -165,8 +165,15 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     if (conv) {
       if (conv.tipo_repasse === "valor" && conv.valor != null) {
         prestador = Number(conv.valor);
-      } else {
-        prestador = +(valor * Number(conv.percentual ?? 0) / 100).toFixed(2);
+      } else if (conv.tipo_repasse === "percentual" && conv.percentual != null) {
+        prestador = +(valor * Number(conv.percentual) / 100).toFixed(2);
+      } else if (medicoData) {
+        // sem tipo/valor cadastrado para o serviço → usa padrão do médico
+        if (medicoData.tipo_repasse === "valor" && medicoData.valor_repasse_padrao != null) {
+          prestador = Number(medicoData.valor_repasse_padrao);
+        } else {
+          prestador = +(valor * Number(medicoData.percentual_repasse_padrao ?? 0) / 100).toFixed(2);
+        }
       }
     } else if (medicoData) {
       if (medicoData.tipo_repasse === "valor" && medicoData.valor_repasse_padrao != null) {
@@ -510,8 +517,14 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
       if (conv) {
         if (conv.tipo_repasse === "valor" && conv.valor != null) {
           prestador = Number(conv.valor);
-        } else {
-          prestador = +(valor * Number(conv.percentual ?? 0) / 100).toFixed(2);
+        } else if (conv.tipo_repasse === "percentual" && conv.percentual != null) {
+          prestador = +(valor * Number(conv.percentual) / 100).toFixed(2);
+        } else if (med) {
+          if (med.tipo_repasse === "valor" && med.valor_repasse_padrao != null) {
+            prestador = Number(med.valor_repasse_padrao);
+          } else {
+            prestador = +(valor * Number(med.percentual_repasse_padrao ?? 0) / 100).toFixed(2);
+          }
         }
       } else if (med) {
         if (med.tipo_repasse === "valor" && med.valor_repasse_padrao != null) {
