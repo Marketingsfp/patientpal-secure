@@ -13,7 +13,7 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/app/tipos-servico")({
   component: TiposServicoPageWithTabs,
-  head: () => ({ meta: [{ title: "Tipos de Serviço — ClinicaOS" }] }),
+  head: () => ({ meta: [{ title: "Categorias de Serviço — ClinicaOS" }] }),
 });
 
 interface Tipo { id: string; nome: string; ativo: boolean }
@@ -60,7 +60,7 @@ function TiposServicoPage() {
       : await supabase.from("tipos_servico").insert(payload);
     setSaving(false);
     if (error) { toast.error(error.message); return; }
-    toast.success(editing ? "Tipo atualizado" : "Tipo criado");
+    toast.success(editing ? "Categoria atualizada" : "Categoria criada");
     setOpen(false);
     void load();
   }
@@ -73,8 +73,8 @@ function TiposServicoPage() {
       <div className="flex items-center gap-3">
         <LayoutGrid className="h-6 w-6 text-primary" />
         <div className="flex-1">
-          <h1 className="text-xl font-bold">Tipos de Serviço</h1>
-          <p className="text-sm text-muted-foreground">Cadastro dos tipos de serviços da clínica (Consulta, Exame, Procedimento, Cirurgia…).</p>
+          <h1 className="text-xl font-bold">Categorias de Serviço</h1>
+          <p className="text-sm text-muted-foreground">Cadastro das categorias de serviços da clínica (Consulta, Exame, Procedimento, Cirurgia…).</p>
         </div>
         <Button onClick={openNew}><Plus className="h-4 w-4 mr-1" /> Novo</Button>
       </div>
@@ -99,7 +99,7 @@ function TiposServicoPage() {
             {loading ? (
               <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-6">Carregando…</TableCell></TableRow>
             ) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-6">Nenhum tipo cadastrado.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-6">Nenhuma categoria cadastrada.</TableCell></TableRow>
             ) : filtered.map(r => (
               <TableRow key={r.id}>
                 <TableCell className="font-medium">{cap(r.nome)}</TableCell>
@@ -119,7 +119,7 @@ function TiposServicoPage() {
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>{editing ? "Editar tipo" : "Novo tipo"}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editing ? "Editar categoria" : "Nova categoria"}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
               <Label>Nome *</Label>
