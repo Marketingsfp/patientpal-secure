@@ -428,6 +428,10 @@ function Page() {
             );
           })()}
         </TabsContent>
+
+        <TabsContent value="enfermagem" className="space-y-6">
+          <EnfermagemRecursosHorariosEditor />
+        </TabsContent>
       </Tabs>
     </div>
   );
