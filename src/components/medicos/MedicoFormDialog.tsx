@@ -108,6 +108,23 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
   const [confirmarSenha, setConfirmarSenha] = useState("");
   const [savingSenha, setSavingSenha] = useState(false);
 
+  const normalizarNome = (s: string) =>
+    s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase();
+
+  const especialidadesSelecionadasNomes = useMemo(() => {
+    const nomes = new Set<string>();
+    for (const er of form.especialidades) {
+      const esp = esps.find((e) => e.id === er.especialidade_id);
+      if (esp?.nome) nomes.add(normalizarNome(esp.nome));
+    }
+    return nomes;
+  }, [form.especialidades, esps]);
+
+  const procsFiltradosPorEspecialidade = useMemo(() => {
+    if (especialidadesSelecionadasNomes.size === 0) return [] as Procedimento[];
+    return procs.filter((p) => p.grupo && especialidadesSelecionadasNomes.has(normalizarNome(p.grupo)));
+  }, [procs, especialidadesSelecionadasNomes]);
+
   // Load reference data
   useEffect(() => {
     if (!open || !clinicaId) return;
