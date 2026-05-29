@@ -397,13 +397,16 @@ function ProcedimentosPage() {
   const filtrados = useMemo(() => {
     const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
     const q = norm(buscaAplicada.trim());
+    const tipoEffective = tab === "consultas" ? "consulta" : tipoAplicado;
     return items.filter(p => {
-      if (tipoAplicado !== "todos" && p.tipo !== tipoAplicado) return false;
+      if (tab === "consultas") {
+        if (norm(p.tipo ?? "") !== "consulta") return false;
+      } else if (tipoEffective !== "todos" && p.tipo !== tipoEffective) return false;
       if (grupoAplicado !== "todos" && norm(p.grupo ?? "") !== norm(grupoAplicado)) return false;
       if (q && !norm(p.nome).includes(q) && !norm(p.codigo ?? "").includes(q) && !norm(p.grupo ?? "").includes(q)) return false;
       return true;
     });
-  }, [items, buscaAplicada, tipoAplicado, grupoAplicado]);
+  }, [items, buscaAplicada, tipoAplicado, grupoAplicado, tab]);
 
   const ordenados = useMemo(() => {
     if (!sort) return filtrados;
@@ -617,6 +620,7 @@ function ProcedimentosPage() {
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="procedimentos">Serviço</TabsTrigger>
+          <TabsTrigger value="consultas">Consultas</TabsTrigger>
         </TabsList>
 
         {/* ============ PROCEDIMENTOS ============ */}
