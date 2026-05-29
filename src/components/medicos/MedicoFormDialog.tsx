@@ -858,7 +858,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                 <div className="pt-4 border-t space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <Label>Convênios / Serviços</Label>
+                      <Label>REPASSE INDIVIDUAL</Label>
                       <p className="text-xs text-muted-foreground">
                         Os serviços selecionados na aba <b>Especialidades</b> aparecem aqui automaticamente. Defina o tipo e o valor de repasse de cada um. Use "Manual" para adicionar itens avulsos (ex: Cartão Consulta).
                       </p>
