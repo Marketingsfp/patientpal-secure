@@ -567,7 +567,7 @@ function AgendaPage() {
       supabase.from("pacientes").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome").limit(500),
       supabase.from("especialidades").select("id,nome").order("nome"),
       supabase.from("medico_especialidades").select("medico_id,especialidade_id"),
-      supabase.from("procedimentos").select("id,nome,tipo").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome").limit(5000),
+      fetchProcedimentosAgenda(clinicaAtual.clinica_id),
       supabase.from("procedimento_split_regras").select("medico_id,procedimento_id").eq("clinica_id", clinicaAtual.clinica_id).not("medico_id", "is", null),
       supabase.from("medico_convenios").select("medico_id,nome,ativo").eq("ativo", true),
       supabase.from("medico_procedimentos").select("medico_id,procedimento_id,created_at"),
@@ -575,7 +575,7 @@ function AgendaPage() {
     setMedicos((m.data ?? []) as Medico[]);
     setPacientes((p.data ?? []) as Paciente[]);
     setEspecialidades((e.data ?? []) as Especialidade[]);
-    const todos = (pr.data ?? []) as { id: string; nome: string; tipo: string | null }[];
+    const todos = Array.isArray(pr) ? pr : [];
     {
       const ex = todos.filter((x) => x.tipo === "exame");
       const vistos = new Set<string>();
