@@ -591,7 +591,7 @@ function AgendaPage() {
       fetchProcedimentosAgenda(clinicaAtual.clinica_id),
       supabase.from("procedimento_split_regras").select("medico_id,procedimento_id").eq("clinica_id", clinicaAtual.clinica_id).not("medico_id", "is", null),
       supabase.from("medico_convenios").select("medico_id,nome,ativo").eq("ativo", true),
-      supabase.from("medico_procedimentos").select("medico_id,procedimento_id,created_at"),
+      fetchMedicoProcedimentosAgenda(),
     ]);
     setMedicos((m.data ?? []) as Medico[]);
     setPacientes((p.data ?? []) as Paciente[]);
@@ -627,7 +627,7 @@ function AgendaPage() {
     const procOpcoesVistos = new Map<string, Set<string>>();
     // Serviços vinculados ao médico pela aba "Especialidades" do cadastro do médico.
     // Esta é a fonte principal e preserva a mesma ordem exibida no cadastro do médico.
-    for (const r of (mp.data ?? []) as Array<{ medico_id: string | null; procedimento_id: string; created_at?: string | null }>) {
+    for (const r of (Array.isArray(mp) ? mp : []) as MedicoProcedimentoRef[]) {
       if (!r.medico_id) continue;
       if (!pm.has(r.medico_id)) pm.set(r.medico_id, new Set());
       pm.get(r.medico_id)!.add(r.procedimento_id);
