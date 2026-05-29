@@ -296,6 +296,7 @@ function AgendaPage() {
   const [convenioMap, setConvenioMap] = useState<Map<string, string>>(new Map());
   const [etapaMap, setEtapaMap] = useState<Map<string, string>>(new Map());
   const [medicos, setMedicos] = useState<Medico[]>([]);
+  const [recursoIds, setRecursoIds] = useState<Set<string>>(new Set());
   const [exames, setExames] = useState<{ id: string; nome: string }[]>([]);
   const [procedimentosList, setProcedimentosList] = useState<{ id: string; nome: string }[]>([]);
   const [procPorMedico, setProcPorMedico] = useState<Map<string, Set<string>>>(new Map());
