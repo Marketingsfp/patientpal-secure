@@ -19,8 +19,7 @@ export function ProcedimentoCell({ valor, opcoes, disabled, onChange }: Props) {
   const [q, setQ] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Deduplicar pelo nome normalizado, preservando a ordem recebida
-  // (o caller já entrega ordenado — top 10 mais usados primeiro, depois alfabético)
+  // Deduplicar pelo nome normalizado, preservando a ordem recebida do cadastro do médico.
   const lista = useMemo(() => {
     const seen = new Set<string>();
     const out: { id: string; nome: string }[] = [];
@@ -112,7 +111,7 @@ export function ProcedimentoCell({ valor, opcoes, disabled, onChange }: Props) {
             />
           </div>
           <p className="text-[10px] text-muted-foreground mt-1">
-            {lista.length} serviço(s) — mais usados primeiro. Tecle 1-9 para selecionar.
+            {lista.length} serviço(s) — na ordem do cadastro do médico. Tecle 1-9 para selecionar.
           </p>
         </div>
         <div className="max-h-72 overflow-auto">

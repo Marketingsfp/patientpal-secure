@@ -254,6 +254,7 @@ function AgendaPage() {
   const [exames, setExames] = useState<{ id: string; nome: string }[]>([]);
   const [procedimentosList, setProcedimentosList] = useState<{ id: string; nome: string }[]>([]);
   const [procPorMedico, setProcPorMedico] = useState<Map<string, Set<string>>>(new Map());
+  const [procOpcoesPorMedico, setProcOpcoesPorMedico] = useState<Map<string, { id: string; nome: string }[]>>(new Map());
   const [procNomesPorMedico, setProcNomesPorMedico] = useState<Map<string, Set<string>>>(new Map());
   // Ranking de procedimentos mais usados por médico (nome normalizado -> contagem)
   const [rankingPorMedico, setRankingPorMedico] = useState<Map<string, Map<string, number>>>(new Map());
@@ -546,7 +547,7 @@ function AgendaPage() {
       supabase.from("procedimentos").select("id,nome,tipo").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome").limit(5000),
       supabase.from("procedimento_split_regras").select("medico_id,procedimento_id").eq("clinica_id", clinicaAtual.clinica_id).not("medico_id", "is", null),
       supabase.from("medico_convenios").select("medico_id,nome,ativo").eq("ativo", true),
-      supabase.from("medico_procedimentos").select("medico_id,procedimento_id"),
+      supabase.from("medico_procedimentos").select("medico_id,procedimento_id,created_at"),
     ]);
     setMedicos((m.data ?? []) as Medico[]);
     setPacientes((p.data ?? []) as Paciente[]);
@@ -565,6 +566,7 @@ function AgendaPage() {
       setExames(unicos);
     }
     setProcedimentosList(todos.map(({ id, nome }) => ({ id, nome })));
+    const procedimentosPorId = new Map(todos.map((p) => [p.id, { id: p.id, nome: p.nome }]));
     const map = new Map<string, Set<string>>();
     for (const r of (me.data ?? []) as Array<{ medico_id: string; especialidade_id: string }>) {
       if (!map.has(r.medico_id)) map.set(r.medico_id, new Set());
@@ -577,13 +579,26 @@ function AgendaPage() {
       if (!pm.has(r.medico_id)) pm.set(r.medico_id, new Set());
       pm.get(r.medico_id)!.add(r.procedimento_id);
     }
+    const procOpcoesMap = new Map<string, { id: string; nome: string }[]>();
+    const procOpcoesVistos = new Map<string, Set<string>>();
     // Serviços vinculados ao médico pela aba "Especialidades" do cadastro do médico.
-    for (const r of (mp.data ?? []) as Array<{ medico_id: string | null; procedimento_id: string }>) {
+    // Esta é a fonte principal e preserva a mesma ordem exibida no cadastro do médico.
+    for (const r of (mp.data ?? []) as Array<{ medico_id: string | null; procedimento_id: string; created_at?: string | null }>) {
       if (!r.medico_id) continue;
       if (!pm.has(r.medico_id)) pm.set(r.medico_id, new Set());
       pm.get(r.medico_id)!.add(r.procedimento_id);
+      const proc = procedimentosPorId.get(r.procedimento_id);
+      if (!proc) continue;
+      if (!procOpcoesMap.has(r.medico_id)) procOpcoesMap.set(r.medico_id, []);
+      if (!procOpcoesVistos.has(r.medico_id)) procOpcoesVistos.set(r.medico_id, new Set());
+      const vistos = procOpcoesVistos.get(r.medico_id)!;
+      const chave = normalizar(proc.nome);
+      if (vistos.has(chave)) continue;
+      vistos.add(chave);
+      procOpcoesMap.get(r.medico_id)!.push(proc);
     }
     setProcPorMedico(pm);
+    setProcOpcoesPorMedico(procOpcoesMap);
     const medicosIds = new Set(((m.data ?? []) as Medico[]).map((x) => x.id));
     const nm = new Map<string, Set<string>>();
     for (const r of (mc.data ?? []) as Array<{ medico_id: string; nome: string }>) {
@@ -671,6 +686,8 @@ function AgendaPage() {
   // Opções de procedimento disponíveis para um médico específico (cadastro do médico)
   const opcoesProcedimentoMedico = (medicoId: string | null) => {
     if (!medicoId) return [] as { id: string; nome: string }[];
+    const opcoesCadastradas = procOpcoesPorMedico.get(medicoId);
+    if (opcoesCadastradas && opcoesCadastradas.length > 0) return opcoesCadastradas;
     const ids = procPorMedico.get(medicoId);
     const nomes = procNomesPorMedico.get(medicoId);
     const temConfig = (ids && ids.size > 0) || (nomes && nomes.size > 0);
@@ -1639,7 +1656,7 @@ function AgendaPage() {
               <div className="space-y-1">
                 <Label>Serviço</Label>
                 {form.medico_id ? (
-                  (procPorMedico.get(form.medico_id)?.size || procNomesPorMedico.get(form.medico_id)?.size) ? (
+                  (procOpcoesPorMedico.get(form.medico_id)?.length || procPorMedico.get(form.medico_id)?.size || procNomesPorMedico.get(form.medico_id)?.size) ? (
                     <p className="text-xs text-muted-foreground">Mostrando apenas serviços configurados para este médico.</p>
                   ) : (
                     <p className="text-xs text-amber-600">
@@ -1656,28 +1673,9 @@ function AgendaPage() {
                   searchPlaceholder="Buscar serviço..."
                   options={[
                     { value: "none", label: "— Selecione —" },
-                    ...(() => {
-                      if (!form.medico_id) return [];
-                      const idsDoMedico = form.medico_id ? procPorMedico.get(form.medico_id) : undefined;
-                      const nomesDoMedico = form.medico_id ? procNomesPorMedico.get(form.medico_id) : undefined;
-                      const temConfig = (idsDoMedico && idsDoMedico.size > 0) || (nomesDoMedico && nomesDoMedico.size > 0);
-                      if (!temConfig) return [];
-                      const filtrados = procedimentosList.filter((p) =>
-                        (idsDoMedico?.has(p.id) ?? false) ||
-                        (nomesDoMedico?.has(normalizar(p.nome)) ?? false)
-                      );
-                      // Deduplicar pelo nome normalizado (evita "CONSULTA" duplicada quando o
-                      // procedimento existe tanto na tabela procedimentos quanto em medico_convenios).
-                      const vistos = new Set<string>();
-                      return filtrados
-                        .filter((p) => {
-                          const k = normalizar(p.nome);
-                          if (vistos.has(k)) return false;
-                          vistos.add(k);
-                          return true;
-                        })
-                        .map((p) => ({ value: p.nome, label: p.nome }));
-                    })(),
+                    ...(form.medico_id
+                      ? opcoesProcedimentoMedico(form.medico_id).map((p) => ({ value: p.nome, label: p.nome }))
+                      : []),
                   ]}
                 />
               </div>
