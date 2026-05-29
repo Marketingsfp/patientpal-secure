@@ -718,7 +718,17 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                       {form.procedimentos.map((pid, idx) => (
                         <div key={idx} className="grid grid-cols-[1fr_auto] gap-2 items-center">
                           <SearchableSelect
-                            options={procsFiltradosPorEspecialidade.map((p) => ({ value: p.id, label: p.grupo ? `${p.nome} (${p.grupo})` : p.nome }))}
+                            options={(() => {
+                              const base = [...procsFiltradosPorEspecialidade];
+                              // garante que serviços já selecionados (mesmo fora da especialidade) apareçam com rótulo
+                              for (const selId of form.procedimentos) {
+                                if (!selId) continue;
+                                if (base.some((p) => p.id === selId)) continue;
+                                const extra = procs.find((p) => p.id === selId);
+                                if (extra) base.push(extra);
+                              }
+                              return base.map((p) => ({ value: p.id, label: p.grupo ? `${p.nome} (${p.grupo})` : p.nome }));
+                            })()}
                             value={pid}
                             onChange={(v) => {
                               if (v && form.procedimentos.some((x, i) => i !== idx && x === v)) {
