@@ -1550,25 +1550,25 @@ function AgendaPage() {
               <div className="space-y-1">
                 <Label>Paciente</Label>
                 <div className="flex gap-2">
-                  <Input list="lista-pacientes" value={form.paciente_nome}
-                    onChange={(e) => {
-                      const nome = e.target.value;
-                      const match = pacientes.find(p => p.nome === nome);
-                      setForm(f => ({ ...f, paciente_nome: nome, paciente_id: match?.id ?? "" }));
-                    }}
-                    placeholder="Nome do paciente" required
-                    readOnly={editing ? pagosSet.has(editing.id) : false}
-                    disabled={editing ? pagosSet.has(editing.id) : false}
-                  />
+                  <div className="flex-1">
+                    <PatientSearchInput
+                      value={form.paciente_id ? { id: form.paciente_id, nome: form.paciente_nome, cpf: null, telefone: null, data_nascimento: null, clinica_id: "" } : null}
+                      onSelect={(p) => {
+                        setForm(f => ({
+                          ...f,
+                          paciente_nome: p?.nome ?? "",
+                          paciente_id: p?.id ?? "",
+                        }));
+                      }}
+                      placeholder="Buscar por nome ou CPF…"
+                    />
+                  </div>
                   <Button type="button" variant="outline" size="icon" title="Cadastrar novo paciente"
                     disabled={editing ? pagosSet.has(editing.id) : false}
                     onClick={() => { setNovoPac(p => ({ ...p, nome: form.paciente_nome })); setNovoPacOpen(true); }}>
                     <UserPlus className="h-4 w-4" />
                   </Button>
                 </div>
-                <datalist id="lista-pacientes">
-                  {pacientes.map(p => <option key={p.id} value={p.nome} />)}
-                </datalist>
                 {editing && pagosSet.has(editing.id) && (
                   <p className="text-xs text-amber-600">
                     Este agendamento já está pago — o nome do paciente não pode ser alterado.
