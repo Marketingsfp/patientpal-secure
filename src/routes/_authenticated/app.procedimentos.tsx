@@ -404,6 +404,7 @@ function ProcedimentosPage() {
   useEffect(() => {
     void load();
     void loadCartoes();
+    void loadVincEsp();
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [clinicaAtual?.clinica_id]);
 
