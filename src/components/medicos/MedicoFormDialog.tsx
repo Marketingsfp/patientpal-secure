@@ -66,6 +66,9 @@ const emptyForm = () => ({
   percentual: "50",
   valor: "",
   aceita_cartao_beneficios: true,
+  cb_tipo_repasse: "valor" as "percentual" | "valor",
+  cb_percentual: "",
+  cb_valor: "",
   duracao_consulta_min: "15",
   cpf: "", rg: "", data_nascimento: "", email: "", telefone: "", telefone2: "",
   nacionalidade: "Brasileira", estado_civil: "",
@@ -250,6 +253,9 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         percentual: sens.percentual_repasse_padrao != null ? String(sens.percentual_repasse_padrao) : "",
         valor: sens.valor_repasse_padrao != null ? String(sens.valor_repasse_padrao) : "",
         aceita_cartao_beneficios: sens.aceita_cartao_beneficios !== false,
+        cb_tipo_repasse: (sens.cb_tipo_repasse as "percentual" | "valor") ?? "valor",
+        cb_percentual: sens.cb_percentual_repasse != null ? String(sens.cb_percentual_repasse) : "",
+        cb_valor: sens.cb_valor_repasse != null ? String(sens.cb_valor_repasse) : "",
         duracao_consulta_min: med.duracao_consulta_min != null ? String(med.duracao_consulta_min) : "15",
         cpf: sens.cpf ?? "", rg: sens.rg ?? "", data_nascimento: sens.data_nascimento ?? "",
         email: med.email ?? "", telefone: med.telefone ?? "", telefone2: med.telefone2 ?? "",
@@ -313,6 +319,13 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       percentual_repasse_padrao: form.tipo_repasse === "percentual" ? parseFloat(form.percentual || "0") : 0,
       valor_repasse_padrao: form.tipo_repasse === "valor" ? parseFloat(form.valor || "0") : null,
       aceita_cartao_beneficios: form.aceita_cartao_beneficios,
+      cb_tipo_repasse: form.aceita_cartao_beneficios ? form.cb_tipo_repasse : null,
+      cb_percentual_repasse: form.aceita_cartao_beneficios && form.cb_tipo_repasse === "percentual"
+        ? parseFloat(form.cb_percentual || "0")
+        : null,
+      cb_valor_repasse: form.aceita_cartao_beneficios && form.cb_tipo_repasse === "valor"
+        ? parseFloat(form.cb_valor || "0")
+        : null,
       duracao_consulta_min: parseInt(form.duracao_consulta_min || "15") || 15,
       cpf: form.cpf || null,
       rg: form.rg || null,
@@ -811,20 +824,48 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
               </TabsContent>
 
               <TabsContent value="repasse" className="space-y-4 pt-4 pb-16">
-                <div className="rounded-md border p-3 flex items-start gap-3 bg-muted/30">
-                  <Checkbox
-                    id="aceita_cartao_beneficios"
-                    checked={form.aceita_cartao_beneficios}
-                    onCheckedChange={(c) => setForm({ ...form, aceita_cartao_beneficios: c === true })}
-                  />
-                  <div className="space-y-1">
-                    <Label htmlFor="aceita_cartao_beneficios" className="cursor-pointer">
-                      Aceita Cartões Benefícios
-                    </Label>
-                    <p className="text-xs text-muted-foreground">
-                      Quando desmarcado, este médico não aceita os preços/descontos dos cartões benefícios em consultas e exames.
-                    </p>
+                <div className="space-y-3">
+                  <Label>REPASSE CARTÕES BENEFÍCIOS</Label>
+                  <div className="rounded-md border p-3 flex items-start gap-3 bg-muted/30">
+                    <Checkbox
+                      id="aceita_cartao_beneficios"
+                      checked={form.aceita_cartao_beneficios}
+                      onCheckedChange={(c) => setForm({ ...form, aceita_cartao_beneficios: c === true })}
+                    />
+                    <div className="space-y-1">
+                      <Label htmlFor="aceita_cartao_beneficios" className="cursor-pointer">
+                        Aceita Cartões Benefícios
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Quando marcado, este médico aceita os preços/descontos dos cartões benefícios. Defina abaixo o repasse aplicado às <b>consultas</b> pagas com cartão benefício.
+                      </p>
+                    </div>
                   </div>
+                  {form.aceita_cartao_beneficios && (
+                    <div className="grid grid-cols-[1fr_1fr] gap-2">
+                      <select
+                        className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                        value={form.cb_tipo_repasse}
+                        onChange={(e) => setForm({ ...form, cb_tipo_repasse: e.target.value as "percentual" | "valor" })}
+                      >
+                        <option value="percentual">% Percentual</option>
+                        <option value="valor">R$ Valor</option>
+                      </select>
+                      {form.cb_tipo_repasse === "percentual" ? (
+                        <Input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step={0.01}
+                          placeholder="% repasse"
+                          value={form.cb_percentual}
+                          onChange={(e) => setForm({ ...form, cb_percentual: e.target.value })}
+                        />
+                      ) : (
+                        <CurrencyInput value={form.cb_valor} onChange={(v) => setForm({ ...form, cb_valor: v })} />
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>REPASSE PADRÃO</Label>

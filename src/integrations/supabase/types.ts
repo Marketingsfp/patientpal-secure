@@ -3946,6 +3946,9 @@ export type Database = {
           ativo: boolean
           bairro: string | null
           banco: string | null
+          cb_percentual_repasse: number | null
+          cb_tipo_repasse: string | null
+          cb_valor_repasse: number | null
           cep: string | null
           cidade: string | null
           clinica_id: string
@@ -3989,6 +3992,9 @@ export type Database = {
           ativo?: boolean
           bairro?: string | null
           banco?: string | null
+          cb_percentual_repasse?: number | null
+          cb_tipo_repasse?: string | null
+          cb_valor_repasse?: number | null
           cep?: string | null
           cidade?: string | null
           clinica_id: string
@@ -4032,6 +4038,9 @@ export type Database = {
           ativo?: boolean
           bairro?: string | null
           banco?: string | null
+          cb_percentual_repasse?: number | null
+          cb_tipo_repasse?: string | null
+          cb_valor_repasse?: number | null
           cep?: string | null
           cidade?: string | null
           clinica_id?: string
