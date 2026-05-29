@@ -92,7 +92,10 @@ function Page() {
       const c = convenios.find((cv) => cv.medico_id === medicoId && norm(cv.nome) === alvo);
       if (c) {
         if (c.tipo_repasse === "valor" && c.valor != null) return Math.min(Number(c.valor), total);
-        return +(total * Number(c.percentual ?? 0) / 100).toFixed(2);
+        if (c.tipo_repasse === "percentual" && c.percentual != null) {
+          return +(total * Number(c.percentual) / 100).toFixed(2);
+        }
+        // sem tipo/valor cadastrado no item → cai no padrão do médico
       }
     }
     // 2) fallback repasse padrão do médico
