@@ -31,7 +31,7 @@ import { ProcedimentoCell } from "@/components/agenda/procedimento-cell";
 import { PatientSearchInput } from "@/components/patient-search-input";
 import {
   CalendarDays, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X,
-  MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, Clock, DollarSign, ShieldCheck, BadgeCheck, IdCard,
+  MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, Clock, DollarSign, ShieldCheck, BadgeCheck, IdCard, Play,
 } from "lucide-react";
 import { printGuiaAtendimento, printGuiaAtendimentoAgrupada } from "@/lib/print-gr";
 import { VoiceInput } from "@/components/voice-input";
@@ -1252,6 +1252,22 @@ function AgendaPage() {
     }
     const { error } = await supabase.from("agendamentos").update({ status }).eq("id", a.id);
     if (error) toast.error(error.message); else await load();
+  };
+
+  const iniciarAtendimentoEnf = async (a: Agendamento) => {
+    const uid = (await supabase.auth.getUser()).data.user?.id;
+    if (!uid) { toast.error("Sessão expirada"); return; }
+    const { error } = await supabase
+      .from("agendamentos")
+      .update({
+        status: "realizado",
+        executado_por: uid,
+        executado_em: new Date().toISOString(),
+      } as never)
+      .eq("id", a.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Atendimento iniciado e registrado");
+    await load();
   };
 
   const cobrarAgendamento = async (a: Agendamento) => {
