@@ -329,6 +329,10 @@ function ProcedimentosPage() {
     })();
   }, []);
   const [especialidades, setEspecialidades] = useState<{ id: string; nome: string }[]>([]);
+  // Map: procedimento_id -> Set de especialidade_id vinculadas
+  const [vincEspMap, setVincEspMap] = useState<Map<string, Set<string>>>(new Map());
+  // Especialidades marcadas no diálogo (apenas para tipo === 'consulta')
+  const [formEspIds, setFormEspIds] = useState<string[]>([]);
   const loadEspecialidades = async () => {
     const { data, error } = await supabase
       .from("especialidades")
@@ -341,6 +345,21 @@ function ProcedimentosPage() {
   useEffect(() => {
     void loadEspecialidades();
   }, []);
+
+  const loadVincEsp = async () => {
+    if (!clinicaAtual) return;
+    const { data, error } = await supabase
+      .from("procedimento_especialidades")
+      .select("procedimento_id,especialidade_id")
+      .eq("clinica_id", clinicaAtual.clinica_id);
+    if (error) { toast.error(error.message); return; }
+    const m = new Map<string, Set<string>>();
+    (data ?? []).forEach((r: any) => {
+      if (!m.has(r.procedimento_id)) m.set(r.procedimento_id, new Set());
+      m.get(r.procedimento_id)!.add(r.especialidade_id);
+    });
+    setVincEspMap(m);
+  };
 
   const load = async () => {
     if (!clinicaAtual) return;
@@ -385,6 +404,7 @@ function ProcedimentosPage() {
   useEffect(() => {
     void load();
     void loadCartoes();
+    void loadVincEsp();
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [clinicaAtual?.clinica_id]);
 
@@ -398,15 +418,24 @@ function ProcedimentosPage() {
     const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
     const q = norm(buscaAplicada.trim());
     const tipoEffective = tab === "consultas" ? "consulta" : tipoAplicado;
+    // Para a aba Consultas, o filtro por especialidade considera também os vínculos extras (N:N)
+    const espIdByNome = new Map<string, string>();
+    especialidades.forEach(e => espIdByNome.set(norm(e.nome), e.id));
+    const espIdFiltro = grupoAplicado !== "todos" ? espIdByNome.get(norm(grupoAplicado)) : undefined;
     return items.filter(p => {
       if (tab === "consultas") {
         if (norm(p.tipo ?? "") !== "consulta") return false;
       } else if (tipoEffective !== "todos" && p.tipo !== tipoEffective) return false;
-      if (grupoAplicado !== "todos" && norm(p.grupo ?? "") !== norm(grupoAplicado)) return false;
+      if (grupoAplicado !== "todos") {
+        const matchGrupo = norm(p.grupo ?? "") === norm(grupoAplicado);
+        const extras = vincEspMap.get(p.id);
+        const matchExtra = tab === "consultas" && !!espIdFiltro && !!extras && extras.has(espIdFiltro);
+        if (!matchGrupo && !matchExtra) return false;
+      }
       if (q && !norm(p.nome).includes(q) && !norm(p.codigo ?? "").includes(q) && !norm(p.grupo ?? "").includes(q)) return false;
       return true;
     });
-  }, [items, buscaAplicada, tipoAplicado, grupoAplicado, tab]);
+  }, [items, buscaAplicada, tipoAplicado, grupoAplicado, tab, vincEspMap, especialidades]);
 
   const ordenados = useMemo(() => {
     if (!sort) return filtrados;
@@ -456,10 +485,17 @@ function ProcedimentosPage() {
     return sort.dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
   };
 
-  const openNew = () => { void loadEspecialidades(); setEditing(null); setForm(EMPTY); setOpen(true); };
+  const openNew = () => {
+    void loadEspecialidades();
+    setEditing(null);
+    setForm({ ...EMPTY, tipo: tab === "consultas" ? "consulta" : EMPTY.tipo });
+    setFormEspIds([]);
+    setOpen(true);
+  };
   const openEdit = (p: Procedimento) => {
     void loadEspecialidades();
     setEditing(p);
+    setFormEspIds(Array.from(vincEspMap.get(p.id) ?? []));
     setForm({
       nome: p.nome, grupo: p.grupo ?? "", tipo: p.tipo, codigo: p.codigo ?? "",
       valor_dinheiro: String(p.valor_dinheiro ?? p.valor_dinheiro_pix ?? p.valor_padrao ?? 0),
@@ -500,14 +536,36 @@ function ProcedimentosPage() {
       preparo: form.preparo.trim() || null,
       ativo: form.ativo,
     };
-    const { error } = editing
-      ? await supabase.from("procedimentos").update(payload).eq("id", editing.id)
-      : await supabase.from("procedimentos").insert(payload);
+    let procId = editing?.id;
+    if (editing) {
+      const { error } = await supabase.from("procedimentos").update(payload).eq("id", editing.id);
+      if (error) { setSaving(false); toast.error(error.message); return; }
+    } else {
+      const { data, error } = await supabase.from("procedimentos").insert(payload).select("id").single();
+      if (error) { setSaving(false); toast.error(error.message); return; }
+      procId = data?.id;
+    }
+    // Sincroniza vínculos N:N de especialidades (apenas quando tipo === 'consulta')
+    if (procId && form.tipo === "consulta") {
+      await supabase.from("procedimento_especialidades").delete().eq("procedimento_id", procId);
+      if (formEspIds.length > 0) {
+        const rows = formEspIds.map(eid => ({
+          procedimento_id: procId!,
+          especialidade_id: eid,
+          clinica_id: clinicaAtual.clinica_id,
+        }));
+        const { error: errVinc } = await supabase.from("procedimento_especialidades").insert(rows);
+        if (errVinc) { setSaving(false); toast.error(errVinc.message); return; }
+      }
+    } else if (procId && form.tipo !== "consulta") {
+      // se o tipo deixou de ser consulta, limpa vínculos extras
+      await supabase.from("procedimento_especialidades").delete().eq("procedimento_id", procId);
+    }
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
     toast.success(editing ? "Atualizado." : "Cadastrado.");
     setOpen(false);
     void load();
+    void loadVincEsp();
   };
 
   const onDelete = async (p: Procedimento) => {
@@ -857,6 +915,38 @@ function ProcedimentosPage() {
                 </Select>
               </div>
             </div>
+
+            {form.tipo === "consulta" && (
+              <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase">
+                  Especialidades em que esta consulta aparece
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  Marque todas as especialidades que devem listar esta consulta. A especialidade do campo "Especialidade" acima é a principal e já é incluída automaticamente.
+                </p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-56 overflow-y-auto pt-1">
+                  {especialidades.length === 0 && (
+                    <p className="col-span-full text-xs text-muted-foreground">Nenhuma especialidade cadastrada.</p>
+                  )}
+                  {especialidades.map(e => {
+                    const checked = formEspIds.includes(e.id);
+                    return (
+                      <label key={e.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(v) => {
+                            setFormEspIds(prev =>
+                              v ? Array.from(new Set([...prev, e.id])) : prev.filter(x => x !== e.id),
+                            );
+                          }}
+                        />
+                        <span className="truncate">{e.nome}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
               <p className="text-xs font-medium text-muted-foreground uppercase">Valores por forma de pagamento</p>
