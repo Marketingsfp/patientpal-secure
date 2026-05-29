@@ -284,16 +284,10 @@ export function EnfermagemRecursosHorariosEditor() {
                       </TableCell>
                       <TableCell className="text-center text-sm text-muted-foreground">{ds.length}</TableCell>
                       <TableCell className="text-right">
-                        {renomeandoId !== r.id && (
-                          <Button size="sm" variant="ghost" title="Renomear"
-                            onClick={() => iniciarRename(r.id, r.nome)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                        )}
                         <Button size="sm" variant="ghost"
-                          title="Editar horários"
+                          title="Editar nome e horários"
                           onClick={() => { setEditandoRecurso(r.id); setNovo({ ...novo, recurso_id: r.id }); }}>
-                          <CalendarRange className="h-4 w-4" />
+                          <Pencil className="h-4 w-4" />
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -319,11 +313,37 @@ export function EnfermagemRecursosHorariosEditor() {
   const ds = disps.filter((d) => d.recurso_id === r.id);
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={() => { setEditandoRecurso(null); setDispEditando(null); }}>
+      <div className="flex items-center gap-3 flex-wrap">
+        <Button variant="ghost" size="sm" onClick={() => { setEditandoRecurso(null); setDispEditando(null); setRenomeandoId(null); }}>
           <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
         </Button>
-        <h2 className="text-lg font-semibold">{r.nome}</h2>
+        {renomeandoId === r.id ? (
+          <div className="flex items-center gap-1">
+            <Input
+              autoFocus
+              value={novoNome}
+              onChange={(e) => setNovoNome(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void salvarNome();
+                if (e.key === "Escape") setRenomeandoId(null);
+              }}
+              className="h-9 w-72"
+            />
+            <Button size="icon" variant="ghost" disabled={salvandoNome} onClick={() => void salvarNome()}>
+              <Check className="h-4 w-4" />
+            </Button>
+            <Button size="icon" variant="ghost" onClick={() => setRenomeandoId(null)}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <>
+            <h2 className="text-lg font-semibold">{r.nome}</h2>
+            <Button size="icon" variant="ghost" title="Renomear" onClick={() => iniciarRename(r.id, r.nome)}>
+              <Pencil className="h-4 w-4" />
+            </Button>
+          </>
+        )}
         <span className="text-xs text-muted-foreground">· {ds.length} horário(s)</span>
       </div>
       <Card>
