@@ -1,31 +1,64 @@
-## Problema
+## Objetivo
 
-O menu lateral em `src/components/app-shell.tsx` tem **dois containers com scroll vertical aninhados**:
+Criar agendas para exames realizados pela equipe de Enfermagem (ECG, MAPA 24h, Holter, ITB, Sala de Enfermagem), compartilhadas entre todos os enfermeiros, com registro automático de quem executou cada exame.
 
-- `<aside>` (linha 375): `h-screen overflow-y-auto flex flex-col`
-- `<nav>` interno (linha 406): `flex-1 ... overflow-y-auto`
+## Conceito
 
-Como o `<nav>` é `flex-1` dentro do `<aside>` que já rola, o conteúdo nunca "transborda" no nav — em vez disso o aside cresce e rola. Isso faz a roda do mouse ora prender no scroller errado, ora não responder, dando a sensação de barra travada. Soma-se a isso o `useEffect` que ajusta `navRoot.scrollTop` automaticamente ao trocar de rota, o que com dois scrollers acaba "puxando" o menu de volta.
+Tratar enfermagem como **Recursos Agendáveis** (salas), separados de médicos. Vários enfermeiros logados enxergam e mexem na mesma agenda em tempo real.
 
-## Correção
+## Mudanças no banco
 
-No arquivo `src/components/app-shell.tsx`, linha 375, remover `overflow-y-auto` do `<aside>` para que apenas o `<nav>` interno seja o container de rolagem (padrão correto para sidebar com header fixo + nav rolante).
+**Nova tabela `enfermagem_recursos`** (salas/recursos de enfermagem)
+- `nome`, `cor`, `descricao`, `duracao_padrao_min`, `ativo`, `clinica_id`
+- RLS: leitura para membros da clínica; gestão para admin/gestor
 
-Antes:
-```tsx
-className={`${collapsed ? "w-16" : "w-64"} transition-all duration-200 shrink-0 text-white h-screen overflow-y-auto flex flex-col`}
-```
+**Nova tabela `enfermagem_recurso_procedimentos`** (quais exames cada recurso faz)
+- `recurso_id`, `procedimento_id`
 
-Depois:
-```tsx
-className={`${collapsed ? "w-16" : "w-64"} transition-all duration-200 shrink-0 text-white h-screen overflow-hidden flex flex-col`}
-```
+**Nova tabela `enfermagem_recurso_disponibilidades`** (horários da sala)
+- mesmo modelo de `disponibilidades` dos médicos
 
-Com `min-h-0` implícito pelo `flex-1` do nav já correto, o nav passa a ter altura limitada e a rolagem flui normalmente.
+**Alterações em `agendamentos`:**
+- `medico_id` continua opcional (já é nullable)
+- Adicionar `enfermagem_recurso_id uuid` (FK opcional)
+- Adicionar `executado_por uuid` (user_id do enfermeiro que iniciou/finalizou)
+- Adicionar `executado_em timestamptz`
+- Constraint: ou `medico_id` ou `enfermagem_recurso_id` preenchido (não os dois)
 
-## Verificação
+## Mudanças no app
 
-- Abrir o app, expandir vários grupos do menu até passar da altura da tela
-- Rolar com a roda do mouse dentro do menu — deve rolar suave, sem travar
-- Trocar de rota — o item ativo continua sendo trazido para a área visível, sem "pular"
-- Testar com menu colapsado e expandido
+**Nova tela "Enfermagem → Recursos"** (`/app/enfermagem-recursos`)
+- CRUD de salas/recursos
+- Seleção de procedimentos vinculados (multi-select alfabético, igual médicos)
+- Configuração de horários de funcionamento
+
+**Agenda (`/app/agenda`)**
+- Filtro/seletor passa a listar Médicos + Recursos de Enfermagem (agrupados)
+- Coluna de recurso renderiza igual coluna de médico
+- Ao agendar, se for recurso de enfermagem grava `enfermagem_recurso_id` em vez de `medico_id`
+- Procedimentos disponíveis vêm dos vinculados ao recurso
+
+**Atendimento / Fluxo**
+- Botão "Iniciar atendimento" em agendamento de enfermagem grava `executado_por = auth.uid()` e `executado_em = now()`
+- Exibe nome do enfermeiro executor no card do agendamento
+
+**Permissões**
+- Papéis `enfermeiro`, `recepcao`, `admin`, `gestor` veem e editam agendas de enfermagem
+- Realtime já habilitado em `agendamentos` propaga mudanças automaticamente
+
+**Seed inicial**
+- Criar automaticamente os 5 recursos informados ao rodar a migração: "EXAME DE ELETROCARDIOGRAMA", "EXAME DE MAPA 24H", "EXAME DE HOLTER", "EXAME DE ITB", "SALA ENFERMAGEM" — apenas como sugestão, podem ser editados/removidos.
+
+## Fora do escopo desta entrega
+
+- Relatórios de produtividade por enfermeiro (fica para depois, dados já ficam gravados)
+- Repasse financeiro para enfermagem
+- Bloqueio de horários por enfermeiro individual
+
+## Detalhes técnicos
+
+- Reuso de `procedimentos` e `medico_procedimentos` é mantido para médicos; criamos tabelas paralelas para enfermagem para não misturar contextos.
+- Componente `procedimento-cell.tsx` ganha suporte a `enfermagem_recurso_id`.
+- `app.agenda.tsx`: a query de "colunas" passa a unir médicos ativos + recursos de enfermagem ativos.
+- Validações Zod nas server functions novas (`enfermagem.functions.ts`).
+- Triggers de auditoria reaproveitam `fn_audit_trigger`.
