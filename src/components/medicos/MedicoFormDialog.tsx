@@ -123,7 +123,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
     return procs.filter((p) => p.grupo && especialidadesSelecionadasNomes.has(normalizarNome(p.grupo)));
   }, [procs, especialidadesSelecionadasNomes]);
 
-  // Auto-adiciona um item em "Convênios / Serviços" (aba Repasse) sempre que um
+  // Auto-adiciona um item em "REPASSE INDIVIDUAL" (aba Repasse) sempre que um
   // serviço for selecionado na aba Especialidades. Não remove nada — cadastros
   // de repasse existentes são preservados para ajuste manual.
   useEffect(() => {
