@@ -23,6 +23,7 @@ export type EnfRecurso = { id: string; nome: string; duracao_padrao_min: number 
 export type EnfDisp = {
   id: string; recurso_id: string; dia_semana: number;
   hora_inicio: string; hora_fim: string; limite_pacientes: number | null;
+  intervalo_min: number | null;
 };
 
 export function useEnfermagemHorariosData() {
@@ -37,7 +38,7 @@ export function useEnfermagemHorariosData() {
         .select("id, nome, duracao_padrao_min")
         .eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("enfermagem_recurso_disponibilidades")
-        .select("id, recurso_id, dia_semana, hora_inicio, hora_fim, limite_pacientes")
+        .select("id, recurso_id, dia_semana, hora_inicio, hora_fim, limite_pacientes, intervalo_min")
         .eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true)
         .order("dia_semana").order("hora_inicio"),
     ]);
@@ -69,8 +70,8 @@ export function EnfermagemGerarAgendaCard() {
       if (isFeriadoOuDomingo(d)) continue;
       const dow = d.getDay();
       for (const r of alvo) {
-        const dur = r.duracao_padrao_min && r.duracao_padrao_min > 0 ? r.duracao_padrao_min : 30;
         const ds = disps.filter((x) => x.recurso_id === r.id && x.dia_semana === dow);
+        const fallbackDur = r.duracao_padrao_min && r.duracao_padrao_min > 0 ? r.duracao_padrao_min : 30;
         const override = gerar.limite_fichas ? parseInt(gerar.limite_fichas) : 0;
         let limiteDia: number;
         if (override > 0) limiteDia = override;
@@ -80,6 +81,7 @@ export function EnfermagemGerarAgendaCard() {
         }
         let criados = 0;
         for (const disp of ds) {
+          const dur = disp.intervalo_min && disp.intervalo_min > 0 ? disp.intervalo_min : fallbackDur;
           const [hi, mi] = disp.hora_inicio.split(":").map(Number);
           const [hf, mf] = disp.hora_fim.split(":").map(Number);
           let cur = hi*60 + mi; const end = hf*60 + mf;
