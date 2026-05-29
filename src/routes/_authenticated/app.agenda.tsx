@@ -1631,9 +1631,17 @@ function AgendaPage() {
               </div>
               <div className="space-y-1">
                 <Label>Serviço</Label>
-                {form.medico_id && (procPorMedico.get(form.medico_id)?.size || procNomesPorMedico.get(form.medico_id)?.size) ? (
-                  <p className="text-xs text-muted-foreground">Mostrando apenas serviços configurados para este médico.</p>
-                ) : null}
+                {form.medico_id ? (
+                  (procPorMedico.get(form.medico_id)?.size || procNomesPorMedico.get(form.medico_id)?.size) ? (
+                    <p className="text-xs text-muted-foreground">Mostrando apenas serviços configurados para este médico.</p>
+                  ) : (
+                    <p className="text-xs text-amber-600">
+                      Este médico não possui serviços cadastrados. Configure-os no cadastro do médico.
+                    </p>
+                  )
+                ) : (
+                  <p className="text-xs text-muted-foreground">Selecione um médico para ver os serviços disponíveis.</p>
+                )}
                 <SearchableSelect
                   value={form.procedimento || "none"}
                   onChange={(v) => setForm(f => ({ ...f, procedimento: v === "none" ? "" : v }))}
@@ -1642,15 +1650,15 @@ function AgendaPage() {
                   options={[
                     { value: "none", label: "— Selecione —" },
                     ...(() => {
+                      if (!form.medico_id) return [];
                       const idsDoMedico = form.medico_id ? procPorMedico.get(form.medico_id) : undefined;
                       const nomesDoMedico = form.medico_id ? procNomesPorMedico.get(form.medico_id) : undefined;
                       const temConfig = (idsDoMedico && idsDoMedico.size > 0) || (nomesDoMedico && nomesDoMedico.size > 0);
-                      const filtrados = temConfig
-                        ? procedimentosList.filter((p) =>
-                            (idsDoMedico?.has(p.id) ?? false) ||
-                            (nomesDoMedico?.has(normalizar(p.nome)) ?? false)
-                          )
-                        : procedimentosList;
+                      if (!temConfig) return [];
+                      const filtrados = procedimentosList.filter((p) =>
+                        (idsDoMedico?.has(p.id) ?? false) ||
+                        (nomesDoMedico?.has(normalizar(p.nome)) ?? false)
+                      );
                       // Deduplicar pelo nome normalizado (evita "CONSULTA" duplicada quando o
                       // procedimento existe tanto na tabela procedimentos quanto em medico_convenios).
                       const vistos = new Set<string>();
