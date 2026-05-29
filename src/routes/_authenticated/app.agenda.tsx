@@ -490,7 +490,7 @@ function AgendaPage() {
     setLoading(true);
     let q = supabase
       .from("agendamentos")
-      .select("id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa")
+      .select("id,paciente_nome,paciente_id,medico_id,enfermagem_recurso_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("inicio", { ascending: false });
     // "agendado" agora significa "qualquer ficha com paciente alocado",
@@ -515,7 +515,13 @@ function AgendaPage() {
     const { data, error } = await q;
     setLoading(false);
     if (error) { toast.error(error.message); return; }
-    setItems((data ?? []) as Agendamento[]);
+    // Recursos de enfermagem aparecem como "médicos virtuais": mapeamos o
+    // enfermagem_recurso_id no campo medico_id para reuso de toda a UI.
+    const mapped = ((data ?? []) as Array<Agendamento & { enfermagem_recurso_id?: string | null }>).map((a) => ({
+      ...a,
+      medico_id: a.medico_id ?? a.enfermagem_recurso_id ?? null,
+    }));
+    setItems(mapped as Agendamento[]);
     setPage(1);
     setSelecionados(new Set());
     setEtapaMap(new Map(((data ?? []) as Array<{ id: string; fluxo_etapa?: string | null }>)
