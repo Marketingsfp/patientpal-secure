@@ -1124,7 +1124,7 @@ function AgendaPage() {
       || editing.medico_id !== form.medico_id
       || new Date(editing.inicio).getTime() !== new Date(form.inicio).getTime()
       || new Date(editing.fim).getTime() !== new Date(form.fim).getTime();
-    if (form.medico_id && mudouHorarioOuMedico) {
+    if (form.medico_id && mudouHorarioOuMedico && !recursoIds.has(form.medico_id)) {
       const di = new Date(form.inicio);
       const df = new Date(form.fim);
       const inicioDia = new Date(di.getFullYear(), di.getMonth(), di.getDate(), 0, 0, 0).toISOString();
@@ -1163,11 +1163,13 @@ function AgendaPage() {
       return;
     }
     setSaving(true);
+    const ehRecurso = !!form.medico_id && recursoIds.has(form.medico_id);
     const payload = {
       clinica_id: clinicaAtual.clinica_id,
       paciente_nome: form.paciente_nome.trim(),
       paciente_id: form.paciente_id || null,
-      medico_id: form.medico_id || null,
+      medico_id: ehRecurso ? null : (form.medico_id || null),
+      enfermagem_recurso_id: ehRecurso ? form.medico_id : null,
       inicio: new Date(form.inicio).toISOString(),
       fim: new Date(form.fim).toISOString(),
       procedimento: form.procedimento.trim() || null,
