@@ -12,7 +12,7 @@ import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -397,13 +397,16 @@ function ProcedimentosPage() {
   const filtrados = useMemo(() => {
     const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
     const q = norm(buscaAplicada.trim());
+    const tipoEffective = tab === "consultas" ? "consulta" : tipoAplicado;
     return items.filter(p => {
-      if (tipoAplicado !== "todos" && p.tipo !== tipoAplicado) return false;
+      if (tab === "consultas") {
+        if (norm(p.tipo ?? "") !== "consulta") return false;
+      } else if (tipoEffective !== "todos" && p.tipo !== tipoEffective) return false;
       if (grupoAplicado !== "todos" && norm(p.grupo ?? "") !== norm(grupoAplicado)) return false;
       if (q && !norm(p.nome).includes(q) && !norm(p.codigo ?? "").includes(q) && !norm(p.grupo ?? "").includes(q)) return false;
       return true;
     });
-  }, [items, buscaAplicada, tipoAplicado, grupoAplicado]);
+  }, [items, buscaAplicada, tipoAplicado, grupoAplicado, tab]);
 
   const ordenados = useMemo(() => {
     if (!sort) return filtrados;
@@ -617,10 +620,11 @@ function ProcedimentosPage() {
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="procedimentos">Serviço</TabsTrigger>
+          <TabsTrigger value="consultas">Consultas</TabsTrigger>
         </TabsList>
 
         {/* ============ PROCEDIMENTOS ============ */}
-        <TabsContent value="procedimentos" className="space-y-4 pt-4 pb-16">
+        <div className="space-y-4 pt-4 pb-16">
           <div className="flex flex-wrap gap-2 justify-end">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -803,7 +807,7 @@ function ProcedimentosPage() {
               </div>
             </div>
           )}
-        </TabsContent>
+        </div>
 
       </Tabs>
 
