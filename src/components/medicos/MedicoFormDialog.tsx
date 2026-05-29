@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -107,6 +107,23 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
   const [novaSenha, setNovaSenha] = useState("");
   const [confirmarSenha, setConfirmarSenha] = useState("");
   const [savingSenha, setSavingSenha] = useState(false);
+
+  const normalizarNome = (s: string) =>
+    s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase();
+
+  const especialidadesSelecionadasNomes = useMemo(() => {
+    const nomes = new Set<string>();
+    for (const er of form.especialidades) {
+      const esp = esps.find((e) => e.id === er.especialidade_id);
+      if (esp?.nome) nomes.add(normalizarNome(esp.nome));
+    }
+    return nomes;
+  }, [form.especialidades, esps]);
+
+  const procsFiltradosPorEspecialidade = useMemo(() => {
+    if (especialidadesSelecionadasNomes.size === 0) return [] as Procedimento[];
+    return procs.filter((p) => p.grupo && especialidadesSelecionadasNomes.has(normalizarNome(p.grupo)));
+  }, [procs, especialidadesSelecionadasNomes]);
 
   // Load reference data
   useEffect(() => {
@@ -676,18 +693,23 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                   <div className="flex items-center justify-between">
                     <div>
                       <Label className="text-sm font-medium">Serviços</Label>
-                      <p className="text-xs text-muted-foreground">Adicione os serviços que o médico realiza (cadastrados no menu "Serviços").</p>
+                      <p className="text-xs text-muted-foreground">Adicione os serviços que o médico realiza. A lista mostra apenas serviços das especialidades selecionadas.</p>
                     </div>
                     <Button
                       type="button"
                       size="sm"
                       variant="outline"
+                      disabled={especialidadesSelecionadasNomes.size === 0 || procsFiltradosPorEspecialidade.length === 0}
                       onClick={() => setForm({ ...form, procedimentos: [...form.procedimentos, ""] })}
                     >
                       <Plus className="h-4 w-4 mr-1" /> Adicionar serviço
                     </Button>
                   </div>
-                  {procs.length === 0 ? (
+                  {especialidadesSelecionadasNomes.size === 0 ? (
+                    <p className="text-xs text-muted-foreground">Selecione ao menos uma especialidade na seção acima para ver os serviços disponíveis.</p>
+                  ) : procsFiltradosPorEspecialidade.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">Nenhum serviço cadastrado para as especialidades selecionadas.</p>
+                  ) : procs.length === 0 ? (
                     <p className="text-xs text-muted-foreground">Nenhum serviço cadastrado na clínica.</p>
                   ) : form.procedimentos.length === 0 ? (
                     <p className="text-xs text-muted-foreground">Nenhum serviço selecionado.</p>
@@ -696,7 +718,17 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                       {form.procedimentos.map((pid, idx) => (
                         <div key={idx} className="grid grid-cols-[1fr_auto] gap-2 items-center">
                           <SearchableSelect
-                            options={procs.map((p) => ({ value: p.id, label: p.grupo ? `${p.nome} (${p.grupo})` : p.nome }))}
+                            options={(() => {
+                              const base = [...procsFiltradosPorEspecialidade];
+                              // garante que serviços já selecionados (mesmo fora da especialidade) apareçam com rótulo
+                              for (const selId of form.procedimentos) {
+                                if (!selId) continue;
+                                if (base.some((p) => p.id === selId)) continue;
+                                const extra = procs.find((p) => p.id === selId);
+                                if (extra) base.push(extra);
+                              }
+                              return base.map((p) => ({ value: p.id, label: p.grupo ? `${p.nome} (${p.grupo})` : p.nome }));
+                            })()}
                             value={pid}
                             onChange={(v) => {
                               if (v && form.procedimentos.some((x, i) => i !== idx && x === v)) {
