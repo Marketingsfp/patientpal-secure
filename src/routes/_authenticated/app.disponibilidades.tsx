@@ -226,7 +226,7 @@ function Page() {
             <CardContent className="py-4 space-y-3">
               <div className="flex items-center gap-2">
                 <CalendarRange className="h-5 w-5 text-primary" />
-                <h2 className="font-semibold">Gerar agenda</h2>
+                <h2 className="font-semibold">Gerar agenda - Médicos</h2>
               </div>
               <p className="text-xs text-muted-foreground">
                 Cria automaticamente slots de horários disponíveis com base na disponibilidade semanal dos médicos.
