@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { EnfermagemGerarAgendaCard, EnfermagemRecursosHorariosEditor } from "@/components/enfermagem-horarios-parts";
 
 export const Route = createFileRoute("/_authenticated/app/disponibilidades")({
   component: Page,
@@ -219,6 +220,7 @@ function Page() {
         <TabsList>
           <TabsTrigger value="agendas">Agendas</TabsTrigger>
           <TabsTrigger value="medicos">Médicos</TabsTrigger>
+          <TabsTrigger value="enfermagem">Enfermagem</TabsTrigger>
         </TabsList>
 
         <TabsContent value="agendas" className="space-y-6">
@@ -274,6 +276,8 @@ function Page() {
               )}
             </CardContent>
           </Card>
+
+          <EnfermagemGerarAgendaCard />
         </TabsContent>
 
         <TabsContent value="medicos" className="space-y-6">
