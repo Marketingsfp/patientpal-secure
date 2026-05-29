@@ -753,7 +753,14 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                     <p className="text-xs text-muted-foreground">Nenhum serviço selecionado.</p>
                   ) : (
                     <div className="space-y-2">
-                      {form.procedimentos.map((pid, idx) => (
+                      {form.procedimentos
+                        .map((pid, idx) => {
+                          const p = procs.find((pp) => pp.id === pid);
+                          const label = p ? (p.grupo ? `${p.nome} (${p.grupo})` : p.nome) : "";
+                          return { pid, idx, label };
+                        })
+                        .sort((a, b) => a.label.localeCompare(b.label, "pt-BR", { sensitivity: "base" }))
+                        .map(({ pid, idx }) => (
                         <div key={idx} className="grid grid-cols-[1fr_auto] gap-2 items-center">
                           <SearchableSelect
                             options={(() => {
