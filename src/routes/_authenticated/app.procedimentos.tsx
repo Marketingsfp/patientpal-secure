@@ -624,7 +624,7 @@ function ProcedimentosPage() {
         </TabsList>
 
         {/* ============ PROCEDIMENTOS ============ */}
-        <TabsContent value="procedimentos" className="space-y-4 pt-4 pb-16">
+        <div className="space-y-4 pt-4 pb-16">
           <div className="flex flex-wrap gap-2 justify-end">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -807,7 +807,7 @@ function ProcedimentosPage() {
               </div>
             </div>
           )}
-        </TabsContent>
+        </div>
 
       </Tabs>
 
