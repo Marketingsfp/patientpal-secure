@@ -31,7 +31,7 @@ import { ProcedimentoCell } from "@/components/agenda/procedimento-cell";
 import { PatientSearchInput } from "@/components/patient-search-input";
 import {
   CalendarDays, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X,
-  MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, Clock, DollarSign, ShieldCheck, BadgeCheck, IdCard,
+  MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, Clock, DollarSign, ShieldCheck, BadgeCheck, IdCard, Play,
 } from "lucide-react";
 import { printGuiaAtendimento, printGuiaAtendimentoAgrupada } from "@/lib/print-gr";
 import { VoiceInput } from "@/components/voice-input";
@@ -1254,6 +1254,22 @@ function AgendaPage() {
     if (error) toast.error(error.message); else await load();
   };
 
+  const iniciarAtendimentoEnf = async (a: Agendamento) => {
+    const uid = (await supabase.auth.getUser()).data.user?.id;
+    if (!uid) { toast.error("Sessão expirada"); return; }
+    const { error } = await supabase
+      .from("agendamentos")
+      .update({
+        status: "realizado",
+        executado_por: uid,
+        executado_em: new Date().toISOString(),
+      } as never)
+      .eq("id", a.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Atendimento iniciado e registrado");
+    await load();
+  };
+
   const cobrarAgendamento = async (a: Agendamento) => {
     if (!clinicaAtual) return;
     if (pagosSet.has(a.id)) {
@@ -2345,6 +2361,14 @@ function AgendaPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => openEdit(a)}><Pencil className="h-4 w-4 mr-2" /> Editar</DropdownMenuItem>
+                        {a.medico_id && recursoIds.has(a.medico_id) && a.paciente_nome !== "DISPONÍVEL" && (
+                          <DropdownMenuItem
+                            onClick={() => iniciarAtendimentoEnf(a)}
+                            disabled={a.status === "realizado"}
+                          >
+                            <Play className="h-4 w-4 mr-2" /> Iniciar atendimento
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem
                           onClick={() => iniciarReagendamento(a)}
                           disabled={a.status === "realizado"}
