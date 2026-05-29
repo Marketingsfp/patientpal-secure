@@ -65,6 +65,7 @@ import { Route as AuthenticatedAppExamesResultadosRouteImport } from './routes/_
 import { Route as AuthenticatedAppEstoqueRouteImport } from './routes/_authenticated/app.estoque'
 import { Route as AuthenticatedAppEspecialidadesRouteImport } from './routes/_authenticated/app.especialidades'
 import { Route as AuthenticatedAppEquipeRouteImport } from './routes/_authenticated/app.equipe'
+import { Route as AuthenticatedAppEnfermagemRecursosRouteImport } from './routes/_authenticated/app.enfermagem-recursos'
 import { Route as AuthenticatedAppDocumentosRouteImport } from './routes/_authenticated/app.documentos'
 import { Route as AuthenticatedAppDisponibilidadesRouteImport } from './routes/_authenticated/app.disponibilidades'
 import { Route as AuthenticatedAppCrmRouteImport } from './routes/_authenticated/app.crm'
@@ -418,6 +419,12 @@ const AuthenticatedAppEquipeRoute = AuthenticatedAppEquipeRouteImport.update({
   path: '/equipe',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
+const AuthenticatedAppEnfermagemRecursosRoute =
+  AuthenticatedAppEnfermagemRecursosRouteImport.update({
+    id: '/enfermagem-recursos',
+    path: '/enfermagem-recursos',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppDocumentosRoute =
   AuthenticatedAppDocumentosRouteImport.update({
     id: '/documentos',
@@ -735,6 +742,7 @@ export interface FileRoutesByFullPath {
   '/app/crm': typeof AuthenticatedAppCrmRoute
   '/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
   '/app/documentos': typeof AuthenticatedAppDocumentosRoute
+  '/app/enfermagem-recursos': typeof AuthenticatedAppEnfermagemRecursosRoute
   '/app/equipe': typeof AuthenticatedAppEquipeRouteWithChildren
   '/app/especialidades': typeof AuthenticatedAppEspecialidadesRoute
   '/app/estoque': typeof AuthenticatedAppEstoqueRoute
@@ -838,6 +846,7 @@ export interface FileRoutesByTo {
   '/app/crm': typeof AuthenticatedAppCrmRoute
   '/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
   '/app/documentos': typeof AuthenticatedAppDocumentosRoute
+  '/app/enfermagem-recursos': typeof AuthenticatedAppEnfermagemRecursosRoute
   '/app/especialidades': typeof AuthenticatedAppEspecialidadesRoute
   '/app/estoque': typeof AuthenticatedAppEstoqueRoute
   '/app/exames-resultados': typeof AuthenticatedAppExamesResultadosRoute
@@ -943,6 +952,7 @@ export interface FileRoutesById {
   '/_authenticated/app/crm': typeof AuthenticatedAppCrmRoute
   '/_authenticated/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
   '/_authenticated/app/documentos': typeof AuthenticatedAppDocumentosRoute
+  '/_authenticated/app/enfermagem-recursos': typeof AuthenticatedAppEnfermagemRecursosRoute
   '/_authenticated/app/equipe': typeof AuthenticatedAppEquipeRouteWithChildren
   '/_authenticated/app/especialidades': typeof AuthenticatedAppEspecialidadesRoute
   '/_authenticated/app/estoque': typeof AuthenticatedAppEstoqueRoute
@@ -1050,6 +1060,7 @@ export interface FileRouteTypes {
     | '/app/crm'
     | '/app/disponibilidades'
     | '/app/documentos'
+    | '/app/enfermagem-recursos'
     | '/app/equipe'
     | '/app/especialidades'
     | '/app/estoque'
@@ -1153,6 +1164,7 @@ export interface FileRouteTypes {
     | '/app/crm'
     | '/app/disponibilidades'
     | '/app/documentos'
+    | '/app/enfermagem-recursos'
     | '/app/especialidades'
     | '/app/estoque'
     | '/app/exames-resultados'
@@ -1257,6 +1269,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/crm'
     | '/_authenticated/app/disponibilidades'
     | '/_authenticated/app/documentos'
+    | '/_authenticated/app/enfermagem-recursos'
     | '/_authenticated/app/equipe'
     | '/_authenticated/app/especialidades'
     | '/_authenticated/app/estoque'
@@ -1743,6 +1756,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppEquipeRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/app/enfermagem-recursos': {
+      id: '/_authenticated/app/enfermagem-recursos'
+      path: '/enfermagem-recursos'
+      fullPath: '/app/enfermagem-recursos'
+      preLoaderRoute: typeof AuthenticatedAppEnfermagemRecursosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/app/documentos': {
       id: '/_authenticated/app/documentos'
       path: '/documentos'
@@ -2217,6 +2237,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppCrmRoute: typeof AuthenticatedAppCrmRoute
   AuthenticatedAppDisponibilidadesRoute: typeof AuthenticatedAppDisponibilidadesRoute
   AuthenticatedAppDocumentosRoute: typeof AuthenticatedAppDocumentosRoute
+  AuthenticatedAppEnfermagemRecursosRoute: typeof AuthenticatedAppEnfermagemRecursosRoute
   AuthenticatedAppEquipeRoute: typeof AuthenticatedAppEquipeRouteWithChildren
   AuthenticatedAppEspecialidadesRoute: typeof AuthenticatedAppEspecialidadesRoute
   AuthenticatedAppEstoqueRoute: typeof AuthenticatedAppEstoqueRoute
@@ -2284,6 +2305,8 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppCrmRoute: AuthenticatedAppCrmRoute,
   AuthenticatedAppDisponibilidadesRoute: AuthenticatedAppDisponibilidadesRoute,
   AuthenticatedAppDocumentosRoute: AuthenticatedAppDocumentosRoute,
+  AuthenticatedAppEnfermagemRecursosRoute:
+    AuthenticatedAppEnfermagemRecursosRoute,
   AuthenticatedAppEquipeRoute: AuthenticatedAppEquipeRouteWithChildren,
   AuthenticatedAppEspecialidadesRoute: AuthenticatedAppEspecialidadesRoute,
   AuthenticatedAppEstoqueRoute: AuthenticatedAppEstoqueRoute,
