@@ -827,32 +827,34 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>Tipo de repasse</Label>
-                  <div className="flex gap-4 text-sm">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="radio" name="tipo_repasse" checked={form.tipo_repasse === "percentual"}
-                        onChange={() => setForm({ ...form, tipo_repasse: "percentual" })} />
-                      Percentual (%)
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="radio" name="tipo_repasse" checked={form.tipo_repasse === "valor"}
-                        onChange={() => setForm({ ...form, tipo_repasse: "valor" })} />
-                      Valor fixo (R$)
-                    </label>
+                  <Label>Repasse padrão</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Usado quando o serviço abaixo não tem tipo/valor preenchido.
+                  </p>
+                  <div className="grid grid-cols-[1fr_1fr] gap-2">
+                    <select
+                      className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                      value={form.tipo_repasse}
+                      onChange={(e) => setForm({ ...form, tipo_repasse: e.target.value as "percentual" | "valor" })}
+                    >
+                      <option value="percentual">% Percentual</option>
+                      <option value="valor">R$ Valor</option>
+                    </select>
+                    {form.tipo_repasse === "percentual" ? (
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={0.01}
+                        placeholder="% repasse"
+                        value={form.percentual}
+                        onChange={(e) => setForm({ ...form, percentual: e.target.value })}
+                      />
+                    ) : (
+                      <CurrencyInput value={form.valor} onChange={(v) => setForm({ ...form, valor: v })} />
+                    )}
                   </div>
                 </div>
-                {form.tipo_repasse === "percentual" ? (
-                  <div className="space-y-2">
-                    <Label>% repasse padrão</Label>
-                    <Input type="number" min={0} max={100} step={0.01} value={form.percentual}
-                      onChange={(e) => setForm({ ...form, percentual: e.target.value })} />
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <Label>Valor repasse padrão (R$)</Label>
-                    <CurrencyInput value={form.valor} onChange={(v) => setForm({ ...form, valor: v })} />
-                  </div>
-                )}
                 <div className="pt-4 border-t space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
