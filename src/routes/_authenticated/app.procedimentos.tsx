@@ -975,17 +975,10 @@ function ProcedimentosPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label>Duração (min)</Label>
-                <Input type="number" min="0" value={form.duracao_minutos}
-                  onChange={(e) => setForm({ ...form, duracao_minutos: e.target.value })} />
-              </div>
-              <label className="flex items-end gap-2 text-sm cursor-pointer pb-2">
-                <Checkbox checked={form.ativo} onCheckedChange={(v) => setForm({ ...form, ativo: !!v })} />
-                Ativo
-              </label>
-            </div>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <Checkbox checked={form.ativo} onCheckedChange={(v) => setForm({ ...form, ativo: !!v })} />
+              Ativo
+            </label>
             <div className="space-y-1">
               <Label>Observações</Label>
               <Textarea rows={2} value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} />
