@@ -363,11 +363,15 @@ function Page() {
                       <label className="text-xs text-muted-foreground">Pacientes/dia</label>
                       <Input type="number" min={1} placeholder="sem limite" className="w-32" value={novo.limite_pacientes} onChange={(e) => setNovo({ ...novo, limite_pacientes: e.target.value })} />
                     </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Intervalo (min)</label>
+                      <Input type="number" min={1} max={480} placeholder="padrão do médico" className="w-36" value={novo.intervalo_min} onChange={(e) => setNovo({ ...novo, intervalo_min: e.target.value })} />
+                    </div>
                     <Button onClick={() => { setNovo({ ...novo, medico_id: m.id }); void adicionar(); }}>
                       {dispEditando ? (<><Pencil className="h-4 w-4 mr-1" /> Salvar</>) : (<><Plus className="h-4 w-4 mr-1" /> Adicionar</>)}
                     </Button>
                     {dispEditando ? (
-                      <Button variant="ghost" onClick={() => { setDispEditando(null); setNovo({ ...novo, dia_semana: "1", hora_inicio: "08:00", hora_fim: "12:00", limite_pacientes: "" }); }}>
+                      <Button variant="ghost" onClick={() => { setDispEditando(null); setNovo({ ...novo, dia_semana: "1", hora_inicio: "08:00", hora_fim: "12:00", limite_pacientes: "", intervalo_min: "" }); }}>
                         Cancelar
                       </Button>
                     ) : null}
@@ -386,6 +390,7 @@ function Page() {
                             <TableHead>Início</TableHead>
                             <TableHead>Fim</TableHead>
                             <TableHead>Pacientes/dia</TableHead>
+                            <TableHead>Intervalo</TableHead>
                             <TableHead className="w-28 text-right">Ações</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -396,6 +401,7 @@ function Page() {
                               <TableCell>{d.hora_inicio.slice(0, 5)}</TableCell>
                               <TableCell>{d.hora_fim.slice(0, 5)}</TableCell>
                               <TableCell>{d.limite_pacientes ?? <span className="text-muted-foreground">—</span>}</TableCell>
+                              <TableCell>{d.intervalo_min ? `${d.intervalo_min} min` : <span className="text-muted-foreground">—</span>}</TableCell>
                               <TableCell className="text-right">
                                 <div className="flex justify-end gap-2">
                                   <button
@@ -407,6 +413,7 @@ function Page() {
                                         hora_inicio: d.hora_inicio.slice(0, 5),
                                         hora_fim: d.hora_fim.slice(0, 5),
                                         limite_pacientes: d.limite_pacientes ? String(d.limite_pacientes) : "",
+                                        intervalo_min: d.intervalo_min ? String(d.intervalo_min) : "",
                                       });
                                     }}
                                     className="text-primary hover:opacity-70"
