@@ -2177,6 +2177,7 @@ export type Database = {
           hora_fim: string
           hora_inicio: string
           id: string
+          intervalo_min: number | null
           limite_pacientes: number | null
           observacoes: string | null
           recurso_id: string
@@ -2190,6 +2191,7 @@ export type Database = {
           hora_fim: string
           hora_inicio: string
           id?: string
+          intervalo_min?: number | null
           limite_pacientes?: number | null
           observacoes?: string | null
           recurso_id: string
@@ -2203,6 +2205,7 @@ export type Database = {
           hora_fim?: string
           hora_inicio?: string
           id?: string
+          intervalo_min?: number | null
           limite_pacientes?: number | null
           observacoes?: string | null
           recurso_id?: string
@@ -3984,6 +3987,7 @@ export type Database = {
           hora_fim: string
           hora_inicio: string
           id: string
+          intervalo_min: number | null
           limite_pacientes: number | null
           medico_id: string
           observacoes: string | null
@@ -3997,6 +4001,7 @@ export type Database = {
           hora_fim: string
           hora_inicio: string
           id?: string
+          intervalo_min?: number | null
           limite_pacientes?: number | null
           medico_id: string
           observacoes?: string | null
@@ -4010,6 +4015,7 @@ export type Database = {
           hora_fim?: string
           hora_inicio?: string
           id?: string
+          intervalo_min?: number | null
           limite_pacientes?: number | null
           medico_id?: string
           observacoes?: string | null

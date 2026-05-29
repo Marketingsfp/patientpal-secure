@@ -38,7 +38,7 @@ function isFeriadoOuDomingo(d: Date): boolean {
   return FERIADOS_FIXOS.has(mmdd);
 }
 
-interface Disp { id: string; medico_id: string; dia_semana: number; hora_inicio: string; hora_fim: string; observacoes: string | null; limite_pacientes: number | null }
+interface Disp { id: string; medico_id: string; dia_semana: number; hora_inicio: string; hora_fim: string; observacoes: string | null; limite_pacientes: number | null; intervalo_min: number | null }
 interface Medico { id: string; nome: string; duracao_consulta_min: number | null }
 
 function Page() {
@@ -46,7 +46,7 @@ function Page() {
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [disps, setDisps] = useState<Disp[]>([]);
   const [filtro, setFiltro] = useState("");
-  const [novo, setNovo] = useState({ medico_id: "", dia_semana: "1", hora_inicio: "08:00", hora_fim: "12:00", limite_pacientes: "" });
+  const [novo, setNovo] = useState({ medico_id: "", dia_semana: "1", hora_inicio: "08:00", hora_fim: "12:00", limite_pacientes: "", intervalo_min: "" });
   const hojeIso = new Date().toISOString().slice(0, 10);
   const em30Iso = (() => { const d = new Date(); d.setDate(d.getDate() + 29); return d.toISOString().slice(0, 10); })();
   const [gerar, setGerar] = useState({ medico_id: "all", dias: "30", data_inicio: hojeIso, data_fim: em30Iso, limite_fichas: "" });
@@ -58,7 +58,7 @@ function Page() {
     if (!clinicaAtual) return;
     const [m, d] = await Promise.all([
       supabase.from("medicos").select("id, nome, duracao_consulta_min").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
-      supabase.from("medico_disponibilidades").select("id, medico_id, dia_semana, hora_inicio, hora_fim, observacoes, limite_pacientes" as never).eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("dia_semana").order("hora_inicio"),
+      supabase.from("medico_disponibilidades").select("id, medico_id, dia_semana, hora_inicio, hora_fim, observacoes, limite_pacientes, intervalo_min" as never).eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("dia_semana").order("hora_inicio"),
     ]);
     setMedicos(((m.data as unknown) as Medico[]) ?? []);
     setDisps(((d.data as unknown) as Disp[]) ?? []);
@@ -104,6 +104,7 @@ function Page() {
       hora_inicio: novo.hora_inicio,
       hora_fim: novo.hora_fim,
       limite_pacientes: novo.limite_pacientes ? parseInt(novo.limite_pacientes) : null,
+      intervalo_min: novo.intervalo_min ? parseInt(novo.intervalo_min) : null,
     };
     if (dispEditando) {
       const { error } = await supabase.from("medico_disponibilidades").update(payload as never).eq("id", dispEditando);
@@ -138,8 +139,8 @@ function Page() {
       if (isFeriadoOuDomingo(d)) continue;
       const dow = d.getDay();
       for (const m of alvo) {
-        const dur = m.duracao_consulta_min && m.duracao_consulta_min > 0 ? m.duracao_consulta_min : 15;
         const ds = disps.filter((x) => x.medico_id === m.id && x.dia_semana === dow);
+        const fallbackDur = m.duracao_consulta_min && m.duracao_consulta_min > 0 ? m.duracao_consulta_min : 15;
         // Limite diário: override manual do formulário; senão soma das janelas cadastradas
         const overrideLimite = gerar.limite_fichas ? parseInt(gerar.limite_fichas) : 0;
         let limiteDia: number;
@@ -151,6 +152,7 @@ function Page() {
         }
         let criadosNoDia = 0;
         for (const disp of ds) {
+          const dur = disp.intervalo_min && disp.intervalo_min > 0 ? disp.intervalo_min : fallbackDur;
           const [hi, mi] = disp.hora_inicio.split(":").map(Number);
           const [hf, mf] = disp.hora_fim.split(":").map(Number);
           let cur = hi * 60 + mi;
@@ -361,11 +363,15 @@ function Page() {
                       <label className="text-xs text-muted-foreground">Pacientes/dia</label>
                       <Input type="number" min={1} placeholder="sem limite" className="w-32" value={novo.limite_pacientes} onChange={(e) => setNovo({ ...novo, limite_pacientes: e.target.value })} />
                     </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Intervalo (min)</label>
+                      <Input type="number" min={1} max={480} placeholder="padrão do médico" className="w-36" value={novo.intervalo_min} onChange={(e) => setNovo({ ...novo, intervalo_min: e.target.value })} />
+                    </div>
                     <Button onClick={() => { setNovo({ ...novo, medico_id: m.id }); void adicionar(); }}>
                       {dispEditando ? (<><Pencil className="h-4 w-4 mr-1" /> Salvar</>) : (<><Plus className="h-4 w-4 mr-1" /> Adicionar</>)}
                     </Button>
                     {dispEditando ? (
-                      <Button variant="ghost" onClick={() => { setDispEditando(null); setNovo({ ...novo, dia_semana: "1", hora_inicio: "08:00", hora_fim: "12:00", limite_pacientes: "" }); }}>
+                      <Button variant="ghost" onClick={() => { setDispEditando(null); setNovo({ ...novo, dia_semana: "1", hora_inicio: "08:00", hora_fim: "12:00", limite_pacientes: "", intervalo_min: "" }); }}>
                         Cancelar
                       </Button>
                     ) : null}
@@ -384,6 +390,7 @@ function Page() {
                             <TableHead>Início</TableHead>
                             <TableHead>Fim</TableHead>
                             <TableHead>Pacientes/dia</TableHead>
+                            <TableHead>Intervalo</TableHead>
                             <TableHead className="w-28 text-right">Ações</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -394,6 +401,7 @@ function Page() {
                               <TableCell>{d.hora_inicio.slice(0, 5)}</TableCell>
                               <TableCell>{d.hora_fim.slice(0, 5)}</TableCell>
                               <TableCell>{d.limite_pacientes ?? <span className="text-muted-foreground">—</span>}</TableCell>
+                              <TableCell>{d.intervalo_min ? `${d.intervalo_min} min` : <span className="text-muted-foreground">—</span>}</TableCell>
                               <TableCell className="text-right">
                                 <div className="flex justify-end gap-2">
                                   <button
@@ -405,6 +413,7 @@ function Page() {
                                         hora_inicio: d.hora_inicio.slice(0, 5),
                                         hora_fim: d.hora_fim.slice(0, 5),
                                         limite_pacientes: d.limite_pacientes ? String(d.limite_pacientes) : "",
+                                        intervalo_min: d.intervalo_min ? String(d.intervalo_min) : "",
                                       });
                                     }}
                                     className="text-primary hover:opacity-70"
