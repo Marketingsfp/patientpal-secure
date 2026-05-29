@@ -916,6 +916,38 @@ function ProcedimentosPage() {
               </div>
             </div>
 
+            {form.tipo === "consulta" && (
+              <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase">
+                  Especialidades em que esta consulta aparece
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  Marque todas as especialidades que devem listar esta consulta. A especialidade do campo "Especialidade" acima é a principal e já é incluída automaticamente.
+                </p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-56 overflow-y-auto pt-1">
+                  {especialidades.length === 0 && (
+                    <p className="col-span-full text-xs text-muted-foreground">Nenhuma especialidade cadastrada.</p>
+                  )}
+                  {especialidades.map(e => {
+                    const checked = formEspIds.includes(e.id);
+                    return (
+                      <label key={e.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(v) => {
+                            setFormEspIds(prev =>
+                              v ? Array.from(new Set([...prev, e.id])) : prev.filter(x => x !== e.id),
+                            );
+                          }}
+                        />
+                        <span className="truncate">{e.nome}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
               <p className="text-xs font-medium text-muted-foreground uppercase">Valores por forma de pagamento</p>
               <div className="grid grid-cols-2 gap-3">
