@@ -1553,7 +1553,7 @@ function AgendaPage() {
               <Plus className="h-3 w-3 mr-1.5" /> Adicionar Encaixe
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editing
