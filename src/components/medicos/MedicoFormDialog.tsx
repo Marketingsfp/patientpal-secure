@@ -93,8 +93,6 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
 
   const [esps, setEsps] = useState<Especialidade[]>([]);
   const [procs, setProcs] = useState<Procedimento[]>([]);
-  const [procFilter, setProcFilter] = useState("");
-  const [procGrupo, setProcGrupo] = useState<string>("__todos__");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
