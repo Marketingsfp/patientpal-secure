@@ -300,8 +300,6 @@ function AgendaPage() {
   const [procPorMedico, setProcPorMedico] = useState<Map<string, Set<string>>>(new Map());
   const [procOpcoesPorMedico, setProcOpcoesPorMedico] = useState<Map<string, { id: string; nome: string }[]>>(new Map());
   const [procNomesPorMedico, setProcNomesPorMedico] = useState<Map<string, Set<string>>>(new Map());
-  // Ranking de procedimentos mais usados por médico (nome normalizado -> contagem)
-  const [rankingPorMedico, setRankingPorMedico] = useState<Map<string, Map<string, number>>>(new Map());
   const [especialidades, setEspecialidades] = useState<Especialidade[]>([]);
   const [medicoEspec, setMedicoEspec] = useState<Map<string, Set<string>>>(new Map());
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
@@ -652,27 +650,6 @@ function AgendaPage() {
     }
     setProcNomesPorMedico(nm);
 
-    // Ranking de procedimentos mais usados por médico — últimos 180 dias
-    const desde = new Date();
-    desde.setDate(desde.getDate() - 180);
-    const { data: histRows } = await supabase
-      .from("agendamentos")
-      .select("medico_id,procedimento")
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .gte("inicio", desde.toISOString())
-      .not("medico_id", "is", null)
-      .not("procedimento", "is", null)
-      .limit(20000);
-    const rk = new Map<string, Map<string, number>>();
-    for (const r of (histRows ?? []) as Array<{ medico_id: string | null; procedimento: string | null }>) {
-      if (!r.medico_id || !r.procedimento) continue;
-      const k = normalizar(r.procedimento);
-      if (!k || k === "disponivel") continue;
-      if (!rk.has(r.medico_id)) rk.set(r.medico_id, new Map());
-      const mm = rk.get(r.medico_id)!;
-      mm.set(k, (mm.get(k) ?? 0) + 1);
-    }
-    setRankingPorMedico(rk);
   };
 
   useEffect(() => { loadRef(); }, [clinicaAtual?.clinica_id]);
@@ -731,7 +708,9 @@ function AgendaPage() {
   const opcoesProcedimentoMedico = (medicoId: string | null) => {
     if (!medicoId) return [] as { id: string; nome: string }[];
     const opcoesCadastradas = procOpcoesPorMedico.get(medicoId);
-    if (opcoesCadastradas && opcoesCadastradas.length > 0) return opcoesCadastradas;
+    if (opcoesCadastradas && opcoesCadastradas.length > 0) {
+      return [...opcoesCadastradas].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" }));
+    }
     const ids = procPorMedico.get(medicoId);
     const nomes = procNomesPorMedico.get(medicoId);
     const temConfig = (ids && ids.size > 0) || (nomes && nomes.size > 0);
@@ -739,24 +718,7 @@ function AgendaPage() {
     const lista = procedimentosList.filter(
       (p) => (ids?.has(p.id) ?? false) || (nomes?.has(normalizar(p.nome)) ?? false),
     );
-    // Top 10 mais usados (últimos 180 dias) vêm primeiro, na ordem do ranking;
-    // o restante segue em ordem alfabética.
-    const ranking = rankingPorMedico.get(medicoId);
-    if (!ranking || ranking.size === 0) {
-      return lista.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
-    }
-    const score = (n: string) => ranking.get(normalizar(n)) ?? 0;
-    const ordenadosPorUso = [...lista].sort((a, b) => score(b.nome) - score(a.nome));
-    const topNomes = new Set(
-      ordenadosPorUso.filter((p) => score(p.nome) > 0).slice(0, 10).map((p) => normalizar(p.nome)),
-    );
-    const top = lista
-      .filter((p) => topNomes.has(normalizar(p.nome)))
-      .sort((a, b) => score(b.nome) - score(a.nome));
-    const resto = lista
-      .filter((p) => !topNomes.has(normalizar(p.nome)))
-      .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
-    return [...top, ...resto];
+    return lista.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" }));
   };
 
   // Atualiza inline o procedimento de um agendamento (do badge na coluna Serviço)
