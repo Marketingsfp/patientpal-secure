@@ -123,7 +123,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
     return procs.filter((p) => p.grupo && especialidadesSelecionadasNomes.has(normalizarNome(p.grupo)));
   }, [procs, especialidadesSelecionadasNomes]);
 
-  // Auto-adiciona um item em "Convênios / Serviços" (aba Repasse) sempre que um
+  // Auto-adiciona um item em "REPASSE INDIVIDUAL" (aba Repasse) sempre que um
   // serviço for selecionado na aba Especialidades. Não remove nada — cadastros
   // de repasse existentes são preservados para ajuste manual.
   useEffect(() => {
@@ -858,7 +858,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                 <div className="pt-4 border-t space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <Label>Convênios / Serviços</Label>
+                      <Label>REPASSE INDIVIDUAL</Label>
                       <p className="text-xs text-muted-foreground">
                         Os serviços selecionados na aba <b>Especialidades</b> aparecem aqui automaticamente. Defina o tipo e o valor de repasse de cada um. Use "Manual" para adicionar itens avulsos (ex: Cartão Consulta).
                       </p>
