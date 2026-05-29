@@ -5110,6 +5110,49 @@ export type Database = {
         }
         Relationships: []
       }
+      procedimento_especialidades: {
+        Row: {
+          clinica_id: string
+          created_at: string
+          especialidade_id: string
+          procedimento_id: string
+        }
+        Insert: {
+          clinica_id: string
+          created_at?: string
+          especialidade_id: string
+          procedimento_id: string
+        }
+        Update: {
+          clinica_id?: string
+          created_at?: string
+          especialidade_id?: string
+          procedimento_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "procedimento_especialidades_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "procedimento_especialidades_especialidade_id_fkey"
+            columns: ["especialidade_id"]
+            isOneToOne: false
+            referencedRelation: "especialidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "procedimento_especialidades_procedimento_id_fkey"
+            columns: ["procedimento_id"]
+            isOneToOne: false
+            referencedRelation: "procedimentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       procedimento_split_regras: {
         Row: {
           ativo: boolean
