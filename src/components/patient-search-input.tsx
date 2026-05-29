@@ -12,6 +12,7 @@ export interface PatientOption {
   telefone: string | null;
   data_nascimento: string | null;
   clinica_id: string;
+  codigo_prontuario?: string | null;
 }
 
 interface PatientSearchInputProps {
@@ -34,7 +35,7 @@ interface PatientSearchInputProps {
 export function PatientSearchInput({
   value,
   onSelect,
-  placeholder = "Buscar paciente por nome ou CPF…",
+  placeholder = "Buscar paciente por nome, CPF ou prontuário…",
   className,
   autoFocus,
   clinicaIdsOverride,
@@ -64,12 +65,17 @@ export function PatientSearchInput({
     const handle = setTimeout(async () => {
       setLoading(true);
       const digits = term.replace(/\D/g, "");
-      const filter = digits.length >= 3
-        ? `nome.ilike.%${term}%,cpf.ilike.%${digits}%`
-        : `nome.ilike.%${term}%`;
+      const parts: string[] = [`nome.ilike.%${term}%`];
+      if (digits.length >= 3) {
+        parts.push(`cpf.ilike.%${digits}%`);
+        parts.push(`codigo_prontuario.ilike.%${digits}%`);
+      } else if (term.length >= 1) {
+        parts.push(`codigo_prontuario.ilike.%${term}%`);
+      }
+      const filter = parts.join(",");
       const { data } = await supabase
         .from("pacientes")
-        .select("id, nome, cpf, telefone, data_nascimento, clinica_id")
+        .select("id, nome, cpf, telefone, data_nascimento, clinica_id, codigo_prontuario")
         .in("clinica_id", scope)
         .eq("ativo", true)
         .or(filter)
@@ -129,6 +135,11 @@ export function PatientSearchInput({
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
                   <span className="font-medium truncate">{p.nome}</span>
+                  {p.codigo_prontuario && (
+                    <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-muted">
+                      Prontuário {p.codigo_prontuario}
+                    </span>
+                  )}
                   <span className="text-xs text-muted-foreground">
                     CPF: {p.cpf ?? "—"}
                   </span>
