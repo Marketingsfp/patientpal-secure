@@ -824,20 +824,48 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
               </TabsContent>
 
               <TabsContent value="repasse" className="space-y-4 pt-4 pb-16">
-                <div className="rounded-md border p-3 flex items-start gap-3 bg-muted/30">
-                  <Checkbox
-                    id="aceita_cartao_beneficios"
-                    checked={form.aceita_cartao_beneficios}
-                    onCheckedChange={(c) => setForm({ ...form, aceita_cartao_beneficios: c === true })}
-                  />
-                  <div className="space-y-1">
-                    <Label htmlFor="aceita_cartao_beneficios" className="cursor-pointer">
-                      Aceita Cartões Benefícios
-                    </Label>
-                    <p className="text-xs text-muted-foreground">
-                      Quando desmarcado, este médico não aceita os preços/descontos dos cartões benefícios em consultas e exames.
-                    </p>
+                <div className="space-y-3">
+                  <Label>REPASSE CARTÕES BENEFÍCIOS</Label>
+                  <div className="rounded-md border p-3 flex items-start gap-3 bg-muted/30">
+                    <Checkbox
+                      id="aceita_cartao_beneficios"
+                      checked={form.aceita_cartao_beneficios}
+                      onCheckedChange={(c) => setForm({ ...form, aceita_cartao_beneficios: c === true })}
+                    />
+                    <div className="space-y-1">
+                      <Label htmlFor="aceita_cartao_beneficios" className="cursor-pointer">
+                        Aceita Cartões Benefícios
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Quando marcado, este médico aceita os preços/descontos dos cartões benefícios. Defina abaixo o repasse aplicado às <b>consultas</b> pagas com cartão benefício.
+                      </p>
+                    </div>
                   </div>
+                  {form.aceita_cartao_beneficios && (
+                    <div className="grid grid-cols-[1fr_1fr] gap-2">
+                      <select
+                        className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                        value={form.cb_tipo_repasse}
+                        onChange={(e) => setForm({ ...form, cb_tipo_repasse: e.target.value as "percentual" | "valor" })}
+                      >
+                        <option value="percentual">% Percentual</option>
+                        <option value="valor">R$ Valor</option>
+                      </select>
+                      {form.cb_tipo_repasse === "percentual" ? (
+                        <Input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step={0.01}
+                          placeholder="% repasse"
+                          value={form.cb_percentual}
+                          onChange={(e) => setForm({ ...form, cb_percentual: e.target.value })}
+                        />
+                      ) : (
+                        <CurrencyInput value={form.cb_valor} onChange={(v) => setForm({ ...form, cb_valor: v })} />
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>REPASSE PADRÃO</Label>
