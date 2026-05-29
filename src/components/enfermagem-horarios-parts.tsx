@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, CalendarRange, ArrowLeft, Pencil } from "lucide-react";
+import { Plus, Trash2, CalendarRange, ArrowLeft, Pencil, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -171,9 +171,30 @@ export function EnfermagemRecursosHorariosEditor() {
   const [filtro, setFiltro] = useState("");
   const [editandoRecurso, setEditandoRecurso] = useState<string | null>(null);
   const [dispEditando, setDispEditando] = useState<string | null>(null);
+  const [renomeandoId, setRenomeandoId] = useState<string | null>(null);
+  const [novoNome, setNovoNome] = useState("");
+  const [salvandoNome, setSalvandoNome] = useState(false);
   const [novo, setNovo] = useState({
     recurso_id: "", dia_semana: "1", hora_inicio: "08:00", hora_fim: "12:00", limite_pacientes: "",
   });
+
+  const iniciarRename = (id: string, nome: string) => {
+    setRenomeandoId(id);
+    setNovoNome(nome);
+  };
+  const salvarNome = async () => {
+    const nome = novoNome.trim();
+    if (!renomeandoId) return;
+    if (!nome) { toast.error("Informe um nome"); return; }
+    setSalvandoNome(true);
+    const { error } = await supabase.from("enfermagem_recursos")
+      .update({ nome }).eq("id", renomeandoId);
+    setSalvandoNome(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Nome atualizado");
+    setRenomeandoId(null);
+    void reload();
+  };
 
   const adicionar = async () => {
     if (!novo.recurso_id) { toast.error("Selecione um recurso"); return; }
@@ -234,12 +255,42 @@ export function EnfermagemRecursosHorariosEditor() {
                   const ds = disps.filter((d) => d.recurso_id === r.id);
                   return (
                     <TableRow key={r.id}>
-                      <TableCell className="font-medium">{r.nome}</TableCell>
+                      <TableCell className="font-medium">
+                        {renomeandoId === r.id ? (
+                          <div className="flex items-center gap-1">
+                            <Input
+                              autoFocus
+                              value={novoNome}
+                              onChange={(e) => setNovoNome(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") void salvarNome();
+                                if (e.key === "Escape") setRenomeandoId(null);
+                              }}
+                              className="h-8 max-w-sm"
+                            />
+                            <Button size="icon" variant="ghost" disabled={salvandoNome} onClick={() => void salvarNome()}>
+                              <Check className="h-4 w-4" />
+                            </Button>
+                            <Button size="icon" variant="ghost" onClick={() => setRenomeandoId(null)}>
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          r.nome
+                        )}
+                      </TableCell>
                       <TableCell className="text-center text-sm text-muted-foreground">{ds.length}</TableCell>
                       <TableCell className="text-right">
+                        {renomeandoId !== r.id && (
+                          <Button size="sm" variant="ghost" title="Renomear"
+                            onClick={() => iniciarRename(r.id, r.nome)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button size="sm" variant="ghost"
+                          title="Editar horários"
                           onClick={() => { setEditandoRecurso(r.id); setNovo({ ...novo, recurso_id: r.id }); }}>
-                          <Pencil className="h-4 w-4" />
+                          <CalendarRange className="h-4 w-4" />
                         </Button>
                       </TableCell>
                     </TableRow>
