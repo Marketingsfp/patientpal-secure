@@ -111,7 +111,6 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     { to: "/app/especialidades", label: "Serviços", icon: Stethoscope },
     { to: "/app/disponibilidades", label: "Horários médicos", icon: Clock },
     { to: "/app/enfermagem-recursos", label: "Enfermagem — Recursos", icon: HeartPulse },
-    { to: "/app/enfermagem-horarios", label: "Enfermagem — Horários", icon: Clock },
     { to: "/app/prontuario-modelos", label: "Modelos de Prontuário", icon: FileHeart },
     { to: "/app/perfis", label: "Perfis", icon: KeyRound },
     { to: "/app/unidades", label: "Unidades", icon: MapPin },
