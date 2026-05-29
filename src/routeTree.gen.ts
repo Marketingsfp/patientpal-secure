@@ -66,7 +66,6 @@ import { Route as AuthenticatedAppEstoqueRouteImport } from './routes/_authentic
 import { Route as AuthenticatedAppEspecialidadesRouteImport } from './routes/_authenticated/app.especialidades'
 import { Route as AuthenticatedAppEquipeRouteImport } from './routes/_authenticated/app.equipe'
 import { Route as AuthenticatedAppEnfermagemRecursosRouteImport } from './routes/_authenticated/app.enfermagem-recursos'
-import { Route as AuthenticatedAppEnfermagemHorariosRouteImport } from './routes/_authenticated/app.enfermagem-horarios'
 import { Route as AuthenticatedAppDocumentosRouteImport } from './routes/_authenticated/app.documentos'
 import { Route as AuthenticatedAppDisponibilidadesRouteImport } from './routes/_authenticated/app.disponibilidades'
 import { Route as AuthenticatedAppCrmRouteImport } from './routes/_authenticated/app.crm'
@@ -426,12 +425,6 @@ const AuthenticatedAppEnfermagemRecursosRoute =
     path: '/enfermagem-recursos',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
-const AuthenticatedAppEnfermagemHorariosRoute =
-  AuthenticatedAppEnfermagemHorariosRouteImport.update({
-    id: '/enfermagem-horarios',
-    path: '/enfermagem-horarios',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
 const AuthenticatedAppDocumentosRoute =
   AuthenticatedAppDocumentosRouteImport.update({
     id: '/documentos',
@@ -749,7 +742,6 @@ export interface FileRoutesByFullPath {
   '/app/crm': typeof AuthenticatedAppCrmRoute
   '/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
   '/app/documentos': typeof AuthenticatedAppDocumentosRoute
-  '/app/enfermagem-horarios': typeof AuthenticatedAppEnfermagemHorariosRoute
   '/app/enfermagem-recursos': typeof AuthenticatedAppEnfermagemRecursosRoute
   '/app/equipe': typeof AuthenticatedAppEquipeRouteWithChildren
   '/app/especialidades': typeof AuthenticatedAppEspecialidadesRoute
@@ -854,7 +846,6 @@ export interface FileRoutesByTo {
   '/app/crm': typeof AuthenticatedAppCrmRoute
   '/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
   '/app/documentos': typeof AuthenticatedAppDocumentosRoute
-  '/app/enfermagem-horarios': typeof AuthenticatedAppEnfermagemHorariosRoute
   '/app/enfermagem-recursos': typeof AuthenticatedAppEnfermagemRecursosRoute
   '/app/especialidades': typeof AuthenticatedAppEspecialidadesRoute
   '/app/estoque': typeof AuthenticatedAppEstoqueRoute
@@ -961,7 +952,6 @@ export interface FileRoutesById {
   '/_authenticated/app/crm': typeof AuthenticatedAppCrmRoute
   '/_authenticated/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
   '/_authenticated/app/documentos': typeof AuthenticatedAppDocumentosRoute
-  '/_authenticated/app/enfermagem-horarios': typeof AuthenticatedAppEnfermagemHorariosRoute
   '/_authenticated/app/enfermagem-recursos': typeof AuthenticatedAppEnfermagemRecursosRoute
   '/_authenticated/app/equipe': typeof AuthenticatedAppEquipeRouteWithChildren
   '/_authenticated/app/especialidades': typeof AuthenticatedAppEspecialidadesRoute
@@ -1070,7 +1060,6 @@ export interface FileRouteTypes {
     | '/app/crm'
     | '/app/disponibilidades'
     | '/app/documentos'
-    | '/app/enfermagem-horarios'
     | '/app/enfermagem-recursos'
     | '/app/equipe'
     | '/app/especialidades'
@@ -1175,7 +1164,6 @@ export interface FileRouteTypes {
     | '/app/crm'
     | '/app/disponibilidades'
     | '/app/documentos'
-    | '/app/enfermagem-horarios'
     | '/app/enfermagem-recursos'
     | '/app/especialidades'
     | '/app/estoque'
@@ -1281,7 +1269,6 @@ export interface FileRouteTypes {
     | '/_authenticated/app/crm'
     | '/_authenticated/app/disponibilidades'
     | '/_authenticated/app/documentos'
-    | '/_authenticated/app/enfermagem-horarios'
     | '/_authenticated/app/enfermagem-recursos'
     | '/_authenticated/app/equipe'
     | '/_authenticated/app/especialidades'
@@ -1776,13 +1763,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppEnfermagemRecursosRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
-    '/_authenticated/app/enfermagem-horarios': {
-      id: '/_authenticated/app/enfermagem-horarios'
-      path: '/enfermagem-horarios'
-      fullPath: '/app/enfermagem-horarios'
-      preLoaderRoute: typeof AuthenticatedAppEnfermagemHorariosRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
     '/_authenticated/app/documentos': {
       id: '/_authenticated/app/documentos'
       path: '/documentos'
@@ -2257,7 +2237,6 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppCrmRoute: typeof AuthenticatedAppCrmRoute
   AuthenticatedAppDisponibilidadesRoute: typeof AuthenticatedAppDisponibilidadesRoute
   AuthenticatedAppDocumentosRoute: typeof AuthenticatedAppDocumentosRoute
-  AuthenticatedAppEnfermagemHorariosRoute: typeof AuthenticatedAppEnfermagemHorariosRoute
   AuthenticatedAppEnfermagemRecursosRoute: typeof AuthenticatedAppEnfermagemRecursosRoute
   AuthenticatedAppEquipeRoute: typeof AuthenticatedAppEquipeRouteWithChildren
   AuthenticatedAppEspecialidadesRoute: typeof AuthenticatedAppEspecialidadesRoute
@@ -2326,8 +2305,6 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppCrmRoute: AuthenticatedAppCrmRoute,
   AuthenticatedAppDisponibilidadesRoute: AuthenticatedAppDisponibilidadesRoute,
   AuthenticatedAppDocumentosRoute: AuthenticatedAppDocumentosRoute,
-  AuthenticatedAppEnfermagemHorariosRoute:
-    AuthenticatedAppEnfermagemHorariosRoute,
   AuthenticatedAppEnfermagemRecursosRoute:
     AuthenticatedAppEnfermagemRecursosRoute,
   AuthenticatedAppEquipeRoute: AuthenticatedAppEquipeRouteWithChildren,
@@ -2420,3 +2397,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
