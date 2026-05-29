@@ -827,7 +827,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>Repasse padrão</Label>
+                  <Label>REPASSE PADRÃO</Label>
                   <p className="text-xs text-muted-foreground">
                     Usado quando o serviço abaixo não tem tipo/valor preenchido.
                   </p>
