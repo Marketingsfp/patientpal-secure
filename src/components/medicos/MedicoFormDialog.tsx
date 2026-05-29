@@ -93,8 +93,6 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
 
   const [esps, setEsps] = useState<Especialidade[]>([]);
   const [procs, setProcs] = useState<Procedimento[]>([]);
-  const [procFilter, setProcFilter] = useState("");
-  const [procGrupo, setProcGrupo] = useState<string>("__todos__");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -124,6 +122,33 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
     if (especialidadesSelecionadasNomes.size === 0) return [] as Procedimento[];
     return procs.filter((p) => p.grupo && especialidadesSelecionadasNomes.has(normalizarNome(p.grupo)));
   }, [procs, especialidadesSelecionadasNomes]);
+
+  // Auto-adiciona um item em "Convênios / Serviços" (aba Repasse) sempre que um
+  // serviço for selecionado na aba Especialidades. Não remove nada — cadastros
+  // de repasse existentes são preservados para ajuste manual.
+  useEffect(() => {
+    if (!form.procedimentos.length || !procs.length) return;
+    setConvenios((cs) => {
+      const existentes = new Set(cs.map((c) => normalizarNome(c.nome)));
+      const novos: ConvenioRow[] = [];
+      for (const pid of form.procedimentos) {
+        if (!pid) continue;
+        const proc = procs.find((p) => p.id === pid);
+        if (!proc) continue;
+        const chave = normalizarNome(proc.nome);
+        if (existentes.has(chave)) continue;
+        existentes.add(chave);
+        novos.push({
+          nome: proc.nome,
+          tipo_repasse: form.tipo_repasse,
+          percentual: "",
+          valor: "",
+          ativo: true,
+        });
+      }
+      return novos.length ? [...cs, ...novos] : cs;
+    });
+  }, [form.procedimentos, procs, form.tipo_repasse]);
 
   // Load reference data
   useEffect(() => {
@@ -832,68 +857,14 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                   <div className="flex items-center justify-between">
                     <div>
                       <Label>Convênios / Serviços</Label>
-                      <p className="text-xs text-muted-foreground">Selecione serviços cadastrados ou adicione manualmente (ex: Cartão Consulta).</p>
+                      <p className="text-xs text-muted-foreground">
+                        Os serviços selecionados na aba <b>Especialidades</b> aparecem aqui automaticamente. Defina o tipo e o valor de repasse de cada um. Use "Manual" para adicionar itens avulsos (ex: Cartão Consulta).
+                      </p>
                     </div>
                     <Button type="button" size="sm" variant="outline"
                       onClick={() => setConvenios((cs) => [...cs, { nome: "", tipo_repasse: "percentual", percentual: "50", valor: "", ativo: true }])}>
                       <Plus className="h-4 w-4 mr-1" /> Manual
                     </Button>
-                  </div>
-                  <div className="rounded-md border p-2 space-y-2 bg-muted/30">
-                    <div className="grid grid-cols-2 gap-2">
-                      <Input
-                        placeholder="Filtrar serviço..."
-                        value={procFilter}
-                        onChange={(e) => setProcFilter(e.target.value)}
-                        className="h-8"
-                      />
-                      <select
-                        className="h-8 rounded-md border bg-background px-2 text-sm"
-                        value={procGrupo}
-                        onChange={(e) => setProcGrupo(e.target.value)}
-                      >
-                        <option value="__todos__">Todos os grupos</option>
-                        {Array.from(new Set(procs.map((p) => p.grupo).filter(Boolean) as string[]))
-                          .sort()
-                          .map((g) => (
-                            <option key={g} value={g}>{g}</option>
-                          ))}
-                      </select>
-                    </div>
-                  <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-1">
-                      {procs.length === 0 && (
-                        <p className="text-xs text-muted-foreground text-center py-3">
-                          Nenhum serviço cadastrado. Cadastre em "Serviços".
-                        </p>
-                      )}
-                      {procs
-                        .filter((p) => procGrupo === "__todos__" || p.grupo === procGrupo)
-                        .filter((p) => p.nome.toLowerCase().includes(procFilter.toLowerCase()))
-                        .map((p) => {
-                          const checked = convenios.some((c) => c.nome.trim().toLowerCase() === p.nome.toLowerCase());
-                          return (
-                          <label key={p.id} className="flex items-center gap-2 text-sm py-1 px-1 hover:bg-background rounded cursor-pointer w-full min-w-0">
-                              <Checkbox
-                                checked={checked}
-                                onCheckedChange={(v) => {
-                                  if (v) {
-                                    setConvenios((cs) => [...cs, {
-                                      nome: p.nome, tipo_repasse: form.tipo_repasse,
-                                      percentual: form.percentual || "50",
-                                      valor: form.valor || "",
-                                      ativo: true,
-                                    }]);
-                                  } else {
-                                    setConvenios((cs) => cs.filter((c) => c.nome.trim().toLowerCase() !== p.nome.toLowerCase()));
-                                  }
-                                }}
-                              />
-                            <span className="flex-1 min-w-0 truncate">{p.nome}</span>
-                            {p.grupo && <span className="text-xs text-muted-foreground truncate max-w-[40%]">{p.grupo}</span>}
-                            </label>
-                          );
-                        })}
-                    </div>
                   </div>
                   <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
                     {convenios.map((c, i) => (
