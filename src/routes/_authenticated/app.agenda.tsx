@@ -589,7 +589,7 @@ function AgendaPage() {
 
   const loadRef = async () => {
     if (!clinicaAtual) return;
-    const [m, p, e, me, pr, sr, mc, mp] = await Promise.all([
+    const [m, p, e, me, pr, sr, mc, mp, er, erp] = await Promise.all([
       supabase.from("medicos").select("id,nome,sexo").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("pacientes").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome").limit(500),
       supabase.from("especialidades").select("id,nome").order("nome"),
@@ -598,8 +598,18 @@ function AgendaPage() {
       supabase.from("procedimento_split_regras").select("medico_id,procedimento_id").eq("clinica_id", clinicaAtual.clinica_id).not("medico_id", "is", null),
       supabase.from("medico_convenios").select("medico_id,nome,ativo").eq("ativo", true),
       fetchMedicoProcedimentosAgenda(),
+      supabase.from("enfermagem_recursos").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
+      supabase.from("enfermagem_recurso_procedimentos").select("recurso_id,procedimento_id"),
     ]);
-    setMedicos((m.data ?? []) as Medico[]);
+    const medicosBase = ((m.data ?? []) as Medico[]).map((x) => ({ ...x, __recurso: false }));
+    const recursosArr = ((er.data ?? []) as RecursoEnf[]);
+    const recursosComoMedicos: Medico[] = recursosArr.map((r) => ({
+      id: r.id,
+      nome: `🩺 ${r.nome}`,
+      sexo: null,
+    }));
+    setRecursoIds(new Set(recursosArr.map((r) => r.id)));
+    setMedicos([...medicosBase, ...recursosComoMedicos] as Medico[]);
     setPacientes((p.data ?? []) as Paciente[]);
     setEspecialidades((e.data ?? []) as Especialidade[]);
     const todos = Array.isArray(pr) ? pr : [];
@@ -648,6 +658,22 @@ function AgendaPage() {
       procOpcoesMap.get(r.medico_id)!.push(proc);
     }
     setProcPorMedico(pm);
+    // Vínculos de procedimentos por recurso de enfermagem
+    const recursoProcsValidos = ((erp.data ?? []) as Array<{ recurso_id: string; procedimento_id: string }>)
+      .filter((r) => new Set(recursosArr.map((x) => x.id)).has(r.recurso_id));
+    for (const r of recursoProcsValidos) {
+      if (!pm.has(r.recurso_id)) pm.set(r.recurso_id, new Set());
+      pm.get(r.recurso_id)!.add(r.procedimento_id);
+      const proc = procedimentosPorId.get(r.procedimento_id);
+      if (!proc) continue;
+      if (!procOpcoesMap.has(r.recurso_id)) procOpcoesMap.set(r.recurso_id, []);
+      if (!procOpcoesVistos.has(r.recurso_id)) procOpcoesVistos.set(r.recurso_id, new Set());
+      const vistos = procOpcoesVistos.get(r.recurso_id)!;
+      const chave = normalizar(proc.nome);
+      if (vistos.has(chave)) continue;
+      vistos.add(chave);
+      procOpcoesMap.get(r.recurso_id)!.push(proc);
+    }
     setProcOpcoesPorMedico(procOpcoesMap);
     const medicosIds = new Set(((m.data ?? []) as Medico[]).map((x) => x.id));
     const nm = new Map<string, Set<string>>();
