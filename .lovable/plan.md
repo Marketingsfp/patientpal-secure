@@ -1,56 +1,110 @@
-## Objetivo
 
-Permitir que um serviço da aba **Consultas** (`tipo = 'consulta'`) apareça em **mais de uma especialidade**, escolhidas via checklist no próprio cadastro do serviço. Para os demais tipos (procedimento, exame, etc.) nada muda — continua com 1 especialidade só, via campo `grupo`.
+## Resumo
 
-## Como vai funcionar (visão do usuário)
+A planilha tem 1.015 linhas (Especialidade, Categoria, Serviço, Médico) para a clínica **POLICLINICA MENINO JESUS**. Cruzei tudo com o banco:
 
-1. Na tela **Serviços → Consultas**, ao **Editar** (ou criar) um serviço, aparece uma nova seção **"Especialidades em que aparece"** com a lista de todas as especialidades ativas e um checkbox em cada.
-2. Você marca as especialidades onde aquela Consulta deve aparecer (ex.: marca "Cardiologia", "Clínica Geral" e "Geriatria" para uma "Consulta Eletrocardiograma").
-3. Na própria aba **Consultas**, o filtro por especialidade passa a mostrar a consulta em **todas** as especialidades marcadas.
-4. O campo "Categoria" (atual `grupo`) continua existindo e funciona como a **especialidade principal** da consulta — é ele que define onde ela "nasce". O checklist apenas adiciona especialidades extras.
+- **Especialidades**: todas as 19 já cadastradas. Nada a criar aqui.
+- **Médicos**: 34 nomes não batem exatamente. **30 deles batem com cadastros existentes** (a planilha usa nome curto; o banco tem nome completo). **4 parecem realmente faltar**.
+- **Serviços (procedimentos)**: 33 nomes únicos não existem no banco para a especialidade/tipo correspondente (70 linhas da planilha).
+- **Vínculos já existentes**: 24.
+- **Vínculos novos a criar (após resolver pendências)**: **676** linhas em `medico_procedimentos`.
 
-Nas outras abas (Procedimentos, Exames, etc.) **nada muda visualmente** — o checklist só aparece quando `tipo = 'consulta'`.
+## O que será feito automaticamente
 
-## Mudanças técnicas
+Para cada linha da planilha onde já encontro médico + serviço no banco, criar o vínculo em `public.medico_procedimentos` (1 único `INSERT ... ON CONFLICT DO NOTHING`). Médicos com correspondência forte por nome (subset/prefixo) entram aqui:
 
-### 1. Banco (1 migração)
+| Planilha | Cadastrado no banco como |
+|---|---|
+| Dr. Alexandre Figueiredo de Queiroz | ALEXANDRE DE FIGUEIREDO QUEIROZ |
+| Dr. Antonio Cobucci | ANTONIO CARLOS SIQUEIRA COBUCCI |
+| Dr. Armando José | ARMANDO JOSE DA SILVA JUNIOR |
+| Dr. Carlos Alberto Varillas | CARLOS ALBERTO OLIVERO VARILLAS |
+| Dr. Carlos Eduardo | CARLOS EDUARDO GONCALVES MONTEIRO |
+| Dr. Eugenio Cesar | EUGENIO CESAR SOLON CAPOBIANCO |
+| Dr. Felipe Moura | FELIPE MOURA CORREA |
+| Dr. José Roberto | JOSE ROBERTO PINTO BARBOSA |
+| Dr. Marcílio Quintão | MARCILIO QUINTAO DE SOUZA |
+| Dr. Mauricio Albuquerque | MAURICIO ALBUQUERQUE DE PAULA |
+| Dr. Milton Pires | MILTON PIRES GUIMARAES |
+| Dr. Paulo Guilherme | PAULO GUILHERME NADER DAMASCENO |
+| Dr. Paulo Roberto | PAULO ROBERTO L MONTEIRO |
+| Dr. Samuel Jose Souza Machado | SAMUEL JOSE |
+| Dr. Sérgio Mendes | SERGIO MENDES MANOEL |
+| Dr. Sérgio Pallermo | SERGIO ANTONIO PALERMO DE ALMEIDA |
+| Dra. Adriana Cristhian Cardoso | ADRIANA CRISTHIAN CARDOSO SOBRINHO |
+| Dra. Aline Ferreira | ALINE DE ANDRADE FERREIRA |
+| Dra. Barbara de Oliveira Soriano | BARBARA OLIVEIRA |
+| Dra. Claudia Maria | CLAUDIA MARIA RODRIGUES DOS SANTOS |
+| Dra. Conceição | CONCEICAO DA SILVA MARTINS |
+| Dra. Elair Magalhães | ELAIR DE MAGALHAES ALVES NUNES |
+| Dra. Eliane Cristina Alves | ELIANE CRISTINA ALVES SOUZA |
+| Dra. Eneida de Oliveira | ENEIDA DE OLIVEIRA RODRIGUES |
+| Dra. Iarmila Ruzena | IARMILA RUZENA KRASNY |
+| Dra. Karina Ruiz | KARINA RUIZ CARDOSO DE OLIVEIRA |
+| Dra. Maria da Penha Condado | MARIA DA PENHA CONDADO TANUS TAYAR |
+| Dra. Priscila Ana Braga da Silva | PRISCILA ANA BRAGA DA SILVA ROCHA |
+| Dra. Roberta Corredeira | ROBERTA DA FONSECA CORREDEIRA |
+| Dra. Valéria Silveira | VALERIA SILVEIRA LIMA TEIXEIRA |
 
-Nova tabela de vínculo N:N:
+**Atenção — preciso da sua confirmação antes de incluir/excluir estes:**
 
-```text
-public.procedimento_especialidades
- ├─ procedimento_id   uuid  → procedimentos(id) ON DELETE CASCADE
- ├─ especialidade_id  uuid  → especialidades(id) ON DELETE CASCADE
- ├─ clinica_id        uuid  (denormalizado p/ RLS)
- ├─ created_at        timestamptz default now()
- └─ PK (procedimento_id, especialidade_id)
-```
+- **Dr. Marcelo Barreto Franco de Oliveira** (planilha) × **MARCELO BARRETO FRANCO DA SILVEIRA** (banco) — sobrenome diferente. É a mesma pessoa (planilha errada no sobrenome) ou são pessoas diferentes?
+- **Dr. Rafael Soares** — não tem cadastro parecido. Cadastrar depois?
+- **Dr. Adrian Andres Jara Benitez** — não tem cadastro. Cadastrar depois?
+- **Dr. Sandro da Silva Princeswal** — não tem cadastro. Cadastrar depois?
 
-- GRANTs para `authenticated` e `service_role`.
-- RLS: SELECT/INSERT/UPDATE/DELETE permitidos para membros da `clinica_id` (`is_member(auth.uid(), clinica_id)`).
-- Índices: `(especialidade_id)` e `(clinica_id, especialidade_id)` para o filtro de listagem.
-- **Backfill:** para cada `procedimento` com `tipo = 'consulta'`, insere uma linha vinculando ao `especialidade.id` cujo `lower(nome) = lower(procedimento.grupo)` (quando existir). Isso garante que tudo que já está cadastrado hoje continua aparecendo onde aparecia.
-- **Não** mexer no campo `grupo` — ele continua sendo a "categoria principal".
+## Pendências para você cadastrar depois
 
-### 2. Frontend — `src/routes/_authenticated/app.procedimentos.tsx`
+### Médicos a cadastrar (4)
+- Dr. Adrian Andres Jara Benitez (Urologia)
+- Dr. Rafael Soares (verificar especialidade na planilha)
+- Dr. Sandro da Silva Princeswal
+- Dr. Marcelo Barreto Franco de Oliveira *(se confirmar que é diferente do "da Silveira")*
 
-- No `useEffect` de carga, buscar também `procedimento_especialidades` da clínica e montar um `Map<procedimento_id, Set<especialidade_id>>`.
-- No **diálogo de edição/criação**, quando `form.tipo === 'consulta'`:
-  - Renderizar bloco **"Especialidades em que aparece"** com lista de checkboxes (vem de `especialidades` ativas, já carregadas pela página).
-  - Estado local `especialidadesIds: string[]`.
-  - Ao salvar: depois do `upsert` do procedimento, fazer `delete` das linhas antigas em `procedimento_especialidades` para aquele `procedimento_id` e `insert` das novas (transação implícita via 2 chamadas; idempotente).
-- No filtro por especialidade da aba **Consultas**: trocar o teste atual `lower(p.grupo) === lower(esp)` por "está em `grupo` **ou** está no mapa de vínculos extras". Outras abas continuam só pelo `grupo`.
+### Serviços a cadastrar (33 únicos)
 
-### 3. Onde **não** mexer (a pedido do usuário)
+**Angiologia / Procedimento**
+- APLICAÇÃO EM VARIZES (Dr. André Luis Lima da Silva)
 
-- Agenda, Orçamentos, Contratos, Relatórios continuam lendo `grupo` como hoje — fora do escopo dessa mudança.
-- Triggers existentes (`sync_procedimentos_grupo_on_esp_rename`) continuam válidos; ao renomear uma especialidade, o `grupo` dos procedimentos vinculados acompanha. O vínculo N:N usa `especialidade_id` (UUID), então rename de nome não afeta.
+**Cardiologia**
+- CARDIOLOGIA — Consulta (Dr. Alex Louza Macedo, Dr. Rosangela Schmitz Riolino) — *obs.: já existe "CONSULTA" em Cardiologia; talvez seja redundância*
+- ECOCARDIOGRAMA — Exame (Dr. Rosangela Schmitz Riolino)
 
-## Verificação após implementar
+**Fisioterapia / Procedimento** (todos com Dra. Daiane Helena de Almeida)
+- 5 SESSÕES DE FISIOTERAPIA
+- 5 SESSÕES DE FISIOTERAPIA INFANTIL
+- 5 SESSÕES DE FISIOTERAPIA OCULAR
+- 5 SESSÕES DE FISIOTERAPIA PÉLVICA
+- 5 SESSÕES DE FISIOTERAPIA RESPIRATÓRIA
+- 5 SESSÕES DE FISIOTERAPIA VESTIBULAR
+- 5 SESSÕES DE RPG
 
-1. Editar uma Consulta existente, marcar 2 especialidades extras, salvar.
-2. Trocar o filtro do topo entre essas especialidades — a mesma consulta deve aparecer em cada uma.
-3. Em uma especialidade **não** marcada, a consulta não aparece.
-4. Conferir no banco: `select count(*) from procedimento_especialidades` > 0 após o backfill.
+**Neurologia / Procedimento**
+- LAUDO (Dr. Anderson Luis Eloy Amaral)
 
-Posso seguir com essa implementação?
+**Odontologia / Procedimento** (Dr. Jean, Dr. Thiago, Dra. Karen, Dra. Raiani)
+- CIRURGIA DE IMPLANTE INDIVIDUAL COM COROA
+- CIRURGIA DE IMPLANTE SÓ CIRURGIA
+- DRENAGEM DE ABCESSO
+- IMPLANTE UNITÁRIO
+- LAUDO
+- MANUTENÇÃO APARELHO DE METAL
+- RETRATMENTO DE CANAL
+- ULOTOMIA (INCISÃO CIRURGICA)
+- VERNIZ POR SESSÃO
+
+**Oftalmologia** (Dr. João Hélio)
+- OCT (categoria em branco na planilha)
+- Exames: CAMPO VISUAL COMPUTADORIZADO, CAPSULOTOMIA COM YAG LASER, CURVA TENSIONAL/CURVA DE PIO/TESTE DE SOBRECARGA HÍDRICA, ECOBIOMETRIA, IRIDOTOMIA COM YAG LASER, MEC - MICROSCOPIA ESPECULAR DE CÓRNEAS, PAM, TOMOGRAFIA DE CORNEAS (GALILEI), TOPOGRAFIA DE CORNEAS, ULTRASSONOGRAFIA OCULAR
+- LAUDO — Procedimento
+
+**Ortopedia / Procedimento**
+- LAUDO (Dr. Jorge Ribeiro)
+
+## Perguntas antes de executar
+
+1. **Dr. Marcelo Barreto Franco de Oliveira** = **MARCELO BARRETO FRANCO DA SILVEIRA**? (sim/não)
+2. Os 3 médicos sem nenhum cadastro (Adrian, Rafael Soares, Sandro Princeswal) eu deixo só na lista de pendências, certo? Não cadastro automático.
+3. Os 33 serviços faltantes eu deixo só na lista de pendências para você cadastrar manualmente (em vez de eu criar tudo)?
+
+Assim que você responder, executo um único `INSERT` criando os **676 vínculos** (idempotente, com `ON CONFLICT DO NOTHING`).
