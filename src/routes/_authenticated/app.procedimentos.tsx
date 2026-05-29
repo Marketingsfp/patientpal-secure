@@ -418,15 +418,24 @@ function ProcedimentosPage() {
     const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
     const q = norm(buscaAplicada.trim());
     const tipoEffective = tab === "consultas" ? "consulta" : tipoAplicado;
+    // Para a aba Consultas, o filtro por especialidade considera também os vínculos extras (N:N)
+    const espIdByNome = new Map<string, string>();
+    especialidades.forEach(e => espIdByNome.set(norm(e.nome), e.id));
+    const espIdFiltro = grupoAplicado !== "todos" ? espIdByNome.get(norm(grupoAplicado)) : undefined;
     return items.filter(p => {
       if (tab === "consultas") {
         if (norm(p.tipo ?? "") !== "consulta") return false;
       } else if (tipoEffective !== "todos" && p.tipo !== tipoEffective) return false;
-      if (grupoAplicado !== "todos" && norm(p.grupo ?? "") !== norm(grupoAplicado)) return false;
+      if (grupoAplicado !== "todos") {
+        const matchGrupo = norm(p.grupo ?? "") === norm(grupoAplicado);
+        const extras = vincEspMap.get(p.id);
+        const matchExtra = tab === "consultas" && !!espIdFiltro && !!extras && extras.has(espIdFiltro);
+        if (!matchGrupo && !matchExtra) return false;
+      }
       if (q && !norm(p.nome).includes(q) && !norm(p.codigo ?? "").includes(q) && !norm(p.grupo ?? "").includes(q)) return false;
       return true;
     });
-  }, [items, buscaAplicada, tipoAplicado, grupoAplicado, tab]);
+  }, [items, buscaAplicada, tipoAplicado, grupoAplicado, tab, vincEspMap, especialidades]);
 
   const ordenados = useMemo(() => {
     if (!sort) return filtrados;
