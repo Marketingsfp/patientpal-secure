@@ -61,6 +61,8 @@ type Agendamento = {
 type Medico = { id: string; nome: string; sexo?: string | null };
 type Especialidade = { id: string; nome: string };
 type Paciente = { id: string; nome: string };
+type ProcedimentoRef = { id: string; nome: string; tipo: string | null };
+type MedicoProcedimentoRef = { medico_id: string | null; procedimento_id: string; created_at?: string | null };
 
 const STATUS_LABEL: Record<Status, string> = {
   agendado: "Agendado", confirmado: "Confirmado", realizado: "Realizado",
@@ -86,6 +88,48 @@ const primeiroValorValido = (...valores: unknown[]) => {
 
 const valorCartaoProcedimento = (proc: any) =>
   primeiroValorValido(proc?.valor_cartao_credito, proc?.valor_cartao_debito, proc?.valor_cartao, proc?.valor_padrao);
+
+async function fetchProcedimentosAgenda(clinicaId: string): Promise<ProcedimentoRef[]> {
+  const pageSize = 1000;
+  const rows: ProcedimentoRef[] = [];
+
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from("procedimentos")
+      .select("id,nome,tipo")
+      .eq("clinica_id", clinicaId)
+      .eq("ativo", true)
+      .order("nome")
+      .range(from, from + pageSize - 1);
+
+    if (error) throw error;
+    const page = (data ?? []) as ProcedimentoRef[];
+    rows.push(...page);
+    if (page.length < pageSize) break;
+  }
+
+  return rows;
+}
+
+async function fetchMedicoProcedimentosAgenda(): Promise<MedicoProcedimentoRef[]> {
+  const pageSize = 1000;
+  const rows: MedicoProcedimentoRef[] = [];
+
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from("medico_procedimentos")
+      .select("medico_id,procedimento_id,created_at")
+      .order("created_at")
+      .range(from, from + pageSize - 1);
+
+    if (error) throw error;
+    const page = (data ?? []) as MedicoProcedimentoRef[];
+    rows.push(...page);
+    if (page.length < pageSize) break;
+  }
+
+  return rows;
+}
 
 type DescontoConvenio =
   | { tipo: "percentual"; valor: number }
@@ -544,15 +588,15 @@ function AgendaPage() {
       supabase.from("pacientes").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome").limit(500),
       supabase.from("especialidades").select("id,nome").order("nome"),
       supabase.from("medico_especialidades").select("medico_id,especialidade_id"),
-      supabase.from("procedimentos").select("id,nome,tipo").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome").limit(5000),
+      fetchProcedimentosAgenda(clinicaAtual.clinica_id),
       supabase.from("procedimento_split_regras").select("medico_id,procedimento_id").eq("clinica_id", clinicaAtual.clinica_id).not("medico_id", "is", null),
       supabase.from("medico_convenios").select("medico_id,nome,ativo").eq("ativo", true),
-      supabase.from("medico_procedimentos").select("medico_id,procedimento_id,created_at"),
+      fetchMedicoProcedimentosAgenda(),
     ]);
     setMedicos((m.data ?? []) as Medico[]);
     setPacientes((p.data ?? []) as Paciente[]);
     setEspecialidades((e.data ?? []) as Especialidade[]);
-    const todos = (pr.data ?? []) as { id: string; nome: string; tipo: string | null }[];
+    const todos = Array.isArray(pr) ? pr : [];
     {
       const ex = todos.filter((x) => x.tipo === "exame");
       const vistos = new Set<string>();
@@ -583,7 +627,7 @@ function AgendaPage() {
     const procOpcoesVistos = new Map<string, Set<string>>();
     // Serviços vinculados ao médico pela aba "Especialidades" do cadastro do médico.
     // Esta é a fonte principal e preserva a mesma ordem exibida no cadastro do médico.
-    for (const r of (mp.data ?? []) as Array<{ medico_id: string | null; procedimento_id: string; created_at?: string | null }>) {
+    for (const r of (Array.isArray(mp) ? mp : []) as MedicoProcedimentoRef[]) {
       if (!r.medico_id) continue;
       if (!pm.has(r.medico_id)) pm.set(r.medico_id, new Set());
       pm.get(r.medico_id)!.add(r.procedimento_id);
