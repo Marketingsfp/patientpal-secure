@@ -667,7 +667,7 @@ function ProcedimentosPage() {
                   [
                     { key: "nome", label: "Nome" },
                     { key: "grupo", label: "Especialidade" },
-                    { key: "tipo", label: "Tipo" },
+                    { key: "tipo", label: "Categoria" },
                     { key: "codigo", label: "Código" },
                     { key: "dinheiro", label: "Dinheiro (R$)" },
                     { key: "cartao", label: "Cartão (R$)" },
@@ -696,7 +696,7 @@ function ProcedimentosPage() {
             <Select value={filtroTipo} onValueChange={(v) => setFiltroTipo(v as typeof filtroTipo)}>
               <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="todos">Tipos</SelectItem>
+                <SelectItem value="todos">Categorias</SelectItem>
                 {tipos.map(t => (
                   <SelectItem key={t.id} value={t.nome}>{tipoLabel(t.nome)}</SelectItem>
                 ))}
@@ -727,7 +727,7 @@ function ProcedimentosPage() {
                   </TableHead>
                   <TableHead className="w-24">
                     <button type="button" onClick={() => toggleSort("tipo")} className="inline-flex items-center gap-1 hover:text-foreground">
-                      Tipo <SortIcon col="tipo" />
+                      Categoria <SortIcon col="tipo" />
                     </button>
                   </TableHead>
                   <TableHead>
@@ -842,7 +842,7 @@ function ProcedimentosPage() {
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label>Tipo</Label>
+                <Label>Categoria</Label>
                 <Select value={form.tipo} onValueChange={(v) => setForm({ ...form, tipo: v as Tipo })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
