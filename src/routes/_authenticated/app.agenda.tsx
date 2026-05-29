@@ -2361,6 +2361,14 @@ function AgendaPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => openEdit(a)}><Pencil className="h-4 w-4 mr-2" /> Editar</DropdownMenuItem>
+                        {a.medico_id && recursoIds.has(a.medico_id) && a.paciente_nome !== "DISPONÍVEL" && (
+                          <DropdownMenuItem
+                            onClick={() => iniciarAtendimentoEnf(a)}
+                            disabled={a.status === "realizado"}
+                          >
+                            <Play className="h-4 w-4 mr-2" /> Iniciar atendimento
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem
                           onClick={() => iniciarReagendamento(a)}
                           disabled={a.status === "realizado"}
