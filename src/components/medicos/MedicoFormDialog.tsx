@@ -123,6 +123,33 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
     return procs.filter((p) => p.grupo && especialidadesSelecionadasNomes.has(normalizarNome(p.grupo)));
   }, [procs, especialidadesSelecionadasNomes]);
 
+  // Auto-adiciona um item em "Convênios / Serviços" (aba Repasse) sempre que um
+  // serviço for selecionado na aba Especialidades. Não remove nada — cadastros
+  // de repasse existentes são preservados para ajuste manual.
+  useEffect(() => {
+    if (!form.procedimentos.length || !procs.length) return;
+    setConvenios((cs) => {
+      const existentes = new Set(cs.map((c) => normalizarNome(c.nome)));
+      const novos: ConvenioRow[] = [];
+      for (const pid of form.procedimentos) {
+        if (!pid) continue;
+        const proc = procs.find((p) => p.id === pid);
+        if (!proc) continue;
+        const chave = normalizarNome(proc.nome);
+        if (existentes.has(chave)) continue;
+        existentes.add(chave);
+        novos.push({
+          nome: proc.nome,
+          tipo_repasse: form.tipo_repasse,
+          percentual: "",
+          valor: "",
+          ativo: true,
+        });
+      }
+      return novos.length ? [...cs, ...novos] : cs;
+    });
+  }, [form.procedimentos, procs, form.tipo_repasse]);
+
   // Load reference data
   useEffect(() => {
     if (!open || !clinicaId) return;
