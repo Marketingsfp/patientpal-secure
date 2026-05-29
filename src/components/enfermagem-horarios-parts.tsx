@@ -177,7 +177,7 @@ export function EnfermagemRecursosHorariosEditor() {
   const [novoNome, setNovoNome] = useState("");
   const [salvandoNome, setSalvandoNome] = useState(false);
   const [novo, setNovo] = useState({
-    recurso_id: "", dia_semana: "1", hora_inicio: "08:00", hora_fim: "12:00", limite_pacientes: "",
+    recurso_id: "", dia_semana: "1", hora_inicio: "08:00", hora_fim: "12:00", limite_pacientes: "", intervalo_min: "",
   });
 
   const iniciarRename = (id: string, nome: string) => {
@@ -206,6 +206,7 @@ export function EnfermagemRecursosHorariosEditor() {
       hora_inicio: novo.hora_inicio,
       hora_fim: novo.hora_fim,
       limite_pacientes: novo.limite_pacientes ? parseInt(novo.limite_pacientes) : null,
+      intervalo_min: novo.intervalo_min ? parseInt(novo.intervalo_min) : null,
     };
     if (dispEditando) {
       const { error } = await supabase.from("enfermagem_recurso_disponibilidades")
@@ -350,6 +351,12 @@ export function EnfermagemRecursosHorariosEditor() {
               value={novo.limite_pacientes}
               onChange={(e) => setNovo({ ...novo, limite_pacientes: e.target.value })} />
           </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Intervalo (min)</label>
+            <Input type="number" min={1} max={480} placeholder="padrão do recurso" className="w-36"
+              value={novo.intervalo_min}
+              onChange={(e) => setNovo({ ...novo, intervalo_min: e.target.value })} />
+          </div>
           <Button onClick={() => { setNovo({ ...novo, recurso_id: r.id }); void adicionar(); }}>
             {dispEditando ? (<><Pencil className="h-4 w-4 mr-1" /> Salvar</>) : (<><Plus className="h-4 w-4 mr-1" /> Adicionar</>)}
           </Button>
@@ -364,18 +371,20 @@ export function EnfermagemRecursosHorariosEditor() {
                 <TableHead>Início</TableHead>
                 <TableHead>Fim</TableHead>
                 <TableHead>Pacientes/dia</TableHead>
+                <TableHead>Intervalo</TableHead>
                 <TableHead className="w-24 text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {ds.length === 0 ? (
-                <TableRow><TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-6">Nenhum horário cadastrado.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-6">Nenhum horário cadastrado.</TableCell></TableRow>
               ) : ds.map((d) => (
                 <TableRow key={d.id}>
                   <TableCell>{DIAS[d.dia_semana]}</TableCell>
                   <TableCell>{d.hora_inicio.slice(0,5)}</TableCell>
                   <TableCell>{d.hora_fim.slice(0,5)}</TableCell>
                   <TableCell>{d.limite_pacientes ?? "—"}</TableCell>
+                  <TableCell>{d.intervalo_min ? `${d.intervalo_min} min` : "—"}</TableCell>
                   <TableCell className="text-right space-x-1">
                     <Button size="icon" variant="ghost" onClick={() => {
                       setDispEditando(d.id);
@@ -385,6 +394,7 @@ export function EnfermagemRecursosHorariosEditor() {
                         hora_inicio: d.hora_inicio.slice(0,5),
                         hora_fim: d.hora_fim.slice(0,5),
                         limite_pacientes: d.limite_pacientes ? String(d.limite_pacientes) : "",
+                        intervalo_min: d.intervalo_min ? String(d.intervalo_min) : "",
                       });
                     }}>
                       <Pencil className="h-4 w-4" />
