@@ -329,6 +329,10 @@ function ProcedimentosPage() {
     })();
   }, []);
   const [especialidades, setEspecialidades] = useState<{ id: string; nome: string }[]>([]);
+  // Map: procedimento_id -> Set de especialidade_id vinculadas
+  const [vincEspMap, setVincEspMap] = useState<Map<string, Set<string>>>(new Map());
+  // Especialidades marcadas no diálogo (apenas para tipo === 'consulta')
+  const [formEspIds, setFormEspIds] = useState<string[]>([]);
   const loadEspecialidades = async () => {
     const { data, error } = await supabase
       .from("especialidades")
@@ -341,6 +345,21 @@ function ProcedimentosPage() {
   useEffect(() => {
     void loadEspecialidades();
   }, []);
+
+  const loadVincEsp = async () => {
+    if (!clinicaAtual) return;
+    const { data, error } = await supabase
+      .from("procedimento_especialidades")
+      .select("procedimento_id,especialidade_id")
+      .eq("clinica_id", clinicaAtual.clinica_id);
+    if (error) { toast.error(error.message); return; }
+    const m = new Map<string, Set<string>>();
+    (data ?? []).forEach((r: any) => {
+      if (!m.has(r.procedimento_id)) m.set(r.procedimento_id, new Set());
+      m.get(r.procedimento_id)!.add(r.especialidade_id);
+    });
+    setVincEspMap(m);
+  };
 
   const load = async () => {
     if (!clinicaAtual) return;
