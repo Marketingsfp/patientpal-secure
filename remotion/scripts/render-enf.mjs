@@ -1,9 +1,11 @@
 import { bundle } from "@remotion/bundler";
 import { renderMedia, selectComposition, openBrowser } from "@remotion/renderer";
 import path from "path";
+import { fileURLToPath } from "url";
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const bundled = await bundle({
-  entryPoint: path.resolve("remotion/src/index.ts"),
+  entryPoint: path.resolve(__dirname, "../src/index.ts"),
   webpackOverride: (c) => c,
 });
 const browser = await openBrowser("chrome", {
