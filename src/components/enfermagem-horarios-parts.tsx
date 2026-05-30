@@ -36,7 +36,7 @@ export function useEnfermagemHorariosData() {
     const [r, d] = await Promise.all([
       supabase.from("enfermagem_recursos")
         .select("id, nome, duracao_padrao_min")
-        .eq("clinica_id", clinicaAtual.clinica_id).order("nome"),
+        .eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("enfermagem_recurso_disponibilidades")
         .select("id, recurso_id, dia_semana, hora_inicio, hora_fim, limite_pacientes, intervalo_min")
         .eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true)
