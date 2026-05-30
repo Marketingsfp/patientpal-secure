@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -65,7 +65,6 @@ function EnfermagemRecursosPage() {
   const [recursos, setRecursos] = useState<Recurso[]>([]);
   const [procedimentos, setProcedimentos] = useState<Procedimento[]>([]);
   const [busca, setBusca] = useState("");
-  const [buscaProc, setBuscaProc] = useState("");
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm());
@@ -111,15 +110,6 @@ function EnfermagemRecursosPage() {
       procedimentos: (vincs ?? []).map((v: any) => v.procedimento_id),
     });
     setOpen(true);
-  };
-
-  const toggleProc = (pid: string) => {
-    setForm((f) => ({
-      ...f,
-      procedimentos: f.procedimentos.includes(pid)
-        ? f.procedimentos.filter((x) => x !== pid)
-        : [...f.procedimentos, pid],
-    }));
   };
 
   const submit = async (e: FormEvent) => {
@@ -177,12 +167,6 @@ function EnfermagemRecursosPage() {
     if (!q) return recursos;
     return recursos.filter((r) => r.nome.toLowerCase().includes(q));
   }, [recursos, busca]);
-
-  const procsFiltrados = useMemo(() => {
-    const q = buscaProc.trim().toLowerCase();
-    if (!q) return procedimentos;
-    return procedimentos.filter((p) => p.nome.toLowerCase().includes(q));
-  }, [procedimentos, buscaProc]);
 
   if (!clinicaAtual) {
     return <p className="text-muted-foreground">Selecione uma clínica primeiro.</p>;
@@ -275,31 +259,70 @@ function EnfermagemRecursosPage() {
               <Switch checked={form.ativo} onCheckedChange={(v) => setForm({ ...form, ativo: v })} id="ativo" />
               <Label htmlFor="ativo">Recurso ativo (aparece na agenda)</Label>
             </div>
-            <div className="space-y-2">
-              <Label>Serviços que este recurso realiza</Label>
-              <Input
-                placeholder="Filtrar serviços..."
-                value={buscaProc}
-                onChange={(e) => setBuscaProc(e.target.value)}
-              />
-              <div className="max-h-64 overflow-y-auto border rounded-md p-2 space-y-1">
-                {procsFiltrados.length === 0 ? (
-                  <p className="text-sm text-muted-foreground p-2">Nenhum serviço.</p>
-                ) : (
-                  procsFiltrados.map((p) => (
-                    <label key={p.id} className="flex items-center gap-2 px-2 py-1 hover:bg-muted/40 rounded cursor-pointer">
-                      <Checkbox
-                        checked={form.procedimentos.includes(p.id)}
-                        onCheckedChange={() => toggleProc(p.id)}
-                      />
-                      <span className="text-sm">{p.nome}</span>
-                    </label>
-                  ))
-                )}
+            <div className="border rounded-md p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-sm font-medium">Serviços que este recurso realiza</Label>
+                  <p className="text-xs text-muted-foreground">Adicione os serviços/exames realizados por este recurso.</p>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={procedimentos.length === 0}
+                  onClick={() => setForm({ ...form, procedimentos: [...form.procedimentos, ""] })}
+                >
+                  <Plus className="h-4 w-4 mr-1" /> Adicionar serviço
+                </Button>
               </div>
-              <p className="text-xs text-muted-foreground">
-                {form.procedimentos.length} serviço(s) selecionado(s)
-              </p>
+              {procedimentos.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Nenhum serviço cadastrado na clínica.</p>
+              ) : form.procedimentos.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Nenhum serviço selecionado.</p>
+              ) : (
+                <div className="space-y-2">
+                  {form.procedimentos
+                    .map((pid, idx) => {
+                      const p = procedimentos.find((pp) => pp.id === pid);
+                      return { pid, idx, label: p?.nome ?? "" };
+                    })
+                    .sort((a, b) => a.label.localeCompare(b.label, "pt-BR", { sensitivity: "base" }))
+                    .map(({ pid, idx }) => (
+                      <div key={idx} className="grid grid-cols-[1fr_auto] gap-2 items-center">
+                        <SearchableSelect
+                          options={procedimentos.map((p) => ({ value: p.id, label: p.nome }))}
+                          value={pid}
+                          onChange={(v) => {
+                            if (v && form.procedimentos.some((x, i) => i !== idx && x === v)) {
+                              toast.warning("Serviço já adicionado");
+                              return;
+                            }
+                            setForm({
+                              ...form,
+                              procedimentos: form.procedimentos.map((x, i) => (i === idx ? v : x)),
+                            });
+                          }}
+                          placeholder="Selecione"
+                          searchPlaceholder="Buscar serviço..."
+                        />
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          onClick={() =>
+                            setForm({
+                              ...form,
+                              procedimentos: form.procedimentos.filter((_, i) => i !== idx),
+                            })
+                          }
+                          aria-label="Remover serviço"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
