@@ -1,0 +1,1 @@
+DELETE FROM public.pacientes WHERE codigo_prontuario IN ('00029','00031','00033','00035') AND ativo = true AND cpf IS NULL;
