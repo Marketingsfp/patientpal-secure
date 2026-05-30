@@ -141,7 +141,7 @@ function EnfermagemRecursosPage() {
       if (error || !novo) { setSaving(false); toast.error(error?.message ?? "Erro"); return; }
       recursoId = novo.id;
     }
-    const procs = Array.from(new Set(form.procedimentos));
+    const procs = Array.from(new Set(form.procedimentos.filter(Boolean)));
     if (recursoId && procs.length) {
       const rows = procs.map((pid) => ({ recurso_id: recursoId!, procedimento_id: pid }));
       const { error: e2 } = await supabase
