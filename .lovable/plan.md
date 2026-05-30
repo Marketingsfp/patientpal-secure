@@ -1,53 +1,55 @@
-## Objetivo
+# Vídeo: Fluxo completo do menu Agendas
 
-Adicionar uma terceira categoria — **Enfermagem** — ao cadastro de Equipe, separada de Funcionários e Médicos, com vínculo às agendas (recursos de enfermagem como CURATIVO, INALAÇÃO, ECG, etc.) que cada profissional pode atender.
+Vídeo Remotion estilo agência (1920x1080, 30fps) demonstrando todas as etapas operacionais do menu **Agendas** do ClinicaOS — sem incluir a abertura de agenda. Renderizado como MP4 para `/mnt/documents/`.
 
-## Mudanças
+## Direção criativa
 
-### 1. Banco — nova tabela de vínculo
+- **Estética**: Tech Product — UI mockada limpa, layout asimétrico, cursor animado, microinterações snappy. Reaproveita a paleta e tipografia já existentes em `remotion/src/theme.ts` (`C` palette + Inter/DM Sans) para manter consistência com os outros vídeos do projeto (`agendamento`, `triagem`, `atendimento`).
+- **Motion system**: entrada padrão spring snappy (`damping: 18`); transições entre cenas alternando `slide(from-right)` e `fade` (mesmo padrão de `AgendamentoVideo.tsx`); cursor guiado por `interpolate()`.
+- **Duração-alvo**: ~28s, dividido em 7 cenas curtas (média 4s cada).
 
-`enfermagem_recurso_atendentes`
-- `user_id` (FK auth.users)
-- `recurso_id` (FK enfermagem_recursos)
-- `clinica_id`
-- Único por (user_id, recurso_id)
-- RLS: leitura para membros da clínica; gestão por admin/gestor
+## Cenas (na ordem)
 
-Isso permite saber **quais agendas cada enfermeiro pode atender** sem mexer no perfil/role.
+1. **Filtro de profissional + data** (~4s) — Header da Agenda, dropdown de Profissional abrindo e selecionando "Dr. Roberto Lima", depois Popover de Calendário avançando do dia atual para uma data futura. Grade da agenda re-renderiza com slots novos.
+2. **Novo agendamento de paciente** (~5s) — Clique em "+ Novo", dialog abre, busca de paciente ("Maria Souza"), seleção de procedimento ("Consulta Cardiológica"), confirmação. Toast "Agendamento criado".
+3. **Pagamento do paciente agendado** (~4s) — Linha do agendamento criado, ação "Pagamento" → LancamentoDialog com resumo (R$ 250,00), seleção PIX, "Pagamento aprovado". Status da linha muda para com ícone $.
+4. **Check-in** (~3s) — Outra linha com status "Agendado"; menu de ações → "Check-in"; badge passa para "Confirmado" com brilho verde.
+5. **Reagendamento** (~4s) — Linha existente → menu "Reagendar"; dialog mostra novo seletor de data/hora; nova data destacada; toast "Reagendado para 22/05 às 10:30".
+6. **Pagamento de vários clientes (lote)** (~4s) — Checkboxes na grade selecionam 3 linhas; barra de ações em lote aparece com "Pagar selecionados"; LancamentoDialog agrupado mostra total R$ 750,00; aprovação coletiva.
+7. **Histórico** (~4s) — Clique em um paciente abre painel/dialog de histórico; lista cronológica com atendimentos anteriores, valores pagos, status. Scroll suave revela 3 eventos.
 
-### 2. Página `/app/equipe` — nova aba "Enfermagem"
+Encerramento: fade rápido com logo/wordmark "ClinicaOS · Agendas".
 
-- Tabs passam a ser: **Funcionários** | **Médicos** | **Enfermagem**
-- A aba Enfermagem lista membros com `role = 'enfermeiro'`, mostrando Nome, Status e **Agendas vinculadas** (badges com nome dos recursos)
-- Botão de editar abre o novo `EnfermeiroFormDialog`
-- Atualizar `validateSearch` para aceitar `tab: "enfermagem"`
-- A aba Funcionários passa a filtrar **fora** os `role = 'enfermeiro'` (eles aparecem só na aba Enfermagem)
+## Arquivos a criar
 
-### 3. Pop-up "Novo cadastro" — terceira opção
+```text
+remotion/src/AgendasVideo.tsx              # composição principal (TransitionSeries)
+remotion/src/scenes/AgendaSceneFiltro.tsx
+remotion/src/scenes/AgendaSceneNovo.tsx
+remotion/src/scenes/AgendaScenePagamento.tsx
+remotion/src/scenes/AgendaSceneCheckin.tsx
+remotion/src/scenes/AgendaSceneReagendar.tsx
+remotion/src/scenes/AgendaSceneLote.tsx
+remotion/src/scenes/AgendaSceneHistorico.tsx
+remotion/scripts/render-agendas.mjs        # script de render headless → /mnt/documents/clinicaos-agendas.mp4
+```
 
-Adicionar card **Enfermagem** (ícone Syringe/HeartPulse) ao lado de Funcionário e Médico. Layout muda para `grid-cols-3`. Ao escolher, abre o `EnfermeiroFormDialog`.
+Atualizações:
+- `remotion/src/Root.tsx`: registrar `<Composition id="agendas" ... durationInFrames=~840 />`.
 
-### 4. Novo `EnfermeiroFormDialog`
+Reaproveita `Frame`/`Cursor` (`remotion/src/components/Frame.tsx`) e tokens de `theme.ts`. Sem áudio (`muted: true`) para evitar dependência de TTS, como nos outros vídeos.
 
-Cópia funcional do `FuncionarioFormDialog` (mesmas abas Dados / Login e perfil, mesma seleção de funcionário disponível do RH, mesmo fluxo de criar login) com:
+## Render
 
-- **Perfil fixo em "enfermeiro"** (campo oculto / pré-selecionado)
-- **Nova aba (ou seção) "Agendas"** com um multi-select listando todos os `enfermagem_recursos` ativos da clínica
-  - Ao salvar, sincroniza `enfermagem_recurso_atendentes` (insere novos / remove desmarcados)
-  - Na edição, vem pré-marcada com os recursos atuais
+```bash
+cd remotion && node scripts/render-agendas.mjs
+# saída: /mnt/documents/clinicaos-agendas.mp4
+```
 
-### 5. Filtro da Agenda (`/app/agenda`)
-
-Quando o usuário logado é `role = 'enfermeiro'`, o seletor de coluna passa a mostrar apenas os recursos de enfermagem para os quais ele está em `enfermagem_recurso_atendentes`. Admin/gestor/recepção continuam vendo todos.
+Verificação: spot-check com `bunx remotion still` em 2-3 frames-chave antes do render final; depois confirmar tamanho/duração do MP4.
 
 ## Fora do escopo
 
-- Não mexer no fluxo de Médicos
-- Não mexer no cadastro de recursos de enfermagem em si (`/app/enfermagem-recursos`)
-- Sem relatórios de produtividade
-
-## Detalhes técnicos
-
-- Server function nova em `src/lib/enfermagem-equipe.functions.ts` para `salvarVinculosAgendas({ userId, clinicaId, recursoIds[] })` rodando com `supabaseAdmin` após `assertManager`.
-- `EquipePage`: estender query inicial para buscar também enfermeiros + vínculos (`enfermagem_recurso_atendentes` + `enfermagem_recursos.nome`) em um `in()` por user_id.
-- Migration cria tabela + GRANTs (`authenticated`, `service_role`) + RLS + policies usando `has_role` / `can_manage_clinica` já existentes.
+- Abertura/configuração de agenda (explícito do usuário).
+- Voiceover/áudio.
+- Mudanças no app React real — somente arquivos sob `remotion/`.
