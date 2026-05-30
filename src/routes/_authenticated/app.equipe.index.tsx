@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { z } from "zod";
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Users, Stethoscope } from "lucide-react";
+import { Plus, Pencil, Users, Stethoscope, HeartPulse } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,12 +13,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { FuncionarioFormDialog } from "@/components/funcionarios/FuncionarioFormDialog";
 import { MedicoFormDialog } from "@/components/medicos/MedicoFormDialog";
+import { EnfermeiroFormDialog } from "@/components/funcionarios/EnfermeiroFormDialog";
 
 export const Route = createFileRoute("/_authenticated/app/equipe/")({
   component: EquipePage,
   head: () => ({ meta: [{ title: "Equipe — ClinicaOS" }] }),
   validateSearch: z.object({
-    tab: z.enum(["funcionarios", "medicos"]).optional(),
+    tab: z.enum(["funcionarios", "medicos", "enfermagem"]).optional(),
   }),
 });
 
@@ -46,15 +47,17 @@ const limparPrefixoMedico = (nome: string) =>
 function EquipePage() {
   const { clinicaAtual } = useClinica();
   const { tab: tabFromUrl } = Route.useSearch();
-  const [tab, setTab] = useState<"funcionarios" | "medicos">(tabFromUrl ?? "funcionarios");
+  const [tab, setTab] = useState<"funcionarios" | "medicos" | "enfermagem">(tabFromUrl ?? "funcionarios");
   useEffect(() => { if (tabFromUrl) setTab(tabFromUrl); }, [tabFromUrl]);
   const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
   const [medicos, setMedicos] = useState<Medico[]>([]);
+  const [enfermeiros, setEnfermeiros] = useState<Array<Funcionario & { agendas: string[] }>>([]);
   const [loading, setLoading] = useState(false);
   const [openChooser, setOpenChooser] = useState(false);
   const [busca, setBusca] = useState("");
   const [funcDialog, setFuncDialog] = useState<{ open: boolean; userId?: string | null }>({ open: false, userId: null });
   const [medicoDialog, setMedicoDialog] = useState<{ open: boolean; id: string | null }>({ open: false, id: null });
+  const [enfDialog, setEnfDialog] = useState<{ open: boolean; userId?: string | null }>({ open: false, userId: null });
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
@@ -79,15 +82,35 @@ function EquipePage() {
         const { data: profs } = await supabase.from("profiles").select("id, nome").in("id", ids);
         (profs ?? []).forEach((p: any) => nomeMap.set(p.id, p.nome));
       }
-      const rows: Funcionario[] = mems.map((r) => ({
+      const allRows: Funcionario[] = mems.map((r) => ({
         id: r.id,
         user_id: r.user_id,
         nome: nomeMap.get(r.user_id) ?? "(sem nome)",
         role: r.role,
         ativo: r.ativo,
       }));
-      rows.sort((a, b) => a.nome.localeCompare(b.nome));
-      setFuncionarios(rows);
+      allRows.sort((a, b) => a.nome.localeCompare(b.nome));
+      const enfRows = allRows.filter((r) => r.role === "enfermeiro");
+      setFuncionarios(allRows.filter((r) => r.role !== "enfermeiro"));
+
+      // Carrega vínculos de agendas para enfermeiros
+      let agendasMap = new Map<string, string[]>();
+      if (enfRows.length) {
+        const userIds = enfRows.map((e) => e.user_id);
+        const { data: vinc } = await supabase
+          .from("enfermagem_recurso_atendentes")
+          .select("user_id, recurso:enfermagem_recursos(nome)")
+          .eq("clinica_id", clinicaAtual.clinica_id)
+          .in("user_id", userIds);
+        for (const r of (vinc ?? []) as Array<{ user_id: string; recurso: { nome: string } | null }>) {
+          const nome = r.recurso?.nome;
+          if (!nome) continue;
+          const arr = agendasMap.get(r.user_id) ?? [];
+          arr.push(nome);
+          agendasMap.set(r.user_id, arr);
+        }
+      }
+      setEnfermeiros(enfRows.map((e) => ({ ...e, agendas: agendasMap.get(e.user_id) ?? [] })));
       setMedicos(((m.data ?? []) as Medico[]).map((medico) => ({
         ...medico,
         nome: limparPrefixoMedico(medico.nome),
@@ -104,6 +127,10 @@ function EquipePage() {
     setOpenChooser(false);
     setMedicoDialog({ open: true, id: null });
   };
+  const escolherEnfermagem = () => {
+    setOpenChooser(false);
+    setEnfDialog({ open: true, userId: null });
+  };
 
   if (!clinicaAtual) return <p className="text-muted-foreground">Selecione uma clínica primeiro.</p>;
 
@@ -114,6 +141,11 @@ function EquipePage() {
   const medicosFiltrados = q
     ? medicos.filter((m) => m.nome.toLowerCase().includes(q) || (m.crm ?? "").includes(q))
     : medicos;
+  const enfermeirosFiltrados = q
+    ? enfermeiros.filter((e) =>
+        e.nome.toLowerCase().includes(q) ||
+        e.agendas.some((a) => a.toLowerCase().includes(q)))
+    : enfermeiros;
 
   return (
     <div className="space-y-6">
@@ -129,7 +161,7 @@ function EquipePage() {
         </Button>
       </div>
 
-      <Tabs value={tab} onValueChange={(v) => setTab(v as "funcionarios" | "medicos")}>
+      <Tabs value={tab} onValueChange={(v) => setTab(v as "funcionarios" | "medicos" | "enfermagem")}>
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <TabsList>
             <TabsTrigger value="funcionarios">
@@ -139,6 +171,10 @@ function EquipePage() {
             <TabsTrigger value="medicos">
               <Stethoscope className="h-4 w-4 mr-2" /> Médicos
               <Badge variant="secondary" className="ml-2">{medicos.length}</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="enfermagem">
+              <HeartPulse className="h-4 w-4 mr-2" /> Enfermagem
+              <Badge variant="secondary" className="ml-2">{enfermeiros.length}</Badge>
             </TabsTrigger>
           </TabsList>
           <Input
@@ -228,6 +264,55 @@ function EquipePage() {
             </Card>
           )}
         </TabsContent>
+
+        <TabsContent value="enfermagem" className="mt-4">
+          {loading ? (
+            <Card><CardContent className="py-12 text-center text-muted-foreground">Carregando…</CardContent></Card>
+          ) : enfermeirosFiltrados.length === 0 ? (
+            <Card><CardContent className="py-12 text-center text-muted-foreground">
+              <HeartPulse className="h-8 w-8 mx-auto mb-2 opacity-50" /> Nenhum enfermeiro cadastrado.
+            </CardContent></Card>
+          ) : (
+            <Card>
+              <Table>
+                <TableHeader><TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Agendas</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="w-16 text-right">Ações</TableHead>
+                </TableRow></TableHeader>
+                <TableBody>
+                  {enfermeirosFiltrados.map((e) => (
+                    <TableRow key={e.id}>
+                      <TableCell>{e.nome}</TableCell>
+                      <TableCell className="text-sm">
+                        {e.agendas.length === 0 ? (
+                          <span className="text-muted-foreground">—</span>
+                        ) : (
+                          <div className="flex flex-wrap gap-1">
+                            {e.agendas.map((a, idx) => (
+                              <Badge key={idx} variant="outline">{a}</Badge>
+                            ))}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={e.ativo ? "default" : "outline"}>{e.ativo ? "Ativo" : "Inativo"}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button size="icon" variant="ghost" asChild>
+                          <Link to="/app/equipe/enfermeiro/$userId/editar" params={{ userId: e.user_id }}>
+                            <Pencil className="h-4 w-4" />
+                          </Link>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Card>
+          )}
+        </TabsContent>
       </Tabs>
 
       <Dialog open={openChooser} onOpenChange={setOpenChooser}>
@@ -238,24 +323,33 @@ function EquipePage() {
               Escolha o tipo de cadastro. Em ambos é possível liberar acesso ao sistema.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <button
               type="button"
               onClick={escolherFuncionario}
-              className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-border bg-background p-6 text-center transition hover:border-primary hover:bg-accent"
+              className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-border bg-background p-4 text-center transition hover:border-primary hover:bg-accent"
             >
               <Users className="h-8 w-8 text-primary" />
               <span className="font-medium">Funcionário</span>
-              <span className="text-xs text-muted-foreground">Equipe administrativa, recepção, enfermagem…</span>
+              <span className="text-xs text-muted-foreground">Administrativo, recepção, financeiro…</span>
             </button>
             <button
               type="button"
               onClick={escolherMedico}
-              className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-border bg-background p-6 text-center transition hover:border-primary hover:bg-accent"
+              className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-border bg-background p-4 text-center transition hover:border-primary hover:bg-accent"
             >
               <Stethoscope className="h-8 w-8 text-primary" />
               <span className="font-medium">Médico</span>
-              <span className="text-xs text-muted-foreground">Profissionais com CRM, especialidades e repasse</span>
+              <span className="text-xs text-muted-foreground">CRM, especialidades e repasse</span>
+            </button>
+            <button
+              type="button"
+              onClick={escolherEnfermagem}
+              className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-border bg-background p-4 text-center transition hover:border-primary hover:bg-accent"
+            >
+              <HeartPulse className="h-8 w-8 text-primary" />
+              <span className="font-medium">Enfermagem</span>
+              <span className="text-xs text-muted-foreground">Vinculado às agendas de enfermagem</span>
             </button>
           </div>
         </DialogContent>
@@ -276,6 +370,15 @@ function EquipePage() {
           onOpenChange={(o) => setMedicoDialog((s) => ({ ...s, open: o }))}
           clinicaId={clinicaAtual.clinica_id}
           editingMedicoId={medicoDialog.id}
+          onSaved={() => setReloadKey((k) => k + 1)}
+        />
+      )}
+      {clinicaAtual && (
+        <EnfermeiroFormDialog
+          open={enfDialog.open}
+          onOpenChange={(o) => setEnfDialog((s) => ({ ...s, open: o }))}
+          clinicaId={clinicaAtual.clinica_id}
+          editingUserId={enfDialog.userId ?? null}
           onSaved={() => setReloadKey((k) => k + 1)}
         />
       )}

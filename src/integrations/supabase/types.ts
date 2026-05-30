@@ -2168,6 +2168,45 @@ export type Database = {
         }
         Relationships: []
       }
+      enfermagem_recurso_atendentes: {
+        Row: {
+          clinica_id: string
+          created_at: string
+          id: string
+          recurso_id: string
+          user_id: string
+        }
+        Insert: {
+          clinica_id: string
+          created_at?: string
+          id?: string
+          recurso_id: string
+          user_id: string
+        }
+        Update: {
+          clinica_id?: string
+          created_at?: string
+          id?: string
+          recurso_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enfermagem_recurso_atendentes_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enfermagem_recurso_atendentes_recurso_id_fkey"
+            columns: ["recurso_id"]
+            isOneToOne: false
+            referencedRelation: "enfermagem_recursos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       enfermagem_recurso_disponibilidades: {
         Row: {
           ativo: boolean
