@@ -1,64 +1,53 @@
 ## Objetivo
 
-Criar agendas para exames realizados pela equipe de Enfermagem (ECG, MAPA 24h, Holter, ITB, Sala de Enfermagem), compartilhadas entre todos os enfermeiros, com registro automático de quem executou cada exame.
+Adicionar uma terceira categoria — **Enfermagem** — ao cadastro de Equipe, separada de Funcionários e Médicos, com vínculo às agendas (recursos de enfermagem como CURATIVO, INALAÇÃO, ECG, etc.) que cada profissional pode atender.
 
-## Conceito
+## Mudanças
 
-Tratar enfermagem como **Recursos Agendáveis** (salas), separados de médicos. Vários enfermeiros logados enxergam e mexem na mesma agenda em tempo real.
+### 1. Banco — nova tabela de vínculo
 
-## Mudanças no banco
+`enfermagem_recurso_atendentes`
+- `user_id` (FK auth.users)
+- `recurso_id` (FK enfermagem_recursos)
+- `clinica_id`
+- Único por (user_id, recurso_id)
+- RLS: leitura para membros da clínica; gestão por admin/gestor
 
-**Nova tabela `enfermagem_recursos`** (salas/recursos de enfermagem)
-- `nome`, `cor`, `descricao`, `duracao_padrao_min`, `ativo`, `clinica_id`
-- RLS: leitura para membros da clínica; gestão para admin/gestor
+Isso permite saber **quais agendas cada enfermeiro pode atender** sem mexer no perfil/role.
 
-**Nova tabela `enfermagem_recurso_procedimentos`** (quais exames cada recurso faz)
-- `recurso_id`, `procedimento_id`
+### 2. Página `/app/equipe` — nova aba "Enfermagem"
 
-**Nova tabela `enfermagem_recurso_disponibilidades`** (horários da sala)
-- mesmo modelo de `disponibilidades` dos médicos
+- Tabs passam a ser: **Funcionários** | **Médicos** | **Enfermagem**
+- A aba Enfermagem lista membros com `role = 'enfermeiro'`, mostrando Nome, Status e **Agendas vinculadas** (badges com nome dos recursos)
+- Botão de editar abre o novo `EnfermeiroFormDialog`
+- Atualizar `validateSearch` para aceitar `tab: "enfermagem"`
+- A aba Funcionários passa a filtrar **fora** os `role = 'enfermeiro'` (eles aparecem só na aba Enfermagem)
 
-**Alterações em `agendamentos`:**
-- `medico_id` continua opcional (já é nullable)
-- Adicionar `enfermagem_recurso_id uuid` (FK opcional)
-- Adicionar `executado_por uuid` (user_id do enfermeiro que iniciou/finalizou)
-- Adicionar `executado_em timestamptz`
-- Constraint: ou `medico_id` ou `enfermagem_recurso_id` preenchido (não os dois)
+### 3. Pop-up "Novo cadastro" — terceira opção
 
-## Mudanças no app
+Adicionar card **Enfermagem** (ícone Syringe/HeartPulse) ao lado de Funcionário e Médico. Layout muda para `grid-cols-3`. Ao escolher, abre o `EnfermeiroFormDialog`.
 
-**Nova tela "Enfermagem → Recursos"** (`/app/enfermagem-recursos`)
-- CRUD de salas/recursos
-- Seleção de procedimentos vinculados (multi-select alfabético, igual médicos)
-- Configuração de horários de funcionamento
+### 4. Novo `EnfermeiroFormDialog`
 
-**Agenda (`/app/agenda`)**
-- Filtro/seletor passa a listar Médicos + Recursos de Enfermagem (agrupados)
-- Coluna de recurso renderiza igual coluna de médico
-- Ao agendar, se for recurso de enfermagem grava `enfermagem_recurso_id` em vez de `medico_id`
-- Procedimentos disponíveis vêm dos vinculados ao recurso
+Cópia funcional do `FuncionarioFormDialog` (mesmas abas Dados / Login e perfil, mesma seleção de funcionário disponível do RH, mesmo fluxo de criar login) com:
 
-**Atendimento / Fluxo**
-- Botão "Iniciar atendimento" em agendamento de enfermagem grava `executado_por = auth.uid()` e `executado_em = now()`
-- Exibe nome do enfermeiro executor no card do agendamento
+- **Perfil fixo em "enfermeiro"** (campo oculto / pré-selecionado)
+- **Nova aba (ou seção) "Agendas"** com um multi-select listando todos os `enfermagem_recursos` ativos da clínica
+  - Ao salvar, sincroniza `enfermagem_recurso_atendentes` (insere novos / remove desmarcados)
+  - Na edição, vem pré-marcada com os recursos atuais
 
-**Permissões**
-- Papéis `enfermeiro`, `recepcao`, `admin`, `gestor` veem e editam agendas de enfermagem
-- Realtime já habilitado em `agendamentos` propaga mudanças automaticamente
+### 5. Filtro da Agenda (`/app/agenda`)
 
-**Seed inicial**
-- Criar automaticamente os 5 recursos informados ao rodar a migração: "EXAME DE ELETROCARDIOGRAMA", "EXAME DE MAPA 24H", "EXAME DE HOLTER", "EXAME DE ITB", "SALA ENFERMAGEM" — apenas como sugestão, podem ser editados/removidos.
+Quando o usuário logado é `role = 'enfermeiro'`, o seletor de coluna passa a mostrar apenas os recursos de enfermagem para os quais ele está em `enfermagem_recurso_atendentes`. Admin/gestor/recepção continuam vendo todos.
 
-## Fora do escopo desta entrega
+## Fora do escopo
 
-- Relatórios de produtividade por enfermeiro (fica para depois, dados já ficam gravados)
-- Repasse financeiro para enfermagem
-- Bloqueio de horários por enfermeiro individual
+- Não mexer no fluxo de Médicos
+- Não mexer no cadastro de recursos de enfermagem em si (`/app/enfermagem-recursos`)
+- Sem relatórios de produtividade
 
 ## Detalhes técnicos
 
-- Reuso de `procedimentos` e `medico_procedimentos` é mantido para médicos; criamos tabelas paralelas para enfermagem para não misturar contextos.
-- Componente `procedimento-cell.tsx` ganha suporte a `enfermagem_recurso_id`.
-- `app.agenda.tsx`: a query de "colunas" passa a unir médicos ativos + recursos de enfermagem ativos.
-- Validações Zod nas server functions novas (`enfermagem.functions.ts`).
-- Triggers de auditoria reaproveitam `fn_audit_trigger`.
+- Server function nova em `src/lib/enfermagem-equipe.functions.ts` para `salvarVinculosAgendas({ userId, clinicaId, recursoIds[] })` rodando com `supabaseAdmin` após `assertManager`.
+- `EquipePage`: estender query inicial para buscar também enfermeiros + vínculos (`enfermagem_recurso_atendentes` + `enfermagem_recursos.nome`) em um `in()` por user_id.
+- Migration cria tabela + GRANTs (`authenticated`, `service_role`) + RLS + policies usando `has_role` / `can_manage_clinica` já existentes.
