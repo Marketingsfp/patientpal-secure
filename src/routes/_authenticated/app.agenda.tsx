@@ -2546,7 +2546,17 @@ function MedicoFiltroInput({
   onlyMedicoId?: string | null;
 }) {
   const lista = useMemo(
-    () => medicos.filter((m) => !onlyMedicoId || m.id === onlyMedicoId),
+    () => {
+      const arr = medicos.filter((m) => !onlyMedicoId || m.id === onlyMedicoId);
+      // Recursos de enfermagem (prefixados com "🩺 ") aparecem primeiro
+      const isRec = (n: string) => n.startsWith("🩺");
+      return [...arr].sort((a, b) => {
+        const ra = isRec(a.nome) ? 0 : 1;
+        const rb = isRec(b.nome) ? 0 : 1;
+        if (ra !== rb) return ra - rb;
+        return a.nome.localeCompare(b.nome, "pt-BR");
+      });
+    },
     [medicos, onlyMedicoId],
   );
   const selecionadoNome = useMemo(
@@ -2560,8 +2570,8 @@ function MedicoFiltroInput({
   const norm = (s: string) => normalizar(s);
   const sugestoes = useMemo(() => {
     const t = norm(texto).trim();
-    if (!t) return lista.slice(0, 30);
-    return lista.filter((m) => norm(m.nome).includes(t)).slice(0, 30);
+    if (!t) return lista.slice(0, 100);
+    return lista.filter((m) => norm(m.nome).includes(t)).slice(0, 100);
   }, [lista, texto]);
 
   return (
