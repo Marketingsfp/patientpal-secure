@@ -602,7 +602,17 @@ function AgendaPage() {
       supabase.from("enfermagem_recurso_procedimentos").select("recurso_id,procedimento_id"),
     ]);
     const medicosBase = ((m.data ?? []) as Medico[]).map((x) => ({ ...x, __recurso: false }));
-    const recursosArr = ((er.data ?? []) as RecursoEnf[]);
+    let recursosArr = ((er.data ?? []) as RecursoEnf[]);
+    // Se o usuário logado é enfermeiro, restringe agendas àquelas em que foi liberado
+    if (clinicaAtual.role === "enfermeiro" && user?.id) {
+      const { data: vinc } = await supabase
+        .from("enfermagem_recurso_atendentes")
+        .select("recurso_id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("user_id", user.id);
+      const allowed = new Set(((vinc ?? []) as Array<{ recurso_id: string }>).map((r) => r.recurso_id));
+      recursosArr = recursosArr.filter((r) => allowed.has(r.id));
+    }
     const recursosComoMedicos: Medico[] = recursosArr.map((r) => ({
       id: r.id,
       nome: `🩺 ${r.nome}`,
