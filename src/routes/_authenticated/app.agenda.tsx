@@ -1469,6 +1469,7 @@ function AgendaPage() {
   const medicoNome = (id: string | null) => {
     const m = medicos.find(x => x.id === id);
     if (!m) return "—";
+    if (m.nome.startsWith("🩺")) return m.nome;
     return `${prefixoMedico(m.sexo)} ${m.nome}`;
   };
   const fmtHora = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -2259,7 +2260,9 @@ function AgendaPage() {
                   <TableCell className="pr-1 align-middle max-w-[220px]">
                     {(() => {
                       const m = medicos.find((x) => x.id === a.medico_id);
-                      const label = m ? `${prefixoMedico(m.sexo)} ${m.nome}` : "—";
+                      const label = m
+                        ? (m.nome.startsWith("🩺") ? m.nome : `${prefixoMedico(m.sexo)} ${m.nome}`)
+                        : "—";
                       return (
                         <div
                           className="text-xs uppercase font-medium text-foreground truncate"
