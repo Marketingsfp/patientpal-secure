@@ -46,7 +46,7 @@ const ChangePasswordDialog = lazy(() =>
   import("@/components/change-password-dialog").then((m) => ({ default: m.ChangePasswordDialog }))
 );
 
-type NavLeaf = { to: string; label: string; icon: typeof LayoutDashboard; hash?: string };
+type NavLeaf = { to: string; label: string; icon: typeof LayoutDashboard; hash?: string; aliases?: ReadonlyArray<string> };
 type NavParent = { label: string; icon: typeof LayoutDashboard; children: ReadonlyArray<NavLeaf> };
 type NavItem = NavLeaf | NavParent;
 const isParent = (it: NavItem): it is NavParent => "children" in it;
@@ -108,7 +108,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     label: "Cadastros",
     items: [
     { to: "/app/equipe", label: "Equipe", icon: Users },
-    { to: "/app/especialidades", label: "Serviços", icon: Stethoscope },
+    { to: "/app/especialidades", label: "Serviços", icon: Stethoscope, aliases: ["/app/tipos-servico", "/app/procedimentos", "/app/enfermagem-recursos"] },
     { to: "/app/disponibilidades", label: "Horários médicos", icon: Clock },
     { to: "/app/prontuario-modelos", label: "Modelos de Prontuário", icon: FileHeart },
     { to: "/app/perfis", label: "Perfis", icon: KeyRound },
@@ -476,8 +476,10 @@ export function AppShell() {
                       </div>
                     );
                   }
+                  const aliases: string[] = (item as { aliases?: string[] }).aliases ?? [];
                   const active = location.pathname === item.to ||
-                    (item.to !== "/app" && location.pathname.startsWith(item.to));
+                    (item.to !== "/app" && location.pathname.startsWith(item.to)) ||
+                    aliases.some((a) => location.pathname === a || location.pathname.startsWith(`${a}/`));
                   return (
                     <Link
                       key={item.to}
