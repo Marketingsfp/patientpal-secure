@@ -46,7 +46,7 @@ const ChangePasswordDialog = lazy(() =>
   import("@/components/change-password-dialog").then((m) => ({ default: m.ChangePasswordDialog }))
 );
 
-type NavLeaf = { to: string; label: string; icon: typeof LayoutDashboard; hash?: string };
+type NavLeaf = { to: string; label: string; icon: typeof LayoutDashboard; hash?: string; aliases?: ReadonlyArray<string> };
 type NavParent = { label: string; icon: typeof LayoutDashboard; children: ReadonlyArray<NavLeaf> };
 type NavItem = NavLeaf | NavParent;
 const isParent = (it: NavItem): it is NavParent => "children" in it;
