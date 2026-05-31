@@ -1902,12 +1902,29 @@ function AgendaPage() {
           // Avança o fluxo do paciente: após o pagamento no caixa, segue para triagem.
           try {
             const todos = [agId, ...pagamentoExtraIds];
-            const { error: errFluxo } = await supabase
-              .from("agendamentos")
-              .update({ fluxo_etapa: "triagem", fluxo_atualizado_em: new Date().toISOString() } as never)
-              .in("id", todos);
-            if (errFluxo) {
-              toast.error("Pagamento salvo, mas falhou ao avançar o fluxo: " + errFluxo.message);
+            // Auto check-in: apenas para atendimentos do MESMO DIA do pagamento.
+            // Se o pagamento é antecipado (consulta em outro dia), o paciente
+            // ainda não chegou — o check-in será feito manualmente na recepção.
+            const hoje = new Date().toISOString().slice(0, 10);
+            const mesmoDia = todos.filter((id) => {
+              const ag = items.find((x) => x.id === id);
+              if (!ag) return false;
+              return new Date(ag.inicio).toISOString().slice(0, 10) === hoje;
+            });
+            if (mesmoDia.length > 0) {
+              const { error: errFluxo } = await supabase
+                .from("agendamentos")
+                .update({ fluxo_etapa: "triagem", fluxo_atualizado_em: new Date().toISOString() } as never)
+                .in("id", mesmoDia);
+              if (errFluxo) {
+                toast.error("Pagamento salvo, mas falhou ao avançar o fluxo: " + errFluxo.message);
+              } else {
+                setEtapaMap((m) => {
+                  const n = new Map(m);
+                  for (const id of mesmoDia) n.set(id, "triagem");
+                  return n;
+                });
+              }
             }
           } catch (err) {
             toast.error(err instanceof Error ? err.message : "Falha ao avançar o fluxo");
