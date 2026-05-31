@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   Wallet, PlusCircle, MinusCircle, ArrowDownToLine, ArrowUpFromLine, Lock,
-  Unlock, Eye, FileDown, Users, Receipt, ChevronRight, Trash2, Plus,
+  Unlock, Eye, FileDown, Users, Receipt, ChevronRight, Trash2, Plus, HandCoins, ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -97,7 +98,35 @@ function Page() {
   const { user } = useAuth();
   const isManager = clinicaAtual?.role === "admin" || clinicaAtual?.role === "gestor";
 
-  const [tab, setTab] = useState<"meu" | "todos">("meu");
+  const [tab, setTab] = useState<"meu" | "todos" | "repasse">("meu");
+
+  // ====== Resumo de repasse do dia (para a aba "Repasse") ======
+  const [repHoje, setRepHoje] = useState<{ pendente: number; pago: number; medicos: number; qtd_pend: number }>({
+    pendente: 0, pago: 0, medicos: 0, qtd_pend: 0,
+  });
+  const loadRepasseHoje = useCallback(async () => {
+    if (!clinicaAtual) return;
+    const hoje = new Date().toISOString().slice(0, 10);
+    const { data, error } = await supabase
+      .from("fin_lancamentos")
+      .select("valor, medico_id, repasse_pago, agendamento_id, data")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("tipo", "receita")
+      .gte("data", hoje)
+      .lte("data", hoje)
+      .not("agendamento_id", "is", null);
+    if (error) return;
+    const rows = (data ?? []) as Array<{ valor: number | null; medico_id: string | null; repasse_pago: boolean | null }>;
+    let pendente = 0, pago = 0, qtd_pend = 0;
+    const medSet = new Set<string>();
+    for (const r of rows) {
+      const v = Number(r.valor) || 0;
+      if (r.repasse_pago) pago += v;
+      else { pendente += v; qtd_pend++; if (r.medico_id) medSet.add(r.medico_id); }
+    }
+    setRepHoje({ pendente, pago, medicos: medSet.size, qtd_pend });
+  }, [clinicaAtual]);
+  useEffect(() => { if (tab === "repasse") void loadRepasseHoje(); }, [tab, loadRepasseHoje]);
   const [loading, setLoading] = useState(true);
   const [minhaSessao, setMinhaSessao] = useState<Sessao | null>(null);
   const [minhasMovs, setMinhasMovs] = useState<Mov[]>([]);
@@ -537,10 +566,11 @@ function Page() {
         </div>
       </div>
 
-      <Tabs value={tab} onValueChange={(v) => setTab(v as "meu" | "todos")}>
+      <Tabs value={tab} onValueChange={(v) => setTab(v as "meu" | "todos" | "repasse")}>
         <TabsList>
           <TabsTrigger value="meu">Meu caixa</TabsTrigger>
           {isManager && <TabsTrigger value="todos"><Users className="h-4 w-4 mr-1" /> Todos (Financeiro)</TabsTrigger>}
+          <TabsTrigger value="repasse"><HandCoins className="h-4 w-4 mr-1" /> Repasse médico</TabsTrigger>
         </TabsList>
 
         {/* ===================== MEU CAIXA ===================== */}
@@ -800,6 +830,59 @@ function Page() {
             </Card>
           </TabsContent>
         )}
+
+        {/* ===================== REPASSE MÉDICO ===================== */}
+        <TabsContent value="repasse" className="space-y-4 pt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <HandCoins className="h-5 w-5 text-emerald-600" />
+                Repasse médico — resumo de hoje
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-lg border bg-rose-50 dark:bg-rose-950/30 p-4">
+                  <p className="text-xs text-muted-foreground">A repassar hoje</p>
+                  <p className="text-2xl font-bold text-rose-700 dark:text-rose-400">{fmt(repHoje.pendente)}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {repHoje.qtd_pend} atendimento{repHoje.qtd_pend === 1 ? "" : "s"} · {repHoje.medicos} médico{repHoje.medicos === 1 ? "" : "s"}
+                  </p>
+                </div>
+                <div className="rounded-lg border bg-emerald-50 dark:bg-emerald-950/30 p-4">
+                  <p className="text-xs text-muted-foreground">Já repassado hoje</p>
+                  <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{fmt(repHoje.pago)}</p>
+                </div>
+                <div className="rounded-lg border bg-sky-50 dark:bg-sky-950/30 p-4">
+                  <p className="text-xs text-muted-foreground">Total movimentado</p>
+                  <p className="text-2xl font-bold text-sky-700 dark:text-sky-400">{fmt(repHoje.pendente + repHoje.pago)}</p>
+                </div>
+              </div>
+
+              <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+                <h4 className="font-medium">Como funciona</h4>
+                <ul className="text-sm text-muted-foreground space-y-1 list-disc pl-5">
+                  <li>O sistema calcula o repasse automaticamente para cada atendimento pago (% ou valor fixo do cadastro do médico).</li>
+                  <li>Selecione vários atendimentos e use <strong>"Pagar repasse selecionados"</strong> — o sistema agrupa por médico e gera <strong>uma despesa por médico</strong>.</li>
+                  <li>O lançamento entra como <strong>despesa em dinheiro</strong> no financeiro, vinculado ao seu caixa do dia.</li>
+                </ul>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button asChild size="lg" className="bg-emerald-600 hover:bg-emerald-700">
+                  <Link to="/app/financeiro/atendimentos">
+                    <HandCoins className="h-4 w-4 mr-2" />
+                    Abrir tela completa de Repasse
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Link>
+                </Button>
+                <Button variant="outline" onClick={() => void loadRepasseHoje()}>
+                  Atualizar resumo
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       {/* === Modal Abrir === */}
