@@ -2388,6 +2388,27 @@ function AgendaPage() {
                       >
                         <DollarSign className="h-4 w-4" strokeWidth={pagosSet.has(a.id) ? 3 : 2.5} />
                       </Button>
+                      {(() => {
+                        const m = medicos.find((x) => x.id === a.medico_id);
+                        const manual = m && m.usa_sistema === false && !recursoIds.has(m.id);
+                        if (!manual) return null;
+                        if (normalizar(a.paciente_nome) === "disponivel") return null;
+                        const concluido = a.status === "realizado";
+                        return (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title={concluido ? "Atendimento concluído (prontuário em papel)" : "Concluir atendimento (médico faz prontuário em papel)"}
+                            disabled={concluido}
+                            onClick={() => concluirAtendimentoManual(a)}
+                            className={`h-7 w-7 border-2 rounded-md shadow-sm ${concluido
+                              ? "bg-emerald-600 text-white border-emerald-700 disabled:opacity-100"
+                              : "text-amber-700 border-amber-600 hover:bg-amber-50"}`}
+                          >
+                            <FileText className="h-4 w-4" strokeWidth={2.5} />
+                          </Button>
+                        );
+                      })()}
                       <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
