@@ -2283,12 +2283,23 @@ function AgendaPage() {
                       const label = m
                         ? (m.nome.startsWith("🩺") ? m.nome : `${prefixoMedico(m.sexo)} ${m.nome}`)
                         : "—";
+                      const manual = m && m.usa_sistema === false && !recursoIds.has(m.id);
                       return (
-                        <div
-                          className="text-xs uppercase font-medium text-foreground truncate"
-                          title={label}
-                        >
-                          {label}
+                        <div className="flex items-center gap-1 min-w-0">
+                          <div
+                            className="text-xs uppercase font-medium text-foreground truncate"
+                            title={manual ? `${label} (prontuário em papel)` : label}
+                          >
+                            {label}
+                          </div>
+                          {manual && (
+                            <span
+                              title="Médico faz prontuário em papel"
+                              className="shrink-0 inline-flex items-center rounded border border-amber-500/60 bg-amber-50 px-1 py-0 text-[9px] font-bold uppercase text-amber-700"
+                            >
+                              Papel
+                            </span>
+                          )}
                         </div>
                       );
                     })()}
