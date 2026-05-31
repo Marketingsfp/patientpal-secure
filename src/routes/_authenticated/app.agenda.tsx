@@ -31,7 +31,7 @@ import { ProcedimentoCell } from "@/components/agenda/procedimento-cell";
 import { PatientSearchInput } from "@/components/patient-search-input";
 import {
   CalendarDays, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X,
-  MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, Clock, DollarSign, ShieldCheck, BadgeCheck, IdCard, Play,
+  MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, Clock, DollarSign, ShieldCheck, BadgeCheck, IdCard, Play, FileText,
 } from "lucide-react";
 import { printGuiaAtendimento, printGuiaAtendimentoAgrupada } from "@/lib/print-gr";
 import { VoiceInput } from "@/components/voice-input";
@@ -58,7 +58,7 @@ type Agendamento = {
   observacoes: string | null;
   data_pagamento?: string | null;
 };
-type Medico = { id: string; nome: string; sexo?: string | null };
+type Medico = { id: string; nome: string; sexo?: string | null; usa_sistema?: boolean };
 type RecursoEnf = { id: string; nome: string };
 type Especialidade = { id: string; nome: string };
 type Paciente = { id: string; nome: string };
@@ -590,7 +590,7 @@ function AgendaPage() {
   const loadRef = async () => {
     if (!clinicaAtual) return;
     const [m, p, e, me, pr, sr, mc, mp, er, erp] = await Promise.all([
-      supabase.from("medicos").select("id,nome,sexo").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
+      supabase.from("medicos").select("id,nome,sexo,usa_sistema").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("pacientes").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome").limit(500),
       supabase.from("especialidades").select("id,nome").order("nome"),
       supabase.from("medico_especialidades").select("medico_id,especialidade_id"),
@@ -1277,6 +1277,26 @@ function AgendaPage() {
       .eq("id", a.id);
     if (error) { toast.error(error.message); return; }
     toast.success("Atendimento iniciado e registrado");
+    await load();
+  };
+
+  const concluirAtendimentoManual = async (a: Agendamento) => {
+    if (a.status === "realizado") { toast.info("Atendimento já concluído."); return; }
+    if (!confirm(`Concluir atendimento de ${a.paciente_nome}?\n\nO médico fará o prontuário em papel. O sistema registra a consulta como realizada e libera o repasse.`)) return;
+    const uid = (await supabase.auth.getUser()).data.user?.id;
+    if (!uid) { toast.error("Sessão expirada"); return; }
+    const { error } = await supabase
+      .from("agendamentos")
+      .update({
+        status: "realizado",
+        fluxo_etapa: "finalizado",
+        fluxo_atualizado_em: new Date().toISOString(),
+        executado_por: uid,
+        executado_em: new Date().toISOString(),
+      } as never)
+      .eq("id", a.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Atendimento concluído");
     await load();
   };
 
@@ -2263,12 +2283,23 @@ function AgendaPage() {
                       const label = m
                         ? (m.nome.startsWith("🩺") ? m.nome : `${prefixoMedico(m.sexo)} ${m.nome}`)
                         : "—";
+                      const manual = m && m.usa_sistema === false && !recursoIds.has(m.id);
                       return (
-                        <div
-                          className="text-xs uppercase font-medium text-foreground truncate"
-                          title={label}
-                        >
-                          {label}
+                        <div className="flex items-center gap-1 min-w-0">
+                          <div
+                            className="text-xs uppercase font-medium text-foreground truncate"
+                            title={manual ? `${label} (prontuário em papel)` : label}
+                          >
+                            {label}
+                          </div>
+                          {manual && (
+                            <span
+                              title="Médico faz prontuário em papel"
+                              className="shrink-0 inline-flex items-center rounded border border-amber-500/60 bg-amber-50 px-1 py-0 text-[9px] font-bold uppercase text-amber-700"
+                            >
+                              Papel
+                            </span>
+                          )}
                         </div>
                       );
                     })()}
@@ -2368,6 +2399,27 @@ function AgendaPage() {
                       >
                         <DollarSign className="h-4 w-4" strokeWidth={pagosSet.has(a.id) ? 3 : 2.5} />
                       </Button>
+                      {(() => {
+                        const m = medicos.find((x) => x.id === a.medico_id);
+                        const manual = m && m.usa_sistema === false && !recursoIds.has(m.id);
+                        if (!manual) return null;
+                        if (normalizar(a.paciente_nome) === "disponivel") return null;
+                        const concluido = a.status === "realizado";
+                        return (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title={concluido ? "Atendimento concluído (prontuário em papel)" : "Concluir atendimento (médico faz prontuário em papel)"}
+                            disabled={concluido}
+                            onClick={() => concluirAtendimentoManual(a)}
+                            className={`h-7 w-7 border-2 rounded-md shadow-sm ${concluido
+                              ? "bg-emerald-600 text-white border-emerald-700 disabled:opacity-100"
+                              : "text-amber-700 border-amber-600 hover:bg-amber-50"}`}
+                          >
+                            <FileText className="h-4 w-4" strokeWidth={2.5} />
+                          </Button>
+                        );
+                      })()}
                       <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>

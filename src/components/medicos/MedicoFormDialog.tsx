@@ -70,6 +70,7 @@ const emptyForm = () => ({
   cb_percentual: "",
   cb_valor: "",
   duracao_consulta_min: "15",
+  usa_sistema: true,
   cpf: "", rg: "", data_nascimento: "", email: "", telefone: "", telefone2: "",
   nacionalidade: "Brasileira", estado_civil: "",
   sexo: "nao_informar",
@@ -193,7 +194,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       setLoading(true);
       const { data: m } = await supabase
         .from("medicos")
-        .select("id, user_id, nome, crm, crm_uf, email, telefone, telefone2, nacionalidade, estado_civil, sexo, duracao_consulta_min, cep, logradouro, numero, complemento, bairro, cidade, estado, medico_especialidades(especialidade_id, tem_rqe, rqe_numero, especialidade:especialidades(id, nome))")
+        .select("id, user_id, nome, crm, crm_uf, email, telefone, telefone2, nacionalidade, estado_civil, sexo, duracao_consulta_min, usa_sistema, cep, logradouro, numero, complemento, bairro, cidade, estado, medico_especialidades(especialidade_id, tem_rqe, rqe_numero, especialidade:especialidades(id, nome))")
         .eq("id", editingMedicoId)
         .maybeSingle();
       if (cancelled) return;
@@ -257,6 +258,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         cb_percentual: sens.cb_percentual_repasse != null ? String(sens.cb_percentual_repasse) : "",
         cb_valor: sens.cb_valor_repasse != null ? String(sens.cb_valor_repasse) : "",
         duracao_consulta_min: med.duracao_consulta_min != null ? String(med.duracao_consulta_min) : "15",
+        usa_sistema: (med as { usa_sistema?: boolean }).usa_sistema !== false,
         cpf: sens.cpf ?? "", rg: sens.rg ?? "", data_nascimento: sens.data_nascimento ?? "",
         email: med.email ?? "", telefone: med.telefone ?? "", telefone2: med.telefone2 ?? "",
         nacionalidade: med.nacionalidade ?? "Brasileira", estado_civil: med.estado_civil ?? "",
@@ -327,6 +329,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         ? parseFloat(form.cb_valor || "0")
         : null,
       duracao_consulta_min: parseInt(form.duracao_consulta_min || "15") || 15,
+      usa_sistema: form.usa_sistema,
       cpf: form.cpf || null,
       rg: form.rg || null,
       data_nascimento: form.data_nascimento || null,
@@ -551,6 +554,24 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                         {["5","10","15","20","30","40","45","60"].map((v) => <SelectItem key={v} value={v}>{v} min</SelectItem>)}
                       </SelectContent>
                     </Select>
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <div className="rounded-md border p-3 flex items-start gap-3 bg-muted/30">
+                    <Checkbox
+                      id="usa_sistema"
+                      checked={form.usa_sistema}
+                      onCheckedChange={(c) => setForm({ ...form, usa_sistema: c === true })}
+                    />
+                    <div className="space-y-1">
+                      <Label htmlFor="usa_sistema" className="cursor-pointer">
+                        Médico usa o sistema (prontuário digital)
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Quando <b>desmarcado</b>, o médico faz prontuário em papel. Na agenda, em vez de abrir o prontuário, aparece o botão <b>"Concluir atendimento"</b> (1 clique) para finalizar a consulta e liberar o repasse normalmente.
+                      </p>
+                    </div>
                   </div>
                 </div>
 

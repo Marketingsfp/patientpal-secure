@@ -1,0 +1,2 @@
+ALTER TABLE public.medicos ADD COLUMN IF NOT EXISTS usa_sistema boolean NOT NULL DEFAULT true;
+COMMENT ON COLUMN public.medicos.usa_sistema IS 'Se false, o médico faz prontuário em papel — o sistema mostra botão "Concluir atendimento" (1 clique) em vez de abrir o prontuário digital.';
