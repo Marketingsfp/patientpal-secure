@@ -258,6 +258,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         cb_percentual: sens.cb_percentual_repasse != null ? String(sens.cb_percentual_repasse) : "",
         cb_valor: sens.cb_valor_repasse != null ? String(sens.cb_valor_repasse) : "",
         duracao_consulta_min: med.duracao_consulta_min != null ? String(med.duracao_consulta_min) : "15",
+        usa_sistema: (med as { usa_sistema?: boolean }).usa_sistema !== false,
         cpf: sens.cpf ?? "", rg: sens.rg ?? "", data_nascimento: sens.data_nascimento ?? "",
         email: med.email ?? "", telefone: med.telefone ?? "", telefone2: med.telefone2 ?? "",
         nacionalidade: med.nacionalidade ?? "Brasileira", estado_civil: med.estado_civil ?? "",
