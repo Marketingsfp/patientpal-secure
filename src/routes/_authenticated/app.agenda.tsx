@@ -31,7 +31,7 @@ import { ProcedimentoCell } from "@/components/agenda/procedimento-cell";
 import { PatientSearchInput } from "@/components/patient-search-input";
 import {
   CalendarDays, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X,
-  MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, Clock, DollarSign, ShieldCheck, BadgeCheck, IdCard, Play,
+  MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, Clock, DollarSign, ShieldCheck, BadgeCheck, IdCard, Play, Stethoscope, FileText,
 } from "lucide-react";
 import { printGuiaAtendimento, printGuiaAtendimentoAgrupada } from "@/lib/print-gr";
 import { VoiceInput } from "@/components/voice-input";
