@@ -4178,6 +4178,7 @@ export type Database = {
           tem_rqe: boolean
           tipo_repasse: string
           updated_at: string
+          usa_sistema: boolean
           user_id: string | null
           valor_repasse_padrao: number | null
         }
@@ -4224,6 +4225,7 @@ export type Database = {
           tem_rqe?: boolean
           tipo_repasse?: string
           updated_at?: string
+          usa_sistema?: boolean
           user_id?: string | null
           valor_repasse_padrao?: number | null
         }
@@ -4270,6 +4272,7 @@ export type Database = {
           tem_rqe?: boolean
           tipo_repasse?: string
           updated_at?: string
+          usa_sistema?: boolean
           user_id?: string | null
           valor_repasse_padrao?: number | null
         }
