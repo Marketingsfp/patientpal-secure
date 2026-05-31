@@ -1902,12 +1902,29 @@ function AgendaPage() {
           // Avança o fluxo do paciente: após o pagamento no caixa, segue para triagem.
           try {
             const todos = [agId, ...pagamentoExtraIds];
-            const { error: errFluxo } = await supabase
-              .from("agendamentos")
-              .update({ fluxo_etapa: "triagem", fluxo_atualizado_em: new Date().toISOString() } as never)
-              .in("id", todos);
-            if (errFluxo) {
-              toast.error("Pagamento salvo, mas falhou ao avançar o fluxo: " + errFluxo.message);
+            // Auto check-in: apenas para atendimentos do MESMO DIA do pagamento.
+            // Se o pagamento é antecipado (consulta em outro dia), o paciente
+            // ainda não chegou — o check-in será feito manualmente na recepção.
+            const hoje = new Date().toISOString().slice(0, 10);
+            const mesmoDia = todos.filter((id) => {
+              const ag = items.find((x) => x.id === id);
+              if (!ag) return false;
+              return new Date(ag.inicio).toISOString().slice(0, 10) === hoje;
+            });
+            if (mesmoDia.length > 0) {
+              const { error: errFluxo } = await supabase
+                .from("agendamentos")
+                .update({ fluxo_etapa: "triagem", fluxo_atualizado_em: new Date().toISOString() } as never)
+                .in("id", mesmoDia);
+              if (errFluxo) {
+                toast.error("Pagamento salvo, mas falhou ao avançar o fluxo: " + errFluxo.message);
+              } else {
+                setEtapaMap((m) => {
+                  const n = new Map(m);
+                  for (const id of mesmoDia) n.set(id, "triagem");
+                  return n;
+                });
+              }
             }
           } catch (err) {
             toast.error(err instanceof Error ? err.message : "Falha ao avançar o fluxo");
@@ -2266,8 +2283,19 @@ function AgendaPage() {
             ) : paginados.map((a) => {
               const fichaNum = fichaPorId.get(a.id) ?? "";
               const realizado = a.status === "realizado";
+                const etapaRow = etapaMap.get(a.id) ?? "aguardando_recepcao";
+                const presente = !realizado && (etapaRow === "recepcao" || etapaRow === "triagem");
               return (
-                <TableRow key={a.id} className={realizado ? "bg-emerald-50 dark:bg-emerald-950/20 [&>td]:py-1 [&>td]:h-9 text-xs" : "[&>td]:py-1 [&>td]:h-9 text-xs"}>
+                  <TableRow
+                    key={a.id}
+                    className={
+                      realizado
+                        ? "bg-emerald-50 dark:bg-emerald-950/20 [&>td]:py-1 [&>td]:h-9 text-xs"
+                        : "[&>td]:py-1 [&>td]:h-9 text-xs"
+                    }
+                    style={presente ? { backgroundColor: "#a8c8ed", borderLeft: "3px solid #7aa9d8" } : undefined}
+                    title={presente ? "Cliente presente na clínica" : undefined}
+                  >
                   <TableCell title="Marque para cobrar este atendimento em um pagamento agrupado">
                     <Checkbox checked={selecionados.has(a.id)} onCheckedChange={() => toggleSel(a.id)} />
                   </TableCell>
