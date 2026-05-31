@@ -1280,6 +1280,26 @@ function AgendaPage() {
     await load();
   };
 
+  const concluirAtendimentoManual = async (a: Agendamento) => {
+    if (a.status === "realizado") { toast.info("Atendimento já concluído."); return; }
+    if (!confirm(`Concluir atendimento de ${a.paciente_nome}?\n\nO médico fará o prontuário em papel. O sistema registra a consulta como realizada e libera o repasse.`)) return;
+    const uid = (await supabase.auth.getUser()).data.user?.id;
+    if (!uid) { toast.error("Sessão expirada"); return; }
+    const { error } = await supabase
+      .from("agendamentos")
+      .update({
+        status: "realizado",
+        fluxo_etapa: "finalizado",
+        fluxo_atualizado_em: new Date().toISOString(),
+        executado_por: uid,
+        executado_em: new Date().toISOString(),
+      } as never)
+      .eq("id", a.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Atendimento concluído");
+    await load();
+  };
+
   const cobrarAgendamento = async (a: Agendamento) => {
     if (!clinicaAtual) return;
     if (pagosSet.has(a.id)) {
