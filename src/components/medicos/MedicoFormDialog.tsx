@@ -70,6 +70,7 @@ const emptyForm = () => ({
   cb_percentual: "",
   cb_valor: "",
   duracao_consulta_min: "15",
+  usa_sistema: true,
   cpf: "", rg: "", data_nascimento: "", email: "", telefone: "", telefone2: "",
   nacionalidade: "Brasileira", estado_civil: "",
   sexo: "nao_informar",
