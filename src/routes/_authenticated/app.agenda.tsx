@@ -2283,8 +2283,19 @@ function AgendaPage() {
             ) : paginados.map((a) => {
               const fichaNum = fichaPorId.get(a.id) ?? "";
               const realizado = a.status === "realizado";
+                const etapaRow = etapaMap.get(a.id) ?? "aguardando_recepcao";
+                const presente = !realizado && (etapaRow === "recepcao" || etapaRow === "triagem");
               return (
-                <TableRow key={a.id} className={realizado ? "bg-emerald-50 dark:bg-emerald-950/20 [&>td]:py-1 [&>td]:h-9 text-xs" : "[&>td]:py-1 [&>td]:h-9 text-xs"}>
+                  <TableRow
+                    key={a.id}
+                    className={
+                      realizado
+                        ? "bg-emerald-50 dark:bg-emerald-950/20 [&>td]:py-1 [&>td]:h-9 text-xs"
+                        : "[&>td]:py-1 [&>td]:h-9 text-xs"
+                    }
+                    style={presente ? { backgroundColor: "#a8c8ed", borderLeft: "3px solid #7aa9d8" } : undefined}
+                    title={presente ? "Cliente presente na clínica" : undefined}
+                  >
                   <TableCell title="Marque para cobrar este atendimento em um pagamento agrupado">
                     <Checkbox checked={selecionados.has(a.id)} onCheckedChange={() => toggleSel(a.id)} />
                   </TableCell>
