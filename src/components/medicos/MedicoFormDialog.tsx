@@ -558,6 +558,24 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                 </div>
 
                 <div className="pt-2">
+                  <div className="rounded-md border p-3 flex items-start gap-3 bg-muted/30">
+                    <Checkbox
+                      id="usa_sistema"
+                      checked={form.usa_sistema}
+                      onCheckedChange={(c) => setForm({ ...form, usa_sistema: c === true })}
+                    />
+                    <div className="space-y-1">
+                      <Label htmlFor="usa_sistema" className="cursor-pointer">
+                        Médico usa o sistema (prontuário digital)
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Quando <b>desmarcado</b>, o médico faz prontuário em papel. Na agenda, em vez de abrir o prontuário, aparece o botão <b>"Concluir atendimento"</b> (1 clique) para finalizar a consulta e liberar o repasse normalmente.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-2">
                   <div className="border-t pt-4 space-y-4">
                     <div>
                       <h3 className="text-sm font-semibold">Contato</h3>
