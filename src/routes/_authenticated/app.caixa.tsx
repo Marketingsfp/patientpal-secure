@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   Wallet, PlusCircle, MinusCircle, ArrowDownToLine, ArrowUpFromLine, Lock,
-  Unlock, Eye, FileDown, Users, Receipt, ChevronRight, Trash2, Plus,
+  Unlock, Eye, FileDown, Users, Receipt, ChevronRight, Trash2, Plus, HandCoins, ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -97,7 +98,35 @@ function Page() {
   const { user } = useAuth();
   const isManager = clinicaAtual?.role === "admin" || clinicaAtual?.role === "gestor";
 
-  const [tab, setTab] = useState<"meu" | "todos">("meu");
+  const [tab, setTab] = useState<"meu" | "todos" | "repasse">("meu");
+
+  // ====== Resumo de repasse do dia (para a aba "Repasse") ======
+  const [repHoje, setRepHoje] = useState<{ pendente: number; pago: number; medicos: number; qtd_pend: number }>({
+    pendente: 0, pago: 0, medicos: 0, qtd_pend: 0,
+  });
+  const loadRepasseHoje = useCallback(async () => {
+    if (!clinicaAtual) return;
+    const hoje = new Date().toISOString().slice(0, 10);
+    const { data, error } = await supabase
+      .from("fin_lancamentos")
+      .select("valor, medico_id, repasse_pago, agendamento_id, data")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("tipo", "receita")
+      .gte("data", hoje)
+      .lte("data", hoje)
+      .not("agendamento_id", "is", null);
+    if (error) return;
+    const rows = (data ?? []) as Array<{ valor: number | null; medico_id: string | null; repasse_pago: boolean | null }>;
+    let pendente = 0, pago = 0, qtd_pend = 0;
+    const medSet = new Set<string>();
+    for (const r of rows) {
+      const v = Number(r.valor) || 0;
+      if (r.repasse_pago) pago += v;
+      else { pendente += v; qtd_pend++; if (r.medico_id) medSet.add(r.medico_id); }
+    }
+    setRepHoje({ pendente, pago, medicos: medSet.size, qtd_pend });
+  }, [clinicaAtual]);
+  useEffect(() => { if (tab === "repasse") void loadRepasseHoje(); }, [tab, loadRepasseHoje]);
   const [loading, setLoading] = useState(true);
   const [minhaSessao, setMinhaSessao] = useState<Sessao | null>(null);
   const [minhasMovs, setMinhasMovs] = useState<Mov[]>([]);
@@ -537,10 +566,11 @@ function Page() {
         </div>
       </div>
 
-      <Tabs value={tab} onValueChange={(v) => setTab(v as "meu" | "todos")}>
+      <Tabs value={tab} onValueChange={(v) => setTab(v as "meu" | "todos" | "repasse")}>
         <TabsList>
           <TabsTrigger value="meu">Meu caixa</TabsTrigger>
           {isManager && <TabsTrigger value="todos"><Users className="h-4 w-4 mr-1" /> Todos (Financeiro)</TabsTrigger>}
+          <TabsTrigger value="repasse"><HandCoins className="h-4 w-4 mr-1" /> Repasse médico</TabsTrigger>
         </TabsList>
 
         {/* ===================== MEU CAIXA ===================== */}
