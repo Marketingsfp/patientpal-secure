@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, ShieldCheck, Layers, Lightbulb, ArrowLeft, FileText, Info, Printer, Gift, FileSignature } from "lucide-react";
+import { Plus, Pencil, Trash2, ShieldCheck, Layers, Lightbulb, ArrowLeft, FileText, Info, Printer, Gift, FileSignature, Stethoscope } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -89,7 +89,7 @@ type Beneficio = {
   nome: string;
   descricao: string | null;
   ativo: boolean;
-  escopo: "servico" | "especialidade";
+  escopo: "servico" | "especialidade" | "consulta";
   procedimento_id: string | null;
   especialidade_id: string | null;
   tipo_desconto: "percentual" | "valor" | "gratuidade";
@@ -98,6 +98,7 @@ type Beneficio = {
   limite_uso: "ilimitado" | "1";
   periodicidade: "dia" | "mes" | "contrato";
   pessoa: "titular" | "titular_dependentes_soma" | "titular_ou_dependentes";
+  prioridade: number;
 };
 
 type ProcOpt = { id: string; nome: string };
@@ -138,7 +139,7 @@ function ConveniosPage() {
     setBenLoading(true);
     const { data, error } = await supabase
       .from("cb_beneficios")
-      .select("id, nome, descricao, ativo, escopo, procedimento_id, especialidade_id, tipo_desconto, valor_desconto, inicio_a_partir, limite_uso, periodicidade, pessoa")
+      .select("id, nome, descricao, ativo, escopo, procedimento_id, especialidade_id, tipo_desconto, valor_desconto, inicio_a_partir, limite_uso, periodicidade, pessoa, prioridade")
       .eq("convenio_id", convenioId)
       .order("nome");
     if (error) toast.error(error.message);
@@ -147,7 +148,7 @@ function ConveniosPage() {
       nome: b.nome,
       descricao: b.descricao,
       ativo: b.ativo,
-      escopo: (b.escopo ?? "servico") as "servico" | "especialidade",
+      escopo: (b.escopo ?? "servico") as Beneficio["escopo"],
       procedimento_id: b.procedimento_id ?? null,
       especialidade_id: b.especialidade_id ?? null,
       tipo_desconto: (b.tipo_desconto ?? "percentual") as "percentual" | "valor" | "gratuidade",
@@ -156,6 +157,7 @@ function ConveniosPage() {
       limite_uso: (b.limite_uso ?? "ilimitado") as "ilimitado" | "1",
       periodicidade: (b.periodicidade ?? "contrato") as "dia" | "mes" | "contrato",
       pessoa: (b.pessoa ?? "titular") as Beneficio["pessoa"],
+      prioridade: Number(b.prioridade ?? 1),
     })));
     setBenLoading(false);
   };
