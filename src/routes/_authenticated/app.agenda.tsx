@@ -63,7 +63,7 @@ type RecursoEnf = { id: string; nome: string };
 type Especialidade = { id: string; nome: string };
 type Paciente = { id: string; nome: string };
 type ProcedimentoRef = { id: string; nome: string; tipo: string | null; grupo?: string | null };
-type MedicoProcedimentoRef = { medico_id: string | null; procedimento_id: string; created_at?: string | null };
+type MedicoProcedimentoRef = { medico_id: string | null; procedimento_id: string; especialidade_id?: string | null; created_at?: string | null };
 
 const STATUS_LABEL: Record<Status, string> = {
   agendado: "Agendado", confirmado: "Confirmado", realizado: "Realizado",
@@ -151,7 +151,7 @@ async function fetchMedicoProcedimentosAgenda(): Promise<MedicoProcedimentoRef[]
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await supabase
       .from("medico_procedimentos")
-      .select("medico_id,procedimento_id,created_at")
+      .select("medico_id,procedimento_id,especialidade_id,created_at")
       .order("created_at")
       .range(from, from + pageSize - 1);
 
