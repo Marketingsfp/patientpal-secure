@@ -164,6 +164,99 @@ export type Database = {
           },
         ]
       }
+      agendamentos_legacy_import: {
+        Row: {
+          agendamento_id: string | null
+          atendido: string | null
+          baixa: string | null
+          cancelamento: string | null
+          chegou_clinica: string | null
+          clinica_id: string
+          codigo_agenda: number
+          codigo_cliente: number | null
+          codigo_profissional: number | null
+          confirmacao: string | null
+          created_at: string
+          data_geracao: string | null
+          data_marcacao: string | null
+          encaixe: string | null
+          fim: string
+          id: string
+          inicio: string
+          migrado_em: string | null
+          observacao: string | null
+          raw: Json | null
+          situacao: string | null
+          telemedicina: string | null
+          turno: string | null
+        }
+        Insert: {
+          agendamento_id?: string | null
+          atendido?: string | null
+          baixa?: string | null
+          cancelamento?: string | null
+          chegou_clinica?: string | null
+          clinica_id: string
+          codigo_agenda: number
+          codigo_cliente?: number | null
+          codigo_profissional?: number | null
+          confirmacao?: string | null
+          created_at?: string
+          data_geracao?: string | null
+          data_marcacao?: string | null
+          encaixe?: string | null
+          fim: string
+          id?: string
+          inicio: string
+          migrado_em?: string | null
+          observacao?: string | null
+          raw?: Json | null
+          situacao?: string | null
+          telemedicina?: string | null
+          turno?: string | null
+        }
+        Update: {
+          agendamento_id?: string | null
+          atendido?: string | null
+          baixa?: string | null
+          cancelamento?: string | null
+          chegou_clinica?: string | null
+          clinica_id?: string
+          codigo_agenda?: number
+          codigo_cliente?: number | null
+          codigo_profissional?: number | null
+          confirmacao?: string | null
+          created_at?: string
+          data_geracao?: string | null
+          data_marcacao?: string | null
+          encaixe?: string | null
+          fim?: string
+          id?: string
+          inicio?: string
+          migrado_em?: string | null
+          observacao?: string | null
+          raw?: Json | null
+          situacao?: string | null
+          telemedicina?: string | null
+          turno?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agendamentos_legacy_import_agendamento_id_fkey"
+            columns: ["agendamento_id"]
+            isOneToOne: false
+            referencedRelation: "agendamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agendamentos_legacy_import_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       alertas_enfermagem: {
         Row: {
           clinica_id: string
@@ -4470,6 +4563,7 @@ export type Database = {
           face_atualizado_em: string | null
           face_descriptor: number[] | null
           id: string
+          legacy_id: number | null
           logradouro: string | null
           nacionalidade: string | null
           nome: string
@@ -4517,6 +4611,7 @@ export type Database = {
           face_atualizado_em?: string | null
           face_descriptor?: number[] | null
           id?: string
+          legacy_id?: number | null
           logradouro?: string | null
           nacionalidade?: string | null
           nome: string
@@ -4564,6 +4659,7 @@ export type Database = {
           face_atualizado_em?: string | null
           face_descriptor?: number[] | null
           id?: string
+          legacy_id?: number | null
           logradouro?: string | null
           nacionalidade?: string | null
           nome?: string
@@ -5187,6 +5283,7 @@ export type Database = {
           foto_atualizado_em: string | null
           foto_url: string | null
           id: string
+          legacy_id: number | null
           logradouro: string | null
           nome: string
           numero: string | null
@@ -5219,6 +5316,7 @@ export type Database = {
           foto_atualizado_em?: string | null
           foto_url?: string | null
           id?: string
+          legacy_id?: number | null
           logradouro?: string | null
           nome: string
           numero?: string | null
@@ -5251,6 +5349,7 @@ export type Database = {
           foto_atualizado_em?: string | null
           foto_url?: string | null
           id?: string
+          legacy_id?: number | null
           logradouro?: string | null
           nome?: string
           numero?: string | null
