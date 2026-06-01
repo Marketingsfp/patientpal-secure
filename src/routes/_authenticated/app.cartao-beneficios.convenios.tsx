@@ -140,7 +140,7 @@ function ConveniosPage() {
     setBenLoading(true);
     const { data, error } = await supabase
       .from("cb_beneficios")
-      .select("id, nome, descricao, ativo, escopo, procedimento_id, especialidade_id, tipo_desconto, valor_desconto, inicio_a_partir, limite_uso, periodicidade, pessoa, prioridade")
+      .select("id, nome, descricao, ativo, escopo, procedimento_id, especialidade_id, tipo_desconto, valor_desconto, inicio_a_partir, limite_uso, periodicidade, pessoa, prioridade, procedimento_ids")
       .eq("convenio_id", convenioId)
       .order("nome");
     if (error) toast.error(error.message);
@@ -173,7 +173,7 @@ function ConveniosPage() {
     for (let from = 0; ; from += PAGE) {
       const { data, error } = await supabase
         .from("procedimentos")
-        .select("id, nome")
+        .select("id, nome, tipo")
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("ativo", true)
         .order("nome")
