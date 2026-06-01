@@ -90,6 +90,36 @@ const primeiroValorValido = (...valores: unknown[]) => {
 const valorCartaoProcedimento = (proc: any) =>
   primeiroValorValido(proc?.valor_cartao_credito, proc?.valor_cartao_debito, proc?.valor_cartao, proc?.valor_padrao);
 
+// Busca robusta de procedimento por nome. Usa lista pré-carregada (lookup local)
+// e, se não achar OU vier sem valores, faz fallback direto no banco com ilike.
+async function buscarProcedimentoPorNome(
+  clinicaId: string,
+  nome: string,
+  lista: any[] | null | undefined,
+): Promise<any | null> {
+  const alvo = (nome ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  const norm = (s: string) => (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  const arr = lista ?? [];
+  let proc: any =
+    arr.find((p) => norm(p.nome ?? "") === alvo)
+    ?? arr.find((p) => norm(p.nome ?? "").includes(alvo))
+    ?? arr.find((p) => alvo.includes(norm(p.nome ?? "")));
+  const temValor = (p: any) =>
+    p && [p.valor_dinheiro, p.valor_pix, p.valor_padrao, p.valor_cartao, p.valor_cartao_credito, p.valor_cartao_debito, p.valor_dinheiro_pix]
+      .some((v) => Number(v) > 0);
+  if (temValor(proc)) return proc;
+  // Fallback: consulta direta no banco com ilike (case-insensitive)
+  const { data } = await supabase
+    .from("procedimentos")
+    .select("nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix")
+    .eq("clinica_id", clinicaId)
+    .ilike("nome", (nome ?? "").trim())
+    .limit(5);
+  const exato = (data ?? []).find((p) => temValor(p)) ?? (data ?? [])[0];
+  if (temValor(exato)) return exato;
+  return proc ?? exato ?? null;
+}
+
 async function fetchProcedimentosAgenda(clinicaId: string): Promise<ProcedimentoRef[]> {
   const pageSize = 1000;
   const rows: ProcedimentoRef[] = [];
