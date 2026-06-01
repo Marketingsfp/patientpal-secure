@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { BellRing } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro/atendimentos")({
   component: Page,
@@ -74,6 +75,70 @@ function Page() {
   const [payOpen, setPayOpen] = useState(false);
   const [payForm, setPayForm] = useState({ data: hoje, conta_id: "", forma_pagamento: "" });
   const [payingNow, setPayingNow] = useState(false);
+
+  // Solicitações de estorno pendentes (vindas do caixa/recepção)
+  interface SolicEst {
+    id: string; paciente_nome: string | null; descricao: string | null;
+    valor: number | null; motivo: string; solicitado_em: string;
+    lancamento_id: string | null;
+  }
+  const [solicitacoes, setSolicitacoes] = useState<SolicEst[]>([]);
+  const loadSolicitacoes = async () => {
+    if (!clinicaAtual) { setSolicitacoes([]); return; }
+    const { data } = await supabase
+      .from("estorno_solicitacoes")
+      .select("id, paciente_nome, descricao, valor, motivo, solicitado_em, lancamento_id")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("status", "pendente")
+      .order("solicitado_em", { ascending: false });
+    setSolicitacoes((data ?? []) as SolicEst[]);
+  };
+  useEffect(() => { void loadSolicitacoes(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clinicaAtual?.clinica_id]);
+  useEffect(() => {
+    if (!clinicaAtual) return;
+    const ch = supabase
+      .channel(`fin-estornos-${clinicaAtual.clinica_id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "estorno_solicitacoes", filter: `clinica_id=eq.${clinicaAtual.clinica_id}` },
+        () => { void loadSolicitacoes(); },
+      )
+      .subscribe();
+    return () => { void supabase.removeChannel(ch); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clinicaAtual?.clinica_id]);
+
+  const aprovarSolicitacao = async (s: SolicEst) => {
+    if (!podeEstornar) { toast.error("Sem permissão"); return; }
+    // Tenta encontrar o atendimento referente para estornar de fato
+    const alvo = s.lancamento_id ? items.find((x) => x.id === s.lancamento_id) : null;
+    if (alvo) {
+      await estornar(alvo);
+    }
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error } = await supabase.from("estorno_solicitacoes").update({
+      status: "aprovado",
+      resolvido_por: user?.id ?? null,
+      resolvido_em: new Date().toISOString(),
+      resposta: alvo ? "Estorno executado" : "Aprovado manualmente (processar baixa)",
+    }).eq("id", s.id);
+    if (error) toast.error(error.message);
+    else { toast.success("Solicitação aprovada"); void loadSolicitacoes(); }
+  };
+
+  const rejeitarSolicitacao = async (s: SolicEst) => {
+    if (!podeEstornar) { toast.error("Sem permissão"); return; }
+    const resp = window.prompt("Motivo da recusa (opcional):") ?? "";
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error } = await supabase.from("estorno_solicitacoes").update({
+      status: "rejeitado",
+      resolvido_por: user?.id ?? null,
+      resolvido_em: new Date().toISOString(),
+      resposta: resp || null,
+    }).eq("id", s.id);
+    if (error) toast.error(error.message);
+    else { toast.success("Solicitação recusada"); void loadSolicitacoes(); }
+  };
 
   // Perfil médico: trava o filtro no próprio profissional
   useEffect(() => {
@@ -370,6 +435,39 @@ function Page() {
 
   return (
     <div className="space-y-3">
+      {podeEstornar && solicitacoes.length > 0 && (
+        <Card className="border-rose-300 bg-rose-50/60">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <BellRing className="h-4 w-4 text-rose-700" />
+              <strong className="text-sm text-rose-900">
+                {solicitacoes.length} solicitação(ões) de estorno pendente(s)
+              </strong>
+              <span className="text-xs text-rose-700/80">enviadas pelo caixa/recepção</span>
+            </div>
+            <ul className="divide-y divide-rose-200/60">
+              {solicitacoes.map((s) => (
+                <li key={s.id} className="py-2 flex flex-wrap items-start gap-2 text-sm">
+                  <div className="flex-1 min-w-[200px]">
+                    <div className="font-medium">{s.paciente_nome ?? "—"} {s.valor != null && <span className="text-muted-foreground font-normal">• {fmt(Number(s.valor))}</span>}</div>
+                    {s.descricao && <div className="text-xs text-muted-foreground">{s.descricao}</div>}
+                    <div className="text-xs italic text-rose-800/80 mt-0.5">"{s.motivo}"</div>
+                    <div className="text-[10px] text-muted-foreground">{new Date(s.solicitado_em).toLocaleString("pt-BR")}</div>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <Button size="sm" className="h-7 text-xs" onClick={() => aprovarSolicitacao(s)}>
+                      <CheckCircle2 className="h-3 w-3 mr-1" /> Aprovar e estornar
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => rejeitarSolicitacao(s)}>
+                      Recusar
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
       <div className="flex items-center justify-between">
         <div><h1 className="text-lg font-semibold leading-tight">Atendimentos</h1>
           <p className="text-xs text-muted-foreground">{isMedicoOnly ? "Seus atendimentos e o repasse devido por serviço" : "Serviços realizados com repasse automático (inclui pagamentos da agenda)"}</p></div>

@@ -10,6 +10,7 @@ import { getSubsystem, setSubsystem, subscribeSubsystem, SUBSYSTEMS } from "@/li
 import logoSaoFrancisco from "@/assets/logo-sao-francisco.png";
 import logoMeninoJesus from "@/assets/logo-menino-jesus.png";
 import logoConsultaHoje from "@/assets/logo-consulta-hoje.png";
+import { EstornosBell } from "@/components/EstornosBell";
 
 function corDaClinica(nome?: string): string {
   const n = (nome ?? "").toLowerCase();
@@ -588,9 +589,7 @@ export function AppShell() {
             >
               <span className="text-base font-semibold">?</span>
             </Button>
-            <Button variant="ghost" size="sm" className="h-9 w-9 p-0 rounded-full" title="Notificações">
-              <Bell className="h-4 w-4" />
-            </Button>
+            <EstornosBell />
           </div>
         </header>
         <main className="flex-1 px-3 pt-1 pb-3 sm:px-4 sm:pt-1.5 sm:pb-4 lg:px-6 lg:pt-2 lg:pb-6 overflow-auto min-w-0" style={{ background: "var(--surface-cream)" }}>

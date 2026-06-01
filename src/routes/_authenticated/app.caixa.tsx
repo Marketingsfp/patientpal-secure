@@ -27,6 +27,8 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { SolicitarEstornoDialog } from "@/components/financeiro/SolicitarEstornoDialog";
+import { Undo2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/caixa")({
   component: Page,
@@ -99,6 +101,7 @@ function Page() {
   const isManager = clinicaAtual?.role === "admin" || clinicaAtual?.role === "gestor";
 
   const [tab, setTab] = useState<"meu" | "todos" | "repasse">("meu");
+  const [estornoFor, setEstornoFor] = useState<Mov | null>(null);
 
   // ====== Resumo de repasse do dia (para a aba "Repasse") ======
   const [repHoje, setRepHoje] = useState<{ pendente: number; pago: number; medicos: number; qtd_pend: number }>({
@@ -693,11 +696,12 @@ function Page() {
                         <TableHead>Descrição</TableHead>
                         <TableHead>Forma</TableHead>
                         <TableHead className="text-right">Valor</TableHead>
+                        <TableHead className="text-right w-[1%]">Ação</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {minhasMovs.length === 0 && (
-                        <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Sem movimentos</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Sem movimentos</TableCell></TableRow>
                       )}
                       {minhasMovs.map((m) => (
                         <TableRow key={m.id}>
@@ -707,6 +711,20 @@ function Page() {
                           <TableCell>{m.forma_pagamento || "—"}</TableCell>
                           <TableCell className={`text-right font-medium ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
                             {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {m.tipo === "recebimento" && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs text-rose-700 border-rose-200 hover:bg-rose-50"
+                                title="Solicitar estorno ao financeiro"
+                                onClick={() => setEstornoFor(m)}
+                              >
+                                <Undo2 className="h-3 w-3 mr-1" /> Solicitar estorno
+                              </Button>
+                            )}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -1173,6 +1191,12 @@ function Page() {
           )}
         </DialogContent>
       </Dialog>
+      <SolicitarEstornoDialog
+        open={!!estornoFor}
+        onOpenChange={(v) => { if (!v) setEstornoFor(null); }}
+        descricao={estornoFor?.descricao ?? null}
+        valor={estornoFor?.valor ?? null}
+      />
     </div>
   );
 }
