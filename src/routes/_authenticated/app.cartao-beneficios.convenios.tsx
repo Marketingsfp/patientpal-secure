@@ -137,7 +137,7 @@ function ConveniosPage() {
     setBenLoading(true);
     const { data, error } = await supabase
       .from("cb_beneficios")
-      .select("id, nome, descricao, ativo")
+      .select("id, nome, descricao, ativo, escopo, procedimento_id, especialidade_id, tipo_desconto, valor_desconto, inicio_a_partir, limite_uso, periodicidade, pessoa")
       .eq("convenio_id", convenioId)
       .order("nome");
     if (error) toast.error(error.message);
