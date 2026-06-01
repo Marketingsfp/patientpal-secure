@@ -1,0 +1,1 @@
+DELETE FROM public.contratos_assinatura WHERE clinica_id = '7570ddde-8c1c-4b55-ba72-cf12b2a6c940';
