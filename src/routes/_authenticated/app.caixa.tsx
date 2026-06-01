@@ -1175,6 +1175,12 @@ function Page() {
           )}
         </DialogContent>
       </Dialog>
+      <SolicitarEstornoDialog
+        open={!!estornoFor}
+        onOpenChange={(v) => { if (!v) setEstornoFor(null); }}
+        descricao={estornoFor?.descricao ?? null}
+        valor={estornoFor?.valor ?? null}
+      />
     </div>
   );
 }
