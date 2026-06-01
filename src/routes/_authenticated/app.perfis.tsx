@@ -1,5 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useClinica } from "@/hooks/use-clinica";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import {
   ShieldCheck, ConciergeBell, Wallet, DollarSign, HeartPulse, Stethoscope, Briefcase,
-  ChevronDown, ChevronRight, Save,
+  ChevronDown, ChevronRight, Save, Loader2,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/perfis")({
@@ -235,12 +238,112 @@ function buildInitialState(): Record<PerfilKey, Record<string, Acesso>> {
 }
 
 function PerfisPage() {
+  const { clinicaAtual } = useClinica();
+  const clinicaId = clinicaAtual?.clinica_id ?? null;
   const [tab, setTab] = useState<"perfis" | "permissoes">("perfis");
   const [perfilSel, setPerfilSel] = useState<PerfilKey>("admin");
   const [matriz, setMatriz] = useState<Record<PerfilKey, Record<string, Acesso>>>(buildInitialState);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(
     () => Object.fromEntries(GRUPOS.map((g) => [g.label, true])),
   );
+  const [perfilIds, setPerfilIds] = useState<Record<PerfilKey, string>>({} as Record<PerfilKey, string>);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const loadedClinicRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!clinicaId || loadedClinicRef.current === clinicaId) return;
+    loadedClinicRef.current = clinicaId;
+    void (async () => {
+      setLoading(true);
+      try {
+        const upsertRows = PERFIS.map((p) => ({
+          clinica_id: clinicaId,
+          chave: p.key,
+          nome: p.nome,
+          descricao: p.descricao,
+          sistema: true,
+          ativo: true,
+        }));
+        const { error: upErr } = await supabase
+          .from("perfis_acesso")
+          .upsert(upsertRows, { onConflict: "clinica_id,chave", ignoreDuplicates: true });
+        if (upErr) throw upErr;
+
+        const { data: perfis, error: pErr } = await supabase
+          .from("perfis_acesso")
+          .select("id, chave")
+          .eq("clinica_id", clinicaId);
+        if (pErr) throw pErr;
+
+        const ids: Record<string, string> = {};
+        for (const p of perfis ?? []) ids[p.chave] = p.id;
+        setPerfilIds(ids as Record<PerfilKey, string>);
+
+        const perfilIdList = (perfis ?? []).map((p) => p.id);
+        if (perfilIdList.length > 0) {
+          const { data: perms, error: permErr } = await supabase
+            .from("perfil_permissoes")
+            .select("perfil_id, modulo, acesso")
+            .in("perfil_id", perfilIdList);
+          if (permErr) throw permErr;
+
+          const idToChave: Record<string, PerfilKey> = {};
+          for (const p of perfis ?? []) idToChave[p.id] = p.chave as PerfilKey;
+
+          setMatriz((prev) => {
+            const next = { ...prev } as Record<PerfilKey, Record<string, Acesso>>;
+            const seen: Record<string, boolean> = {};
+            for (const row of perms ?? []) {
+              const chave = idToChave[row.perfil_id];
+              if (!chave) continue;
+              if (!seen[chave]) {
+                next[chave] = Object.fromEntries(TODOS_MODULOS.map((k) => [k, "none" as Acesso]));
+                seen[chave] = true;
+              }
+              next[chave][row.modulo] = row.acesso as Acesso;
+            }
+            return next;
+          });
+        }
+      } catch (e) {
+        console.error("[perfis] load error", e);
+        toast.error("Falha ao carregar perfis", {
+          description: e instanceof Error ? e.message : String(e),
+        });
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [clinicaId]);
+
+  const salvar = async () => {
+    const perfilId = perfilIds[perfilSel];
+    if (!perfilId) {
+      toast.error("Perfil ainda não foi inicializado.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const rows = TODOS_MODULOS.map((modulo) => ({
+        perfil_id: perfilId,
+        modulo,
+        acesso: matriz[perfilSel][modulo],
+      }));
+      const { error } = await supabase
+        .from("perfil_permissoes")
+        .upsert(rows, { onConflict: "perfil_id,modulo" });
+      if (error) throw error;
+      toast.success("Permissões salvas");
+    } catch (e) {
+      console.error("[perfis] save error", e);
+      toast.error("Falha ao salvar", {
+        description: e instanceof Error ? e.message : String(e),
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const contagens = useMemo(() => {
     const out = {} as Record<PerfilKey, number>;
@@ -342,11 +445,12 @@ function PerfisPage() {
                   <Badge variant="outline" className="text-sm">
                     Acessos: <span className="ml-1 font-semibold">{acessosPerfil}</span> / {totalModulos}
                   </Badge>
-                  <Button variant="outline" size="sm" onClick={() => aplicarTodos("read")}>Tudo Leitura</Button>
-                  <Button variant="outline" size="sm" onClick={() => aplicarTodos("write")}>Tudo Edição</Button>
-                  <Button variant="outline" size="sm" onClick={() => aplicarTodos("none")}>Limpar</Button>
-                  <Button size="sm" disabled title="Apenas pré-visualização">
-                    <Save className="h-4 w-4 mr-2" /> Salvar
+                  <Button variant="outline" size="sm" onClick={() => aplicarTodos("read")} disabled={loading || saving}>Tudo Leitura</Button>
+                  <Button variant="outline" size="sm" onClick={() => aplicarTodos("write")} disabled={loading || saving}>Tudo Edição</Button>
+                  <Button variant="outline" size="sm" onClick={() => aplicarTodos("none")} disabled={loading || saving}>Limpar</Button>
+                  <Button size="sm" onClick={salvar} disabled={loading || saving || !perfilIds[perfilSel]}>
+                    {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                    Salvar
                   </Button>
                 </div>
               </div>
@@ -423,9 +527,11 @@ function PerfisPage() {
             );
           })}
 
-          <p className="text-xs text-muted-foreground">
-            Pré-visualização: as alterações ainda não são salvas no banco. Aprove o formato para que eu habilite a persistência.
-          </p>
+          {loading && (
+            <p className="text-xs text-muted-foreground flex items-center gap-2">
+              <Loader2 className="h-3 w-3 animate-spin" /> Carregando permissões…
+            </p>
+          )}
         </TabsContent>
       </Tabs>
     </div>
