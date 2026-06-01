@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Undo2, BellRing } from "lucide-react";
+import { BellRing } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro/atendimentos")({
   component: Page,
