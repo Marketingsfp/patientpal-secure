@@ -159,6 +159,7 @@ function ConveniosPage() {
       periodicidade: (b.periodicidade ?? "contrato") as "dia" | "mes" | "contrato",
       pessoa: (b.pessoa ?? "titular") as Beneficio["pessoa"],
       prioridade: Number(b.prioridade ?? 1),
+      procedimento_ids: Array.isArray(b.procedimento_ids) ? (b.procedimento_ids as string[]) : [],
     })));
     setBenLoading(false);
   };
@@ -204,6 +205,7 @@ function ConveniosPage() {
         periodicidade: "contrato" as const,
         pessoa: "titular" as Beneficio["pessoa"],
         prioridade: 1,
+        procedimento_ids: [] as string[],
       }];
       setEditingBenIdx(next.length - 1);
       return next;
