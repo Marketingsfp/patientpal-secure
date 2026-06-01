@@ -710,6 +710,9 @@ function AgendaPage() {
     }
     const procOpcoesMap = new Map<string, { id: string; nome: string }[]>();
     const procOpcoesVistos = new Map<string, Set<string>>();
+    const especialidadesPorId = new Map<string, string>(
+      ((e.data ?? []) as Especialidade[]).map((x) => [x.id, x.nome]),
+    );
     // Serviços vinculados ao médico pela aba "Especialidades" do cadastro do médico.
     // Esta é a fonte principal e preserva a mesma ordem exibida no cadastro do médico.
     for (const r of (Array.isArray(mp) ? mp : []) as MedicoProcedimentoRef[]) {
@@ -721,9 +724,16 @@ function AgendaPage() {
       if (!procOpcoesMap.has(r.medico_id)) procOpcoesMap.set(r.medico_id, []);
       if (!procOpcoesVistos.has(r.medico_id)) procOpcoesVistos.set(r.medico_id, new Set());
       const vistos = procOpcoesVistos.get(r.medico_id)!;
+      // Prioridade: especialidade explícita gravada na linha (novo modelo).
+      // Fallback (legado, sem especialidade gravada): só decora com o grupo
+      // quando o médico tem mais de uma especialidade.
+      const espNomeExplicito = r.especialidade_id
+        ? especialidadesPorId.get(r.especialidade_id) ?? null
+        : null;
       const grupo = (proc.grupo ?? "").trim();
-      const decorado =
-        medicoMultiEsp.has(r.medico_id) && grupo
+      const decorado = espNomeExplicito
+        ? `${proc.nome} (${espNomeExplicito.toUpperCase()})`
+        : medicoMultiEsp.has(r.medico_id) && grupo
           ? `${proc.nome} (${grupo.toUpperCase()})`
           : proc.nome;
       const chave = normalizar(decorado);
