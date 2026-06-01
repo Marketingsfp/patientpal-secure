@@ -359,7 +359,9 @@ function ConveniosPage() {
       }
       const nomeAuto = b.escopo === "servico"
         ? (procedimentosList.find((p) => p.id === b.procedimento_id)?.nome ?? "Serviço")
-        : "Especialidade: " + (especialidadesList.find((e) => e.id === b.especialidade_id)?.nome ?? "");
+        : b.escopo === "especialidade"
+          ? "Especialidade: " + (especialidadesList.find((e) => e.id === b.especialidade_id)?.nome ?? "")
+          : `Consultas (Grupo ${b.prioridade})`;
       bensToInsert.push({
         clinica_id: clinicaAtual.clinica_id,
         convenio_id: convenioId!,
@@ -375,6 +377,7 @@ function ConveniosPage() {
         limite_uso: b.limite_uso,
         periodicidade: b.periodicidade,
         pessoa: b.pessoa,
+        prioridade: b.prioridade,
       });
     }
     if (bensToInsert.length) {
