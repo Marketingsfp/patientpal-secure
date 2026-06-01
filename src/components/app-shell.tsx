@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
 import { useMedicoContext } from "@/hooks/use-medico-context";
+import { usePermissoes } from "@/hooks/use-permissoes";
 import { supabase } from "@/integrations/supabase/client";
 import { getSubsystem, setSubsystem, subscribeSubsystem, SUBSYSTEMS } from "@/lib/subsystem";
 import logoSaoFrancisco from "@/assets/logo-sao-francisco.png";
@@ -51,6 +52,51 @@ type NavLeaf = { to: string; label: string; icon: typeof LayoutDashboard; hash?:
 type NavParent = { label: string; icon: typeof LayoutDashboard; children: ReadonlyArray<NavLeaf> };
 type NavItem = NavLeaf | NavParent;
 const isParent = (it: NavItem): it is NavParent => "children" in it;
+
+// Mapeia rota do menu → chave de módulo da tela de Perfis de Acesso.
+// Rotas omitidas aqui são sempre visíveis (não controladas por permissão).
+const ROUTE_TO_MODULE: Record<string, string> = {
+  "/app/agenda": "agenda",
+  "/app/checkin": "checkin",
+  "/app/caixa": "caixa",
+  "/app/financeiro/atendimentos": "financeiro",
+  "/app/chat": "chat",
+  "/app/clientes": "clientes",
+  "/app/painel": "dashboard",
+  "/app/fluxo": "fluxo",
+  "/app/orcamentos": "orcamentos",
+  "/app/recepcao": "recepcao",
+  "/app/triagem-enfermagem": "triagem-enfermagem",
+  "/app/cartao-beneficios/contratos": "cartao-beneficios",
+  "/app/atendimento-ia": "atendimento-ia",
+  "/app/crm": "crm",
+  "/app/alertas-enfermagem": "alertas-enfermagem",
+  "/app/consulta-rapida": "consulta-rapida",
+  "/app/nina": "nina",
+  "/app/odontologia": "odontologia",
+  "/app/exames-resultados": "exames-resultados",
+  "/app/mkt-leads": "mkt-leads",
+  "/app/equipe": "equipe",
+  "/app/especialidades": "especialidades",
+  "/app/disponibilidades": "disponibilidades",
+  "/app/prontuario-modelos": "prontuario-modelos",
+  "/app/perfis": "perfis",
+  "/app/unidades": "unidades",
+  "/app/hr-ponto": "hr-ponto",
+  "/app/cargos": "cargos",
+  "/app/financeiro": "financeiro",
+  "/app/funcionarios": "funcionarios",
+  "/app/relatorios": "relatorios",
+  "/app/auditoria": "auditoria",
+  "/app/setores": "setores",
+};
+
+function leafAllowed(to: string, allowed: Set<string> | null): boolean {
+  if (!allowed) return true;
+  const mod = ROUTE_TO_MODULE[to];
+  if (!mod) return true; // rota não mapeada → sempre visível
+  return allowed.has(mod);
+}
 const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> = [
   {
     label: "Operação",
@@ -140,6 +186,7 @@ export function AppShell() {
   const { user, signOut, loading } = useAuth();
   const { memberships, clinicaAtual, setClinicaAtual, modoTodas, setModoTodas, branding } = useClinica();
   const { isMedicoOnly } = useMedicoContext();
+  const { allowed: allowedModules } = usePermissoes();
   const location = useLocation();
   const navigate = useNavigate();
   const navScrollRef = useRef<HTMLElement | null>(null);
@@ -278,7 +325,24 @@ export function AppShell() {
       : row.items.filter((it) => isParent(it) || !gestaoPessoasItems.has(it.to));
     return { ...row, items };
   }).filter((row) => row.items.length > 0);
-  const visibleNavRows = isMedicoOnly ? medicoNavRows : scopedNavRows;
+  const permissionFilteredRows = scopedNavRows
+    .map((row) => {
+      const items = row.items
+        .map((item) => {
+          if (isParent(item)) {
+            // Para itens pai (ex.: Nina), verifica a chave do próprio "to" base
+            // dos filhos. Atualmente Nina compartilha o módulo "nina".
+            const baseTo = item.children[0]?.to;
+            if (baseTo && !leafAllowed(baseTo, allowedModules)) return null;
+            return item;
+          }
+          return leafAllowed(item.to, allowedModules) ? item : null;
+        })
+        .filter((it): it is NavItem => it !== null);
+      return { ...row, items };
+    })
+    .filter((row) => row.items.length > 0);
+  const visibleNavRows = isMedicoOnly ? medicoNavRows : permissionFilteredRows;
   const subsystemLabel = subsystem ? SUBSYSTEMS[subsystem].label : null;
 
   // Lista plana de rotas visíveis no menu (respeitando grupos abertos) para navegação por seta
