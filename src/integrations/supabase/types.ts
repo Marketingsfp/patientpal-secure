@@ -3581,6 +3581,177 @@ export type Database = {
           },
         ]
       }
+      import_agenda_legado: {
+        Row: {
+          agendamento_online: string | null
+          agendamento_online_codigo_origem: string | null
+          atendido: string | null
+          baixa: string | null
+          callcenter: string | null
+          cancelamento: string | null
+          cancelamento_usuario: string | null
+          chegou_clinica: string | null
+          clinica_id: string
+          codigo_agenda: string | null
+          codigo_agenda_pai: string | null
+          codigo_agenda_situacao: string | null
+          codigo_cliente: string | null
+          codigo_convenio: string | null
+          codigo_filial: string | null
+          codigo_midia: string | null
+          codigo_plano: string | null
+          codigo_profissional: string | null
+          codigo_profissional_original: string | null
+          codigo_sala: string | null
+          codigo_usuario_baixa: string | null
+          codigo_usuario_geracao: string | null
+          codigo_usuario_marcacao: string | null
+          codigo_usuario_marcacao_original: string | null
+          confirmacao: string | null
+          confirmacao_envio: string | null
+          data_geracao: string | null
+          data_hora_fim: string | null
+          data_hora_fim_real: string | null
+          data_hora_inicio: string | null
+          data_hora_inicio_real: string | null
+          data_hora_senha_acesso: string | null
+          data_marcacao: string | null
+          encaixe: string | null
+          ficha: string | null
+          id: number
+          importado_em: string
+          observacao: string | null
+          observacao_temp: string | null
+          qnt_impressao_guia_atendimento: string | null
+          reagendamento: string | null
+          reagendamento_agenda_anterior: string | null
+          reagendamento_marcacao_anterior: string | null
+          reagendamento_usuario_anterior: string | null
+          repique: string | null
+          reservado_avaliacao: string | null
+          reservado_avaliacao_motivo: string | null
+          sem_faturamento: string | null
+          sem_faturamento_data: string | null
+          sem_faturamento_motivo: string | null
+          sem_faturamento_usuario: string | null
+          situacao: string | null
+          telemedicina: string | null
+          turno: string | null
+        }
+        Insert: {
+          agendamento_online?: string | null
+          agendamento_online_codigo_origem?: string | null
+          atendido?: string | null
+          baixa?: string | null
+          callcenter?: string | null
+          cancelamento?: string | null
+          cancelamento_usuario?: string | null
+          chegou_clinica?: string | null
+          clinica_id: string
+          codigo_agenda?: string | null
+          codigo_agenda_pai?: string | null
+          codigo_agenda_situacao?: string | null
+          codigo_cliente?: string | null
+          codigo_convenio?: string | null
+          codigo_filial?: string | null
+          codigo_midia?: string | null
+          codigo_plano?: string | null
+          codigo_profissional?: string | null
+          codigo_profissional_original?: string | null
+          codigo_sala?: string | null
+          codigo_usuario_baixa?: string | null
+          codigo_usuario_geracao?: string | null
+          codigo_usuario_marcacao?: string | null
+          codigo_usuario_marcacao_original?: string | null
+          confirmacao?: string | null
+          confirmacao_envio?: string | null
+          data_geracao?: string | null
+          data_hora_fim?: string | null
+          data_hora_fim_real?: string | null
+          data_hora_inicio?: string | null
+          data_hora_inicio_real?: string | null
+          data_hora_senha_acesso?: string | null
+          data_marcacao?: string | null
+          encaixe?: string | null
+          ficha?: string | null
+          id?: number
+          importado_em?: string
+          observacao?: string | null
+          observacao_temp?: string | null
+          qnt_impressao_guia_atendimento?: string | null
+          reagendamento?: string | null
+          reagendamento_agenda_anterior?: string | null
+          reagendamento_marcacao_anterior?: string | null
+          reagendamento_usuario_anterior?: string | null
+          repique?: string | null
+          reservado_avaliacao?: string | null
+          reservado_avaliacao_motivo?: string | null
+          sem_faturamento?: string | null
+          sem_faturamento_data?: string | null
+          sem_faturamento_motivo?: string | null
+          sem_faturamento_usuario?: string | null
+          situacao?: string | null
+          telemedicina?: string | null
+          turno?: string | null
+        }
+        Update: {
+          agendamento_online?: string | null
+          agendamento_online_codigo_origem?: string | null
+          atendido?: string | null
+          baixa?: string | null
+          callcenter?: string | null
+          cancelamento?: string | null
+          cancelamento_usuario?: string | null
+          chegou_clinica?: string | null
+          clinica_id?: string
+          codigo_agenda?: string | null
+          codigo_agenda_pai?: string | null
+          codigo_agenda_situacao?: string | null
+          codigo_cliente?: string | null
+          codigo_convenio?: string | null
+          codigo_filial?: string | null
+          codigo_midia?: string | null
+          codigo_plano?: string | null
+          codigo_profissional?: string | null
+          codigo_profissional_original?: string | null
+          codigo_sala?: string | null
+          codigo_usuario_baixa?: string | null
+          codigo_usuario_geracao?: string | null
+          codigo_usuario_marcacao?: string | null
+          codigo_usuario_marcacao_original?: string | null
+          confirmacao?: string | null
+          confirmacao_envio?: string | null
+          data_geracao?: string | null
+          data_hora_fim?: string | null
+          data_hora_fim_real?: string | null
+          data_hora_inicio?: string | null
+          data_hora_inicio_real?: string | null
+          data_hora_senha_acesso?: string | null
+          data_marcacao?: string | null
+          encaixe?: string | null
+          ficha?: string | null
+          id?: number
+          importado_em?: string
+          observacao?: string | null
+          observacao_temp?: string | null
+          qnt_impressao_guia_atendimento?: string | null
+          reagendamento?: string | null
+          reagendamento_agenda_anterior?: string | null
+          reagendamento_marcacao_anterior?: string | null
+          reagendamento_usuario_anterior?: string | null
+          repique?: string | null
+          reservado_avaliacao?: string | null
+          reservado_avaliacao_motivo?: string | null
+          sem_faturamento?: string | null
+          sem_faturamento_data?: string | null
+          sem_faturamento_motivo?: string | null
+          sem_faturamento_usuario?: string | null
+          situacao?: string | null
+          telemedicina?: string | null
+          turno?: string | null
+        }
+        Relationships: []
+      }
       integration_secrets: {
         Row: {
           chave: string
