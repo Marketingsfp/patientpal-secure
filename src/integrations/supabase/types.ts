@@ -14,6 +14,63 @@ export type Database = {
   }
   public: {
     Tables: {
+      _pac_stage_import: {
+        Row: {
+          bairro: string | null
+          cep: string | null
+          cidade: string | null
+          codigo_prontuario: string | null
+          complemento: string | null
+          cpf: string | null
+          data_nascimento: string | null
+          email: string | null
+          estado: string | null
+          id: number
+          logradouro: string | null
+          nome: string | null
+          numero: string | null
+          sexo: string | null
+          telefone: string | null
+          telefone2: string | null
+        }
+        Insert: {
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
+          codigo_prontuario?: string | null
+          complemento?: string | null
+          cpf?: string | null
+          data_nascimento?: string | null
+          email?: string | null
+          estado?: string | null
+          id?: number
+          logradouro?: string | null
+          nome?: string | null
+          numero?: string | null
+          sexo?: string | null
+          telefone?: string | null
+          telefone2?: string | null
+        }
+        Update: {
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
+          codigo_prontuario?: string | null
+          complemento?: string | null
+          cpf?: string | null
+          data_nascimento?: string | null
+          email?: string | null
+          estado?: string | null
+          id?: number
+          logradouro?: string | null
+          nome?: string | null
+          numero?: string | null
+          sexo?: string | null
+          telefone?: string | null
+          telefone2?: string | null
+        }
+        Relationships: []
+      }
       agendamentos: {
         Row: {
           clinica_id: string
