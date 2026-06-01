@@ -712,6 +712,13 @@ function ConveniosPage() {
                           <>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div>
+                              <Label className="text-xs">Nome do grupo</Label>
+                              <Input
+                                value={b.nome ?? ""}
+                                placeholder="Ex.: Consultas básicas"
+                                onChange={(e) => update({ nome: e.target.value })} />
+                            </div>
+                            <div>
                               <Label className="text-xs">Valor (R$)</Label>
                               <CurrencyInput
                                 value={b.valor_desconto !== null ? b.valor_desconto.toFixed(2) : ""}
