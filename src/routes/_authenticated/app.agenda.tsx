@@ -1316,6 +1316,7 @@ function AgendaPage() {
       .select("id")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("tipo", "receita")
+      .eq("status", "confirmado")
       .eq("agendamento_id", a.id)
       .limit(1);
     if ((jaPagos ?? []).length > 0) {
