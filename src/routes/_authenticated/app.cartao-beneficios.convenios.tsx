@@ -162,12 +162,26 @@ function ConveniosPage() {
 
   const loadCatalogos = async () => {
     if (!clinicaAtual) return;
-    const [{ data: procs }, { data: esps }] = await Promise.all([
-      supabase.from("procedimentos").select("id, nome")
-        .eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome").range(0, 9999),
-      supabase.from("especialidades").select("id, nome").eq("ativo", true).order("nome").range(0, 9999),
-    ]);
-    setProcedimentosList((procs ?? []) as ProcOpt[]);
+    // PostgREST aplica db-max-rows=1000 mesmo com .range() amplo —
+    // precisamos paginar manualmente para obter todos os serviços.
+    const PAGE = 1000;
+    const allProcs: ProcOpt[] = [];
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await supabase
+        .from("procedimentos")
+        .select("id, nome")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("ativo", true)
+        .order("nome")
+        .range(from, from + PAGE - 1);
+      if (error) break;
+      const page = (data ?? []) as ProcOpt[];
+      allProcs.push(...page);
+      if (page.length < PAGE) break;
+    }
+    const { data: esps } = await supabase
+      .from("especialidades").select("id, nome").eq("ativo", true).order("nome").range(0, 9999);
+    setProcedimentosList(allProcs);
     setEspecialidadesList((esps ?? []) as EspOpt[]);
   };
 
