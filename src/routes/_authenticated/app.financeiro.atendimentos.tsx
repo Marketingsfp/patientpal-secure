@@ -435,6 +435,39 @@ function Page() {
 
   return (
     <div className="space-y-3">
+      {podeEstornar && solicitacoes.length > 0 && (
+        <Card className="border-rose-300 bg-rose-50/60">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <BellRing className="h-4 w-4 text-rose-700" />
+              <strong className="text-sm text-rose-900">
+                {solicitacoes.length} solicitação(ões) de estorno pendente(s)
+              </strong>
+              <span className="text-xs text-rose-700/80">enviadas pelo caixa/recepção</span>
+            </div>
+            <ul className="divide-y divide-rose-200/60">
+              {solicitacoes.map((s) => (
+                <li key={s.id} className="py-2 flex flex-wrap items-start gap-2 text-sm">
+                  <div className="flex-1 min-w-[200px]">
+                    <div className="font-medium">{s.paciente_nome ?? "—"} {s.valor != null && <span className="text-muted-foreground font-normal">• {fmt(Number(s.valor))}</span>}</div>
+                    {s.descricao && <div className="text-xs text-muted-foreground">{s.descricao}</div>}
+                    <div className="text-xs italic text-rose-800/80 mt-0.5">"{s.motivo}"</div>
+                    <div className="text-[10px] text-muted-foreground">{new Date(s.solicitado_em).toLocaleString("pt-BR")}</div>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <Button size="sm" className="h-7 text-xs" onClick={() => aprovarSolicitacao(s)}>
+                      <CheckCircle2 className="h-3 w-3 mr-1" /> Aprovar e estornar
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => rejeitarSolicitacao(s)}>
+                      Recusar
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
       <div className="flex items-center justify-between">
         <div><h1 className="text-lg font-semibold leading-tight">Atendimentos</h1>
           <p className="text-xs text-muted-foreground">{isMedicoOnly ? "Seus atendimentos e o repasse devido por serviço" : "Serviços realizados com repasse automático (inclui pagamentos da agenda)"}</p></div>
