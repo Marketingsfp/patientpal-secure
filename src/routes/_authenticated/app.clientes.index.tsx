@@ -60,6 +60,7 @@ interface Paciente {
 function ClientesPage() {
   const { clinicaAtual } = useClinica();
   const [items, setItems] = useState<Paciente[]>([]);
+  const [totalPacientes, setTotalPacientes] = useState<number | null>(null);
   const [busca, setBusca] = useState(() => {
     if (typeof window === "undefined") return "";
     const params = new URLSearchParams(window.location.search);
@@ -73,14 +74,21 @@ function ClientesPage() {
   const load = async () => {
     if (!clinicaAtual) return;
     setLoading(true);
-    const { data, error } = await supabase
-      .from("pacientes")
-      .select("id,nome,cpf,telefone,email,data_nascimento,ativo,cidade,estado,created_at,foto_url,codigo_prontuario")
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .order("codigo_prontuario", { ascending: false, nullsFirst: false })
-      .limit(100);
+    const [{ data, error }, { count, error: countError }] = await Promise.all([
+      supabase
+        .from("pacientes")
+        .select("id,nome,cpf,telefone,email,data_nascimento,ativo,cidade,estado,created_at,foto_url,codigo_prontuario")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .order("codigo_prontuario", { ascending: false, nullsFirst: false })
+        .limit(100),
+      supabase
+        .from("pacientes")
+        .select("id", { count: "exact", head: true })
+        .eq("clinica_id", clinicaAtual.clinica_id),
+    ]);
     setLoading(false);
     if (error) { toast.error(error.message); return; }
+    if (countError) { toast.error(countError.message); } else { setTotalPacientes(count ?? 0); }
     setItems((data ?? []) as any);
   };
 
@@ -122,6 +130,11 @@ function ClientesPage() {
         <div>
           <h1 className="text-2xl font-semibold flex items-center gap-2">
             <Users className="h-6 w-6 text-primary" /> Clientes
+            {totalPacientes !== null && (
+              <span className="text-sm font-normal text-muted-foreground">
+                ({totalPacientes.toLocaleString("pt-BR")} {totalPacientes === 1 ? "paciente" : "pacientes"})
+              </span>
+            )}
           </h1>
           <p className="text-sm text-muted-foreground">Cadastre e gerencie os pacientes da clínica.</p>
         </div>
