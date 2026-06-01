@@ -14,6 +14,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      _stg_pagos2: {
+        Row: {
+          data_pagamento: string | null
+          inicio_local: string | null
+          medico_nome: string | null
+        }
+        Insert: {
+          data_pagamento?: string | null
+          inicio_local?: string | null
+          medico_nome?: string | null
+        }
+        Update: {
+          data_pagamento?: string | null
+          inicio_local?: string | null
+          medico_nome?: string | null
+        }
+        Relationships: []
+      }
       agendamentos: {
         Row: {
           clinica_id: string
