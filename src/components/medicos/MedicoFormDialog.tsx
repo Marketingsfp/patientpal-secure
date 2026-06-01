@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
@@ -13,6 +13,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 
 interface Especialidade { id: string; nome: string }
 interface Procedimento { id: string; nome: string; grupo: string | null; tipo: string; valor_padrao: number }
@@ -800,15 +808,76 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                       <Label className="text-sm font-medium">Serviços</Label>
                       <p className="text-xs text-muted-foreground">Adicione os serviços que o médico realiza. A lista mostra apenas serviços das especialidades selecionadas.</p>
                     </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      disabled={especialidadesSelecionadasNomes.size === 0 || procsFiltradosPorEspecialidade.length === 0}
-                      onClick={() => setForm({ ...form, procedimentos: [...form.procedimentos, ""] })}
-                    >
-                      <Plus className="h-4 w-4 mr-1" /> Adicionar serviço
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={especialidadesSelecionadasNomes.size === 0 || procsFiltradosPorEspecialidade.length === 0}
+                          >
+                            <Plus className="h-4 w-4 mr-1" /> Adicionar todos da especialidade
+                            <ChevronDown className="h-4 w-4 ml-1" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-72">
+                          <DropdownMenuLabel>Selecione a especialidade</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          {form.especialidades.length === 0 ? (
+                            <DropdownMenuItem disabled>Nenhuma especialidade selecionada</DropdownMenuItem>
+                          ) : (
+                            form.especialidades.map((er, i) => {
+                              const esp = esps.find((e) => e.id === er.especialidade_id);
+                              if (!esp) return null;
+                              const key = normalizarNome(esp.nome);
+                              const procsDaEsp = procs.filter((p) => {
+                                if (p.grupo && normalizarNome(p.grupo) === key) return true;
+                                const extras = procEspMap.get(p.id);
+                                if (extras && extras.has(key)) return true;
+                                return false;
+                              });
+                              return (
+                                <DropdownMenuItem
+                                  key={`${er.especialidade_id}-${i}`}
+                                  disabled={procsDaEsp.length === 0}
+                                  onSelect={() => {
+                                    const jaSel = new Set(form.procedimentos.filter(Boolean));
+                                    const novos = procsDaEsp.map((p) => p.id).filter((id) => !jaSel.has(id));
+                                    if (novos.length === 0) {
+                                      toast.info("Todos os serviços dessa especialidade já estão adicionados.");
+                                      return;
+                                    }
+                                    setForm({
+                                      ...form,
+                                      procedimentos: [
+                                        ...form.procedimentos.filter(Boolean),
+                                        ...novos,
+                                      ],
+                                    });
+                                    toast.success(`${novos.length} serviço(s) adicionado(s).`);
+                                  }}
+                                >
+                                  <span className="truncate">{esp.nome}</span>
+                                  <span className="ml-auto text-xs text-muted-foreground">
+                                    {procsDaEsp.length}
+                                  </span>
+                                </DropdownMenuItem>
+                              );
+                            })
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={especialidadesSelecionadasNomes.size === 0 || procsFiltradosPorEspecialidade.length === 0}
+                        onClick={() => setForm({ ...form, procedimentos: [...form.procedimentos, ""] })}
+                      >
+                        <Plus className="h-4 w-4 mr-1" /> Adicionar serviço
+                      </Button>
+                    </div>
                   </div>
                   {especialidadesSelecionadasNomes.size === 0 ? (
                     <p className="text-xs text-muted-foreground">Selecione ao menos uma especialidade na seção acima para ver os serviços disponíveis.</p>
