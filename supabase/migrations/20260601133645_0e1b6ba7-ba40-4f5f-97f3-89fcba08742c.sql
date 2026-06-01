@@ -1,0 +1,1 @@
+ALTER TABLE public._pac_stage_import ADD COLUMN IF NOT EXISTS id bigserial;

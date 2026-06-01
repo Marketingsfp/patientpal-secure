@@ -1,0 +1,1 @@
+GRANT ALL ON public._pac_stage_import TO sandbox_exec;
