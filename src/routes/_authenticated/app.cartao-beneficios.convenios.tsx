@@ -99,9 +99,10 @@ type Beneficio = {
   periodicidade: "dia" | "mes" | "contrato";
   pessoa: "titular" | "titular_dependentes_soma" | "titular_ou_dependentes";
   prioridade: number;
+  procedimento_ids: string[];
 };
 
-type ProcOpt = { id: string; nome: string };
+type ProcOpt = { id: string; nome: string; tipo?: string | null };
 type EspOpt = { id: string; nome: string };
 
 function ConveniosPage() {
@@ -139,7 +140,7 @@ function ConveniosPage() {
     setBenLoading(true);
     const { data, error } = await supabase
       .from("cb_beneficios")
-      .select("id, nome, descricao, ativo, escopo, procedimento_id, especialidade_id, tipo_desconto, valor_desconto, inicio_a_partir, limite_uso, periodicidade, pessoa, prioridade")
+      .select("id, nome, descricao, ativo, escopo, procedimento_id, especialidade_id, tipo_desconto, valor_desconto, inicio_a_partir, limite_uso, periodicidade, pessoa, prioridade, procedimento_ids")
       .eq("convenio_id", convenioId)
       .order("nome");
     if (error) toast.error(error.message);
@@ -158,6 +159,7 @@ function ConveniosPage() {
       periodicidade: (b.periodicidade ?? "contrato") as "dia" | "mes" | "contrato",
       pessoa: (b.pessoa ?? "titular") as Beneficio["pessoa"],
       prioridade: Number(b.prioridade ?? 1),
+      procedimento_ids: Array.isArray(b.procedimento_ids) ? (b.procedimento_ids as string[]) : [],
     })));
     setBenLoading(false);
   };
@@ -171,7 +173,7 @@ function ConveniosPage() {
     for (let from = 0; ; from += PAGE) {
       const { data, error } = await supabase
         .from("procedimentos")
-        .select("id, nome")
+        .select("id, nome, tipo")
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("ativo", true)
         .order("nome")
@@ -203,6 +205,7 @@ function ConveniosPage() {
         periodicidade: "contrato" as const,
         pessoa: "titular" as Beneficio["pessoa"],
         prioridade: 1,
+        procedimento_ids: [] as string[],
       }];
       setEditingBenIdx(next.length - 1);
       return next;
@@ -378,6 +381,7 @@ function ConveniosPage() {
         periodicidade: b.periodicidade,
         pessoa: b.pessoa,
         prioridade: b.prioridade,
+        procedimento_ids: b.escopo === "consulta" ? (b.procedimento_ids ?? []) : [],
       });
     }
     if (bensToInsert.length) {
@@ -705,6 +709,7 @@ function ConveniosPage() {
                           </div>
                         </div>
                         {b.escopo === "consulta" ? (
+                          <>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div>
                               <Label className="text-xs">Valor (R$)</Label>
@@ -713,6 +718,48 @@ function ConveniosPage() {
                                 onChange={(v) => update({ valor_desconto: v ? parseFloat(v) : null })} />
                             </div>
                           </div>
+                          {(() => {
+                            const consultaProcs = procedimentosList.filter((p) => (p.tipo ?? "").toLowerCase() === "consulta");
+                            const selected = b.procedimento_ids ?? [];
+                            const allSelected = consultaProcs.length > 0 && selected.length === consultaProcs.length;
+                            const toggle = (id: string) => {
+                              const set = new Set(selected);
+                              if (set.has(id)) set.delete(id); else set.add(id);
+                              update({ procedimento_ids: Array.from(set) });
+                            };
+                            const toggleAll = () => {
+                              update({ procedimento_ids: allSelected ? [] : consultaProcs.map((p) => p.id) });
+                            };
+                            return (
+                              <div>
+                                <div className="flex items-center justify-between mb-1">
+                                  <Label className="text-xs">Serviços (categoria Consulta)</Label>
+                                  <button type="button" onClick={toggleAll} className="text-xs text-primary hover:underline">
+                                    {allSelected ? "Desmarcar todos" : "Selecionar todos"}
+                                  </button>
+                                </div>
+                                <div className="border rounded-md p-2 max-h-56 overflow-auto bg-background">
+                                  {consultaProcs.length === 0 ? (
+                                    <p className="text-xs text-muted-foreground p-2">Nenhum serviço com categoria "Consulta" cadastrado.</p>
+                                  ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
+                                      {consultaProcs.map((p) => {
+                                        const checked = selected.includes(p.id);
+                                        return (
+                                          <label key={p.id} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-muted cursor-pointer text-sm">
+                                            <input type="checkbox" checked={checked} onChange={() => toggle(p.id)} />
+                                            <span className="truncate">{p.nome}</span>
+                                          </label>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                                <p className="text-[11px] text-muted-foreground mt-1">{selected.length} serviço(s) selecionado(s)</p>
+                              </div>
+                            );
+                          })()}
+                          </>
                         ) : (
                         <>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">

@@ -1453,6 +1453,7 @@ export type Database = {
           pessoa: string
           prioridade: number
           procedimento_id: string | null
+          procedimento_ids: string[]
           tipo_desconto: string
           updated_at: string
           valor_desconto: number | null
@@ -1473,6 +1474,7 @@ export type Database = {
           pessoa?: string
           prioridade?: number
           procedimento_id?: string | null
+          procedimento_ids?: string[]
           tipo_desconto?: string
           updated_at?: string
           valor_desconto?: number | null
@@ -1493,6 +1495,7 @@ export type Database = {
           pessoa?: string
           prioridade?: number
           procedimento_id?: string | null
+          procedimento_ids?: string[]
           tipo_desconto?: string
           updated_at?: string
           valor_desconto?: number | null
