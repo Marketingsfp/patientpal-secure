@@ -90,6 +90,36 @@ const primeiroValorValido = (...valores: unknown[]) => {
 const valorCartaoProcedimento = (proc: any) =>
   primeiroValorValido(proc?.valor_cartao_credito, proc?.valor_cartao_debito, proc?.valor_cartao, proc?.valor_padrao);
 
+// Busca robusta de procedimento por nome. Usa lista pré-carregada (lookup local)
+// e, se não achar OU vier sem valores, faz fallback direto no banco com ilike.
+async function buscarProcedimentoPorNome(
+  clinicaId: string,
+  nome: string,
+  lista: any[] | null | undefined,
+): Promise<any | null> {
+  const alvo = (nome ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  const norm = (s: string) => (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  const arr = lista ?? [];
+  let proc: any =
+    arr.find((p) => norm(p.nome ?? "") === alvo)
+    ?? arr.find((p) => norm(p.nome ?? "").includes(alvo))
+    ?? arr.find((p) => alvo.includes(norm(p.nome ?? "")));
+  const temValor = (p: any) =>
+    p && [p.valor_dinheiro, p.valor_pix, p.valor_padrao, p.valor_cartao, p.valor_cartao_credito, p.valor_cartao_debito, p.valor_dinheiro_pix]
+      .some((v) => Number(v) > 0);
+  if (temValor(proc)) return proc;
+  // Fallback: consulta direta no banco com ilike (case-insensitive)
+  const { data } = await supabase
+    .from("procedimentos")
+    .select("nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix")
+    .eq("clinica_id", clinicaId)
+    .ilike("nome", (nome ?? "").trim())
+    .limit(5);
+  const exato = (data ?? []).find((p) => temValor(p)) ?? (data ?? [])[0];
+  if (temValor(exato)) return exato;
+  return proc ?? exato ?? null;
+}
+
 async function fetchProcedimentosAgenda(clinicaId: string): Promise<ProcedimentoRef[]> {
   const pageSize = 1000;
   const rows: ProcedimentoRef[] = [];
@@ -921,7 +951,7 @@ function AgendaPage() {
     };
     let totalDinheiro = 0, totalPix = 0, totalDebito = 0, totalCredito = 0;
     for (const it of itens) {
-      const p: any = acharProc(it.procedimento ?? "CONSULTA");
+      const p: any = await buscarProcedimentoPorNome(clinicaAtual.clinica_id, it.procedimento ?? "CONSULTA", procs ?? []);
       const valorCartao = valorCartaoProcedimento(p);
       totalDinheiro += primeiroValorValido(p?.valor_dinheiro, p?.valor_dinheiro_pix, p?.valor_padrao);
       totalPix      += valorCartao;
@@ -1226,8 +1256,8 @@ function AgendaPage() {
         .select("nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix")
         .eq("clinica_id", clinicaAtual.clinica_id)
         .limit(5000);
-      const proc: any = (lista ?? []).find((p) => normalizar(p.nome ?? "") === nomeBusca)
-        ?? (lista ?? []).find((p) => normalizar(p.nome ?? "").includes(nomeBusca));
+      void nomeBusca;
+      const proc: any = await buscarProcedimentoPorNome(clinicaAtual.clinica_id, payload.procedimento ?? "CONSULTA", lista ?? []);
       const valorCartao = valorCartaoProcedimento(proc);
       const vDinheiro = primeiroValorValido(proc?.valor_dinheiro, proc?.valor_dinheiro_pix, proc?.valor_padrao);
       const vPix = valorCartao;
@@ -1271,9 +1301,27 @@ function AgendaPage() {
   };
 
   const remove = async (a: Agendamento) => {
-    if (!confirm(`Excluir agendamento de ${a.paciente_nome}?`)) return;
-    const { error } = await supabase.from("agendamentos").delete().eq("id", a.id);
-    if (error) toast.error(error.message); else { toast.success("Excluído"); await load(); }
+    // "Excluir" no menu (...) da linha NÃO apaga a ficha — apenas libera o horário
+    // (remove o cliente e volta o slot para DISPONÍVEL). Para excluir o número da ficha,
+    // selecione a linha e use "Excluir horários selecionados" no menu de Opções.
+    if (pagosSet.has(a.id)) {
+      toast.error("Este agendamento já foi pago. Estorne no Financeiro antes de liberar.");
+      return;
+    }
+    if (!confirm(`Liberar este horário? O cliente ${a.paciente_nome} será removido, mas a ficha continuará disponível.`)) return;
+    const { error } = await supabase
+      .from("agendamentos")
+      .update({
+        paciente_id: null,
+        paciente_nome: "DISPONÍVEL",
+        procedimento: null,
+        observacoes: null,
+        status: "agendado",
+        data_pagamento: null,
+      } as never)
+      .eq("id", a.id);
+    if (error) toast.error(error.message);
+    else { toast.success("Horário liberado."); await load(); }
   };
 
   const mudarStatus = async (a: Agendamento, status: Status) => {
@@ -1349,8 +1397,8 @@ function AgendaPage() {
       .select("nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .limit(5000);
-    const proc = (lista ?? []).find((p) => normalizar(p.nome ?? "") === nomeBusca)
-      ?? (lista ?? []).find((p) => normalizar(p.nome ?? "").includes(nomeBusca));
+    void nomeBusca;
+    const proc = await buscarProcedimentoPorNome(clinicaAtual.clinica_id, a.procedimento ?? "CONSULTA", lista ?? []);
     const valorCartao = valorCartaoProcedimento(proc);
     const vDinheiro = primeiroValorValido(proc?.valor_dinheiro, proc?.valor_dinheiro_pix, proc?.valor_padrao);
     const vPix = valorCartao;
