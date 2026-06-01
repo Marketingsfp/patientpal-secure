@@ -717,7 +717,7 @@ function AgendaPage() {
   };
 
   useEffect(() => { loadRef(); }, [clinicaAtual?.clinica_id]);
-  useEffect(() => { load(); }, [clinicaAtual?.clinica_id, dataRef, dataFim, apenasData, filtroStatus]);
+  useEffect(() => { load(); }, [clinicaAtual?.clinica_id, dataRef, dataFim, apenasData, filtroStatus, filtroMedico]);
 
   // Perfil de médico: trava o filtro no próprio profissional
   useEffect(() => {
