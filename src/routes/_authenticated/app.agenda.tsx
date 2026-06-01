@@ -500,6 +500,13 @@ function AgendaPage() {
     if (statusEspecifico) {
       q = q.eq("status", filtroStatus as Status).limit(1000);
     }
+    // Empurra o filtro de profissional para o servidor quando definido.
+    // Sem isso, a busca de 30 dias pode estourar o limite padrão de 1000
+    // linhas do PostgREST e descartar os agendamentos do profissional/dia
+    // selecionado.
+    if (filtroMedico !== "todos") {
+      q = q.or(`medico_id.eq.${filtroMedico},enfermagem_recurso_id.eq.${filtroMedico}`);
+    }
     if (apenasData) {
       const inicio = new Date(`${dataRef}T00:00:00`).toISOString();
       const fimDia = dataFim ?? dataRef;
@@ -511,6 +518,9 @@ function AgendaPage() {
       if (!dataFim) f.setDate(f.getDate() + 30);
       else f.setHours(23, 59, 59);
       q = q.gte("inicio", inicio).lte("inicio", f.toISOString());
+    }
+    if (!statusEspecifico) {
+      q = q.range(0, 9999);
     }
     const { data, error } = await q;
     setLoading(false);
