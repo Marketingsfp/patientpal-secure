@@ -48,8 +48,10 @@ export function SearchableSelect({
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        className="w-[--radix-popover-trigger-width] p-0"
+        className="p-0 w-[min(var(--radix-popover-trigger-width),24rem)] max-w-[90vw]"
         align="start"
+        sideOffset={4}
+        collisionPadding={12}
         onWheel={(e) => e.stopPropagation()}
         onTouchMove={(e) => e.stopPropagation()}
       >
@@ -61,7 +63,7 @@ export function SearchableSelect({
           }}
         >
           <CommandInput placeholder={searchPlaceholder} />
-          <CommandList className="max-h-[300px] overflow-y-auto overscroll-contain">
+          <CommandList className="max-h-[min(300px,var(--radix-popover-content-available-height))] overflow-y-auto overscroll-contain">
             <CommandEmpty>{emptyText}</CommandEmpty>
             <CommandGroup>
               {options.map((o) => (
