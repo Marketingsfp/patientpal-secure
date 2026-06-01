@@ -836,31 +836,17 @@ function ConveniosPage() {
                               </SelectContent>
                             </Select>
                           </div>
-                          {b.escopo === "consulta" ? (
-                            <div>
-                              <Label className="text-xs">Prioridade</Label>
-                              <Select value={String(b.prioridade)} onValueChange={(v) => update({ prioridade: parseInt(v) })}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="1">1</SelectItem>
-                                  <SelectItem value="2">2</SelectItem>
-                                  <SelectItem value="3">3</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          ) : (
-                            <div>
-                              <Label className="text-xs">Periodicidade</Label>
-                              <Select value={b.periodicidade} onValueChange={(v) => update({ periodicidade: v as Beneficio["periodicidade"] })}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="dia">Por dia</SelectItem>
-                                  <SelectItem value="mes">Por mês</SelectItem>
-                                  <SelectItem value="contrato">Por contrato</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          )}
+                          <div>
+                            <Label className="text-xs">Periodicidade</Label>
+                            <Select value={b.periodicidade} onValueChange={(v) => update({ periodicidade: v as Beneficio["periodicidade"] })}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="dia">Por dia</SelectItem>
+                                <SelectItem value="mes">Por mês</SelectItem>
+                                <SelectItem value="contrato">Por contrato</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                           <div>
                             <Label className="text-xs">Pessoa</Label>
                             <Select value={b.pessoa} onValueChange={(v) => update({ pessoa: v as Beneficio["pessoa"] })}>
