@@ -163,8 +163,8 @@ function ConveniosPage() {
     if (!clinicaAtual) return;
     const [{ data: procs }, { data: esps }] = await Promise.all([
       supabase.from("procedimentos").select("id, nome")
-        .eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
-      supabase.from("especialidades").select("id, nome").eq("ativo", true).order("nome"),
+        .eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome").range(0, 9999),
+      supabase.from("especialidades").select("id, nome").eq("ativo", true).order("nome").range(0, 9999),
     ]);
     setProcedimentosList((procs ?? []) as ProcOpt[]);
     setEspecialidadesList((esps ?? []) as EspOpt[]);
