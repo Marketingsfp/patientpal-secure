@@ -1532,6 +1532,10 @@ function AgendaPage() {
 
   const imprimirGR = async (a: Agendamento) => {
     if (!clinicaAtual) return;
+    if (!pagosSet.has(a.id)) {
+      toast.error("GR só pode ser impressa após o pagamento. Registre o pagamento antes.");
+      return;
+    }
     try {
       await printGuiaAtendimento({
         agendamentoId: a.id,
