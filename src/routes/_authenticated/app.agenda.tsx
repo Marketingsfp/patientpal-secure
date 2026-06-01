@@ -97,7 +97,9 @@ async function buscarProcedimentoPorNome(
   nome: string,
   lista: any[] | null | undefined,
 ): Promise<any | null> {
-  const alvo = (nome ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  // Remove sufixo de disambiguação " (ESPECIALIDADE)" antes de pesquisar.
+  const nomeBase = (nome ?? "").replace(/\s*\([^()]*\)\s*$/, "").trim();
+  const alvo = nomeBase.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
   const norm = (s: string) => (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
   const arr = lista ?? [];
   let proc: any =
