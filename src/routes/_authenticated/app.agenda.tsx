@@ -880,6 +880,7 @@ function AgendaPage() {
       .select("agendamento_id")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("tipo", "receita")
+      .eq("status", "confirmado")
       .in("agendamento_id", ids);
     if ((jaPagosLote ?? []).length > 0) {
       const pagos = new Set(((jaPagosLote ?? []) as Array<{ agendamento_id: string | null }>)
