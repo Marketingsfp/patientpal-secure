@@ -109,7 +109,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     a.medico_id
       ? supabase
           .from("medicos")
-          .select("nome")
+          .select("nome, especialidade:especialidades(nome)")
           .eq("id", a.medico_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
@@ -124,8 +124,9 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   ]);
 
   const paciente = pac.data as { nome: string; cpf: string | null; telefone: string | null; data_nascimento: string | null } | null;
-  const medicoBasic = med.data as { nome: string } | null;
+  const medicoBasic = med.data as { nome: string; especialidade: { nome: string } | null } | null;
   const medicoNome = medicoBasic?.nome ?? "—";
+  const espNome = medicoBasic?.especialidade?.nome?.toUpperCase() ?? "";
   let medicoData: { tipo_repasse: string | null; percentual_repasse_padrao: number | null; valor_repasse_padrao: number | null } | null = null;
   if (a.medico_id) {
     try {
@@ -138,7 +139,8 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
 
   // Se já temos pagamento informado, usa ele; senão tenta tabela de procedimentos
   const valor = pagamento ? Number(pagamento.valor) : Number(procData?.valor_dinheiro_pix ?? 0);
-  const procNome = (a.procedimento || procData?.nome || "CONSULTA").toUpperCase();
+  const procNomeBase = (a.procedimento || procData?.nome || "CONSULTA").toUpperCase();
+  const procNome = espNome ? `${espNome} - ${procNomeBase}` : procNomeBase;
 
   // Ficha = sequência do dia (placeholder simples baseado nos minutos)
   const inicioDt = new Date(a.inicio);
