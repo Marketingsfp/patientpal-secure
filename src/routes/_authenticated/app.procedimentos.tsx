@@ -729,8 +729,6 @@ function ProcedimentosPage() {
                     codigo: p.codigo ?? "",
                     dinheiro: Number(p.valor_dinheiro ?? p.valor_dinheiro_pix ?? 0).toFixed(2),
                     cartao: Number(p.valor_cartao_credito ?? p.valor_cartao_debito ?? p.valor_cartao ?? 0).toFixed(2),
-                    cartao_consulta: Number(p.valor_cartao_consulta ?? 0).toFixed(2),
-                    cartao_desconto: Number(p.valor_cartao_desconto ?? 0).toFixed(2),
                     duracao: p.duracao_minutos,
                     preparo: p.preparo ?? "",
                     ativo: p.ativo ? "Sim" : "Não",
@@ -743,8 +741,6 @@ function ProcedimentosPage() {
                     { key: "codigo", label: "Código" },
                     { key: "dinheiro", label: "Dinheiro (R$)" },
                     { key: "cartao", label: "Cartão (R$)" },
-                    { key: "cartao_consulta", label: "C. Consulta (R$)" },
-                    { key: "cartao_desconto", label: "C. Desconto (R$)" },
                     { key: "duracao", label: "Duração (min)" },
                     { key: "preparo", label: "Preparo" },
                     { key: "ativo", label: "Ativo" },
@@ -811,8 +807,6 @@ function ProcedimentosPage() {
                   <TableHead className="w-20 text-right">Pix</TableHead>
                   <TableHead className="w-20 text-right">Débito</TableHead>
                   <TableHead className="w-20 text-right">Crédito</TableHead>
-                  <TableHead className="w-24 text-right">C. Consulta</TableHead>
-                  <TableHead className="w-24 text-right">C. Desconto</TableHead>
                   <TableHead className="w-24">Situação</TableHead>
                   <TableHead className="w-28 text-right">Ações</TableHead>
                 </TableRow>
@@ -835,8 +829,6 @@ function ProcedimentosPage() {
                     <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_pix ?? p.valor_cartao_credito ?? p.valor_cartao_debito ?? p.valor_cartao))}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_cartao_debito ?? p.valor_cartao_credito ?? p.valor_cartao))}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_cartao_credito ?? p.valor_cartao_debito ?? p.valor_cartao))}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_cartao_consulta))}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_cartao_desconto))}</TableCell>
                     <TableCell>
                       <span className={`text-[10px] px-1.5 py-0 rounded-full ${p.ativo ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}>
                         {p.ativo ? "Ativo" : "Inativo"}
@@ -977,16 +969,6 @@ function ProcedimentosPage() {
                   <CurrencyInput value={form.valor_pix_cartao}
                     onChange={(v) => setForm({ ...form, valor_pix_cartao: v })} />
                   <p className="text-[10px] text-muted-foreground">Mesmo valor para Pix, Cartão de Débito e Crédito.</p>
-                </div>
-                <div className="space-y-1">
-                  <Label>Cartão Consulta (R$)</Label>
-                  <CurrencyInput value={form.valor_cartao_consulta}
-                    onChange={(v) => setForm({ ...form, valor_cartao_consulta: v })} />
-                </div>
-                <div className="space-y-1">
-                  <Label>Cartão Desconto (R$)</Label>
-                  <CurrencyInput value={form.valor_cartao_desconto}
-                    onChange={(v) => setForm({ ...form, valor_cartao_desconto: v })} />
                 </div>
               </div>
             </div>
