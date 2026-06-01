@@ -1,0 +1,1 @@
+ALTER TABLE public.cb_beneficios ADD COLUMN IF NOT EXISTS procedimento_ids uuid[] NOT NULL DEFAULT '{}';
