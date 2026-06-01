@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, ShieldCheck, Layers, Lightbulb, ArrowLeft, FileText, Info, Printer, Gift, FileSignature } from "lucide-react";
+import { Plus, Pencil, Trash2, ShieldCheck, Layers, Lightbulb, ArrowLeft, FileText, Info, Printer, Gift, FileSignature, Stethoscope } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -89,7 +89,7 @@ type Beneficio = {
   nome: string;
   descricao: string | null;
   ativo: boolean;
-  escopo: "servico" | "especialidade";
+  escopo: "servico" | "especialidade" | "consulta";
   procedimento_id: string | null;
   especialidade_id: string | null;
   tipo_desconto: "percentual" | "valor" | "gratuidade";
@@ -98,6 +98,7 @@ type Beneficio = {
   limite_uso: "ilimitado" | "1";
   periodicidade: "dia" | "mes" | "contrato";
   pessoa: "titular" | "titular_dependentes_soma" | "titular_ou_dependentes";
+  prioridade: number;
 };
 
 type ProcOpt = { id: string; nome: string };
@@ -138,7 +139,7 @@ function ConveniosPage() {
     setBenLoading(true);
     const { data, error } = await supabase
       .from("cb_beneficios")
-      .select("id, nome, descricao, ativo, escopo, procedimento_id, especialidade_id, tipo_desconto, valor_desconto, inicio_a_partir, limite_uso, periodicidade, pessoa")
+      .select("id, nome, descricao, ativo, escopo, procedimento_id, especialidade_id, tipo_desconto, valor_desconto, inicio_a_partir, limite_uso, periodicidade, pessoa, prioridade")
       .eq("convenio_id", convenioId)
       .order("nome");
     if (error) toast.error(error.message);
@@ -147,7 +148,7 @@ function ConveniosPage() {
       nome: b.nome,
       descricao: b.descricao,
       ativo: b.ativo,
-      escopo: (b.escopo ?? "servico") as "servico" | "especialidade",
+      escopo: (b.escopo ?? "servico") as Beneficio["escopo"],
       procedimento_id: b.procedimento_id ?? null,
       especialidade_id: b.especialidade_id ?? null,
       tipo_desconto: (b.tipo_desconto ?? "percentual") as "percentual" | "valor" | "gratuidade",
@@ -156,6 +157,7 @@ function ConveniosPage() {
       limite_uso: (b.limite_uso ?? "ilimitado") as "ilimitado" | "1",
       periodicidade: (b.periodicidade ?? "contrato") as "dia" | "mes" | "contrato",
       pessoa: (b.pessoa ?? "titular") as Beneficio["pessoa"],
+      prioridade: Number(b.prioridade ?? 1),
     })));
     setBenLoading(false);
   };
@@ -185,7 +187,7 @@ function ConveniosPage() {
     setEspecialidadesList((esps ?? []) as EspOpt[]);
   };
 
-  const addBeneficio = (escopo: "servico" | "especialidade") => {
+  const addBeneficio = (escopo: "servico" | "especialidade" | "consulta") => {
     setBeneficios((prev) => {
       const next = [...prev, {
         nome: "",
@@ -194,12 +196,13 @@ function ConveniosPage() {
         escopo,
         procedimento_id: null,
         especialidade_id: null,
-        tipo_desconto: "percentual" as const,
+        tipo_desconto: (escopo === "consulta" ? "valor" : "percentual") as Beneficio["tipo_desconto"],
         valor_desconto: null,
         inicio_a_partir: 1 as 1 | 2 | 6,
         limite_uso: "ilimitado" as const,
         periodicidade: "contrato" as const,
         pessoa: "titular" as Beneficio["pessoa"],
+        prioridade: 1,
       }];
       setEditingBenIdx(next.length - 1);
       return next;
@@ -356,7 +359,9 @@ function ConveniosPage() {
       }
       const nomeAuto = b.escopo === "servico"
         ? (procedimentosList.find((p) => p.id === b.procedimento_id)?.nome ?? "Serviço")
-        : "Especialidade: " + (especialidadesList.find((e) => e.id === b.especialidade_id)?.nome ?? "");
+        : b.escopo === "especialidade"
+          ? "Especialidade: " + (especialidadesList.find((e) => e.id === b.especialidade_id)?.nome ?? "")
+          : `Consultas (Grupo ${b.prioridade})`;
       bensToInsert.push({
         clinica_id: clinicaAtual.clinica_id,
         convenio_id: convenioId!,
@@ -372,6 +377,7 @@ function ConveniosPage() {
         limite_uso: b.limite_uso,
         periodicidade: b.periodicidade,
         pessoa: b.pessoa,
+        prioridade: b.prioridade,
       });
     }
     if (bensToInsert.length) {
@@ -629,7 +635,9 @@ function ConveniosPage() {
                         {beneficios.map((b, idx) => {
                           const alvo = b.escopo === "servico"
                             ? (procedimentosList.find((p) => p.id === b.procedimento_id)?.nome ?? "—")
-                            : (especialidadesList.find((e) => e.id === b.especialidade_id)?.nome ?? "—");
+                            : b.escopo === "especialidade"
+                              ? (especialidadesList.find((e) => e.id === b.especialidade_id)?.nome ?? "—")
+                              : `Consultas — Grupo ${b.prioridade}`;
                           const valor = b.tipo_desconto === "gratuidade"
                             ? "Gratuito"
                             : b.valor_desconto === null
@@ -642,8 +650,8 @@ function ConveniosPage() {
                           return (
                             <TableRow key={b.id ?? `new-${idx}`}>
                               <TableCell>
-                                <Badge variant={b.escopo === "servico" ? "default" : "secondary"}>
-                                  {b.escopo === "servico" ? "Serviço" : "Especialidade"}
+                                <Badge variant={b.escopo === "servico" ? "default" : b.escopo === "consulta" ? "outline" : "secondary"}>
+                                  {b.escopo === "servico" ? "Serviço" : b.escopo === "consulta" ? "Consultas" : "Especialidade"}
                                 </Badge>
                               </TableCell>
                               <TableCell className="font-medium">{alvo}</TableCell>
@@ -688,14 +696,25 @@ function ConveniosPage() {
                       </div>
                       <div className="border rounded-md p-4 space-y-3 bg-card">
                         <div className="flex items-center justify-between gap-2">
-                          <Badge variant={b.escopo === "servico" ? "default" : "secondary"}>
-                            {b.escopo === "servico" ? "Serviço único" : "Especialidade"}
+                          <Badge variant={b.escopo === "servico" ? "default" : b.escopo === "consulta" ? "outline" : "secondary"}>
+                            {b.escopo === "servico" ? "Serviço único" : b.escopo === "consulta" ? "Consultas" : "Especialidade"}
                           </Badge>
                           <div className="flex items-center gap-1.5">
                             <Switch checked={b.ativo} onCheckedChange={(v) => update({ ativo: v })} />
                             <Label className="text-xs">Ativo</Label>
                           </div>
                         </div>
+                        {b.escopo === "consulta" ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                              <Label className="text-xs">Valor (R$)</Label>
+                              <CurrencyInput
+                                value={b.valor_desconto !== null ? b.valor_desconto.toFixed(2) : ""}
+                                onChange={(v) => update({ valor_desconto: v ? parseFloat(v) : null })} />
+                            </div>
+                          </div>
+                        ) : (
+                        <>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                           <div className="md:col-span-2">
                             <Label className="text-xs">{b.escopo === "servico" ? "Serviço" : "Especialidade"}</Label>
@@ -739,6 +758,8 @@ function ConveniosPage() {
                             </div>
                           </div>
                         )}
+                        </>
+                        )}
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                           <div>
                             <Label className="text-xs">A partir de</Label>
@@ -761,17 +782,31 @@ function ConveniosPage() {
                               </SelectContent>
                             </Select>
                           </div>
-                          <div>
-                            <Label className="text-xs">Periodicidade</Label>
-                            <Select value={b.periodicidade} onValueChange={(v) => update({ periodicidade: v as Beneficio["periodicidade"] })}>
-                              <SelectTrigger><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="dia">Por dia</SelectItem>
-                                <SelectItem value="mes">Por mês</SelectItem>
-                                <SelectItem value="contrato">Por contrato</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
+                          {b.escopo === "consulta" ? (
+                            <div>
+                              <Label className="text-xs">Prioridade</Label>
+                              <Select value={String(b.prioridade)} onValueChange={(v) => update({ prioridade: parseInt(v) })}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="1">1</SelectItem>
+                                  <SelectItem value="2">2</SelectItem>
+                                  <SelectItem value="3">3</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          ) : (
+                            <div>
+                              <Label className="text-xs">Periodicidade</Label>
+                              <Select value={b.periodicidade} onValueChange={(v) => update({ periodicidade: v as Beneficio["periodicidade"] })}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="dia">Por dia</SelectItem>
+                                  <SelectItem value="mes">Por mês</SelectItem>
+                                  <SelectItem value="contrato">Por contrato</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
                           <div>
                             <Label className="text-xs">Pessoa</Label>
                             <Select value={b.pessoa} onValueChange={(v) => update({ pessoa: v as Beneficio["pessoa"] })}>
@@ -950,7 +985,7 @@ function ConveniosPage() {
             <DialogTitle>Novo benefício</DialogTitle>
             <DialogDescription>O desconto será aplicado a um serviço único ou a uma especialidade inteira?</DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-3 py-2">
+          <div className="grid grid-cols-3 gap-3 py-2">
             <Button variant="outline" className="h-24 flex-col gap-2" onClick={() => addBeneficio("servico")}>
               <Gift className="h-6 w-6" />
               <span>Serviço único</span>
@@ -958,6 +993,10 @@ function ConveniosPage() {
             <Button variant="outline" className="h-24 flex-col gap-2" onClick={() => addBeneficio("especialidade")}>
               <Layers className="h-6 w-6" />
               <span>Especialidade</span>
+            </Button>
+            <Button variant="outline" className="h-24 flex-col gap-2" onClick={() => addBeneficio("consulta")}>
+              <Stethoscope className="h-6 w-6" />
+              <span>Consultas</span>
             </Button>
           </div>
           <DialogFooter>
