@@ -578,6 +578,7 @@ function AgendaPage() {
         .select("agendamento_id")
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("tipo", "receita")
+        .eq("status", "confirmado")
         .in("agendamento_id", ids);
       setPagosSet(new Set(((pg ?? []) as Array<{ agendamento_id: string | null }>)
         .map((r) => r.agendamento_id)
@@ -879,6 +880,7 @@ function AgendaPage() {
       .select("agendamento_id")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("tipo", "receita")
+      .eq("status", "confirmado")
       .in("agendamento_id", ids);
     if ((jaPagosLote ?? []).length > 0) {
       const pagos = new Set(((jaPagosLote ?? []) as Array<{ agendamento_id: string | null }>)
@@ -1314,6 +1316,7 @@ function AgendaPage() {
       .select("id")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("tipo", "receita")
+      .eq("status", "confirmado")
       .eq("agendamento_id", a.id)
       .limit(1);
     if ((jaPagos ?? []).length > 0) {
