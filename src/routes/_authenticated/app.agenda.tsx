@@ -1271,9 +1271,27 @@ function AgendaPage() {
   };
 
   const remove = async (a: Agendamento) => {
-    if (!confirm(`Excluir agendamento de ${a.paciente_nome}?`)) return;
-    const { error } = await supabase.from("agendamentos").delete().eq("id", a.id);
-    if (error) toast.error(error.message); else { toast.success("Excluído"); await load(); }
+    // "Excluir" no menu (...) da linha NÃO apaga a ficha — apenas libera o horário
+    // (remove o cliente e volta o slot para DISPONÍVEL). Para excluir o número da ficha,
+    // selecione a linha e use "Excluir horários selecionados" no menu de Opções.
+    if (pagosSet.has(a.id)) {
+      toast.error("Este agendamento já foi pago. Estorne no Financeiro antes de liberar.");
+      return;
+    }
+    if (!confirm(`Liberar este horário? O cliente ${a.paciente_nome} será removido, mas a ficha continuará disponível.`)) return;
+    const { error } = await supabase
+      .from("agendamentos")
+      .update({
+        paciente_id: null,
+        paciente_nome: "DISPONÍVEL",
+        procedimento: null,
+        observacoes: null,
+        status: "agendado",
+        data_pagamento: null,
+      } as never)
+      .eq("id", a.id);
+    if (error) toast.error(error.message);
+    else { toast.success("Horário liberado."); await load(); }
   };
 
   const mudarStatus = async (a: Agendamento, status: Status) => {
