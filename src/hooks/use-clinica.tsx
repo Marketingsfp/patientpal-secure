@@ -40,13 +40,25 @@ const STORAGE_KEY = "clinica_atual_id";
 const TODAS_KEY = "clinica_modo_todas";
 const MEMBERSHIPS_CACHE_KEY = "clinica_memberships_cache_v1";
 
-function readCachedMemberships(): ClinicaMembership[] {
+function isClinicaMembership(value: unknown): value is ClinicaMembership {
+  const membership = value as Partial<ClinicaMembership> | null;
+  return Boolean(
+    membership?.id &&
+    membership.clinica_id &&
+    membership.role &&
+    membership.clinica &&
+    typeof membership.clinica.nome === "string",
+  );
+}
+
+function readCachedMemberships(userId?: string): ClinicaMembership[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = window.localStorage.getItem(MEMBERSHIPS_CACHE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as ClinicaMembership[]) : [];
+    if (!userId || parsed?.userId !== userId || !Array.isArray(parsed?.memberships)) return [];
+    return parsed.memberships.filter(isClinicaMembership);
   } catch {
     return [];
   }
@@ -54,40 +66,49 @@ function readCachedMemberships(): ClinicaMembership[] {
 
 export function ClinicaProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const [memberships, setMemberships] = useState<ClinicaMembership[]>(() => readCachedMemberships());
+  const [memberships, setMemberships] = useState<ClinicaMembership[]>([]);
   const [clinicaAtualId, setClinicaAtualId] = useState<string | null>(
     typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null,
   );
   const [modoTodas, setModoTodasState] = useState<boolean>(
     typeof window !== "undefined" ? localStorage.getItem(TODAS_KEY) === "1" : false,
   );
-  // Se já há cache, não bloqueamos a UI — apenas revalidamos em background.
-  const [loading, setLoading] = useState(() => readCachedMemberships().length === 0);
+  const [loading, setLoading] = useState(true);
 
-  const load = async () => {
+  const load = async (showLoading = memberships.length === 0) => {
     if (!user) {
       setMemberships([]);
       setLoading(false);
       return;
     }
-    // Só mostra "loading" se ainda não há dados em cache.
-    setLoading((prev) => (memberships.length === 0 ? true : prev));
+    if (showLoading) setLoading(true);
     const { data, error } = await supabase
       .from("clinica_memberships")
       .select("id, clinica_id, role, clinica:clinicas(id, nome, cidade, estado, branding)")
       .eq("user_id", user.id)
       .eq("ativo", true);
     if (!error && data) {
-      const next = data as unknown as ClinicaMembership[];
+      const next = (data as unknown[]).filter(isClinicaMembership);
       setMemberships(next);
       try {
-        window.localStorage.setItem(MEMBERSHIPS_CACHE_KEY, JSON.stringify(next));
+        window.localStorage.setItem(MEMBERSHIPS_CACHE_KEY, JSON.stringify({ userId: user.id, memberships: next }));
       } catch { /* ignore quota */ }
     }
     setLoading(false);
   };
 
-  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [user?.id]);
+  useEffect(() => {
+    if (!user?.id) {
+      setMemberships([]);
+      setLoading(false);
+      return;
+    }
+    const cached = readCachedMemberships(user.id);
+    setMemberships(cached);
+    setLoading(cached.length === 0);
+    void load(cached.length === 0);
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [user?.id]);
 
   const setClinicaAtual = (id: string) => {
     setClinicaAtualId(id);
