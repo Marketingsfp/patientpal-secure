@@ -920,30 +920,51 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                   ) : (
                     <div className="space-y-2">
                       {form.procedimentos
-                        .map((pid, idx) => {
+                        .map((item, idx) => {
+                          const { pid, eid } = splitItem(item);
                           const p = procs.find((pp) => pp.id === pid);
-                          const label = p ? labelProcedimento(p) : "";
-                          return { pid, idx, label };
+                          const esp = eid ? esps.find((e) => e.id === eid) ?? null : null;
+                          const label = p ? labelProcedimentoEsp(p, esp) : "";
+                          return { item, idx, label };
                         })
                         .sort((a, b) => a.label.localeCompare(b.label, "pt-BR", { sensitivity: "base" }))
-                        .map(({ pid, idx }) => (
+                        .map(({ item, idx }) => (
                         <div key={idx} className="grid grid-cols-[1fr_auto] gap-2 items-center">
                           <SearchableSelect
                             options={(() => {
-                              const base = [...procsFiltradosPorEspecialidade];
-                              // garante que serviços já selecionados (mesmo fora da especialidade) apareçam com rótulo
-                              for (const selId of form.procedimentos) {
-                                if (!selId) continue;
-                                if (base.some((p) => p.id === selId)) continue;
-                                const extra = procs.find((p) => p.id === selId);
-                                if (extra) base.push(extra);
+                              const opts: { value: string; label: string }[] = [];
+                              const pushed = new Set<string>();
+                              const addProcOpts = (p: Procedimento) => {
+                                const choices = procEspChoices.get(p.id) ?? [];
+                                if (choices.length === 0) {
+                                  const v = joinItem(p.id, null);
+                                  if (!pushed.has(v)) { pushed.add(v); opts.push({ value: v, label: p.nome }); }
+                                } else {
+                                  for (const c of choices) {
+                                    const v = joinItem(p.id, c.id);
+                                    if (pushed.has(v)) continue;
+                                    pushed.add(v);
+                                    opts.push({ value: v, label: `${p.nome} (${c.nome.toUpperCase()})` });
+                                  }
+                                }
+                              };
+                              for (const p of procsFiltradosPorEspecialidade) addProcOpts(p);
+                              // garante que itens já selecionados (mesmo fora do filtro) apareçam com rótulo
+                              for (const sel of form.procedimentos) {
+                                if (!sel || pushed.has(sel)) continue;
+                                const { pid, eid } = splitItem(sel);
+                                const extra = procs.find((p) => p.id === pid);
+                                if (!extra) continue;
+                                const esp = eid ? esps.find((e) => e.id === eid) ?? null : null;
+                                pushed.add(sel);
+                                opts.push({ value: sel, label: labelProcedimentoEsp(extra, esp) });
                               }
-                              return base.map((p) => ({ value: p.id, label: labelProcedimento(p) }));
+                              return opts;
                             })()}
-                            value={pid}
+                            value={item}
                             onChange={(v) => {
                               if (v && form.procedimentos.some((x, i) => i !== idx && x === v)) {
-                                toast.warning("Procedimento já adicionado");
+                                toast.warning("Serviço já adicionado para essa especialidade");
                                 return;
                               }
                               setForm({
