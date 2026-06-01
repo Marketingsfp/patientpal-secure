@@ -238,12 +238,112 @@ function buildInitialState(): Record<PerfilKey, Record<string, Acesso>> {
 }
 
 function PerfisPage() {
+  const { clinicaAtual } = useClinica();
+  const clinicaId = clinicaAtual?.clinica_id ?? null;
   const [tab, setTab] = useState<"perfis" | "permissoes">("perfis");
   const [perfilSel, setPerfilSel] = useState<PerfilKey>("admin");
   const [matriz, setMatriz] = useState<Record<PerfilKey, Record<string, Acesso>>>(buildInitialState);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(
     () => Object.fromEntries(GRUPOS.map((g) => [g.label, true])),
   );
+  const [perfilIds, setPerfilIds] = useState<Record<PerfilKey, string>>({} as Record<PerfilKey, string>);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const loadedClinicRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!clinicaId || loadedClinicRef.current === clinicaId) return;
+    loadedClinicRef.current = clinicaId;
+    void (async () => {
+      setLoading(true);
+      try {
+        const upsertRows = PERFIS.map((p) => ({
+          clinica_id: clinicaId,
+          chave: p.key,
+          nome: p.nome,
+          descricao: p.descricao,
+          sistema: true,
+          ativo: true,
+        }));
+        const { error: upErr } = await supabase
+          .from("perfis_acesso")
+          .upsert(upsertRows, { onConflict: "clinica_id,chave", ignoreDuplicates: true });
+        if (upErr) throw upErr;
+
+        const { data: perfis, error: pErr } = await supabase
+          .from("perfis_acesso")
+          .select("id, chave")
+          .eq("clinica_id", clinicaId);
+        if (pErr) throw pErr;
+
+        const ids: Record<string, string> = {};
+        for (const p of perfis ?? []) ids[p.chave] = p.id;
+        setPerfilIds(ids as Record<PerfilKey, string>);
+
+        const perfilIdList = (perfis ?? []).map((p) => p.id);
+        if (perfilIdList.length > 0) {
+          const { data: perms, error: permErr } = await supabase
+            .from("perfil_permissoes")
+            .select("perfil_id, modulo, acesso")
+            .in("perfil_id", perfilIdList);
+          if (permErr) throw permErr;
+
+          const idToChave: Record<string, PerfilKey> = {};
+          for (const p of perfis ?? []) idToChave[p.id] = p.chave as PerfilKey;
+
+          setMatriz((prev) => {
+            const next = { ...prev } as Record<PerfilKey, Record<string, Acesso>>;
+            const seen: Record<string, boolean> = {};
+            for (const row of perms ?? []) {
+              const chave = idToChave[row.perfil_id];
+              if (!chave) continue;
+              if (!seen[chave]) {
+                next[chave] = Object.fromEntries(TODOS_MODULOS.map((k) => [k, "none" as Acesso]));
+                seen[chave] = true;
+              }
+              next[chave][row.modulo] = row.acesso as Acesso;
+            }
+            return next;
+          });
+        }
+      } catch (e) {
+        console.error("[perfis] load error", e);
+        toast.error("Falha ao carregar perfis", {
+          description: e instanceof Error ? e.message : String(e),
+        });
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [clinicaId]);
+
+  const salvar = async () => {
+    const perfilId = perfilIds[perfilSel];
+    if (!perfilId) {
+      toast.error("Perfil ainda não foi inicializado.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const rows = TODOS_MODULOS.map((modulo) => ({
+        perfil_id: perfilId,
+        modulo,
+        acesso: matriz[perfilSel][modulo],
+      }));
+      const { error } = await supabase
+        .from("perfil_permissoes")
+        .upsert(rows, { onConflict: "perfil_id,modulo" });
+      if (error) throw error;
+      toast.success("Permissões salvas");
+    } catch (e) {
+      console.error("[perfis] save error", e);
+      toast.error("Falha ao salvar", {
+        description: e instanceof Error ? e.message : String(e),
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const contagens = useMemo(() => {
     const out = {} as Record<PerfilKey, number>;
