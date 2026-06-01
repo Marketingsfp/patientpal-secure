@@ -227,6 +227,7 @@ function ConveniosPage() {
 
   const openNew = () => {
     setEditing(null);
+    setEditingBenIdx(null);
     setNome(""); setDescricao(""); setAtivo(true);
     setTaxaAdesao(0); setNumParcelas(12);
     setMaxDependentes(0); setFidelidadeMeses(0); setVigenciaMeses(12);
@@ -241,6 +242,7 @@ function ConveniosPage() {
 
   const openEdit = async (c: Convenio) => {
     setEditing(c);
+    setEditingBenIdx(null);
     setNome(c.nome);
     setDescricao(c.descricao ?? "");
     setAtivo(c.ativo);
