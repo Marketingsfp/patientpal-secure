@@ -5910,6 +5910,36 @@ export type Database = {
           },
         ]
       }
+      sistema_planos: {
+        Row: {
+          ativo: boolean
+          codigo_plano: number
+          created_at: string
+          data: string
+          descricao: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          codigo_plano: number
+          created_at?: string
+          data?: string
+          descricao: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          codigo_plano?: number
+          created_at?: string
+          data?: string
+          descricao?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       tipos_servico: {
         Row: {
           ativo: boolean
