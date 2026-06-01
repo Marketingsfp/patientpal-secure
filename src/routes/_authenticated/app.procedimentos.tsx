@@ -79,6 +79,10 @@ const EMPTY = {
 const EMPTY_CARTAO = { nome: "", descricao: "", percentual_desconto: "0", ativo: true };
 
 const fmtBRL = (n: number) => Number(n || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const especialidadeKey = (nome?: string | null) =>
+  (nome ?? "").trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+const displayEspecialidadeNome = (nome: string) =>
+  especialidadeKey(nome) === "ginecologia" ? "Ginecologia" : nome;
 
 // Pacotes pré-prontos de exames por grupo
 type PacoteExames = { id: string; label: string; grupo: string; duracao: number; itens: string[] };
@@ -464,6 +468,8 @@ function ProcedimentosPage() {
   const totalPaginas = Math.max(1, Math.ceil(ordenados.length / PAGE_SIZE));
   const paginaAtual = Math.min(pagina, totalPaginas);
   const visiveis = ordenados.slice((paginaAtual - 1) * PAGE_SIZE, paginaAtual * PAGE_SIZE);
+  const grupoSelecionadoKey = form.grupo ? especialidadeKey(form.grupo) : "__none__";
+  const grupoExisteNasEspecialidades = especialidades.some(e => especialidadeKey(e.nome) === grupoSelecionadoKey);
 
   // Reset de página quando filtros aplicados ou ordenação mudam
   useEffect(() => { setPagina(1); }, [buscaAplicada, tipoAplicado, grupoAplicado, sort]);
@@ -895,14 +901,20 @@ function ProcedimentosPage() {
               <div className="space-y-1 col-span-2">
                 <Label>Especialidade</Label>
                 <Select
-                  value={form.grupo || "__none__"}
-                  onValueChange={(v) => setForm({ ...form, grupo: v === "__none__" ? "" : v })}
+                  value={grupoSelecionadoKey}
+                  onValueChange={(v) => {
+                    const esp = especialidades.find(e => especialidadeKey(e.nome) === v);
+                    setForm({ ...form, grupo: v === "__none__" ? "" : displayEspecialidadeNome(esp?.nome ?? form.grupo) });
+                  }}
                 >
                   <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">Nenhuma</SelectItem>
+                    {form.grupo && !grupoExisteNasEspecialidades && (
+                      <SelectItem value={grupoSelecionadoKey}>{displayEspecialidadeNome(form.grupo)}</SelectItem>
+                    )}
                     {especialidades.map(e => (
-                      <SelectItem key={e.id} value={e.nome}>{e.nome}</SelectItem>
+                      <SelectItem key={e.id} value={especialidadeKey(e.nome)}>{displayEspecialidadeNome(e.nome)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
