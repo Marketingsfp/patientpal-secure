@@ -2449,6 +2449,71 @@ export type Database = {
         }
         Relationships: []
       }
+      estorno_solicitacoes: {
+        Row: {
+          agendamento_id: string | null
+          clinica_id: string
+          created_at: string
+          descricao: string | null
+          id: string
+          lancamento_id: string | null
+          motivo: string
+          paciente_nome: string | null
+          resolvido_em: string | null
+          resolvido_por: string | null
+          resposta: string | null
+          solicitado_em: string
+          solicitado_por: string
+          status: string
+          updated_at: string
+          valor: number | null
+        }
+        Insert: {
+          agendamento_id?: string | null
+          clinica_id: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          lancamento_id?: string | null
+          motivo: string
+          paciente_nome?: string | null
+          resolvido_em?: string | null
+          resolvido_por?: string | null
+          resposta?: string | null
+          solicitado_em?: string
+          solicitado_por: string
+          status?: string
+          updated_at?: string
+          valor?: number | null
+        }
+        Update: {
+          agendamento_id?: string | null
+          clinica_id?: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          lancamento_id?: string | null
+          motivo?: string
+          paciente_nome?: string | null
+          resolvido_em?: string | null
+          resolvido_por?: string | null
+          resposta?: string | null
+          solicitado_em?: string
+          solicitado_por?: string
+          status?: string
+          updated_at?: string
+          valor?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "estorno_solicitacoes_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exame_resultados: {
         Row: {
           classificado_em: string | null
