@@ -81,13 +81,16 @@ function Page() {
     id: string; paciente_nome: string | null; descricao: string | null;
     valor: number | null; motivo: string; solicitado_em: string;
     lancamento_id: string | null;
+    tipo: "erro_caixa" | "devolucao" | null;
+    data_pagamento_original: string | null;
+    data_estorno: string | null;
   }
   const [solicitacoes, setSolicitacoes] = useState<SolicEst[]>([]);
   const loadSolicitacoes = async () => {
     if (!clinicaAtual) { setSolicitacoes([]); return; }
     const { data } = await supabase
       .from("estorno_solicitacoes")
-      .select("id, paciente_nome, descricao, valor, motivo, solicitado_em, lancamento_id")
+      .select("id, paciente_nome, descricao, valor, motivo, solicitado_em, lancamento_id, tipo, data_pagamento_original, data_estorno")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("status", "pendente")
       .order("solicitado_em", { ascending: false });
