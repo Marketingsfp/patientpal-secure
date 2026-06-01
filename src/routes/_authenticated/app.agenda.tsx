@@ -573,16 +573,25 @@ function AgendaPage() {
         .map((a) => a.id),
     );
     if (ids.length) {
-      const { data: pg } = await supabase
-        .from("fin_lancamentos")
-        .select("agendamento_id")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("tipo", "receita")
-        .eq("status", "confirmado")
-        .in("agendamento_id", ids);
-      setPagosSet(new Set(((pg ?? []) as Array<{ agendamento_id: string | null }>)
-        .map((r) => r.agendamento_id)
-        .filter((x): x is string => !!x && idsComPaciente.has(x))));
+      // Batch em lotes para não estourar o limite de URL do PostgREST
+      // quando há muitos agendamentos no dia.
+      const CHUNK = 200;
+      const pagosIds: string[] = [];
+      for (let i = 0; i < ids.length; i += CHUNK) {
+        const slice = ids.slice(i, i + CHUNK);
+        const { data: pg, error: pgErr } = await supabase
+          .from("fin_lancamentos")
+          .select("agendamento_id")
+          .eq("clinica_id", clinicaAtual.clinica_id)
+          .eq("tipo", "receita")
+          .eq("status", "confirmado")
+          .in("agendamento_id", slice);
+        if (pgErr) continue;
+        ((pg ?? []) as Array<{ agendamento_id: string | null }>).forEach((r) => {
+          if (r.agendamento_id) pagosIds.push(r.agendamento_id);
+        });
+      }
+      setPagosSet(new Set(pagosIds.filter((x) => idsComPaciente.has(x))));
     } else {
       setPagosSet(new Set());
     }
