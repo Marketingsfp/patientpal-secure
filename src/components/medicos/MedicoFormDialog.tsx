@@ -319,7 +319,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       }
       const { data: mprocs } = await supabase
         .from("medico_procedimentos")
-        .select("procedimento_id")
+        .select("procedimento_id, especialidade_id")
         .eq("medico_id", med.id);
       if (cancelled) return;
       setForm({
@@ -333,7 +333,9 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
             tem_rqe: !!me.tem_rqe,
             rqe_numero: me.rqe_numero ?? "",
           })),
-        procedimentos: (mprocs ?? []).map((p: any) => p.procedimento_id),
+        procedimentos: (mprocs ?? []).map(
+          (p: any) => `${p.procedimento_id}|${p.especialidade_id ?? ""}`,
+        ),
         tipo_repasse: (sens.tipo_repasse as "percentual" | "valor") ?? "percentual",
         percentual: sens.percentual_repasse_padrao != null ? String(sens.percentual_repasse_padrao) : "",
         valor: sens.valor_repasse_padrao != null ? String(sens.valor_repasse_padrao) : "",
