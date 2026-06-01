@@ -578,6 +578,7 @@ function AgendaPage() {
         .select("agendamento_id")
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("tipo", "receita")
+        .eq("status", "confirmado")
         .in("agendamento_id", ids);
       setPagosSet(new Set(((pg ?? []) as Array<{ agendamento_id: string | null }>)
         .map((r) => r.agendamento_id)
