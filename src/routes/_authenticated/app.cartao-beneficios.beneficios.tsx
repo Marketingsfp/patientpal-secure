@@ -67,17 +67,32 @@ function BeneficiosPage() {
     if (!clinicaAtual) return;
     setLoading(true);
     const cid = clinicaAtual.clinica_id;
-    const [cs, bs, ps, es] = await Promise.all([
+    const [cs, bs, es] = await Promise.all([
       supabase.from("cb_convenios").select("id, nome, ativo").eq("clinica_id", cid).order("nome"),
       supabase.from("cb_beneficios").select("id, clinica_id, convenio_id, nome, descricao, ativo, escopo, procedimento_id, especialidade_id, tipo_desconto, valor_desconto").eq("clinica_id", cid).order("nome"),
-      supabase.from("procedimentos").select("id, nome").eq("clinica_id", cid).order("nome").range(0, 9999),
       supabase.from("especialidades").select("id, nome").eq("ativo", true).order("nome").range(0, 9999),
     ]);
+    // PostgREST aplica db-max-rows=1000 mesmo com .range() amplo —
+    // pagina manualmente para trazer todos os procedimentos ativos.
+    const PAGE = 1000;
+    const allProcs: Procedimento[] = [];
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await supabase
+        .from("procedimentos")
+        .select("id, nome")
+        .eq("clinica_id", cid)
+        .order("nome")
+        .range(from, from + PAGE - 1);
+      if (error) break;
+      const page = (data ?? []) as Procedimento[];
+      allProcs.push(...page);
+      if (page.length < PAGE) break;
+    }
     if (cs.error) toast.error(cs.error.message);
     if (bs.error) toast.error(bs.error.message);
     setConvenios((cs.data ?? []) as Convenio[]);
     setRows((bs.data ?? []) as Beneficio[]);
-    setProcedimentos((ps.data ?? []) as Procedimento[]);
+    setProcedimentos(allProcs);
     setEspecialidades((es.data ?? []) as Especialidade[]);
     setLoading(false);
   };
