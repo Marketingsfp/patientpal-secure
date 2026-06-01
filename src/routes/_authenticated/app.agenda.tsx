@@ -1256,8 +1256,8 @@ function AgendaPage() {
         .select("nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix")
         .eq("clinica_id", clinicaAtual.clinica_id)
         .limit(5000);
-      const proc: any = (lista ?? []).find((p) => normalizar(p.nome ?? "") === nomeBusca)
-        ?? (lista ?? []).find((p) => normalizar(p.nome ?? "").includes(nomeBusca));
+      void nomeBusca;
+      const proc: any = await buscarProcedimentoPorNome(clinicaAtual.clinica_id, payload.procedimento ?? "CONSULTA", lista ?? []);
       const valorCartao = valorCartaoProcedimento(proc);
       const vDinheiro = primeiroValorValido(proc?.valor_dinheiro, proc?.valor_dinheiro_pix, proc?.valor_padrao);
       const vPix = valorCartao;
@@ -1397,8 +1397,8 @@ function AgendaPage() {
       .select("nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .limit(5000);
-    const proc = (lista ?? []).find((p) => normalizar(p.nome ?? "") === nomeBusca)
-      ?? (lista ?? []).find((p) => normalizar(p.nome ?? "").includes(nomeBusca));
+    void nomeBusca;
+    const proc = await buscarProcedimentoPorNome(clinicaAtual.clinica_id, a.procedimento ?? "CONSULTA", lista ?? []);
     const valorCartao = valorCartaoProcedimento(proc);
     const vDinheiro = primeiroValorValido(proc?.valor_dinheiro, proc?.valor_dinheiro_pix, proc?.valor_padrao);
     const vPix = valorCartao;
