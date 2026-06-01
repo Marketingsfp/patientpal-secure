@@ -1532,6 +1532,10 @@ function AgendaPage() {
 
   const imprimirGR = async (a: Agendamento) => {
     if (!clinicaAtual) return;
+    if (!pagosSet.has(a.id)) {
+      toast.error("GR só pode ser impressa após o pagamento. Registre o pagamento antes.");
+      return;
+    }
     try {
       await printGuiaAtendimento({
         agendamentoId: a.id,
@@ -2541,8 +2545,14 @@ function AgendaPage() {
                         <DropdownMenuItem onClick={() => cobrarAgendamento(a)}>
                           <DollarSign className="h-4 w-4 mr-2" /> Pagamento
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => imprimirGR(a)}>
+                        <DropdownMenuItem
+                          onClick={() => imprimirGR(a)}
+                          disabled={!pagosSet.has(a.id)}
+                        >
                           <Printer className="h-4 w-4 mr-2" /> Imprimir GR
+                          {!pagosSet.has(a.id) && (
+                            <span className="ml-2 text-xs text-muted-foreground">(pagar primeiro)</span>
+                          )}
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => {
                           const url = `${window.location.origin}/p/${(a as any).token_publico}`;
