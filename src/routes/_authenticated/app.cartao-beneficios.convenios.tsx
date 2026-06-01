@@ -381,6 +381,7 @@ function ConveniosPage() {
         periodicidade: b.periodicidade,
         pessoa: b.pessoa,
         prioridade: b.prioridade,
+        procedimento_ids: b.escopo === "consulta" ? (b.procedimento_ids ?? []) : [],
       });
     }
     if (bensToInsert.length) {
