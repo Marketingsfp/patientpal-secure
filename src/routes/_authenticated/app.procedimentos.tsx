@@ -873,12 +873,13 @@ function ProcedimentosPage() {
 
       {/* ============ DIALOG PROCEDIMENTO ============ */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-2xl max-h-[95vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="max-w-2xl max-h-[95vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="px-6 pt-6 pb-2">
             <DialogTitle>{editing ? "Editar serviço" : "Novo serviço"}</DialogTitle>
             <DialogDescription>Preencha valores para cada forma de pagamento.</DialogDescription>
           </DialogHeader>
-          <form onSubmit={onSubmit} className="space-y-4">
+          <form onSubmit={onSubmit} className="flex flex-col min-h-0 flex-1">
+            <div className="space-y-4 overflow-y-auto px-6 py-4 flex-1 min-h-0">
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1 col-span-2">
                 <Label>Nome *</Label>
@@ -993,7 +994,8 @@ function ProcedimentosPage() {
                 Aparece nas Informações rápidas e a Nina responde quando perguntarem sobre o preparo.
               </p>
             </div>
-            <DialogFooter className="sticky bottom-0 bg-background border-t -mx-6 -mb-6 px-6 py-3 z-10">
+            </div>
+            <DialogFooter className="bg-background border-t px-6 py-3">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
               <Button type="submit" disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
             </DialogFooter>
