@@ -635,7 +635,9 @@ function ConveniosPage() {
                         {beneficios.map((b, idx) => {
                           const alvo = b.escopo === "servico"
                             ? (procedimentosList.find((p) => p.id === b.procedimento_id)?.nome ?? "—")
-                            : (especialidadesList.find((e) => e.id === b.especialidade_id)?.nome ?? "—");
+                            : b.escopo === "especialidade"
+                              ? (especialidadesList.find((e) => e.id === b.especialidade_id)?.nome ?? "—")
+                              : `Consultas — Grupo ${b.prioridade}`;
                           const valor = b.tipo_desconto === "gratuidade"
                             ? "Gratuito"
                             : b.valor_desconto === null
@@ -648,8 +650,8 @@ function ConveniosPage() {
                           return (
                             <TableRow key={b.id ?? `new-${idx}`}>
                               <TableCell>
-                                <Badge variant={b.escopo === "servico" ? "default" : "secondary"}>
-                                  {b.escopo === "servico" ? "Serviço" : "Especialidade"}
+                                <Badge variant={b.escopo === "servico" ? "default" : b.escopo === "consulta" ? "outline" : "secondary"}>
+                                  {b.escopo === "servico" ? "Serviço" : b.escopo === "consulta" ? "Consultas" : "Especialidade"}
                                 </Badge>
                               </TableCell>
                               <TableCell className="font-medium">{alvo}</TableCell>
