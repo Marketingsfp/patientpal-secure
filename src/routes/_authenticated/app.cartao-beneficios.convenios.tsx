@@ -132,6 +132,7 @@ function ConveniosPage() {
   const [procedimentosList, setProcedimentosList] = useState<ProcOpt[]>([]);
   const [especialidadesList, setEspecialidadesList] = useState<EspOpt[]>([]);
   const [escopoDialogOpen, setEscopoDialogOpen] = useState(false);
+  const [editingBenIdx, setEditingBenIdx] = useState<number | null>(null);
 
   const loadBeneficios = async (convenioId: string) => {
     setBenLoading(true);
@@ -171,20 +172,24 @@ function ConveniosPage() {
   };
 
   const addBeneficio = (escopo: "servico" | "especialidade") => {
-    setBeneficios((prev) => [...prev, {
-      nome: "",
-      descricao: "",
-      ativo: true,
-      escopo,
-      procedimento_id: null,
-      especialidade_id: null,
-      tipo_desconto: "percentual",
-      valor_desconto: null,
-      inicio_a_partir: 1,
-      limite_uso: "ilimitado",
-      periodicidade: "contrato",
-      pessoa: "titular",
-    }]);
+    setBeneficios((prev) => {
+      const next = [...prev, {
+        nome: "",
+        descricao: "",
+        ativo: true,
+        escopo,
+        procedimento_id: null,
+        especialidade_id: null,
+        tipo_desconto: "percentual" as const,
+        valor_desconto: null,
+        inicio_a_partir: 1 as 1 | 2 | 6,
+        limite_uso: "ilimitado" as const,
+        periodicidade: "contrato" as const,
+        pessoa: "titular" as Beneficio["pessoa"],
+      }];
+      setEditingBenIdx(next.length - 1);
+      return next;
+    });
     setEscopoDialogOpen(false);
   };
 
