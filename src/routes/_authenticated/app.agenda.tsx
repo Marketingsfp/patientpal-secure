@@ -688,13 +688,20 @@ function AgendaPage() {
       setExames(unicos);
     }
     setProcedimentosList(todos.map(({ id, nome }) => ({ id, nome })));
-    const procedimentosPorId = new Map(todos.map((p) => [p.id, { id: p.id, nome: p.nome }]));
+    const procedimentosPorId = new Map(
+      todos.map((p) => [p.id, { id: p.id, nome: p.nome, grupo: p.grupo ?? null }]),
+    );
     const map = new Map<string, Set<string>>();
     for (const r of (me.data ?? []) as Array<{ medico_id: string; especialidade_id: string }>) {
       if (!map.has(r.medico_id)) map.set(r.medico_id, new Set());
       map.get(r.medico_id)!.add(r.especialidade_id);
     }
     setMedicoEspec(map);
+    // Médicos com mais de uma especialidade: precisam mostrar o serviço como "NOME (ESPECIALIDADE)".
+    const medicoMultiEsp = new Set<string>();
+    for (const [mid, set] of map.entries()) {
+      if (set.size > 1) medicoMultiEsp.add(mid);
+    }
     const pm = new Map<string, Set<string>>();
     for (const r of (sr.data ?? []) as Array<{ medico_id: string | null; procedimento_id: string }>) {
       if (!r.medico_id) continue;
@@ -714,10 +721,15 @@ function AgendaPage() {
       if (!procOpcoesMap.has(r.medico_id)) procOpcoesMap.set(r.medico_id, []);
       if (!procOpcoesVistos.has(r.medico_id)) procOpcoesVistos.set(r.medico_id, new Set());
       const vistos = procOpcoesVistos.get(r.medico_id)!;
-      const chave = normalizar(proc.nome);
+      const grupo = (proc.grupo ?? "").trim();
+      const decorado =
+        medicoMultiEsp.has(r.medico_id) && grupo
+          ? `${proc.nome} (${grupo.toUpperCase()})`
+          : proc.nome;
+      const chave = normalizar(decorado);
       if (vistos.has(chave)) continue;
       vistos.add(chave);
-      procOpcoesMap.get(r.medico_id)!.push(proc);
+      procOpcoesMap.get(r.medico_id)!.push({ id: proc.id, nome: decorado });
     }
     setProcPorMedico(pm);
     // Vínculos de procedimentos por recurso de enfermagem
