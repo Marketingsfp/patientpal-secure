@@ -162,7 +162,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
       .select("nome, tipo_repasse, percentual, valor, ativo")
       .eq("medico_id", a.medico_id)
       .eq("ativo", true);
-    const alvo = norm(procNome);
+    const alvo = norm(procNomeBase);
     const conv = (convs ?? []).find((c) => norm(c.nome) === alvo);
     if (conv) {
       if (conv.tipo_repasse === "valor" && conv.valor != null) {
