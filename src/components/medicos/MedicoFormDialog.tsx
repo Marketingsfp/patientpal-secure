@@ -873,7 +873,9 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                                   disabled={procsDaEsp.length === 0}
                                   onSelect={() => {
                                     const jaSel = new Set(form.procedimentos.filter(Boolean));
-                                    const novos = procsDaEsp.map((p) => p.id).filter((id) => !jaSel.has(id));
+                                    const novos = procsDaEsp
+                                      .map((p) => joinItem(p.id, esp.id))
+                                      .filter((v) => !jaSel.has(v));
                                     if (novos.length === 0) {
                                       toast.info("Todos os serviços dessa especialidade já estão adicionados.");
                                       return;
