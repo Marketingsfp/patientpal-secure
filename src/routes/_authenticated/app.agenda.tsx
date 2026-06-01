@@ -115,7 +115,7 @@ async function buscarProcedimentoPorNome(
     .from("procedimentos")
     .select("nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix")
     .eq("clinica_id", clinicaId)
-    .ilike("nome", (nome ?? "").trim())
+    .ilike("nome", nomeBase)
     .limit(5);
   const exato = (data ?? []).find((p) => temValor(p)) ?? (data ?? [])[0];
   if (temValor(exato)) return exato;
