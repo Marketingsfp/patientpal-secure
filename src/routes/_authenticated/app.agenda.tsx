@@ -63,7 +63,7 @@ type RecursoEnf = { id: string; nome: string };
 type Especialidade = { id: string; nome: string };
 type Paciente = { id: string; nome: string };
 type ProcedimentoRef = { id: string; nome: string; tipo: string | null; grupo?: string | null };
-type MedicoProcedimentoRef = { medico_id: string | null; procedimento_id: string; created_at?: string | null };
+type MedicoProcedimentoRef = { medico_id: string | null; procedimento_id: string; especialidade_id?: string | null; created_at?: string | null };
 
 const STATUS_LABEL: Record<Status, string> = {
   agendado: "Agendado", confirmado: "Confirmado", realizado: "Realizado",
@@ -151,7 +151,7 @@ async function fetchMedicoProcedimentosAgenda(): Promise<MedicoProcedimentoRef[]
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await supabase
       .from("medico_procedimentos")
-      .select("medico_id,procedimento_id,created_at")
+      .select("medico_id,procedimento_id,especialidade_id,created_at")
       .order("created_at")
       .range(from, from + pageSize - 1);
 
@@ -710,6 +710,9 @@ function AgendaPage() {
     }
     const procOpcoesMap = new Map<string, { id: string; nome: string }[]>();
     const procOpcoesVistos = new Map<string, Set<string>>();
+    const especialidadesPorId = new Map<string, string>(
+      ((e.data ?? []) as Especialidade[]).map((x) => [x.id, x.nome]),
+    );
     // Serviços vinculados ao médico pela aba "Especialidades" do cadastro do médico.
     // Esta é a fonte principal e preserva a mesma ordem exibida no cadastro do médico.
     for (const r of (Array.isArray(mp) ? mp : []) as MedicoProcedimentoRef[]) {
@@ -721,9 +724,16 @@ function AgendaPage() {
       if (!procOpcoesMap.has(r.medico_id)) procOpcoesMap.set(r.medico_id, []);
       if (!procOpcoesVistos.has(r.medico_id)) procOpcoesVistos.set(r.medico_id, new Set());
       const vistos = procOpcoesVistos.get(r.medico_id)!;
+      // Prioridade: especialidade explícita gravada na linha (novo modelo).
+      // Fallback (legado, sem especialidade gravada): só decora com o grupo
+      // quando o médico tem mais de uma especialidade.
+      const espNomeExplicito = r.especialidade_id
+        ? especialidadesPorId.get(r.especialidade_id) ?? null
+        : null;
       const grupo = (proc.grupo ?? "").trim();
-      const decorado =
-        medicoMultiEsp.has(r.medico_id) && grupo
+      const decorado = espNomeExplicito
+        ? `${proc.nome} (${espNomeExplicito.toUpperCase()})`
+        : medicoMultiEsp.has(r.medico_id) && grupo
           ? `${proc.nome} (${grupo.toUpperCase()})`
           : proc.nome;
       const chave = normalizar(decorado);

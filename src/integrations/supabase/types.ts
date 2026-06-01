@@ -4505,20 +4505,33 @@ export type Database = {
       medico_procedimentos: {
         Row: {
           created_at: string
+          especialidade_id: string | null
+          id: string
           medico_id: string
           procedimento_id: string
         }
         Insert: {
           created_at?: string
+          especialidade_id?: string | null
+          id?: string
           medico_id: string
           procedimento_id: string
         }
         Update: {
           created_at?: string
+          especialidade_id?: string | null
+          id?: string
           medico_id?: string
           procedimento_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "medico_procedimentos_especialidade_id_fkey"
+            columns: ["especialidade_id"]
+            isOneToOne: false
+            referencedRelation: "especialidades"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "medico_procedimentos_medico_id_fkey"
             columns: ["medico_id"]
