@@ -696,14 +696,25 @@ function ConveniosPage() {
                       </div>
                       <div className="border rounded-md p-4 space-y-3 bg-card">
                         <div className="flex items-center justify-between gap-2">
-                          <Badge variant={b.escopo === "servico" ? "default" : "secondary"}>
-                            {b.escopo === "servico" ? "Serviço único" : "Especialidade"}
+                          <Badge variant={b.escopo === "servico" ? "default" : b.escopo === "consulta" ? "outline" : "secondary"}>
+                            {b.escopo === "servico" ? "Serviço único" : b.escopo === "consulta" ? "Consultas" : "Especialidade"}
                           </Badge>
                           <div className="flex items-center gap-1.5">
                             <Switch checked={b.ativo} onCheckedChange={(v) => update({ ativo: v })} />
                             <Label className="text-xs">Ativo</Label>
                           </div>
                         </div>
+                        {b.escopo === "consulta" ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                              <Label className="text-xs">Valor (R$)</Label>
+                              <CurrencyInput
+                                value={b.valor_desconto !== null ? b.valor_desconto.toFixed(2) : ""}
+                                onChange={(v) => update({ valor_desconto: v ? parseFloat(v) : null })} />
+                            </div>
+                          </div>
+                        ) : (
+                        <>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                           <div className="md:col-span-2">
                             <Label className="text-xs">{b.escopo === "servico" ? "Serviço" : "Especialidade"}</Label>
@@ -747,6 +758,8 @@ function ConveniosPage() {
                             </div>
                           </div>
                         )}
+                        </>
+                        )}
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                           <div>
                             <Label className="text-xs">A partir de</Label>
@@ -769,17 +782,31 @@ function ConveniosPage() {
                               </SelectContent>
                             </Select>
                           </div>
-                          <div>
-                            <Label className="text-xs">Periodicidade</Label>
-                            <Select value={b.periodicidade} onValueChange={(v) => update({ periodicidade: v as Beneficio["periodicidade"] })}>
-                              <SelectTrigger><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="dia">Por dia</SelectItem>
-                                <SelectItem value="mes">Por mês</SelectItem>
-                                <SelectItem value="contrato">Por contrato</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
+                          {b.escopo === "consulta" ? (
+                            <div>
+                              <Label className="text-xs">Prioridade</Label>
+                              <Select value={String(b.prioridade)} onValueChange={(v) => update({ prioridade: parseInt(v) })}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="1">1</SelectItem>
+                                  <SelectItem value="2">2</SelectItem>
+                                  <SelectItem value="3">3</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          ) : (
+                            <div>
+                              <Label className="text-xs">Periodicidade</Label>
+                              <Select value={b.periodicidade} onValueChange={(v) => update({ periodicidade: v as Beneficio["periodicidade"] })}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="dia">Por dia</SelectItem>
+                                  <SelectItem value="mes">Por mês</SelectItem>
+                                  <SelectItem value="contrato">Por contrato</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
                           <div>
                             <Label className="text-xs">Pessoa</Label>
                             <Select value={b.pessoa} onValueChange={(v) => update({ pessoa: v as Beneficio["pessoa"] })}>
