@@ -445,11 +445,12 @@ function PerfisPage() {
                   <Badge variant="outline" className="text-sm">
                     Acessos: <span className="ml-1 font-semibold">{acessosPerfil}</span> / {totalModulos}
                   </Badge>
-                  <Button variant="outline" size="sm" onClick={() => aplicarTodos("read")}>Tudo Leitura</Button>
-                  <Button variant="outline" size="sm" onClick={() => aplicarTodos("write")}>Tudo Edição</Button>
-                  <Button variant="outline" size="sm" onClick={() => aplicarTodos("none")}>Limpar</Button>
-                  <Button size="sm" disabled title="Apenas pré-visualização">
-                    <Save className="h-4 w-4 mr-2" /> Salvar
+                  <Button variant="outline" size="sm" onClick={() => aplicarTodos("read")} disabled={loading || saving}>Tudo Leitura</Button>
+                  <Button variant="outline" size="sm" onClick={() => aplicarTodos("write")} disabled={loading || saving}>Tudo Edição</Button>
+                  <Button variant="outline" size="sm" onClick={() => aplicarTodos("none")} disabled={loading || saving}>Limpar</Button>
+                  <Button size="sm" onClick={salvar} disabled={loading || saving || !perfilIds[perfilSel]}>
+                    {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                    Salvar
                   </Button>
                 </div>
               </div>
@@ -526,9 +527,11 @@ function PerfisPage() {
             );
           })}
 
-          <p className="text-xs text-muted-foreground">
-            Pré-visualização: as alterações ainda não são salvas no banco. Aprove o formato para que eu habilite a persistência.
-          </p>
+          {loading && (
+            <p className="text-xs text-muted-foreground flex items-center gap-2">
+              <Loader2 className="h-3 w-3 animate-spin" /> Carregando permissões…
+            </p>
+          )}
         </TabsContent>
       </Tabs>
     </div>
