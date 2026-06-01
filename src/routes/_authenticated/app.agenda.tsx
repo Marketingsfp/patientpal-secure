@@ -62,7 +62,7 @@ type Medico = { id: string; nome: string; sexo?: string | null; usa_sistema?: bo
 type RecursoEnf = { id: string; nome: string };
 type Especialidade = { id: string; nome: string };
 type Paciente = { id: string; nome: string };
-type ProcedimentoRef = { id: string; nome: string; tipo: string | null };
+type ProcedimentoRef = { id: string; nome: string; tipo: string | null; grupo?: string | null };
 type MedicoProcedimentoRef = { medico_id: string | null; procedimento_id: string; created_at?: string | null };
 
 const STATUS_LABEL: Record<Status, string> = {
@@ -127,7 +127,7 @@ async function fetchProcedimentosAgenda(clinicaId: string): Promise<Procedimento
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await supabase
       .from("procedimentos")
-      .select("id,nome,tipo")
+      .select("id,nome,tipo,grupo")
       .eq("clinica_id", clinicaId)
       .eq("ativo", true)
       .order("nome")
