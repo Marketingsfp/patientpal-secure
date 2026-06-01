@@ -187,7 +187,7 @@ function ConveniosPage() {
     setEspecialidadesList((esps ?? []) as EspOpt[]);
   };
 
-  const addBeneficio = (escopo: "servico" | "especialidade") => {
+  const addBeneficio = (escopo: "servico" | "especialidade" | "consulta") => {
     setBeneficios((prev) => {
       const next = [...prev, {
         nome: "",
@@ -196,12 +196,13 @@ function ConveniosPage() {
         escopo,
         procedimento_id: null,
         especialidade_id: null,
-        tipo_desconto: "percentual" as const,
+        tipo_desconto: (escopo === "consulta" ? "valor" : "percentual") as Beneficio["tipo_desconto"],
         valor_desconto: null,
         inicio_a_partir: 1 as 1 | 2 | 6,
         limite_uso: "ilimitado" as const,
         periodicidade: "contrato" as const,
         pessoa: "titular" as Beneficio["pessoa"],
+        prioridade: 1,
       }];
       setEditingBenIdx(next.length - 1);
       return next;
