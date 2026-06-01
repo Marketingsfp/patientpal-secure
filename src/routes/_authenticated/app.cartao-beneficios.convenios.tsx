@@ -99,9 +99,10 @@ type Beneficio = {
   periodicidade: "dia" | "mes" | "contrato";
   pessoa: "titular" | "titular_dependentes_soma" | "titular_ou_dependentes";
   prioridade: number;
+  procedimento_ids: string[];
 };
 
-type ProcOpt = { id: string; nome: string };
+type ProcOpt = { id: string; nome: string; tipo?: string | null };
 type EspOpt = { id: string; nome: string };
 
 function ConveniosPage() {
