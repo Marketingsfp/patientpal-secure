@@ -62,7 +62,7 @@ type Medico = { id: string; nome: string; sexo?: string | null; usa_sistema?: bo
 type RecursoEnf = { id: string; nome: string };
 type Especialidade = { id: string; nome: string };
 type Paciente = { id: string; nome: string };
-type ProcedimentoRef = { id: string; nome: string; tipo: string | null };
+type ProcedimentoRef = { id: string; nome: string; tipo: string | null; grupo?: string | null };
 type MedicoProcedimentoRef = { medico_id: string | null; procedimento_id: string; created_at?: string | null };
 
 const STATUS_LABEL: Record<Status, string> = {
@@ -97,7 +97,9 @@ async function buscarProcedimentoPorNome(
   nome: string,
   lista: any[] | null | undefined,
 ): Promise<any | null> {
-  const alvo = (nome ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  // Remove sufixo de disambiguação " (ESPECIALIDADE)" antes de pesquisar.
+  const nomeBase = (nome ?? "").replace(/\s*\([^()]*\)\s*$/, "").trim();
+  const alvo = nomeBase.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
   const norm = (s: string) => (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
   const arr = lista ?? [];
   let proc: any =
@@ -113,7 +115,7 @@ async function buscarProcedimentoPorNome(
     .from("procedimentos")
     .select("nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix")
     .eq("clinica_id", clinicaId)
-    .ilike("nome", (nome ?? "").trim())
+    .ilike("nome", nomeBase)
     .limit(5);
   const exato = (data ?? []).find((p) => temValor(p)) ?? (data ?? [])[0];
   if (temValor(exato)) return exato;
@@ -127,7 +129,7 @@ async function fetchProcedimentosAgenda(clinicaId: string): Promise<Procedimento
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await supabase
       .from("procedimentos")
-      .select("id,nome,tipo")
+      .select("id,nome,tipo,grupo")
       .eq("clinica_id", clinicaId)
       .eq("ativo", true)
       .order("nome")
@@ -686,13 +688,20 @@ function AgendaPage() {
       setExames(unicos);
     }
     setProcedimentosList(todos.map(({ id, nome }) => ({ id, nome })));
-    const procedimentosPorId = new Map(todos.map((p) => [p.id, { id: p.id, nome: p.nome }]));
+    const procedimentosPorId = new Map(
+      todos.map((p) => [p.id, { id: p.id, nome: p.nome, grupo: p.grupo ?? null }]),
+    );
     const map = new Map<string, Set<string>>();
     for (const r of (me.data ?? []) as Array<{ medico_id: string; especialidade_id: string }>) {
       if (!map.has(r.medico_id)) map.set(r.medico_id, new Set());
       map.get(r.medico_id)!.add(r.especialidade_id);
     }
     setMedicoEspec(map);
+    // Médicos com mais de uma especialidade: precisam mostrar o serviço como "NOME (ESPECIALIDADE)".
+    const medicoMultiEsp = new Set<string>();
+    for (const [mid, set] of map.entries()) {
+      if (set.size > 1) medicoMultiEsp.add(mid);
+    }
     const pm = new Map<string, Set<string>>();
     for (const r of (sr.data ?? []) as Array<{ medico_id: string | null; procedimento_id: string }>) {
       if (!r.medico_id) continue;
@@ -712,10 +721,15 @@ function AgendaPage() {
       if (!procOpcoesMap.has(r.medico_id)) procOpcoesMap.set(r.medico_id, []);
       if (!procOpcoesVistos.has(r.medico_id)) procOpcoesVistos.set(r.medico_id, new Set());
       const vistos = procOpcoesVistos.get(r.medico_id)!;
-      const chave = normalizar(proc.nome);
+      const grupo = (proc.grupo ?? "").trim();
+      const decorado =
+        medicoMultiEsp.has(r.medico_id) && grupo
+          ? `${proc.nome} (${grupo.toUpperCase()})`
+          : proc.nome;
+      const chave = normalizar(decorado);
       if (vistos.has(chave)) continue;
       vistos.add(chave);
-      procOpcoesMap.get(r.medico_id)!.push(proc);
+      procOpcoesMap.get(r.medico_id)!.push({ id: proc.id, nome: decorado });
     }
     setProcPorMedico(pm);
     // Vínculos de procedimentos por recurso de enfermagem
