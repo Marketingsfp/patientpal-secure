@@ -104,7 +104,8 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
   const [existingEmail, setExistingEmail] = useState<string | null>(null);
   const [convenios, setConvenios] = useState<ConvenioRow[]>(CONVENIOS_PADRAO);
   const [form, setForm] = useState(emptyForm());
-  const [procEspMap, setProcEspMap] = useState<Map<string, Set<string>>>(new Map());
+  // Map procedimento_id -> Map(normalizedSpecialtyKey -> originalSpecialtyName)
+  const [procEspMap, setProcEspMap] = useState<Map<string, Map<string, string>>>(new Map());
 
   const [showSenha, setShowSenha] = useState(false);
   const [novaSenha, setNovaSenha] = useState("");
@@ -129,13 +130,32 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       if (p.grupo && especialidadesSelecionadasNomes.has(normalizarNome(p.grupo))) return true;
       const extras = procEspMap.get(p.id);
       if (extras) {
-        for (const nome of extras) {
-          if (especialidadesSelecionadasNomes.has(nome)) return true;
+        for (const key of extras.keys()) {
+          if (especialidadesSelecionadasNomes.has(key)) return true;
         }
       }
       return false;
     });
   }, [procs, especialidadesSelecionadasNomes, procEspMap]);
+
+  // Monta o rótulo exibido para um serviço, incluindo a(s) especialidade(s)
+  // associada(s) que estão selecionadas no médico (ex.: "CONSULTA (GERIATRIA, CARDIOLOGIA)").
+  const labelProcedimento = (p: Procedimento): string => {
+    const nomes: string[] = [];
+    if (p.grupo && especialidadesSelecionadasNomes.has(normalizarNome(p.grupo))) {
+      nomes.push(p.grupo);
+    }
+    const extras = procEspMap.get(p.id);
+    if (extras) {
+      for (const [key, nome] of extras) {
+        if (especialidadesSelecionadasNomes.has(key) && !nomes.includes(nome)) {
+          nomes.push(nome);
+        }
+      }
+    }
+    if (nomes.length === 0 && p.grupo) nomes.push(p.grupo);
+    return nomes.length ? `${p.nome} (${nomes.join(", ")})` : p.nome;
+  };
 
   // Auto-adiciona um item em "REPASSE INDIVIDUAL" (aba Repasse) sempre que um
   // serviço for selecionado na aba Especialidades. Não remove nada — cadastros
@@ -185,13 +205,13 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       .eq("clinica_id", clinicaId)
       .then(({ data }) => {
         if (cancelled) return;
-        const m = new Map<string, Set<string>>();
+        const m = new Map<string, Map<string, string>>();
         for (const row of (data as any[]) ?? []) {
           const nome = row?.especialidade?.nome;
           if (!nome) continue;
           const key = nome.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase();
-          if (!m.has(row.procedimento_id)) m.set(row.procedimento_id, new Set());
-          m.get(row.procedimento_id)!.add(key);
+          if (!m.has(row.procedimento_id)) m.set(row.procedimento_id, new Map());
+          m.get(row.procedimento_id)!.set(key, nome);
         }
         setProcEspMap(m);
       });
@@ -803,7 +823,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                       {form.procedimentos
                         .map((pid, idx) => {
                           const p = procs.find((pp) => pp.id === pid);
-                          const label = p ? (p.grupo ? `${p.nome} (${p.grupo})` : p.nome) : "";
+                          const label = p ? labelProcedimento(p) : "";
                           return { pid, idx, label };
                         })
                         .sort((a, b) => a.label.localeCompare(b.label, "pt-BR", { sensitivity: "base" }))
@@ -819,7 +839,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                                 const extra = procs.find((p) => p.id === selId);
                                 if (extra) base.push(extra);
                               }
-                              return base.map((p) => ({ value: p.id, label: p.grupo ? `${p.nome} (${p.grupo})` : p.nome }));
+                              return base.map((p) => ({ value: p.id, label: labelProcedimento(p) }));
                             })()}
                             value={pid}
                             onChange={(v) => {
