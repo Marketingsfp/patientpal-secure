@@ -132,6 +132,39 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
     return nomes;
   }, [form.especialidades, esps]);
 
+  // Especialidades selecionadas pelo médico (objetos completos), preservando a ordem
+  const especialidadesSelecionadas = useMemo(() => {
+    const out: Especialidade[] = [];
+    const seen = new Set<string>();
+    for (const er of form.especialidades) {
+      if (!er.especialidade_id || seen.has(er.especialidade_id)) continue;
+      const esp = esps.find((e) => e.id === er.especialidade_id);
+      if (!esp) continue;
+      seen.add(esp.id);
+      out.push(esp);
+    }
+    return out;
+  }, [form.especialidades, esps]);
+
+  // Para cada procedimento, lista as especialidades (entre as que o médico tem)
+  // a que ele está associado (via grupo direto ou via procedimento_especialidades).
+  const procEspChoices = useMemo(() => {
+    const map = new Map<string, { id: string; nome: string }[]>();
+    for (const p of procs) {
+      const out: { id: string; nome: string }[] = [];
+      const grupoKey = p.grupo ? normalizarNome(p.grupo) : "";
+      const extras = procEspMap.get(p.id);
+      for (const e of especialidadesSelecionadas) {
+        const key = normalizarNome(e.nome);
+        if ((grupoKey && grupoKey === key) || extras?.has(key)) {
+          out.push({ id: e.id, nome: e.nome });
+        }
+      }
+      map.set(p.id, out);
+    }
+    return map;
+  }, [procs, especialidadesSelecionadas, procEspMap]);
+
   const procsFiltradosPorEspecialidade = useMemo(() => {
     if (especialidadesSelecionadasNomes.size === 0) return [] as Procedimento[];
     return procs.filter((p) => {
@@ -146,23 +179,19 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
     });
   }, [procs, especialidadesSelecionadasNomes, procEspMap]);
 
-  // Monta o rótulo exibido para um serviço, incluindo a(s) especialidade(s)
-  // associada(s) que estão selecionadas no médico (ex.: "CONSULTA (GERIATRIA, CARDIOLOGIA)").
-  const labelProcedimento = (p: Procedimento): string => {
-    const nomes: string[] = [];
-    if (p.grupo && especialidadesSelecionadasNomes.has(normalizarNome(p.grupo))) {
-      nomes.push(p.grupo);
-    }
-    const extras = procEspMap.get(p.id);
-    if (extras) {
-      for (const [key, nome] of extras) {
-        if (especialidadesSelecionadasNomes.has(key) && !nomes.includes(nome)) {
-          nomes.push(nome);
-        }
-      }
-    }
-    if (nomes.length === 0 && p.grupo) nomes.push(p.grupo);
-    return nomes.length ? `${p.nome} (${nomes.join(", ")})` : p.nome;
+  // Codifica/decodifica um item da lista de serviços do médico como `procId|espId`.
+  // Quando não há especialidade associada (legado), usa só `procId|`.
+  const splitItem = (v: string): { pid: string; eid: string | null } => {
+    if (!v) return { pid: "", eid: null };
+    const [pid, eid] = v.split("|");
+    return { pid: pid ?? "", eid: eid && eid.length > 0 ? eid : null };
+  };
+  const joinItem = (pid: string, eid: string | null) => `${pid}|${eid ?? ""}`;
+
+  // Rótulo da opção, sempre "NOME (ESPECIALIDADE)" quando houver especialidade.
+  const labelProcedimentoEsp = (p: Procedimento, esp: Especialidade | null): string => {
+    if (esp) return `${p.nome} (${esp.nome.toUpperCase()})`;
+    return p.nome;
   };
 
   // Auto-adiciona um item em "REPASSE INDIVIDUAL" (aba Repasse) sempre que um
