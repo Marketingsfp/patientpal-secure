@@ -985,7 +985,7 @@ function ConveniosPage() {
             <DialogTitle>Novo benefício</DialogTitle>
             <DialogDescription>O desconto será aplicado a um serviço único ou a uma especialidade inteira?</DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-3 py-2">
+          <div className="grid grid-cols-3 gap-3 py-2">
             <Button variant="outline" className="h-24 flex-col gap-2" onClick={() => addBeneficio("servico")}>
               <Gift className="h-6 w-6" />
               <span>Serviço único</span>
@@ -993,6 +993,10 @@ function ConveniosPage() {
             <Button variant="outline" className="h-24 flex-col gap-2" onClick={() => addBeneficio("especialidade")}>
               <Layers className="h-6 w-6" />
               <span>Especialidade</span>
+            </Button>
+            <Button variant="outline" className="h-24 flex-col gap-2" onClick={() => addBeneficio("consulta")}>
+              <Stethoscope className="h-6 w-6" />
+              <span>Consultas</span>
             </Button>
           </div>
           <DialogFooter>
