@@ -466,9 +466,16 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       const { error: e2 } = await supabase.from("medico_especialidades").insert(rows);
       if (e2) { setSaving(false); toast.error(e2.message); return; }
     }
-    const procedimentosIds = Array.from(new Set(form.procedimentos.filter((x) => !!x)));
-    if (medicoId && procedimentosIds.length) {
-      const procRows = procedimentosIds.map((pid) => ({ medico_id: medicoId!, procedimento_id: pid }));
+    const itensUnicos = Array.from(new Set(form.procedimentos.filter((x) => !!x)));
+    if (medicoId && itensUnicos.length) {
+      const procRows = itensUnicos
+        .map((item) => splitItem(item))
+        .filter((x) => !!x.pid)
+        .map((x) => ({
+          medico_id: medicoId!,
+          procedimento_id: x.pid,
+          especialidade_id: x.eid,
+        }));
       const { error: ep } = await supabase.from("medico_procedimentos").insert(procRows);
       if (ep) { setSaving(false); toast.error(ep.message); return; }
     }
