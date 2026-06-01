@@ -951,7 +951,7 @@ function AgendaPage() {
     };
     let totalDinheiro = 0, totalPix = 0, totalDebito = 0, totalCredito = 0;
     for (const it of itens) {
-      const p: any = acharProc(it.procedimento ?? "CONSULTA");
+      const p: any = await buscarProcedimentoPorNome(clinicaAtual.clinica_id, it.procedimento ?? "CONSULTA", procs ?? []);
       const valorCartao = valorCartaoProcedimento(p);
       totalDinheiro += primeiroValorValido(p?.valor_dinheiro, p?.valor_dinheiro_pix, p?.valor_padrao);
       totalPix      += valorCartao;
