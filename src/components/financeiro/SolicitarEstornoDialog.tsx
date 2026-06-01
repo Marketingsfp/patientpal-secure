@@ -9,6 +9,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Undo2 } from "lucide-react";
 
 interface Props {
@@ -31,7 +33,11 @@ export function SolicitarEstornoDialog({
 }: Props) {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
+  const hoje = new Date().toISOString().slice(0, 10);
+  const [tipo, setTipo] = useState<"erro_caixa" | "devolucao">("erro_caixa");
   const [motivo, setMotivo] = useState("");
+  const [dataPagamentoOriginal, setDataPagamentoOriginal] = useState<string>(hoje);
+  const [dataEstorno, setDataEstorno] = useState<string>(hoje);
   const [saving, setSaving] = useState(false);
 
   const submit = async (e: FormEvent) => {
@@ -48,6 +54,9 @@ export function SolicitarEstornoDialog({
       descricao: descricao ?? null,
       valor: valor ?? null,
       motivo: txt,
+      tipo,
+      data_pagamento_original: tipo === "devolucao" ? (dataPagamentoOriginal || null) : null,
+      data_estorno: tipo === "devolucao" ? (dataEstorno || null) : null,
       status: "pendente",
       solicitado_por: user.id,
     });
@@ -55,6 +64,7 @@ export function SolicitarEstornoDialog({
     if (error) { toast.error(error.message); return; }
     toast.success("Solicitação enviada ao financeiro");
     setMotivo("");
+    setTipo("erro_caixa");
     onOpenChange(false);
     onCreated?.();
   };
@@ -77,6 +87,51 @@ export function SolicitarEstornoDialog({
                 {pacienteNome && <div><span className="text-muted-foreground">Paciente:</span> <strong>{pacienteNome}</strong></div>}
                 {descricao && <div><span className="text-muted-foreground">Lançamento:</span> {descricao}</div>}
                 {valor != null && <div><span className="text-muted-foreground">Valor:</span> <strong>{fmt(Number(valor))}</strong></div>}
+              </div>
+            )}
+            <div>
+              <Label>Tipo de estorno</Label>
+              <RadioGroup
+                value={tipo}
+                onValueChange={(v) => setTipo(v as "erro_caixa" | "devolucao")}
+                className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1"
+              >
+                <label className="flex items-start gap-2 rounded-md border p-3 cursor-pointer hover:bg-muted/40">
+                  <RadioGroupItem value="erro_caixa" id="t-erro" className="mt-0.5" />
+                  <div className="text-sm">
+                    <div className="font-medium">Erro de caixa</div>
+                    <div className="text-xs text-muted-foreground">Cobrança errada, duplicidade, valor incorreto.</div>
+                  </div>
+                </label>
+                <label className="flex items-start gap-2 rounded-md border p-3 cursor-pointer hover:bg-muted/40">
+                  <RadioGroupItem value="devolucao" id="t-dev" className="mt-0.5" />
+                  <div className="text-sm">
+                    <div className="font-medium">Devolução ao paciente</div>
+                    <div className="text-xs text-muted-foreground">Desistência, ocorrido, reembolso (pode ser em outro dia).</div>
+                  </div>
+                </label>
+              </RadioGroup>
+            </div>
+            {tipo === "devolucao" && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="data-pg-orig">Data do pagamento original</Label>
+                  <Input
+                    id="data-pg-orig"
+                    type="date"
+                    value={dataPagamentoOriginal}
+                    onChange={(e) => setDataPagamentoOriginal(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="data-est">Data da devolução</Label>
+                  <Input
+                    id="data-est"
+                    type="date"
+                    value={dataEstorno}
+                    onChange={(e) => setDataEstorno(e.target.value)}
+                  />
+                </div>
               </div>
             )}
             <div>
