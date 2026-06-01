@@ -101,6 +101,7 @@ function Page() {
   const isManager = clinicaAtual?.role === "admin" || clinicaAtual?.role === "gestor";
 
   const [tab, setTab] = useState<"meu" | "todos" | "repasse">("meu");
+  const [estornoFor, setEstornoFor] = useState<Mov | null>(null);
 
   // ====== Resumo de repasse do dia (para a aba "Repasse") ======
   const [repHoje, setRepHoje] = useState<{ pendente: number; pago: number; medicos: number; qtd_pend: number }>({
