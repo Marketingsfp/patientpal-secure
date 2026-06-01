@@ -27,6 +27,8 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { SolicitarEstornoDialog } from "@/components/financeiro/SolicitarEstornoDialog";
+import { Undo2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/caixa")({
   component: Page,
