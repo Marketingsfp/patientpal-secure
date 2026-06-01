@@ -709,6 +709,7 @@ function ConveniosPage() {
                           </div>
                         </div>
                         {b.escopo === "consulta" ? (
+                          <>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div>
                               <Label className="text-xs">Valor (R$)</Label>
@@ -717,6 +718,48 @@ function ConveniosPage() {
                                 onChange={(v) => update({ valor_desconto: v ? parseFloat(v) : null })} />
                             </div>
                           </div>
+                          {(() => {
+                            const consultaProcs = procedimentosList.filter((p) => (p.tipo ?? "").toLowerCase() === "consulta");
+                            const selected = b.procedimento_ids ?? [];
+                            const allSelected = consultaProcs.length > 0 && selected.length === consultaProcs.length;
+                            const toggle = (id: string) => {
+                              const set = new Set(selected);
+                              if (set.has(id)) set.delete(id); else set.add(id);
+                              update({ procedimento_ids: Array.from(set) });
+                            };
+                            const toggleAll = () => {
+                              update({ procedimento_ids: allSelected ? [] : consultaProcs.map((p) => p.id) });
+                            };
+                            return (
+                              <div>
+                                <div className="flex items-center justify-between mb-1">
+                                  <Label className="text-xs">Serviços (categoria Consulta)</Label>
+                                  <button type="button" onClick={toggleAll} className="text-xs text-primary hover:underline">
+                                    {allSelected ? "Desmarcar todos" : "Selecionar todos"}
+                                  </button>
+                                </div>
+                                <div className="border rounded-md p-2 max-h-56 overflow-auto bg-background">
+                                  {consultaProcs.length === 0 ? (
+                                    <p className="text-xs text-muted-foreground p-2">Nenhum serviço com categoria "Consulta" cadastrado.</p>
+                                  ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
+                                      {consultaProcs.map((p) => {
+                                        const checked = selected.includes(p.id);
+                                        return (
+                                          <label key={p.id} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-muted cursor-pointer text-sm">
+                                            <input type="checkbox" checked={checked} onChange={() => toggle(p.id)} />
+                                            <span className="truncate">{p.nome}</span>
+                                          </label>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                                <p className="text-[11px] text-muted-foreground mt-1">{selected.length} serviço(s) selecionado(s)</p>
+                              </div>
+                            );
+                          })()}
+                          </>
                         ) : (
                         <>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
