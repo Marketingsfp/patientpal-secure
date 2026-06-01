@@ -202,7 +202,8 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
     setConvenios((cs) => {
       const existentes = new Set(cs.map((c) => normalizarNome(c.nome)));
       const novos: ConvenioRow[] = [];
-      for (const pid of form.procedimentos) {
+      for (const item of form.procedimentos) {
+        const { pid } = splitItem(item);
         if (!pid) continue;
         const proc = procs.find((p) => p.id === pid);
         if (!proc) continue;
