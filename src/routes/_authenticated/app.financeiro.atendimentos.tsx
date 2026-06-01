@@ -81,13 +81,16 @@ function Page() {
     id: string; paciente_nome: string | null; descricao: string | null;
     valor: number | null; motivo: string; solicitado_em: string;
     lancamento_id: string | null;
+    tipo: "erro_caixa" | "devolucao" | null;
+    data_pagamento_original: string | null;
+    data_estorno: string | null;
   }
   const [solicitacoes, setSolicitacoes] = useState<SolicEst[]>([]);
   const loadSolicitacoes = async () => {
     if (!clinicaAtual) { setSolicitacoes([]); return; }
     const { data } = await supabase
       .from("estorno_solicitacoes")
-      .select("id, paciente_nome, descricao, valor, motivo, solicitado_em, lancamento_id")
+      .select("id, paciente_nome, descricao, valor, motivo, solicitado_em, lancamento_id, tipo, data_pagamento_original, data_estorno")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("status", "pendente")
       .order("solicitado_em", { ascending: false });
@@ -449,9 +452,29 @@ function Page() {
               {solicitacoes.map((s) => (
                 <li key={s.id} className="py-2 flex flex-wrap items-start gap-2 text-sm">
                   <div className="flex-1 min-w-[200px]">
-                    <div className="font-medium">{s.paciente_nome ?? "—"} {s.valor != null && <span className="text-muted-foreground font-normal">• {fmt(Number(s.valor))}</span>}</div>
+                    <div className="font-medium flex flex-wrap items-center gap-1.5">
+                      <span>{s.paciente_nome ?? "—"}</span>
+                      {s.valor != null && <span className="text-muted-foreground font-normal">• {fmt(Number(s.valor))}</span>}
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "text-[10px] h-4 px-1.5",
+                          s.tipo === "devolucao"
+                            ? "border-amber-400 text-amber-900 bg-amber-100"
+                            : "border-rose-400 text-rose-900 bg-rose-100",
+                        )}
+                      >
+                        {s.tipo === "devolucao" ? "Devolução" : "Erro de caixa"}
+                      </Badge>
+                    </div>
                     {s.descricao && <div className="text-xs text-muted-foreground">{s.descricao}</div>}
                     <div className="text-xs italic text-rose-800/80 mt-0.5">"{s.motivo}"</div>
+                    {s.tipo === "devolucao" && (s.data_pagamento_original || s.data_estorno) && (
+                      <div className="text-[10px] text-muted-foreground">
+                        {s.data_pagamento_original && <>Pago em {new Date(s.data_pagamento_original).toLocaleDateString("pt-BR")} • </>}
+                        {s.data_estorno && <>Devolver em {new Date(s.data_estorno).toLocaleDateString("pt-BR")}</>}
+                      </div>
+                    )}
                     <div className="text-[10px] text-muted-foreground">{new Date(s.solicitado_em).toLocaleString("pt-BR")}</div>
                   </div>
                   <div className="flex gap-1.5">

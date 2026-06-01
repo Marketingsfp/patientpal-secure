@@ -2454,6 +2454,8 @@ export type Database = {
           agendamento_id: string | null
           clinica_id: string
           created_at: string
+          data_estorno: string | null
+          data_pagamento_original: string | null
           descricao: string | null
           id: string
           lancamento_id: string | null
@@ -2465,6 +2467,7 @@ export type Database = {
           solicitado_em: string
           solicitado_por: string
           status: string
+          tipo: string
           updated_at: string
           valor: number | null
         }
@@ -2472,6 +2475,8 @@ export type Database = {
           agendamento_id?: string | null
           clinica_id: string
           created_at?: string
+          data_estorno?: string | null
+          data_pagamento_original?: string | null
           descricao?: string | null
           id?: string
           lancamento_id?: string | null
@@ -2483,6 +2488,7 @@ export type Database = {
           solicitado_em?: string
           solicitado_por: string
           status?: string
+          tipo?: string
           updated_at?: string
           valor?: number | null
         }
@@ -2490,6 +2496,8 @@ export type Database = {
           agendamento_id?: string | null
           clinica_id?: string
           created_at?: string
+          data_estorno?: string | null
+          data_pagamento_original?: string | null
           descricao?: string | null
           id?: string
           lancamento_id?: string | null
@@ -2501,6 +2509,7 @@ export type Database = {
           solicitado_em?: string
           solicitado_por?: string
           status?: string
+          tipo?: string
           updated_at?: string
           valor?: number | null
         }
