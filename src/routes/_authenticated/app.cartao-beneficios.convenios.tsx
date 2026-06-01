@@ -641,7 +641,7 @@ function ConveniosPage() {
                             ? (procedimentosList.find((p) => p.id === b.procedimento_id)?.nome ?? "—")
                             : b.escopo === "especialidade"
                               ? (especialidadesList.find((e) => e.id === b.especialidade_id)?.nome ?? "—")
-                              : `Consultas — Grupo ${b.prioridade}`;
+                              : ((b.nome ?? "").toString().trim() || "Consultas");
                           const valor = b.tipo_desconto === "gratuidade"
                             ? "Gratuito"
                             : b.valor_desconto === null
