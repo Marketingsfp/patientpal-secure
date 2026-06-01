@@ -104,6 +104,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
   const [existingEmail, setExistingEmail] = useState<string | null>(null);
   const [convenios, setConvenios] = useState<ConvenioRow[]>(CONVENIOS_PADRAO);
   const [form, setForm] = useState(emptyForm());
+  const [procEspMap, setProcEspMap] = useState<Map<string, Set<string>>>(new Map());
 
   const [showSenha, setShowSenha] = useState(false);
   const [novaSenha, setNovaSenha] = useState("");
@@ -124,8 +125,17 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
 
   const procsFiltradosPorEspecialidade = useMemo(() => {
     if (especialidadesSelecionadasNomes.size === 0) return [] as Procedimento[];
-    return procs.filter((p) => p.grupo && especialidadesSelecionadasNomes.has(normalizarNome(p.grupo)));
-  }, [procs, especialidadesSelecionadasNomes]);
+    return procs.filter((p) => {
+      if (p.grupo && especialidadesSelecionadasNomes.has(normalizarNome(p.grupo))) return true;
+      const extras = procEspMap.get(p.id);
+      if (extras) {
+        for (const nome of extras) {
+          if (especialidadesSelecionadasNomes.has(nome)) return true;
+        }
+      }
+      return false;
+    });
+  }, [procs, especialidadesSelecionadasNomes, procEspMap]);
 
   // Auto-adiciona um item em "REPASSE INDIVIDUAL" (aba Repasse) sempre que um
   // serviço for selecionado na aba Especialidades. Não remove nada — cadastros
@@ -168,6 +178,22 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
           setProcs([]);
           toast.error("Não foi possível carregar os serviços.");
         }
+      });
+    void supabase
+      .from("procedimento_especialidades")
+      .select("procedimento_id, especialidade:especialidades(nome)")
+      .eq("clinica_id", clinicaId)
+      .then(({ data }) => {
+        if (cancelled) return;
+        const m = new Map<string, Set<string>>();
+        for (const row of (data as any[]) ?? []) {
+          const nome = row?.especialidade?.nome;
+          if (!nome) continue;
+          const key = nome.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase();
+          if (!m.has(row.procedimento_id)) m.set(row.procedimento_id, new Set());
+          m.get(row.procedimento_id)!.add(key);
+        }
+        setProcEspMap(m);
       });
 
     return () => {
