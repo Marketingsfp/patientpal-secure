@@ -186,6 +186,7 @@ export function AppShell() {
   const { user, signOut, loading } = useAuth();
   const { memberships, clinicaAtual, setClinicaAtual, modoTodas, setModoTodas, branding } = useClinica();
   const { isMedicoOnly } = useMedicoContext();
+  const { allowed: allowedModules } = usePermissoes();
   const location = useLocation();
   const navigate = useNavigate();
   const navScrollRef = useRef<HTMLElement | null>(null);
@@ -324,7 +325,24 @@ export function AppShell() {
       : row.items.filter((it) => isParent(it) || !gestaoPessoasItems.has(it.to));
     return { ...row, items };
   }).filter((row) => row.items.length > 0);
-  const visibleNavRows = isMedicoOnly ? medicoNavRows : scopedNavRows;
+  const permissionFilteredRows = scopedNavRows
+    .map((row) => {
+      const items = row.items
+        .map((item) => {
+          if (isParent(item)) {
+            // Para itens pai (ex.: Nina), verifica a chave do próprio "to" base
+            // dos filhos. Atualmente Nina compartilha o módulo "nina".
+            const baseTo = item.children[0]?.to;
+            if (baseTo && !leafAllowed(baseTo, allowedModules)) return null;
+            return item;
+          }
+          return leafAllowed(item.to, allowedModules) ? item : null;
+        })
+        .filter((it): it is NavItem => it !== null);
+      return { ...row, items };
+    })
+    .filter((row) => row.items.length > 0);
+  const visibleNavRows = isMedicoOnly ? medicoNavRows : permissionFilteredRows;
   const subsystemLabel = subsystem ? SUBSYSTEMS[subsystem].label : null;
 
   // Lista plana de rotas visíveis no menu (respeitando grupos abertos) para navegação por seta
