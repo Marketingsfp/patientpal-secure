@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Plus, Pencil, Trash2, ArrowUpCircle, ArrowDownCircle, Download } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -116,13 +116,13 @@ function Page() {
       : await supabase.from("fin_lancamentos").insert(payload);
     setSaving(false);
     if (error) { toast.error(error.message); return; }
-    toast.success("Salvo"); setOpen(false); await load();
+    toast.success("Salvo"); setOpen(false); await load(); await loadResumo();
   };
 
   const remove = async (l: Lanc) => {
     if (!confirm(`Excluir "${l.descricao}"?`)) return;
     const { error } = await supabase.from("fin_lancamentos").delete().eq("id", l.id);
-    if (error) toast.error(error.message); else { toast.success("Removido"); await load(); }
+    if (error) toast.error(error.message); else { toast.success("Removido"); await load(); await loadResumo(); }
   };
 
   const catsFiltradas = cats.filter((c) => !c.tipo || c.tipo === form.tipo);
@@ -284,12 +284,27 @@ function Page() {
               <SelectItem value="despesa">Despesas</SelectItem>
             </SelectContent>
           </Select></div>
+        <div className="space-y-1"><Label className="text-xs">Status (totais)</Label>
+          <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as typeof filterStatus)}>
+            <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="confirmado">Apenas confirmados</SelectItem>
+              <SelectItem value="pendente">Apenas pendentes</SelectItem>
+              <SelectItem value="todos">Todos (exceto cancelados não soma)</SelectItem>
+            </SelectContent>
+          </Select></div>
       </CardContent></Card>
 
       <Card><CardContent className="p-0">
         {loading ? <div className="py-12 text-center text-muted-foreground">Carregando...</div>
           : items.length === 0 ? <div className="py-12 text-center text-muted-foreground">Nenhum lançamento no período.</div>
-          : <Table>
+          : <>
+          {resumo.totalRows > items.length ? (
+            <div className="px-4 py-2 text-xs text-muted-foreground bg-muted/30 border-b">
+              Exibindo os {items.length.toLocaleString("pt-BR")} lançamentos mais recentes de {resumo.totalRows.toLocaleString("pt-BR")} no período. Os totais acima consideram todos.
+            </div>
+          ) : null}
+          <Table>
             <TableHeader><TableRow>
               <TableHead className="w-10"></TableHead>
               <TableHead>Data</TableHead>
@@ -314,7 +329,7 @@ function Page() {
                 </TableCell>
               </TableRow>))}
             </TableBody>
-          </Table>}
+          </Table></>}
       </CardContent></Card>
     </div>
   );
