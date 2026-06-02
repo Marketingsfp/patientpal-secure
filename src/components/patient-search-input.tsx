@@ -50,6 +50,8 @@ export function PatientSearchInput({
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const reqIdRef = useRef(0);
+  const cacheRef = useRef<Map<string, PatientOption[]>>(new Map());
 
   useEffect(() => {
     setQuery(value?.nome ?? "");
@@ -62,7 +64,15 @@ export function PatientSearchInput({
       setOptions([]);
       return;
     }
+    const cacheKey = `${scope.slice().sort().join(",")}|${term.toLowerCase()}`;
+    const cached = cacheRef.current.get(cacheKey);
+    if (cached) {
+      setOptions(cached);
+      setLoading(false);
+      return;
+    }
     const handle = setTimeout(async () => {
+      const myReq = ++reqIdRef.current;
       setLoading(true);
       const digits = term.replace(/\D/g, "");
       const parts: string[] = [`nome.ilike.%${term}%`];
@@ -81,9 +91,15 @@ export function PatientSearchInput({
         .or(filter)
         .order("nome", { ascending: true })
         .limit(20);
-      setOptions((data ?? []) as PatientOption[]);
+      // Ignora respostas obsoletas (digitação rápida -> várias requests)
+      if (myReq !== reqIdRef.current) return;
+      const rows = (data ?? []) as PatientOption[];
+      // Cache simples (até 50 termos) para repetidos backspace/typing
+      if (cacheRef.current.size > 50) cacheRef.current.clear();
+      cacheRef.current.set(cacheKey, rows);
+      setOptions(rows);
       setLoading(false);
-    }, 220);
+    }, 180);
     return () => clearTimeout(handle);
   }, [query, open, scope]);
 
