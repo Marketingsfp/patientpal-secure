@@ -615,11 +615,30 @@ function ProcedimentosPage() {
       // se o tipo deixou de ser consulta, limpa vínculos extras
       await supabase.from("procedimento_especialidades").delete().eq("procedimento_id", procId);
     }
+    // Sincroniza valores por convênio (cartão benefícios)
+    if (procId && convenios.length > 0) {
+      const rows = convenios
+        .map(c => {
+          const v = formConvValores[c.id] ?? { dinheiro: "0", outros: "0" };
+          return {
+            clinica_id: clinicaAtual.clinica_id,
+            procedimento_id: procId!,
+            convenio_id: c.id,
+            valor_dinheiro: Number(v.dinheiro) || 0,
+            valor_outros: Number(v.outros) || 0,
+          };
+        });
+      const { error: errConv } = await (supabase as any)
+        .from("procedimento_cb_convenio_valores")
+        .upsert(rows, { onConflict: "procedimento_id,convenio_id" });
+      if (errConv) { setSaving(false); toast.error(errConv.message); return; }
+    }
     setSaving(false);
     toast.success(editing ? "Atualizado." : "Cadastrado.");
     setOpen(false);
     void load();
     void loadVincEsp();
+    void loadConvValores();
   };
 
   const onDelete = async (p: Procedimento) => {
