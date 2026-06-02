@@ -469,7 +469,37 @@ function AgendaPage() {
       .select("id,nome,cpf,telefone,email,data_nascimento,numero_pasta,cidade,estado,bairro,logradouro,numero,foto_url")
       .eq("id", pacienteId)
       .maybeSingle();
-    if (data) setPacInfo(data as any);
+    if (data) {
+      const base: any = { ...data };
+      const camposComplementares = ["telefone","email","cep","logradouro","numero","bairro","cidade","estado","foto_url"];
+      const faltando = camposComplementares.filter((k) => !base[k]);
+      if (faltando.length > 0 && clinicaAtual) {
+        try {
+          const cpfDigits = String(base.cpf ?? "").replace(/\D/g, "");
+          let q = supabase
+            .from("pacientes")
+            .select("id,cpf,nome,data_nascimento,telefone,email,cep,logradouro,numero,bairro,cidade,estado,foto_url")
+            .eq("clinica_id", clinicaAtual.clinica_id)
+            .neq("id", base.id);
+          if (base.data_nascimento) q = q.eq("data_nascimento", base.data_nascimento);
+          if (!base.data_nascimento && base.nome) q = q.ilike("nome", base.nome);
+          const { data: irmaos } = await q.limit(20);
+          const match = (irmaos ?? []).filter((p: any) => {
+            if (cpfDigits.length >= 11) {
+              return String(p.cpf ?? "").replace(/\D/g, "") === cpfDigits;
+            }
+            return String(p.nome ?? "").trim().toUpperCase() === String(base.nome ?? "").trim().toUpperCase();
+          });
+          for (const k of faltando) {
+            const v = match.map((p: any) => p[k]).find((x: any) => x !== null && x !== undefined && String(x).length > 0);
+            if (v) base[k] = v;
+          }
+        } catch (e) {
+          console.warn("pacInfo fallback duplicatas:", e);
+        }
+      }
+      setPacInfo(base);
+    }
     setPacInfoLoading(false);
   };
   type FormaOpcao = { forma: string; label: string; valor: number };

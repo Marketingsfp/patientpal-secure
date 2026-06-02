@@ -1,83 +1,82 @@
-## Objetivo
+## Diagnóstico
 
-Cadastrar as regras do **CARTÃO CONSULTA + SEGUROS** extraídas do documento, aplicá-las a todos os serviços já existentes e fazer com que novos cadastros recebam os valores automaticamente (você ainda pode editar caso a caso).
+A paciente "MARIA BATALHA DA SILVA OLIVEIRA" existe **duas vezes** na tabela `pacientes` (mesmo CPF `79217117749`, mesma data de nascimento `11/02/1964`):
 
-## 1. Nova tabela `cb_convenio_regras`
+| id | cpf | telefone | email | endereço |
+|---|---|---|---|---|
+| `c6e0a881…` | `792.171.177-49` (com pontuação) | vazio | vazio | vazio |
+| `23ffd434…` | `79217117749` (sem pontuação) | `21988540962` | vazio | vazio |
 
-Armazena as regras de preço por convênio. Estrutura:
+O agendamento da agenda está vinculado ao primeiro cadastro (o "vazio"), por isso o modal "Informações do cliente" mostra Telefone/Email/Endereço como `—`. Os dados existem, mas no cadastro duplicado.
 
-- `convenio_id` → convênio (ex: Cartão Consulta + Seguros)
-- `especialidade_id` (opcional) → ex: Cardiologia
-- `tipo` (opcional) → consulta / exame / procedimento
-- `modo` → `valor_fixo` ou `percentual_desconto`
-- `valor` (numeric) → ex: 9.99
-- `percentual` (numeric) → ex: 10 (significa 10% de desconto)
-- `prioridade` (integer) → regra mais específica vence
+Esse padrão deve se repetir com vários pacientes (várias pessoas atualizando o sistema criaram cadastros em paralelo, alguns com CPF formatado e outros não).
 
-Regra de aplicação: para cada (serviço × convênio), procura a regra de maior prioridade que casa com (especialidade, tipo). Se `valor_fixo`, define `valor_dinheiro = valor_outros = valor`. Se `percentual_desconto`, calcula `valor_dinheiro = base_dinheiro × (1 - %/100)` e `valor_outros = base_outros × (1 - %/100)` separadamente.
+## Plano
 
-Migration cria a tabela com RLS (gerentes editam, membros leem) e índices.
+Ajustar **apenas** a função `abrirInfoPaciente` em `src/routes/_authenticated/app.agenda.tsx` (modal "Informações do cliente") para, quando o cadastro vinculado ao agendamento tiver campos vazios, buscar os dados que faltam em outros cadastros do mesmo paciente e exibi-los — sem alterar nada no banco.
 
-## 2. Seed das regras do Cartão Consulta + Seguros
+Fluxo:
 
-```text
-Consultas clínicas (R$ 9,99 fixo)
-  Angiologia, Cardiologia, Clínica Médica (Clinico Geral),
-  Dermatologia, Endocrinologia, Gastroenterologia, Geriatria,
-  Ginecologia, Ortopedia, Otorrinolaringologia, Obstetrícia,
-  Pediatria, Urologia × tipo=consulta → R$ 9,99
+1. Carrega o paciente atual (`pacienteId`) como já faz hoje.
+2. Se **qualquer** dos campos `telefone`, `email`, `cep`, `logradouro`, `numero`, `bairro`, `cidade`, `estado`, `foto_url` estiver vazio, dispara uma busca de "irmãos" na mesma `clinica_id`:
+   - Primeiro por **CPF normalizado** (só dígitos) — pega o CPF do paciente atual, remove tudo que não é dígito, e procura outros pacientes cuja versão normalizada do CPF bata. (Implementado no client: traz candidatos com `select` filtrado por `data_nascimento` igual + `nome` igual para limitar o set, e filtra em JS por CPF normalizado.)
+   - Se o paciente atual não tiver CPF, faz fallback por `nome` (uppercase, trim) + `data_nascimento` iguais.
+3. Para cada campo vazio do paciente atual, preenche **na exibição** com o primeiro valor não-vazio encontrado entre os irmãos.
+4. Renderiza o modal com o objeto mesclado.
 
-Franquia R$ 60 (consultas)
-  Psicologia, Nutrição × tipo=consulta → R$ 60,00
+Nada é gravado: o banco continua igual, é apenas leitura adicional para a tela.
 
-Franquia R$ 80 (consultas)
-  Alergologia, Fonoaudiologia, Mastologia, Nefrologia,
-  Neurologia, Oftalmologia, Pneumologia, Proctologia,
-  Psiquiatria, Reumatologia × tipo=consulta → R$ 80,00
-  (Cardiologia Infantil, Endocrinologia Infantil e Podologia
-   serão criadas como especialidade se você confirmar — hoje
-   não existem na base)
+## Fora de escopo
 
-Exames com 10% de desconto
-  LABORATORIO, RAIO-X, MAMOGRAFIA, DENSITOMETRIA OSSEA × tipo=exame
-  + exames cujo nome contenha "PREVENTIVO" ou "ELETROCARDIOGRAMA"
-
-Exames com 5% de desconto
-  ODONTOLOGIA, ULTRASSONOGRAFIA, TOMOGRAFIA COMPUTADORIZADA,
-  FISIOTERAPIA × tipo=exame
-  + exames cujo nome contenha "RESSONANCIA", "ECOCARDIOGRAMA",
-    "ELETROENCEFALOGRAMA", "ERGOMETRICO", "ENDOSCOPIA",
-    "RPG" ou "ACUPUNTURA"
-```
-
-## 3. Aplicar agora aos serviços existentes
-
-Script de bulk update: para cada serviço da clínica, calcula o valor pela regra e faz upsert na tabela `procedimento_cb_convenio_valores` (a que já criamos). Executa para todos os serviços do convênio Cartão Consulta + Seguros. Resultado imediato na coluna do convênio na tela de Serviços.
-
-## 4. Auto-preenchimento ao cadastrar novo serviço
-
-No formulário "Novo serviço" da tela de Serviços:
-
-- Quando você escolhe a **especialidade** e o **tipo** (consulta/exame/procedimento), os campos do bloco "Valores por convênio" são preenchidos automaticamente pela regra.
-- Mudar o valor base (Dinheiro / Pix·Déb·Créd) recalcula em tempo real os convênios baseados em percentual.
-- Você ainda pode sobrescrever manualmente qualquer campo antes de salvar — o valor manual é respeitado.
-
-## 5. Onde gerenciar as regras
-
-Em **Cartão Benefícios > Convênios**, cada convênio ganha um botão "Regras de preço" que abre um modal/painel listando as regras existentes e permitindo:
-
-- adicionar/editar/remover regras (especialidade, tipo, valor fixo ou %)
-- botão "Aplicar a todos os serviços" para reprocessar em lote
-
-## 6. Observações / pontos a confirmar
-
-- O documento cita **Cardiologia Infantil**, **Endocrinologia Infantil** e **Podologia** que não existem hoje como especialidades. Posso criá-las junto com as regras, ou ignorá-las até você cadastrar.
-- O documento também menciona benefícios que são **regras de uso** (carência, 1 consulta por dia, gratuidade após 6ª mensalidade, 1 exame anual, telemedicina a 50%). Esses **não entram** como valor de serviço — se quiser, faço uma seção posterior com elegibilidade/limites por contrato (precisaria criar entidades de contrato / mensalidade).
-- Para o convênio **Cartão Consulta** e **Cartão Terapêutico**, faço o mesmo motor; basta me enviar os documentos correspondentes.
+- **Não** vou deduplicar nem mesclar registros no banco (isso é um mutirão à parte, com risco de mexer em agendamentos, financeiro, prontuário).
+- **Não** vou mudar a tela de cadastro/edição de cliente nem a busca de pacientes em outros lugares.
+- **Não** vou mexer em relatórios, financeiro ou regra de preço.
 
 ## Detalhes técnicos
 
-- Migration: tabela `cb_convenio_regras` + função `apply_convenio_rules(clinica_id, convenio_id)` (Postgres) que reaplica as regras a todos os serviços.
-- Frontend: hook `useConvenioRules(convenioId)` + helper `computeConvenioValor(servico, rules)` reutilizado no form e na tela de regras.
-- Server function `recalcConvenioValores({ clinicaId, convenioId })` para o botão de bulk apply.
-- Ordenação de prioridade: regra com `especialidade_id + tipo` (10) > só `especialidade_id` (8) > só `tipo` (5) > genérica (1).
+Arquivo: `src/routes/_authenticated/app.agenda.tsx`, função `abrirInfoPaciente` (≈ linhas 462–474).
+
+Pseudocódigo do trecho novo, dentro da função:
+
+```ts
+const base = data as any;
+const camposVazios = ["telefone","email","cep","logradouro","numero","bairro","cidade","estado","foto_url"]
+  .filter(k => !base?.[k]);
+
+if (base && camposVazios.length > 0) {
+  const cpfDigits = (base.cpf ?? "").replace(/\D/g, "");
+  let irmaosQ = supabase.from("pacientes")
+    .select("id,cpf,telefone,email,cep,logradouro,numero,bairro,cidade,estado,foto_url")
+    .eq("clinica_id", clinicaAtual.clinica_id)
+    .neq("id", base.id);
+
+  if (cpfDigits.length >= 11 && base.data_nascimento) {
+    irmaosQ = irmaosQ.eq("data_nascimento", base.data_nascimento);
+  } else {
+    irmaosQ = irmaosQ.ilike("nome", base.nome).eq("data_nascimento", base.data_nascimento);
+  }
+
+  const { data: irmaos } = await irmaosQ.limit(20);
+  const match = (irmaos ?? []).filter(p => {
+    if (cpfDigits.length >= 11) return (p.cpf ?? "").replace(/\D/g, "") === cpfDigits;
+    return true;
+  });
+
+  for (const k of camposVazios) {
+    if (!base[k]) {
+      const v = match.map(p => (p as any)[k]).find(Boolean);
+      if (v) base[k] = v;
+    }
+  }
+}
+
+setPacInfo(base);
+```
+
+`clinicaAtual` já está disponível no escopo (usado em outras consultas do arquivo).
+
+## Arquivos a alterar
+
+- `src/routes/_authenticated/app.agenda.tsx` — apenas a função `abrirInfoPaciente`.
+
+Sem migrations. Sem alteração de tipos. Sem mudança no banco.
