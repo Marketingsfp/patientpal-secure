@@ -25,6 +25,8 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 
+import { findRegra, computeValor, type CbRegra } from "@/lib/cb-regras";
+
 export const Route = createFileRoute("/_authenticated/app/procedimentos")({
   component: ProcedimentosPageWithTabs,
   head: () => ({ meta: [{ title: "Exames / Procedimentos — ClinicaOS" }] }),
@@ -421,6 +423,10 @@ function ProcedimentosPage() {
   const [convValores, setConvValores] = useState<Map<string, ConvValor>>(new Map());
   // Formulário do diálogo: convenio_id -> { dinheiro, outros } (strings)
   const [formConvValores, setFormConvValores] = useState<Record<string, { dinheiro: string; outros: string }>>({});
+  // Convenios cujo valor foi editado manualmente no diálogo (não recalcula automaticamente).
+  const [formConvManual, setFormConvManual] = useState<Record<string, boolean>>({});
+  // Regras de preço por convênio
+  const [regras, setRegras] = useState<CbRegra[]>([]);
 
   const loadConvenios = async () => {
     if (!clinicaAtual) return;
@@ -451,14 +457,56 @@ function ProcedimentosPage() {
     setConvValores(m);
   };
 
+  const loadRegras = async () => {
+    if (!clinicaAtual) return;
+    const { data, error } = await (supabase as any)
+      .from("cb_convenio_regras")
+      .select("id,convenio_id,especialidade_id,tipo,modo,valor,percentual,prioridade,ativo")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("ativo", true);
+    if (error) { toast.error(error.message); return; }
+    setRegras((data ?? []) as CbRegra[]);
+  };
+
   useEffect(() => {
     void load();
     void loadCartoes();
     void loadVincEsp();
     void loadConvenios();
     void loadConvValores();
+    void loadRegras();
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [clinicaAtual?.clinica_id]);
+
+  // ---- Auto-preenchimento dos valores por convênio a partir das regras ----
+  // Recalcula quando o usuário muda especialidade, tipo, ou os valores base
+  // (Dinheiro / Pix·Déb·Créd). Convenios marcados como manuais ficam intactos.
+  useEffect(() => {
+    if (!open || convenios.length === 0) return;
+    // Resolve especialidade_id pelo nome de form.grupo (igual ao filtro)
+    const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const espId = form.grupo
+      ? (especialidades.find(e => norm(e.nome) === norm(form.grupo))?.id ?? null)
+      : null;
+    const baseDin = Number(form.valor_dinheiro) || 0;
+    const baseOut = Number(form.valor_pix_cartao) || 0;
+    setFormConvValores(prev => {
+      const next = { ...prev };
+      for (const c of convenios) {
+        if (formConvManual[c.id]) continue;
+        const regrasDoConv = regras.filter(r => r.convenio_id === c.id);
+        const r = findRegra(regrasDoConv, espId, form.tipo);
+        const calc = computeValor(r, baseDin, baseOut);
+        if (calc) {
+          next[c.id] = { dinheiro: calc.dinheiro.toFixed(2), outros: calc.outros.toFixed(2) };
+        } else if (!prev[c.id]) {
+          next[c.id] = { dinheiro: "0", outros: "0" };
+        }
+      }
+      return next;
+    });
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [open, form.grupo, form.tipo, form.valor_dinheiro, form.valor_pix_cartao, regras, convenios, especialidades]);
 
   const grupos = useMemo(() => {
     const s = new Set<string>();
@@ -543,6 +591,7 @@ function ProcedimentosPage() {
     setFormConvValores(
       Object.fromEntries(convenios.map(c => [c.id, { dinheiro: "0", outros: "0" }])),
     );
+    setFormConvManual({});
     setOpen(true);
   };
   const openEdit = (p: Procedimento) => {
@@ -560,6 +609,11 @@ function ProcedimentosPage() {
         }),
       ),
     );
+    // Ao editar, considera valores existentes como manuais — não sobrescreve.
+    setFormConvManual(Object.fromEntries(convenios.map(c => {
+      const v = convValores.get(`${p.id}::${c.id}`);
+      return [c.id, !!(v && (v.valor_dinheiro || v.valor_outros))];
+    })));
     setForm({
       nome: p.nome, grupo: p.grupo ?? "", tipo: p.tipo, codigo: p.codigo ?? "",
       valor_dinheiro: String(p.valor_dinheiro ?? p.valor_dinheiro_pix ?? p.valor_padrao ?? 0),
@@ -1052,20 +1106,42 @@ function ProcedimentosPage() {
                     const v = formConvValores[c.id] ?? { dinheiro: "0", outros: "0" };
                     return (
                       <div key={c.id} className="space-y-2 border-l-2 border-primary/30 pl-3">
-                        <p className="text-sm font-medium">{c.nome}</p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium">
+                            {c.nome}
+                            {!formConvManual[c.id] && (
+                              <span className="ml-2 text-[10px] font-normal text-muted-foreground">(auto pela regra)</span>
+                            )}
+                          </p>
+                          {formConvManual[c.id] && (
+                            <button
+                              type="button"
+                              className="text-[10px] text-primary hover:underline"
+                              onClick={() => setFormConvManual(prev => ({ ...prev, [c.id]: false }))}
+                            >
+                              Recalcular pela regra
+                            </button>
+                          )}
+                        </div>
                         <div className="grid grid-cols-2 gap-3">
                           <div className="space-y-1">
                             <Label className="text-xs">Dinheiro (R$)</Label>
                             <CurrencyInput
                               value={v.dinheiro}
-                              onChange={(val) => setFormConvValores(prev => ({ ...prev, [c.id]: { ...v, dinheiro: val } }))}
+                              onChange={(val) => {
+                                setFormConvValores(prev => ({ ...prev, [c.id]: { ...v, dinheiro: val } }));
+                                setFormConvManual(prev => ({ ...prev, [c.id]: true }));
+                              }}
                             />
                           </div>
                           <div className="space-y-1">
                             <Label className="text-xs">Pix / Débito / Crédito (R$)</Label>
                             <CurrencyInput
                               value={v.outros}
-                              onChange={(val) => setFormConvValores(prev => ({ ...prev, [c.id]: { ...v, outros: val } }))}
+                              onChange={(val) => {
+                                setFormConvValores(prev => ({ ...prev, [c.id]: { ...v, outros: val } }));
+                                setFormConvManual(prev => ({ ...prev, [c.id]: true }));
+                              }}
                             />
                           </div>
                         </div>

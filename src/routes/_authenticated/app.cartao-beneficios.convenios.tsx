@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, ShieldCheck, Layers, Lightbulb, ArrowLeft, FileText, Info, Printer, Gift, FileSignature, Stethoscope } from "lucide-react";
+import { Plus, Pencil, Trash2, ShieldCheck, Layers, Lightbulb, ArrowLeft, FileText, Info, Printer, Gift, FileSignature, Stethoscope, Scale } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { RichEditor } from "@/components/cartao-beneficios/rich-editor";
 import { INFORMATIVO_CARTAO_CONSULTA_SEGUROS_HTML } from "@/components/cartao-beneficios/informativo-seed";
+import { RegrasConvenioTab } from "@/components/cartao-beneficios/regras-tab";
 
 const CONTRATO_VARIAVEIS: { label: string; token: string }[] = [
   { label: "Nome da clínica", token: "CLINICA_NOME" },
@@ -471,6 +472,7 @@ function ConveniosPage() {
               <TabsTrigger value="info">Informações</TabsTrigger>
               <TabsTrigger value="faixas"><Layers className="h-4 w-4 mr-1" />Faixas de Preço</TabsTrigger>
               <TabsTrigger value="beneficios"><Gift className="h-4 w-4 mr-1" />Benefícios</TabsTrigger>
+              <TabsTrigger value="regras"><Scale className="h-4 w-4 mr-1" />Regras de Preço</TabsTrigger>
               <TabsTrigger value="contrato"><FileText className="h-4 w-4 mr-1" />Contrato</TabsTrigger>
               <TabsTrigger value="informativo"><Info className="h-4 w-4 mr-1" />Informativo</TabsTrigger>
               <TabsTrigger value="termo"><FileSignature className="h-4 w-4 mr-1" />Termo de Inclusão</TabsTrigger>
@@ -877,6 +879,13 @@ function ConveniosPage() {
                   );
                 })()}
               </div>
+            </TabsContent>
+            <TabsContent value="regras" className="mt-3">
+              <RegrasConvenioTab
+                clinicaId={clinicaAtual.clinica_id}
+                convenioId={editing?.id ?? null}
+                convenioNome={editing?.nome ?? nome}
+              />
             </TabsContent>
             <TabsContent value="contrato" className="mt-3">
               <div className="space-y-3">
