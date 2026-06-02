@@ -586,6 +586,17 @@ function AgendaPage() {
     if (filtroMedico !== "todos") {
       q = q.or(`medico_id.eq.${filtroMedico},enfermagem_recurso_id.eq.${filtroMedico}`);
     }
+    // Empurra a busca por nome de cliente para o servidor — sem isso a
+    // janela de 30 dias pode trazer mais que o limite do PostgREST e
+    // descartar justamente o paciente buscado.
+    const termoCli = filtroCliente.trim();
+    if (termoCli.length >= 2) {
+      const termo = termoCli
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toUpperCase();
+      q = q.ilike("paciente_nome", `%${termo}%`);
+    }
     if (apenasData) {
       const inicio = new Date(`${dataRef}T00:00:00`).toISOString();
       const fimDia = dataFim ?? dataRef;
@@ -838,7 +849,7 @@ function AgendaPage() {
   };
 
   useEffect(() => { loadRef(); }, [clinicaAtual?.clinica_id]);
-  useEffect(() => { load(); }, [clinicaAtual?.clinica_id, dataRef, dataFim, apenasData, filtroStatus, filtroMedico]);
+  useEffect(() => { load(); }, [clinicaAtual?.clinica_id, dataRef, dataFim, apenasData, filtroStatus, filtroMedico, filtroCliente]);
 
   // Perfil de médico: trava o filtro no próprio profissional
   useEffect(() => {
