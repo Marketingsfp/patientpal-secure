@@ -436,11 +436,11 @@ function KpiCard({ icon: Icon, title, big, small, children }: {
     <Card className="overflow-hidden">
       <CardContent className="p-5">
         <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Icon className="h-4 w-4 text-primary" />
-            <span className={small ? "truncate max-w-[180px]" : ""}>{title}</span>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground min-w-0 flex-1">
+            <Icon className="h-4 w-4 text-primary shrink-0" />
+            <span className="truncate" title={title}>{title}</span>
           </div>
-          {big !== undefined && <div className="text-2xl font-semibold tabular-nums">{big}</div>}
+          {big !== undefined && <div className="text-2xl font-semibold tabular-nums shrink-0">{big}</div>}
         </div>
         {children && <div className="mt-4 pt-3 border-t border-border">{children}</div>}
       </CardContent>
