@@ -215,6 +215,7 @@ const CUBOS: CubeSpec[] = [
 ];
 
 const DIAS_SEMANA = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+const MESES_NOMES = ["01-Jan", "02-Fev", "03-Mar", "04-Abr", "05-Mai", "06-Jun", "07-Jul", "08-Ago", "09-Set", "10-Out", "11-Nov", "12-Dez"];
 
 async function lookupNames(
   table: "medicos" | "pacientes" | "fin_categorias" | "fin_contas",
@@ -292,12 +293,15 @@ async function lookupEspecialidadePorProcedimento(
 }
 
 function transformDate(isoStr: string | null, base: Record<string, any>) {
-  if (!isoStr) return { ...base, dia: "", mes: "", dia_semana: "", hora: "" };
+  if (!isoStr) return { ...base, dia: "", mes: "", ano: "", mes_nome: "", dia_semana: "", hora: "" };
   const d = new Date(isoStr);
+  const mesIdx = Number(isoStr.slice(5, 7)) - 1;
   return {
     ...base,
     dia: isoStr.slice(0, 10),
     mes: isoStr.slice(0, 7),
+    ano: isoStr.slice(0, 4),
+    mes_nome: mesIdx >= 0 && mesIdx < 12 ? MESES_NOMES[mesIdx] : "",
     dia_semana: DIAS_SEMANA[d.getDay()],
     hora: String(d.getHours()).padStart(2, "0") + ":00",
   };
