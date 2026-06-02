@@ -2015,10 +2015,17 @@ function AgendaPage() {
           <DialogHeader>
             <DialogTitle>Forma de pagamento</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground -mt-2">
-            {formaPagCtx?.desc}
-            <span className="block text-xs mt-1 opacity-70">Dica: use as teclas 1–5 para escolher rapidamente.</span>
-          </p>
+          <div className="text-sm -mt-2 space-y-1">
+            {formaPagCtx?.paciente ? (
+              <div className="font-semibold text-primary leading-tight">{formaPagCtx.paciente}</div>
+            ) : null}
+            {formaPagCtx?.procedimento ? (
+              <div className="font-medium text-emerald-600 dark:text-emerald-400 leading-tight">{formaPagCtx.procedimento}</div>
+            ) : (
+              <div className="text-muted-foreground">{formaPagCtx?.desc}</div>
+            )}
+            <span className="block text-xs mt-1 text-muted-foreground opacity-80">Dica: use as teclas 1–5 para escolher rapidamente.</span>
+          </div>
           <div className="grid gap-2 mt-2">
             {formaPagOpcoes.map((op, idx) => (
               <Button
