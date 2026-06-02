@@ -590,7 +590,6 @@ function ProcedimentosPage() {
   };
 
   const openNew = () => {
-  const openNew = () => {
     setOpenTipoPicker(true);
   };
   const startNewComTipo = (tipo: Tipo) => {
