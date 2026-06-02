@@ -36,6 +36,7 @@ interface Atend {
   repasse_pago_em?: string | null;
   repasse_forma_pagamento?: string | null;
   paciente_nome_extra?: string | null;
+  agendamento_inicio?: string | null;
 }
 interface Medico {
   id: string; nome: string;
@@ -76,6 +77,7 @@ function Page() {
   const [fFim, setFFim] = useState<string>(hoje);
   const [fStatus, setFStatus] = useState<"todos" | "aberto" | "pago">("aberto");
   const [fPaciente, setFPaciente] = useState<string>("");
+  const [fOrdem, setFOrdem] = useState<"data_desc" | "data_asc" | "gr" | "paciente_az" | "paciente_za">("data_desc");
   const [contas, setContas] = useState<Conta[]>([]);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [payOpen, setPayOpen] = useState(false);
@@ -225,7 +227,7 @@ function Page() {
       .lte("data", fFim);
     let qAgenda = supabase
       .from("fin_lancamentos")
-      .select("id, data, descricao, valor, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_forma_pagamento, agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id)")
+      .select("id, data, descricao, valor, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_forma_pagamento, agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio)")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("tipo", "receita")
       .eq("status", "confirmado")
@@ -248,7 +250,7 @@ function Page() {
       repasse_pago: !!r.repasse_pago, repasse_pago_em: r.repasse_pago_em, repasse_forma_pagamento: r.repasse_forma_pagamento,
     }));
     const agend: Atend[] = (ar.data ?? []).map((r): Atend => {
-      const ag = (r as any).agendamento as { procedimento: string | null; paciente_nome: string | null; paciente_id: string | null; medico_id: string | null } | null;
+      const ag = (r as any).agendamento as { procedimento: string | null; paciente_nome: string | null; paciente_id: string | null; medico_id: string | null; inicio: string | null } | null;
       // Procedimento: só usamos o do agendamento. Quando não há agendamento
       // vinculado, a "cauda" da descrição costuma ser tipo de contrato/forma
       // (CONTRATO, RECEBIMENTOS DIVERSOS, AJUSTE…), não o serviço realizado.
@@ -266,6 +268,7 @@ function Page() {
         paciente_nome_extra: pacNomeExtra,
         origem: "agenda",
         repasse_pago: !!r.repasse_pago, repasse_pago_em: r.repasse_pago_em, repasse_forma_pagamento: r.repasse_forma_pagamento,
+        agendamento_inicio: ag?.inicio ?? null,
       };
     });
     // Filtro client-side por médico para os registros da agenda (cobre os
@@ -419,13 +422,42 @@ function Page() {
   const pacMap = new Map(pacientes.map((p) => [p.id, p.nome]));
   const filteredItems = useMemo(() => {
     const q = norm(fPaciente.trim());
-    if (!q) return items;
-    return items.filter((a) => {
-      const nome = (a.paciente_id ? pacMap.get(a.paciente_id) : null) ?? a.paciente_nome_extra ?? "";
-      return norm(nome).includes(q);
-    });
+    const base = !q
+      ? items
+      : items.filter((a) => {
+          const nome = (a.paciente_id ? pacMap.get(a.paciente_id) : null) ?? a.paciente_nome_extra ?? "";
+          return norm(nome).includes(q);
+        });
+    const nomeDe = (a: Atend) =>
+      norm(((a.paciente_id ? pacMap.get(a.paciente_id) : null) ?? a.paciente_nome_extra ?? "").trim());
+    const grDe = (a: Atend) => a.agendamento_inicio ?? a.data ?? "";
+    const arr = [...base];
+    switch (fOrdem) {
+      case "data_asc":
+        arr.sort((a, b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : 0));
+        break;
+      case "gr":
+        // GR = ordem da agenda (data/hora do agendamento). Manuais vão para o fim.
+        arr.sort((a, b) => {
+          const ai = grDe(a); const bi = grDe(b);
+          if (a.origem === "agenda" && b.origem !== "agenda") return -1;
+          if (b.origem === "agenda" && a.origem !== "agenda") return 1;
+          return ai < bi ? -1 : ai > bi ? 1 : 0;
+        });
+        break;
+      case "paciente_az":
+        arr.sort((a, b) => nomeDe(a).localeCompare(nomeDe(b)));
+        break;
+      case "paciente_za":
+        arr.sort((a, b) => nomeDe(b).localeCompare(nomeDe(a)));
+        break;
+      case "data_desc":
+      default:
+        arr.sort((a, b) => (a.data < b.data ? 1 : a.data > b.data ? -1 : 0));
+    }
+    return arr;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, fPaciente, pacientes.length]);
+  }, [items, fPaciente, pacientes.length, fOrdem]);
   const totais = useMemo(() => filteredItems.reduce(
     (acc, a) => {
       acc.total += Number(a.valor_total) || 0;
@@ -678,7 +710,7 @@ function Page() {
       {/* Filtros */}
       <Card>
         <CardContent className="p-2">
-          <div className="grid grid-cols-1 md:grid-cols-6 gap-2 items-end">
+          <div className="grid grid-cols-1 md:grid-cols-7 gap-2 items-end">
             <div className="space-y-1">
               <Label className="text-[10px] flex items-center gap-1"><Filter className="h-3 w-3" />Médico</Label>
               <MedicoCombobox
@@ -712,6 +744,19 @@ function Page() {
                   <SelectItem value="aberto">A receber</SelectItem>
                   <SelectItem value="pago">Pagos</SelectItem>
                   <SelectItem value="todos">Todos</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[10px]">Ordenar por</Label>
+              <Select value={fOrdem} onValueChange={(v) => setFOrdem(v as typeof fOrdem)}>
+                <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="data_desc">Data (mais recente)</SelectItem>
+                  <SelectItem value="data_asc">Data (mais antiga)</SelectItem>
+                  <SelectItem value="gr">Nº da GR (agenda)</SelectItem>
+                  <SelectItem value="paciente_az">Paciente (A-Z)</SelectItem>
+                  <SelectItem value="paciente_za">Paciente (Z-A)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
