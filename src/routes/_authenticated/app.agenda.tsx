@@ -855,7 +855,8 @@ function AgendaPage() {
     if (!medicoId) return [] as { id: string; nome: string }[];
     const opcoesCadastradas = procOpcoesPorMedico.get(medicoId);
     if (opcoesCadastradas && opcoesCadastradas.length > 0) {
-      return [...opcoesCadastradas].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" }));
+      // Preserva a ordem do cadastro (created_at asc) — Top 10 aparecem primeiro.
+      return [...opcoesCadastradas];
     }
     const ids = procPorMedico.get(medicoId);
     const nomes = procNomesPorMedico.get(medicoId);
@@ -864,7 +865,7 @@ function AgendaPage() {
     const lista = procedimentosList.filter(
       (p) => (ids?.has(p.id) ?? false) || (nomes?.has(normalizar(p.nome)) ?? false),
     );
-    return lista.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" }));
+    return lista;
   };
 
   const procedimentoPadraoDoMedico = (medicoId: string | null | undefined) => {
