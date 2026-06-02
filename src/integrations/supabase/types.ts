@@ -6886,6 +6886,41 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      fin_resumo_categoria: {
+        Args: {
+          p_clinica: string
+          p_fim: string
+          p_ini: string
+          p_status?: string
+        }
+        Returns: {
+          categoria_id: string
+          tipo: string
+          total: number
+        }[]
+      }
+      fin_resumo_periodo: {
+        Args: { p_clinica: string; p_fim: string; p_ini: string }
+        Returns: {
+          qtd: number
+          status: string
+          tipo: string
+          total: number
+        }[]
+      }
+      fin_serie_diaria: {
+        Args: {
+          p_clinica: string
+          p_fim: string
+          p_ini: string
+          p_status?: string
+        }
+        Returns: {
+          data: string
+          tipo: string
+          total: number
+        }[]
+      }
       has_role: {
         Args: {
           _clinica_id: string
