@@ -50,6 +50,8 @@ function Page() {
   const [fromDate, setFromDate] = useState(new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10));
   const [toDate, setToDate] = useState(new Date().toISOString().slice(0, 10));
   const [detalhe, setDetalhe] = useState<null | "receita" | "despesa">(null);
+  const [resumo, setResumo] = useState<{ r: number; d: number; saldo: number; totalRows: number }>({ r: 0, d: 0, saldo: 0, totalRows: 0 });
+  const [filterStatus, setFilterStatus] = useState<"confirmado" | "todos" | "pendente">("confirmado");
 
   const load = async () => {
     if (!clinicaAtual) { setItems([]); setLoading(false); return; }
@@ -58,11 +60,27 @@ function Page() {
       .select("id, tipo, descricao, valor, data, status, categoria_id, conta_id, forma_pagamento")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .gte("data", fromDate).lte("data", toDate)
-      .order("data", { ascending: false });
+      .order("data", { ascending: false })
+      .range(0, 499);
     if (filterTipo !== "todos") q = q.eq("tipo", filterTipo);
     const { data, error } = await q;
     if (error) toast.error(error.message); else setItems((data ?? []) as Lanc[]);
     setLoading(false);
+  };
+  const loadResumo = async () => {
+    if (!clinicaAtual) { setResumo({ r: 0, d: 0, saldo: 0, totalRows: 0 }); return; }
+    const { data, error } = await supabase.rpc("fin_resumo_periodo", {
+      p_clinica: clinicaAtual.clinica_id, p_ini: fromDate, p_fim: toDate,
+    });
+    if (error) { toast.error(error.message); return; }
+    let r = 0, d = 0, totalRows = 0;
+    for (const row of (data ?? []) as Array<{ tipo: string; status: string; qtd: number; total: number }>) {
+      totalRows += Number(row.qtd) || 0;
+      if (filterStatus !== "todos" && row.status !== filterStatus) continue;
+      if (row.tipo === "receita") r += Number(row.total) || 0;
+      else if (row.tipo === "despesa") d += Number(row.total) || 0;
+    }
+    setResumo({ r, d, saldo: r - d, totalRows });
   };
   const loadOpts = async () => {
     if (!clinicaAtual) return;
@@ -72,14 +90,9 @@ function Page() {
     ]);
     setCats((c.data ?? []) as Opt[]); setContas((b.data ?? []) as Opt[]);
   };
-  useEffect(() => { void load(); }, [clinicaAtual?.clinica_id, filterTipo, fromDate, toDate]);
+  useEffect(() => { void load(); void loadResumo(); }, [clinicaAtual?.clinica_id, filterTipo, fromDate, toDate, filterStatus]);
   useEffect(() => { void loadOpts(); }, [clinicaAtual?.clinica_id]);
-
-  const totais = useMemo(() => {
-    let r = 0, d = 0;
-    for (const i of items) { if (i.tipo === "receita") r += Number(i.valor); else d += Number(i.valor); }
-    return { r, d, saldo: r - d };
-  }, [items]);
+  const totais = resumo;
 
   const openNew = () => { setEditing(null); setForm(EMPTY); setOpen(true); };
   const openEdit = (l: Lanc) => { setEditing(l); setForm({
