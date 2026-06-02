@@ -853,17 +853,20 @@ function ProcedimentosPage() {
                   </TableHead>
                   <TableHead className="w-24 text-right">Dinheiro</TableHead>
                   <TableHead className="w-28 text-right">Pix / Débito / Crédito</TableHead>
+                  {convenios.map(c => (
+                    <TableHead key={c.id} className="w-28 text-right">{c.nome}</TableHead>
+                  ))}
                   <TableHead className="w-24">Situação</TableHead>
                   <TableHead className="w-28 text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
-                  <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7 + convenios.length} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>
                 ) : !clinicaAtual ? (
-                  <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7 + convenios.length} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
                 ) : filtrados.length === 0 ? (
-                  <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Nenhum serviço.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7 + convenios.length} className="text-center py-8 text-muted-foreground">Nenhum serviço.</TableCell></TableRow>
                 ) : visiveis.map(p => (
                   <TableRow key={p.id} className="h-8">
                     <TableCell className="text-xs text-muted-foreground">{p.grupo ?? "—"}</TableCell>
@@ -873,6 +876,17 @@ function ProcedimentosPage() {
                     <TableCell className="font-medium">{p.nome}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_dinheiro ?? p.valor_dinheiro_pix))}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_pix ?? p.valor_cartao_credito ?? p.valor_cartao_debito ?? p.valor_cartao))}</TableCell>
+                    {convenios.map(c => {
+                      const v = convValores.get(`${p.id}::${c.id}`);
+                      return (
+                        <TableCell key={c.id} className="text-right tabular-nums">
+                          <div className="leading-tight">
+                            <div>{fmtBRL(v?.valor_dinheiro ?? 0)}</div>
+                            <div className="text-[10px] text-muted-foreground">{fmtBRL(v?.valor_outros ?? 0)}</div>
+                          </div>
+                        </TableCell>
+                      );
+                    })}
                     <TableCell>
                       <span className={`text-[10px] px-1.5 py-0 rounded-full ${p.ativo ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}>
                         {p.ativo ? "Ativo" : "Inativo"}
