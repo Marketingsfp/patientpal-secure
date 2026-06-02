@@ -58,7 +58,7 @@ type Agendamento = {
   observacoes: string | null;
   data_pagamento?: string | null;
 };
-type Medico = { id: string; nome: string; sexo?: string | null; usa_sistema?: boolean };
+type Medico = { id: string; nome: string; sexo?: string | null; usa_sistema?: boolean; procedimento_padrao_id?: string | null };
 type RecursoEnf = { id: string; nome: string };
 type Especialidade = { id: string; nome: string };
 type Paciente = { id: string; nome: string };
