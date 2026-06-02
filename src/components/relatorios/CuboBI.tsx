@@ -542,6 +542,24 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
               </Select>
             </div>
             <div className="space-y-1.5">
+              <Label>Detalhar ainda mais por</Label>
+              <Select
+                value={cfg.subSubRowKey ?? "__none__"}
+                onValueChange={(v) => setField("subSubRowKey", v === "__none__" ? null : v)}
+                disabled={!cfg.subRowKey}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Nenhum</SelectItem>
+                  {cube.fields
+                    .filter((f) => f.kind !== "number" && f.key !== cfg.rowKey && f.key !== cfg.subRowKey)
+                    .map((f) => (
+                      <SelectItem key={f.key} value={f.key}>{f.label}</SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
               <Label>Colunas (séries)</Label>
               <Select value={cfg.colKey ?? "__none__"} onValueChange={(v) => setField("colKey", v === "__none__" ? null : v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
