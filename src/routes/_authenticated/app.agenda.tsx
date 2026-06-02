@@ -2998,7 +2998,7 @@ function FragmentDayCell({
   fmtHora: (iso: string) => string;
   corStatus: (s: Status) => string;
 }) {
-  const ehLivre = ag && normalizar(ag.paciente_nome) === "disponivel";
+  const ehLivre = ag && isSlotLivre(ag.paciente_nome);
   return (
     <>
       <td className="px-2 py-1 text-xs font-mono text-muted-foreground border-r align-middle text-center" style={{ minWidth: 70 }}>
