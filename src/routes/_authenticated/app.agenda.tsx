@@ -2576,7 +2576,14 @@ function AgendaPage() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        title={pagosSet.has(a.id) ? "Pago" : "Pagamento pendente"}
+                        title={(() => {
+                          if (!pagosSet.has(a.id)) return "Pagamento pendente";
+                          const info = pagoInfoMap.get(a.id);
+                          if (!info) return "Pago";
+                          const v = info.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+                          const f = info.forma ? info.forma.replace(/_/g, " ").toUpperCase() : "—";
+                          return `Pago • ${f} • ${v}`;
+                        })()}
                         onClick={() => cobrarAgendamento(a)}
                         className={`h-7 w-7 border-2 rounded-md shadow-sm ${pagosSet.has(a.id)
                           ? "bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-700 hover:text-white ring-2 ring-emerald-200"
