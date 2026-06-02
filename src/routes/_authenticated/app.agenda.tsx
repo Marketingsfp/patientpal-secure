@@ -117,6 +117,11 @@ async function buscarProcedimentoPorNome(
     p && [p.valor_dinheiro, p.valor_pix, p.valor_padrao, p.valor_cartao, p.valor_cartao_credito, p.valor_cartao_debito, p.valor_dinheiro_pix]
       .some((v) => Number(v) > 0);
   if (temValor(proc)) return proc;
+  // Se a lista pré-carregada já contém os valores (formato completo) e
+  // achamos o procedimento, mesmo sem valor não vale a pena bater no banco
+  // de novo — economiza ~300-800ms por clique.
+  const listaTemValores = arr.length > 0 && arr.some((p) => "valor_dinheiro" in p);
+  if (proc && listaTemValores) return proc;
   // Fallback: consulta direta no banco com ilike (case-insensitive),
   // usando %nome% para casar variações como "ELETROCARDIOGRAMA (ECG)"
   // quando o agendamento está como "ELETROCARDIOGRAMA".
@@ -133,6 +138,34 @@ async function buscarProcedimentoPorNome(
   const escolhido = exatoComValor ?? qualquerComValor ?? (data ?? [])[0];
   if (temValor(escolhido)) return escolhido;
   return proc ?? escolhido ?? null;
+}
+
+// Cache em memória de procedimentos da clínica (com valores) para acelerar
+// o diálogo de pagamento. TTL curto: 60s. Invalida automaticamente.
+type ProcComValor = {
+  nome: string;
+  valor_dinheiro: number | null;
+  valor_pix: number | null;
+  valor_padrao: number | null;
+  valor_cartao: number | null;
+  valor_cartao_credito: number | null;
+  valor_cartao_debito: number | null;
+  valor_dinheiro_pix: number | null;
+};
+const _procsCache = new Map<string, { ts: number; data: ProcComValor[] }>();
+const PROCS_TTL_MS = 60_000;
+async function getProcedimentosComValor(clinicaId: string): Promise<ProcComValor[]> {
+  const cached = _procsCache.get(clinicaId);
+  if (cached && Date.now() - cached.ts < PROCS_TTL_MS) return cached.data;
+  const { data } = await supabase
+    .from("procedimentos")
+    .select("nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix")
+    .eq("clinica_id", clinicaId)
+    .eq("ativo", true)
+    .limit(5000);
+  const rows = (data ?? []) as ProcComValor[];
+  _procsCache.set(clinicaId, { ts: Date.now(), data: rows });
+  return rows;
 }
 
 async function fetchProcedimentosAgenda(clinicaId: string): Promise<ProcedimentoRef[]> {
