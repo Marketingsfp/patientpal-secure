@@ -2450,9 +2450,7 @@ function AgendaPage() {
                   <TableCell className="pr-1 align-middle max-w-[220px]">
                     {(() => {
                       const m = medicos.find((x) => x.id === a.medico_id);
-                      const label = m
-                        ? (m.nome.startsWith("🩺") ? m.nome : `${prefixoMedico(m.sexo)} ${m.nome}`)
-                        : "—";
+                      const label = medicoNomeAgendamento(a);
                       const manual = m && m.usa_sistema === false && !recursoIds.has(m.id);
                       return (
                         <div className="flex items-center gap-1 min-w-0">
