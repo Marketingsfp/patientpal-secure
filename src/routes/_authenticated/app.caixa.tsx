@@ -1304,44 +1304,43 @@ function Page() {
           {openDetalhe && (
             <div className="space-y-3">
               {(() => {
-                const tot = { recebimento: 0, suprimento: 0, sangria: 0, despesa: 0, estorno: 0 };
+                const tot = { recebimento: 0, sangria: 0, estorno: 0 };
                 let qtdReceb = 0;
                 detalheMovs.forEach((m) => {
                   const v = Number(m.valor || 0);
                   if (m.tipo === "recebimento") { tot.recebimento += v; qtdReceb++; }
-                  else if (m.tipo === "suprimento") tot.suprimento += v;
                   else if (m.tipo === "sangria") tot.sangria += v;
-                  else if (m.tipo === "despesa") tot.despesa += v;
                   if ((m.descricao ?? "").toLowerCase().includes("estorno")) tot.estorno += v;
                 });
                 const diff = Number(openDetalhe.diferenca || 0);
+                const media = qtdReceb > 0 ? tot.recebimento / qtdReceb : 0;
                 return (
                   <>
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                      <div className="rounded-lg border bg-slate-50 dark:bg-slate-900/40 p-2.5">
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Abertura</p>
+                        <p className="text-base font-bold text-slate-700 dark:text-slate-200">{fmt(openDetalhe.valor_abertura)}</p>
+                      </div>
                       <div className="rounded-lg border bg-emerald-50 dark:bg-emerald-950/30 p-2.5">
                         <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Recebimentos</p>
                         <p className="text-base font-bold text-emerald-700 dark:text-emerald-400">{fmt(tot.recebimento)}</p>
                         <p className="text-[11px] text-muted-foreground">{qtdReceb} lançamento{qtdReceb === 1 ? "" : "s"}</p>
                       </div>
-                      <div className="rounded-lg border bg-sky-50 dark:bg-sky-950/30 p-2.5">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Suprimentos</p>
-                        <p className="text-base font-bold text-sky-700 dark:text-sky-400">{fmt(tot.suprimento)}</p>
-                      </div>
                       <div className="rounded-lg border bg-amber-50 dark:bg-amber-950/30 p-2.5">
                         <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Sangrias</p>
                         <p className="text-base font-bold text-amber-700 dark:text-amber-400">{fmt(tot.sangria)}</p>
                       </div>
-                      <div className="rounded-lg border bg-rose-50 dark:bg-rose-950/30 p-2.5">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Despesas</p>
-                        <p className="text-base font-bold text-rose-700 dark:text-rose-400">{fmt(tot.despesa)}</p>
+                      <div className="rounded-lg border bg-sky-50 dark:bg-sky-950/30 p-2.5">
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Média / atendimento</p>
+                        <p className="text-base font-bold text-sky-700 dark:text-sky-400">{fmt(media)}</p>
+                        <p className="text-[11px] text-muted-foreground">{qtdReceb} atendimento{qtdReceb === 1 ? "" : "s"}</p>
                       </div>
                       <div className="rounded-lg border bg-fuchsia-50 dark:bg-fuchsia-950/30 p-2.5">
                         <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Estornos</p>
                         <p className="text-base font-bold text-fuchsia-700 dark:text-fuchsia-400">{fmt(tot.estorno)}</p>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm rounded-lg border bg-muted/30 p-3">
-                      <div><span className="text-muted-foreground">Abertura:</span> <strong>{fmt(openDetalhe.valor_abertura)}</strong></div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm rounded-lg border bg-muted/30 p-3">
                       <div><span className="text-muted-foreground">Calculado:</span> <strong>{fmt(openDetalhe.valor_fechamento_calculado)}</strong></div>
                       <div><span className="text-muted-foreground">Informado:</span> <strong>{fmt(openDetalhe.valor_fechamento_informado)}</strong></div>
                       <div>
