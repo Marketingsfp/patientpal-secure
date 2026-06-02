@@ -586,9 +586,68 @@ function Page() {
       "Valor abertura": Number(s.valor_abertura || 0),
       "Saldo calculado": calcSaldoSessao(s.id),
       "Valor informado": Number(s.valor_fechamento_informado || 0),
+      Sangria: calcSangriaSessao(s.id),
+      Estorno: calcEstornoSessao(s.id),
       Diferenca: Number(s.diferenca || 0),
     }));
     exportToExcel(rows, `caixas_${fIni}_a_${fFim}`);
+  };
+
+  const exportarDetalhe = () => {
+    if (!openDetalhe) return;
+    const rows = detalheMovs.map((m) => ({
+      Data: new Date(m.created_at).toLocaleDateString("pt-BR"),
+      Hora: new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+      Tipo: TIPO_LABEL[m.tipo],
+      Descricao: m.descricao ?? "",
+      Forma: m.forma_pagamento ?? "",
+      Valor: (TIPO_SINAL[m.tipo] < 0 ? -1 : 1) * Number(m.valor || 0),
+    }));
+    const op = (openDetalhe.user_nome || "operador").replace(/\s+/g, "_");
+    exportToExcel(rows, `sessao_caixa_${op}_${openDetalhe.id.slice(0, 8)}`);
+  };
+
+  const imprimirDetalhe = () => {
+    if (!openDetalhe) return;
+    const s = openDetalhe;
+    const linhas = detalheMovs.map((m) => `
+      <tr>
+        <td>${new Date(m.created_at).toLocaleDateString("pt-BR")}</td>
+        <td>${new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</td>
+        <td>${TIPO_LABEL[m.tipo]}</td>
+        <td>${(m.descricao ?? "").replace(/</g, "&lt;")}</td>
+        <td>${m.forma_pagamento ?? "—"}</td>
+        <td style="text-align:right;">${TIPO_SINAL[m.tipo] < 0 ? "-" : ""}${fmt(m.valor)}</td>
+      </tr>`).join("");
+    const html = `<!doctype html><html><head><meta charset="utf-8"/>
+      <title>Sessão de caixa</title>
+      <style>
+        body{font-family:Arial,sans-serif;padding:24px;color:#0f172a;}
+        h1{font-size:18px;margin:0 0 4px;}
+        .meta{font-size:12px;color:#475569;margin-bottom:12px;}
+        .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;font-size:12px;margin-bottom:12px;}
+        .grid div{border:1px solid #e2e8f0;border-radius:6px;padding:8px;}
+        table{width:100%;border-collapse:collapse;font-size:12px;}
+        th,td{border-bottom:1px solid #e2e8f0;padding:6px;text-align:left;}
+        th{background:#f1f5f9;}
+      </style></head><body>
+      <h1>Sessão de caixa</h1>
+      <div class="meta">${s.user_nome ?? "—"} · ${fmtDT(s.aberto_em)} → ${fmtDT(s.fechado_em)}</div>
+      <div class="grid">
+        <div><b>Abertura</b><br/>${fmt(s.valor_abertura)}</div>
+        <div><b>Calculado</b><br/>${fmt(s.valor_fechamento_calculado)}</div>
+        <div><b>Informado</b><br/>${fmt(s.valor_fechamento_informado)}</div>
+        <div><b>Diferença</b><br/>${fmt(s.diferenca)}</div>
+      </div>
+      <table><thead><tr>
+        <th>Data</th><th>Hora</th><th>Tipo</th><th>Descrição</th><th>Forma</th><th style="text-align:right;">Valor</th>
+      </tr></thead><tbody>${linhas}</tbody></table>
+      <script>window.onload=()=>{window.print();}</script>
+      </body></html>`;
+    const w = window.open("", "_blank", "width=900,height=700");
+    if (!w) { toast.error("Bloqueador de pop-up impediu a impressão"); return; }
+    w.document.write(html);
+    w.document.close();
   };
 
   return (
