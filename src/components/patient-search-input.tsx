@@ -151,6 +151,21 @@ export function PatientSearchInput({
           if (value) onSelect(null);
         }}
         onFocus={() => setOpen(true)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            // Não deixar o Enter submeter o formulário pai sem que o
+            // usuário tenha escolhido um paciente da lista.
+            e.preventDefault();
+            if (options.length > 0) {
+              const first = options[0];
+              onSelect(first);
+              setQuery(first.nome);
+              setOpen(false);
+            }
+          } else if (e.key === "Escape") {
+            setOpen(false);
+          }
+        }}
         placeholder={placeholder}
         className="pl-9"
       />
