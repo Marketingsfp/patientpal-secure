@@ -405,10 +405,48 @@ function ProcedimentosPage() {
     setCartoes((data ?? []) as any);
   };
 
+  // ----- Convênios Cartão Benefícios + valores por (procedimento, convênio) -----
+  const [convenios, setConvenios] = useState<CbConvenio[]>([]);
+  // Map: `${procedimento_id}::${convenio_id}` -> ConvValor
+  const [convValores, setConvValores] = useState<Map<string, ConvValor>>(new Map());
+  // Formulário do diálogo: convenio_id -> { dinheiro, outros } (strings)
+  const [formConvValores, setFormConvValores] = useState<Record<string, { dinheiro: string; outros: string }>>({});
+
+  const loadConvenios = async () => {
+    if (!clinicaAtual) return;
+    const { data, error } = await (supabase as any)
+      .from("cb_convenios")
+      .select("id,nome,ativo")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("ativo", true)
+      .order("nome");
+    if (error) { toast.error(error.message); return; }
+    setConvenios((data ?? []) as CbConvenio[]);
+  };
+
+  const loadConvValores = async () => {
+    if (!clinicaAtual) return;
+    const { data, error } = await (supabase as any)
+      .from("procedimento_cb_convenio_valores")
+      .select("procedimento_id,convenio_id,valor_dinheiro,valor_outros")
+      .eq("clinica_id", clinicaAtual.clinica_id);
+    if (error) { toast.error(error.message); return; }
+    const m = new Map<string, ConvValor>();
+    (data ?? []).forEach((r: any) => {
+      m.set(`${r.procedimento_id}::${r.convenio_id}`, {
+        valor_dinheiro: Number(r.valor_dinheiro) || 0,
+        valor_outros: Number(r.valor_outros) || 0,
+      });
+    });
+    setConvValores(m);
+  };
+
   useEffect(() => {
     void load();
     void loadCartoes();
     void loadVincEsp();
+    void loadConvenios();
+    void loadConvValores();
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [clinicaAtual?.clinica_id]);
 
