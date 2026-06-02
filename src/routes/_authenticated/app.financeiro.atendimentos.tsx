@@ -226,8 +226,6 @@ function Page() {
       .lte("data", fFim);
     let qAgenda = supabase
       .from("fin_lancamentos")
-      .select("id, data, descricao, valor, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_forma_pagamento, agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id)")
-      // Nota: incluímos `inicio` do agendamento para permitir ordenação pela ordem da agenda (GR).
       .select("id, data, descricao, valor, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_forma_pagamento, agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio)")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("tipo", "receita")
