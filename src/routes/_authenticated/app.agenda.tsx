@@ -1381,7 +1381,12 @@ function AgendaPage() {
         }
       }
       setFormaPagOpcoes(opcoes);
-      setFormaPagCtx({ agId: novoId, desc: `${payload.paciente_nome} — ${payload.procedimento ?? "CONSULTA"}${descSuffix}` });
+      setFormaPagCtx({
+        agId: novoId,
+        desc: `${payload.paciente_nome} — ${payload.procedimento ?? "CONSULTA"}${descSuffix}`,
+        paciente: payload.paciente_nome ?? "",
+        procedimento: `${payload.procedimento ?? "CONSULTA"}${descSuffix}`,
+      });
       setFormaPagOpen(true);
     }
   };
