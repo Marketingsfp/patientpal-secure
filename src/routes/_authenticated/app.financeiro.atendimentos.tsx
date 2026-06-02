@@ -35,8 +35,14 @@ interface Atend {
   repasse_pago?: boolean;
   repasse_pago_em?: string | null;
   repasse_forma_pagamento?: string | null;
+  paciente_nome_extra?: string | null;
 }
-interface Medico { id: string; nome: string; tipo_repasse: string; percentual_repasse_padrao: number; valor_repasse_padrao: number | null }
+interface Medico {
+  id: string; nome: string;
+  tipo_repasse: string; percentual_repasse_padrao: number; valor_repasse_padrao: number | null;
+  aceita_cartao_beneficios?: boolean;
+  cb_tipo_repasse?: string | null; cb_valor_repasse?: number | null; cb_percentual_repasse?: number | null;
+}
 interface Pac { id: string; nome: string }
 interface Convenio { medico_id: string; nome: string; tipo_repasse: string; percentual: number | null; valor: number | null }
 interface Conta { id: string; nome: string }
@@ -150,8 +156,14 @@ function Page() {
     s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 
   const calcRepasse = (medicoId: string | null, total: number, procNome: string | null): number => {
-    if (!medicoId || !total) return 0;
+    if (!medicoId) return 0;
     const med = medicos.find((m) => m.id === medicoId);
+    // Cartão Consulta / convênios em que a clínica recebe R$ 0 mas o médico recebe o valor do cartão.
+    if (!total) {
+      if (med?.cb_tipo_repasse === "valor" && med.cb_valor_repasse != null) return Number(med.cb_valor_repasse);
+      if (med?.tipo_repasse === "valor" && med.valor_repasse_padrao != null) return Number(med.valor_repasse_padrao);
+      return 0;
+    }
     // 1) tenta convenio por nome do procedimento
     if (procNome) {
       const alvo = norm(procNome);
@@ -186,7 +198,7 @@ function Page() {
       .lte("data", fFim);
     let qAgenda = supabase
       .from("fin_lancamentos")
-      .select("id, data, descricao, valor, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_forma_pagamento")
+      .select("id, data, descricao, valor, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_forma_pagamento, agendamento:agendamentos(procedimento, paciente_nome, paciente_id)")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("tipo", "receita")
       .eq("status", "confirmado")
@@ -208,14 +220,19 @@ function Page() {
       repasse_pago: !!r.repasse_pago, repasse_pago_em: r.repasse_pago_em, repasse_forma_pagamento: r.repasse_forma_pagamento,
     }));
     const agend: Atend[] = (ar.data ?? []).map((r): Atend => {
-      const proc = (r.descricao ?? "").split("—").slice(1).join("—").trim() || r.descricao;
+      const ag = (r as any).agendamento as { procedimento: string | null; paciente_nome: string | null; paciente_id: string | null } | null;
+      // Prefer the real procedure from the agendamento (descricao often holds the especialidade after the em-dash).
+      const proc = ag?.procedimento || ((r.descricao ?? "").split("—").slice(1).join("—").trim() || r.descricao);
+      const pacNomeExtra = ag?.paciente_nome ?? ((r.descricao ?? "").split("—")[0]?.trim() || null);
+      const pacIdEff = r.paciente_id ?? ag?.paciente_id ?? null;
       const total = Number(r.valor);
       const repasse = calcRepasse(r.medico_id, total, proc);
       return {
         id: r.id, data: r.data, procedimento: proc,
         valor_total: total, valor_medico: repasse, valor_clinica: +(total - repasse).toFixed(2),
         status: "realizado", forma_pagamento: r.forma_pagamento,
-        medico_id: r.medico_id, paciente_id: r.paciente_id,
+        medico_id: r.medico_id, paciente_id: pacIdEff,
+        paciente_nome_extra: pacNomeExtra,
         origem: "agenda",
         repasse_pago: !!r.repasse_pago, repasse_pago_em: r.repasse_pago_em, repasse_forma_pagamento: r.repasse_forma_pagamento,
       };
@@ -230,16 +247,25 @@ function Page() {
   const loadOpts = async () => {
     if (!clinicaAtual) return;
     const [m, p, c] = await Promise.all([
-      supabase.from("medicos").select("id, nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
+      supabase.from("medicos").select("id, nome, aceita_cartao_beneficios, cb_tipo_repasse, cb_valor_repasse, cb_percentual_repasse").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("pacientes").select("id, nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome").limit(500),
       supabase.from("fin_contas").select("id, nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
     ]);
     const { data: rep } = await supabase.rpc("medicos_repasse_lista", { _clinica_id: clinicaAtual.clinica_id });
     const repMap = new Map<string, { tipo_repasse: string; percentual_repasse_padrao: number | null; valor_repasse_padrao: number | null }>();
     for (const r of (rep as any[] | null) ?? []) repMap.set(r.id, r);
-    const merged: Medico[] = ((m.data ?? []) as { id: string; nome: string }[]).map((x) => {
+    const merged: Medico[] = ((m.data ?? []) as any[]).map((x) => {
       const r = repMap.get(x.id);
-      return { id: x.id, nome: x.nome, tipo_repasse: r?.tipo_repasse ?? "percentual", percentual_repasse_padrao: Number(r?.percentual_repasse_padrao ?? 0), valor_repasse_padrao: r?.valor_repasse_padrao ?? null };
+      return {
+        id: x.id, nome: x.nome,
+        tipo_repasse: r?.tipo_repasse ?? "percentual",
+        percentual_repasse_padrao: Number(r?.percentual_repasse_padrao ?? 0),
+        valor_repasse_padrao: r?.valor_repasse_padrao ?? null,
+        aceita_cartao_beneficios: !!x.aceita_cartao_beneficios,
+        cb_tipo_repasse: x.cb_tipo_repasse ?? null,
+        cb_valor_repasse: x.cb_valor_repasse ?? null,
+        cb_percentual_repasse: x.cb_percentual_repasse ?? null,
+      };
     });
     setMedicos(merged); setPacientes((p.data ?? []) as Pac[]);
     setContas((c.data ?? []) as Conta[]);
@@ -678,7 +704,7 @@ function Page() {
                 )}
                 <TableCell className="text-sm">{new Date(a.data).toLocaleDateString("pt-BR")}</TableCell>
                 <TableCell className="text-sm">{a.medico_id ? medMap.get(a.medico_id) ?? "—" : "—"}</TableCell>
-                <TableCell className="text-sm">{a.paciente_id ? pacMap.get(a.paciente_id) ?? "—" : "—"}</TableCell>
+                <TableCell className="text-sm">{(a.paciente_id ? pacMap.get(a.paciente_id) : null) ?? a.paciente_nome_extra ?? "—"}</TableCell>
                 <TableCell className="text-sm">{a.procedimento ?? "—"}</TableCell>
                 {!isMedicoOnly && <TableCell className="text-right font-medium">{fmt(Number(a.valor_total))}</TableCell>}
                 <TableCell className="text-right font-semibold text-primary">{fmt(Number(a.valor_medico))}</TableCell>
