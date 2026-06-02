@@ -131,6 +131,10 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       toast.error("Descrição e valor são obrigatórios");
       return;
     }
+    if (valorNum <= 0) {
+      toast.error("O valor do pagamento deve ser maior que zero.");
+      return;
+    }
     setSaving(true);
     if (agendamentoId && tipo === "receita") {
       const { data: jaPago } = await supabase
