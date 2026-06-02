@@ -605,7 +605,7 @@ function AgendaPage() {
     // "agendado" agora significa "qualquer ficha com paciente alocado",
     // então não restringe por status no servidor — filtra em memória.
     const statusEspecifico =
-      filtroStatus !== "todos" && filtroStatus !== "livres" && filtroStatus !== "agendado";
+      filtroStatus !== "todos" && filtroStatus !== "livres" && filtroStatus !== "agendado" && filtroStatus !== "pago";
     if (statusEspecifico) {
       q = q.eq("status", filtroStatus as Status).limit(1000);
     }
@@ -1018,6 +1018,9 @@ function AgendaPage() {
         if (!ehLivre) return false;
       } else if (filtroStatus === "agendado") {
         if (ehLivre) return false;
+      } else if (filtroStatus === "pago") {
+        if (ehLivre) return false;
+        if (!a.data_pagamento) return false;
       } else if (filtroStatus !== "todos") {
         if (ehLivre) return false;
         if (a.status !== filtroStatus) return false;
@@ -2478,6 +2481,7 @@ function AgendaPage() {
               <SelectContent>
                 <SelectItem value="todos">TODOS</SelectItem>
                 <SelectItem value="livres">Livres</SelectItem>
+                <SelectItem value="pago">Pago</SelectItem>
                 {(Object.keys(STATUS_LABEL) as Status[]).map(s => (
                   <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>
                 ))}
