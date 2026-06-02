@@ -666,15 +666,6 @@ function ProcedimentosPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-semibold flex items-center gap-2">
-            <ClipboardList className="h-6 w-6 text-primary" /> Serviço
-          </h1>
-          <p className="text-sm text-muted-foreground">Consultas, exames e procedimentos — com valores por forma de pagamento.</p>
-        </div>
-      </div>
-
       {/* ============ SERVIÇOS (unificado) ============ */}
       <div className="space-y-4 pt-4 pb-16">
           <div className="flex flex-wrap gap-2 justify-end">
