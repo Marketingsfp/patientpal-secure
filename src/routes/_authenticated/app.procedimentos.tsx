@@ -788,9 +788,7 @@ function ProcedimentosPage() {
                     </button>
                   </TableHead>
                   <TableHead className="w-24 text-right">Dinheiro</TableHead>
-                  <TableHead className="w-20 text-right">Pix</TableHead>
-                  <TableHead className="w-20 text-right">Débito</TableHead>
-                  <TableHead className="w-20 text-right">Crédito</TableHead>
+                  <TableHead className="w-28 text-right">Pix / Débito / Crédito</TableHead>
                   <TableHead className="w-24">Situação</TableHead>
                   <TableHead className="w-28 text-right">Ações</TableHead>
                 </TableRow>
@@ -811,8 +809,6 @@ function ProcedimentosPage() {
                     <TableCell className="font-medium">{p.nome}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_dinheiro ?? p.valor_dinheiro_pix))}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_pix ?? p.valor_cartao_credito ?? p.valor_cartao_debito ?? p.valor_cartao))}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_cartao_debito ?? p.valor_cartao_credito ?? p.valor_cartao))}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_cartao_credito ?? p.valor_cartao_debito ?? p.valor_cartao))}</TableCell>
                     <TableCell>
                       <span className={`text-[10px] px-1.5 py-0 rounded-full ${p.ativo ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}>
                         {p.ativo ? "Ativo" : "Inativo"}
