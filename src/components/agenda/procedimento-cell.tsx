@@ -10,11 +10,12 @@ const norm = (s: string) =>
 interface Props {
   valor: string | null;
   opcoes: { id: string; nome: string }[]; // já filtrado para este médico
+  padrao?: string | null; // serviço padrão do médico — usado como fallback quando vazio
   disabled?: boolean;
   onChange: (novoNome: string) => void | Promise<void>;
 }
 
-export function ProcedimentoCell({ valor, opcoes, disabled, onChange }: Props) {
+export function ProcedimentoCell({ valor, opcoes, padrao, disabled, onChange }: Props) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -74,7 +75,8 @@ export function ProcedimentoCell({ valor, opcoes, disabled, onChange }: Props) {
     await onChange(nome);
   };
 
-  const textoAtual = valor || "CONSULTA";
+  const fallback = (padrao && padrao.trim()) || "CONSULTA";
+  const textoAtual = valor || fallback;
 
   if (disabled || lista.length === 0) {
     return <Badge variant="outline" className="text-xs">{textoAtual}</Badge>;
@@ -119,7 +121,7 @@ export function ProcedimentoCell({ valor, opcoes, disabled, onChange }: Props) {
               onClick={() => escolher("")}
               className="mt-2 w-full text-xs text-rose-600 hover:bg-rose-50 border border-rose-200 rounded px-2 py-1"
             >
-              Limpar serviço (voltar ao padrão)
+              Limpar serviço (voltar para {fallback})
             </button>
           )}
         </div>
