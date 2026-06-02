@@ -315,10 +315,12 @@ function ProcedimentosPage() {
   const [busca, setBusca] = useState("");
   const [filtroGrupo, setFiltroGrupo] = useState<string>("todos");
   const [filtroTipo, setFiltroTipo] = useState<"todos" | Tipo>("todos");
+  const [filtroSituacao, setFiltroSituacao] = useState<"todos" | "ativos" | "inativos">("ativos");
   // Valores aplicados (só mudam ao clicar em Pesquisar)
   const [buscaAplicada, setBuscaAplicada] = useState("");
   const [grupoAplicado, setGrupoAplicado] = useState<string>("todos");
   const [tipoAplicado, setTipoAplicado] = useState<"todos" | Tipo>("todos");
+  const [situacaoAplicada, setSituacaoAplicada] = useState<"todos" | "ativos" | "inativos">("ativos");
   // Ordenação
   type SortCol = "nome" | "grupo" | "tipo";
   const [sort, setSort] = useState<{ col: SortCol; dir: "asc" | "desc" } | null>(null);
