@@ -107,12 +107,25 @@ const RELATORIOS: Relatorio[] = [
     icon: DollarSign, cor: "#facc15",
     usaPeriodo: true,
     carregar: async ({ clinicaId, ini, fim }) => {
-      const { data } = await supabase.from("fin_lancamentos")
-        .select("tipo, descricao, valor, data_vencimento, data_pagamento, status, categoria")
+      const { data, error } = await supabase.from("fin_lancamentos")
+        .select("data, tipo, descricao, valor, status, forma_pagamento, observacoes, fin_categorias(nome), fin_contas(nome), pacientes(nome), medicos(nome)")
         .eq("clinica_id", clinicaId)
-        .gte("data_vencimento", ini!).lte("data_vencimento", fim!)
-        .order("data_vencimento", { ascending: false });
-      return (data ?? []) as any;
+        .gte("data", ini!).lte("data", fim!)
+        .order("data", { ascending: false });
+      if (error) { console.error("relatorio financeiro:", error); throw error; }
+      return (data ?? []).map((r: any) => ({
+        Data: r.data,
+        Tipo: r.tipo,
+        Descrição: r.descricao,
+        Categoria: r.fin_categorias?.nome ?? "",
+        Conta: r.fin_contas?.nome ?? "",
+        Paciente: r.pacientes?.nome ?? "",
+        Médico: r.medicos?.nome ?? "",
+        "Forma de pagamento": r.forma_pagamento ?? "",
+        Status: r.status,
+        Valor: r.valor,
+        Observações: r.observacoes ?? "",
+      }));
     },
   },
   {
