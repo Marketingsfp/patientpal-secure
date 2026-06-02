@@ -418,6 +418,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         : null,
       duracao_consulta_min: parseInt(form.duracao_consulta_min || "15") || 15,
       usa_sistema: form.usa_sistema,
+      procedimento_padrao_id: form.procedimento_padrao_id || null,
       cpf: form.cpf || null,
       rg: form.rg || null,
       data_nascimento: form.data_nascimento || null,
