@@ -13,7 +13,7 @@ import { MiniPieChart } from "@/components/charts/MiniPieChart";
 import { MiniLineChart } from "@/components/charts/MiniLineChart";
 import { exportToExcel } from "@/lib/export-csv";
 import { toast } from "sonner";
-import { Download, Save, Trash2, BarChart3, PieChart, LineChart, Table as TableIcon } from "lucide-react";
+import { Download, Save, Trash2, BarChart3, PieChart, LineChart, Table as TableIcon, ChevronRight, ChevronDown } from "lucide-react";
 
 // ============================================================
 // Tipos
@@ -335,6 +335,7 @@ type VizKind = "tabela" | "barras" | "pizza" | "linha";
 interface CubeConfig {
   cubeId: string;
   rowKey: string;
+  subRowKey: string | null;
   colKey: string | null;
   measureField: string | null;
   measureAgg: AggKind;
@@ -350,6 +351,7 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
   const [cfg, setCfg] = useState<CubeConfig>({
     cubeId: "agendamentos",
     rowKey: "medico",
+    subRowKey: null,
     colKey: "status",
     measureField: null,
     measureAgg: "count",
@@ -360,6 +362,15 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
   const [rawRows, setRawRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState<SavedView[]>([]);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  function toggleExpand(label: string) {
+    setExpanded((s) => {
+      const next = new Set(s);
+      if (next.has(label)) next.delete(label); else next.add(label);
+      return next;
+    });
+  }
 
   // load saved views
   useEffect(() => {
@@ -388,9 +399,10 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
       const numKeys = cube.fields.filter((f) => f.kind === "number").map((f) => f.key);
       const rowKey = keys.includes(c.rowKey) ? c.rowKey : (keys[0] ?? "");
       const colKey = c.colKey && keys.includes(c.colKey) ? c.colKey : null;
+      const subRowKey = c.subRowKey && keys.includes(c.subRowKey) && c.subRowKey !== rowKey ? c.subRowKey : null;
       const measureField = c.measureField && numKeys.includes(c.measureField) ? c.measureField : null;
       const measureAgg: AggKind = measureField ? (c.measureAgg === "count" ? "sum" : c.measureAgg) : "count";
-      return { ...c, rowKey, colKey, measureField, measureAgg };
+      return { ...c, rowKey, subRowKey, colKey, measureField, measureAgg };
     });
   }, [cube]);
 
@@ -478,6 +490,21 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {cube.fields.filter((f) => f.kind !== "number").map((f) => (
+                    <SelectItem key={f.key} value={f.key}>{f.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Detalhar linha por</Label>
+              <Select
+                value={cfg.subRowKey ?? "__none__"}
+                onValueChange={(v) => setField("subRowKey", v === "__none__" ? null : v)}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Nenhum</SelectItem>
+                  {cube.fields.filter((f) => f.kind !== "number" && f.key !== cfg.rowKey).map((f) => (
                     <SelectItem key={f.key} value={f.key}>{f.label}</SelectItem>
                   ))}
                 </SelectContent>
