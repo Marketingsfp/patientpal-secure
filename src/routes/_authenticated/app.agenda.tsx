@@ -570,12 +570,13 @@ function AgendaPage() {
     setItems(mapped as Agendamento[]);
     setPage(1);
     setSelecionados(new Set());
-    setEtapaMap(new Map(((data ?? []) as Array<{ id: string; fluxo_etapa?: string | null }>)
+    const agendaRows = (((data ?? []) as unknown) as Array<Agendamento & { fluxo_etapa?: string | null }>);
+    setEtapaMap(new Map(agendaRows
       .map((r) => [r.id, r.fluxo_etapa ?? "aguardando_recepcao"] as [string, string])));
     // Busca data_nascimento dos pacientes para exibir ícone de idade
     const pacIds = Array.from(new Set(
-      (data ?? [])
-        .map((a: any) => a.paciente_id as string | null)
+      agendaRows
+        .map((a) => a.paciente_id as string | null)
         .filter((x): x is string => !!x),
     ));
     if (pacIds.length) {
@@ -609,12 +610,12 @@ function AgendaPage() {
       setConvenioMap(new Map());
     }
     // Marca agendamentos pagos (receita vinculada em fin_lancamentos)
-    const ids = (data ?? []).map((a) => a.id);
+    const ids = agendaRows.map((a) => a.id);
     // Fichas DISPONÍVEIS não podem ser exibidas como "Pago" — ignoramos
     // qualquer lançamento órfão que tenha ficado vinculado a uma ficha
     // que foi posteriormente liberada por um reagendamento.
     const idsComPaciente = new Set(
-      ((data ?? []) as Array<{ id: string; paciente_nome: string }>)
+      agendaRows
         .filter((a) => normalizar(a.paciente_nome) !== "disponivel")
         .map((a) => a.id),
     );
