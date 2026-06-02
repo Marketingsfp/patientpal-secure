@@ -881,8 +881,12 @@ function ProcedimentosPage() {
                       return (
                         <TableCell key={c.id} className="text-right tabular-nums">
                           <div className="leading-tight">
-                            <div title={`Dinheiro: ${fmtBRL(v?.valor_dinheiro ?? 0)}`}>{fmtBRL(v?.valor_dinheiro ?? 0)}</div>
-                            <div className="text-[10px] text-muted-foreground" title={`Pix / Débito / Crédito: ${fmtBRL(v?.valor_outros ?? 0)}`}>{fmtBRL(v?.valor_outros ?? 0)}</div>
+                            <div title={`Dinheiro: ${fmtBRL(v?.valor_dinheiro ?? 0)}`}>
+                              <span className="text-muted-foreground mr-1">D</span>{fmtBRL(v?.valor_dinheiro ?? 0)}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground" title={`Pix / Débito / Crédito: ${fmtBRL(v?.valor_outros ?? 0)}`}>
+                              <span className="mr-1">C</span>{fmtBRL(v?.valor_outros ?? 0)}
+                            </div>
                           </div>
                         </TableCell>
                       );
