@@ -75,6 +75,7 @@ function Page() {
   const [fIni, setFIni] = useState<string>(primeiroDia.toISOString().slice(0, 10));
   const [fFim, setFFim] = useState<string>(hoje);
   const [fStatus, setFStatus] = useState<"todos" | "aberto" | "pago">("aberto");
+  const [fPaciente, setFPaciente] = useState<string>("");
   const [contas, setContas] = useState<Conta[]>([]);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [payOpen, setPayOpen] = useState(false);
@@ -416,7 +417,16 @@ function Page() {
 
   const medMap = new Map(medicos.map((m) => [m.id, m.nome]));
   const pacMap = new Map(pacientes.map((p) => [p.id, p.nome]));
-  const totais = useMemo(() => items.reduce(
+  const filteredItems = useMemo(() => {
+    const q = norm(fPaciente.trim());
+    if (!q) return items;
+    return items.filter((a) => {
+      const nome = (a.paciente_id ? pacMap.get(a.paciente_id) : null) ?? a.paciente_nome_extra ?? "";
+      return norm(nome).includes(q);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, fPaciente, pacientes.length]);
+  const totais = useMemo(() => filteredItems.reduce(
     (acc, a) => {
       acc.total += Number(a.valor_total) || 0;
       acc.medico += Number(a.valor_medico) || 0;
@@ -426,9 +436,9 @@ function Page() {
       return acc;
     },
     { total: 0, medico: 0, clinica: 0, pago: 0, aReceber: 0 },
-  ), [items]);
+  ), [filteredItems]);
 
-  const selectables = items.filter((a) => !a.repasse_pago && (a.valor_medico ?? 0) > 0);
+  const selectables = filteredItems.filter((a) => !a.repasse_pago && (a.valor_medico ?? 0) > 0);
   const allSelected = selectables.length > 0 && selectables.every((a) => sel.has(`${a.origem}:${a.id}`));
   const toggleAll = () => {
     if (allSelected) setSel(new Set());
@@ -440,7 +450,7 @@ function Page() {
     if (next.has(k)) next.delete(k); else next.add(k);
     setSel(next);
   };
-  const selectedItems = items.filter((a) => sel.has(`${a.origem}:${a.id}`));
+  const selectedItems = filteredItems.filter((a) => sel.has(`${a.origem}:${a.id}`));
   const selectedTotal = selectedItems.reduce((s, a) => s + (Number(a.valor_medico) || 0), 0);
 
   const openPay = () => {
@@ -569,9 +579,9 @@ function Page() {
         <Button
           variant="outline"
           onClick={() => {
-            if (!items.length) { toast.info("Sem dados para exportar."); return; }
+            if (!filteredItems.length) { toast.info("Sem dados para exportar."); return; }
             exportToExcel(
-              items.map((a) => ({
+              filteredItems.map((a) => ({
                 data: new Date(a.data).toLocaleDateString("pt-BR"),
                 medico: a.medico_id ? medMap.get(a.medico_id) ?? "" : "",
                 paciente: a.paciente_id ? pacMap.get(a.paciente_id) ?? "" : "",
@@ -668,13 +678,22 @@ function Page() {
       {/* Filtros */}
       <Card>
         <CardContent className="p-2">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-2 items-end">
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-2 items-end">
             <div className="space-y-1">
               <Label className="text-[10px] flex items-center gap-1"><Filter className="h-3 w-3" />Médico</Label>
               <MedicoCombobox
                 value={fMedico}
                 onChange={(v) => { if (!isMedicoOnly) setFMedico(v); }}
                 medicos={isMedicoOnly ? medicos.filter((m) => m.id === medicoLogadoId) : medicos}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[10px]">Paciente</Label>
+              <Input
+                className="h-8"
+                placeholder="Buscar por nome..."
+                value={fPaciente}
+                onChange={(e) => setFPaciente(e.target.value)}
               />
             </div>
             <div className="space-y-1">
@@ -725,7 +744,7 @@ function Page() {
 
       <Card><CardContent className="p-0">
         {loading ? <div className="py-12 text-center text-muted-foreground">Carregando...</div>
-          : items.length === 0 ? <div className="py-12 text-center text-muted-foreground"><Stethoscope className="h-10 w-10 mx-auto mb-2 text-muted-foreground/50" />Nenhum atendimento no período/filtro selecionado.</div>
+          : filteredItems.length === 0 ? <div className="py-12 text-center text-muted-foreground"><Stethoscope className="h-10 w-10 mx-auto mb-2 text-muted-foreground/50" />Nenhum atendimento no período/filtro selecionado.</div>
           : <Table>
             <TableHeader><TableRow>
               {!isMedicoOnly && (
@@ -741,7 +760,7 @@ function Page() {
               <TableHead className="text-center">Status</TableHead>
               {!isMedicoOnly && <TableHead className="w-24"></TableHead>}
             </TableRow></TableHeader>
-            <TableBody>{items.map((a) => (
+            <TableBody>{filteredItems.map((a) => (
               <TableRow key={`${a.origem}:${a.id}`}>
                 {!isMedicoOnly && (
                   <TableCell>
