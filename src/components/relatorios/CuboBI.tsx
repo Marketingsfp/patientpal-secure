@@ -413,6 +413,32 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   // Sort state for the result table. key: "__label__" (row label), "__total__" or one of colLabels
   const [sort, setSort] = useState<{ key: string; dir: "asc" | "desc" } | null>(null);
+  // Período próprio do cubo (sobrepõe o período do dashboard). "" = usar o do dashboard.
+  const [periodoPreset, setPeriodoPreset] = useState<string>("");
+
+  const { effIni, effFim } = useMemo(() => {
+    const hoje = new Date();
+    const fimISO = hoje.toISOString().slice(0, 10);
+    const startOfYear = (y: number) => `${y}-01-01`;
+    switch (periodoPreset) {
+      case "este_ano":
+        return { effIni: startOfYear(hoje.getFullYear()), effFim: fimISO };
+      case "12m": {
+        const d = new Date(hoje); d.setMonth(d.getMonth() - 12);
+        return { effIni: d.toISOString().slice(0, 10), effFim: fimISO };
+      }
+      case "2anos":
+        return { effIni: startOfYear(hoje.getFullYear() - 1), effFim: fimISO };
+      case "3anos":
+        return { effIni: startOfYear(hoje.getFullYear() - 2), effFim: fimISO };
+      case "5anos":
+        return { effIni: startOfYear(hoje.getFullYear() - 4), effFim: fimISO };
+      case "tudo":
+        return { effIni: "2000-01-01", effFim: fimISO };
+      default:
+        return { effIni: ini, effFim: fim };
+    }
+  }, [periodoPreset, ini, fim]);
 
   function toggleExpand(label: string) {
     setExpanded((s) => {
@@ -435,12 +461,12 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
     if (!clinicaId) return;
     let cancel = false;
     setLoading(true);
-    cube.load({ clinicaId, ini, fim })
+    cube.load({ clinicaId, ini: effIni, fim: effFim })
       .then((rows) => { if (!cancel) setRawRows(rows); })
       .catch((e) => toast.error(e?.message ?? "Erro ao carregar cubo"))
       .finally(() => { if (!cancel) setLoading(false); });
     return () => { cancel = true; };
-  }, [clinicaId, ini, fim, cube]);
+  }, [clinicaId, effIni, effFim, cube]);
 
   // when cube changes, validate fields
   useEffect(() => {
