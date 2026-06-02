@@ -17,8 +17,9 @@ import {
   Download, CalendarDays, Users, ClipboardList, FileText, DollarSign,
   Stethoscope, Clock, Brain, FlaskConical, BellRing, FileHeart, Target,
   CreditCard, ShieldCheck, Building2, BookOpen, MessageCircle, Bell, Workflow,
-  HeartPulse, LayoutDashboard, TrendingUp, TrendingDown, Wallet, Settings2, RotateCcw,
+  HeartPulse, LayoutDashboard, TrendingUp, TrendingDown, Wallet, Settings2, RotateCcw, Boxes,
 } from "lucide-react";
+import { CuboBI } from "@/components/relatorios/CuboBI";
 
 export const Route = createFileRoute("/_authenticated/app/relatorios")({
   component: RelatoriosPage,
@@ -408,6 +409,9 @@ function RelatoriosPage() {
           <TabsTrigger value="dashboard" className="gap-2">
             <LayoutDashboard className="h-4 w-4" /> Dashboard
           </TabsTrigger>
+          <TabsTrigger value="cubo" className="gap-2">
+            <Boxes className="h-4 w-4" /> Cubo BI
+          </TabsTrigger>
           <TabsTrigger value="downloads" className="gap-2">
             <Download className="h-4 w-4" /> Baixar planilhas
           </TabsTrigger>
@@ -415,6 +419,10 @@ function RelatoriosPage() {
 
         <TabsContent value="dashboard" className="mt-4">
           <DashboardView clinicaId={clinicaAtual?.clinica_id} ini={ini} fim={fim} />
+        </TabsContent>
+
+        <TabsContent value="cubo" className="mt-4">
+          <CuboBI clinicaId={clinicaAtual?.clinica_id} ini={ini} fim={fim} />
         </TabsContent>
 
         <TabsContent value="downloads" className="mt-4">
