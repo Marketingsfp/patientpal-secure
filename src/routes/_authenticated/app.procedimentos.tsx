@@ -880,15 +880,9 @@ function ProcedimentosPage() {
                       const v = convValores.get(`${p.id}::${c.id}`);
                       return (
                         <TableCell key={c.id} className="text-right tabular-nums">
-                          <div className="leading-tight space-y-0.5">
-                            <div className="flex items-center justify-end gap-1 text-[10px]">
-                              <span className="text-muted-foreground">Dinheiro:</span>
-                              <span>{fmtBRL(v?.valor_dinheiro ?? 0)}</span>
-                            </div>
-                            <div className="flex items-center justify-end gap-1 text-[10px]">
-                              <span className="text-muted-foreground">Pix/Déb/Créd:</span>
-                              <span>{fmtBRL(v?.valor_outros ?? 0)}</span>
-                            </div>
+                          <div className="leading-tight">
+                            <div title={`Dinheiro: ${fmtBRL(v?.valor_dinheiro ?? 0)}`}>{fmtBRL(v?.valor_dinheiro ?? 0)}</div>
+                            <div className="text-[10px] text-muted-foreground" title={`Pix / Débito / Crédito: ${fmtBRL(v?.valor_outros ?? 0)}`}>{fmtBRL(v?.valor_outros ?? 0)}</div>
                           </div>
                         </TableCell>
                       );
