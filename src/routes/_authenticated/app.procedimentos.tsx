@@ -561,6 +561,7 @@ function ProcedimentosPage() {
     setFormConvValores(
       Object.fromEntries(convenios.map(c => [c.id, { dinheiro: "0", outros: "0" }])),
     );
+    setFormConvManual({});
     setOpen(true);
   };
   const openEdit = (p: Procedimento) => {
@@ -578,6 +579,11 @@ function ProcedimentosPage() {
         }),
       ),
     );
+    // Ao editar, considera valores existentes como manuais — não sobrescreve.
+    setFormConvManual(Object.fromEntries(convenios.map(c => {
+      const v = convValores.get(`${p.id}::${c.id}`);
+      return [c.id, !!(v && (v.valor_dinheiro || v.valor_outros))];
+    })));
     setForm({
       nome: p.nome, grupo: p.grupo ?? "", tipo: p.tipo, codigo: p.codigo ?? "",
       valor_dinheiro: String(p.valor_dinheiro ?? p.valor_dinheiro_pix ?? p.valor_padrao ?? 0),
