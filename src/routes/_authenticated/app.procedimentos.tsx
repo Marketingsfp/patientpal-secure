@@ -530,12 +530,26 @@ function ProcedimentosPage() {
     setEditing(null);
     setForm({ ...EMPTY });
     setFormEspIds([]);
+    setFormConvValores(
+      Object.fromEntries(convenios.map(c => [c.id, { dinheiro: "0", outros: "0" }])),
+    );
     setOpen(true);
   };
   const openEdit = (p: Procedimento) => {
     void loadEspecialidades();
     setEditing(p);
     setFormEspIds(Array.from(vincEspMap.get(p.id) ?? []));
+    setFormConvValores(
+      Object.fromEntries(
+        convenios.map(c => {
+          const v = convValores.get(`${p.id}::${c.id}`);
+          return [c.id, {
+            dinheiro: String(v?.valor_dinheiro ?? 0),
+            outros: String(v?.valor_outros ?? 0),
+          }];
+        }),
+      ),
+    );
     setForm({
       nome: p.nome, grupo: p.grupo ?? "", tipo: p.tipo, codigo: p.codigo ?? "",
       valor_dinheiro: String(p.valor_dinheiro ?? p.valor_dinheiro_pix ?? p.valor_padrao ?? 0),
