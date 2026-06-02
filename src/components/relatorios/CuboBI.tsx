@@ -58,15 +58,15 @@ const CUBOS: CubeSpec[] = [
         .lte("inicio", fim + "T23:59:59");
       if (error) throw error;
       const rows = (data ?? []) as any[];
-      const [medMap, pacMap, espMap] = await Promise.all([
+      const [medMap, pacMap, espPorProc] = await Promise.all([
         lookupNames("medicos", rows.map((r) => r.medico_id)),
         lookupNames("pacientes", rows.map((r) => r.paciente_id)),
-        lookupEspecialidadePorMedico(rows.map((r) => r.medico_id)),
+        lookupEspecialidadePorProcedimento(clinicaId, rows.map((r) => r.procedimento)),
       ]);
       return rows.map((r) => transformDate(r.inicio, {
         status: r.status ?? "—",
         medico: medMap.get(r.medico_id) ?? "Sem médico",
-        especialidade: espMap.get(r.medico_id) ?? "—",
+        especialidade: espPorProc.get(normalizeProcKey(r.procedimento)) ?? "—",
         procedimento: r.procedimento ?? "—",
         paciente: pacMap.get(r.paciente_id) ?? r.paciente_nome ?? "—",
       }));
@@ -255,6 +255,27 @@ async function lookupEspecialidadePorMedico(
     }
   }
   return result;
+}
+
+function normalizeProcKey(s: string | null | undefined): string {
+  return (s ?? "").trim().toUpperCase();
+}
+
+async function lookupEspecialidadePorProcedimento(
+  clinicaId: string,
+  procNomes: Array<string | null | undefined>,
+): Promise<Map<string, string>> {
+  const unique = Array.from(new Set(procNomes.map(normalizeProcKey).filter((x) => x.length > 0)));
+  if (unique.length === 0) return new Map();
+  const { data } = await supabase
+    .from("procedimentos")
+    .select("nome, grupo")
+    .eq("clinica_id", clinicaId);
+  const map = new Map<string, string>();
+  for (const r of (data ?? []) as Array<{ nome: string; grupo: string | null }>) {
+    if (r.grupo) map.set(normalizeProcKey(r.nome), r.grupo);
+  }
+  return map;
 }
 
 function transformDate(isoStr: string | null, base: Record<string, any>) {
