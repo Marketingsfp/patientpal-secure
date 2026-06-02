@@ -61,6 +61,7 @@ function Page() {
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [pacientes, setPacientes] = useState<Pac[]>([]);
   const [convenios, setConvenios] = useState<Convenio[]>([]);
+  const [procValores, setProcValores] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -168,10 +169,13 @@ function Page() {
     if (procNome) {
       const alvo = norm(procNome);
       const c = convenios.find((cv) => cv.medico_id === medicoId && norm(cv.nome) === alvo);
+      // Valor de tabela do procedimento (preço cheio que a clínica cobra)
+      const procFull = procValores.get(alvo) ?? 0;
       if (c) {
         // Valor de referência do convênio (o que a clínica recebe do convênio/paciente)
         const ref = c.valor != null ? Number(c.valor) : totalPago;
-        const base = totalPago > 0 ? totalPago : ref;
+        // Total exibido = preço cheio do procedimento (se cadastrado) ou pagamento/ref
+        const base = Math.max(totalPago, procFull, ref);
         if (c.tipo_repasse === "valor" && c.valor != null) {
           return { total: base, repasse: Math.min(Number(c.valor), base) };
         }
@@ -294,6 +298,21 @@ function Page() {
     });
     setMedicos(merged); setPacientes((p.data ?? []) as Pac[]);
     setContas((c.data ?? []) as Conta[]);
+    // Carrega valor de tabela dos procedimentos para usar como "total cheio"
+    const { data: procs } = await supabase
+      .from("procedimentos")
+      .select("nome, valor_padrao, valor_dinheiro")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("ativo", true);
+    const pmap = new Map<string, number>();
+    for (const pr of (procs as any[] | null) ?? []) {
+      const v = Number(pr.valor_padrao ?? pr.valor_dinheiro ?? 0);
+      if (!pr?.nome) continue;
+      const key = norm(String(pr.nome));
+      // mantém o maior valor caso haja duplicidade entre unidades
+      if (v > (pmap.get(key) ?? 0)) pmap.set(key, v);
+    }
+    setProcValores(pmap);
     const ids = ((m.data ?? []) as Medico[]).map((x) => x.id);
     if (ids.length) {
       const { data: cv } = await supabase
@@ -307,7 +326,7 @@ function Page() {
   useEffect(() => { void loadOpts(); }, [clinicaAtual?.clinica_id]);
   useEffect(() => { void load(); /* refaz ao mudar filtros ou opções de repasse */ },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [clinicaAtual?.clinica_id, fMedico, fIni, fFim, fStatus, medicos.length, convenios.length]);
+    [clinicaAtual?.clinica_id, fMedico, fIni, fFim, fStatus, medicos.length, convenios.length, procValores.size]);
 
   const calc = useMemo(() => {
     const total = Number(form.valor_total || 0);
