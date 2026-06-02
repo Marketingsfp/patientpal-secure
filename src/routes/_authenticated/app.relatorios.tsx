@@ -9,13 +9,15 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { MiniBarChart } from "@/components/charts/MiniBarChart";
 import { MiniPieChart } from "@/components/charts/MiniPieChart";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { exportToExcel } from "@/lib/export-csv";
 import { toast } from "sonner";
 import {
   Download, CalendarDays, Users, ClipboardList, FileText, DollarSign,
   Stethoscope, Clock, Brain, FlaskConical, BellRing, FileHeart, Target,
   CreditCard, ShieldCheck, Building2, BookOpen, MessageCircle, Bell, Workflow,
-  HeartPulse, LayoutDashboard, TrendingUp, TrendingDown, Wallet,
+  HeartPulse, LayoutDashboard, TrendingUp, TrendingDown, Wallet, Settings2, RotateCcw,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/relatorios")({
