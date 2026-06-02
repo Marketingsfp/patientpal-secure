@@ -1527,7 +1527,12 @@ function AgendaPage() {
       }
     }
     setFormaPagOpcoes(opcoes);
-    setFormaPagCtx({ agId: a.id, desc: `${a.paciente_nome} — ${a.procedimento ?? "CONSULTA"}${descSuffix}` });
+    setFormaPagCtx({
+      agId: a.id,
+      desc: `${a.paciente_nome} — ${a.procedimento ?? "CONSULTA"}${descSuffix}`,
+      paciente: a.paciente_nome ?? "",
+      procedimento: `${a.procedimento ?? "CONSULTA"}${descSuffix}`,
+    });
     setFormaPagOpen(true);
   };
 
