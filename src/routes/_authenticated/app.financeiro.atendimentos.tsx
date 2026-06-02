@@ -169,10 +169,13 @@ function Page() {
     if (procNome) {
       const alvo = norm(procNome);
       const c = convenios.find((cv) => cv.medico_id === medicoId && norm(cv.nome) === alvo);
+      // Valor de tabela do procedimento (preço cheio que a clínica cobra)
+      const procFull = procValores.get(alvo) ?? 0;
       if (c) {
         // Valor de referência do convênio (o que a clínica recebe do convênio/paciente)
         const ref = c.valor != null ? Number(c.valor) : totalPago;
-        const base = totalPago > 0 ? totalPago : ref;
+        // Total exibido = preço cheio do procedimento (se cadastrado) ou pagamento/ref
+        const base = Math.max(totalPago, procFull, ref);
         if (c.tipo_repasse === "valor" && c.valor != null) {
           return { total: base, repasse: Math.min(Number(c.valor), base) };
         }
