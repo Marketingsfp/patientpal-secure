@@ -1618,6 +1618,11 @@ function AgendaPage() {
     if (m.nome.startsWith("🩺")) return m.nome;
     return `${prefixoMedico(m.sexo)} ${m.nome}`;
   };
+  const medicoNomeAgendamento = (a: Agendamento) => {
+    const m = medicos.find((x) => x.id === a.medico_id);
+    if (m) return m.nome.startsWith("🩺") ? m.nome : `${prefixoMedico(m.sexo)} ${m.nome}`;
+    return a.medico_nome ? `${prefixoMedico(a.medico_sexo)} ${a.medico_nome}` : "—";
+  };
   const fmtHora = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   const fmtData = (iso: string) => {
     const d = new Date(iso);
@@ -1739,7 +1744,7 @@ function AgendaPage() {
                   dia: fmtDiaSemana(a.inicio),
                   inicio: fmtHora(a.inicio),
                   fim: fmtHora(a.fim),
-                  profissional: medicoNome(a.medico_id),
+                  profissional: medicoNomeAgendamento(a),
                   paciente: a.paciente_nome,
                   procedimento: a.procedimento ?? "CONSULTA",
                   status: a.status,
