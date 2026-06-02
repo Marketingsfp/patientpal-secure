@@ -1498,27 +1498,32 @@ function AgendaPage() {
     // Verificação fresca no banco: impede faturar duas vezes mesmo se o cache
     // local estiver desatualizado (ex.: outro usuário pagou em outra aba, ou
     // o pagamento foi transferido de uma ficha reagendada).
-    const { data: jaPagos } = await supabase
-      .from("fin_lancamentos")
-      .select("id")
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .eq("tipo", "receita")
-      .eq("status", "confirmado")
-      .eq("agendamento_id", a.id)
-      .limit(1);
+    // Roda em paralelo: checagem de pago + lista de procedimentos (cache)
+    // + info de convênio do paciente. Antes era serial (3-5s); agora ~= a
+    // chamada mais lenta.
+    const [{ data: jaPagos }, lista, info] = await Promise.all([
+      supabase
+        .from("fin_lancamentos")
+        .select("id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("tipo", "receita")
+        .eq("status", "confirmado")
+        .eq("agendamento_id", a.id)
+        .limit(1),
+      getProcedimentosComValor(clinicaAtual.clinica_id),
+      obterInfoConvenioPaciente({
+        clinicaId: clinicaAtual.clinica_id,
+        pacienteId: a.paciente_id,
+        medicoId: a.medico_id,
+        procedimentoNome: a.procedimento ?? "",
+      }),
+    ]);
     if ((jaPagos ?? []).length > 0) {
       toast.info("Este agendamento já foi pago.");
       setPagosSet((prev) => { const n = new Set(prev); n.add(a.id); return n; });
       return;
     }
-    const nomeBusca = normalizar((a.procedimento ?? "CONSULTA").trim());
-    const { data: lista } = await supabase
-      .from("procedimentos")
-      .select("nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix")
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .limit(5000);
-    void nomeBusca;
-    const proc = await buscarProcedimentoPorNome(clinicaAtual.clinica_id, a.procedimento ?? "CONSULTA", lista ?? []);
+    const proc = await buscarProcedimentoPorNome(clinicaAtual.clinica_id, a.procedimento ?? "CONSULTA", lista);
     const valorCartao = valorCartaoProcedimento(proc);
     const vDinheiro = primeiroValorValido(proc?.valor_dinheiro, proc?.valor_dinheiro_pix, proc?.valor_padrao);
     const vPix = valorCartao;
@@ -1531,12 +1536,6 @@ function AgendaPage() {
       { forma: "cartao_credito", label: "Cartão de Crédito", valor: vCredito },
     ];
     let descSuffix = "";
-    const info = await obterInfoConvenioPaciente({
-      clinicaId: clinicaAtual.clinica_id,
-      pacienteId: a.paciente_id,
-      medicoId: a.medico_id,
-      procedimentoNome: a.procedimento ?? "",
-    });
     if (info) {
       if (!info.emDia) {
         toast.error(`Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.`);
