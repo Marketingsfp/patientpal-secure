@@ -25,22 +25,25 @@ function Page() {
       if (!clinicaAtual) return;
       setLoading(true);
       const since = new Date(); since.setDate(since.getDate() - 30);
-      const [lancs, cats] = await Promise.all([
-        supabase.from("fin_lancamentos").select("tipo, valor, data, categoria_id")
-          .eq("clinica_id", clinicaAtual.clinica_id).gte("data", since.toISOString().slice(0, 10)).neq("status", "cancelado"),
+      const ini = since.toISOString().slice(0, 10);
+      const fim = new Date().toISOString().slice(0, 10);
+      const [serieRes, catRes, cats] = await Promise.all([
+        supabase.rpc("fin_serie_diaria", { p_clinica: clinicaAtual.clinica_id, p_ini: ini, p_fim: fim, p_status: "confirmado" }),
+        supabase.rpc("fin_resumo_categoria", { p_clinica: clinicaAtual.clinica_id, p_ini: ini, p_fim: fim, p_status: "confirmado" }),
         supabase.from("fin_categorias").select("id, nome").eq("clinica_id", clinicaAtual.clinica_id),
       ]);
       const catMap = new Map((cats.data ?? []).map((c) => [c.id as string, c.nome as string]));
       const map: Record<string, number> = {};
       const dayMap: Record<string, number> = {};
-      (lancs.data ?? []).forEach((r) => {
-        if (r.tipo === "despesa") {
-          const k = r.categoria_id ? catMap.get(r.categoria_id as string) ?? "Sem categoria" : "Sem categoria";
-          map[k] = (map[k] ?? 0) + Number(r.valor);
-        }
-        const k = r.data as string;
-        dayMap[k] = (dayMap[k] ?? 0) + (r.tipo === "receita" ? Number(r.valor) : -Number(r.valor));
-      });
+      for (const row of ((catRes.data ?? []) as Array<{ categoria_id: string | null; tipo: string; total: number }>)) {
+        if (row.tipo !== "despesa") continue;
+        const k = row.categoria_id ? catMap.get(row.categoria_id) ?? "Sem categoria" : "Sem categoria";
+        map[k] = (map[k] ?? 0) + Number(row.total);
+      }
+      for (const row of ((serieRes.data ?? []) as Array<{ data: string; tipo: string; total: number }>)) {
+        const v = Number(row.total) || 0;
+        dayMap[row.data] = (dayMap[row.data] ?? 0) + (row.tipo === "receita" ? v : -v);
+      }
       setByCat(Object.entries(map).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value).slice(0, 8));
       setDaily(Object.entries(dayMap).sort(([a], [b]) => a.localeCompare(b))
         .map(([d, v]) => ({ dia: new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }), Saldo: +v.toFixed(2) })));
