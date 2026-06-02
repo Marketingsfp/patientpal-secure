@@ -315,10 +315,12 @@ function ProcedimentosPage() {
   const [busca, setBusca] = useState("");
   const [filtroGrupo, setFiltroGrupo] = useState<string>("todos");
   const [filtroTipo, setFiltroTipo] = useState<"todos" | Tipo>("todos");
+  const [filtroSituacao, setFiltroSituacao] = useState<"todos" | "ativos" | "inativos">("ativos");
   // Valores aplicados (só mudam ao clicar em Pesquisar)
   const [buscaAplicada, setBuscaAplicada] = useState("");
   const [grupoAplicado, setGrupoAplicado] = useState<string>("todos");
   const [tipoAplicado, setTipoAplicado] = useState<"todos" | Tipo>("todos");
+  const [situacaoAplicada, setSituacaoAplicada] = useState<"todos" | "ativos" | "inativos">("ativos");
   // Ordenação
   type SortCol = "nome" | "grupo" | "tipo";
   const [sort, setSort] = useState<{ col: SortCol; dir: "asc" | "desc" } | null>(null);
@@ -522,6 +524,8 @@ function ProcedimentosPage() {
     const espIdFiltro = grupoAplicado !== "todos" ? espIdByNome.get(norm(grupoAplicado)) : undefined;
     return items.filter(p => {
       if (tipoAplicado !== "todos" && p.tipo !== tipoAplicado) return false;
+      if (situacaoAplicada === "ativos" && !p.ativo) return false;
+      if (situacaoAplicada === "inativos" && p.ativo) return false;
       if (grupoAplicado !== "todos") {
         const matchGrupo = norm(p.grupo ?? "") === norm(grupoAplicado);
         const extras = vincEspMap.get(p.id);
@@ -531,7 +535,7 @@ function ProcedimentosPage() {
       if (q && !norm(p.nome).includes(q) && !norm(p.codigo ?? "").includes(q) && !norm(p.grupo ?? "").includes(q)) return false;
       return true;
     });
-  }, [items, buscaAplicada, tipoAplicado, grupoAplicado, vincEspMap, especialidades]);
+  }, [items, buscaAplicada, tipoAplicado, grupoAplicado, situacaoAplicada, vincEspMap, especialidades]);
 
   const ordenados = useMemo(() => {
     if (!sort) return filtrados;
@@ -560,16 +564,17 @@ function ProcedimentosPage() {
   const grupoExisteNasEspecialidades = especialidades.some(e => especialidadeKey(e.nome) === grupoSelecionadoKey);
 
   // Reset de página quando filtros aplicados ou ordenação mudam
-  useEffect(() => { setPagina(1); }, [buscaAplicada, tipoAplicado, grupoAplicado, sort]);
+  useEffect(() => { setPagina(1); }, [buscaAplicada, tipoAplicado, grupoAplicado, situacaoAplicada, sort]);
 
   const aplicarFiltros = () => {
     setBuscaAplicada(busca);
     setGrupoAplicado(filtroGrupo);
     setTipoAplicado(filtroTipo);
+    setSituacaoAplicada(filtroSituacao);
   };
   const limparFiltros = () => {
-    setBusca(""); setFiltroGrupo("todos"); setFiltroTipo("todos");
-    setBuscaAplicada(""); setGrupoAplicado("todos"); setTipoAplicado("todos");
+    setBusca(""); setFiltroGrupo("todos"); setFiltroTipo("todos"); setFiltroSituacao("ativos");
+    setBuscaAplicada(""); setGrupoAplicado("todos"); setTipoAplicado("todos"); setSituacaoAplicada("ativos");
   };
   const toggleSort = (col: SortCol) => {
     setSort(prev => {
@@ -880,6 +885,14 @@ function ProcedimentosPage() {
                 {tipos.map(t => (
                   <SelectItem key={t.id} value={t.nome}>{tipoLabel(t.nome)}</SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+            <Select value={filtroSituacao} onValueChange={(v) => setFiltroSituacao(v as typeof filtroSituacao)}>
+              <SelectTrigger className="w-40"><SelectValue placeholder="Situação" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ativos">Ativos</SelectItem>
+                <SelectItem value="inativos">Inativos</SelectItem>
+                <SelectItem value="todos">Todos</SelectItem>
               </SelectContent>
             </Select>
             <div className="relative flex-1 min-w-[240px]">
