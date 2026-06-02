@@ -585,6 +585,26 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-end gap-3 rounded-md border bg-muted/30 p-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Período (sobrepõe o do topo)</Label>
+              <Select value={periodoPreset || "__dash__"} onValueChange={(v) => setPeriodoPreset(v === "__dash__" ? "" : v)}>
+                <SelectTrigger className="w-[240px] h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__dash__">Usar período do dashboard</SelectItem>
+                  <SelectItem value="este_ano">Este ano</SelectItem>
+                  <SelectItem value="12m">Últimos 12 meses</SelectItem>
+                  <SelectItem value="2anos">2 anos (este + anterior)</SelectItem>
+                  <SelectItem value="3anos">3 anos</SelectItem>
+                  <SelectItem value="5anos">5 anos</SelectItem>
+                  <SelectItem value="tudo">Tudo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Carregando de <span className="font-mono">{effIni}</span> até <span className="font-mono">{effFim}</span>
+            </p>
+          </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-1.5">
               <Label>Fonte de dados</Label>
