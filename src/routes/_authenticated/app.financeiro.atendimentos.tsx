@@ -61,6 +61,7 @@ function Page() {
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [pacientes, setPacientes] = useState<Pac[]>([]);
   const [convenios, setConvenios] = useState<Convenio[]>([]);
+  const [procValores, setProcValores] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
