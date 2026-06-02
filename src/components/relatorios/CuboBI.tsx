@@ -708,17 +708,58 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
                           ))}
                           <TableCell className="text-right font-semibold">{fmt(topRows.totalByRow[ri])}</TableCell>
                         </TableRow>
-                        {isOpen && subRows ? subRows.rowLabels.map((srl, sri) => (
-                          <TableRow key={`${rl}::${srl}`} className="bg-muted/20">
-                            <TableCell className="pl-10 text-sm text-muted-foreground">{srl}</TableCell>
-                            {piv.colLabels.map((cl, ci) => {
-                              const idx = subRows.colLabels.indexOf(cl);
-                              const v = idx >= 0 ? subRows.matrix[sri][idx] : 0;
-                              return <TableCell key={ci} className="text-right text-sm">{fmt(v)}</TableCell>;
-                            })}
-                            <TableCell className="text-right text-sm font-medium">{fmt(subRows.totalByRow[sri])}</TableCell>
-                          </TableRow>
-                        )) : null}
+                        {isOpen && subRows ? subRows.rowLabels.map((srl, sri) => {
+                          const subKey = `${rl}::${srl}`;
+                          const isSubOpen = expanded.has(subKey);
+                          const subSubRows = cfg.subSubRowKey
+                            ? (() => {
+                                const subset = rawRows.filter(
+                                  (r) =>
+                                    String(r[cfg.rowKey] ?? "—") === rl &&
+                                    String(r[cfg.subRowKey!] ?? "—") === srl,
+                                );
+                                return pivot(subset, cfg.subSubRowKey!, cfg.colKey, cfg.measureField, cfg.measureAgg);
+                              })()
+                            : null;
+                          return (
+                            <Fragment key={subKey}>
+                              <TableRow className="bg-muted/20">
+                                <TableCell className="pl-10 text-sm text-muted-foreground">
+                                  <div className="flex items-center gap-1">
+                                    {cfg.subSubRowKey ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => toggleExpand(subKey)}
+                                        className="p-0.5 hover:bg-muted rounded"
+                                        aria-label={isSubOpen ? "Recolher" : "Expandir"}
+                                      >
+                                        {isSubOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                                      </button>
+                                    ) : null}
+                                    <span>{srl}</span>
+                                  </div>
+                                </TableCell>
+                                {piv.colLabels.map((cl, ci) => {
+                                  const idx = subRows.colLabels.indexOf(cl);
+                                  const v = idx >= 0 ? subRows.matrix[sri][idx] : 0;
+                                  return <TableCell key={ci} className="text-right text-sm">{fmt(v)}</TableCell>;
+                                })}
+                                <TableCell className="text-right text-sm font-medium">{fmt(subRows.totalByRow[sri])}</TableCell>
+                              </TableRow>
+                              {isSubOpen && subSubRows ? subSubRows.rowLabels.map((ssrl, ssri) => (
+                                <TableRow key={`${subKey}::${ssrl}`} className="bg-muted/30">
+                                  <TableCell className="pl-16 text-xs text-muted-foreground">{ssrl}</TableCell>
+                                  {piv.colLabels.map((cl, ci) => {
+                                    const idx = subSubRows.colLabels.indexOf(cl);
+                                    const v = idx >= 0 ? subSubRows.matrix[ssri][idx] : 0;
+                                    return <TableCell key={ci} className="text-right text-xs">{fmt(v)}</TableCell>;
+                                  })}
+                                  <TableCell className="text-right text-xs font-medium">{fmt(subSubRows.totalByRow[ssri])}</TableCell>
+                                </TableRow>
+                              )) : null}
+                            </Fragment>
+                          );
+                        }) : null}
                       </Fragment>
                     );
                   })}
