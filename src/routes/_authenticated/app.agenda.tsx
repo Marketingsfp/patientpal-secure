@@ -371,7 +371,7 @@ function AgendaPage() {
     const origem = reagendandoAg;
     if (!origem || reagSalvando) return;
     if (slot.id === origem.id) { toast.info("Esse já é o horário atual."); return; }
-    if (normalizar(slot.paciente_nome) !== "disponivel") {
+    if (!isSlotLivre(slot.paciente_nome)) {
       toast.error("Esse horário não está disponível. Escolha um slot DISPONÍVEL.");
       return;
     }
@@ -622,7 +622,7 @@ function AgendaPage() {
     // que foi posteriormente liberada por um reagendamento.
     const idsComPaciente = new Set(
       agendaRows
-        .filter((a) => normalizar(a.paciente_nome) !== "disponivel")
+        .filter((a) => !isSlotLivre(a.paciente_nome))
         .map((a) => a.id),
     );
     if (ids.length) {
@@ -909,9 +909,9 @@ function AgendaPage() {
 
   const filtrados = useMemo(() => {
     return items.filter((a) => {
-      if (!mostrarLivres && normalizar(a.paciente_nome) === "disponivel") return false;
+      if (!mostrarLivres && isSlotLivre(a.paciente_nome)) return false;
       if (filtroMedico !== "todos" && a.medico_id !== filtroMedico) return false;
-      const ehLivre = normalizar(a.paciente_nome) === "disponivel";
+      const ehLivre = isSlotLivre(a.paciente_nome);
       if (filtroStatus === "livres") {
         if (!ehLivre) return false;
       } else if (filtroStatus === "agendado") {
