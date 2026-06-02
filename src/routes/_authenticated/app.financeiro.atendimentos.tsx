@@ -155,36 +155,60 @@ function Page() {
   const norm = (s: string) =>
     s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 
-  const calcRepasse = (medicoId: string | null, total: number, procNome: string | null): number => {
-    if (!medicoId) return 0;
+  // Calcula repasse e também o "total" efetivo (valor do convênio quando o paciente
+  // não paga em dinheiro, ex.: ANGIOLOGIA por convênio). Retorna { total, repasse }.
+  const calcRepasseFull = (
+    medicoId: string | null,
+    totalPago: number,
+    procNome: string | null,
+  ): { total: number; repasse: number } => {
+    if (!medicoId) return { total: totalPago, repasse: 0 };
     const med = medicos.find((m) => m.id === medicoId);
-    // Cartão Consulta / convênios em que a clínica recebe R$ 0 mas o médico recebe o valor do cartão.
-    if (!total) {
-      if (med?.cb_tipo_repasse === "valor" && med.cb_valor_repasse != null) return Number(med.cb_valor_repasse);
-      if (med?.tipo_repasse === "valor" && med.valor_repasse_padrao != null) return Number(med.valor_repasse_padrao);
-      return 0;
-    }
-    // 1) tenta convenio por nome do procedimento
+    // 1) Procura convênio cadastrado pelo nome do procedimento (independente de ter pagamento)
     if (procNome) {
       const alvo = norm(procNome);
       const c = convenios.find((cv) => cv.medico_id === medicoId && norm(cv.nome) === alvo);
       if (c) {
-        if (c.tipo_repasse === "valor" && c.valor != null) return Math.min(Number(c.valor), total);
-        if (c.tipo_repasse === "percentual" && c.percentual != null) {
-          return +(total * Number(c.percentual) / 100).toFixed(2);
+        // Valor de referência do convênio (o que a clínica recebe do convênio/paciente)
+        const ref = c.valor != null ? Number(c.valor) : totalPago;
+        const base = totalPago > 0 ? totalPago : ref;
+        if (c.tipo_repasse === "valor" && c.valor != null) {
+          return { total: base, repasse: Math.min(Number(c.valor), base) };
         }
-        // sem tipo/valor cadastrado no item → cai no padrão do médico
+        if (c.tipo_repasse === "percentual" && c.percentual != null) {
+          return { total: base, repasse: +(base * Number(c.percentual) / 100).toFixed(2) };
+        }
+        // convênio sem tipo definido → cai no padrão do médico abaixo, usando base
+        if (med) {
+          if (med.tipo_repasse === "valor" && med.valor_repasse_padrao != null) {
+            return { total: base, repasse: Math.min(Number(med.valor_repasse_padrao), base) };
+          }
+          return { total: base, repasse: +(base * Number(med.percentual_repasse_padrao ?? 0) / 100).toFixed(2) };
+        }
+        return { total: base, repasse: 0 };
       }
     }
-    // 2) fallback repasse padrão do médico
+    // 2) Sem convênio casado e sem pagamento → trata como Cartão Consulta
+    if (!totalPago) {
+      if (med?.cb_tipo_repasse === "valor" && med.cb_valor_repasse != null) {
+        return { total: 0, repasse: Number(med.cb_valor_repasse) };
+      }
+      if (med?.tipo_repasse === "valor" && med.valor_repasse_padrao != null) {
+        return { total: 0, repasse: Number(med.valor_repasse_padrao) };
+      }
+      return { total: 0, repasse: 0 };
+    }
+    // 3) Pagou em dinheiro/cartão sem convênio → repasse padrão do médico sobre o total pago
     if (med) {
       if (med.tipo_repasse === "valor" && med.valor_repasse_padrao != null) {
-        return Math.min(Number(med.valor_repasse_padrao), total);
+        return { total: totalPago, repasse: Math.min(Number(med.valor_repasse_padrao), totalPago) };
       }
-      return +(total * Number(med.percentual_repasse_padrao ?? 0) / 100).toFixed(2);
+      return { total: totalPago, repasse: +(totalPago * Number(med.percentual_repasse_padrao ?? 0) / 100).toFixed(2) };
     }
-    return 0;
+    return { total: totalPago, repasse: 0 };
   };
+  const calcRepasse = (medicoId: string | null, total: number, procNome: string | null): number =>
+    calcRepasseFull(medicoId, total, procNome).repasse;
 
   const load = async () => {
     if (!clinicaAtual) { setItems([]); setLoading(false); return; }
