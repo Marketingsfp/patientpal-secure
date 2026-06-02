@@ -178,7 +178,7 @@ function DashboardPage() {
       return {
         nome: m.nome,
         total: contarGRs(agendados),
-        pagos: contarGRs(agendados.filter(a => a.status === "pago" || a.status === "realizado")),
+        pagos: contarGRs(agendados.filter(a => a.status === "realizado")),
         novos: pacIdsM.filter(p => !setExistentes.has(p)).length,
       };
     }).sort((a, b) => b.total - a.total);
