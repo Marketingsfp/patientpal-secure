@@ -176,7 +176,7 @@ function EquipePage() {
             </TabsTrigger>
             <TabsTrigger value="medicos">
               <Stethoscope className="h-4 w-4 mr-2" /> Médicos
-              <Badge variant="secondary" className="ml-2">{medicos.length}</Badge>
+              <Badge variant="secondary" className="ml-2">{medicosAtivosCount}</Badge>
             </TabsTrigger>
             <TabsTrigger value="enfermagem">
               <HeartPulse className="h-4 w-4 mr-2" /> Enfermagem
@@ -231,6 +231,30 @@ function EquipePage() {
         </TabsContent>
 
         <TabsContent value="medicos" className="mt-4">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="text-sm text-muted-foreground mr-1">Mostrar:</span>
+            <Button
+              size="sm"
+              variant={medicoStatus === "ativos" ? "default" : "outline"}
+              onClick={() => setMedicoStatus("ativos")}
+            >
+              Ativos <Badge variant="secondary" className="ml-2">{medicosAtivosCount}</Badge>
+            </Button>
+            <Button
+              size="sm"
+              variant={medicoStatus === "inativos" ? "default" : "outline"}
+              onClick={() => setMedicoStatus("inativos")}
+            >
+              Inativos <Badge variant="secondary" className="ml-2">{medicosInativosCount}</Badge>
+            </Button>
+            <Button
+              size="sm"
+              variant={medicoStatus === "todos" ? "default" : "outline"}
+              onClick={() => setMedicoStatus("todos")}
+            >
+              Todos <Badge variant="secondary" className="ml-2">{medicos.length}</Badge>
+            </Button>
+          </div>
           {loading ? (
             <Card><CardContent className="py-12 text-center text-muted-foreground">Carregando…</CardContent></Card>
           ) : medicosFiltrados.length === 0 ? (
