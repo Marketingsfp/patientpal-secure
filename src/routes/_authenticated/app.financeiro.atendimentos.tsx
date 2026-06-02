@@ -710,7 +710,7 @@ function Page() {
       {/* Filtros */}
       <Card>
         <CardContent className="p-2">
-          <div className="grid grid-cols-1 md:grid-cols-6 gap-2 items-end">
+          <div className="grid grid-cols-1 md:grid-cols-7 gap-2 items-end">
             <div className="space-y-1">
               <Label className="text-[10px] flex items-center gap-1"><Filter className="h-3 w-3" />Médico</Label>
               <MedicoCombobox
@@ -744,6 +744,19 @@ function Page() {
                   <SelectItem value="aberto">A receber</SelectItem>
                   <SelectItem value="pago">Pagos</SelectItem>
                   <SelectItem value="todos">Todos</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[10px]">Ordenar por</Label>
+              <Select value={fOrdem} onValueChange={(v) => setFOrdem(v as typeof fOrdem)}>
+                <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="data_desc">Data (mais recente)</SelectItem>
+                  <SelectItem value="data_asc">Data (mais antiga)</SelectItem>
+                  <SelectItem value="gr">Nº da GR (agenda)</SelectItem>
+                  <SelectItem value="paciente_az">Paciente (A-Z)</SelectItem>
+                  <SelectItem value="paciente_za">Paciente (Z-A)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
