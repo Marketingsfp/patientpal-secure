@@ -74,7 +74,7 @@ function TiposServicoPage() {
         <LayoutGrid className="h-6 w-6 text-primary" />
         <div className="flex-1">
           <h1 className="text-xl font-bold">Categorias de Serviço</h1>
-          <p className="text-sm text-muted-foreground">Cadastro das categorias de serviços da clínica (Consulta, Exame, Procedimento, Cirurgia…).</p>
+          <p className="text-sm text-muted-foreground">Cadastro das categorias de serviços da clínica (Consulta, Exames / Procedimentos, Cirurgia…).</p>
         </div>
         <Button onClick={openNew}><Plus className="h-4 w-4 mr-1" /> Novo</Button>
       </div>

@@ -28,7 +28,7 @@ import {
 
 export const Route = createFileRoute("/_authenticated/app/procedimentos")({
   component: ProcedimentosPageWithTabs,
-  head: () => ({ meta: [{ title: "Serviços — ClinicaOS" }] }),
+  head: () => ({ meta: [{ title: "Exames / Procedimentos — ClinicaOS" }] }),
 });
 
 type Tipo = string;
@@ -430,7 +430,7 @@ function ProcedimentosPage() {
       if (tab === "consultas") {
         if (norm(p.tipo ?? "") !== "consulta") return false;
       } else {
-        // Aba "Serviço" não deve mostrar consultas (elas têm aba própria)
+        // Aba "Exames / Procedimentos" não deve mostrar consultas (elas têm aba própria)
         if (norm(p.tipo ?? "") === "consulta") return false;
         if (tipoEffective !== "todos" && p.tipo !== tipoEffective) return false;
       }
