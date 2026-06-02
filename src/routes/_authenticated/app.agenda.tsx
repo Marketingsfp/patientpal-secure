@@ -58,7 +58,7 @@ type Agendamento = {
   observacoes: string | null;
   data_pagamento?: string | null;
 };
-type Medico = { id: string; nome: string; sexo?: string | null; usa_sistema?: boolean; procedimento_padrao_id?: string | null; procedimento_padrao_nome?: string | null; especialidade_nome?: string | null };
+type Medico = { id: string; nome: string; sexo?: string | null; usa_sistema?: boolean; especialidade_id?: string | null; procedimento_padrao_id?: string | null; procedimento_padrao_nome?: string | null; especialidade_nome?: string | null };
 type RecursoEnf = { id: string; nome: string };
 type Especialidade = { id: string; nome: string };
 type Paciente = { id: string; nome: string };
@@ -642,7 +642,7 @@ function AgendaPage() {
   const loadRef = async () => {
     if (!clinicaAtual) return;
     const [m, p, e, me, pr, sr, mc, mp, er, erp] = await Promise.all([
-      supabase.from("medicos").select("id,nome,sexo,usa_sistema,procedimento_padrao_id,procedimento:procedimentos!medicos_procedimento_padrao_id_fkey(nome),especialidade:especialidades(nome)" as never).eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
+      supabase.from("medicos").select("id,nome,sexo,usa_sistema,especialidade_id,procedimento_padrao_id").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("pacientes").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome").limit(500),
       supabase.from("especialidades").select("id,nome").order("nome"),
       supabase.from("medico_especialidades").select("medico_id,especialidade_id"),
@@ -653,11 +653,18 @@ function AgendaPage() {
       supabase.from("enfermagem_recursos").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("enfermagem_recurso_procedimentos").select("recurso_id,procedimento_id"),
     ]);
-    type RawMedicoAgenda = Medico & { procedimento?: { nome: string | null } | null; especialidade?: { nome: string | null } | null };
+    const todos = Array.isArray(pr) ? pr : [];
+    const procedimentosPorId = new Map(
+      todos.map((p) => [p.id, { id: p.id, nome: p.nome, grupo: p.grupo ?? null }]),
+    );
+    const especialidadesPorId = new Map<string, string>(
+      ((e.data ?? []) as Especialidade[]).map((x) => [x.id, x.nome]),
+    );
+    type RawMedicoAgenda = Medico;
     const medicosBase = (((m.data ?? []) as unknown) as RawMedicoAgenda[]).map((x) => ({
       ...x,
-      procedimento_padrao_nome: x.procedimento_padrao_nome ?? x.procedimento?.nome ?? null,
-      especialidade_nome: x.especialidade_nome ?? x.especialidade?.nome ?? null,
+      procedimento_padrao_nome: x.procedimento_padrao_id ? procedimentosPorId.get(x.procedimento_padrao_id)?.nome ?? null : null,
+      especialidade_nome: x.especialidade_id ? especialidadesPorId.get(x.especialidade_id) ?? null : null,
       __recurso: false,
     }));
     let recursosArr = ((er.data ?? []) as RecursoEnf[]);
@@ -680,7 +687,6 @@ function AgendaPage() {
     setMedicos([...medicosBase, ...recursosComoMedicos] as Medico[]);
     setPacientes((p.data ?? []) as Paciente[]);
     setEspecialidades((e.data ?? []) as Especialidade[]);
-    const todos = Array.isArray(pr) ? pr : [];
     {
       const ex = todos.filter((x) => x.tipo === "exame");
       const vistos = new Set<string>();
@@ -694,9 +700,6 @@ function AgendaPage() {
       setExames(unicos);
     }
     setProcedimentosList(todos.map(({ id, nome }) => ({ id, nome })));
-    const procedimentosPorId = new Map(
-      todos.map((p) => [p.id, { id: p.id, nome: p.nome, grupo: p.grupo ?? null }]),
-    );
     const map = new Map<string, Set<string>>();
     for (const r of (me.data ?? []) as Array<{ medico_id: string; especialidade_id: string }>) {
       if (!map.has(r.medico_id)) map.set(r.medico_id, new Set());
@@ -716,9 +719,6 @@ function AgendaPage() {
     }
     const procOpcoesMap = new Map<string, { id: string; nome: string }[]>();
     const procOpcoesVistos = new Map<string, Set<string>>();
-    const especialidadesPorId = new Map<string, string>(
-      ((e.data ?? []) as Especialidade[]).map((x) => [x.id, x.nome]),
-    );
     // Serviços vinculados ao médico pela aba "Especialidades" do cadastro do médico.
     // Esta é a fonte principal e preserva a mesma ordem exibida no cadastro do médico.
     for (const r of (Array.isArray(mp) ? mp : []) as MedicoProcedimentoRef[]) {
