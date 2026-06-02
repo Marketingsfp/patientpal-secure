@@ -113,6 +113,15 @@ export function ProcedimentoCell({ valor, opcoes, disabled, onChange }: Props) {
           <p className="text-[10px] text-muted-foreground mt-1">
             {lista.length} serviço(s) — na ordem do cadastro do médico. Tecle 1-9 para selecionar.
           </p>
+          {valor && (
+            <button
+              type="button"
+              onClick={() => escolher("")}
+              className="mt-2 w-full text-xs text-rose-600 hover:bg-rose-50 border border-rose-200 rounded px-2 py-1"
+            >
+              Limpar serviço (voltar para ULTRASSONOGRAFIA)
+            </button>
+          )}
         </div>
         <div className="max-h-72 overflow-auto">
           {filtrada.length === 0 ? (
