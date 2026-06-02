@@ -183,6 +183,20 @@ const CUBOS: CubeSpec[] = [
 
 const DIAS_SEMANA = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 
+async function lookupNames(
+  table: "medicos" | "pacientes" | "fin_categorias" | "fin_contas",
+  ids: Array<string | null | undefined>,
+): Promise<Map<string, string>> {
+  const unique = Array.from(new Set(ids.filter((x): x is string => !!x)));
+  if (unique.length === 0) return new Map();
+  const { data } = await supabase.from(table).select("id, nome").in("id", unique);
+  const map = new Map<string, string>();
+  for (const r of (data ?? []) as Array<{ id: string; nome: string }>) {
+    map.set(r.id, r.nome);
+  }
+  return map;
+}
+
 function transformDate(isoStr: string | null, base: Record<string, any>) {
   if (!isoStr) return { ...base, dia: "", mes: "", dia_semana: "", hora: "" };
   const d = new Date(isoStr);
