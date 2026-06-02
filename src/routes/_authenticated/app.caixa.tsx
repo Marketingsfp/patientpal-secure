@@ -909,6 +909,43 @@ function Page() {
                 </ul>
               </div>
 
+              <div className="rounded-lg border">
+                <div className="px-4 py-3 border-b bg-muted/30">
+                  <h4 className="font-medium">Repasses realizados hoje</h4>
+                  <p className="text-xs text-muted-foreground">Lista de pagamentos efetuados no dia, por médico.</p>
+                </div>
+                {repPagosHoje.length === 0 ? (
+                  <div className="p-6 text-center text-sm text-muted-foreground">
+                    Nenhum repasse pago hoje.
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Hora</TableHead>
+                        <TableHead>Médico</TableHead>
+                        <TableHead>Forma</TableHead>
+                        <TableHead className="text-right">Valor</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {repPagosHoje.map((r) => (
+                        <TableRow key={r.id}>
+                          <TableCell className="text-muted-foreground">{r.hora ?? "—"}</TableCell>
+                          <TableCell className="font-medium">{r.medico}</TableCell>
+                          <TableCell className="capitalize">{r.forma ?? "—"}</TableCell>
+                          <TableCell className="text-right font-semibold text-emerald-700 dark:text-emerald-400">{fmt(r.valor)}</TableCell>
+                        </TableRow>
+                      ))}
+                      <TableRow>
+                        <TableCell colSpan={3} className="text-right font-medium">Total</TableCell>
+                        <TableCell className="text-right font-bold">{fmt(repPagosHoje.reduce((s, r) => s + r.valor, 0))}</TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                )}
+              </div>
+
               <div className="flex flex-wrap gap-2">
                 <Button asChild size="lg" className="bg-emerald-600 hover:bg-emerald-700">
                   <Link to="/app/financeiro/atendimentos">
