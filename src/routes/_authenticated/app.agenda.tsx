@@ -84,6 +84,11 @@ const PAGE_SIZE = 50;
 const normalizar = (s: string) =>
   (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
+const isSlotLivre = (pacienteNome: string | null | undefined) => {
+  const nome = normalizar(pacienteNome ?? "").trim();
+  return nome === "disponivel" || nome === "bloqueio";
+};
+
 const primeiroValorValido = (...valores: unknown[]) => {
   const numeros = valores.map((valor) => Number(valor)).filter((valor) => Number.isFinite(valor));
   return numeros.find((valor) => valor > 0) ?? numeros[0] ?? 0;
@@ -366,7 +371,7 @@ function AgendaPage() {
     const origem = reagendandoAg;
     if (!origem || reagSalvando) return;
     if (slot.id === origem.id) { toast.info("Esse já é o horário atual."); return; }
-    if (normalizar(slot.paciente_nome) !== "disponivel") {
+    if (!isSlotLivre(slot.paciente_nome)) {
       toast.error("Esse horário não está disponível. Escolha um slot DISPONÍVEL.");
       return;
     }
@@ -563,6 +568,7 @@ function AgendaPage() {
     // enfermagem_recurso_id no campo medico_id para reuso de toda a UI.
     const mapped = (((data ?? []) as unknown) as Array<Agendamento & { enfermagem_recurso_id?: string | null; medico?: { nome: string | null; sexo: string | null } | null }>).map((a) => ({
       ...a,
+      paciente_nome: isSlotLivre(a.paciente_nome) ? "DISPONÍVEL" : a.paciente_nome,
       medico_id: a.medico_id ?? a.enfermagem_recurso_id ?? null,
       medico_nome: a.medico_nome ?? a.medico?.nome ?? null,
       medico_sexo: a.medico_sexo ?? a.medico?.sexo ?? null,
@@ -570,7 +576,7 @@ function AgendaPage() {
     setItems(mapped as Agendamento[]);
     setPage(1);
     setSelecionados(new Set());
-    const agendaRows = (((data ?? []) as unknown) as Array<Agendamento & { fluxo_etapa?: string | null }>);
+    const agendaRows = (((mapped ?? []) as unknown) as Array<Agendamento & { fluxo_etapa?: string | null }>);
     setEtapaMap(new Map(agendaRows
       .map((r) => [r.id, r.fluxo_etapa ?? "aguardando_recepcao"] as [string, string])));
     // Busca data_nascimento dos pacientes para exibir ícone de idade
@@ -616,7 +622,7 @@ function AgendaPage() {
     // que foi posteriormente liberada por um reagendamento.
     const idsComPaciente = new Set(
       agendaRows
-        .filter((a) => normalizar(a.paciente_nome) !== "disponivel")
+        .filter((a) => !isSlotLivre(a.paciente_nome))
         .map((a) => a.id),
     );
     if (ids.length) {
@@ -903,9 +909,9 @@ function AgendaPage() {
 
   const filtrados = useMemo(() => {
     return items.filter((a) => {
-      if (!mostrarLivres && normalizar(a.paciente_nome) === "disponivel") return false;
+      if (!mostrarLivres && isSlotLivre(a.paciente_nome)) return false;
       if (filtroMedico !== "todos" && a.medico_id !== filtroMedico) return false;
-      const ehLivre = normalizar(a.paciente_nome) === "disponivel";
+      const ehLivre = isSlotLivre(a.paciente_nome);
       if (filtroStatus === "livres") {
         if (!ehLivre) return false;
       } else if (filtroStatus === "agendado") {
@@ -1031,7 +1037,7 @@ function AgendaPage() {
     const ids = Array.from(selecionados);
     const itens = items.filter(a => ids.includes(a.id));
     if (itens.length === 0) { toast.info("Selecione ao menos um horário."); return; }
-    const bloqueados = itens.filter(i => pagosSet.has(i.id) || (i.paciente_nome !== "DISPONÍVEL" && i.status !== "agendado"));
+    const bloqueados = itens.filter(i => pagosSet.has(i.id) || (!isSlotLivre(i.paciente_nome) && i.status !== "agendado"));
     if (bloqueados.length > 0) {
       toast.error(`${bloqueados.length} agendamento(s) não podem ser excluídos (já pagos ou em atendimento). Desmarque-os.`);
       return;
@@ -1057,7 +1063,7 @@ function AgendaPage() {
       toast.error(`${atendidos.length} paciente(s) já atendido(s) não podem ser reagendados. Desmarque-os.`);
       return;
     }
-    const validos = itens.filter(i => normalizar(i.paciente_nome) !== "disponivel");
+    const validos = itens.filter(i => !isSlotLivre(i.paciente_nome));
     if (validos.length === 0) {
       toast.info("Nenhum paciente válido para reagendar (todas as fichas selecionadas estão vazias).");
       return;
@@ -1080,7 +1086,7 @@ function AgendaPage() {
     const ids = reagLoteIds ?? [];
     if (ids.length === 0 || reagLoteSalvando) return;
     if (!slot.medico_id) { toast.error("Slot sem médico definido."); return; }
-    if (normalizar(slot.paciente_nome) !== "disponivel") {
+    if (!isSlotLivre(slot.paciente_nome)) {
       toast.error("Esse horário não está disponível. Escolha um slot DISPONÍVEL.");
       return;
     }
@@ -1093,7 +1099,7 @@ function AgendaPage() {
       .limit(1000);
     if (eFontes) { toast.error(eFontes.message); return; }
     const fontes = ((fontesRaw ?? []) as Array<Agendamento>)
-      .filter(a => a.status !== "realizado" && normalizar(a.paciente_nome) !== "disponivel")
+      .filter(a => a.status !== "realizado" && !isSlotLivre(a.paciente_nome))
       .sort((a, b) => new Date(a.inicio).getTime() - new Date(b.inicio).getTime());
     if (fontes.length === 0) { toast.error("Nenhum paciente selecionado."); return; }
 
@@ -1123,7 +1129,7 @@ function AgendaPage() {
     const candidatos = destino
       .slice(fichaInicial - 1)
       .filter(s => !idsFonte.has(s.id));
-    const livres = candidatos.filter(s => normalizar(s.paciente_nome) === "disponivel");
+    const livres = candidatos.filter(s => isSlotLivre(s.paciente_nome));
     if (livres.length < fontes.length) {
       toast.error(
         `Não há horários livres suficientes a partir da ficha ${String(fichaInicial).padStart(3, "0")} `
@@ -1261,7 +1267,7 @@ function AgendaPage() {
       const inicioMs = di.getTime();
       const fimMs = df.getTime();
       const cobre = excluindoEditing.some((s) => {
-        if (normalizar(s.paciente_nome) !== "disponivel") return false;
+        if (!isSlotLivre(s.paciente_nome)) return false;
         const sIni = new Date(s.inicio).getTime();
         const sFim = new Date(s.fim).getTime();
         return sIni <= inicioMs && sFim >= fimMs;
@@ -1912,7 +1918,7 @@ function AgendaPage() {
               </div>
               <div className="space-y-1">
                 <Label>Status</Label>
-                {editing && normalizar(editing.paciente_nome) !== "disponivel" ? (
+                {editing && !isSlotLivre(editing.paciente_nome) ? (
                   <Select value={form.status} onValueChange={(v) => setForm(f => ({ ...f, status: v as Status }))}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -1924,7 +1930,7 @@ function AgendaPage() {
                 ) : (
                   <Input value={STATUS_LABEL[form.status]} disabled readOnly />
                 )}
-                {(!editing || normalizar(editing.paciente_nome) === "disponivel") && (
+                {(!editing || isSlotLivre(editing.paciente_nome)) && (
                   <p className="text-xs text-muted-foreground">Status definido automaticamente. Pode ser alterado depois pelo menu de ações.</p>
                 )}
               </div>
@@ -2473,7 +2479,7 @@ function AgendaPage() {
                     })()}
                   </TableCell>
                   <TableCell className="pr-1 align-middle max-w-[220px]">
-                    {normalizar(a.paciente_nome) === "disponivel" ? (
+                    {isSlotLivre(a.paciente_nome) ? (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -2509,13 +2515,13 @@ function AgendaPage() {
                     <ProcedimentoCell
                       valor={procedimentoEfetivo(a.medico_id, a.procedimento)}
                       opcoes={opcoesProcedimentoMedico(a.medico_id)}
-                      disabled={normalizar(a.paciente_nome) === "disponivel"}
+                      disabled={isSlotLivre(a.paciente_nome)}
                       onChange={(novo) => atualizarProcedimento(a, novo)}
                     />
                   </TableCell>
                   <TableCell className="text-center">
                     <div className="flex flex-col items-center gap-0.5">
-                      {normalizar(a.paciente_nome) === "disponivel" ? (
+                      {isSlotLivre(a.paciente_nome) ? (
                         <Badge className="bg-slate-100 text-slate-600 border border-slate-300">Livre</Badge>
                       ) : (
                         <Badge className={STATUS_COR[a.status]}>{STATUS_LABEL[a.status]}</Badge>
@@ -2541,7 +2547,7 @@ function AgendaPage() {
                             </Button>
                           );
                         }
-                        if (!pendenteCheckin && normalizar(a.paciente_nome) !== "disponivel") {
+                        if (!pendenteCheckin && !isSlotLivre(a.paciente_nome)) {
                           return (
                             <Button
                               variant="ghost"
@@ -2571,7 +2577,7 @@ function AgendaPage() {
                         const m = medicos.find((x) => x.id === a.medico_id);
                         const manual = m && m.usa_sistema === false && !recursoIds.has(m.id);
                         if (!manual) return null;
-                        if (normalizar(a.paciente_nome) === "disponivel") return null;
+                        if (isSlotLivre(a.paciente_nome)) return null;
                         const concluido = a.status === "realizado";
                         return (
                           <Button
@@ -2594,7 +2600,7 @@ function AgendaPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => openEdit(a)}><Pencil className="h-4 w-4 mr-2" /> Editar</DropdownMenuItem>
-                        {a.medico_id && recursoIds.has(a.medico_id) && a.paciente_nome !== "DISPONÍVEL" && (
+                        {a.medico_id && recursoIds.has(a.medico_id) && !isSlotLivre(a.paciente_nome) && (
                           <DropdownMenuItem
                             onClick={() => iniciarAtendimentoEnf(a)}
                             disabled={a.status === "realizado"}
@@ -2992,7 +2998,7 @@ function FragmentDayCell({
   fmtHora: (iso: string) => string;
   corStatus: (s: Status) => string;
 }) {
-  const ehLivre = ag && normalizar(ag.paciente_nome) === "disponivel";
+  const ehLivre = ag && isSlotLivre(ag.paciente_nome);
   return (
     <>
       <td className="px-2 py-1 text-xs font-mono text-muted-foreground border-r align-middle text-center" style={{ minWidth: 70 }}>
