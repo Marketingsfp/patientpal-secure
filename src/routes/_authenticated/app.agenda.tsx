@@ -2529,6 +2529,7 @@ function AgendaPage() {
                     <ProcedimentoCell
                       valor={procedimentoEfetivo(a.medico_id, a.procedimento)}
                       opcoes={opcoesProcedimentoMedico(a.medico_id)}
+                      padrao={procedimentoPadraoDoMedico(a.medico_id)}
                       disabled={isSlotLivre(a.paciente_nome)}
                       onChange={(novo) => atualizarProcedimento(a, novo)}
                     />
