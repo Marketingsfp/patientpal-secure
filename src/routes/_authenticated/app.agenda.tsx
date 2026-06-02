@@ -1018,6 +1018,9 @@ function AgendaPage() {
         if (!ehLivre) return false;
       } else if (filtroStatus === "agendado") {
         if (ehLivre) return false;
+      } else if (filtroStatus === "pago") {
+        if (ehLivre) return false;
+        if (!a.data_pagamento) return false;
       } else if (filtroStatus !== "todos") {
         if (ehLivre) return false;
         if (a.status !== filtroStatus) return false;
