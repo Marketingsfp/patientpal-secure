@@ -106,6 +106,7 @@ function Page() {
   const [repHoje, setRepHoje] = useState<{ pendente: number; pago: number; medicos: number; qtd_pend: number }>({
     pendente: 0, pago: 0, medicos: 0, qtd_pend: 0,
   });
+  const [repPagosHoje, setRepPagosHoje] = useState<Array<{ id: string; medico: string; valor: number; forma: string | null; hora: string | null }>>([]);
   const loadRepasseHoje = useCallback(async () => {
     if (!clinicaAtual) return;
     const hoje = new Date().toISOString().slice(0, 10);
@@ -127,6 +128,29 @@ function Page() {
       else { pendente += v; qtd_pend++; if (r.medico_id) medSet.add(r.medico_id); }
     }
     setRepHoje({ pendente, pago, medicos: medSet.size, qtd_pend });
+    // Lista de pagamentos de repasse realizados hoje (despesas "Repasse médico — ...")
+    const { data: pagos } = await supabase
+      .from("fin_lancamentos")
+      .select("id, valor, medico_id, descricao, forma_pagamento, created_at, data")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("tipo", "despesa")
+      .eq("data", hoje)
+      .ilike("descricao", "Repasse médico%")
+      .order("created_at", { ascending: false });
+    const pagosRows = (pagos ?? []) as Array<{ id: string; valor: number | null; medico_id: string | null; descricao: string | null; forma_pagamento: string | null; created_at: string | null }>;
+    const medIds = Array.from(new Set(pagosRows.map((p) => p.medico_id).filter(Boolean) as string[]));
+    const medMap = new Map<string, string>();
+    if (medIds.length) {
+      const { data: meds } = await supabase.from("medicos").select("id, nome").in("id", medIds);
+      for (const m of (meds ?? []) as Array<{ id: string; nome: string }>) medMap.set(m.id, m.nome);
+    }
+    setRepPagosHoje(pagosRows.map((p) => ({
+      id: p.id,
+      medico: p.medico_id ? (medMap.get(p.medico_id) ?? "—") : (p.descricao?.replace(/^Repasse médico\s*—\s*/, "").replace(/\s*\(.*\)$/, "") || "—"),
+      valor: Number(p.valor) || 0,
+      forma: p.forma_pagamento,
+      hora: p.created_at ? new Date(p.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : null,
+    })));
   }, [clinicaAtual]);
   useEffect(() => { if (tab === "repasse") void loadRepasseHoje(); }, [tab, loadRepasseHoje]);
   const [loading, setLoading] = useState(true);
