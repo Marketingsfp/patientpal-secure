@@ -559,11 +559,8 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
           ) : cfg.viz === "linha" ? (
             <MiniLineChart
               labels={topRows.rowLabels}
-              series={piv.colLabels.map((cl, ci) => ({
-                name: cl,
-                color: PALETTE[ci % PALETTE.length],
-                values: topRows.matrix.map((row) => row[ci] ?? 0),
-              }))}
+              values={topRows.totalByRow}
+              color={PALETTE[0]}
               formatY={fmt}
             />
           ) : (
