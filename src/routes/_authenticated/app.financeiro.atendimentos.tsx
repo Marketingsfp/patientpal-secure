@@ -190,7 +190,6 @@ function Page() {
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("tipo", "receita")
       .eq("status", "confirmado")
-      .gt("valor", 0)
       .not("medico_id", "is", null)
       .gte("data", fIni)
       .lte("data", fFim);
@@ -220,7 +219,7 @@ function Page() {
         origem: "agenda",
         repasse_pago: !!r.repasse_pago, repasse_pago_em: r.repasse_pago_em, repasse_forma_pagamento: r.repasse_forma_pagamento,
       };
-    });
+    }).filter((x) => x.valor_total > 0 || x.valor_medico > 0);
     let unif = [...manuais, ...agend].sort((a, b) => (a.data < b.data ? 1 : -1));
     if (fStatus === "aberto") unif = unif.filter((x) => !x.repasse_pago);
     else if (fStatus === "pago") unif = unif.filter((x) => x.repasse_pago);
