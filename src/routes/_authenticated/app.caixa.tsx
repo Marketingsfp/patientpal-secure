@@ -785,6 +785,7 @@ function Page() {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead>Data</TableHead>
                         <TableHead>Hora</TableHead>
                         <TableHead>Tipo</TableHead>
                         <TableHead>Descrição</TableHead>
@@ -795,10 +796,11 @@ function Page() {
                     </TableHeader>
                     <TableBody>
                       {minhasMovs.length === 0 && (
-                        <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Sem movimentos</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Sem movimentos</TableCell></TableRow>
                       )}
                       {minhasMovs.map((m) => (
                         <TableRow key={m.id}>
+                          <TableCell className="whitespace-nowrap">{new Date(m.created_at).toLocaleDateString("pt-BR")}</TableCell>
                           <TableCell className="whitespace-nowrap">{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</TableCell>
                           <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
                           <TableCell>{m.descricao || "—"}</TableCell>
