@@ -248,8 +248,10 @@ function Page() {
     }));
     const agend: Atend[] = (ar.data ?? []).map((r): Atend => {
       const ag = (r as any).agendamento as { procedimento: string | null; paciente_nome: string | null; paciente_id: string | null; medico_id: string | null } | null;
-      // Prefer the real procedure from the agendamento (descricao often holds the especialidade after the em-dash).
-      const proc = ag?.procedimento || ((r.descricao ?? "").split("—").slice(1).join("—").trim() || r.descricao);
+      // Procedimento: só usamos o do agendamento. Quando não há agendamento
+      // vinculado, a "cauda" da descrição costuma ser tipo de contrato/forma
+      // (CONTRATO, RECEBIMENTOS DIVERSOS, AJUSTE…), não o serviço realizado.
+      const proc = ag?.procedimento ?? null;
       const pacNomeExtra = ag?.paciente_nome ?? ((r.descricao ?? "").split("—")[0]?.trim() || null);
       const pacIdEff = r.paciente_id ?? ag?.paciente_id ?? null;
       const medIdEff = r.medico_id ?? ag?.medico_id ?? null;
