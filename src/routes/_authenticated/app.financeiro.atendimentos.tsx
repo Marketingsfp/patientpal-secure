@@ -298,6 +298,21 @@ function Page() {
     });
     setMedicos(merged); setPacientes((p.data ?? []) as Pac[]);
     setContas((c.data ?? []) as Conta[]);
+    // Carrega valor de tabela dos procedimentos para usar como "total cheio"
+    const { data: procs } = await supabase
+      .from("procedimentos")
+      .select("nome, valor_padrao, valor_dinheiro")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("ativo", true);
+    const pmap = new Map<string, number>();
+    for (const pr of (procs as any[] | null) ?? []) {
+      const v = Number(pr.valor_padrao ?? pr.valor_dinheiro ?? 0);
+      if (!pr?.nome) continue;
+      const key = norm(String(pr.nome));
+      // mantém o maior valor caso haja duplicidade entre unidades
+      if (v > (pmap.get(key) ?? 0)) pmap.set(key, v);
+    }
+    setProcValores(pmap);
     const ids = ((m.data ?? []) as Medico[]).map((x) => x.id);
     if (ids.length) {
       const { data: cv } = await supabase
