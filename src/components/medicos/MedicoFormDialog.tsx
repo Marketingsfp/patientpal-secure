@@ -1007,6 +1007,29 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                       ))}
                     </div>
                   )}
+                  {form.procedimentos.length > 0 && (
+                    <div className="border-t pt-3 mt-2 space-y-1">
+                      <Label className="text-sm font-medium">Procedimento padrão (pré-selecionado na agenda)</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Ao agendar com este médico, o sistema já preenche este serviço — agiliza o atendimento.
+                        Ex.: Ortopedista → CONSULTA. Médico que só faz USG → o exame mais comum.
+                      </p>
+                      <SearchableSelect
+                        value={form.procedimento_padrao_id || "none"}
+                        onChange={(v) => setForm({ ...form, procedimento_padrao_id: v === "none" ? "" : v })}
+                        placeholder="— Sem padrão (usa CONSULTA) —"
+                        searchPlaceholder="Buscar serviço..."
+                        options={[
+                          { value: "none", label: "— Sem padrão (usa CONSULTA) —" },
+                          ...Array.from(new Set(form.procedimentos.map((it) => splitItem(it).pid).filter(Boolean)))
+                            .map((pid) => procs.find((p) => p.id === pid))
+                            .filter((p): p is Procedimento => !!p)
+                            .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
+                            .map((p) => ({ value: p.id, label: p.nome })),
+                        ]}
+                      />
+                    </div>
+                  )}
                 </div>
               </TabsContent>
 
