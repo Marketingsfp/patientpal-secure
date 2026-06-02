@@ -266,6 +266,14 @@ function normalizeProcKey(s: string | null | undefined): string {
   return (s ?? "").trim().toUpperCase();
 }
 
+function extractEspFromProcNome(s: string | null | undefined): string | undefined {
+  if (!s) return undefined;
+  const m = s.match(/\(([^)]+)\)\s*$/);
+  if (!m) return undefined;
+  const v = m[1].trim();
+  return v.length > 0 ? v.toUpperCase() : undefined;
+}
+
 async function lookupEspecialidadePorProcedimento(
   clinicaId: string,
   procNomes: Array<string | null | undefined>,
