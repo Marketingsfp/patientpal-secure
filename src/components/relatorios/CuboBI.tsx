@@ -361,6 +361,7 @@ interface CubeConfig {
   cubeId: string;
   rowKey: string;
   subRowKey: string | null;
+  subSubRowKey: string | null;
   colKey: string | null;
   measureField: string | null;
   measureAgg: AggKind;
@@ -377,6 +378,7 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
     cubeId: "agendamentos",
     rowKey: "medico",
     subRowKey: null,
+    subSubRowKey: null,
     colKey: "status",
     measureField: null,
     measureAgg: "count",
@@ -425,9 +427,13 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
       const rowKey = keys.includes(c.rowKey) ? c.rowKey : (keys[0] ?? "");
       const colKey = c.colKey && keys.includes(c.colKey) ? c.colKey : null;
       const subRowKey = c.subRowKey && keys.includes(c.subRowKey) && c.subRowKey !== rowKey ? c.subRowKey : null;
+      const subSubRowKey =
+        c.subSubRowKey && keys.includes(c.subSubRowKey) && c.subSubRowKey !== rowKey && c.subSubRowKey !== subRowKey
+          ? c.subSubRowKey
+          : null;
       const measureField = c.measureField && numKeys.includes(c.measureField) ? c.measureField : null;
       const measureAgg: AggKind = measureField ? (c.measureAgg === "count" ? "sum" : c.measureAgg) : "count";
-      return { ...c, rowKey, subRowKey, colKey, measureField, measureAgg };
+      return { ...c, rowKey, subRowKey, subSubRowKey, colKey, measureField, measureAgg };
     });
   }, [cube]);
 
