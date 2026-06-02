@@ -880,6 +880,13 @@ function ConveniosPage() {
                 })()}
               </div>
             </TabsContent>
+            <TabsContent value="regras" className="mt-3">
+              <RegrasConvenioTab
+                clinicaId={clinicaAtual.clinica_id}
+                convenioId={editing?.id ?? null}
+                convenioNome={editing?.nome ?? nome}
+              />
+            </TabsContent>
             <TabsContent value="contrato" className="mt-3">
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
