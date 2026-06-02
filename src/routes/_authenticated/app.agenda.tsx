@@ -1803,7 +1803,18 @@ function AgendaPage() {
                        setForm(f => {
                          const medico_id = v === "none" ? "" : v;
                          const fim = f.inicio ? calcFimAuto(f.inicio, medico_id) : f.fim;
-                         return { ...f, medico_id, fim };
+                         // Pré-preenche o serviço com o procedimento padrão do médico (se houver)
+                         // e só se ainda não houver um serviço escolhido — não sobrescreve edição manual.
+                         let procedimento = f.procedimento;
+                         if (medico_id && !procedimento) {
+                           const med = medicos.find((m) => m.id === medico_id);
+                           const padraoId = med?.procedimento_padrao_id;
+                           if (padraoId) {
+                             const proc = procedimentosList.find((p) => p.id === padraoId);
+                             if (proc) procedimento = proc.nome;
+                           }
+                         }
+                         return { ...f, medico_id, fim, procedimento };
                        });
                     }
                   }}
