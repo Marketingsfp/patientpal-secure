@@ -60,6 +60,16 @@ interface Cartao {
 }
 interface CbConvenio { id: string; nome: string; ativo: boolean }
 interface ConvValor { valor_dinheiro: number; valor_outros: number }
+interface CbConvenioRegra {
+  id: string;
+  convenio_id: string;
+  especialidade_id: string | null;
+  tipo: string | null;
+  modo: "valor_fixo" | "percentual_desconto";
+  valor: number | null;
+  percentual: number | null;
+  prioridade: number;
+}
 
 const TIPO_COR_MAP: Record<string, string> = {
   consulta: "bg-primary/10 text-primary",

@@ -1,55 +1,83 @@
-# Vídeo: Fluxo completo do menu Agendas
+## Objetivo
 
-Vídeo Remotion estilo agência (1920x1080, 30fps) demonstrando todas as etapas operacionais do menu **Agendas** do ClinicaOS — sem incluir a abertura de agenda. Renderizado como MP4 para `/mnt/documents/`.
+Cadastrar as regras do **CARTÃO CONSULTA + SEGUROS** extraídas do documento, aplicá-las a todos os serviços já existentes e fazer com que novos cadastros recebam os valores automaticamente (você ainda pode editar caso a caso).
 
-## Direção criativa
+## 1. Nova tabela `cb_convenio_regras`
 
-- **Estética**: Tech Product — UI mockada limpa, layout asimétrico, cursor animado, microinterações snappy. Reaproveita a paleta e tipografia já existentes em `remotion/src/theme.ts` (`C` palette + Inter/DM Sans) para manter consistência com os outros vídeos do projeto (`agendamento`, `triagem`, `atendimento`).
-- **Motion system**: entrada padrão spring snappy (`damping: 18`); transições entre cenas alternando `slide(from-right)` e `fade` (mesmo padrão de `AgendamentoVideo.tsx`); cursor guiado por `interpolate()`.
-- **Duração-alvo**: ~28s, dividido em 7 cenas curtas (média 4s cada).
+Armazena as regras de preço por convênio. Estrutura:
 
-## Cenas (na ordem)
+- `convenio_id` → convênio (ex: Cartão Consulta + Seguros)
+- `especialidade_id` (opcional) → ex: Cardiologia
+- `tipo` (opcional) → consulta / exame / procedimento
+- `modo` → `valor_fixo` ou `percentual_desconto`
+- `valor` (numeric) → ex: 9.99
+- `percentual` (numeric) → ex: 10 (significa 10% de desconto)
+- `prioridade` (integer) → regra mais específica vence
 
-1. **Filtro de profissional + data** (~4s) — Header da Agenda, dropdown de Profissional abrindo e selecionando "Dr. Roberto Lima", depois Popover de Calendário avançando do dia atual para uma data futura. Grade da agenda re-renderiza com slots novos.
-2. **Novo agendamento de paciente** (~5s) — Clique em "+ Novo", dialog abre, busca de paciente ("Maria Souza"), seleção de procedimento ("Consulta Cardiológica"), confirmação. Toast "Agendamento criado".
-3. **Pagamento do paciente agendado** (~4s) — Linha do agendamento criado, ação "Pagamento" → LancamentoDialog com resumo (R$ 250,00), seleção PIX, "Pagamento aprovado". Status da linha muda para com ícone $.
-4. **Check-in** (~3s) — Outra linha com status "Agendado"; menu de ações → "Check-in"; badge passa para "Confirmado" com brilho verde.
-5. **Reagendamento** (~4s) — Linha existente → menu "Reagendar"; dialog mostra novo seletor de data/hora; nova data destacada; toast "Reagendado para 22/05 às 10:30".
-6. **Pagamento de vários clientes (lote)** (~4s) — Checkboxes na grade selecionam 3 linhas; barra de ações em lote aparece com "Pagar selecionados"; LancamentoDialog agrupado mostra total R$ 750,00; aprovação coletiva.
-7. **Histórico** (~4s) — Clique em um paciente abre painel/dialog de histórico; lista cronológica com atendimentos anteriores, valores pagos, status. Scroll suave revela 3 eventos.
+Regra de aplicação: para cada (serviço × convênio), procura a regra de maior prioridade que casa com (especialidade, tipo). Se `valor_fixo`, define `valor_dinheiro = valor_outros = valor`. Se `percentual_desconto`, calcula `valor_dinheiro = base_dinheiro × (1 - %/100)` e `valor_outros = base_outros × (1 - %/100)` separadamente.
 
-Encerramento: fade rápido com logo/wordmark "ClinicaOS · Agendas".
+Migration cria a tabela com RLS (gerentes editam, membros leem) e índices.
 
-## Arquivos a criar
+## 2. Seed das regras do Cartão Consulta + Seguros
 
 ```text
-remotion/src/AgendasVideo.tsx              # composição principal (TransitionSeries)
-remotion/src/scenes/AgendaSceneFiltro.tsx
-remotion/src/scenes/AgendaSceneNovo.tsx
-remotion/src/scenes/AgendaScenePagamento.tsx
-remotion/src/scenes/AgendaSceneCheckin.tsx
-remotion/src/scenes/AgendaSceneReagendar.tsx
-remotion/src/scenes/AgendaSceneLote.tsx
-remotion/src/scenes/AgendaSceneHistorico.tsx
-remotion/scripts/render-agendas.mjs        # script de render headless → /mnt/documents/clinicaos-agendas.mp4
+Consultas clínicas (R$ 9,99 fixo)
+  Angiologia, Cardiologia, Clínica Médica (Clinico Geral),
+  Dermatologia, Endocrinologia, Gastroenterologia, Geriatria,
+  Ginecologia, Ortopedia, Otorrinolaringologia, Obstetrícia,
+  Pediatria, Urologia × tipo=consulta → R$ 9,99
+
+Franquia R$ 60 (consultas)
+  Psicologia, Nutrição × tipo=consulta → R$ 60,00
+
+Franquia R$ 80 (consultas)
+  Alergologia, Fonoaudiologia, Mastologia, Nefrologia,
+  Neurologia, Oftalmologia, Pneumologia, Proctologia,
+  Psiquiatria, Reumatologia × tipo=consulta → R$ 80,00
+  (Cardiologia Infantil, Endocrinologia Infantil e Podologia
+   serão criadas como especialidade se você confirmar — hoje
+   não existem na base)
+
+Exames com 10% de desconto
+  LABORATORIO, RAIO-X, MAMOGRAFIA, DENSITOMETRIA OSSEA × tipo=exame
+  + exames cujo nome contenha "PREVENTIVO" ou "ELETROCARDIOGRAMA"
+
+Exames com 5% de desconto
+  ODONTOLOGIA, ULTRASSONOGRAFIA, TOMOGRAFIA COMPUTADORIZADA,
+  FISIOTERAPIA × tipo=exame
+  + exames cujo nome contenha "RESSONANCIA", "ECOCARDIOGRAMA",
+    "ELETROENCEFALOGRAMA", "ERGOMETRICO", "ENDOSCOPIA",
+    "RPG" ou "ACUPUNTURA"
 ```
 
-Atualizações:
-- `remotion/src/Root.tsx`: registrar `<Composition id="agendas" ... durationInFrames=~840 />`.
+## 3. Aplicar agora aos serviços existentes
 
-Reaproveita `Frame`/`Cursor` (`remotion/src/components/Frame.tsx`) e tokens de `theme.ts`. Sem áudio (`muted: true`) para evitar dependência de TTS, como nos outros vídeos.
+Script de bulk update: para cada serviço da clínica, calcula o valor pela regra e faz upsert na tabela `procedimento_cb_convenio_valores` (a que já criamos). Executa para todos os serviços do convênio Cartão Consulta + Seguros. Resultado imediato na coluna do convênio na tela de Serviços.
 
-## Render
+## 4. Auto-preenchimento ao cadastrar novo serviço
 
-```bash
-cd remotion && node scripts/render-agendas.mjs
-# saída: /mnt/documents/clinicaos-agendas.mp4
-```
+No formulário "Novo serviço" da tela de Serviços:
 
-Verificação: spot-check com `bunx remotion still` em 2-3 frames-chave antes do render final; depois confirmar tamanho/duração do MP4.
+- Quando você escolhe a **especialidade** e o **tipo** (consulta/exame/procedimento), os campos do bloco "Valores por convênio" são preenchidos automaticamente pela regra.
+- Mudar o valor base (Dinheiro / Pix·Déb·Créd) recalcula em tempo real os convênios baseados em percentual.
+- Você ainda pode sobrescrever manualmente qualquer campo antes de salvar — o valor manual é respeitado.
 
-## Fora do escopo
+## 5. Onde gerenciar as regras
 
-- Abertura/configuração de agenda (explícito do usuário).
-- Voiceover/áudio.
-- Mudanças no app React real — somente arquivos sob `remotion/`.
+Em **Cartão Benefícios > Convênios**, cada convênio ganha um botão "Regras de preço" que abre um modal/painel listando as regras existentes e permitindo:
+
+- adicionar/editar/remover regras (especialidade, tipo, valor fixo ou %)
+- botão "Aplicar a todos os serviços" para reprocessar em lote
+
+## 6. Observações / pontos a confirmar
+
+- O documento cita **Cardiologia Infantil**, **Endocrinologia Infantil** e **Podologia** que não existem hoje como especialidades. Posso criá-las junto com as regras, ou ignorá-las até você cadastrar.
+- O documento também menciona benefícios que são **regras de uso** (carência, 1 consulta por dia, gratuidade após 6ª mensalidade, 1 exame anual, telemedicina a 50%). Esses **não entram** como valor de serviço — se quiser, faço uma seção posterior com elegibilidade/limites por contrato (precisaria criar entidades de contrato / mensalidade).
+- Para o convênio **Cartão Consulta** e **Cartão Terapêutico**, faço o mesmo motor; basta me enviar os documentos correspondentes.
+
+## Detalhes técnicos
+
+- Migration: tabela `cb_convenio_regras` + função `apply_convenio_rules(clinica_id, convenio_id)` (Postgres) que reaplica as regras a todos os serviços.
+- Frontend: hook `useConvenioRules(convenioId)` + helper `computeConvenioValor(servico, rules)` reutilizado no form e na tela de regras.
+- Server function `recalcConvenioValores({ clinicaId, convenioId })` para o botão de bulk apply.
+- Ordenação de prioridade: regra com `especialidade_id + tipo` (10) > só `especialidade_id` (8) > só `tipo` (5) > genérica (1).
