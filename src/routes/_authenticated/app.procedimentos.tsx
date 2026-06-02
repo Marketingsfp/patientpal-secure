@@ -1106,20 +1106,42 @@ function ProcedimentosPage() {
                     const v = formConvValores[c.id] ?? { dinheiro: "0", outros: "0" };
                     return (
                       <div key={c.id} className="space-y-2 border-l-2 border-primary/30 pl-3">
-                        <p className="text-sm font-medium">{c.nome}</p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium">
+                            {c.nome}
+                            {!formConvManual[c.id] && (
+                              <span className="ml-2 text-[10px] font-normal text-muted-foreground">(auto pela regra)</span>
+                            )}
+                          </p>
+                          {formConvManual[c.id] && (
+                            <button
+                              type="button"
+                              className="text-[10px] text-primary hover:underline"
+                              onClick={() => setFormConvManual(prev => ({ ...prev, [c.id]: false }))}
+                            >
+                              Recalcular pela regra
+                            </button>
+                          )}
+                        </div>
                         <div className="grid grid-cols-2 gap-3">
                           <div className="space-y-1">
                             <Label className="text-xs">Dinheiro (R$)</Label>
                             <CurrencyInput
                               value={v.dinheiro}
-                              onChange={(val) => setFormConvValores(prev => ({ ...prev, [c.id]: { ...v, dinheiro: val } }))}
+                              onChange={(val) => {
+                                setFormConvValores(prev => ({ ...prev, [c.id]: { ...v, dinheiro: val } }));
+                                setFormConvManual(prev => ({ ...prev, [c.id]: true }));
+                              }}
                             />
                           </div>
                           <div className="space-y-1">
                             <Label className="text-xs">Pix / Débito / Crédito (R$)</Label>
                             <CurrencyInput
                               value={v.outros}
-                              onChange={(val) => setFormConvValores(prev => ({ ...prev, [c.id]: { ...v, outros: val } }))}
+                              onChange={(val) => {
+                                setFormConvValores(prev => ({ ...prev, [c.id]: { ...v, outros: val } }));
+                                setFormConvManual(prev => ({ ...prev, [c.id]: true }));
+                              }}
                             />
                           </div>
                         </div>
