@@ -376,10 +376,20 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
     <div className="space-y-4">
       {/* Configuração */}
       <Card>
-        <CardHeader><CardTitle className="text-base">Monte sua visualização</CardTitle></CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
+          <CardTitle className="text-base">Monte sua visualização</CardTitle>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={salvarView} className="gap-1">
+              <Save className="h-4 w-4" /> <span className="hidden sm:inline">Salvar</span>
+            </Button>
+            <Button size="sm" variant="outline" onClick={exportar} className="gap-1">
+              <Download className="h-4 w-4" /> <span className="hidden sm:inline">Excel</span>
+            </Button>
+          </div>
+        </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-            <div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="space-y-1.5">
               <Label>Fonte de dados</Label>
               <Select value={cfg.cubeId} onValueChange={(v) => setField("cubeId", v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -388,7 +398,7 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
                 </SelectContent>
               </Select>
             </div>
-            <div>
+            <div className="space-y-1.5">
               <Label>Linhas (agrupar por)</Label>
               <Select value={cfg.rowKey} onValueChange={(v) => setField("rowKey", v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -399,7 +409,7 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
                 </SelectContent>
               </Select>
             </div>
-            <div>
+            <div className="space-y-1.5">
               <Label>Colunas (séries)</Label>
               <Select value={cfg.colKey ?? "__none__"} onValueChange={(v) => setField("colKey", v === "__none__" ? null : v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -411,11 +421,11 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
                 </SelectContent>
               </Select>
             </div>
-            <div>
+            <div className="space-y-1.5">
               <Label>Métrica</Label>
               <div className="flex gap-2">
                 <Select value={cfg.measureAgg} onValueChange={(v) => setField("measureAgg", v as AggKind)}>
-                  <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-[110px] shrink-0"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="count">Contar</SelectItem>
                     <SelectItem value="sum">Somar</SelectItem>
@@ -429,7 +439,7 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
                   onValueChange={(v) => setField("measureField", v === "__none__" ? null : v)}
                   disabled={cfg.measureAgg === "count"}
                 >
-                  <SelectTrigger><SelectValue placeholder="campo" /></SelectTrigger>
+                  <SelectTrigger className="min-w-0 flex-1"><SelectValue placeholder="campo" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">— (registros)</SelectItem>
                     {cube.fields.filter((f) => f.kind === "number").map((f) => (
@@ -441,10 +451,10 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
             </div>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-            <div>
+          <div className="grid gap-3 sm:grid-cols-[1fr_140px]">
+            <div className="space-y-1.5">
               <Label>Visualização</Label>
-              <div className="flex gap-1">
+              <div className="inline-flex flex-wrap gap-1 rounded-md border p-1 bg-muted/30">
                 {[
                   { id: "tabela", icon: TableIcon, label: "Tabela" },
                   { id: "barras", icon: BarChart3, label: "Barras" },
@@ -457,29 +467,21 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
                       key={v.id}
                       type="button"
                       size="sm"
-                      variant={cfg.viz === v.id ? "default" : "outline"}
-                      className="flex-1 gap-1"
+                      variant={cfg.viz === v.id ? "default" : "ghost"}
+                      className="h-8 gap-1.5 px-3"
                       onClick={() => setField("viz", v.id as VizKind)}
                     >
                       <Icon className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline">{v.label}</span>
+                      <span>{v.label}</span>
                     </Button>
                   );
                 })}
               </div>
             </div>
-            <div>
+            <div className="space-y-1.5">
               <Label htmlFor="topn">Mostrar top</Label>
               <Input id="topn" type="number" min={1} max={100} value={cfg.topN}
                 onChange={(e) => setField("topN", Number(e.target.value) || 10)} />
-            </div>
-            <div className="lg:col-span-2 flex items-end gap-2">
-              <Button size="sm" variant="outline" onClick={salvarView} className="gap-1">
-                <Save className="h-4 w-4" /> Salvar visualização
-              </Button>
-              <Button size="sm" variant="outline" onClick={exportar} className="gap-1">
-                <Download className="h-4 w-4" /> Exportar Excel
-              </Button>
             </div>
           </div>
 
