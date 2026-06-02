@@ -76,6 +76,7 @@ function Page() {
     let r = 0, d = 0, totalRows = 0;
     for (const row of (data ?? []) as Array<{ tipo: string; status: string; qtd: number; total: number }>) {
       totalRows += Number(row.qtd) || 0;
+      if (row.status === "cancelado") continue;
       if (filterStatus !== "todos" && row.status !== filterStatus) continue;
       if (row.tipo === "receita") r += Number(row.total) || 0;
       else if (row.tipo === "despesa") d += Number(row.total) || 0;
@@ -290,7 +291,7 @@ function Page() {
             <SelectContent>
               <SelectItem value="confirmado">Apenas confirmados</SelectItem>
               <SelectItem value="pendente">Apenas pendentes</SelectItem>
-              <SelectItem value="todos">Todos (exceto cancelados não soma)</SelectItem>
+              <SelectItem value="todos">Confirmados + pendentes</SelectItem>
             </SelectContent>
           </Select></div>
       </CardContent></Card>
