@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   Wallet, PlusCircle, MinusCircle, ArrowDownToLine, ArrowUpFromLine, Lock,
-  Unlock, Eye, FileDown, Users, Receipt, ChevronRight, Trash2, Plus, HandCoins, ArrowRight, Undo2,
+  Unlock, Eye, FileDown, Users, Receipt, ChevronRight, Trash2, Plus, HandCoins, ArrowRight, Undo2, Printer,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -449,6 +449,18 @@ function Page() {
       .reduce((acc, m) => acc + TIPO_SINAL[m.tipo] * Number(m.valor || 0), 0);
   }, [todosMovs]);
 
+  // Totais auxiliares por sessao
+  const calcSangriaSessao = useCallback((sid: string) => {
+    return todosMovs
+      .filter((m) => m.sessao_id === sid && m.tipo === "sangria")
+      .reduce((acc, m) => acc + Number(m.valor || 0), 0);
+  }, [todosMovs]);
+  const calcEstornoSessao = useCallback((sid: string) => {
+    return todosMovs
+      .filter((m) => m.sessao_id === sid && (m.descricao ?? "").toLowerCase().includes("estorno"))
+      .reduce((acc, m) => acc + Number(m.valor || 0), 0);
+  }, [todosMovs]);
+
   // Acoes
   const abrirCaixa = async (e: FormEvent) => {
     e.preventDefault();
@@ -574,9 +586,68 @@ function Page() {
       "Valor abertura": Number(s.valor_abertura || 0),
       "Saldo calculado": calcSaldoSessao(s.id),
       "Valor informado": Number(s.valor_fechamento_informado || 0),
+      Sangria: calcSangriaSessao(s.id),
+      Estorno: calcEstornoSessao(s.id),
       Diferenca: Number(s.diferenca || 0),
     }));
     exportToExcel(rows, `caixas_${fIni}_a_${fFim}`);
+  };
+
+  const exportarDetalhe = () => {
+    if (!openDetalhe) return;
+    const rows = detalheMovs.map((m) => ({
+      Data: new Date(m.created_at).toLocaleDateString("pt-BR"),
+      Hora: new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+      Tipo: TIPO_LABEL[m.tipo],
+      Descricao: m.descricao ?? "",
+      Forma: m.forma_pagamento ?? "",
+      Valor: (TIPO_SINAL[m.tipo] < 0 ? -1 : 1) * Number(m.valor || 0),
+    }));
+    const op = (openDetalhe.user_nome || "operador").replace(/\s+/g, "_");
+    exportToExcel(rows, `sessao_caixa_${op}_${openDetalhe.id.slice(0, 8)}`);
+  };
+
+  const imprimirDetalhe = () => {
+    if (!openDetalhe) return;
+    const s = openDetalhe;
+    const linhas = detalheMovs.map((m) => `
+      <tr>
+        <td>${new Date(m.created_at).toLocaleDateString("pt-BR")}</td>
+        <td>${new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</td>
+        <td>${TIPO_LABEL[m.tipo]}</td>
+        <td>${(m.descricao ?? "").replace(/</g, "&lt;")}</td>
+        <td>${m.forma_pagamento ?? "—"}</td>
+        <td style="text-align:right;">${TIPO_SINAL[m.tipo] < 0 ? "-" : ""}${fmt(m.valor)}</td>
+      </tr>`).join("");
+    const html = `<!doctype html><html><head><meta charset="utf-8"/>
+      <title>Sessão de caixa</title>
+      <style>
+        body{font-family:Arial,sans-serif;padding:24px;color:#0f172a;}
+        h1{font-size:18px;margin:0 0 4px;}
+        .meta{font-size:12px;color:#475569;margin-bottom:12px;}
+        .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;font-size:12px;margin-bottom:12px;}
+        .grid div{border:1px solid #e2e8f0;border-radius:6px;padding:8px;}
+        table{width:100%;border-collapse:collapse;font-size:12px;}
+        th,td{border-bottom:1px solid #e2e8f0;padding:6px;text-align:left;}
+        th{background:#f1f5f9;}
+      </style></head><body>
+      <h1>Sessão de caixa</h1>
+      <div class="meta">${s.user_nome ?? "—"} · ${fmtDT(s.aberto_em)} → ${fmtDT(s.fechado_em)}</div>
+      <div class="grid">
+        <div><b>Abertura</b><br/>${fmt(s.valor_abertura)}</div>
+        <div><b>Calculado</b><br/>${fmt(s.valor_fechamento_calculado)}</div>
+        <div><b>Informado</b><br/>${fmt(s.valor_fechamento_informado)}</div>
+        <div><b>Diferença</b><br/>${fmt(s.diferenca)}</div>
+      </div>
+      <table><thead><tr>
+        <th>Data</th><th>Hora</th><th>Tipo</th><th>Descrição</th><th>Forma</th><th style="text-align:right;">Valor</th>
+      </tr></thead><tbody>${linhas}</tbody></table>
+      <script>window.onload=()=>{window.print();}</script>
+      </body></html>`;
+    const w = window.open("", "_blank", "width=900,height=700");
+    if (!w) { toast.error("Bloqueador de pop-up impediu a impressão"); return; }
+    w.document.write(html);
+    w.document.close();
   };
 
   return (
@@ -839,16 +910,20 @@ function Page() {
                       <TableHead className="text-right">Abertura</TableHead>
                       <TableHead className="text-right">Calculado</TableHead>
                       <TableHead className="text-right">Informado</TableHead>
+                      <TableHead className="text-right">Sangria</TableHead>
+                      <TableHead className="text-right">Estorno</TableHead>
                       <TableHead className="text-right">Diferença</TableHead>
                       <TableHead></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {todasSessoes.length === 0 && (
-                      <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Sem sessões no período</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground">Sem sessões no período</TableCell></TableRow>
                     )}
                     {todasSessoes.map((s) => {
                       const calc = calcSaldoSessao(s.id);
+                      const sangria = calcSangriaSessao(s.id);
+                      const estorno = calcEstornoSessao(s.id);
                       return (
                         <TableRow key={s.id}>
                           <TableCell className="font-medium">{s.user_nome || s.user_id.slice(0, 8)}</TableCell>
@@ -858,6 +933,8 @@ function Page() {
                           <TableCell className="text-right">{fmt(s.valor_abertura)}</TableCell>
                           <TableCell className="text-right">{fmt(calc)}</TableCell>
                           <TableCell className="text-right">{fmt(s.valor_fechamento_informado)}</TableCell>
+                          <TableCell className={`text-right ${sangria > 0 ? "text-amber-700" : "text-muted-foreground"}`}>{fmt(sangria)}</TableCell>
+                          <TableCell className={`text-right ${estorno > 0 ? "text-rose-700" : "text-muted-foreground"}`}>{fmt(estorno)}</TableCell>
                           <TableCell className={`text-right ${Number(s.diferenca || 0) < 0 ? "text-rose-600" : Number(s.diferenca || 0) > 0 ? "text-amber-600" : ""}`}>
                             {fmt(s.diferenca)}
                           </TableCell>
@@ -1204,7 +1281,20 @@ function Page() {
       {/* === Modal Detalhe === */}
       <Dialog open={!!openDetalhe} onOpenChange={(o) => { if (!o) { setOpenDetalhe(null); setDetalheMovs([]); } }}>
         <DialogContent className="max-w-3xl">
-          <DialogHeader><DialogTitle>Sessão de caixa</DialogTitle>
+          <DialogHeader>
+            <div className="flex items-center justify-between gap-2 pr-8">
+              <DialogTitle>Sessão de caixa</DialogTitle>
+              {openDetalhe && (
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="outline" onClick={exportarDetalhe}>
+                    <FileDown className="h-4 w-4 mr-1" /> Excel
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={imprimirDetalhe}>
+                    <Printer className="h-4 w-4 mr-1" /> Imprimir
+                  </Button>
+                </div>
+              )}
+            </div>
             {openDetalhe && (
               <DialogDescription>
                 {openDetalhe.user_nome || "—"} · {fmtDT(openDetalhe.aberto_em)} → {fmtDT(openDetalhe.fechado_em)}
