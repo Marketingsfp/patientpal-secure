@@ -888,19 +888,21 @@ function AgendaPage() {
   // Atualiza inline o procedimento de um agendamento (do badge na coluna Serviço)
   const atualizarProcedimento = async (ag: Agendamento, novoNome: string) => {
     const nomeFinal = novoNome.trim();
-    if (!nomeFinal || nomeFinal === (ag.procedimento ?? "")) return;
+    // Sentinela vazio: limpa o procedimento (volta ao padrão do médico).
+    const limpar = nomeFinal === "";
+    if (!limpar && nomeFinal === (ag.procedimento ?? "")) return;
     const anterior = ag.procedimento;
-    setItems((prev) => prev.map((x) => (x.id === ag.id ? { ...x, procedimento: nomeFinal } : x)));
+    setItems((prev) => prev.map((x) => (x.id === ag.id ? { ...x, procedimento: limpar ? null : nomeFinal } : x)));
     const { error } = await supabase
       .from("agendamentos")
-      .update({ procedimento: nomeFinal })
+      .update({ procedimento: limpar ? null : nomeFinal })
       .eq("id", ag.id);
     if (error) {
       setItems((prev) => prev.map((x) => (x.id === ag.id ? { ...x, procedimento: anterior } : x)));
       toast.error("Não foi possível atualizar o procedimento");
       return;
     }
-    toast.success(`Serviço alterado para ${nomeFinal}`);
+    toast.success(limpar ? "Serviço removido" : `Serviço alterado para ${nomeFinal}`);
   };
 
   const fichaPorId = useMemo(() => {
