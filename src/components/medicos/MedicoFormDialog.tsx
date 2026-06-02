@@ -70,6 +70,7 @@ const emptyForm = () => ({
   nome: "", crm: "", crm_uf: "",
   especialidades: [] as EspecialidadeRow[],
   procedimentos: [] as string[],
+  procedimento_padrao_id: "" as string,
   tipo_repasse: "percentual" as "percentual" | "valor",
   percentual: "50",
   valor: "",
