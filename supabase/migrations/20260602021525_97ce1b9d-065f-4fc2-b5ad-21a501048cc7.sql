@@ -1,0 +1,1 @@
+DELETE FROM medicos WHERE id IN ('63ec8ce1-1675-4a83-aa6c-a56731aa81ad','11008364-59b5-4da3-84a0-d6510e80bc31');
