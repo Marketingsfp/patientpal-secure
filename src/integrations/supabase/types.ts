@@ -5747,6 +5747,61 @@ export type Database = {
         }
         Relationships: []
       }
+      procedimento_cb_convenio_valores: {
+        Row: {
+          clinica_id: string
+          convenio_id: string
+          created_at: string
+          id: string
+          procedimento_id: string
+          updated_at: string
+          valor_dinheiro: number
+          valor_outros: number
+        }
+        Insert: {
+          clinica_id: string
+          convenio_id: string
+          created_at?: string
+          id?: string
+          procedimento_id: string
+          updated_at?: string
+          valor_dinheiro?: number
+          valor_outros?: number
+        }
+        Update: {
+          clinica_id?: string
+          convenio_id?: string
+          created_at?: string
+          id?: string
+          procedimento_id?: string
+          updated_at?: string
+          valor_dinheiro?: number
+          valor_outros?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "procedimento_cb_convenio_valores_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "procedimento_cb_convenio_valores_convenio_id_fkey"
+            columns: ["convenio_id"]
+            isOneToOne: false
+            referencedRelation: "cb_convenios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "procedimento_cb_convenio_valores_procedimento_id_fkey"
+            columns: ["procedimento_id"]
+            isOneToOne: false
+            referencedRelation: "procedimentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       procedimento_especialidades: {
         Row: {
           clinica_id: string
