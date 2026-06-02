@@ -190,7 +190,6 @@ function Page() {
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("tipo", "receita")
       .eq("status", "confirmado")
-      .gt("valor", 0)
       .not("medico_id", "is", null)
       .gte("data", fIni)
       .lte("data", fFim);
@@ -208,7 +207,7 @@ function Page() {
       origem: "manual",
       repasse_pago: !!r.repasse_pago, repasse_pago_em: r.repasse_pago_em, repasse_forma_pagamento: r.repasse_forma_pagamento,
     }));
-    const agend: Atend[] = (ar.data ?? []).map((r) => {
+    const agend: Atend[] = (ar.data ?? []).map((r): Atend => {
       const proc = (r.descricao ?? "").split("—").slice(1).join("—").trim() || r.descricao;
       const total = Number(r.valor);
       const repasse = calcRepasse(r.medico_id, total, proc);
