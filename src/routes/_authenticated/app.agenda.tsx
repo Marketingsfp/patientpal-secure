@@ -1365,14 +1365,16 @@ function AgendaPage() {
     setSaving(false);
     toast.success("Salvo"); setOpen(false); await load();
     if (irParaPagamento && novoId) {
-      const nomeBusca = normalizar((payload.procedimento ?? "CONSULTA").trim());
-      const { data: lista } = await supabase
-        .from("procedimentos")
-        .select("nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .limit(5000);
-      void nomeBusca;
-      const proc: any = await buscarProcedimentoPorNome(clinicaAtual.clinica_id, payload.procedimento ?? "CONSULTA", lista ?? []);
+      const [lista, info] = await Promise.all([
+        getProcedimentosComValor(clinicaAtual.clinica_id),
+        obterInfoConvenioPaciente({
+          clinicaId: clinicaAtual.clinica_id,
+          pacienteId: payload.paciente_id,
+          medicoId: payload.medico_id,
+          procedimentoNome: payload.procedimento ?? "",
+        }),
+      ]);
+      const proc: any = await buscarProcedimentoPorNome(clinicaAtual.clinica_id, payload.procedimento ?? "CONSULTA", lista);
       const valorCartao = valorCartaoProcedimento(proc);
       const vDinheiro = primeiroValorValido(proc?.valor_dinheiro, proc?.valor_dinheiro_pix, proc?.valor_padrao);
       const vPix = valorCartao;
@@ -1385,12 +1387,6 @@ function AgendaPage() {
         { forma: "cartao_credito", label: "Cartão de Crédito", valor: vCredito },
       ];
       let descSuffix = "";
-      const info = await obterInfoConvenioPaciente({
-        clinicaId: clinicaAtual.clinica_id,
-        pacienteId: payload.paciente_id,
-        medicoId: payload.medico_id,
-        procedimentoNome: payload.procedimento ?? "",
-      });
       if (info) {
         if (!info.emDia) {
           toast.error(`Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.`);
