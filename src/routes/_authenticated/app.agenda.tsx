@@ -765,7 +765,7 @@ function AgendaPage() {
       procOpcoesMap.get(r.recurso_id)!.push(proc);
     }
     setProcOpcoesPorMedico(procOpcoesMap);
-    const medicosIds = new Set(((m.data ?? []) as Medico[]).map((x) => x.id));
+    const medicosIds = new Set((((m.data ?? []) as unknown) as Medico[]).map((x) => x.id));
     const nm = new Map<string, Set<string>>();
     for (const r of (mc.data ?? []) as Array<{ medico_id: string; nome: string }>) {
       if (!r.medico_id || !medicosIds.has(r.medico_id)) continue;
@@ -843,6 +843,23 @@ function AgendaPage() {
       (p) => (ids?.has(p.id) ?? false) || (nomes?.has(normalizar(p.nome)) ?? false),
     );
     return lista.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" }));
+  };
+
+  const procedimentoPadraoDoMedico = (medicoId: string | null | undefined) => {
+    if (!medicoId) return "";
+    const med = medicos.find((m) => m.id === medicoId);
+    if (!med?.procedimento_padrao_id) return "";
+    return med.procedimento_padrao_nome
+      ?? procedimentosList.find((p) => p.id === med.procedimento_padrao_id)?.nome
+      ?? "";
+  };
+
+  const procedimentoEfetivo = (medicoId: string | null | undefined, procedimento: string | null | undefined) => {
+    const atual = (procedimento ?? "").trim();
+    const med = medicoId ? medicos.find((m) => m.id === medicoId) : null;
+    const padrao = procedimentoPadraoDoMedico(medicoId);
+    if (padrao && (!atual || normalizar(atual) === normalizar(med?.especialidade_nome ?? ""))) return padrao;
+    return atual;
   };
 
   // Atualiza inline o procedimento de um agendamento (do badge na coluna Serviço)
