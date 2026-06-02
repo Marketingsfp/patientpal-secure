@@ -75,6 +75,7 @@ function Page() {
   const [fIni, setFIni] = useState<string>(primeiroDia.toISOString().slice(0, 10));
   const [fFim, setFFim] = useState<string>(hoje);
   const [fStatus, setFStatus] = useState<"todos" | "aberto" | "pago">("aberto");
+  const [fPaciente, setFPaciente] = useState<string>("");
   const [contas, setContas] = useState<Conta[]>([]);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [payOpen, setPayOpen] = useState(false);
@@ -668,13 +669,22 @@ function Page() {
       {/* Filtros */}
       <Card>
         <CardContent className="p-2">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-2 items-end">
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-2 items-end">
             <div className="space-y-1">
               <Label className="text-[10px] flex items-center gap-1"><Filter className="h-3 w-3" />Médico</Label>
               <MedicoCombobox
                 value={fMedico}
                 onChange={(v) => { if (!isMedicoOnly) setFMedico(v); }}
                 medicos={isMedicoOnly ? medicos.filter((m) => m.id === medicoLogadoId) : medicos}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[10px]">Paciente</Label>
+              <Input
+                className="h-8"
+                placeholder="Buscar por nome..."
+                value={fPaciente}
+                onChange={(e) => setFPaciente(e.target.value)}
               />
             </div>
             <div className="space-y-1">
