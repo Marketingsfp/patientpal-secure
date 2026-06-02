@@ -579,9 +579,9 @@ function Page() {
         <Button
           variant="outline"
           onClick={() => {
-            if (!items.length) { toast.info("Sem dados para exportar."); return; }
+            if (!filteredItems.length) { toast.info("Sem dados para exportar."); return; }
             exportToExcel(
-              items.map((a) => ({
+              filteredItems.map((a) => ({
                 data: new Date(a.data).toLocaleDateString("pt-BR"),
                 medico: a.medico_id ? medMap.get(a.medico_id) ?? "" : "",
                 paciente: a.paciente_id ? pacMap.get(a.paciente_id) ?? "" : "",
@@ -744,7 +744,7 @@ function Page() {
 
       <Card><CardContent className="p-0">
         {loading ? <div className="py-12 text-center text-muted-foreground">Carregando...</div>
-          : items.length === 0 ? <div className="py-12 text-center text-muted-foreground"><Stethoscope className="h-10 w-10 mx-auto mb-2 text-muted-foreground/50" />Nenhum atendimento no período/filtro selecionado.</div>
+          : filteredItems.length === 0 ? <div className="py-12 text-center text-muted-foreground"><Stethoscope className="h-10 w-10 mx-auto mb-2 text-muted-foreground/50" />Nenhum atendimento no período/filtro selecionado.</div>
           : <Table>
             <TableHeader><TableRow>
               {!isMedicoOnly && (
@@ -760,7 +760,7 @@ function Page() {
               <TableHead className="text-center">Status</TableHead>
               {!isMedicoOnly && <TableHead className="w-24"></TableHead>}
             </TableRow></TableHeader>
-            <TableBody>{items.map((a) => (
+            <TableBody>{filteredItems.map((a) => (
               <TableRow key={`${a.origem}:${a.id}`}>
                 {!isMedicoOnly && (
                   <TableCell>
