@@ -628,15 +628,51 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {topRows.rowLabels.map((rl, ri) => (
-                    <TableRow key={rl}>
-                      <TableCell className="font-medium">{rl}</TableCell>
-                      {topRows.matrix[ri].map((v, ci) => (
-                        <TableCell key={ci} className="text-right">{fmt(v)}</TableCell>
-                      ))}
-                      <TableCell className="text-right font-semibold">{fmt(topRows.totalByRow[ri])}</TableCell>
-                    </TableRow>
-                  ))}
+                  {topRows.rowLabels.map((rl, ri) => {
+                    const isOpen = expanded.has(rl);
+                    const subRows = cfg.subRowKey
+                      ? (() => {
+                          const subset = rawRows.filter((r) => String(r[cfg.rowKey] ?? "—") === rl);
+                          return pivot(subset, cfg.subRowKey!, cfg.colKey, cfg.measureField, cfg.measureAgg);
+                        })()
+                      : null;
+                    return (
+                      <>
+                        <TableRow key={rl}>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-1">
+                              {cfg.subRowKey ? (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleExpand(rl)}
+                                  className="p-0.5 hover:bg-muted rounded"
+                                  aria-label={isOpen ? "Recolher" : "Expandir"}
+                                >
+                                  {isOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                                </button>
+                              ) : null}
+                              <span>{rl}</span>
+                            </div>
+                          </TableCell>
+                          {topRows.matrix[ri].map((v, ci) => (
+                            <TableCell key={ci} className="text-right">{fmt(v)}</TableCell>
+                          ))}
+                          <TableCell className="text-right font-semibold">{fmt(topRows.totalByRow[ri])}</TableCell>
+                        </TableRow>
+                        {isOpen && subRows ? subRows.rowLabels.map((srl, sri) => (
+                          <TableRow key={`${rl}::${srl}`} className="bg-muted/20">
+                            <TableCell className="pl-10 text-sm text-muted-foreground">{srl}</TableCell>
+                            {piv.colLabels.map((cl, ci) => {
+                              const idx = subRows.colLabels.indexOf(cl);
+                              const v = idx >= 0 ? subRows.matrix[sri][idx] : 0;
+                              return <TableCell key={ci} className="text-right text-sm">{fmt(v)}</TableCell>;
+                            })}
+                            <TableCell className="text-right text-sm font-medium">{fmt(subRows.totalByRow[sri])}</TableCell>
+                          </TableRow>
+                        )) : null}
+                      </>
+                    );
+                  })}
                   <TableRow className="bg-muted/40">
                     <TableCell className="font-semibold">Total</TableCell>
                     {piv.totalByCol.map((v, ci) => (
