@@ -334,6 +334,7 @@ function ProcedimentosPage() {
   const [saving, setSaving] = useState(false);
   const [seeding, setSeeding] = useState(false);
   const [tipos, setTipos] = useState<{ id: string; nome: string }[]>([]);
+  const [openTipoPicker, setOpenTipoPicker] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -589,14 +590,19 @@ function ProcedimentosPage() {
   };
 
   const openNew = () => {
+  const openNew = () => {
+    setOpenTipoPicker(true);
+  };
+  const startNewComTipo = (tipo: Tipo) => {
     void loadEspecialidades();
     setEditing(null);
-    setForm({ ...EMPTY });
+    setForm({ ...EMPTY, tipo });
     setFormEspIds([]);
     setFormConvValores(
       Object.fromEntries(convenios.map(c => [c.id, { dinheiro: "0", outros: "0" }])),
     );
     setFormConvManual({});
+    setOpenTipoPicker(false);
     setOpen(true);
   };
   const openEdit = (p: Procedimento) => {
