@@ -524,6 +524,8 @@ function ProcedimentosPage() {
     const espIdFiltro = grupoAplicado !== "todos" ? espIdByNome.get(norm(grupoAplicado)) : undefined;
     return items.filter(p => {
       if (tipoAplicado !== "todos" && p.tipo !== tipoAplicado) return false;
+      if (situacaoAplicada === "ativos" && !p.ativo) return false;
+      if (situacaoAplicada === "inativos" && p.ativo) return false;
       if (grupoAplicado !== "todos") {
         const matchGrupo = norm(p.grupo ?? "") === norm(grupoAplicado);
         const extras = vincEspMap.get(p.id);
@@ -533,7 +535,7 @@ function ProcedimentosPage() {
       if (q && !norm(p.nome).includes(q) && !norm(p.codigo ?? "").includes(q) && !norm(p.grupo ?? "").includes(q)) return false;
       return true;
     });
-  }, [items, buscaAplicada, tipoAplicado, grupoAplicado, vincEspMap, especialidades]);
+  }, [items, buscaAplicada, tipoAplicado, grupoAplicado, situacaoAplicada, vincEspMap, especialidades]);
 
   const ordenados = useMemo(() => {
     if (!sort) return filtrados;
@@ -562,16 +564,17 @@ function ProcedimentosPage() {
   const grupoExisteNasEspecialidades = especialidades.some(e => especialidadeKey(e.nome) === grupoSelecionadoKey);
 
   // Reset de página quando filtros aplicados ou ordenação mudam
-  useEffect(() => { setPagina(1); }, [buscaAplicada, tipoAplicado, grupoAplicado, sort]);
+  useEffect(() => { setPagina(1); }, [buscaAplicada, tipoAplicado, grupoAplicado, situacaoAplicada, sort]);
 
   const aplicarFiltros = () => {
     setBuscaAplicada(busca);
     setGrupoAplicado(filtroGrupo);
     setTipoAplicado(filtroTipo);
+    setSituacaoAplicada(filtroSituacao);
   };
   const limparFiltros = () => {
-    setBusca(""); setFiltroGrupo("todos"); setFiltroTipo("todos");
-    setBuscaAplicada(""); setGrupoAplicado("todos"); setTipoAplicado("todos");
+    setBusca(""); setFiltroGrupo("todos"); setFiltroTipo("todos"); setFiltroSituacao("ativos");
+    setBuscaAplicada(""); setGrupoAplicado("todos"); setTipoAplicado("todos"); setSituacaoAplicada("ativos");
   };
   const toggleSort = (col: SortCol) => {
     setSort(prev => {
