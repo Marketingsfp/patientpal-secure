@@ -687,7 +687,7 @@ function ProcedimentosPage() {
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="procedimentos">Serviço</TabsTrigger>
+          <TabsTrigger value="procedimentos">Exames / Procedimentos</TabsTrigger>
           <TabsTrigger value="consultas">Consultas</TabsTrigger>
         </TabsList>
 
