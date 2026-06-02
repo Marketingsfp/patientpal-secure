@@ -605,7 +605,7 @@ function AgendaPage() {
     // "agendado" agora significa "qualquer ficha com paciente alocado",
     // então não restringe por status no servidor — filtra em memória.
     const statusEspecifico =
-      filtroStatus !== "todos" && filtroStatus !== "livres" && filtroStatus !== "agendado";
+      filtroStatus !== "todos" && filtroStatus !== "livres" && filtroStatus !== "agendado" && filtroStatus !== "pago";
     if (statusEspecifico) {
       q = q.eq("status", filtroStatus as Status).limit(1000);
     }
