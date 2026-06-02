@@ -1037,7 +1037,7 @@ function AgendaPage() {
     const ids = Array.from(selecionados);
     const itens = items.filter(a => ids.includes(a.id));
     if (itens.length === 0) { toast.info("Selecione ao menos um horário."); return; }
-    const bloqueados = itens.filter(i => pagosSet.has(i.id) || (i.paciente_nome !== "DISPONÍVEL" && i.status !== "agendado"));
+    const bloqueados = itens.filter(i => pagosSet.has(i.id) || (!isSlotLivre(i.paciente_nome) && i.status !== "agendado"));
     if (bloqueados.length > 0) {
       toast.error(`${bloqueados.length} agendamento(s) não podem ser excluídos (já pagos ou em atendimento). Desmarque-os.`);
       return;
@@ -1063,7 +1063,7 @@ function AgendaPage() {
       toast.error(`${atendidos.length} paciente(s) já atendido(s) não podem ser reagendados. Desmarque-os.`);
       return;
     }
-    const validos = itens.filter(i => normalizar(i.paciente_nome) !== "disponivel");
+    const validos = itens.filter(i => !isSlotLivre(i.paciente_nome));
     if (validos.length === 0) {
       toast.info("Nenhum paciente válido para reagendar (todas as fichas selecionadas estão vazias).");
       return;
@@ -1086,7 +1086,7 @@ function AgendaPage() {
     const ids = reagLoteIds ?? [];
     if (ids.length === 0 || reagLoteSalvando) return;
     if (!slot.medico_id) { toast.error("Slot sem médico definido."); return; }
-    if (normalizar(slot.paciente_nome) !== "disponivel") {
+    if (!isSlotLivre(slot.paciente_nome)) {
       toast.error("Esse horário não está disponível. Escolha um slot DISPONÍVEL.");
       return;
     }
@@ -1099,7 +1099,7 @@ function AgendaPage() {
       .limit(1000);
     if (eFontes) { toast.error(eFontes.message); return; }
     const fontes = ((fontesRaw ?? []) as Array<Agendamento>)
-      .filter(a => a.status !== "realizado" && normalizar(a.paciente_nome) !== "disponivel")
+      .filter(a => a.status !== "realizado" && !isSlotLivre(a.paciente_nome))
       .sort((a, b) => new Date(a.inicio).getTime() - new Date(b.inicio).getTime());
     if (fontes.length === 0) { toast.error("Nenhum paciente selecionado."); return; }
 
@@ -1129,7 +1129,7 @@ function AgendaPage() {
     const candidatos = destino
       .slice(fichaInicial - 1)
       .filter(s => !idsFonte.has(s.id));
-    const livres = candidatos.filter(s => normalizar(s.paciente_nome) === "disponivel");
+    const livres = candidatos.filter(s => isSlotLivre(s.paciente_nome));
     if (livres.length < fontes.length) {
       toast.error(
         `Não há horários livres suficientes a partir da ficha ${String(fichaInicial).padStart(3, "0")} `
