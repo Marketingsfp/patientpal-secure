@@ -423,6 +423,10 @@ function ProcedimentosPage() {
   const [convValores, setConvValores] = useState<Map<string, ConvValor>>(new Map());
   // Formulário do diálogo: convenio_id -> { dinheiro, outros } (strings)
   const [formConvValores, setFormConvValores] = useState<Record<string, { dinheiro: string; outros: string }>>({});
+  // Convenios cujo valor foi editado manualmente no diálogo (não recalcula automaticamente).
+  const [formConvManual, setFormConvManual] = useState<Record<string, boolean>>({});
+  // Regras de preço por convênio
+  const [regras, setRegras] = useState<CbRegra[]>([]);
 
   const loadConvenios = async () => {
     if (!clinicaAtual) return;
@@ -453,12 +457,24 @@ function ProcedimentosPage() {
     setConvValores(m);
   };
 
+  const loadRegras = async () => {
+    if (!clinicaAtual) return;
+    const { data, error } = await (supabase as any)
+      .from("cb_convenio_regras")
+      .select("id,convenio_id,especialidade_id,tipo,modo,valor,percentual,prioridade,ativo")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("ativo", true);
+    if (error) { toast.error(error.message); return; }
+    setRegras((data ?? []) as CbRegra[]);
+  };
+
   useEffect(() => {
     void load();
     void loadCartoes();
     void loadVincEsp();
     void loadConvenios();
     void loadConvValores();
+    void loadRegras();
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [clinicaAtual?.clinica_id]);
 
