@@ -71,16 +71,31 @@ function ClientesPage() {
 
   const [fotoSigned, setFotoSigned] = useState<Record<string, string>>({});
 
-  const load = async () => {
+  const load = async (termo: string = "") => {
     if (!clinicaAtual) return;
     setLoading(true);
+    let query = supabase
+      .from("pacientes")
+      .select("id,nome,cpf,telefone,email,data_nascimento,ativo,cidade,estado,created_at,foto_url,codigo_prontuario")
+      .eq("clinica_id", clinicaAtual.clinica_id);
+    const q = termo.trim();
+    if (q) {
+      const like = `%${q}%`;
+      const dataIso = /^\d{2}\/\d{2}\/\d{4}$/.test(q)
+        ? q.split("/").reverse().join("-")
+        : null;
+      const ors = [
+        `nome.ilike.${like}`,
+        `cpf.ilike.${like}`,
+        `telefone.ilike.${like}`,
+        `email.ilike.${like}`,
+        `codigo_prontuario.ilike.${like}`,
+      ];
+      if (dataIso) ors.push(`data_nascimento.eq.${dataIso}`);
+      query = query.or(ors.join(","));
+    }
     const [{ data, error }, { count, error: countError }] = await Promise.all([
-      supabase
-        .from("pacientes")
-        .select("id,nome,cpf,telefone,email,data_nascimento,ativo,cidade,estado,created_at,foto_url,codigo_prontuario")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .order("codigo_prontuario", { ascending: false, nullsFirst: false })
-        .limit(100),
+      query.order("nome", { ascending: true }).limit(500),
       supabase
         .from("pacientes")
         .select("id", { count: "exact", head: true })
@@ -92,7 +107,15 @@ function ClientesPage() {
     setItems((data ?? []) as any);
   };
 
-  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clinicaAtual?.clinica_id]);
+  useEffect(() => { void load(busca); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clinicaAtual?.clinica_id]);
+
+  // Debounced server-side search
+  useEffect(() => {
+    if (!clinicaAtual) return;
+    const t = setTimeout(() => { void load(busca); }, 300);
+    return () => clearTimeout(t);
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [busca, clinicaAtual?.clinica_id]);
 
   useEffect(() => {
     const paths = items.filter(p => p.foto_url).map(p => p.foto_url as string);
@@ -109,20 +132,7 @@ function ClientesPage() {
     })();
   }, [items]);
 
-  const filtrados = useMemo(() => {
-    const q = busca.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter(p =>
-      p.nome.toLowerCase().includes(q) ||
-      (p.cpf ?? "").toLowerCase().includes(q) ||
-      (p.telefone ?? "").toLowerCase().includes(q) ||
-      (p.email ?? "").toLowerCase().includes(q) ||
-      (p.numero_pasta ?? "").toLowerCase().includes(q) ||
-      (p.codigo_prontuario ?? "").toLowerCase().includes(q) ||
-      (p.data_nascimento ?? "").toLowerCase().includes(q) ||
-      (p.data_nascimento ? p.data_nascimento.split("-").reverse().join("/") : "").includes(q)
-    );
-  }, [items, busca]);
+  const filtrados = items;
 
   return (
     <div className="space-y-6">
@@ -270,7 +280,7 @@ function ClientesPage() {
               paciente={null}
               stickyFooter
               onCancel={() => setOpenNovo(false)}
-              onSaved={() => { setOpenNovo(false); void load(); }}
+              onSaved={() => { setOpenNovo(false); void load(busca); }}
             />
           )}
         </DialogContent>
