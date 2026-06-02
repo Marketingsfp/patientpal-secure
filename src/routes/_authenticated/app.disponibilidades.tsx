@@ -39,7 +39,7 @@ function isFeriadoOuDomingo(d: Date): boolean {
 }
 
 interface Disp { id: string; medico_id: string; dia_semana: number; hora_inicio: string; hora_fim: string; observacoes: string | null; limite_pacientes: number | null; intervalo_min: number | null }
-interface Medico { id: string; nome: string; duracao_consulta_min: number | null }
+interface Medico { id: string; nome: string; duracao_consulta_min: number | null; procedimento_padrao_id: string | null; procedimento_padrao_nome: string | null; especialidade_nome: string | null }
 
 function Page() {
   const { clinicaAtual } = useClinica();
@@ -57,10 +57,19 @@ function Page() {
   const load = async () => {
     if (!clinicaAtual) return;
     const [m, d] = await Promise.all([
-      supabase.from("medicos").select("id, nome, duracao_consulta_min").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
+      supabase.from("medicos").select("id, nome, duracao_consulta_min, procedimento_padrao_id, procedimento:procedimentos!medicos_procedimento_padrao_id_fkey(nome), especialidade:especialidades(nome)" as never).eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("medico_disponibilidades").select("id, medico_id, dia_semana, hora_inicio, hora_fim, observacoes, limite_pacientes, intervalo_min" as never).eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("dia_semana").order("hora_inicio"),
     ]);
-    setMedicos(((m.data as unknown) as Medico[]) ?? []);
+    type RawMedico = { id: string; nome: string; duracao_consulta_min: number | null; procedimento_padrao_id: string | null; procedimento?: { nome: string | null } | null; especialidade?: { nome: string | null } | null };
+    const rawList = ((m.data as unknown) as RawMedico[]) ?? [];
+    setMedicos(rawList.map((r) => ({
+      id: r.id,
+      nome: r.nome,
+      duracao_consulta_min: r.duracao_consulta_min,
+      procedimento_padrao_id: r.procedimento_padrao_id,
+      procedimento_padrao_nome: r.procedimento?.nome ?? null,
+      especialidade_nome: r.especialidade?.nome ?? null,
+    })));
     setDisps(((d.data as unknown) as Disp[]) ?? []);
   };
 
