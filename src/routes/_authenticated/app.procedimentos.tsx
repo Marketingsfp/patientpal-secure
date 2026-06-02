@@ -58,6 +58,8 @@ interface Cartao {
   percentual_desconto: number;
   ativo: boolean;
 }
+interface CbConvenio { id: string; nome: string; ativo: boolean }
+interface ConvValor { valor_dinheiro: number; valor_outros: number }
 
 const TIPO_COR_MAP: Record<string, string> = {
   consulta: "bg-primary/10 text-primary",
