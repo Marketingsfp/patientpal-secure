@@ -58,7 +58,7 @@ type Agendamento = {
   observacoes: string | null;
   data_pagamento?: string | null;
 };
-type Medico = { id: string; nome: string; sexo?: string | null; usa_sistema?: boolean; procedimento_padrao_id?: string | null };
+type Medico = { id: string; nome: string; sexo?: string | null; usa_sistema?: boolean; procedimento_padrao_id?: string | null; procedimento_padrao_nome?: string | null; especialidade_nome?: string | null };
 type RecursoEnf = { id: string; nome: string };
 type Especialidade = { id: string; nome: string };
 type Paciente = { id: string; nome: string };
@@ -642,7 +642,7 @@ function AgendaPage() {
   const loadRef = async () => {
     if (!clinicaAtual) return;
     const [m, p, e, me, pr, sr, mc, mp, er, erp] = await Promise.all([
-      supabase.from("medicos").select("id,nome,sexo,usa_sistema,procedimento_padrao_id").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
+      supabase.from("medicos").select("id,nome,sexo,usa_sistema,procedimento_padrao_id,procedimento:procedimentos!medicos_procedimento_padrao_id_fkey(nome),especialidade:especialidades(nome)" as never).eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("pacientes").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome").limit(500),
       supabase.from("especialidades").select("id,nome").order("nome"),
       supabase.from("medico_especialidades").select("medico_id,especialidade_id"),
@@ -653,7 +653,13 @@ function AgendaPage() {
       supabase.from("enfermagem_recursos").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("enfermagem_recurso_procedimentos").select("recurso_id,procedimento_id"),
     ]);
-    const medicosBase = ((m.data ?? []) as Medico[]).map((x) => ({ ...x, __recurso: false }));
+    type RawMedicoAgenda = Medico & { procedimento?: { nome: string | null } | null; especialidade?: { nome: string | null } | null };
+    const medicosBase = (((m.data ?? []) as unknown) as RawMedicoAgenda[]).map((x) => ({
+      ...x,
+      procedimento_padrao_nome: x.procedimento_padrao_nome ?? x.procedimento?.nome ?? null,
+      especialidade_nome: x.especialidade_nome ?? x.especialidade?.nome ?? null,
+      __recurso: false,
+    }));
     let recursosArr = ((er.data ?? []) as RecursoEnf[]);
     // Se o usuário logado é enfermeiro, restringe agendas àquelas em que foi liberado
     if (clinicaAtual.role === "enfermeiro" && user?.id) {
@@ -759,7 +765,7 @@ function AgendaPage() {
       procOpcoesMap.get(r.recurso_id)!.push(proc);
     }
     setProcOpcoesPorMedico(procOpcoesMap);
-    const medicosIds = new Set(((m.data ?? []) as Medico[]).map((x) => x.id));
+    const medicosIds = new Set((((m.data ?? []) as unknown) as Medico[]).map((x) => x.id));
     const nm = new Map<string, Set<string>>();
     for (const r of (mc.data ?? []) as Array<{ medico_id: string; nome: string }>) {
       if (!r.medico_id || !medicosIds.has(r.medico_id)) continue;
@@ -837,6 +843,23 @@ function AgendaPage() {
       (p) => (ids?.has(p.id) ?? false) || (nomes?.has(normalizar(p.nome)) ?? false),
     );
     return lista.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" }));
+  };
+
+  const procedimentoPadraoDoMedico = (medicoId: string | null | undefined) => {
+    if (!medicoId) return "";
+    const med = medicos.find((m) => m.id === medicoId);
+    if (!med?.procedimento_padrao_id) return "";
+    return med.procedimento_padrao_nome
+      ?? procedimentosList.find((p) => p.id === med.procedimento_padrao_id)?.nome
+      ?? "";
+  };
+
+  const procedimentoEfetivo = (medicoId: string | null | undefined, procedimento: string | null | undefined) => {
+    const atual = (procedimento ?? "").trim();
+    const med = medicoId ? medicos.find((m) => m.id === medicoId) : null;
+    const padrao = procedimentoPadraoDoMedico(medicoId);
+    if (padrao && (!atual || normalizar(atual) === normalizar(med?.especialidade_nome ?? ""))) return padrao;
+    return atual;
   };
 
   // Atualiza inline o procedimento de um agendamento (do badge na coluna Serviço)
@@ -1164,7 +1187,7 @@ function AgendaPage() {
       paciente_id: "",
       medico_id: a.medico_id ?? "",
       inicio: toLocalInput(a.inicio), fim: toLocalInput(a.fim),
-      procedimento: a.procedimento ?? "CONSULTA",
+      procedimento: procedimentoEfetivo(a.medico_id, a.procedimento) || "CONSULTA",
       status: "agendado",
       observacoes: a.observacoes ?? "",
       data_pagamento: a.data_pagamento ?? "",
@@ -1181,7 +1204,7 @@ function AgendaPage() {
       paciente_id: a.paciente_id ?? "",
       medico_id: a.medico_id ?? "",
       inicio: toLocalInput(a.inicio), fim: toLocalInput(a.fim),
-      procedimento: a.procedimento ?? "",
+      procedimento: procedimentoEfetivo(a.medico_id, a.procedimento),
       status: a.status,
       observacoes: a.observacoes ?? "",
       data_pagamento: a.data_pagamento ?? "",
@@ -1257,7 +1280,7 @@ function AgendaPage() {
       enfermagem_recurso_id: ehRecurso ? form.medico_id : null,
       inicio: new Date(form.inicio).toISOString(),
       fim: new Date(form.fim).toISOString(),
-      procedimento: form.procedimento.trim() || null,
+      procedimento: procedimentoEfetivo(form.medico_id, form.procedimento) || null,
       status: form.status,
       observacoes: form.observacoes.trim() || null,
       data_pagamento: form.data_pagamento ? form.data_pagamento : null,
@@ -1804,14 +1827,14 @@ function AgendaPage() {
                          const medico_id = v === "none" ? "" : v;
                          const fim = f.inicio ? calcFimAuto(f.inicio, medico_id) : f.fim;
                          // Pré-preenche o serviço com o procedimento padrão do médico (se houver)
-                         // e só se ainda não houver um serviço escolhido — não sobrescreve edição manual.
+                         // e substitui apenas serviço vazio ou herdado da especialidade antiga.
                          let procedimento = f.procedimento;
-                         if (medico_id && !procedimento) {
+                         if (medico_id) {
                            const med = medicos.find((m) => m.id === medico_id);
-                           const padraoId = med?.procedimento_padrao_id;
-                           if (padraoId) {
-                             const proc = procedimentosList.find((p) => p.id === padraoId);
-                             if (proc) procedimento = proc.nome;
+                           const padrao = procedimentoPadraoDoMedico(medico_id);
+                           const deveAplicarPadrao = !procedimento || normalizar(procedimento) === normalizar(med?.especialidade_nome ?? "");
+                           if (padrao && deveAplicarPadrao) {
+                             procedimento = padrao;
                            }
                          }
                          return { ...f, medico_id, fim, procedimento };
@@ -2476,7 +2499,7 @@ function AgendaPage() {
                   </TableCell>
                   <TableCell>
                     <ProcedimentoCell
-                      valor={a.procedimento}
+                      valor={procedimentoEfetivo(a.medico_id, a.procedimento)}
                       opcoes={opcoesProcedimentoMedico(a.medico_id)}
                       disabled={normalizar(a.paciente_nome) === "disponivel"}
                       onChange={(novo) => atualizarProcedimento(a, novo)}
