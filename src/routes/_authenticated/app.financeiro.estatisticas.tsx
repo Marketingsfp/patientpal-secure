@@ -23,18 +23,20 @@ function Page() {
       setLoading(true);
       const ini = new Date(); ini.setDate(1);
       const since = ini.toISOString().slice(0, 10);
-      const [lancs, atend, notas] = await Promise.all([
-        supabase.from("fin_lancamentos").select("tipo, valor, status").eq("clinica_id", clinicaAtual.clinica_id).gte("data", since),
+      const hoje = new Date().toISOString().slice(0, 10);
+      const [resumoRes, atend, notas] = await Promise.all([
+        supabase.rpc("fin_resumo_periodo", { p_clinica: clinicaAtual.clinica_id, p_ini: since, p_fim: hoje }),
         supabase.from("fin_atendimentos").select("valor_total").eq("clinica_id", clinicaAtual.clinica_id).gte("data", since),
         supabase.from("fin_notas_pacientes").select("id", { count: "exact", head: true }).eq("clinica_id", clinicaAtual.clinica_id).gte("data_emissao", since),
       ]);
       let r = 0, d = 0, p = 0;
-      (lancs.data ?? []).forEach((l) => {
-        if (l.status === "pendente") p += Number(l.valor);
-        else if (l.status !== "cancelado") {
-          if (l.tipo === "receita") r += Number(l.valor); else d += Number(l.valor);
+      for (const row of ((resumoRes.data ?? []) as Array<{ tipo: string; status: string; total: number }>)) {
+        const v = Number(row.total) || 0;
+        if (row.status === "pendente") p += v;
+        else if (row.status !== "cancelado") {
+          if (row.tipo === "receita") r += v; else if (row.tipo === "despesa") d += v;
         }
-      });
+      }
       const totA = (atend.data ?? []).reduce((s, a) => s + Number(a.valor_total), 0);
       const cntA = (atend.data ?? []).length;
       setStats({
