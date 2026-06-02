@@ -57,8 +57,10 @@ type Agendamento = {
   status: Status;
   observacoes: string | null;
   data_pagamento?: string | null;
+  medico_nome?: string | null;
+  medico_sexo?: string | null;
 };
-type Medico = { id: string; nome: string; sexo?: string | null; usa_sistema?: boolean; procedimento_padrao_id?: string | null; procedimento_padrao_nome?: string | null; especialidade_nome?: string | null };
+type Medico = { id: string; nome: string; sexo?: string | null; usa_sistema?: boolean; especialidade_id?: string | null; procedimento_padrao_id?: string | null; procedimento_padrao_nome?: string | null; especialidade_nome?: string | null };
 type RecursoEnf = { id: string; nome: string };
 type Especialidade = { id: string; nome: string };
 type Paciente = { id: string; nome: string };
@@ -522,7 +524,7 @@ function AgendaPage() {
     setLoading(true);
     let q = supabase
       .from("agendamentos")
-      .select("id,paciente_nome,paciente_id,medico_id,enfermagem_recurso_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa")
+      .select("id,paciente_nome,paciente_id,medico_id,enfermagem_recurso_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,medico:medicos(nome,sexo)" as never)
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("inicio", { ascending: false });
     // "agendado" agora significa "qualquer ficha com paciente alocado",
@@ -559,19 +561,22 @@ function AgendaPage() {
     if (error) { toast.error(error.message); return; }
     // Recursos de enfermagem aparecem como "médicos virtuais": mapeamos o
     // enfermagem_recurso_id no campo medico_id para reuso de toda a UI.
-    const mapped = ((data ?? []) as Array<Agendamento & { enfermagem_recurso_id?: string | null }>).map((a) => ({
+    const mapped = (((data ?? []) as unknown) as Array<Agendamento & { enfermagem_recurso_id?: string | null; medico?: { nome: string | null; sexo: string | null } | null }>).map((a) => ({
       ...a,
       medico_id: a.medico_id ?? a.enfermagem_recurso_id ?? null,
+      medico_nome: a.medico_nome ?? a.medico?.nome ?? null,
+      medico_sexo: a.medico_sexo ?? a.medico?.sexo ?? null,
     }));
     setItems(mapped as Agendamento[]);
     setPage(1);
     setSelecionados(new Set());
-    setEtapaMap(new Map(((data ?? []) as Array<{ id: string; fluxo_etapa?: string | null }>)
+    const agendaRows = (((data ?? []) as unknown) as Array<Agendamento & { fluxo_etapa?: string | null }>);
+    setEtapaMap(new Map(agendaRows
       .map((r) => [r.id, r.fluxo_etapa ?? "aguardando_recepcao"] as [string, string])));
     // Busca data_nascimento dos pacientes para exibir ícone de idade
     const pacIds = Array.from(new Set(
-      (data ?? [])
-        .map((a: any) => a.paciente_id as string | null)
+      agendaRows
+        .map((a) => a.paciente_id as string | null)
         .filter((x): x is string => !!x),
     ));
     if (pacIds.length) {
@@ -605,12 +610,12 @@ function AgendaPage() {
       setConvenioMap(new Map());
     }
     // Marca agendamentos pagos (receita vinculada em fin_lancamentos)
-    const ids = (data ?? []).map((a) => a.id);
+    const ids = agendaRows.map((a) => a.id);
     // Fichas DISPONÍVEIS não podem ser exibidas como "Pago" — ignoramos
     // qualquer lançamento órfão que tenha ficado vinculado a uma ficha
     // que foi posteriormente liberada por um reagendamento.
     const idsComPaciente = new Set(
-      ((data ?? []) as Array<{ id: string; paciente_nome: string }>)
+      agendaRows
         .filter((a) => normalizar(a.paciente_nome) !== "disponivel")
         .map((a) => a.id),
     );
@@ -642,7 +647,7 @@ function AgendaPage() {
   const loadRef = async () => {
     if (!clinicaAtual) return;
     const [m, p, e, me, pr, sr, mc, mp, er, erp] = await Promise.all([
-      supabase.from("medicos").select("id,nome,sexo,usa_sistema,procedimento_padrao_id,procedimento:procedimentos!medicos_procedimento_padrao_id_fkey(nome),especialidade:especialidades(nome)" as never).eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
+      supabase.from("medicos").select("id,nome,sexo,usa_sistema,especialidade_id,procedimento_padrao_id").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("pacientes").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome").limit(500),
       supabase.from("especialidades").select("id,nome").order("nome"),
       supabase.from("medico_especialidades").select("medico_id,especialidade_id"),
@@ -653,11 +658,18 @@ function AgendaPage() {
       supabase.from("enfermagem_recursos").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("enfermagem_recurso_procedimentos").select("recurso_id,procedimento_id"),
     ]);
-    type RawMedicoAgenda = Medico & { procedimento?: { nome: string | null } | null; especialidade?: { nome: string | null } | null };
+    const todos = Array.isArray(pr) ? pr : [];
+    const procedimentosPorId = new Map(
+      todos.map((p) => [p.id, { id: p.id, nome: p.nome, grupo: p.grupo ?? null }]),
+    );
+    const especialidadesPorId = new Map<string, string>(
+      ((e.data ?? []) as Especialidade[]).map((x) => [x.id, x.nome]),
+    );
+    type RawMedicoAgenda = Medico;
     const medicosBase = (((m.data ?? []) as unknown) as RawMedicoAgenda[]).map((x) => ({
       ...x,
-      procedimento_padrao_nome: x.procedimento_padrao_nome ?? x.procedimento?.nome ?? null,
-      especialidade_nome: x.especialidade_nome ?? x.especialidade?.nome ?? null,
+      procedimento_padrao_nome: x.procedimento_padrao_id ? procedimentosPorId.get(x.procedimento_padrao_id)?.nome ?? null : null,
+      especialidade_nome: x.especialidade_id ? especialidadesPorId.get(x.especialidade_id) ?? null : null,
       __recurso: false,
     }));
     let recursosArr = ((er.data ?? []) as RecursoEnf[]);
@@ -680,7 +692,6 @@ function AgendaPage() {
     setMedicos([...medicosBase, ...recursosComoMedicos] as Medico[]);
     setPacientes((p.data ?? []) as Paciente[]);
     setEspecialidades((e.data ?? []) as Especialidade[]);
-    const todos = Array.isArray(pr) ? pr : [];
     {
       const ex = todos.filter((x) => x.tipo === "exame");
       const vistos = new Set<string>();
@@ -694,9 +705,6 @@ function AgendaPage() {
       setExames(unicos);
     }
     setProcedimentosList(todos.map(({ id, nome }) => ({ id, nome })));
-    const procedimentosPorId = new Map(
-      todos.map((p) => [p.id, { id: p.id, nome: p.nome, grupo: p.grupo ?? null }]),
-    );
     const map = new Map<string, Set<string>>();
     for (const r of (me.data ?? []) as Array<{ medico_id: string; especialidade_id: string }>) {
       if (!map.has(r.medico_id)) map.set(r.medico_id, new Set());
@@ -716,9 +724,6 @@ function AgendaPage() {
     }
     const procOpcoesMap = new Map<string, { id: string; nome: string }[]>();
     const procOpcoesVistos = new Map<string, Set<string>>();
-    const especialidadesPorId = new Map<string, string>(
-      ((e.data ?? []) as Especialidade[]).map((x) => [x.id, x.nome]),
-    );
     // Serviços vinculados ao médico pela aba "Especialidades" do cadastro do médico.
     // Esta é a fonte principal e preserva a mesma ordem exibida no cadastro do médico.
     for (const r of (Array.isArray(mp) ? mp : []) as MedicoProcedimentoRef[]) {
@@ -1613,6 +1618,11 @@ function AgendaPage() {
     if (m.nome.startsWith("🩺")) return m.nome;
     return `${prefixoMedico(m.sexo)} ${m.nome}`;
   };
+  const medicoNomeAgendamento = (a: Agendamento) => {
+    const m = medicos.find((x) => x.id === a.medico_id);
+    if (m) return m.nome.startsWith("🩺") ? m.nome : `${prefixoMedico(m.sexo)} ${m.nome}`;
+    return a.medico_nome ? `${prefixoMedico(a.medico_sexo)} ${a.medico_nome}` : "—";
+  };
   const fmtHora = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   const fmtData = (iso: string) => {
     const d = new Date(iso);
@@ -1734,7 +1744,7 @@ function AgendaPage() {
                   dia: fmtDiaSemana(a.inicio),
                   inicio: fmtHora(a.inicio),
                   fim: fmtHora(a.fim),
-                  profissional: medicoNome(a.medico_id),
+                  profissional: medicoNomeAgendamento(a),
                   paciente: a.paciente_nome,
                   procedimento: a.procedimento ?? "CONSULTA",
                   status: a.status,
@@ -2440,9 +2450,7 @@ function AgendaPage() {
                   <TableCell className="pr-1 align-middle max-w-[220px]">
                     {(() => {
                       const m = medicos.find((x) => x.id === a.medico_id);
-                      const label = m
-                        ? (m.nome.startsWith("🩺") ? m.nome : `${prefixoMedico(m.sexo)} ${m.nome}`)
-                        : "—";
+                      const label = medicoNomeAgendamento(a);
                       const manual = m && m.usa_sistema === false && !recursoIds.has(m.id);
                       return (
                         <div className="flex items-center gap-1 min-w-0">
