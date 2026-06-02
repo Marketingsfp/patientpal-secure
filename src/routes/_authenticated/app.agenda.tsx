@@ -58,7 +58,7 @@ type Agendamento = {
   observacoes: string | null;
   data_pagamento?: string | null;
 };
-type Medico = { id: string; nome: string; sexo?: string | null; usa_sistema?: boolean; procedimento_padrao_id?: string | null };
+type Medico = { id: string; nome: string; sexo?: string | null; usa_sistema?: boolean; procedimento_padrao_id?: string | null; procedimento_padrao_nome?: string | null; especialidade_nome?: string | null };
 type RecursoEnf = { id: string; nome: string };
 type Especialidade = { id: string; nome: string };
 type Paciente = { id: string; nome: string };
@@ -642,7 +642,7 @@ function AgendaPage() {
   const loadRef = async () => {
     if (!clinicaAtual) return;
     const [m, p, e, me, pr, sr, mc, mp, er, erp] = await Promise.all([
-      supabase.from("medicos").select("id,nome,sexo,usa_sistema,procedimento_padrao_id").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
+      supabase.from("medicos").select("id,nome,sexo,usa_sistema,procedimento_padrao_id,procedimento:procedimentos!medicos_procedimento_padrao_id_fkey(nome),especialidade:especialidades(nome)" as never).eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("pacientes").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome").limit(500),
       supabase.from("especialidades").select("id,nome").order("nome"),
       supabase.from("medico_especialidades").select("medico_id,especialidade_id"),
@@ -653,7 +653,13 @@ function AgendaPage() {
       supabase.from("enfermagem_recursos").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("enfermagem_recurso_procedimentos").select("recurso_id,procedimento_id"),
     ]);
-    const medicosBase = ((m.data ?? []) as Medico[]).map((x) => ({ ...x, __recurso: false }));
+    type RawMedicoAgenda = Medico & { procedimento?: { nome: string | null } | null; especialidade?: { nome: string | null } | null };
+    const medicosBase = (((m.data ?? []) as unknown) as RawMedicoAgenda[]).map((x) => ({
+      ...x,
+      procedimento_padrao_nome: x.procedimento_padrao_nome ?? x.procedimento?.nome ?? null,
+      especialidade_nome: x.especialidade_nome ?? x.especialidade?.nome ?? null,
+      __recurso: false,
+    }));
     let recursosArr = ((er.data ?? []) as RecursoEnf[]);
     // Se o usuário logado é enfermeiro, restringe agendas àquelas em que foi liberado
     if (clinicaAtual.role === "enfermeiro" && user?.id) {
