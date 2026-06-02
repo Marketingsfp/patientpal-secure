@@ -109,7 +109,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     a.medico_id
       ? supabase
           .from("medicos")
-          .select("nome")
+          .select("nome, especialidade:especialidades(nome)")
           .eq("id", a.medico_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
@@ -124,8 +124,9 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   ]);
 
   const paciente = pac.data as { nome: string; cpf: string | null; telefone: string | null; data_nascimento: string | null } | null;
-  const medicoBasic = med.data as { nome: string } | null;
+  const medicoBasic = med.data as { nome: string; especialidade: { nome: string } | null } | null;
   const medicoNome = medicoBasic?.nome ?? "—";
+  const espNome = medicoBasic?.especialidade?.nome?.toUpperCase() ?? "";
   let medicoData: { tipo_repasse: string | null; percentual_repasse_padrao: number | null; valor_repasse_padrao: number | null } | null = null;
   if (a.medico_id) {
     try {
@@ -138,7 +139,8 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
 
   // Se já temos pagamento informado, usa ele; senão tenta tabela de procedimentos
   const valor = pagamento ? Number(pagamento.valor) : Number(procData?.valor_dinheiro_pix ?? 0);
-  const procNome = (a.procedimento || procData?.nome || "CONSULTA").toUpperCase();
+  const procNomeBase = (a.procedimento || procData?.nome || "CONSULTA").toUpperCase();
+  const procNome = espNome ? `${espNome} - ${procNomeBase}` : procNomeBase;
 
   // Ficha = sequência do dia (placeholder simples baseado nos minutos)
   const inicioDt = new Date(a.inicio);
@@ -160,7 +162,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
       .select("nome, tipo_repasse, percentual, valor, ativo")
       .eq("medico_id", a.medico_id)
       .eq("ativo", true);
-    const alvo = norm(procNome);
+    const alvo = norm(procNomeBase);
     const conv = (convs ?? []).find((c) => norm(c.nome) === alvo);
     if (conv) {
       if (conv.tipo_repasse === "valor" && conv.valor != null) {
@@ -464,9 +466,9 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     medicoIds.length > 0
       ? supabase
           .from("medicos")
-          .select("id, nome")
+          .select("id, nome, especialidade:especialidades(nome)")
           .in("id", medicoIds)
-      : Promise.resolve({ data: [] as Array<{ id: string; nome: string }> }),
+      : Promise.resolve({ data: [] as Array<{ id: string; nome: string; especialidade: { nome: string } | null }> }),
     medicoIds.length > 0
       ? supabase
           .from("medico_convenios")
@@ -482,9 +484,9 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   for (const r of ((repRes as any).data ?? []) as Array<{ id: string; tipo_repasse: string | null; percentual_repasse_padrao: number | null; valor_repasse_padrao: number | null }>) {
     repMap.set(r.id, r);
   }
-  const medById = new Map(((medsRes.data ?? []) as Array<{ id: string; nome: string }>).map((m) => {
+  const medById = new Map(((medsRes.data ?? []) as Array<{ id: string; nome: string; especialidade: { nome: string } | null }>).map((m) => {
     const r = repMap.get(m.id);
-    return [m.id, { id: m.id, nome: m.nome, tipo_repasse: r?.tipo_repasse ?? null, percentual_repasse_padrao: r?.percentual_repasse_padrao ?? null, valor_repasse_padrao: r?.valor_repasse_padrao ?? null }] as const;
+    return [m.id, { id: m.id, nome: m.nome, especialidadeNome: m.especialidade?.nome ?? null, tipo_repasse: r?.tipo_repasse ?? null, percentual_repasse_padrao: r?.percentual_repasse_padrao ?? null, valor_repasse_padrao: r?.valor_repasse_padrao ?? null }] as const;
   }));
   const convsByMedico = new Map<string, Array<{ nome: string; tipo_repasse: string | null; percentual: number | null; valor: number | null }>>();
   for (const cv of (convsRes.data ?? []) as Array<{ medico_id: string; nome: string; tipo_repasse: string | null; percentual: number | null; valor: number | null }>) {
@@ -499,8 +501,10 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   const grupos = new Map<string, Grupo>();
 
   for (const a of ags) {
-    const procNome = (a.procedimento || "CONSULTA").toUpperCase();
-    const proc = procByNome.get(normalizar(procNome));
+    const procNomeBase = (a.procedimento || "CONSULTA").toUpperCase();
+    const proc = procByNome.get(normalizar(procNomeBase));
+    const espNome = a.medico_id ? (medById.get(a.medico_id)?.especialidadeNome ?? null) : null;
+    const procNome = espNome ? `${espNome.toUpperCase()} - ${procNomeBase}` : procNomeBase;
     // Prioriza valor realmente pago (fin_lancamentos); cai para tabela de procedimentos.
     const valorPago = valorPagoByAg.get(a.id);
     const valor = valorPago != null && valorPago > 0
@@ -512,7 +516,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     if (a.medico_id) {
       const med = medById.get(a.medico_id);
       const convs = convsByMedico.get(a.medico_id) ?? [];
-      const alvo = normalizar(procNome);
+      const alvo = normalizar(procNomeBase);
       const conv = convs.find((cv) => normalizar(cv.nome) === alvo);
       if (conv) {
         if (conv.tipo_repasse === "valor" && conv.valor != null) {
