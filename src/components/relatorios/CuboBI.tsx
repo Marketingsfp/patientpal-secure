@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -637,8 +637,8 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
                         })()
                       : null;
                     return (
-                      <>
-                        <TableRow key={rl}>
+                      <Fragment key={rl}>
+                        <TableRow>
                           <TableCell className="font-medium">
                             <div className="flex items-center gap-1">
                               {cfg.subRowKey ? (
@@ -670,7 +670,7 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
                             <TableCell className="text-right text-sm font-medium">{fmt(subRows.totalByRow[sri])}</TableCell>
                           </TableRow>
                         )) : null}
-                      </>
+                      </Fragment>
                     );
                   })}
                   <TableRow className="bg-muted/40">
