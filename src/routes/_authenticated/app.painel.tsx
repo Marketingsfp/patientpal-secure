@@ -460,3 +460,80 @@ function SubGrid({ items }: { items: { label: string; value: string; pct?: strin
     </div>
   );
 }
+
+function MultiSelectFiltro({
+  label, placeholder, options, selected, onChange, busca, setBusca,
+}: {
+  label: string;
+  placeholder: string;
+  options: { value: string; label: string }[];
+  selected: string[];
+  onChange: (v: string[]) => void;
+  busca: string;
+  setBusca: (v: string) => void;
+}) {
+  const filtradas = busca.trim()
+    ? options.filter(o => o.label.toLowerCase().includes(busca.toLowerCase()))
+    : options;
+  const toggle = (v: string) => {
+    onChange(selected.includes(v) ? selected.filter(x => x !== v) : [...selected, v]);
+  };
+  const resumo = selected.length === 0
+    ? placeholder
+    : selected.length === 1
+      ? options.find(o => o.value === selected[0])?.label ?? "1 selecionado"
+      : `${selected.length} selecionados`;
+  return (
+    <div className="space-y-1">
+      <Label className="text-xs">{label}</Label>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="outline" className="w-56 justify-between font-normal">
+            <span className="flex items-center gap-2 truncate">
+              <Filter className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <span className="truncate">{resumo}</span>
+            </span>
+            {selected.length > 0 && (
+              <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-xs">{selected.length}</Badge>
+            )}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-72 p-0" align="end">
+          <div className="p-2 border-b">
+            <Input
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder={`Buscar ${label.toLowerCase()}...`}
+              className="h-8"
+            />
+          </div>
+          <div className="max-h-72 overflow-y-auto p-1">
+            {filtradas.length === 0 ? (
+              <p className="p-3 text-sm text-muted-foreground text-center">Nada encontrado.</p>
+            ) : (
+              filtradas.map(o => {
+                const checked = selected.includes(o.value);
+                return (
+                  <label
+                    key={o.value}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent cursor-pointer text-sm"
+                  >
+                    <Checkbox checked={checked} onCheckedChange={() => toggle(o.value)} />
+                    <span className="truncate">{o.label}</span>
+                  </label>
+                );
+              })
+            )}
+          </div>
+          {selected.length > 0 && (
+            <div className="p-2 border-t flex justify-end">
+              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => onChange([])}>
+                Limpar seleção
+              </Button>
+            </div>
+          )}
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
