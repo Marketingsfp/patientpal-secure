@@ -2481,6 +2481,7 @@ function AgendaPage() {
               <SelectContent>
                 <SelectItem value="todos">TODOS</SelectItem>
                 <SelectItem value="livres">Livres</SelectItem>
+                <SelectItem value="pago">Pago</SelectItem>
                 {(Object.keys(STATUS_LABEL) as Status[]).map(s => (
                   <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>
                 ))}
