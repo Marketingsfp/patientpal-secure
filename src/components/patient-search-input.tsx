@@ -32,6 +32,17 @@ interface PatientSearchInputProps {
  * qualquer tela nova (agendamentos, prontuário, financeiro, odontograma etc.).
  * Respeita o multi-tenancy (clinica_id) e o modo "Todas" do ClinicSwitcher.
  */
+// Remove acentos e normaliza para uppercase — os nomes são salvos assim
+// no banco (trigger uppercase_text_fields + strip_accents), então a busca
+// fica mais rápida e tolerante a "joão" / "JOAO" / "joao".
+function normalizarBusca(s: string) {
+  return (s ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .trim();
+}
+
 export function PatientSearchInput({
   value,
   onSelect,
@@ -75,7 +86,14 @@ export function PatientSearchInput({
       const myReq = ++reqIdRef.current;
       setLoading(true);
       const digits = term.replace(/\D/g, "");
-      const parts: string[] = [`nome.ilike.%${term}%`];
+      const termoSemAcento = normalizarBusca(term);
+      // Prioriza prefixo (rápido — usa índice btree em nome) tanto no
+      // início do nome quanto no início de qualquer parte (sobrenome).
+      // Ex.: "rodrigo" pega "RODRIGO ..." e "DAVI RODRIGO ...".
+      const parts: string[] = [
+        `nome.ilike.${termoSemAcento}%`,
+        `nome.ilike.% ${termoSemAcento}%`,
+      ];
       if (digits.length >= 3) {
         parts.push(`cpf.ilike.%${digits}%`);
         parts.push(`codigo_prontuario.ilike.%${digits}%`);
@@ -90,16 +108,26 @@ export function PatientSearchInput({
         .eq("ativo", true)
         .or(filter)
         .order("nome", { ascending: true })
-        .limit(20);
+        .limit(30);
       // Ignora respostas obsoletas (digitação rápida -> várias requests)
       if (myReq !== reqIdRef.current) return;
-      const rows = (data ?? []) as PatientOption[];
+      // Reordena: nomes que COMEÇAM com o termo aparecem primeiro
+      // (match de "primeiro nome" tem prioridade sobre meio/sobrenome).
+      const todas = (data ?? []) as PatientOption[];
+      const prefixo: PatientOption[] = [];
+      const meio: PatientOption[] = [];
+      for (const p of todas) {
+        const nomeNorm = normalizarBusca(p.nome ?? "");
+        if (nomeNorm.startsWith(termoSemAcento)) prefixo.push(p);
+        else meio.push(p);
+      }
+      const rows = [...prefixo, ...meio].slice(0, 20);
       // Cache simples (até 50 termos) para repetidos backspace/typing
       if (cacheRef.current.size > 50) cacheRef.current.clear();
       cacheRef.current.set(cacheKey, rows);
       setOptions(rows);
       setLoading(false);
-    }, 180);
+    }, 150);
     return () => clearTimeout(handle);
   }, [query, open, scope]);
 
