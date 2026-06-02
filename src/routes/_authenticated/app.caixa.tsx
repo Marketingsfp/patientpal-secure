@@ -46,6 +46,7 @@ interface Mov {
   id: string; sessao_id: string; user_id: string; tipo: MovTipo;
   valor: number; descricao: string | null; forma_pagamento: string | null;
   created_at: string;
+  lancamento_id?: string | null;
 }
 interface FilaCaixa {
   id: string;
