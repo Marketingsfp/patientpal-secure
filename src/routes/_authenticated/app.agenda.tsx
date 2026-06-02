@@ -1827,14 +1827,14 @@ function AgendaPage() {
                          const medico_id = v === "none" ? "" : v;
                          const fim = f.inicio ? calcFimAuto(f.inicio, medico_id) : f.fim;
                          // Pré-preenche o serviço com o procedimento padrão do médico (se houver)
-                         // e só se ainda não houver um serviço escolhido — não sobrescreve edição manual.
+                         // e substitui apenas serviço vazio ou herdado da especialidade antiga.
                          let procedimento = f.procedimento;
-                         if (medico_id && !procedimento) {
+                         if (medico_id) {
                            const med = medicos.find((m) => m.id === medico_id);
-                           const padraoId = med?.procedimento_padrao_id;
-                           if (padraoId) {
-                             const proc = procedimentosList.find((p) => p.id === padraoId);
-                             if (proc) procedimento = proc.nome;
+                           const padrao = procedimentoPadraoDoMedico(medico_id);
+                           const deveAplicarPadrao = !procedimento || normalizar(procedimento) === normalizar(med?.especialidade_nome ?? "");
+                           if (padrao && deveAplicarPadrao) {
+                             procedimento = padrao;
                            }
                          }
                          return { ...f, medico_id, fim, procedimento };
@@ -2499,7 +2499,7 @@ function AgendaPage() {
                   </TableCell>
                   <TableCell>
                     <ProcedimentoCell
-                      valor={a.procedimento}
+                      valor={procedimentoEfetivo(a.medico_id, a.procedimento)}
                       opcoes={opcoesProcedimentoMedico(a.medico_id)}
                       disabled={normalizar(a.paciente_nome) === "disponivel"}
                       onChange={(novo) => atualizarProcedimento(a, novo)}
