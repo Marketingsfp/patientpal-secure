@@ -25,6 +25,8 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 
+import { findRegra, computeValor, type CbRegra } from "@/lib/cb-regras";
+
 export const Route = createFileRoute("/_authenticated/app/procedimentos")({
   component: ProcedimentosPageWithTabs,
   head: () => ({ meta: [{ title: "Exames / Procedimentos — ClinicaOS" }] }),
