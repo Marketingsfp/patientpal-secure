@@ -45,6 +45,8 @@ const CUBOS: CubeSpec[] = [
       { key: "procedimento", label: "Serviço", kind: "string" },
       { key: "dia", label: "Dia", kind: "date" },
       { key: "mes", label: "Mês", kind: "string" },
+      { key: "ano", label: "Ano", kind: "string" },
+      { key: "mes_nome", label: "Mês (Jan-Dez)", kind: "string" },
       { key: "dia_semana", label: "Dia da semana", kind: "string" },
       { key: "hora", label: "Hora", kind: "string" },
       { key: "paciente", label: "Paciente", kind: "string" },
@@ -92,6 +94,8 @@ const CUBOS: CubeSpec[] = [
       { key: "paciente", label: "Paciente", kind: "string" },
       { key: "dia", label: "Dia", kind: "date" },
       { key: "mes", label: "Mês", kind: "string" },
+      { key: "ano", label: "Ano", kind: "string" },
+      { key: "mes_nome", label: "Mês (Jan-Dez)", kind: "string" },
       { key: "valor", label: "Valor (R$)", kind: "number" },
     ],
     load: async ({ clinicaId, ini, fim }) => {
@@ -133,6 +137,8 @@ const CUBOS: CubeSpec[] = [
       { key: "paciente", label: "Paciente", kind: "string" },
       { key: "dia", label: "Dia", kind: "date" },
       { key: "mes", label: "Mês", kind: "string" },
+      { key: "ano", label: "Ano", kind: "string" },
+      { key: "mes_nome", label: "Mês (Jan-Dez)", kind: "string" },
     ],
     load: async ({ clinicaId, ini, fim }) => {
       const { data, error } = await supabase
@@ -191,6 +197,8 @@ const CUBOS: CubeSpec[] = [
       { key: "paciente", label: "Paciente", kind: "string" },
       { key: "dia", label: "Dia", kind: "date" },
       { key: "mes", label: "Mês", kind: "string" },
+      { key: "ano", label: "Ano", kind: "string" },
+      { key: "mes_nome", label: "Mês (Jan-Dez)", kind: "string" },
       { key: "valor_final", label: "Valor final (R$)", kind: "number" },
       { key: "desconto", label: "Desconto (R$)", kind: "number" },
     ],
