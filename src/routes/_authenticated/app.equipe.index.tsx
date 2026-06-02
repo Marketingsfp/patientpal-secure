@@ -55,6 +55,7 @@ function EquipePage() {
   const [loading, setLoading] = useState(false);
   const [openChooser, setOpenChooser] = useState(false);
   const [busca, setBusca] = useState("");
+  const [medicoStatus, setMedicoStatus] = useState<"ativos" | "inativos" | "todos">("ativos");
   const [funcDialog, setFuncDialog] = useState<{ open: boolean; userId?: string | null }>({ open: false, userId: null });
   const [medicoDialog, setMedicoDialog] = useState<{ open: boolean; id: string | null }>({ open: false, id: null });
   const [enfDialog, setEnfDialog] = useState<{ open: boolean; userId?: string | null }>({ open: false, userId: null });
@@ -138,9 +139,14 @@ function EquipePage() {
   const funcsFiltrados = q
     ? funcionarios.filter((f) => f.nome.toLowerCase().includes(q) || f.role.toLowerCase().includes(q))
     : funcionarios;
+  const medicosPorStatus = medicos.filter((m) =>
+    medicoStatus === "todos" ? true : medicoStatus === "ativos" ? m.ativo : !m.ativo
+  );
   const medicosFiltrados = q
-    ? medicos.filter((m) => m.nome.toLowerCase().includes(q) || (m.crm ?? "").includes(q))
-    : medicos;
+    ? medicosPorStatus.filter((m) => m.nome.toLowerCase().includes(q) || (m.crm ?? "").includes(q))
+    : medicosPorStatus;
+  const medicosAtivosCount = medicos.filter((m) => m.ativo).length;
+  const medicosInativosCount = medicos.length - medicosAtivosCount;
   const enfermeirosFiltrados = q
     ? enfermeiros.filter((e) =>
         e.nome.toLowerCase().includes(q) ||
@@ -170,7 +176,7 @@ function EquipePage() {
             </TabsTrigger>
             <TabsTrigger value="medicos">
               <Stethoscope className="h-4 w-4 mr-2" /> Médicos
-              <Badge variant="secondary" className="ml-2">{medicos.length}</Badge>
+              <Badge variant="secondary" className="ml-2">{medicosAtivosCount}</Badge>
             </TabsTrigger>
             <TabsTrigger value="enfermagem">
               <HeartPulse className="h-4 w-4 mr-2" /> Enfermagem
@@ -225,6 +231,30 @@ function EquipePage() {
         </TabsContent>
 
         <TabsContent value="medicos" className="mt-4">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="text-sm text-muted-foreground mr-1">Mostrar:</span>
+            <Button
+              size="sm"
+              variant={medicoStatus === "ativos" ? "default" : "outline"}
+              onClick={() => setMedicoStatus("ativos")}
+            >
+              Ativos <Badge variant="secondary" className="ml-2">{medicosAtivosCount}</Badge>
+            </Button>
+            <Button
+              size="sm"
+              variant={medicoStatus === "inativos" ? "default" : "outline"}
+              onClick={() => setMedicoStatus("inativos")}
+            >
+              Inativos <Badge variant="secondary" className="ml-2">{medicosInativosCount}</Badge>
+            </Button>
+            <Button
+              size="sm"
+              variant={medicoStatus === "todos" ? "default" : "outline"}
+              onClick={() => setMedicoStatus("todos")}
+            >
+              Todos <Badge variant="secondary" className="ml-2">{medicos.length}</Badge>
+            </Button>
+          </div>
           {loading ? (
             <Card><CardContent className="py-12 text-center text-muted-foreground">Carregando…</CardContent></Card>
           ) : medicosFiltrados.length === 0 ? (
