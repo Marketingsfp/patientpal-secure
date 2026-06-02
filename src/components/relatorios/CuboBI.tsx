@@ -257,6 +257,27 @@ async function lookupEspecialidadePorMedico(
   return result;
 }
 
+function normalizeProcKey(s: string | null | undefined): string {
+  return (s ?? "").trim().toUpperCase();
+}
+
+async function lookupEspecialidadePorProcedimento(
+  clinicaId: string,
+  procNomes: Array<string | null | undefined>,
+): Promise<Map<string, string>> {
+  const unique = Array.from(new Set(procNomes.map(normalizeProcKey).filter((x) => x.length > 0)));
+  if (unique.length === 0) return new Map();
+  const { data } = await supabase
+    .from("procedimentos")
+    .select("nome, grupo")
+    .eq("clinica_id", clinicaId);
+  const map = new Map<string, string>();
+  for (const r of (data ?? []) as Array<{ nome: string; grupo: string | null }>) {
+    if (r.grupo) map.set(normalizeProcKey(r.nome), r.grupo);
+  }
+  return map;
+}
+
 function transformDate(isoStr: string | null, base: Record<string, any>) {
   if (!isoStr) return { ...base, dia: "", mes: "", dia_semana: "", hora: "" };
   const d = new Date(isoStr);
