@@ -119,7 +119,7 @@ export function ProcedimentoCell({ valor, opcoes, disabled, onChange }: Props) {
               onClick={() => escolher("")}
               className="mt-2 w-full text-xs text-rose-600 hover:bg-rose-50 border border-rose-200 rounded px-2 py-1"
             >
-              Limpar serviço (voltar para ULTRASSONOGRAFIA)
+              Limpar serviço (voltar ao padrão)
             </button>
           )}
         </div>
