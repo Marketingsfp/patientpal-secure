@@ -331,6 +331,7 @@ function AgendaPage() {
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [items, setItems] = useState<Agendamento[]>([]);
   const [pagosSet, setPagosSet] = useState<Set<string>>(new Set());
+  const [pagoInfoMap, setPagoInfoMap] = useState<Map<string, { valor: number; forma: string | null }>>(new Map());
   const [nascMap, setNascMap] = useState<Map<string, string | null>>(new Map());
   const [convenioMap, setConvenioMap] = useState<Map<string, string>>(new Map());
   const [etapaMap, setEtapaMap] = useState<Map<string, string>>(new Map());
@@ -630,23 +631,33 @@ function AgendaPage() {
       // quando há muitos agendamentos no dia.
       const CHUNK = 200;
       const pagosIds: string[] = [];
+      const infoMap = new Map<string, { valor: number; forma: string | null }>();
       for (let i = 0; i < ids.length; i += CHUNK) {
         const slice = ids.slice(i, i + CHUNK);
         const { data: pg, error: pgErr } = await supabase
           .from("fin_lancamentos")
-          .select("agendamento_id")
+          .select("agendamento_id, valor, forma_pagamento")
           .eq("clinica_id", clinicaAtual.clinica_id)
           .eq("tipo", "receita")
           .eq("status", "confirmado")
           .in("agendamento_id", slice);
         if (pgErr) continue;
-        ((pg ?? []) as Array<{ agendamento_id: string | null }>).forEach((r) => {
-          if (r.agendamento_id) pagosIds.push(r.agendamento_id);
+        ((pg ?? []) as Array<{ agendamento_id: string | null; valor: number | string | null; forma_pagamento: string | null }>).forEach((r) => {
+          if (!r.agendamento_id) return;
+          pagosIds.push(r.agendamento_id);
+          const prev = infoMap.get(r.agendamento_id);
+          const v = Number(r.valor ?? 0);
+          infoMap.set(r.agendamento_id, {
+            valor: (prev?.valor ?? 0) + v,
+            forma: prev?.forma ?? r.forma_pagamento ?? null,
+          });
         });
       }
       setPagosSet(new Set(pagosIds.filter((x) => idsComPaciente.has(x))));
+      setPagoInfoMap(infoMap);
     } else {
       setPagosSet(new Set());
+      setPagoInfoMap(new Map());
     }
   };
 
@@ -2565,7 +2576,14 @@ function AgendaPage() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        title={pagosSet.has(a.id) ? "Pago" : "Pagamento pendente"}
+                        title={(() => {
+                          if (!pagosSet.has(a.id)) return "Pagamento pendente";
+                          const info = pagoInfoMap.get(a.id);
+                          if (!info) return "Pago";
+                          const v = info.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+                          const f = info.forma ? info.forma.replace(/_/g, " ").toUpperCase() : "—";
+                          return `Pago • ${f} • ${v}`;
+                        })()}
                         onClick={() => cobrarAgendamento(a)}
                         className={`h-7 w-7 border-2 rounded-md shadow-sm ${pagosSet.has(a.id)
                           ? "bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-700 hover:text-white ring-2 ring-emerald-200"
