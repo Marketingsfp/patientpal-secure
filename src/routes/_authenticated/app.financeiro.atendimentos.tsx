@@ -422,13 +422,42 @@ function Page() {
   const pacMap = new Map(pacientes.map((p) => [p.id, p.nome]));
   const filteredItems = useMemo(() => {
     const q = norm(fPaciente.trim());
-    if (!q) return items;
-    return items.filter((a) => {
-      const nome = (a.paciente_id ? pacMap.get(a.paciente_id) : null) ?? a.paciente_nome_extra ?? "";
-      return norm(nome).includes(q);
-    });
+    const base = !q
+      ? items
+      : items.filter((a) => {
+          const nome = (a.paciente_id ? pacMap.get(a.paciente_id) : null) ?? a.paciente_nome_extra ?? "";
+          return norm(nome).includes(q);
+        });
+    const nomeDe = (a: Atend) =>
+      norm(((a.paciente_id ? pacMap.get(a.paciente_id) : null) ?? a.paciente_nome_extra ?? "").trim());
+    const grDe = (a: Atend) => a.agendamento_inicio ?? a.data ?? "";
+    const arr = [...base];
+    switch (fOrdem) {
+      case "data_asc":
+        arr.sort((a, b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : 0));
+        break;
+      case "gr":
+        // GR = ordem da agenda (data/hora do agendamento). Manuais vão para o fim.
+        arr.sort((a, b) => {
+          const ai = grDe(a); const bi = grDe(b);
+          if (a.origem === "agenda" && b.origem !== "agenda") return -1;
+          if (b.origem === "agenda" && a.origem !== "agenda") return 1;
+          return ai < bi ? -1 : ai > bi ? 1 : 0;
+        });
+        break;
+      case "paciente_az":
+        arr.sort((a, b) => nomeDe(a).localeCompare(nomeDe(b)));
+        break;
+      case "paciente_za":
+        arr.sort((a, b) => nomeDe(b).localeCompare(nomeDe(a)));
+        break;
+      case "data_desc":
+      default:
+        arr.sort((a, b) => (a.data < b.data ? 1 : a.data > b.data ? -1 : 0));
+    }
+    return arr;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, fPaciente, pacientes.length]);
+  }, [items, fPaciente, pacientes.length, fOrdem]);
   const totais = useMemo(() => filteredItems.reduce(
     (acc, a) => {
       acc.total += Number(a.valor_total) || 0;
