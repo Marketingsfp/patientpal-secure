@@ -51,16 +51,21 @@ const CUBOS: CubeSpec[] = [
     load: async ({ clinicaId, ini, fim }) => {
       const { data, error } = await supabase
         .from("agendamentos")
-        .select("inicio, status, procedimento, paciente_nome, medicos(nome), pacientes(nome)")
+        .select("inicio, status, procedimento, paciente_nome, medico_id, paciente_id")
         .eq("clinica_id", clinicaId)
         .gte("inicio", ini)
         .lte("inicio", fim + "T23:59:59");
       if (error) throw error;
-      return (data ?? []).map((r: any) => transformDate(r.inicio, {
+      const rows = (data ?? []) as any[];
+      const [medMap, pacMap] = await Promise.all([
+        lookupNames("medicos", rows.map((r) => r.medico_id)),
+        lookupNames("pacientes", rows.map((r) => r.paciente_id)),
+      ]);
+      return rows.map((r) => transformDate(r.inicio, {
         status: r.status ?? "—",
-        medico: r.medicos?.nome ?? "Sem médico",
+        medico: medMap.get(r.medico_id) ?? "Sem médico",
         procedimento: r.procedimento ?? "—",
-        paciente: r.pacientes?.nome ?? r.paciente_nome ?? "—",
+        paciente: pacMap.get(r.paciente_id) ?? r.paciente_nome ?? "—",
       }));
     },
   },
@@ -83,19 +88,26 @@ const CUBOS: CubeSpec[] = [
     load: async ({ clinicaId, ini, fim }) => {
       const { data, error } = await supabase
         .from("fin_lancamentos")
-        .select("data, tipo, valor, status, forma_pagamento, fin_categorias(nome), fin_contas(nome), pacientes(nome), medicos(nome)")
+        .select("data, tipo, valor, status, forma_pagamento, categoria_id, conta_id, paciente_id, medico_id")
         .eq("clinica_id", clinicaId)
         .gte("data", ini)
         .lte("data", fim);
       if (error) throw error;
-      return (data ?? []).map((r: any) => transformDate(r.data, {
+      const rows = (data ?? []) as any[];
+      const [catMap, contMap, pacMap, medMap] = await Promise.all([
+        lookupNames("fin_categorias", rows.map((r) => r.categoria_id)),
+        lookupNames("fin_contas", rows.map((r) => r.conta_id)),
+        lookupNames("pacientes", rows.map((r) => r.paciente_id)),
+        lookupNames("medicos", rows.map((r) => r.medico_id)),
+      ]);
+      return rows.map((r) => transformDate(r.data, {
         tipo: r.tipo ?? "—",
-        categoria: r.fin_categorias?.nome ?? "Sem categoria",
-        conta: r.fin_contas?.nome ?? "—",
+        categoria: catMap.get(r.categoria_id) ?? "Sem categoria",
+        conta: contMap.get(r.conta_id) ?? "—",
         forma_pagamento: r.forma_pagamento ?? "—",
         status: r.status ?? "—",
-        medico: r.medicos?.nome ?? "—",
-        paciente: r.pacientes?.nome ?? "—",
+        medico: medMap.get(r.medico_id) ?? "—",
+        paciente: pacMap.get(r.paciente_id) ?? "—",
         valor: Number(r.valor) || 0,
       }));
     },
@@ -113,14 +125,19 @@ const CUBOS: CubeSpec[] = [
     load: async ({ clinicaId, ini, fim }) => {
       const { data, error } = await supabase
         .from("prontuarios")
-        .select("data_atendimento, medicos(nome), pacientes(nome)")
+        .select("data_atendimento, medico_id, paciente_id")
         .eq("clinica_id", clinicaId)
         .gte("data_atendimento", ini)
         .lte("data_atendimento", fim + "T23:59:59");
       if (error) throw error;
-      return (data ?? []).map((r: any) => transformDate(r.data_atendimento, {
-        medico: r.medicos?.nome ?? "Sem médico",
-        paciente: r.pacientes?.nome ?? "—",
+      const rows = (data ?? []) as any[];
+      const [medMap, pacMap] = await Promise.all([
+        lookupNames("medicos", rows.map((r) => r.medico_id)),
+        lookupNames("pacientes", rows.map((r) => r.paciente_id)),
+      ]);
+      return rows.map((r) => transformDate(r.data_atendimento, {
+        medico: medMap.get(r.medico_id) ?? "Sem médico",
+        paciente: pacMap.get(r.paciente_id) ?? "—",
       }));
     },
   },
@@ -166,14 +183,16 @@ const CUBOS: CubeSpec[] = [
     load: async ({ clinicaId, ini, fim }) => {
       const { data, error } = await supabase
         .from("orcamentos")
-        .select("created_at, status, valor_final, desconto, pacientes(nome)")
+        .select("created_at, status, valor_final, desconto, paciente_id")
         .eq("clinica_id", clinicaId)
         .gte("created_at", ini)
         .lte("created_at", fim + "T23:59:59");
       if (error) throw error;
-      return (data ?? []).map((r: any) => transformDate(r.created_at, {
+      const rows = (data ?? []) as any[];
+      const pacMap = await lookupNames("pacientes", rows.map((r) => r.paciente_id));
+      return rows.map((r) => transformDate(r.created_at, {
         status: r.status ?? "—",
-        paciente: r.pacientes?.nome ?? "—",
+        paciente: pacMap.get(r.paciente_id) ?? "—",
         valor_final: Number(r.valor_final) || 0,
         desconto: Number(r.desconto) || 0,
       }));
@@ -182,6 +201,20 @@ const CUBOS: CubeSpec[] = [
 ];
 
 const DIAS_SEMANA = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+
+async function lookupNames(
+  table: "medicos" | "pacientes" | "fin_categorias" | "fin_contas",
+  ids: Array<string | null | undefined>,
+): Promise<Map<string, string>> {
+  const unique = Array.from(new Set(ids.filter((x): x is string => !!x)));
+  if (unique.length === 0) return new Map();
+  const { data } = await supabase.from(table).select("id, nome").in("id", unique);
+  const map = new Map<string, string>();
+  for (const r of (data ?? []) as Array<{ id: string; nome: string }>) {
+    map.set(r.id, r.nome);
+  }
+  return map;
+}
 
 function transformDate(isoStr: string | null, base: Record<string, any>) {
   if (!isoStr) return { ...base, dia: "", mes: "", dia_semana: "", hora: "" };
