@@ -605,8 +605,13 @@ function AgendaPage() {
     } else if (!statusEspecifico) {
       const inicio = new Date(`${dataRef}T00:00:00`).toISOString();
       const f = new Date(`${(dataFim ?? dataRef)}T00:00:00`);
-      if (!dataFim) f.setDate(f.getDate() + 30);
-      else f.setHours(23, 59, 59);
+      if (!dataFim) {
+        // Quando há busca por cliente, ampliamos a janela (o ILIKE no
+        // servidor já reduz o volume). Sem filtro, mantemos 30 dias.
+        f.setDate(f.getDate() + (termoCli.length >= 2 ? 365 : 30));
+      } else {
+        f.setHours(23, 59, 59);
+      }
       q = q.gte("inicio", inicio).lte("inicio", f.toISOString());
     }
     if (!statusEspecifico) {
