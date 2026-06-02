@@ -1048,7 +1048,12 @@ function AgendaPage() {
       { forma: "cartao_credito", label: "Cartão de Crédito", valor: totalCredito },
     ];
     setFormaPagOpcoes(opcoes);
-    setFormaPagCtx({ agId: itens.map(i => i.id).join(","), desc });
+    setFormaPagCtx({
+      agId: itens.map(i => i.id).join(","),
+      desc,
+      paciente,
+      procedimento: `${itens.map(i => (i.procedimento ?? "CONSULTA")).join(" + ")} (${itens.length} serviços)`,
+    });
     setFormaPagOpen(true);
   };
 
