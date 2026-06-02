@@ -250,8 +250,8 @@ function Page() {
       const proc = ag?.procedimento || ((r.descricao ?? "").split("—").slice(1).join("—").trim() || r.descricao);
       const pacNomeExtra = ag?.paciente_nome ?? ((r.descricao ?? "").split("—")[0]?.trim() || null);
       const pacIdEff = r.paciente_id ?? ag?.paciente_id ?? null;
-      const total = Number(r.valor);
-      const repasse = calcRepasse(r.medico_id, total, proc);
+      const pago = Number(r.valor);
+      const { total, repasse } = calcRepasseFull(r.medico_id, pago, proc);
       return {
         id: r.id, data: r.data, procedimento: proc,
         valor_total: total, valor_medico: repasse, valor_clinica: +(total - repasse).toFixed(2),
