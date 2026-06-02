@@ -1,18 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { MiniBarChart } from "@/components/charts/MiniBarChart";
+import { MiniPieChart } from "@/components/charts/MiniPieChart";
 import { exportToExcel } from "@/lib/export-csv";
 import { toast } from "sonner";
 import {
   Download, CalendarDays, Users, ClipboardList, FileText, DollarSign,
   Stethoscope, Clock, Brain, FlaskConical, BellRing, FileHeart, Target,
   CreditCard, ShieldCheck, Building2, BookOpen, MessageCircle, Bell, Workflow,
-  HeartPulse,
+  HeartPulse, LayoutDashboard, TrendingUp, TrendingDown, Wallet,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/relatorios")({
