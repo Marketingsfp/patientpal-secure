@@ -144,11 +144,12 @@ function DashboardPage() {
     // Novos x regulares (a partir de paciente_id em agendamentos do período vs histórico)
     const pacIds = Array.from(new Set(ags.map(a => a.paciente_id).filter(Boolean) as string[]));
     let novos = 0, regulares = 0;
+    let setExistentes = new Set<string>();
     if (pacIds.length > 0) {
       const { data: hist } = await supabase
         .from("agendamentos").select("paciente_id,inicio")
         .eq("clinica_id", cid).in("paciente_id", pacIds).lt("inicio", ini);
-      const setExistentes = new Set((hist ?? []).map(h => h.paciente_id));
+      setExistentes = new Set((hist ?? []).map(h => h.paciente_id) as string[]);
       novos = pacIds.filter(p => !setExistentes.has(p)).length;
       regulares = pacIds.length - novos;
     }
@@ -173,11 +174,12 @@ function DashboardPage() {
     // Por médico
     const porMedico = meds.map(m => {
       const agendados = ags.filter(a => a.medico_id === m.id);
+      const pacIdsM = Array.from(new Set(agendados.map(a => a.paciente_id).filter(Boolean) as string[]));
       return {
         nome: m.nome,
         total: contarGRs(agendados),
-        pagos: atends.filter(a => a.medico_id === m.id).length,
-        novos: agendados.filter(a => a.paciente_id && pacIds.includes(a.paciente_id)).length,
+        pagos: contarGRs(agendados.filter(a => a.status === "pago" || a.status === "realizado")),
+        novos: pacIdsM.filter(p => !setExistentes.has(p)).length,
       };
     }).sort((a, b) => b.total - a.total);
 
