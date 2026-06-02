@@ -106,6 +106,7 @@ function Page() {
   const [repHoje, setRepHoje] = useState<{ pendente: number; pago: number; medicos: number; qtd_pend: number }>({
     pendente: 0, pago: 0, medicos: 0, qtd_pend: 0,
   });
+  const [repPagosHoje, setRepPagosHoje] = useState<Array<{ id: string; medico: string; valor: number; forma: string | null; hora: string | null }>>([]);
   const loadRepasseHoje = useCallback(async () => {
     if (!clinicaAtual) return;
     const hoje = new Date().toISOString().slice(0, 10);
@@ -127,6 +128,29 @@ function Page() {
       else { pendente += v; qtd_pend++; if (r.medico_id) medSet.add(r.medico_id); }
     }
     setRepHoje({ pendente, pago, medicos: medSet.size, qtd_pend });
+    // Lista de pagamentos de repasse realizados hoje (despesas "Repasse médico — ...")
+    const { data: pagos } = await supabase
+      .from("fin_lancamentos")
+      .select("id, valor, medico_id, descricao, forma_pagamento, created_at, data")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("tipo", "despesa")
+      .eq("data", hoje)
+      .ilike("descricao", "Repasse médico%")
+      .order("created_at", { ascending: false });
+    const pagosRows = (pagos ?? []) as Array<{ id: string; valor: number | null; medico_id: string | null; descricao: string | null; forma_pagamento: string | null; created_at: string | null }>;
+    const medIds = Array.from(new Set(pagosRows.map((p) => p.medico_id).filter(Boolean) as string[]));
+    const medMap = new Map<string, string>();
+    if (medIds.length) {
+      const { data: meds } = await supabase.from("medicos").select("id, nome").in("id", medIds);
+      for (const m of (meds ?? []) as Array<{ id: string; nome: string }>) medMap.set(m.id, m.nome);
+    }
+    setRepPagosHoje(pagosRows.map((p) => ({
+      id: p.id,
+      medico: p.medico_id ? (medMap.get(p.medico_id) ?? "—") : (p.descricao?.replace(/^Repasse médico\s*—\s*/, "").replace(/\s*\(.*\)$/, "") || "—"),
+      valor: Number(p.valor) || 0,
+      forma: p.forma_pagamento,
+      hora: p.created_at ? new Date(p.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : null,
+    })));
   }, [clinicaAtual]);
   useEffect(() => { if (tab === "repasse") void loadRepasseHoje(); }, [tab, loadRepasseHoje]);
   const [loading, setLoading] = useState(true);
@@ -883,6 +907,43 @@ function Page() {
                   <li>Selecione vários atendimentos e use <strong>"Pagar repasse selecionados"</strong> — o sistema agrupa por médico e gera <strong>uma despesa por médico</strong>.</li>
                   <li>O lançamento entra como <strong>despesa em dinheiro</strong> no financeiro, vinculado ao seu caixa do dia.</li>
                 </ul>
+              </div>
+
+              <div className="rounded-lg border">
+                <div className="px-4 py-3 border-b bg-muted/30">
+                  <h4 className="font-medium">Repasses realizados hoje</h4>
+                  <p className="text-xs text-muted-foreground">Lista de pagamentos efetuados no dia, por médico.</p>
+                </div>
+                {repPagosHoje.length === 0 ? (
+                  <div className="p-6 text-center text-sm text-muted-foreground">
+                    Nenhum repasse pago hoje.
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Hora</TableHead>
+                        <TableHead>Médico</TableHead>
+                        <TableHead>Forma</TableHead>
+                        <TableHead className="text-right">Valor</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {repPagosHoje.map((r) => (
+                        <TableRow key={r.id}>
+                          <TableCell className="text-muted-foreground">{r.hora ?? "—"}</TableCell>
+                          <TableCell className="font-medium">{r.medico}</TableCell>
+                          <TableCell className="capitalize">{r.forma ?? "—"}</TableCell>
+                          <TableCell className="text-right font-semibold text-emerald-700 dark:text-emerald-400">{fmt(r.valor)}</TableCell>
+                        </TableRow>
+                      ))}
+                      <TableRow>
+                        <TableCell colSpan={3} className="text-right font-medium">Total</TableCell>
+                        <TableCell className="text-right font-bold">{fmt(repPagosHoje.reduce((s, r) => s + r.valor, 0))}</TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                )}
               </div>
 
               <div className="flex flex-wrap gap-2">
