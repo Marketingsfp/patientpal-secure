@@ -9,13 +9,15 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { MiniBarChart } from "@/components/charts/MiniBarChart";
 import { MiniPieChart } from "@/components/charts/MiniPieChart";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { exportToExcel } from "@/lib/export-csv";
 import { toast } from "sonner";
 import {
   Download, CalendarDays, Users, ClipboardList, FileText, DollarSign,
   Stethoscope, Clock, Brain, FlaskConical, BellRing, FileHeart, Target,
   CreditCard, ShieldCheck, Building2, BookOpen, MessageCircle, Bell, Workflow,
-  HeartPulse, LayoutDashboard, TrendingUp, TrendingDown, Wallet,
+  HeartPulse, LayoutDashboard, TrendingUp, TrendingDown, Wallet, Settings2, RotateCcw,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/relatorios")({
@@ -589,6 +591,49 @@ function DashboardView({
     [data],
   );
 
+  // ---------- widgets editáveis ----------
+  const ALL_WIDGETS: { id: string; label: string; group: "kpi" | "chart" }[] = [
+    { id: "kpi_agend", label: "KPI — Agendamentos", group: "kpi" },
+    { id: "kpi_novos", label: "KPI — Novos pacientes", group: "kpi" },
+    { id: "kpi_pront", label: "KPI — Prontuários", group: "kpi" },
+    { id: "kpi_saldo", label: "KPI — Saldo", group: "kpi" },
+    { id: "kpi_rec", label: "KPI — Receitas", group: "kpi" },
+    { id: "kpi_desp", label: "KPI — Despesas", group: "kpi" },
+    { id: "ch_fin_dia", label: "Gráfico — Receitas vs Despesas por dia", group: "chart" },
+    { id: "ch_agend_status", label: "Gráfico — Agendamentos por status", group: "chart" },
+    { id: "ch_agend_medico", label: "Gráfico — Agendamentos por médico", group: "chart" },
+    { id: "ch_fin_cat", label: "Gráfico — Financeiro por categoria", group: "chart" },
+  ];
+  const STORAGE_KEY = `relatorios.dashboard.widgets.${clinicaId ?? "default"}`;
+  const [enabled, setEnabled] = useState<Record<string, boolean>>(() => {
+    if (typeof window === "undefined") return Object.fromEntries(ALL_WIDGETS.map((w) => [w.id, true]));
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return Object.fromEntries(ALL_WIDGETS.map((w) => [w.id, true]));
+  });
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      setEnabled(raw ? JSON.parse(raw) : Object.fromEntries(ALL_WIDGETS.map((w) => [w.id, true])));
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [STORAGE_KEY]);
+  function toggle(id: string, val: boolean) {
+    setEnabled((prev) => {
+      const next = { ...prev, [id]: val };
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }
+  function resetWidgets() {
+    const next = Object.fromEntries(ALL_WIDGETS.map((w) => [w.id, true]));
+    setEnabled(next);
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
+  }
+  const on = (id: string) => enabled[id] !== false;
+
   if (!clinicaId) {
     return (
       <Card>
@@ -609,60 +654,109 @@ function DashboardView({
     );
   }
 
+  const kpiVisible = ALL_WIDGETS.filter((w) => w.group === "kpi" && on(w.id)).length;
+  const chartsVisible = ALL_WIDGETS.filter((w) => w.group === "chart" && on(w.id)).length;
+
   return (
     <div className="space-y-6">
-      {/* KPIs */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi icon={<CalendarDays className="h-5 w-5" />} label="Agendamentos" value={data.totalAgend.toString()} tint="text-blue-600" />
-        <Kpi icon={<Users className="h-5 w-5" />} label="Novos pacientes" value={data.novosPacientes.toString()} tint="text-purple-600" />
-        <Kpi icon={<FileHeart className="h-5 w-5" />} label="Prontuários" value={data.prontuariosCount.toString()} tint="text-pink-600" />
-        <Kpi icon={<Wallet className="h-5 w-5" />} label="Saldo" value={fmtBRL(saldo)} tint={saldo >= 0 ? "text-emerald-600" : "text-red-600"} />
-        <Kpi icon={<TrendingUp className="h-5 w-5" />} label="Receitas" value={fmtBRL(data.receitas)} tint="text-emerald-600" />
-        <Kpi icon={<TrendingDown className="h-5 w-5" />} label="Despesas" value={fmtBRL(data.despesas)} tint="text-red-600" />
+      {/* Barra de configuração */}
+      <div className="flex justify-end">
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-2">
+              <Settings2 className="h-4 w-4" /> Personalizar dashboard
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-80">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-medium">Itens exibidos</p>
+              <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs" onClick={resetWidgets}>
+                <RotateCcw className="h-3 w-3" /> Restaurar
+              </Button>
+            </div>
+            <div className="space-y-3 max-h-80 overflow-auto">
+              {(["kpi", "chart"] as const).map((g) => (
+                <div key={g}>
+                  <p className="text-xs uppercase text-muted-foreground mb-1">
+                    {g === "kpi" ? "Indicadores" : "Gráficos"}
+                  </p>
+                  {ALL_WIDGETS.filter((w) => w.group === g).map((w) => (
+                    <label key={w.id} className="flex items-center gap-2 py-1 cursor-pointer text-sm">
+                      <Checkbox checked={on(w.id)} onCheckedChange={(v) => toggle(w.id, v === true)} />
+                      <span>{w.label}</span>
+                    </label>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
+
+      {/* KPIs */}
+      {kpiVisible > 0 && (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {on("kpi_agend") && <Kpi icon={<CalendarDays className="h-5 w-5" />} label="Agendamentos" value={data.totalAgend.toString()} tint="text-blue-600" />}
+          {on("kpi_novos") && <Kpi icon={<Users className="h-5 w-5" />} label="Novos pacientes" value={data.novosPacientes.toString()} tint="text-purple-600" />}
+          {on("kpi_pront") && <Kpi icon={<FileHeart className="h-5 w-5" />} label="Prontuários" value={data.prontuariosCount.toString()} tint="text-pink-600" />}
+          {on("kpi_saldo") && <Kpi icon={<Wallet className="h-5 w-5" />} label="Saldo" value={fmtBRL(saldo)} tint={saldo >= 0 ? "text-emerald-600" : "text-red-600"} />}
+          {on("kpi_rec") && <Kpi icon={<TrendingUp className="h-5 w-5" />} label="Receitas" value={fmtBRL(data.receitas)} tint="text-emerald-600" />}
+          {on("kpi_desp") && <Kpi icon={<TrendingDown className="h-5 w-5" />} label="Despesas" value={fmtBRL(data.despesas)} tint="text-red-600" />}
+        </div>
+      )}
 
       {/* Financeiro por dia */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Receitas vs Despesas (por dia)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {data.finPorDia.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-8 text-center">Sem lançamentos no período.</p>
-          ) : (
-            <MiniBarChart
-              labels={data.finPorDia.map((d) => d.label)}
-              series={[
-                { name: "Receitas", color: "#10b981", values: data.finPorDia.map((d) => d.receita) },
-                { name: "Despesas", color: "#ef4444", values: data.finPorDia.map((d) => d.despesa) },
-              ]}
-              formatY={(n) => "R$ " + Math.round(n).toLocaleString("pt-BR")}
-            />
-          )}
-        </CardContent>
-      </Card>
+      {on("ch_fin_dia") && (
+        <Card>
+          <CardHeader><CardTitle className="text-base">Receitas vs Despesas (por dia)</CardTitle></CardHeader>
+          <CardContent>
+            {data.finPorDia.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-8 text-center">Sem lançamentos no período.</p>
+            ) : (
+              <MiniBarChart
+                labels={data.finPorDia.map((d) => d.label)}
+                series={[
+                  { name: "Receitas", color: "#10b981", values: data.finPorDia.map((d) => d.receita) },
+                  { name: "Despesas", color: "#ef4444", values: data.finPorDia.map((d) => d.despesa) },
+                ]}
+                formatY={(n) => "R$ " + Math.round(n).toLocaleString("pt-BR")}
+              />
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Pies */}
-      <div className="grid gap-4 lg:grid-cols-2">
+      {chartsVisible > 0 && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {on("ch_agend_status") && (
+            <Card>
+              <CardHeader><CardTitle className="text-base">Agendamentos por status</CardTitle></CardHeader>
+              <CardContent><MiniPieChart data={data.agendPorStatus} /></CardContent>
+            </Card>
+          )}
+          {on("ch_agend_medico") && (
+            <Card>
+              <CardHeader><CardTitle className="text-base">Agendamentos por médico (top 8)</CardTitle></CardHeader>
+              <CardContent><MiniPieChart data={data.agendPorMedico} /></CardContent>
+            </Card>
+          )}
+          {on("ch_fin_cat") && (
+            <Card className="lg:col-span-2">
+              <CardHeader><CardTitle className="text-base">Financeiro por categoria (top 8)</CardTitle></CardHeader>
+              <CardContent><MiniPieChart data={data.finPorCategoria} formatValue={fmtBRL} /></CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {kpiVisible === 0 && chartsVisible === 0 && (
         <Card>
-          <CardHeader><CardTitle className="text-base">Agendamentos por status</CardTitle></CardHeader>
-          <CardContent>
-            <MiniPieChart data={data.agendPorStatus} />
+          <CardContent className="py-10 text-center text-muted-foreground">
+            Nenhum item selecionado. Use "Personalizar dashboard" para escolher o que exibir.
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader><CardTitle className="text-base">Agendamentos por médico (top 8)</CardTitle></CardHeader>
-          <CardContent>
-            <MiniPieChart data={data.agendPorMedico} />
-          </CardContent>
-        </Card>
-        <Card className="lg:col-span-2">
-          <CardHeader><CardTitle className="text-base">Financeiro por categoria (top 8)</CardTitle></CardHeader>
-          <CardContent>
-            <MiniPieChart data={data.finPorCategoria} formatValue={fmtBRL} />
-          </CardContent>
-        </Card>
-      </div>
+      )}
     </div>
   );
 }
