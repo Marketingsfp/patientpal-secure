@@ -72,9 +72,9 @@ const STATUS_LABEL: Record<Status, string> = {
   cancelado: "Cancelado", faltou: "Faltou",
 };
 const STATUS_COR: Record<Status, string> = {
-  agendado: "bg-[#d1f0d6] text-slate-800 border border-[#8fd49a]",
-  confirmado: "bg-[#d1f0d6] text-slate-800 border border-[#8fd49a]",
-  realizado: "bg-[#d1f0d6] text-slate-800 border border-[#8fd49a]",
+  agendado: "bg-[#dbe7fb] text-slate-800 border border-[#b6cdf5]",
+  confirmado: "bg-[#cfe3fb] text-slate-800 border border-[#9fc3f3]",
+  realizado: "bg-[#a8dcb0] text-slate-900 border border-[#5fb36e]",
   cancelado: "bg-[#f8d2d6] text-slate-800 border border-[#eea1a8]",
   faltou: "bg-[#f7b6c0] text-slate-800 border border-[#e88594]",
 };
