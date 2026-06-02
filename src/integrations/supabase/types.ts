@@ -4584,6 +4584,7 @@ export type Database = {
           paytime_recipient_id: string | null
           percentual_repasse_padrao: number
           pix_chave: string | null
+          procedimento_padrao_id: string | null
           rg: string | null
           rqe_especialidade: string | null
           rqes: Json
@@ -4632,6 +4633,7 @@ export type Database = {
           paytime_recipient_id?: string | null
           percentual_repasse_padrao?: number
           pix_chave?: string | null
+          procedimento_padrao_id?: string | null
           rg?: string | null
           rqe_especialidade?: string | null
           rqes?: Json
@@ -4680,6 +4682,7 @@ export type Database = {
           paytime_recipient_id?: string | null
           percentual_repasse_padrao?: number
           pix_chave?: string | null
+          procedimento_padrao_id?: string | null
           rg?: string | null
           rqe_especialidade?: string | null
           rqes?: Json
@@ -4706,6 +4709,13 @@ export type Database = {
             columns: ["especialidade_id"]
             isOneToOne: false
             referencedRelation: "especialidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medicos_procedimento_padrao_id_fkey"
+            columns: ["procedimento_padrao_id"]
+            isOneToOne: false
+            referencedRelation: "procedimentos"
             referencedColumns: ["id"]
           },
         ]

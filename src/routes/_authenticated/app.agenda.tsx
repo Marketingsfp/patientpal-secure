@@ -58,7 +58,7 @@ type Agendamento = {
   observacoes: string | null;
   data_pagamento?: string | null;
 };
-type Medico = { id: string; nome: string; sexo?: string | null; usa_sistema?: boolean };
+type Medico = { id: string; nome: string; sexo?: string | null; usa_sistema?: boolean; procedimento_padrao_id?: string | null };
 type RecursoEnf = { id: string; nome: string };
 type Especialidade = { id: string; nome: string };
 type Paciente = { id: string; nome: string };
@@ -642,7 +642,7 @@ function AgendaPage() {
   const loadRef = async () => {
     if (!clinicaAtual) return;
     const [m, p, e, me, pr, sr, mc, mp, er, erp] = await Promise.all([
-      supabase.from("medicos").select("id,nome,sexo,usa_sistema").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
+      supabase.from("medicos").select("id,nome,sexo,usa_sistema,procedimento_padrao_id").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("pacientes").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome").limit(500),
       supabase.from("especialidades").select("id,nome").order("nome"),
       supabase.from("medico_especialidades").select("medico_id,especialidade_id"),
@@ -1803,7 +1803,18 @@ function AgendaPage() {
                        setForm(f => {
                          const medico_id = v === "none" ? "" : v;
                          const fim = f.inicio ? calcFimAuto(f.inicio, medico_id) : f.fim;
-                         return { ...f, medico_id, fim };
+                         // Pré-preenche o serviço com o procedimento padrão do médico (se houver)
+                         // e só se ainda não houver um serviço escolhido — não sobrescreve edição manual.
+                         let procedimento = f.procedimento;
+                         if (medico_id && !procedimento) {
+                           const med = medicos.find((m) => m.id === medico_id);
+                           const padraoId = med?.procedimento_padrao_id;
+                           if (padraoId) {
+                             const proc = procedimentosList.find((p) => p.id === padraoId);
+                             if (proc) procedimento = proc.nome;
+                           }
+                         }
+                         return { ...f, medico_id, fim, procedimento };
                        });
                     }
                   }}

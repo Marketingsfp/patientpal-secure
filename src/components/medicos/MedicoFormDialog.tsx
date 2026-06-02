@@ -70,6 +70,7 @@ const emptyForm = () => ({
   nome: "", crm: "", crm_uf: "",
   especialidades: [] as EspecialidadeRow[],
   procedimentos: [] as string[],
+  procedimento_padrao_id: "" as string,
   tipo_repasse: "percentual" as "percentual" | "valor",
   percentual: "50",
   valor: "",
@@ -278,7 +279,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       setLoading(true);
       const { data: m } = await supabase
         .from("medicos")
-        .select("id, user_id, nome, crm, crm_uf, email, telefone, telefone2, nacionalidade, estado_civil, sexo, duracao_consulta_min, usa_sistema, cep, logradouro, numero, complemento, bairro, cidade, estado, medico_especialidades(especialidade_id, tem_rqe, rqe_numero, especialidade:especialidades(id, nome))")
+        .select("id, user_id, nome, crm, crm_uf, email, telefone, telefone2, nacionalidade, estado_civil, sexo, duracao_consulta_min, usa_sistema, procedimento_padrao_id, cep, logradouro, numero, complemento, bairro, cidade, estado, medico_especialidades(especialidade_id, tem_rqe, rqe_numero, especialidade:especialidades(id, nome))")
         .eq("id", editingMedicoId)
         .maybeSingle();
       if (cancelled) return;
@@ -336,6 +337,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         procedimentos: (mprocs ?? []).map(
           (p: any) => `${p.procedimento_id}|${p.especialidade_id ?? ""}`,
         ),
+        procedimento_padrao_id: (med as any).procedimento_padrao_id ?? "",
         tipo_repasse: (sens.tipo_repasse as "percentual" | "valor") ?? "percentual",
         percentual: sens.percentual_repasse_padrao != null ? String(sens.percentual_repasse_padrao) : "",
         valor: sens.valor_repasse_padrao != null ? String(sens.valor_repasse_padrao) : "",
@@ -416,6 +418,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         : null,
       duracao_consulta_min: parseInt(form.duracao_consulta_min || "15") || 15,
       usa_sistema: form.usa_sistema,
+      procedimento_padrao_id: form.procedimento_padrao_id || null,
       cpf: form.cpf || null,
       rg: form.rg || null,
       data_nascimento: form.data_nascimento || null,
@@ -1002,6 +1005,29 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                           </Button>
                         </div>
                       ))}
+                    </div>
+                  )}
+                  {form.procedimentos.length > 0 && (
+                    <div className="border-t pt-3 mt-2 space-y-1">
+                      <Label className="text-sm font-medium">Procedimento padrão (pré-selecionado na agenda)</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Ao agendar com este médico, o sistema já preenche este serviço — agiliza o atendimento.
+                        Ex.: Ortopedista → CONSULTA. Médico que só faz USG → o exame mais comum.
+                      </p>
+                      <SearchableSelect
+                        value={form.procedimento_padrao_id || "none"}
+                        onChange={(v) => setForm({ ...form, procedimento_padrao_id: v === "none" ? "" : v })}
+                        placeholder="— Sem padrão (usa CONSULTA) —"
+                        searchPlaceholder="Buscar serviço..."
+                        options={[
+                          { value: "none", label: "— Sem padrão (usa CONSULTA) —" },
+                          ...Array.from(new Set(form.procedimentos.map((it) => splitItem(it).pid).filter(Boolean)))
+                            .map((pid) => procs.find((p) => p.id === pid))
+                            .filter((p): p is Procedimento => !!p)
+                            .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
+                            .map((p) => ({ value: p.id, label: p.nome })),
+                        ]}
+                      />
                     </div>
                   )}
                 </div>
