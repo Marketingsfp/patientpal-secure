@@ -188,6 +188,7 @@ function Page() {
 
   const load = async () => {
     if (!clinicaAtual) { setItems([]); setLoading(false); return; }
+    if (!fIni || !fFim) { setLoading(false); return; }
     setLoading(true);
     // Une atendimentos manuais (fin_atendimentos) com pagamentos da agenda (fin_lancamentos receita).
     let qManual = supabase
