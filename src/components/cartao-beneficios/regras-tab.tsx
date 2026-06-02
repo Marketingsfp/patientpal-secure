@@ -4,7 +4,6 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -351,6 +350,3 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     </div>
   );
 }
-
-// Hack to silence unused Label import warning if any
-export { Label as _RegrasLabel };
