@@ -1037,14 +1037,17 @@ function AgendaPage() {
       toast.info("Há atendimentos já pagos na seleção. Desmarque-os antes de cobrar.");
       return;
     }
-    // Verificação fresca: bloqueia se algum item já tiver lançamento no banco
-    const { data: jaPagosLote } = await supabase
-      .from("fin_lancamentos")
-      .select("agendamento_id")
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .eq("tipo", "receita")
-      .eq("status", "confirmado")
-      .in("agendamento_id", ids);
+    // Verificação fresca + carga de procedimentos em PARALELO (cache 60s)
+    const [{ data: jaPagosLote }, procs] = await Promise.all([
+      supabase
+        .from("fin_lancamentos")
+        .select("agendamento_id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("tipo", "receita")
+        .eq("status", "confirmado")
+        .in("agendamento_id", ids),
+      getProcedimentosComValor(clinicaAtual.clinica_id),
+    ]);
     if ((jaPagosLote ?? []).length > 0) {
       const pagos = new Set(((jaPagosLote ?? []) as Array<{ agendamento_id: string | null }>)
         .map((r) => r.agendamento_id).filter((x): x is string => !!x));
@@ -1052,20 +1055,18 @@ function AgendaPage() {
       toast.info("Há atendimentos já pagos na seleção. Desmarque-os antes de cobrar.");
       return;
     }
-    // busca valores dos procedimentos pelo nome (todas as formas de pagamento)
-    const { data: procs } = await supabase
-      .from("procedimentos")
-      .select("nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix")
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .limit(5000);
     const acharProc = (nomeProc: string) => {
       const alvo = normalizar(nomeProc);
       return (procs ?? []).find(p => normalizar(p.nome ?? "") === alvo)
         ?? (procs ?? []).find(p => normalizar(p.nome ?? "").includes(alvo));
     };
     let totalDinheiro = 0, totalPix = 0, totalDebito = 0, totalCredito = 0;
-    for (const it of itens) {
-      const p: any = await buscarProcedimentoPorNome(clinicaAtual.clinica_id, it.procedimento ?? "CONSULTA", procs ?? []);
+    // Resolve todos os procedimentos em paralelo (cada um pode cair em
+    // fallback no banco; em paralelo o tempo total fica ~= 1 chamada).
+    const procsResolvidos = await Promise.all(
+      itens.map((it) => buscarProcedimentoPorNome(clinicaAtual.clinica_id, it.procedimento ?? "CONSULTA", procs)),
+    );
+    for (const p of procsResolvidos as any[]) {
       const valorCartao = valorCartaoProcedimento(p);
       totalDinheiro += primeiroValorValido(p?.valor_dinheiro, p?.valor_dinheiro_pix, p?.valor_padrao);
       totalPix      += valorCartao;
