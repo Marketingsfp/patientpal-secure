@@ -232,9 +232,9 @@ function Page() {
       .lte("data", fFim);
     if (fMedico !== "todos") {
       qManual = qManual.eq("medico_id", fMedico);
-      // Para agenda: o lançamento pode estar com medico_id nulo; filtramos pelo
-      // medico_id do próprio agendamento referenciado.
-      qAgenda = qAgenda.or(`medico_id.eq.${fMedico},agendamento.medico_id.eq.${fMedico}`);
+      // Para agenda: não filtramos no servidor porque o lançamento pode estar
+      // com medico_id nulo (médico vem do agendamento). Filtramos client-side
+      // logo após o mapeamento abaixo.
     }
     const [mr, ar] = await Promise.all([qManual.order("data", { ascending: false }), qAgenda.order("data", { ascending: false })]);
     if (mr.error) { toast.error(mr.error.message); setLoading(false); return; }
@@ -265,7 +265,10 @@ function Page() {
         repasse_pago: !!r.repasse_pago, repasse_pago_em: r.repasse_pago_em, repasse_forma_pagamento: r.repasse_forma_pagamento,
       };
     });
-    let unif = [...manuais, ...agend].sort((a, b) => (a.data < b.data ? 1 : -1));
+    // Filtro client-side por médico para os registros da agenda (cobre os
+    // lançamentos cujo medico_id está nulo e vem do agendamento).
+    const agendFiltered = fMedico === "todos" ? agend : agend.filter((x) => x.medico_id === fMedico);
+    let unif = [...manuais, ...agendFiltered].sort((a, b) => (a.data < b.data ? 1 : -1));
     if (fStatus === "aberto") unif = unif.filter((x) => !x.repasse_pago);
     else if (fStatus === "pago") unif = unif.filter((x) => x.repasse_pago);
     setItems(unif);
