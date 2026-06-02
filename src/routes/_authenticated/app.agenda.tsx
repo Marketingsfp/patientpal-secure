@@ -117,6 +117,11 @@ async function buscarProcedimentoPorNome(
     p && [p.valor_dinheiro, p.valor_pix, p.valor_padrao, p.valor_cartao, p.valor_cartao_credito, p.valor_cartao_debito, p.valor_dinheiro_pix]
       .some((v) => Number(v) > 0);
   if (temValor(proc)) return proc;
+  // Se a lista pré-carregada já contém os valores (formato completo) e
+  // achamos o procedimento, mesmo sem valor não vale a pena bater no banco
+  // de novo — economiza ~300-800ms por clique.
+  const listaTemValores = arr.length > 0 && arr.some((p) => "valor_dinheiro" in p);
+  if (proc && listaTemValores) return proc;
   // Fallback: consulta direta no banco com ilike (case-insensitive),
   // usando %nome% para casar variações como "ELETROCARDIOGRAMA (ECG)"
   // quando o agendamento está como "ELETROCARDIOGRAMA".
@@ -133,6 +138,34 @@ async function buscarProcedimentoPorNome(
   const escolhido = exatoComValor ?? qualquerComValor ?? (data ?? [])[0];
   if (temValor(escolhido)) return escolhido;
   return proc ?? escolhido ?? null;
+}
+
+// Cache em memória de procedimentos da clínica (com valores) para acelerar
+// o diálogo de pagamento. TTL curto: 60s. Invalida automaticamente.
+type ProcComValor = {
+  nome: string;
+  valor_dinheiro: number | null;
+  valor_pix: number | null;
+  valor_padrao: number | null;
+  valor_cartao: number | null;
+  valor_cartao_credito: number | null;
+  valor_cartao_debito: number | null;
+  valor_dinheiro_pix: number | null;
+};
+const _procsCache = new Map<string, { ts: number; data: ProcComValor[] }>();
+const PROCS_TTL_MS = 60_000;
+async function getProcedimentosComValor(clinicaId: string): Promise<ProcComValor[]> {
+  const cached = _procsCache.get(clinicaId);
+  if (cached && Date.now() - cached.ts < PROCS_TTL_MS) return cached.data;
+  const { data } = await supabase
+    .from("procedimentos")
+    .select("nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix")
+    .eq("clinica_id", clinicaId)
+    .eq("ativo", true)
+    .limit(5000);
+  const rows = (data ?? []) as ProcComValor[];
+  _procsCache.set(clinicaId, { ts: Date.now(), data: rows });
+  return rows;
 }
 
 async function fetchProcedimentosAgenda(clinicaId: string): Promise<ProcedimentoRef[]> {
@@ -1004,14 +1037,17 @@ function AgendaPage() {
       toast.info("Há atendimentos já pagos na seleção. Desmarque-os antes de cobrar.");
       return;
     }
-    // Verificação fresca: bloqueia se algum item já tiver lançamento no banco
-    const { data: jaPagosLote } = await supabase
-      .from("fin_lancamentos")
-      .select("agendamento_id")
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .eq("tipo", "receita")
-      .eq("status", "confirmado")
-      .in("agendamento_id", ids);
+    // Verificação fresca + carga de procedimentos em PARALELO (cache 60s)
+    const [{ data: jaPagosLote }, procs] = await Promise.all([
+      supabase
+        .from("fin_lancamentos")
+        .select("agendamento_id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("tipo", "receita")
+        .eq("status", "confirmado")
+        .in("agendamento_id", ids),
+      getProcedimentosComValor(clinicaAtual.clinica_id),
+    ]);
     if ((jaPagosLote ?? []).length > 0) {
       const pagos = new Set(((jaPagosLote ?? []) as Array<{ agendamento_id: string | null }>)
         .map((r) => r.agendamento_id).filter((x): x is string => !!x));
@@ -1019,20 +1055,13 @@ function AgendaPage() {
       toast.info("Há atendimentos já pagos na seleção. Desmarque-os antes de cobrar.");
       return;
     }
-    // busca valores dos procedimentos pelo nome (todas as formas de pagamento)
-    const { data: procs } = await supabase
-      .from("procedimentos")
-      .select("nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix")
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .limit(5000);
-    const acharProc = (nomeProc: string) => {
-      const alvo = normalizar(nomeProc);
-      return (procs ?? []).find(p => normalizar(p.nome ?? "") === alvo)
-        ?? (procs ?? []).find(p => normalizar(p.nome ?? "").includes(alvo));
-    };
     let totalDinheiro = 0, totalPix = 0, totalDebito = 0, totalCredito = 0;
-    for (const it of itens) {
-      const p: any = await buscarProcedimentoPorNome(clinicaAtual.clinica_id, it.procedimento ?? "CONSULTA", procs ?? []);
+    // Resolve todos os procedimentos em paralelo (cada um pode cair em
+    // fallback no banco; em paralelo o tempo total fica ~= 1 chamada).
+    const procsResolvidos = await Promise.all(
+      itens.map((it) => buscarProcedimentoPorNome(clinicaAtual.clinica_id, it.procedimento ?? "CONSULTA", procs)),
+    );
+    for (const p of procsResolvidos as any[]) {
       const valorCartao = valorCartaoProcedimento(p);
       totalDinheiro += primeiroValorValido(p?.valor_dinheiro, p?.valor_dinheiro_pix, p?.valor_padrao);
       totalPix      += valorCartao;
@@ -1336,14 +1365,16 @@ function AgendaPage() {
     setSaving(false);
     toast.success("Salvo"); setOpen(false); await load();
     if (irParaPagamento && novoId) {
-      const nomeBusca = normalizar((payload.procedimento ?? "CONSULTA").trim());
-      const { data: lista } = await supabase
-        .from("procedimentos")
-        .select("nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .limit(5000);
-      void nomeBusca;
-      const proc: any = await buscarProcedimentoPorNome(clinicaAtual.clinica_id, payload.procedimento ?? "CONSULTA", lista ?? []);
+      const [lista, info] = await Promise.all([
+        getProcedimentosComValor(clinicaAtual.clinica_id),
+        obterInfoConvenioPaciente({
+          clinicaId: clinicaAtual.clinica_id,
+          pacienteId: payload.paciente_id,
+          medicoId: payload.medico_id,
+          procedimentoNome: payload.procedimento ?? "",
+        }),
+      ]);
+      const proc: any = await buscarProcedimentoPorNome(clinicaAtual.clinica_id, payload.procedimento ?? "CONSULTA", lista);
       const valorCartao = valorCartaoProcedimento(proc);
       const vDinheiro = primeiroValorValido(proc?.valor_dinheiro, proc?.valor_dinheiro_pix, proc?.valor_padrao);
       const vPix = valorCartao;
@@ -1356,12 +1387,6 @@ function AgendaPage() {
         { forma: "cartao_credito", label: "Cartão de Crédito", valor: vCredito },
       ];
       let descSuffix = "";
-      const info = await obterInfoConvenioPaciente({
-        clinicaId: clinicaAtual.clinica_id,
-        pacienteId: payload.paciente_id,
-        medicoId: payload.medico_id,
-        procedimentoNome: payload.procedimento ?? "",
-      });
       if (info) {
         if (!info.emDia) {
           toast.error(`Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.`);
@@ -1469,27 +1494,32 @@ function AgendaPage() {
     // Verificação fresca no banco: impede faturar duas vezes mesmo se o cache
     // local estiver desatualizado (ex.: outro usuário pagou em outra aba, ou
     // o pagamento foi transferido de uma ficha reagendada).
-    const { data: jaPagos } = await supabase
-      .from("fin_lancamentos")
-      .select("id")
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .eq("tipo", "receita")
-      .eq("status", "confirmado")
-      .eq("agendamento_id", a.id)
-      .limit(1);
+    // Roda em paralelo: checagem de pago + lista de procedimentos (cache)
+    // + info de convênio do paciente. Antes era serial (3-5s); agora ~= a
+    // chamada mais lenta.
+    const [{ data: jaPagos }, lista, info] = await Promise.all([
+      supabase
+        .from("fin_lancamentos")
+        .select("id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("tipo", "receita")
+        .eq("status", "confirmado")
+        .eq("agendamento_id", a.id)
+        .limit(1),
+      getProcedimentosComValor(clinicaAtual.clinica_id),
+      obterInfoConvenioPaciente({
+        clinicaId: clinicaAtual.clinica_id,
+        pacienteId: a.paciente_id,
+        medicoId: a.medico_id,
+        procedimentoNome: a.procedimento ?? "",
+      }),
+    ]);
     if ((jaPagos ?? []).length > 0) {
       toast.info("Este agendamento já foi pago.");
       setPagosSet((prev) => { const n = new Set(prev); n.add(a.id); return n; });
       return;
     }
-    const nomeBusca = normalizar((a.procedimento ?? "CONSULTA").trim());
-    const { data: lista } = await supabase
-      .from("procedimentos")
-      .select("nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix")
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .limit(5000);
-    void nomeBusca;
-    const proc = await buscarProcedimentoPorNome(clinicaAtual.clinica_id, a.procedimento ?? "CONSULTA", lista ?? []);
+    const proc = await buscarProcedimentoPorNome(clinicaAtual.clinica_id, a.procedimento ?? "CONSULTA", lista);
     const valorCartao = valorCartaoProcedimento(proc);
     const vDinheiro = primeiroValorValido(proc?.valor_dinheiro, proc?.valor_dinheiro_pix, proc?.valor_padrao);
     const vPix = valorCartao;
@@ -1502,12 +1532,6 @@ function AgendaPage() {
       { forma: "cartao_credito", label: "Cartão de Crédito", valor: vCredito },
     ];
     let descSuffix = "";
-    const info = await obterInfoConvenioPaciente({
-      clinicaId: clinicaAtual.clinica_id,
-      pacienteId: a.paciente_id,
-      medicoId: a.medico_id,
-      procedimentoNome: a.procedimento ?? "",
-    });
     if (info) {
       if (!info.emDia) {
         toast.error(`Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.`);
