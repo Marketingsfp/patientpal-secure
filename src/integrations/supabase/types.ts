@@ -1662,6 +1662,76 @@ export type Database = {
           },
         ]
       }
+      cb_convenio_regras: {
+        Row: {
+          ativo: boolean
+          clinica_id: string
+          convenio_id: string
+          created_at: string
+          especialidade_id: string | null
+          id: string
+          modo: string
+          nome_padrao: string | null
+          percentual: number | null
+          prioridade: number
+          tipo: string | null
+          updated_at: string
+          valor: number | null
+        }
+        Insert: {
+          ativo?: boolean
+          clinica_id: string
+          convenio_id: string
+          created_at?: string
+          especialidade_id?: string | null
+          id?: string
+          modo: string
+          nome_padrao?: string | null
+          percentual?: number | null
+          prioridade?: number
+          tipo?: string | null
+          updated_at?: string
+          valor?: number | null
+        }
+        Update: {
+          ativo?: boolean
+          clinica_id?: string
+          convenio_id?: string
+          created_at?: string
+          especialidade_id?: string | null
+          id?: string
+          modo?: string
+          nome_padrao?: string | null
+          percentual?: number | null
+          prioridade?: number
+          tipo?: string | null
+          updated_at?: string
+          valor?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cb_convenio_regras_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cb_convenio_regras_convenio_id_fkey"
+            columns: ["convenio_id"]
+            isOneToOne: false
+            referencedRelation: "cb_convenios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cb_convenio_regras_especialidade_id_fkey"
+            columns: ["especialidade_id"]
+            isOneToOne: false
+            referencedRelation: "especialidades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cb_convenios: {
         Row: {
           ativo: boolean
