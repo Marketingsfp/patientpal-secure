@@ -143,10 +143,10 @@ const CUBOS: CubeSpec[] = [
     load: async ({ clinicaId, ini, fim }) => {
       const { data, error } = await supabase
         .from("prontuarios")
-        .select("data_atendimento, medico_id, paciente_id")
+        .select("data, medico_id, paciente_id")
         .eq("clinica_id", clinicaId)
-        .gte("data_atendimento", ini)
-        .lte("data_atendimento", fim + "T23:59:59");
+        .gte("data", ini)
+        .lte("data", fim + "T23:59:59");
       if (error) throw error;
       const rows = (data ?? []) as any[];
       const [medMap, pacMap, espMap] = await Promise.all([
@@ -154,7 +154,7 @@ const CUBOS: CubeSpec[] = [
         lookupNames("pacientes", rows.map((r) => r.paciente_id)),
         lookupEspecialidadePorMedico(rows.map((r) => r.medico_id)),
       ]);
-      return rows.map((r) => transformDate(r.data_atendimento, {
+      return rows.map((r) => transformDate(r.data, {
         medico: medMap.get(r.medico_id) ?? "Sem médico",
         especialidade: espMap.get(r.medico_id) ?? "—",
         paciente: pacMap.get(r.paciente_id) ?? "—",
