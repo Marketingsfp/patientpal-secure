@@ -337,6 +337,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         procedimentos: (mprocs ?? []).map(
           (p: any) => `${p.procedimento_id}|${p.especialidade_id ?? ""}`,
         ),
+        procedimento_padrao_id: (med as any).procedimento_padrao_id ?? "",
         tipo_repasse: (sens.tipo_repasse as "percentual" | "valor") ?? "percentual",
         percentual: sens.percentual_repasse_padrao != null ? String(sens.percentual_repasse_padrao) : "",
         valor: sens.valor_repasse_padrao != null ? String(sens.valor_repasse_padrao) : "",
