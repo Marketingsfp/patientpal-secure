@@ -390,32 +390,30 @@ function RelatoriosPage() {
         <p className="text-muted-foreground">Visualize um dashboard ou baixe planilhas Excel.</p>
       </div>
 
-      <Card>
-        <CardHeader><CardTitle className="text-base">Período (para relatórios com data)</CardTitle></CardHeader>
-        <CardContent className="flex flex-wrap gap-4 items-end">
-          <div>
-            <Label htmlFor="ini">De</Label>
-            <Input id="ini" type="date" value={ini} onChange={(e) => setIni(e.target.value)} className="w-40" />
-          </div>
-          <div>
-            <Label htmlFor="fim">Até</Label>
-            <Input id="fim" type="date" value={fim} onChange={(e) => setFim(e.target.value)} className="w-40" />
-          </div>
-        </CardContent>
-      </Card>
-
       <Tabs defaultValue="dashboard">
-        <TabsList>
-          <TabsTrigger value="dashboard" className="gap-2">
-            <LayoutDashboard className="h-4 w-4" /> Dashboard
-          </TabsTrigger>
-          <TabsTrigger value="cubo" className="gap-2">
-            <Boxes className="h-4 w-4" /> Cubo BI
-          </TabsTrigger>
-          <TabsTrigger value="downloads" className="gap-2">
-            <Download className="h-4 w-4" /> Baixar planilhas
-          </TabsTrigger>
-        </TabsList>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-3">
+          <TabsList>
+            <TabsTrigger value="dashboard" className="gap-2">
+              <LayoutDashboard className="h-4 w-4" /> Dashboard
+            </TabsTrigger>
+            <TabsTrigger value="cubo" className="gap-2">
+              <Boxes className="h-4 w-4" /> Cubo BI
+            </TabsTrigger>
+            <TabsTrigger value="downloads" className="gap-2">
+              <Download className="h-4 w-4" /> Baixar planilhas
+            </TabsTrigger>
+          </TabsList>
+          <div className="flex items-end gap-2">
+            <div>
+              <Label htmlFor="ini" className="text-xs text-muted-foreground">De</Label>
+              <Input id="ini" type="date" value={ini} onChange={(e) => setIni(e.target.value)} className="h-9 w-36" />
+            </div>
+            <div>
+              <Label htmlFor="fim" className="text-xs text-muted-foreground">Até</Label>
+              <Input id="fim" type="date" value={fim} onChange={(e) => setFim(e.target.value)} className="h-9 w-36" />
+            </div>
+          </div>
+        </div>
 
         <TabsContent value="dashboard" className="mt-4">
           <DashboardView clinicaId={clinicaAtual?.clinica_id} ini={ini} fim={fim} />
