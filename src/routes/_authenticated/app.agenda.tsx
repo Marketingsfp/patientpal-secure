@@ -84,6 +84,11 @@ const PAGE_SIZE = 50;
 const normalizar = (s: string) =>
   (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
+const isSlotLivre = (pacienteNome: string | null | undefined) => {
+  const nome = normalizar(pacienteNome ?? "").trim();
+  return nome === "disponivel" || nome === "bloqueio";
+};
+
 const primeiroValorValido = (...valores: unknown[]) => {
   const numeros = valores.map((valor) => Number(valor)).filter((valor) => Number.isFinite(valor));
   return numeros.find((valor) => valor > 0) ?? numeros[0] ?? 0;
@@ -563,6 +568,7 @@ function AgendaPage() {
     // enfermagem_recurso_id no campo medico_id para reuso de toda a UI.
     const mapped = (((data ?? []) as unknown) as Array<Agendamento & { enfermagem_recurso_id?: string | null; medico?: { nome: string | null; sexo: string | null } | null }>).map((a) => ({
       ...a,
+      paciente_nome: isSlotLivre(a.paciente_nome) ? "DISPONÍVEL" : a.paciente_nome,
       medico_id: a.medico_id ?? a.enfermagem_recurso_id ?? null,
       medico_nome: a.medico_nome ?? a.medico?.nome ?? null,
       medico_sexo: a.medico_sexo ?? a.medico?.sexo ?? null,
@@ -570,7 +576,7 @@ function AgendaPage() {
     setItems(mapped as Agendamento[]);
     setPage(1);
     setSelecionados(new Set());
-    const agendaRows = (((data ?? []) as unknown) as Array<Agendamento & { fluxo_etapa?: string | null }>);
+    const agendaRows = (((mapped ?? []) as unknown) as Array<Agendamento & { fluxo_etapa?: string | null }>);
     setEtapaMap(new Map(agendaRows
       .map((r) => [r.id, r.fluxo_etapa ?? "aguardando_recepcao"] as [string, string])));
     // Busca data_nascimento dos pacientes para exibir ícone de idade
