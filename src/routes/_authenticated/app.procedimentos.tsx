@@ -58,6 +58,8 @@ interface Cartao {
   percentual_desconto: number;
   ativo: boolean;
 }
+interface CbConvenio { id: string; nome: string; ativo: boolean }
+interface ConvValor { valor_dinheiro: number; valor_outros: number }
 
 const TIPO_COR_MAP: Record<string, string> = {
   consulta: "bg-primary/10 text-primary",
@@ -403,10 +405,48 @@ function ProcedimentosPage() {
     setCartoes((data ?? []) as any);
   };
 
+  // ----- Convênios Cartão Benefícios + valores por (procedimento, convênio) -----
+  const [convenios, setConvenios] = useState<CbConvenio[]>([]);
+  // Map: `${procedimento_id}::${convenio_id}` -> ConvValor
+  const [convValores, setConvValores] = useState<Map<string, ConvValor>>(new Map());
+  // Formulário do diálogo: convenio_id -> { dinheiro, outros } (strings)
+  const [formConvValores, setFormConvValores] = useState<Record<string, { dinheiro: string; outros: string }>>({});
+
+  const loadConvenios = async () => {
+    if (!clinicaAtual) return;
+    const { data, error } = await (supabase as any)
+      .from("cb_convenios")
+      .select("id,nome,ativo")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("ativo", true)
+      .order("nome");
+    if (error) { toast.error(error.message); return; }
+    setConvenios((data ?? []) as CbConvenio[]);
+  };
+
+  const loadConvValores = async () => {
+    if (!clinicaAtual) return;
+    const { data, error } = await (supabase as any)
+      .from("procedimento_cb_convenio_valores")
+      .select("procedimento_id,convenio_id,valor_dinheiro,valor_outros")
+      .eq("clinica_id", clinicaAtual.clinica_id);
+    if (error) { toast.error(error.message); return; }
+    const m = new Map<string, ConvValor>();
+    (data ?? []).forEach((r: any) => {
+      m.set(`${r.procedimento_id}::${r.convenio_id}`, {
+        valor_dinheiro: Number(r.valor_dinheiro) || 0,
+        valor_outros: Number(r.valor_outros) || 0,
+      });
+    });
+    setConvValores(m);
+  };
+
   useEffect(() => {
     void load();
     void loadCartoes();
     void loadVincEsp();
+    void loadConvenios();
+    void loadConvValores();
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [clinicaAtual?.clinica_id]);
 
@@ -490,12 +530,26 @@ function ProcedimentosPage() {
     setEditing(null);
     setForm({ ...EMPTY });
     setFormEspIds([]);
+    setFormConvValores(
+      Object.fromEntries(convenios.map(c => [c.id, { dinheiro: "0", outros: "0" }])),
+    );
     setOpen(true);
   };
   const openEdit = (p: Procedimento) => {
     void loadEspecialidades();
     setEditing(p);
     setFormEspIds(Array.from(vincEspMap.get(p.id) ?? []));
+    setFormConvValores(
+      Object.fromEntries(
+        convenios.map(c => {
+          const v = convValores.get(`${p.id}::${c.id}`);
+          return [c.id, {
+            dinheiro: String(v?.valor_dinheiro ?? 0),
+            outros: String(v?.valor_outros ?? 0),
+          }];
+        }),
+      ),
+    );
     setForm({
       nome: p.nome, grupo: p.grupo ?? "", tipo: p.tipo, codigo: p.codigo ?? "",
       valor_dinheiro: String(p.valor_dinheiro ?? p.valor_dinheiro_pix ?? p.valor_padrao ?? 0),
@@ -561,11 +615,30 @@ function ProcedimentosPage() {
       // se o tipo deixou de ser consulta, limpa vínculos extras
       await supabase.from("procedimento_especialidades").delete().eq("procedimento_id", procId);
     }
+    // Sincroniza valores por convênio (cartão benefícios)
+    if (procId && convenios.length > 0) {
+      const rows = convenios
+        .map(c => {
+          const v = formConvValores[c.id] ?? { dinheiro: "0", outros: "0" };
+          return {
+            clinica_id: clinicaAtual.clinica_id,
+            procedimento_id: procId!,
+            convenio_id: c.id,
+            valor_dinheiro: Number(v.dinheiro) || 0,
+            valor_outros: Number(v.outros) || 0,
+          };
+        });
+      const { error: errConv } = await (supabase as any)
+        .from("procedimento_cb_convenio_valores")
+        .upsert(rows, { onConflict: "procedimento_id,convenio_id" });
+      if (errConv) { setSaving(false); toast.error(errConv.message); return; }
+    }
     setSaving(false);
     toast.success(editing ? "Atualizado." : "Cadastrado.");
     setOpen(false);
     void load();
     void loadVincEsp();
+    void loadConvValores();
   };
 
   const onDelete = async (p: Procedimento) => {
@@ -780,17 +853,20 @@ function ProcedimentosPage() {
                   </TableHead>
                   <TableHead className="w-24 text-right">Dinheiro</TableHead>
                   <TableHead className="w-28 text-right">Pix / Débito / Crédito</TableHead>
+                  {convenios.map(c => (
+                    <TableHead key={c.id} className="w-28 text-right">{c.nome}</TableHead>
+                  ))}
                   <TableHead className="w-24">Situação</TableHead>
                   <TableHead className="w-28 text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
-                  <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7 + convenios.length} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>
                 ) : !clinicaAtual ? (
-                  <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7 + convenios.length} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
                 ) : filtrados.length === 0 ? (
-                  <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Nenhum serviço.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7 + convenios.length} className="text-center py-8 text-muted-foreground">Nenhum serviço.</TableCell></TableRow>
                 ) : visiveis.map(p => (
                   <TableRow key={p.id} className="h-8">
                     <TableCell className="text-xs text-muted-foreground">{p.grupo ?? "—"}</TableCell>
@@ -800,6 +876,17 @@ function ProcedimentosPage() {
                     <TableCell className="font-medium">{p.nome}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_dinheiro ?? p.valor_dinheiro_pix))}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_pix ?? p.valor_cartao_credito ?? p.valor_cartao_debito ?? p.valor_cartao))}</TableCell>
+                    {convenios.map(c => {
+                      const v = convValores.get(`${p.id}::${c.id}`);
+                      return (
+                        <TableCell key={c.id} className="text-right tabular-nums">
+                          <div className="leading-tight">
+                            <div>{fmtBRL(v?.valor_dinheiro ?? 0)}</div>
+                            <div className="text-[10px] text-muted-foreground">{fmtBRL(v?.valor_outros ?? 0)}</div>
+                          </div>
+                        </TableCell>
+                      );
+                    })}
                     <TableCell>
                       <span className={`text-[10px] px-1.5 py-0 rounded-full ${p.ativo ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}>
                         {p.ativo ? "Ativo" : "Inativo"}
@@ -942,6 +1029,38 @@ function ProcedimentosPage() {
                 </div>
               </div>
             </div>
+
+            {convenios.length > 0 && (
+              <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
+                <p className="text-xs font-medium text-muted-foreground uppercase">Valores por convênio (Cartão Benefícios)</p>
+                <div className="space-y-3">
+                  {convenios.map(c => {
+                    const v = formConvValores[c.id] ?? { dinheiro: "0", outros: "0" };
+                    return (
+                      <div key={c.id} className="space-y-2 border-l-2 border-primary/30 pl-3">
+                        <p className="text-sm font-medium">{c.nome}</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label className="text-xs">Dinheiro (R$)</Label>
+                            <CurrencyInput
+                              value={v.dinheiro}
+                              onChange={(val) => setFormConvValores(prev => ({ ...prev, [c.id]: { ...v, dinheiro: val } }))}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Pix / Débito / Crédito (R$)</Label>
+                            <CurrencyInput
+                              value={v.outros}
+                              onChange={(val) => setFormConvValores(prev => ({ ...prev, [c.id]: { ...v, outros: val } }))}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <label className="flex items-center gap-2 text-sm cursor-pointer">
               <Checkbox checked={form.ativo} onCheckedChange={(v) => setForm({ ...form, ativo: !!v })} />
