@@ -1267,7 +1267,7 @@ function AgendaPage() {
       const inicioMs = di.getTime();
       const fimMs = df.getTime();
       const cobre = excluindoEditing.some((s) => {
-        if (normalizar(s.paciente_nome) !== "disponivel") return false;
+        if (!isSlotLivre(s.paciente_nome)) return false;
         const sIni = new Date(s.inicio).getTime();
         const sFim = new Date(s.fim).getTime();
         return sIni <= inicioMs && sFim >= fimMs;
@@ -1918,7 +1918,7 @@ function AgendaPage() {
               </div>
               <div className="space-y-1">
                 <Label>Status</Label>
-                {editing && normalizar(editing.paciente_nome) !== "disponivel" ? (
+                {editing && !isSlotLivre(editing.paciente_nome) ? (
                   <Select value={form.status} onValueChange={(v) => setForm(f => ({ ...f, status: v as Status }))}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -1930,7 +1930,7 @@ function AgendaPage() {
                 ) : (
                   <Input value={STATUS_LABEL[form.status]} disabled readOnly />
                 )}
-                {(!editing || normalizar(editing.paciente_nome) === "disponivel") && (
+                {(!editing || isSlotLivre(editing.paciente_nome)) && (
                   <p className="text-xs text-muted-foreground">Status definido automaticamente. Pode ser alterado depois pelo menu de ações.</p>
                 )}
               </div>
