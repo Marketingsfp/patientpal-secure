@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState, type ElementType } from "react";
+import { useEffect, useMemo, useState, type ElementType } from "react";
 import {
   Building2, Bell, CalendarDays, Users, RotateCcw, MessageCircle,
-  CheckCircle2, Handshake, CreditCard, Banknote, Receipt, BadgeDollarSign, Stethoscope, BookOpen, Brain,
+  CheckCircle2, Handshake, CreditCard, Banknote, Receipt, BadgeDollarSign, Stethoscope, BookOpen, Brain, Filter, X,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -10,6 +10,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 
 export const Route = createFileRoute("/_authenticated/app/painel")({
   component: DashboardPage,
@@ -29,6 +32,13 @@ function DashboardPage() {
   const podeVerFinanceiro = ["admin", "gestor", "financeiro"].includes(clinicaAtual?.role ?? "");
   const [periodo, setPeriodo] = useState<Periodo>({ de: hojeISO(), ate: hojeISO() });
   const [carregando, setCarregando] = useState(false);
+  const [medicosLista, setMedicosLista] = useState<{ id: string; nome: string }[]>([]);
+  const [especialidadesLista, setEspecialidadesLista] = useState<{ id: string; nome: string }[]>([]);
+  const [medEspMap, setMedEspMap] = useState<Record<string, string[]>>({}); // medico_id -> [esp_id]
+  const [medicosSel, setMedicosSel] = useState<string[]>([]);
+  const [especialidadesSel, setEspecialidadesSel] = useState<string[]>([]);
+  const [buscaMed, setBuscaMed] = useState("");
+  const [buscaEsp, setBuscaEsp] = useState("");
   const [data, setData] = useState({
     alertas: [] as { id: string; mensagem: string }[],
     agend: { total: 0, atendidos: 0, faltas: 0, pagos: 0, naoPagos: 0, novos: 0, regulares: 0, retornos: 0, semAgenda: 0 },
@@ -40,6 +50,17 @@ function DashboardPage() {
     comissoes: { pagas: 0, pendentes: 0, percentReceita: 0 },
     porMedico: [] as { nome: string; total: number; pagos: number; novos: number }[],
   });
+
+  // Conjunto efetivo de medico_ids após filtros (intersecção médicos x especialidades)
+  const medicosFiltradosIds = useMemo(() => {
+    let ids = medicosLista.map(m => m.id);
+    if (medicosSel.length > 0) ids = ids.filter(id => medicosSel.includes(id));
+    if (especialidadesSel.length > 0) {
+      ids = ids.filter(id => (medEspMap[id] ?? []).some(e => especialidadesSel.includes(e)));
+    }
+    return ids;
+  }, [medicosLista, medicosSel, especialidadesSel, medEspMap]);
+  const filtrosAtivos = medicosSel.length > 0 || especialidadesSel.length > 0;
 
   const load = async () => {
     if (!clinicaAtual) return;
@@ -58,21 +79,48 @@ function DashboardPage() {
       supabase.from("medico_especialidades").select("medico_id,especialidade_id"),
     ]);
 
-    const ags = agendR.data ?? [];
-    const lancs = lancR.data ?? [];
-    const atends = atendR.data ?? [];
-    const meds = medicosR.data ?? [];
+    const medsAll = (medicosR.data ?? []) as { id: string; nome: string }[];
+    const espAll = (espR.data ?? []) as { id: string; nome: string }[];
+    const medEspAll = (medEspR.data ?? []) as Array<{ medico_id: string; especialidade_id: string }>;
+
+    // Atualiza listas para os filtros
+    setMedicosLista(medsAll.slice().sort((a, b) => a.nome.localeCompare(b.nome)));
+    setEspecialidadesLista(espAll.slice().sort((a, b) => a.nome.localeCompare(b.nome)));
+    const mapTmp: Record<string, string[]> = {};
+    for (const me of medEspAll) {
+      (mapTmp[me.medico_id] ||= []).push(me.especialidade_id);
+    }
+    setMedEspMap(mapTmp);
+
+    // Aplica filtros de médico / especialidade
+    let medsFiltrados = medsAll;
+    if (medicosSel.length > 0) {
+      medsFiltrados = medsFiltrados.filter(m => medicosSel.includes(m.id));
+    }
+    if (especialidadesSel.length > 0) {
+      medsFiltrados = medsFiltrados.filter(m =>
+        (mapTmp[m.id] ?? []).some(e => especialidadesSel.includes(e)),
+      );
+    }
+    const filtroAtivo = medicosSel.length > 0 || especialidadesSel.length > 0;
+    const medIdsPermitidos = new Set(medsFiltrados.map(m => m.id));
+    const passaFiltro = (mid: string | null) => !filtroAtivo || (!!mid && medIdsPermitidos.has(mid));
+
+    const ags = (agendR.data ?? []).filter(a => passaFiltro(a.medico_id));
+    const lancs = (lancR.data ?? []).filter(l => !filtroAtivo || passaFiltro(l.medico_id));
+    const atends = (atendR.data ?? []).filter(a => passaFiltro(a.medico_id));
+    const meds = medsFiltrados;
 
     // Identifica médicos cuja especialidade é "Laboratório"
     // Regra de contagem: 1 paciente por GR/procedimento, exceto laboratório
     // (vários exames do mesmo paciente no mesmo dia contam como 1).
     const espLabIds = new Set(
-      (espR.data ?? [])
+      espAll
         .filter(e => (e.nome ?? "").toLowerCase().includes("laborat"))
         .map(e => e.id),
     );
     const labMedicoIds = new Set<string>();
-    for (const me of (medEspR.data ?? []) as Array<{ medico_id: string; especialidade_id: string }>) {
+    for (const me of medEspAll) {
       if (espLabIds.has(me.especialidade_id)) labMedicoIds.add(me.medico_id);
     }
     const isLab = (a: { medico_id: string | null }) => !!a.medico_id && labMedicoIds.has(a.medico_id);
@@ -147,7 +195,7 @@ function DashboardPage() {
     setCarregando(false);
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [clinicaAtual?.clinica_id, periodo.de, periodo.ate]);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [clinicaAtual?.clinica_id, periodo.de, periodo.ate, medicosSel, especialidadesSel]);
 
   if (loading) return <p className="text-muted-foreground">Carregando...</p>;
 
@@ -174,6 +222,27 @@ function DashboardPage() {
           <p className="text-sm text-muted-foreground">{clinicaAtual?.clinica.nome} {carregando && "• atualizando…"}</p>
         </div>
         <div className="flex items-end gap-2">
+          <MultiSelectFiltro
+            label="Profissional"
+            placeholder="Todos os profissionais"
+            options={medicosLista.filter(m =>
+              especialidadesSel.length === 0 ||
+              (medEspMap[m.id] ?? []).some(e => especialidadesSel.includes(e))
+            ).map(m => ({ value: m.id, label: m.nome }))}
+            selected={medicosSel}
+            onChange={setMedicosSel}
+            busca={buscaMed}
+            setBusca={setBuscaMed}
+          />
+          <MultiSelectFiltro
+            label="Especialidade"
+            placeholder="Todas as especialidades"
+            options={especialidadesLista.map(e => ({ value: e.id, label: e.nome }))}
+            selected={especialidadesSel}
+            onChange={setEspecialidadesSel}
+            busca={buscaEsp}
+            setBusca={setBuscaEsp}
+          />
           <div className="space-y-1">
             <Label className="text-xs">Período</Label>
             <Input type="date" value={periodo.de} onChange={(e) => setPeriodo(p => ({ ...p, de: e.target.value }))} className="w-40" />
@@ -185,6 +254,47 @@ function DashboardPage() {
           <Button variant="outline" onClick={load}>Atualizar</Button>
         </div>
       </div>
+
+      {filtrosAtivos && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-muted-foreground">Filtros ativos:</span>
+          {medicosSel.map(id => {
+            const m = medicosLista.find(x => x.id === id);
+            if (!m) return null;
+            return (
+              <Badge key={`m-${id}`} variant="secondary" className="gap-1">
+                {m.nome}
+                <button onClick={() => setMedicosSel(s => s.filter(x => x !== id))} className="hover:text-destructive">
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            );
+          })}
+          {especialidadesSel.map(id => {
+            const e = especialidadesLista.find(x => x.id === id);
+            if (!e) return null;
+            return (
+              <Badge key={`e-${id}`} variant="outline" className="gap-1">
+                {e.nome}
+                <button onClick={() => setEspecialidadesSel(s => s.filter(x => x !== id))} className="hover:text-destructive">
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            );
+          })}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-xs"
+            onClick={() => { setMedicosSel([]); setEspecialidadesSel([]); }}
+          >
+            Limpar
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            ({medicosFiltradosIds.length} {medicosFiltradosIds.length === 1 ? "profissional" : "profissionais"})
+          </span>
+        </div>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {/* Informações rápidas — lembrete para a equipe */}
@@ -347,6 +457,83 @@ function SubGrid({ items }: { items: { label: string; value: string; pct?: strin
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function MultiSelectFiltro({
+  label, placeholder, options, selected, onChange, busca, setBusca,
+}: {
+  label: string;
+  placeholder: string;
+  options: { value: string; label: string }[];
+  selected: string[];
+  onChange: (v: string[]) => void;
+  busca: string;
+  setBusca: (v: string) => void;
+}) {
+  const filtradas = busca.trim()
+    ? options.filter(o => o.label.toLowerCase().includes(busca.toLowerCase()))
+    : options;
+  const toggle = (v: string) => {
+    onChange(selected.includes(v) ? selected.filter(x => x !== v) : [...selected, v]);
+  };
+  const resumo = selected.length === 0
+    ? placeholder
+    : selected.length === 1
+      ? options.find(o => o.value === selected[0])?.label ?? "1 selecionado"
+      : `${selected.length} selecionados`;
+  return (
+    <div className="space-y-1">
+      <Label className="text-xs">{label}</Label>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="outline" className="w-56 justify-between font-normal">
+            <span className="flex items-center gap-2 truncate">
+              <Filter className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <span className="truncate">{resumo}</span>
+            </span>
+            {selected.length > 0 && (
+              <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-xs">{selected.length}</Badge>
+            )}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-72 p-0" align="end">
+          <div className="p-2 border-b">
+            <Input
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder={`Buscar ${label.toLowerCase()}...`}
+              className="h-8"
+            />
+          </div>
+          <div className="max-h-72 overflow-y-auto p-1">
+            {filtradas.length === 0 ? (
+              <p className="p-3 text-sm text-muted-foreground text-center">Nada encontrado.</p>
+            ) : (
+              filtradas.map(o => {
+                const checked = selected.includes(o.value);
+                return (
+                  <label
+                    key={o.value}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent cursor-pointer text-sm"
+                  >
+                    <Checkbox checked={checked} onCheckedChange={() => toggle(o.value)} />
+                    <span className="truncate">{o.label}</span>
+                  </label>
+                );
+              })
+            )}
+          </div>
+          {selected.length > 0 && (
+            <div className="p-2 border-t flex justify-end">
+              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => onChange([])}>
+                Limpar seleção
+              </Button>
+            </div>
+          )}
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }
