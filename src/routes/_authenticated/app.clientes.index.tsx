@@ -95,7 +95,9 @@ function ClientesPage() {
       query = query.or(ors.join(","));
     }
     const [{ data, error }, { count, error: countError }] = await Promise.all([
-      query.order("nome", { ascending: true }).limit(500),
+      query
+        .order("codigo_prontuario", { ascending: true, nullsFirst: false })
+        .limit(500),
       supabase
         .from("pacientes")
         .select("id", { count: "exact", head: true })
