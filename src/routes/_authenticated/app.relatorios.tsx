@@ -384,7 +384,7 @@ function RelatoriosPage() {
     <div className="container mx-auto py-6 space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Relatórios</h1>
-        <p className="text-muted-foreground">Baixe planilhas Excel de cada módulo do sistema.</p>
+        <p className="text-muted-foreground">Visualize um dashboard ou baixe planilhas Excel.</p>
       </div>
 
       <Card>
@@ -401,7 +401,22 @@ function RelatoriosPage() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <Tabs defaultValue="dashboard">
+        <TabsList>
+          <TabsTrigger value="dashboard" className="gap-2">
+            <LayoutDashboard className="h-4 w-4" /> Dashboard
+          </TabsTrigger>
+          <TabsTrigger value="downloads" className="gap-2">
+            <Download className="h-4 w-4" /> Baixar planilhas
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="dashboard" className="mt-4">
+          <DashboardView clinicaId={clinicaAtual?.clinica_id} ini={ini} fim={fim} />
+        </TabsContent>
+
+        <TabsContent value="downloads" className="mt-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {RELATORIOS.map((r) => {
           const Icon = r.icon;
           return (
@@ -430,7 +445,237 @@ function RelatoriosPage() {
             </Card>
           );
         })}
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+// ============================================================
+// Dashboard view — KPIs e gráficos no período selecionado
+// ============================================================
+
+const fmtBRL = (n: number) =>
+  n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+interface DashboardData {
+  totalAgend: number;
+  agendPorStatus: { name: string; value: number }[];
+  agendPorMedico: { name: string; value: number }[];
+  receitas: number;
+  despesas: number;
+  finPorCategoria: { name: string; value: number }[];
+  finPorDia: { label: string; receita: number; despesa: number }[];
+  novosPacientes: number;
+  prontuariosCount: number;
+}
+
+function DashboardView({
+  clinicaId,
+  ini,
+  fim,
+}: {
+  clinicaId?: string;
+  ini: string;
+  fim: string;
+}) {
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!clinicaId) return;
+    let cancel = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const [agend, fin, pac, pront] = await Promise.all([
+          supabase
+            .from("agendamentos")
+            .select("status, medicos(nome)")
+            .eq("clinica_id", clinicaId)
+            .gte("inicio", ini)
+            .lte("inicio", fim + "T23:59:59"),
+          supabase
+            .from("fin_lancamentos")
+            .select("data, tipo, valor, status, fin_categorias(nome)")
+            .eq("clinica_id", clinicaId)
+            .gte("data", ini)
+            .lte("data", fim),
+          supabase
+            .from("pacientes")
+            .select("id", { count: "exact", head: true })
+            .eq("clinica_id", clinicaId)
+            .gte("created_at", ini)
+            .lte("created_at", fim + "T23:59:59"),
+          supabase
+            .from("prontuarios")
+            .select("id", { count: "exact", head: true })
+            .eq("clinica_id", clinicaId)
+            .gte("data_atendimento", ini)
+            .lte("data_atendimento", fim + "T23:59:59"),
+        ]);
+
+        const agendRows = (agend.data ?? []) as any[];
+        const statusMap = new Map<string, number>();
+        const medicoMap = new Map<string, number>();
+        agendRows.forEach((r) => {
+          statusMap.set(r.status ?? "—", (statusMap.get(r.status ?? "—") ?? 0) + 1);
+          const m = r.medicos?.nome ?? "Sem médico";
+          medicoMap.set(m, (medicoMap.get(m) ?? 0) + 1);
+        });
+
+        const finRows = ((fin.data ?? []) as any[]).filter(
+          (r) => r.status !== "cancelado",
+        );
+        let receitas = 0;
+        let despesas = 0;
+        const catMap = new Map<string, number>();
+        const diaMap = new Map<string, { receita: number; despesa: number }>();
+        finRows.forEach((r) => {
+          const v = Number(r.valor) || 0;
+          const dia = (r.data as string).slice(0, 10);
+          const bucket = diaMap.get(dia) ?? { receita: 0, despesa: 0 };
+          if (r.tipo === "receita") {
+            receitas += v;
+            bucket.receita += v;
+          } else {
+            despesas += v;
+            bucket.despesa += v;
+          }
+          diaMap.set(dia, bucket);
+          const cat = r.fin_categorias?.nome ?? "Sem categoria";
+          catMap.set(cat, (catMap.get(cat) ?? 0) + v);
+        });
+
+        const finPorDia = Array.from(diaMap.entries())
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([dia, v]) => ({
+            label: dia.slice(8, 10) + "/" + dia.slice(5, 7),
+            receita: v.receita,
+            despesa: v.despesa,
+          }));
+
+        if (cancel) return;
+        setData({
+          totalAgend: agendRows.length,
+          agendPorStatus: Array.from(statusMap, ([name, value]) => ({ name, value })),
+          agendPorMedico: Array.from(medicoMap, ([name, value]) => ({ name, value }))
+            .sort((a, b) => b.value - a.value)
+            .slice(0, 8),
+          receitas,
+          despesas,
+          finPorCategoria: Array.from(catMap, ([name, value]) => ({ name, value }))
+            .sort((a, b) => b.value - a.value)
+            .slice(0, 8),
+          finPorDia,
+          novosPacientes: pac.count ?? 0,
+          prontuariosCount: pront.count ?? 0,
+        });
+      } catch (e: any) {
+        console.error("dashboard relatorios:", e);
+        toast.error(e?.message ?? "Erro ao carregar dashboard");
+      } finally {
+        if (!cancel) setLoading(false);
+      }
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [clinicaId, ini, fim]);
+
+  const saldo = useMemo(
+    () => (data ? data.receitas - data.despesas : 0),
+    [data],
+  );
+
+  if (!clinicaId) {
+    return (
+      <Card>
+        <CardContent className="py-10 text-center text-muted-foreground">
+          Selecione uma clínica para visualizar o dashboard.
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (loading || !data) {
+    return (
+      <Card>
+        <CardContent className="py-10 text-center text-muted-foreground">
+          Carregando dados…
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* KPIs */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Kpi icon={<CalendarDays className="h-5 w-5" />} label="Agendamentos" value={data.totalAgend.toString()} tint="text-blue-600" />
+        <Kpi icon={<Users className="h-5 w-5" />} label="Novos pacientes" value={data.novosPacientes.toString()} tint="text-purple-600" />
+        <Kpi icon={<FileHeart className="h-5 w-5" />} label="Prontuários" value={data.prontuariosCount.toString()} tint="text-pink-600" />
+        <Kpi icon={<Wallet className="h-5 w-5" />} label="Saldo" value={fmtBRL(saldo)} tint={saldo >= 0 ? "text-emerald-600" : "text-red-600"} />
+        <Kpi icon={<TrendingUp className="h-5 w-5" />} label="Receitas" value={fmtBRL(data.receitas)} tint="text-emerald-600" />
+        <Kpi icon={<TrendingDown className="h-5 w-5" />} label="Despesas" value={fmtBRL(data.despesas)} tint="text-red-600" />
+      </div>
+
+      {/* Financeiro por dia */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Receitas vs Despesas (por dia)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {data.finPorDia.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-8 text-center">Sem lançamentos no período.</p>
+          ) : (
+            <MiniBarChart
+              labels={data.finPorDia.map((d) => d.label)}
+              series={[
+                { name: "Receitas", color: "#10b981", values: data.finPorDia.map((d) => d.receita) },
+                { name: "Despesas", color: "#ef4444", values: data.finPorDia.map((d) => d.despesa) },
+              ]}
+              formatY={(n) => "R$ " + Math.round(n).toLocaleString("pt-BR")}
+            />
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Pies */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader><CardTitle className="text-base">Agendamentos por status</CardTitle></CardHeader>
+          <CardContent>
+            <MiniPieChart data={data.agendPorStatus} />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle className="text-base">Agendamentos por médico (top 8)</CardTitle></CardHeader>
+          <CardContent>
+            <MiniPieChart data={data.agendPorMedico} />
+          </CardContent>
+        </Card>
+        <Card className="lg:col-span-2">
+          <CardHeader><CardTitle className="text-base">Financeiro por categoria (top 8)</CardTitle></CardHeader>
+          <CardContent>
+            <MiniPieChart data={data.finPorCategoria} formatValue={fmtBRL} />
+          </CardContent>
+        </Card>
       </div>
     </div>
+  );
+}
+
+function Kpi({
+  icon, label, value, tint,
+}: { icon: React.ReactNode; label: string; value: string; tint: string }) {
+  return (
+    <Card>
+      <CardContent className="pt-6">
+        <div className={`flex items-center gap-2 ${tint}`}>{icon}<span className="text-sm text-muted-foreground">{label}</span></div>
+        <p className={`text-2xl font-semibold mt-1 ${tint}`}>{value}</p>
+      </CardContent>
+    </Card>
   );
 }
