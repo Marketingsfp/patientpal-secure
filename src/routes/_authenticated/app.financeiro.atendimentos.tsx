@@ -224,16 +224,17 @@ function Page() {
       .lte("data", fFim);
     let qAgenda = supabase
       .from("fin_lancamentos")
-      .select("id, data, descricao, valor, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_forma_pagamento, agendamento:agendamentos(procedimento, paciente_nome, paciente_id)")
+      .select("id, data, descricao, valor, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_forma_pagamento, agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id)")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("tipo", "receita")
       .eq("status", "confirmado")
-      .not("medico_id", "is", null)
       .gte("data", fIni)
       .lte("data", fFim);
     if (fMedico !== "todos") {
       qManual = qManual.eq("medico_id", fMedico);
-      qAgenda = qAgenda.eq("medico_id", fMedico);
+      // Para agenda: o lançamento pode estar com medico_id nulo; filtramos pelo
+      // medico_id do próprio agendamento referenciado.
+      qAgenda = qAgenda.or(`medico_id.eq.${fMedico},agendamento.medico_id.eq.${fMedico}`);
     }
     const [mr, ar] = await Promise.all([qManual.order("data", { ascending: false }), qAgenda.order("data", { ascending: false })]);
     if (mr.error) { toast.error(mr.error.message); setLoading(false); return; }
@@ -246,18 +247,19 @@ function Page() {
       repasse_pago: !!r.repasse_pago, repasse_pago_em: r.repasse_pago_em, repasse_forma_pagamento: r.repasse_forma_pagamento,
     }));
     const agend: Atend[] = (ar.data ?? []).map((r): Atend => {
-      const ag = (r as any).agendamento as { procedimento: string | null; paciente_nome: string | null; paciente_id: string | null } | null;
+      const ag = (r as any).agendamento as { procedimento: string | null; paciente_nome: string | null; paciente_id: string | null; medico_id: string | null } | null;
       // Prefer the real procedure from the agendamento (descricao often holds the especialidade after the em-dash).
       const proc = ag?.procedimento || ((r.descricao ?? "").split("—").slice(1).join("—").trim() || r.descricao);
       const pacNomeExtra = ag?.paciente_nome ?? ((r.descricao ?? "").split("—")[0]?.trim() || null);
       const pacIdEff = r.paciente_id ?? ag?.paciente_id ?? null;
+      const medIdEff = r.medico_id ?? ag?.medico_id ?? null;
       const pago = Number(r.valor);
-      const { total, repasse } = calcRepasseFull(r.medico_id, pago, proc);
+      const { total, repasse } = calcRepasseFull(medIdEff, pago, proc);
       return {
         id: r.id, data: r.data, procedimento: proc,
         valor_total: total, valor_medico: repasse, valor_clinica: +(total - repasse).toFixed(2),
         status: "realizado", forma_pagamento: r.forma_pagamento,
-        medico_id: r.medico_id, paciente_id: pacIdEff,
+        medico_id: medIdEff, paciente_id: pacIdEff,
         paciente_nome_extra: pacNomeExtra,
         origem: "agenda",
         repasse_pago: !!r.repasse_pago, repasse_pago_em: r.repasse_pago_em, repasse_forma_pagamento: r.repasse_forma_pagamento,
