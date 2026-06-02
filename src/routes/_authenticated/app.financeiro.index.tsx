@@ -23,15 +23,17 @@ function FinDashboard() {
     if (!clinicaAtual) return;
     const { from, to } = rangeFromPeriodo(periodo);
     (async () => {
-      const [{ data: lanc }, { data: at }] = await Promise.all([
-        supabase.from("fin_lancamentos").select("tipo, valor, categoria_id, fin_categorias(nome)")
-          .eq("clinica_id", clinicaAtual.clinica_id).eq("status","confirmado")
-          .gte("data", from).lte("data", to),
+      const [resumoRes, { data: at }] = await Promise.all([
+        supabase.rpc("fin_resumo_periodo", { p_clinica: clinicaAtual.clinica_id, p_ini: from, p_fim: to }),
         supabase.from("fin_atendimentos").select("valor_total, valor_medico")
           .eq("clinica_id", clinicaAtual.clinica_id).gte("data", from).lte("data", to),
       ]);
-      const receitas = (lanc ?? []).filter((l: { tipo: string }) => l.tipo === "receita").reduce((s, l) => s + Number(l.valor), 0);
-      const despesas = (lanc ?? []).filter((l: { tipo: string }) => l.tipo === "despesa").reduce((s, l) => s + Number(l.valor), 0);
+      let receitas = 0, despesas = 0;
+      for (const row of ((resumoRes.data ?? []) as Array<{ tipo: string; status: string; total: number }>)) {
+        if (row.status !== "confirmado") continue;
+        if (row.tipo === "receita") receitas += Number(row.total) || 0;
+        else if (row.tipo === "despesa") despesas += Number(row.total) || 0;
+      }
       const repasse = (at ?? []).reduce((s, a) => s + Number(a.valor_medico ?? 0), 0);
       setStats({ receitas, despesas, atendimentos: at?.length ?? 0, repasse });
     })();
