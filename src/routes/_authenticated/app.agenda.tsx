@@ -2479,7 +2479,7 @@ function AgendaPage() {
                     })()}
                   </TableCell>
                   <TableCell className="pr-1 align-middle max-w-[220px]">
-                    {normalizar(a.paciente_nome) === "disponivel" ? (
+                    {isSlotLivre(a.paciente_nome) ? (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -2515,13 +2515,13 @@ function AgendaPage() {
                     <ProcedimentoCell
                       valor={procedimentoEfetivo(a.medico_id, a.procedimento)}
                       opcoes={opcoesProcedimentoMedico(a.medico_id)}
-                      disabled={normalizar(a.paciente_nome) === "disponivel"}
+                      disabled={isSlotLivre(a.paciente_nome)}
                       onChange={(novo) => atualizarProcedimento(a, novo)}
                     />
                   </TableCell>
                   <TableCell className="text-center">
                     <div className="flex flex-col items-center gap-0.5">
-                      {normalizar(a.paciente_nome) === "disponivel" ? (
+                      {isSlotLivre(a.paciente_nome) ? (
                         <Badge className="bg-slate-100 text-slate-600 border border-slate-300">Livre</Badge>
                       ) : (
                         <Badge className={STATUS_COR[a.status]}>{STATUS_LABEL[a.status]}</Badge>
