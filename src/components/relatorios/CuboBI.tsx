@@ -41,6 +41,7 @@ const CUBOS: CubeSpec[] = [
     fields: [
       { key: "status", label: "Status", kind: "string" },
       { key: "medico", label: "Médico", kind: "string" },
+      { key: "especialidade", label: "Especialidade", kind: "string" },
       { key: "procedimento", label: "Serviço", kind: "string" },
       { key: "dia", label: "Dia", kind: "date" },
       { key: "mes", label: "Mês", kind: "string" },
@@ -57,13 +58,15 @@ const CUBOS: CubeSpec[] = [
         .lte("inicio", fim + "T23:59:59");
       if (error) throw error;
       const rows = (data ?? []) as any[];
-      const [medMap, pacMap] = await Promise.all([
+      const [medMap, pacMap, espMap] = await Promise.all([
         lookupNames("medicos", rows.map((r) => r.medico_id)),
         lookupNames("pacientes", rows.map((r) => r.paciente_id)),
+        lookupEspecialidadePorMedico(rows.map((r) => r.medico_id)),
       ]);
       return rows.map((r) => transformDate(r.inicio, {
         status: r.status ?? "—",
         medico: medMap.get(r.medico_id) ?? "Sem médico",
+        especialidade: espMap.get(r.medico_id) ?? "—",
         procedimento: r.procedimento ?? "—",
         paciente: pacMap.get(r.paciente_id) ?? r.paciente_nome ?? "—",
       }));
