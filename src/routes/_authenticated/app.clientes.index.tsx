@@ -280,7 +280,7 @@ function ClientesPage() {
               paciente={null}
               stickyFooter
               onCancel={() => setOpenNovo(false)}
-              onSaved={() => { setOpenNovo(false); void load(); }}
+              onSaved={() => { setOpenNovo(false); void load(busca); }}
             />
           )}
         </DialogContent>
