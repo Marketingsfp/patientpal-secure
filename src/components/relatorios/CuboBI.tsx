@@ -68,8 +68,8 @@ const CUBOS: CubeSpec[] = [
         status: r.status ?? "—",
         medico: medMap.get(r.medico_id) ?? "Sem médico",
         especialidade:
-          espPorMedico.get(r.medico_id) ??
           espPorProc.get(normalizeProcKey(r.procedimento)) ??
+          espPorMedico.get(r.medico_id) ??
           "—",
         procedimento: r.procedimento ?? "—",
         paciente: pacMap.get(r.paciente_id) ?? r.paciente_nome ?? "—",
