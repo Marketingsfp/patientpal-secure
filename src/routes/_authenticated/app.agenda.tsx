@@ -2547,7 +2547,7 @@ function AgendaPage() {
                             </Button>
                           );
                         }
-                        if (!pendenteCheckin && normalizar(a.paciente_nome) !== "disponivel") {
+                        if (!pendenteCheckin && !isSlotLivre(a.paciente_nome)) {
                           return (
                             <Button
                               variant="ghost"
@@ -2577,7 +2577,7 @@ function AgendaPage() {
                         const m = medicos.find((x) => x.id === a.medico_id);
                         const manual = m && m.usa_sistema === false && !recursoIds.has(m.id);
                         if (!manual) return null;
-                        if (normalizar(a.paciente_nome) === "disponivel") return null;
+                        if (isSlotLivre(a.paciente_nome)) return null;
                         const concluido = a.status === "realizado";
                         return (
                           <Button
@@ -2600,7 +2600,7 @@ function AgendaPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => openEdit(a)}><Pencil className="h-4 w-4 mr-2" /> Editar</DropdownMenuItem>
-                        {a.medico_id && recursoIds.has(a.medico_id) && a.paciente_nome !== "DISPONÍVEL" && (
+                        {a.medico_id && recursoIds.has(a.medico_id) && !isSlotLivre(a.paciente_nome) && (
                           <DropdownMenuItem
                             onClick={() => iniciarAtendimentoEnf(a)}
                             disabled={a.status === "realizado"}
