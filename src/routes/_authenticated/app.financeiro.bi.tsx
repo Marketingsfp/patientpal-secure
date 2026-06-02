@@ -24,21 +24,21 @@ function Page() {
       if (!clinicaAtual) { setData([]); setLoading(false); return; }
       setLoading(true);
       const since = new Date(); since.setMonth(since.getMonth() - 5); since.setDate(1);
-      const { data: rows } = await supabase.from("fin_lancamentos")
-        .select("tipo, valor, data")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .gte("data", since.toISOString().slice(0, 10))
-        .neq("status", "cancelado");
+      const ini = since.toISOString().slice(0, 10);
+      const fim = new Date().toISOString().slice(0, 10);
+      const { data: rows } = await supabase.rpc("fin_serie_diaria", {
+        p_clinica: clinicaAtual.clinica_id, p_ini: ini, p_fim: fim, p_status: "confirmado",
+      });
       const buckets: Record<string, Row> = {};
       for (let i = 5; i >= 0; i--) {
         const d = new Date(); d.setMonth(d.getMonth() - i); d.setDate(1);
         const key = d.toISOString().slice(0, 7);
         buckets[key] = { mes: d.toLocaleDateString("pt-BR", { month: "short" }), Receitas: 0, Despesas: 0 };
       }
-      (rows ?? []).forEach((r) => {
-        const key = (r.data as string).slice(0, 7);
+      ((rows ?? []) as Array<{ data: string; tipo: string; total: number }>).forEach((r) => {
+        const key = r.data.slice(0, 7);
         const b = buckets[key]; if (!b) return;
-        if (r.tipo === "receita") b.Receitas += Number(r.valor); else b.Despesas += Number(r.valor);
+        if (r.tipo === "receita") b.Receitas += Number(r.total); else if (r.tipo === "despesa") b.Despesas += Number(r.total);
       });
       setData(Object.values(buckets));
       setLoading(false);
