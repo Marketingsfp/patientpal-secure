@@ -13,7 +13,7 @@ import { MiniPieChart } from "@/components/charts/MiniPieChart";
 import { MiniLineChart } from "@/components/charts/MiniLineChart";
 import { exportToExcel } from "@/lib/export-csv";
 import { toast } from "sonner";
-import { Download, Save, Trash2, BarChart3, PieChart, LineChart, Table as TableIcon, ChevronRight, ChevronDown } from "lucide-react";
+import { Download, Save, Trash2, BarChart3, PieChart, LineChart, Table as TableIcon, ChevronRight, ChevronDown, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 
 // ============================================================
 // Tipos
@@ -399,6 +399,8 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState<SavedView[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  // Sort state for the result table. key: "__label__" (row label), "__total__" or one of colLabels
+  const [sort, setSort] = useState<{ key: string; dir: "asc" | "desc" } | null>(null);
 
   function toggleExpand(label: string) {
     setExpanded((s) => {
@@ -452,12 +454,43 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
 
   const topRows = useMemo(() => {
     const n = Math.max(1, cfg.topN);
+    let order = piv.rowLabels.map((_, i) => i);
+    if (sort) {
+      const collator = new Intl.Collator("pt-BR", { sensitivity: "base", numeric: true });
+      order = order.slice().sort((a, b) => {
+        let cmp = 0;
+        if (sort.key === "__label__") {
+          cmp = collator.compare(piv.rowLabels[a], piv.rowLabels[b]);
+        } else if (sort.key === "__total__") {
+          cmp = piv.totalByRow[a] - piv.totalByRow[b];
+        } else {
+          const ci = piv.colLabels.indexOf(sort.key);
+          if (ci >= 0) cmp = (piv.matrix[a][ci] ?? 0) - (piv.matrix[b][ci] ?? 0);
+        }
+        return sort.dir === "asc" ? cmp : -cmp;
+      });
+    }
+    const top = order.slice(0, n);
     return {
-      rowLabels: piv.rowLabels.slice(0, n),
-      matrix: piv.matrix.slice(0, n),
-      totalByRow: piv.totalByRow.slice(0, n),
+      rowLabels: top.map((i) => piv.rowLabels[i]),
+      matrix: top.map((i) => piv.matrix[i]),
+      totalByRow: top.map((i) => piv.totalByRow[i]),
     };
-  }, [piv, cfg.topN]);
+  }, [piv, cfg.topN, sort]);
+
+  function toggleSort(key: string) {
+    setSort((s) => {
+      if (!s || s.key !== key) return { key, dir: key === "__label__" ? "asc" : "desc" };
+      if (s.dir === "desc") return { key, dir: "asc" };
+      return null; // back to default
+    });
+  }
+  function sortIcon(key: string) {
+    if (!sort || sort.key !== key) return <ArrowUpDown className="h-3 w-3 opacity-40 inline ml-1" />;
+    return sort.dir === "asc"
+      ? <ArrowUp className="h-3 w-3 inline ml-1" />
+      : <ArrowDown className="h-3 w-3 inline ml-1" />;
+  }
 
   const isMonetary = cfg.measureField === "valor" || cfg.measureField === "valor_final" || cfg.measureField === "desconto";
   const fmt = isMonetary ? fmtBRL : fmtNum;
@@ -680,9 +713,24 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>{cube.fields.find((f) => f.key === cfg.rowKey)?.label}</TableHead>
-                    {piv.colLabels.map((c) => <TableHead key={c} className="text-right">{c}</TableHead>)}
-                    <TableHead className="text-right font-semibold">Total</TableHead>
+                    <TableHead>
+                      <button type="button" onClick={() => toggleSort("__label__")} className="hover:underline inline-flex items-center">
+                        {cube.fields.find((f) => f.key === cfg.rowKey)?.label}
+                        {sortIcon("__label__")}
+                      </button>
+                    </TableHead>
+                    {piv.colLabels.map((c) => (
+                      <TableHead key={c} className="text-right">
+                        <button type="button" onClick={() => toggleSort(c)} className="hover:underline inline-flex items-center">
+                          {c}{sortIcon(c)}
+                        </button>
+                      </TableHead>
+                    ))}
+                    <TableHead className="text-right font-semibold">
+                      <button type="button" onClick={() => toggleSort("__total__")} className="hover:underline inline-flex items-center">
+                        Total{sortIcon("__total__")}
+                      </button>
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
