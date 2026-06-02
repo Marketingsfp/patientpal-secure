@@ -417,7 +417,16 @@ function Page() {
 
   const medMap = new Map(medicos.map((m) => [m.id, m.nome]));
   const pacMap = new Map(pacientes.map((p) => [p.id, p.nome]));
-  const totais = useMemo(() => items.reduce(
+  const filteredItems = useMemo(() => {
+    const q = norm(fPaciente.trim());
+    if (!q) return items;
+    return items.filter((a) => {
+      const nome = (a.paciente_id ? pacMap.get(a.paciente_id) : null) ?? a.paciente_nome_extra ?? "";
+      return norm(nome).includes(q);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, fPaciente, pacientes.length]);
+  const totais = useMemo(() => filteredItems.reduce(
     (acc, a) => {
       acc.total += Number(a.valor_total) || 0;
       acc.medico += Number(a.valor_medico) || 0;
@@ -427,9 +436,9 @@ function Page() {
       return acc;
     },
     { total: 0, medico: 0, clinica: 0, pago: 0, aReceber: 0 },
-  ), [items]);
+  ), [filteredItems]);
 
-  const selectables = items.filter((a) => !a.repasse_pago && (a.valor_medico ?? 0) > 0);
+  const selectables = filteredItems.filter((a) => !a.repasse_pago && (a.valor_medico ?? 0) > 0);
   const allSelected = selectables.length > 0 && selectables.every((a) => sel.has(`${a.origem}:${a.id}`));
   const toggleAll = () => {
     if (allSelected) setSel(new Set());
@@ -441,7 +450,7 @@ function Page() {
     if (next.has(k)) next.delete(k); else next.add(k);
     setSel(next);
   };
-  const selectedItems = items.filter((a) => sel.has(`${a.origem}:${a.id}`));
+  const selectedItems = filteredItems.filter((a) => sel.has(`${a.origem}:${a.id}`));
   const selectedTotal = selectedItems.reduce((s, a) => s + (Number(a.valor_medico) || 0), 0);
 
   const openPay = () => {
