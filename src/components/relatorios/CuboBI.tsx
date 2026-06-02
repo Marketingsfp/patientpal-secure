@@ -83,6 +83,7 @@ const CUBOS: CubeSpec[] = [
       { key: "forma_pagamento", label: "Forma de pagamento", kind: "string" },
       { key: "status", label: "Status", kind: "string" },
       { key: "medico", label: "Médico", kind: "string" },
+      { key: "especialidade", label: "Especialidade", kind: "string" },
       { key: "paciente", label: "Paciente", kind: "string" },
       { key: "dia", label: "Dia", kind: "date" },
       { key: "mes", label: "Mês", kind: "string" },
@@ -97,11 +98,12 @@ const CUBOS: CubeSpec[] = [
         .lte("data", fim);
       if (error) throw error;
       const rows = (data ?? []) as any[];
-      const [catMap, contMap, pacMap, medMap] = await Promise.all([
+      const [catMap, contMap, pacMap, medMap, espMap] = await Promise.all([
         lookupNames("fin_categorias", rows.map((r) => r.categoria_id)),
         lookupNames("fin_contas", rows.map((r) => r.conta_id)),
         lookupNames("pacientes", rows.map((r) => r.paciente_id)),
         lookupNames("medicos", rows.map((r) => r.medico_id)),
+        lookupEspecialidadePorMedico(rows.map((r) => r.medico_id)),
       ]);
       return rows.map((r) => transformDate(r.data, {
         tipo: r.tipo ?? "—",
@@ -110,6 +112,7 @@ const CUBOS: CubeSpec[] = [
         forma_pagamento: r.forma_pagamento ?? "—",
         status: r.status ?? "—",
         medico: medMap.get(r.medico_id) ?? "—",
+        especialidade: espMap.get(r.medico_id) ?? "—",
         paciente: pacMap.get(r.paciente_id) ?? "—",
         valor: Number(r.valor) || 0,
       }));
@@ -121,6 +124,7 @@ const CUBOS: CubeSpec[] = [
     usaPeriodo: true,
     fields: [
       { key: "medico", label: "Médico", kind: "string" },
+      { key: "especialidade", label: "Especialidade", kind: "string" },
       { key: "paciente", label: "Paciente", kind: "string" },
       { key: "dia", label: "Dia", kind: "date" },
       { key: "mes", label: "Mês", kind: "string" },
@@ -134,12 +138,14 @@ const CUBOS: CubeSpec[] = [
         .lte("data_atendimento", fim + "T23:59:59");
       if (error) throw error;
       const rows = (data ?? []) as any[];
-      const [medMap, pacMap] = await Promise.all([
+      const [medMap, pacMap, espMap] = await Promise.all([
         lookupNames("medicos", rows.map((r) => r.medico_id)),
         lookupNames("pacientes", rows.map((r) => r.paciente_id)),
+        lookupEspecialidadePorMedico(rows.map((r) => r.medico_id)),
       ]);
       return rows.map((r) => transformDate(r.data_atendimento, {
         medico: medMap.get(r.medico_id) ?? "Sem médico",
+        especialidade: espMap.get(r.medico_id) ?? "—",
         paciente: pacMap.get(r.paciente_id) ?? "—",
       }));
     },
@@ -217,6 +223,38 @@ async function lookupNames(
     map.set(r.id, r.nome);
   }
   return map;
+}
+
+async function lookupEspecialidadePorMedico(
+  medicoIds: Array<string | null | undefined>,
+): Promise<Map<string, string>> {
+  const unique = Array.from(new Set(medicoIds.filter((x): x is string => !!x)));
+  if (unique.length === 0) return new Map();
+  const { data: meds } = await supabase
+    .from("medicos")
+    .select("id, especialidade_id")
+    .in("id", unique);
+  const espIds = Array.from(
+    new Set(((meds ?? []) as any[]).map((m) => m.especialidade_id).filter((x): x is string => !!x)),
+  );
+  const espMap = new Map<string, string>();
+  if (espIds.length > 0) {
+    const { data: esps } = await supabase
+      .from("especialidades")
+      .select("id, nome")
+      .in("id", espIds);
+    for (const e of (esps ?? []) as Array<{ id: string; nome: string }>) {
+      espMap.set(e.id, e.nome);
+    }
+  }
+  const result = new Map<string, string>();
+  for (const m of (meds ?? []) as Array<{ id: string; especialidade_id: string | null }>) {
+    if (m.especialidade_id) {
+      const nome = espMap.get(m.especialidade_id);
+      if (nome) result.set(m.id, nome);
+    }
+  }
+  return result;
 }
 
 function transformDate(isoStr: string | null, base: Record<string, any>) {
