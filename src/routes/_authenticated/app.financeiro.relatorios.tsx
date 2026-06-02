@@ -29,6 +29,21 @@ function download(filename: string, content: string) {
   URL.revokeObjectURL(url);
 }
 
+async function fetchAll(builder: () => any): Promise<Record<string, unknown>[]> {
+  const PAGE = 1000;
+  let offset = 0;
+  const all: Record<string, unknown>[] = [];
+  while (true) {
+    const { data, error } = await builder().range(offset, offset + PAGE - 1);
+    if (error) throw error;
+    const rows = (data ?? []) as Record<string, unknown>[];
+    all.push(...rows);
+    if (rows.length < PAGE) break;
+    offset += PAGE;
+  }
+  return all;
+}
+
 function Page() {
   const { clinicaAtual } = useClinica();
   const [tipo, setTipo] = useState<"lancamentos" | "atendimentos" | "notas">("lancamentos");
@@ -39,22 +54,25 @@ function Page() {
   const gerar = async () => {
     if (!clinicaAtual) return;
     setLoading(true);
-    let data: Record<string, unknown>[] | null = null;
-    if (tipo === "lancamentos") {
-      const { data: d } = await supabase.from("fin_lancamentos")
-        .select("data, tipo, descricao, valor, status, forma_pagamento")
-        .eq("clinica_id", clinicaAtual.clinica_id).gte("data", from).lte("data", to).order("data");
-      data = d;
-    } else if (tipo === "atendimentos") {
-      const { data: d } = await supabase.from("fin_atendimentos")
-        .select("data, procedimento, valor_total, valor_medico, valor_clinica, status, forma_pagamento")
-        .eq("clinica_id", clinicaAtual.clinica_id).gte("data", from).lte("data", to).order("data");
-      data = d;
-    } else {
-      const { data: d } = await supabase.from("fin_notas_pacientes")
-        .select("data_emissao, numero, serie, valor, status")
-        .eq("clinica_id", clinicaAtual.clinica_id).gte("data_emissao", from).lte("data_emissao", to).order("data_emissao");
-      data = d;
+    let data: Record<string, unknown>[] = [];
+    try {
+      if (tipo === "lancamentos") {
+        data = await fetchAll(() => supabase.from("fin_lancamentos")
+          .select("data, tipo, descricao, valor, status, forma_pagamento")
+          .eq("clinica_id", clinicaAtual.clinica_id).gte("data", from).lte("data", to).order("data"));
+      } else if (tipo === "atendimentos") {
+        data = await fetchAll(() => supabase.from("fin_atendimentos")
+          .select("data, procedimento, valor_total, valor_medico, valor_clinica, status, forma_pagamento")
+          .eq("clinica_id", clinicaAtual.clinica_id).gte("data", from).lte("data", to).order("data"));
+      } else {
+        data = await fetchAll(() => supabase.from("fin_notas_pacientes")
+          .select("data_emissao, numero, serie, valor, status")
+          .eq("clinica_id", clinicaAtual.clinica_id).gte("data_emissao", from).lte("data_emissao", to).order("data_emissao"));
+      }
+    } catch (e: any) {
+      setLoading(false);
+      toast.error(e?.message ?? "Erro ao buscar dados");
+      return;
     }
     setLoading(false);
     if (!data || data.length === 0) { toast.info("Nenhum dado no período"); return; }

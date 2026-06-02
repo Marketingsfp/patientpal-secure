@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Plus, Pencil, Trash2, ArrowUpCircle, ArrowDownCircle, Download } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -50,6 +50,8 @@ function Page() {
   const [fromDate, setFromDate] = useState(new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10));
   const [toDate, setToDate] = useState(new Date().toISOString().slice(0, 10));
   const [detalhe, setDetalhe] = useState<null | "receita" | "despesa">(null);
+  const [resumo, setResumo] = useState<{ r: number; d: number; saldo: number; totalRows: number }>({ r: 0, d: 0, saldo: 0, totalRows: 0 });
+  const [filterStatus, setFilterStatus] = useState<"confirmado" | "todos" | "pendente">("confirmado");
 
   const load = async () => {
     if (!clinicaAtual) { setItems([]); setLoading(false); return; }
@@ -58,11 +60,28 @@ function Page() {
       .select("id, tipo, descricao, valor, data, status, categoria_id, conta_id, forma_pagamento")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .gte("data", fromDate).lte("data", toDate)
-      .order("data", { ascending: false });
+      .order("data", { ascending: false })
+      .range(0, 499);
     if (filterTipo !== "todos") q = q.eq("tipo", filterTipo);
     const { data, error } = await q;
     if (error) toast.error(error.message); else setItems((data ?? []) as Lanc[]);
     setLoading(false);
+  };
+  const loadResumo = async () => {
+    if (!clinicaAtual) { setResumo({ r: 0, d: 0, saldo: 0, totalRows: 0 }); return; }
+    const { data, error } = await supabase.rpc("fin_resumo_periodo", {
+      p_clinica: clinicaAtual.clinica_id, p_ini: fromDate, p_fim: toDate,
+    });
+    if (error) { toast.error(error.message); return; }
+    let r = 0, d = 0, totalRows = 0;
+    for (const row of (data ?? []) as Array<{ tipo: string; status: string; qtd: number; total: number }>) {
+      totalRows += Number(row.qtd) || 0;
+      if (row.status === "cancelado") continue;
+      if (filterStatus !== "todos" && row.status !== filterStatus) continue;
+      if (row.tipo === "receita") r += Number(row.total) || 0;
+      else if (row.tipo === "despesa") d += Number(row.total) || 0;
+    }
+    setResumo({ r, d, saldo: r - d, totalRows });
   };
   const loadOpts = async () => {
     if (!clinicaAtual) return;
@@ -72,14 +91,9 @@ function Page() {
     ]);
     setCats((c.data ?? []) as Opt[]); setContas((b.data ?? []) as Opt[]);
   };
-  useEffect(() => { void load(); }, [clinicaAtual?.clinica_id, filterTipo, fromDate, toDate]);
+  useEffect(() => { void load(); void loadResumo(); }, [clinicaAtual?.clinica_id, filterTipo, fromDate, toDate, filterStatus]);
   useEffect(() => { void loadOpts(); }, [clinicaAtual?.clinica_id]);
-
-  const totais = useMemo(() => {
-    let r = 0, d = 0;
-    for (const i of items) { if (i.tipo === "receita") r += Number(i.valor); else d += Number(i.valor); }
-    return { r, d, saldo: r - d };
-  }, [items]);
+  const totais = resumo;
 
   const openNew = () => { setEditing(null); setForm(EMPTY); setOpen(true); };
   const openEdit = (l: Lanc) => { setEditing(l); setForm({
@@ -103,13 +117,13 @@ function Page() {
       : await supabase.from("fin_lancamentos").insert(payload);
     setSaving(false);
     if (error) { toast.error(error.message); return; }
-    toast.success("Salvo"); setOpen(false); await load();
+    toast.success("Salvo"); setOpen(false); await load(); await loadResumo();
   };
 
   const remove = async (l: Lanc) => {
     if (!confirm(`Excluir "${l.descricao}"?`)) return;
     const { error } = await supabase.from("fin_lancamentos").delete().eq("id", l.id);
-    if (error) toast.error(error.message); else { toast.success("Removido"); await load(); }
+    if (error) toast.error(error.message); else { toast.success("Removido"); await load(); await loadResumo(); }
   };
 
   const catsFiltradas = cats.filter((c) => !c.tipo || c.tipo === form.tipo);
@@ -271,12 +285,27 @@ function Page() {
               <SelectItem value="despesa">Despesas</SelectItem>
             </SelectContent>
           </Select></div>
+        <div className="space-y-1"><Label className="text-xs">Status (totais)</Label>
+          <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as typeof filterStatus)}>
+            <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="confirmado">Apenas confirmados</SelectItem>
+              <SelectItem value="pendente">Apenas pendentes</SelectItem>
+              <SelectItem value="todos">Confirmados + pendentes</SelectItem>
+            </SelectContent>
+          </Select></div>
       </CardContent></Card>
 
       <Card><CardContent className="p-0">
         {loading ? <div className="py-12 text-center text-muted-foreground">Carregando...</div>
           : items.length === 0 ? <div className="py-12 text-center text-muted-foreground">Nenhum lançamento no período.</div>
-          : <Table>
+          : <>
+          {resumo.totalRows > items.length ? (
+            <div className="px-4 py-2 text-xs text-muted-foreground bg-muted/30 border-b">
+              Exibindo os {items.length.toLocaleString("pt-BR")} lançamentos mais recentes de {resumo.totalRows.toLocaleString("pt-BR")} no período. Os totais acima consideram todos.
+            </div>
+          ) : null}
+          <Table>
             <TableHeader><TableRow>
               <TableHead className="w-10"></TableHead>
               <TableHead>Data</TableHead>
@@ -301,7 +330,7 @@ function Page() {
                 </TableCell>
               </TableRow>))}
             </TableBody>
-          </Table>}
+          </Table></>}
       </CardContent></Card>
     </div>
   );
