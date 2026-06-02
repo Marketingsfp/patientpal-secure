@@ -117,16 +117,22 @@ async function buscarProcedimentoPorNome(
     p && [p.valor_dinheiro, p.valor_pix, p.valor_padrao, p.valor_cartao, p.valor_cartao_credito, p.valor_cartao_debito, p.valor_dinheiro_pix]
       .some((v) => Number(v) > 0);
   if (temValor(proc)) return proc;
-  // Fallback: consulta direta no banco com ilike (case-insensitive)
+  // Fallback: consulta direta no banco com ilike (case-insensitive),
+  // usando %nome% para casar variações como "ELETROCARDIOGRAMA (ECG)"
+  // quando o agendamento está como "ELETROCARDIOGRAMA".
+  const padrao = `%${nomeBase}%`;
   const { data } = await supabase
     .from("procedimentos")
     .select("nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix")
     .eq("clinica_id", clinicaId)
-    .ilike("nome", nomeBase)
-    .limit(5);
-  const exato = (data ?? []).find((p) => temValor(p)) ?? (data ?? [])[0];
-  if (temValor(exato)) return exato;
-  return proc ?? exato ?? null;
+    .ilike("nome", padrao)
+    .limit(10);
+  // Prefere match exato com valor; depois qualquer um com valor; depois o primeiro.
+  const exatoComValor = (data ?? []).find((p) => norm(p.nome ?? "") === alvo && temValor(p));
+  const qualquerComValor = (data ?? []).find((p) => temValor(p));
+  const escolhido = exatoComValor ?? qualquerComValor ?? (data ?? [])[0];
+  if (temValor(escolhido)) return escolhido;
+  return proc ?? escolhido ?? null;
 }
 
 async function fetchProcedimentosAgenda(clinicaId: string): Promise<ProcedimentoRef[]> {
@@ -436,7 +442,7 @@ function AgendaPage() {
   type FormaOpcao = { forma: string; label: string; valor: number };
   const [formaPagOpen, setFormaPagOpen] = useState(false);
   const [formaPagOpcoes, setFormaPagOpcoes] = useState<FormaOpcao[]>([]);
-  const [formaPagCtx, setFormaPagCtx] = useState<{ agId: string; desc: string } | null>(null);
+  const [formaPagCtx, setFormaPagCtx] = useState<{ agId: string; desc: string; paciente?: string; procedimento?: string } | null>(null);
   const [novoPacOpen, setNovoPacOpen] = useState(false);
   const [novoPac, setNovoPac] = useState({ nome: "", cpf: "", telefone: "", data_nascimento: "", email: "" });
   const [savingPac, setSavingPac] = useState(false);
@@ -1042,7 +1048,12 @@ function AgendaPage() {
       { forma: "cartao_credito", label: "Cartão de Crédito", valor: totalCredito },
     ];
     setFormaPagOpcoes(opcoes);
-    setFormaPagCtx({ agId: itens.map(i => i.id).join(","), desc });
+    setFormaPagCtx({
+      agId: itens.map(i => i.id).join(","),
+      desc,
+      paciente,
+      procedimento: `${itens.map(i => (i.procedimento ?? "CONSULTA")).join(" + ")} (${itens.length} serviços)`,
+    });
     setFormaPagOpen(true);
   };
 
@@ -1370,7 +1381,12 @@ function AgendaPage() {
         }
       }
       setFormaPagOpcoes(opcoes);
-      setFormaPagCtx({ agId: novoId, desc: `${payload.paciente_nome} — ${payload.procedimento ?? "CONSULTA"}${descSuffix}` });
+      setFormaPagCtx({
+        agId: novoId,
+        desc: `${payload.paciente_nome} — ${payload.procedimento ?? "CONSULTA"}${descSuffix}`,
+        paciente: payload.paciente_nome ?? "",
+        procedimento: `${payload.procedimento ?? "CONSULTA"}${descSuffix}`,
+      });
       setFormaPagOpen(true);
     }
   };
@@ -1511,7 +1527,12 @@ function AgendaPage() {
       }
     }
     setFormaPagOpcoes(opcoes);
-    setFormaPagCtx({ agId: a.id, desc: `${a.paciente_nome} — ${a.procedimento ?? "CONSULTA"}${descSuffix}` });
+    setFormaPagCtx({
+      agId: a.id,
+      desc: `${a.paciente_nome} — ${a.procedimento ?? "CONSULTA"}${descSuffix}`,
+      paciente: a.paciente_nome ?? "",
+      procedimento: `${a.procedimento ?? "CONSULTA"}${descSuffix}`,
+    });
     setFormaPagOpen(true);
   };
 
@@ -1994,10 +2015,17 @@ function AgendaPage() {
           <DialogHeader>
             <DialogTitle>Forma de pagamento</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground -mt-2">
-            {formaPagCtx?.desc}
-            <span className="block text-xs mt-1 opacity-70">Dica: use as teclas 1–5 para escolher rapidamente.</span>
-          </p>
+          <div className="text-sm -mt-2 space-y-1">
+            {formaPagCtx?.paciente ? (
+              <div className="font-semibold text-primary leading-tight">{formaPagCtx.paciente}</div>
+            ) : null}
+            {formaPagCtx?.procedimento ? (
+              <div className="font-medium text-emerald-600 dark:text-emerald-400 leading-tight">{formaPagCtx.procedimento}</div>
+            ) : (
+              <div className="text-muted-foreground">{formaPagCtx?.desc}</div>
+            )}
+            <span className="block text-xs mt-1 text-muted-foreground opacity-80">Dica: use as teclas 1–5 para escolher rapidamente.</span>
+          </div>
           <div className="grid gap-2 mt-2">
             {formaPagOpcoes.map((op, idx) => (
               <Button
