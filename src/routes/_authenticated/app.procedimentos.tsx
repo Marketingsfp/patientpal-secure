@@ -479,11 +479,11 @@ function ProcedimentosPage() {
   }, [clinicaAtual?.clinica_id]);
 
   // ---- Auto-preenchimento dos valores por convênio a partir das regras ----
-  // Recalcula quando o usuário muda especialidade, tipo, ou os valores base
-  // (Dinheiro / Pix·Déb·Créd). Convenios marcados como manuais ficam intactos.
+  // Recalcula APENAS quando os valores base (Dinheiro / Pix·Déb·Créd) mudam.
+  // Mudar especialidade ou tipo NÃO recalcula. Convenios marcados como manuais
+  // (qualquer edição feita pelo usuário) também ficam intactos.
   useEffect(() => {
     if (!open || convenios.length === 0) return;
-    // Resolve especialidade_id pelo nome de form.grupo (igual ao filtro)
     const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
     const espId = form.grupo
       ? (especialidades.find(e => norm(e.nome) === norm(form.grupo))?.id ?? null)
@@ -506,7 +506,7 @@ function ProcedimentosPage() {
       return next;
     });
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
-  }, [open, form.grupo, form.tipo, form.valor_dinheiro, form.valor_pix_cartao, regras, convenios, especialidades]);
+  }, [open, form.valor_dinheiro, form.valor_pix_cartao, regras, convenios]);
 
   const grupos = useMemo(() => {
     const s = new Set<string>();
