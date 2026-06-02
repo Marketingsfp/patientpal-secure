@@ -1391,6 +1391,13 @@ function Page() {
         onOpenChange={(v) => { if (!v) setEstornoFor(null); }}
         descricao={estornoFor?.descricao ?? null}
         valor={estornoFor?.valor ?? null}
+        lancamentoId={estornoFor?.lancamento_id ?? null}
+        pacienteNome={(() => {
+          const d = estornoFor?.descricao ?? "";
+          // Formato esperado: "NOME PACIENTE — PROCEDIMENTO"
+          const idx = d.indexOf("—");
+          return idx > 0 ? d.slice(0, idx).trim() : null;
+        })()}
       />
     </div>
   );
