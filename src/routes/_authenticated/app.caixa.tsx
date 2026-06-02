@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   Wallet, PlusCircle, MinusCircle, ArrowDownToLine, ArrowUpFromLine, Lock,
-  Unlock, Eye, FileDown, Users, Receipt, ChevronRight, Trash2, Plus, HandCoins, ArrowRight, Undo2,
+  Unlock, Eye, FileDown, Users, Receipt, ChevronRight, Trash2, Plus, HandCoins, ArrowRight, Undo2, Printer,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -447,6 +447,18 @@ function Page() {
     return todosMovs
       .filter((m) => m.sessao_id === sid)
       .reduce((acc, m) => acc + TIPO_SINAL[m.tipo] * Number(m.valor || 0), 0);
+  }, [todosMovs]);
+
+  // Totais auxiliares por sessao
+  const calcSangriaSessao = useCallback((sid: string) => {
+    return todosMovs
+      .filter((m) => m.sessao_id === sid && m.tipo === "sangria")
+      .reduce((acc, m) => acc + Number(m.valor || 0), 0);
+  }, [todosMovs]);
+  const calcEstornoSessao = useCallback((sid: string) => {
+    return todosMovs
+      .filter((m) => m.sessao_id === sid && (m.descricao ?? "").toLowerCase().includes("estorno"))
+      .reduce((acc, m) => acc + Number(m.valor || 0), 0);
   }, [todosMovs]);
 
   // Acoes
