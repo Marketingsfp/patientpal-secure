@@ -55,6 +55,7 @@ function EquipePage() {
   const [loading, setLoading] = useState(false);
   const [openChooser, setOpenChooser] = useState(false);
   const [busca, setBusca] = useState("");
+  const [medicoStatus, setMedicoStatus] = useState<"ativos" | "inativos" | "todos">("ativos");
   const [funcDialog, setFuncDialog] = useState<{ open: boolean; userId?: string | null }>({ open: false, userId: null });
   const [medicoDialog, setMedicoDialog] = useState<{ open: boolean; id: string | null }>({ open: false, id: null });
   const [enfDialog, setEnfDialog] = useState<{ open: boolean; userId?: string | null }>({ open: false, userId: null });
@@ -138,9 +139,14 @@ function EquipePage() {
   const funcsFiltrados = q
     ? funcionarios.filter((f) => f.nome.toLowerCase().includes(q) || f.role.toLowerCase().includes(q))
     : funcionarios;
+  const medicosPorStatus = medicos.filter((m) =>
+    medicoStatus === "todos" ? true : medicoStatus === "ativos" ? m.ativo : !m.ativo
+  );
   const medicosFiltrados = q
-    ? medicos.filter((m) => m.nome.toLowerCase().includes(q) || (m.crm ?? "").includes(q))
-    : medicos;
+    ? medicosPorStatus.filter((m) => m.nome.toLowerCase().includes(q) || (m.crm ?? "").includes(q))
+    : medicosPorStatus;
+  const medicosAtivosCount = medicos.filter((m) => m.ativo).length;
+  const medicosInativosCount = medicos.length - medicosAtivosCount;
   const enfermeirosFiltrados = q
     ? enfermeiros.filter((e) =>
         e.nome.toLowerCase().includes(q) ||
