@@ -910,16 +910,20 @@ function Page() {
                       <TableHead className="text-right">Abertura</TableHead>
                       <TableHead className="text-right">Calculado</TableHead>
                       <TableHead className="text-right">Informado</TableHead>
+                      <TableHead className="text-right">Sangria</TableHead>
+                      <TableHead className="text-right">Estorno</TableHead>
                       <TableHead className="text-right">Diferença</TableHead>
                       <TableHead></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {todasSessoes.length === 0 && (
-                      <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Sem sessões no período</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground">Sem sessões no período</TableCell></TableRow>
                     )}
                     {todasSessoes.map((s) => {
                       const calc = calcSaldoSessao(s.id);
+                      const sangria = calcSangriaSessao(s.id);
+                      const estorno = calcEstornoSessao(s.id);
                       return (
                         <TableRow key={s.id}>
                           <TableCell className="font-medium">{s.user_nome || s.user_id.slice(0, 8)}</TableCell>
@@ -929,6 +933,8 @@ function Page() {
                           <TableCell className="text-right">{fmt(s.valor_abertura)}</TableCell>
                           <TableCell className="text-right">{fmt(calc)}</TableCell>
                           <TableCell className="text-right">{fmt(s.valor_fechamento_informado)}</TableCell>
+                          <TableCell className={`text-right ${sangria > 0 ? "text-amber-700" : "text-muted-foreground"}`}>{fmt(sangria)}</TableCell>
+                          <TableCell className={`text-right ${estorno > 0 ? "text-rose-700" : "text-muted-foreground"}`}>{fmt(estorno)}</TableCell>
                           <TableCell className={`text-right ${Number(s.diferenca || 0) < 0 ? "text-rose-600" : Number(s.diferenca || 0) > 0 ? "text-amber-600" : ""}`}>
                             {fmt(s.diferenca)}
                           </TableCell>
