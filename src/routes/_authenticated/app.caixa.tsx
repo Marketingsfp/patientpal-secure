@@ -1281,7 +1281,20 @@ function Page() {
       {/* === Modal Detalhe === */}
       <Dialog open={!!openDetalhe} onOpenChange={(o) => { if (!o) { setOpenDetalhe(null); setDetalheMovs([]); } }}>
         <DialogContent className="max-w-3xl">
-          <DialogHeader><DialogTitle>Sessão de caixa</DialogTitle>
+          <DialogHeader>
+            <div className="flex items-center justify-between gap-2 pr-8">
+              <DialogTitle>Sessão de caixa</DialogTitle>
+              {openDetalhe && (
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="outline" onClick={exportarDetalhe}>
+                    <FileDown className="h-4 w-4 mr-1" /> Excel
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={imprimirDetalhe}>
+                    <Printer className="h-4 w-4 mr-1" /> Imprimir
+                  </Button>
+                </div>
+              )}
+            </div>
             {openDetalhe && (
               <DialogDescription>
                 {openDetalhe.user_nome || "—"} · {fmtDT(openDetalhe.aberto_em)} → {fmtDT(openDetalhe.fechado_em)}
