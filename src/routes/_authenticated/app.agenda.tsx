@@ -871,9 +871,12 @@ function AgendaPage() {
   const procedimentoPadraoDoMedico = (medicoId: string | null | undefined) => {
     if (!medicoId) return "";
     const med = medicos.find((m) => m.id === medicoId);
-    if (!med?.procedimento_padrao_id) return "";
-    return med.procedimento_padrao_nome
-      ?? procedimentosList.find((p) => p.id === med.procedimento_padrao_id)?.nome
+    if (!med) return "";
+    return (med.procedimento_padrao_id
+      ? med.procedimento_padrao_nome
+        ?? procedimentosList.find((p) => p.id === med.procedimento_padrao_id)?.nome
+      : null)
+      ?? med.especialidade_nome
       ?? "";
   };
 
