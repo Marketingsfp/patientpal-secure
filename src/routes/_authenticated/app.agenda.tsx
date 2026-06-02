@@ -631,23 +631,33 @@ function AgendaPage() {
       // quando há muitos agendamentos no dia.
       const CHUNK = 200;
       const pagosIds: string[] = [];
+      const infoMap = new Map<string, { valor: number; forma: string | null }>();
       for (let i = 0; i < ids.length; i += CHUNK) {
         const slice = ids.slice(i, i + CHUNK);
         const { data: pg, error: pgErr } = await supabase
           .from("fin_lancamentos")
-          .select("agendamento_id")
+          .select("agendamento_id, valor, forma_pagamento")
           .eq("clinica_id", clinicaAtual.clinica_id)
           .eq("tipo", "receita")
           .eq("status", "confirmado")
           .in("agendamento_id", slice);
         if (pgErr) continue;
-        ((pg ?? []) as Array<{ agendamento_id: string | null }>).forEach((r) => {
-          if (r.agendamento_id) pagosIds.push(r.agendamento_id);
+        ((pg ?? []) as Array<{ agendamento_id: string | null; valor: number | string | null; forma_pagamento: string | null }>).forEach((r) => {
+          if (!r.agendamento_id) return;
+          pagosIds.push(r.agendamento_id);
+          const prev = infoMap.get(r.agendamento_id);
+          const v = Number(r.valor ?? 0);
+          infoMap.set(r.agendamento_id, {
+            valor: (prev?.valor ?? 0) + v,
+            forma: prev?.forma ?? r.forma_pagamento ?? null,
+          });
         });
       }
       setPagosSet(new Set(pagosIds.filter((x) => idsComPaciente.has(x))));
+      setPagoInfoMap(infoMap);
     } else {
       setPagosSet(new Set());
+      setPagoInfoMap(new Map());
     }
   };
 
