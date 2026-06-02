@@ -334,6 +334,7 @@ function ProcedimentosPage() {
   const [saving, setSaving] = useState(false);
   const [seeding, setSeeding] = useState(false);
   const [tipos, setTipos] = useState<{ id: string; nome: string }[]>([]);
+  const [openTipoPicker, setOpenTipoPicker] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -589,14 +590,18 @@ function ProcedimentosPage() {
   };
 
   const openNew = () => {
+    setOpenTipoPicker(true);
+  };
+  const startNewComTipo = (tipo: Tipo) => {
     void loadEspecialidades();
     setEditing(null);
-    setForm({ ...EMPTY });
+    setForm({ ...EMPTY, tipo });
     setFormEspIds([]);
     setFormConvValores(
       Object.fromEntries(convenios.map(c => [c.id, { dinheiro: "0", outros: "0" }])),
     );
     setFormConvManual({});
+    setOpenTipoPicker(false);
     setOpen(true);
   };
   const openEdit = (p: Procedimento) => {
@@ -1007,6 +1012,37 @@ function ProcedimentosPage() {
             </div>
           )}
       </div>
+
+      {/* ============ DIALOG TIPO PICKER ============ */}
+      <Dialog open={openTipoPicker} onOpenChange={setOpenTipoPicker}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Qual o tipo de serviço?</DialogTitle>
+            <DialogDescription>Escolha o tipo para começar o cadastro.</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 gap-2 py-2">
+            {tipos.map(t => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => startNewComTipo(t.nome as Tipo)}
+                className={`flex items-center justify-between rounded-lg border border-border px-4 py-3 text-left transition hover:border-primary hover:bg-muted/50`}
+              >
+                <span className="flex items-center gap-3">
+                  <span className={`inline-flex h-8 w-8 items-center justify-center rounded-md ${tipoCor(t.nome)}`}>
+                    <ClipboardList className="h-4 w-4" />
+                  </span>
+                  <span className="font-medium">{tipoLabel(t.nome)}</span>
+                </span>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </button>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpenTipoPicker(false)}>Cancelar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ============ DIALOG PROCEDIMENTO ============ */}
       <Dialog open={open} onOpenChange={setOpen}>
