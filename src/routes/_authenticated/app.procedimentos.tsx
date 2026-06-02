@@ -1030,6 +1030,38 @@ function ProcedimentosPage() {
               </div>
             </div>
 
+            {convenios.length > 0 && (
+              <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
+                <p className="text-xs font-medium text-muted-foreground uppercase">Valores por convênio (Cartão Benefícios)</p>
+                <div className="space-y-3">
+                  {convenios.map(c => {
+                    const v = formConvValores[c.id] ?? { dinheiro: "0", outros: "0" };
+                    return (
+                      <div key={c.id} className="space-y-2 border-l-2 border-primary/30 pl-3">
+                        <p className="text-sm font-medium">{c.nome}</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label className="text-xs">Dinheiro (R$)</Label>
+                            <CurrencyInput
+                              value={v.dinheiro}
+                              onChange={(val) => setFormConvValores(prev => ({ ...prev, [c.id]: { ...v, dinheiro: val } }))}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Pix / Débito / Crédito (R$)</Label>
+                            <CurrencyInput
+                              value={v.outros}
+                              onChange={(val) => setFormConvValores(prev => ({ ...prev, [c.id]: { ...v, outros: val } }))}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <label className="flex items-center gap-2 text-sm cursor-pointer">
               <Checkbox checked={form.ativo} onCheckedChange={(v) => setForm({ ...form, ativo: !!v })} />
               Ativo
