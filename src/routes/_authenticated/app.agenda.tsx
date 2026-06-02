@@ -331,6 +331,7 @@ function AgendaPage() {
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [items, setItems] = useState<Agendamento[]>([]);
   const [pagosSet, setPagosSet] = useState<Set<string>>(new Set());
+  const [pagoInfoMap, setPagoInfoMap] = useState<Map<string, { valor: number; forma: string | null }>>(new Map());
   const [nascMap, setNascMap] = useState<Map<string, string | null>>(new Map());
   const [convenioMap, setConvenioMap] = useState<Map<string, string>>(new Map());
   const [etapaMap, setEtapaMap] = useState<Map<string, string>>(new Map());
