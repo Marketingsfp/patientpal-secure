@@ -68,6 +68,7 @@ const CUBOS: CubeSpec[] = [
         status: r.status ?? "—",
         medico: medMap.get(r.medico_id) ?? "Sem médico",
         especialidade:
+          extractEspFromProcNome(r.procedimento) ??
           espPorProc.get(normalizeProcKey(r.procedimento)) ??
           espPorMedico.get(r.medico_id) ??
           "—",
@@ -263,6 +264,14 @@ async function lookupEspecialidadePorMedico(
 
 function normalizeProcKey(s: string | null | undefined): string {
   return (s ?? "").trim().toUpperCase();
+}
+
+function extractEspFromProcNome(s: string | null | undefined): string | undefined {
+  if (!s) return undefined;
+  const m = s.match(/\(([^)]+)\)\s*$/);
+  if (!m) return undefined;
+  const v = m[1].trim();
+  return v.length > 0 ? v.toUpperCase() : undefined;
 }
 
 async function lookupEspecialidadePorProcedimento(
