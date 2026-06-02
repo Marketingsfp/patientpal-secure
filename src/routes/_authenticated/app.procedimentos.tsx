@@ -675,14 +675,8 @@ function ProcedimentosPage() {
         </div>
       </div>
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="procedimentos">Exames / Procedimentos</TabsTrigger>
-          <TabsTrigger value="consultas">Consultas</TabsTrigger>
-        </TabsList>
-
-        {/* ============ PROCEDIMENTOS ============ */}
-        <div className="space-y-4 pt-4 pb-16">
+      {/* ============ SERVIÇOS (unificado) ============ */}
+      <div className="space-y-4 pt-4 pb-16">
           <div className="flex flex-wrap gap-2 justify-end">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -857,9 +851,7 @@ function ProcedimentosPage() {
               </div>
             </div>
           )}
-        </div>
-
-      </Tabs>
+      </div>
 
       {/* ============ DIALOG PROCEDIMENTO ============ */}
       <Dialog open={open} onOpenChange={setOpen}>
