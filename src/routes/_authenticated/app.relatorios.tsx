@@ -41,17 +41,20 @@ const RELATORIOS: Relatorio[] = [
     cor: "#60a5fa",
     usaPeriodo: true,
     carregar: async ({ clinicaId, ini, fim }) => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("agendamentos")
-        .select("inicio, fim, status, observacao, pacientes(nome), medicos(nome), procedimentos(nome)")
+        .select("inicio, fim, status, observacoes, procedimento, paciente_nome, pacientes(nome), medicos(nome)")
         .eq("clinica_id", clinicaId)
         .gte("inicio", ini!)
         .lte("inicio", fim! + "T23:59:59")
         .order("inicio");
+      if (error) { console.error("relatorio agendamentos:", error); throw error; }
       return (data ?? []).map((r: any) => ({
         Inicio: r.inicio, Fim: r.fim, Status: r.status,
-        Paciente: r.pacientes?.nome ?? "", Medico: r.medicos?.nome ?? "",
-        "Serviço": r.procedimentos?.nome ?? "", Observacao: r.observacao ?? "",
+        Paciente: r.pacientes?.nome ?? r.paciente_nome ?? "",
+        Medico: r.medicos?.nome ?? "",
+        "Serviço": r.procedimento ?? "",
+        Observacao: r.observacoes ?? "",
       }));
     },
   },
