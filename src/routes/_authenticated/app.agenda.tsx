@@ -117,16 +117,22 @@ async function buscarProcedimentoPorNome(
     p && [p.valor_dinheiro, p.valor_pix, p.valor_padrao, p.valor_cartao, p.valor_cartao_credito, p.valor_cartao_debito, p.valor_dinheiro_pix]
       .some((v) => Number(v) > 0);
   if (temValor(proc)) return proc;
-  // Fallback: consulta direta no banco com ilike (case-insensitive)
+  // Fallback: consulta direta no banco com ilike (case-insensitive),
+  // usando %nome% para casar variações como "ELETROCARDIOGRAMA (ECG)"
+  // quando o agendamento está como "ELETROCARDIOGRAMA".
+  const padrao = `%${nomeBase}%`;
   const { data } = await supabase
     .from("procedimentos")
     .select("nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix")
     .eq("clinica_id", clinicaId)
-    .ilike("nome", nomeBase)
-    .limit(5);
-  const exato = (data ?? []).find((p) => temValor(p)) ?? (data ?? [])[0];
-  if (temValor(exato)) return exato;
-  return proc ?? exato ?? null;
+    .ilike("nome", padrao)
+    .limit(10);
+  // Prefere match exato com valor; depois qualquer um com valor; depois o primeiro.
+  const exatoComValor = (data ?? []).find((p) => norm(p.nome ?? "") === alvo && temValor(p));
+  const qualquerComValor = (data ?? []).find((p) => temValor(p));
+  const escolhido = exatoComValor ?? qualquerComValor ?? (data ?? [])[0];
+  if (temValor(escolhido)) return escolhido;
+  return proc ?? escolhido ?? null;
 }
 
 async function fetchProcedimentosAgenda(clinicaId: string): Promise<ProcedimentoRef[]> {
