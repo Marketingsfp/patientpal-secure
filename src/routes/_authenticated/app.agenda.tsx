@@ -1055,11 +1055,6 @@ function AgendaPage() {
       toast.info("Há atendimentos já pagos na seleção. Desmarque-os antes de cobrar.");
       return;
     }
-    const acharProc = (nomeProc: string) => {
-      const alvo = normalizar(nomeProc);
-      return (procs ?? []).find(p => normalizar(p.nome ?? "") === alvo)
-        ?? (procs ?? []).find(p => normalizar(p.nome ?? "").includes(alvo));
-    };
     let totalDinheiro = 0, totalPix = 0, totalDebito = 0, totalCredito = 0;
     // Resolve todos os procedimentos em paralelo (cada um pode cair em
     // fallback no banco; em paralelo o tempo total fica ~= 1 chamada).
