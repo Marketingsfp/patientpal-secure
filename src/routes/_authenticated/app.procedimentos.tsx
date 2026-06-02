@@ -12,7 +12,6 @@ import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -296,7 +295,6 @@ const PACOTES_EXAMES: PacoteExames[] = [
 
 function ProcedimentosPage() {
   const { clinicaAtual } = useClinica();
-  const [tab, setTab] = useState("procedimentos");
 
   // ----- Procedimentos -----
   const [items, setItems] = useState<Procedimento[]>([]);
@@ -421,29 +419,21 @@ function ProcedimentosPage() {
   const filtrados = useMemo(() => {
     const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
     const q = norm(buscaAplicada.trim());
-    const tipoEffective = tab === "consultas" ? "consulta" : tipoAplicado;
-    // Para a aba Consultas, o filtro por especialidade considera também os vínculos extras (N:N)
     const espIdByNome = new Map<string, string>();
     especialidades.forEach(e => espIdByNome.set(norm(e.nome), e.id));
     const espIdFiltro = grupoAplicado !== "todos" ? espIdByNome.get(norm(grupoAplicado)) : undefined;
     return items.filter(p => {
-      if (tab === "consultas") {
-        if (norm(p.tipo ?? "") !== "consulta") return false;
-      } else {
-        // Aba "Exames / Procedimentos" não deve mostrar consultas (elas têm aba própria)
-        if (norm(p.tipo ?? "") === "consulta") return false;
-        if (tipoEffective !== "todos" && p.tipo !== tipoEffective) return false;
-      }
+      if (tipoAplicado !== "todos" && p.tipo !== tipoAplicado) return false;
       if (grupoAplicado !== "todos") {
         const matchGrupo = norm(p.grupo ?? "") === norm(grupoAplicado);
         const extras = vincEspMap.get(p.id);
-        const matchExtra = tab === "consultas" && !!espIdFiltro && !!extras && extras.has(espIdFiltro);
+        const matchExtra = norm(p.tipo ?? "") === "consulta" && !!espIdFiltro && !!extras && extras.has(espIdFiltro);
         if (!matchGrupo && !matchExtra) return false;
       }
       if (q && !norm(p.nome).includes(q) && !norm(p.codigo ?? "").includes(q) && !norm(p.grupo ?? "").includes(q)) return false;
       return true;
     });
-  }, [items, buscaAplicada, tipoAplicado, grupoAplicado, tab, vincEspMap, especialidades]);
+  }, [items, buscaAplicada, tipoAplicado, grupoAplicado, vincEspMap, especialidades]);
 
   const ordenados = useMemo(() => {
     if (!sort) return filtrados;
@@ -498,7 +488,7 @@ function ProcedimentosPage() {
   const openNew = () => {
     void loadEspecialidades();
     setEditing(null);
-    setForm({ ...EMPTY, tipo: tab === "consultas" ? "consulta" : EMPTY.tipo });
+    setForm({ ...EMPTY });
     setFormEspIds([]);
     setOpen(true);
   };
@@ -685,14 +675,8 @@ function ProcedimentosPage() {
         </div>
       </div>
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="procedimentos">Exames / Procedimentos</TabsTrigger>
-          <TabsTrigger value="consultas">Consultas</TabsTrigger>
-        </TabsList>
-
-        {/* ============ PROCEDIMENTOS ============ */}
-        <div className="space-y-4 pt-4 pb-16">
+      {/* ============ SERVIÇOS (unificado) ============ */}
+      <div className="space-y-4 pt-4 pb-16">
           <div className="flex flex-wrap gap-2 justify-end">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -867,9 +851,7 @@ function ProcedimentosPage() {
               </div>
             </div>
           )}
-        </div>
-
-      </Tabs>
+      </div>
 
       {/* ============ DIALOG PROCEDIMENTO ============ */}
       <Dialog open={open} onOpenChange={setOpen}>
