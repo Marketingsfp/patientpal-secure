@@ -478,6 +478,36 @@ function ProcedimentosPage() {
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [clinicaAtual?.clinica_id]);
 
+  // ---- Auto-preenchimento dos valores por convênio a partir das regras ----
+  // Recalcula quando o usuário muda especialidade, tipo, ou os valores base
+  // (Dinheiro / Pix·Déb·Créd). Convenios marcados como manuais ficam intactos.
+  useEffect(() => {
+    if (!open || convenios.length === 0) return;
+    // Resolve especialidade_id pelo nome de form.grupo (igual ao filtro)
+    const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const espId = form.grupo
+      ? (especialidades.find(e => norm(e.nome) === norm(form.grupo))?.id ?? null)
+      : null;
+    const baseDin = Number(form.valor_dinheiro) || 0;
+    const baseOut = Number(form.valor_pix_cartao) || 0;
+    setFormConvValores(prev => {
+      const next = { ...prev };
+      for (const c of convenios) {
+        if (formConvManual[c.id]) continue;
+        const regrasDoConv = regras.filter(r => r.convenio_id === c.id);
+        const r = findRegra(regrasDoConv, espId, form.tipo);
+        const calc = computeValor(r, baseDin, baseOut);
+        if (calc) {
+          next[c.id] = { dinheiro: calc.dinheiro.toFixed(2), outros: calc.outros.toFixed(2) };
+        } else if (!prev[c.id]) {
+          next[c.id] = { dinheiro: "0", outros: "0" };
+        }
+      }
+      return next;
+    });
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [open, form.grupo, form.tipo, form.valor_dinheiro, form.valor_pix_cartao, regras, convenios, especialidades]);
+
   const grupos = useMemo(() => {
     const s = new Set<string>();
     items.forEach(p => { if (p.grupo) s.add(p.grupo); });
