@@ -325,7 +325,7 @@ function ProcedimentosPage() {
   type SortCol = "nome" | "grupo" | "tipo";
   const [sort, setSort] = useState<{ col: SortCol; dir: "asc" | "desc" } | null>(null);
   // Paginação
-  const PAGE_SIZE = 20;
+  const PAGE_SIZE = 50;
   const [pagina, setPagina] = useState(1);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
