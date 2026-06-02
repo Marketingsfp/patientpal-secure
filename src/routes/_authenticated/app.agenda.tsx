@@ -109,13 +109,19 @@ async function buscarProcedimentoPorNome(
   const alvo = nomeBase.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
   const norm = (s: string) => (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
   const arr = lista ?? [];
-  let proc: any =
-    arr.find((p) => norm(p.nome ?? "") === alvo)
-    ?? arr.find((p) => norm(p.nome ?? "").includes(alvo))
-    ?? arr.find((p) => alvo.includes(norm(p.nome ?? "")));
   const temValor = (p: any) =>
     p && [p.valor_dinheiro, p.valor_pix, p.valor_padrao, p.valor_cartao, p.valor_cartao_credito, p.valor_cartao_debito, p.valor_dinheiro_pix]
       .some((v) => Number(v) > 0);
+  // Prioriza matches que TÊM valores cadastrados, para evitar pegar linhas
+  // placeholder (ex.: "CONSULTA 110 E 130" com tudo zerado) na frente da
+  // "CONSULTA CLINICA MEDICA" / "CONSULTA" com preços reais.
+  const exatos = arr.filter((p) => norm(p.nome ?? "") === alvo);
+  const includes = arr.filter((p) => norm(p.nome ?? "").includes(alvo));
+  const reverso = arr.filter((p) => alvo.includes(norm(p.nome ?? "")));
+  let proc: any =
+    exatos.find(temValor) ?? exatos[0]
+    ?? includes.find(temValor) ?? includes[0]
+    ?? reverso.find(temValor) ?? reverso[0];
   if (temValor(proc)) return proc;
   // Se a lista pré-carregada já contém os valores (formato completo) e
   // achamos o procedimento, mesmo sem valor não vale a pena bater no banco
