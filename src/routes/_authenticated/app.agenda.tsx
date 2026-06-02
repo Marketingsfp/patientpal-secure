@@ -2800,6 +2800,7 @@ function MedicoFiltroInput({
   );
   const [texto, setTexto] = useState(selecionadoNome);
   const [aberto, setAberto] = useState(false);
+  const [highlight, setHighlight] = useState(0);
   useEffect(() => { setTexto(selecionadoNome); }, [selecionadoNome]);
 
   const norm = (s: string) => normalizar(s);
@@ -2808,6 +2809,13 @@ function MedicoFiltroInput({
     if (!t) return lista.slice(0, 100);
     return lista.filter((m) => norm(m.nome).includes(t)).slice(0, 100);
   }, [lista, texto]);
+  useEffect(() => { setHighlight(0); }, [texto, aberto]);
+
+  const selecionar = (m: Medico) => {
+    onChange(m.id);
+    setTexto(m.nome);
+    setAberto(false);
+  };
 
   return (
     <div className="relative">
@@ -2820,6 +2828,23 @@ function MedicoFiltroInput({
           onChange={(e) => { setTexto(e.target.value); setAberto(true); }}
           onFocus={() => setAberto(true)}
           onBlur={() => setTimeout(() => setAberto(false), 150)}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowDown") {
+              e.preventDefault();
+              setAberto(true);
+              setHighlight((h) => Math.min(h + 1, sugestoes.length - 1));
+            } else if (e.key === "ArrowUp") {
+              e.preventDefault();
+              setHighlight((h) => Math.max(h - 1, 0));
+            } else if (e.key === "Enter") {
+              if (aberto && sugestoes[highlight]) {
+                e.preventDefault();
+                selecionar(sugestoes[highlight]);
+              }
+            } else if (e.key === "Escape") {
+              setAberto(false);
+            }
+          }}
         />
         {value !== "todos" && !disabled && (
           <Button
@@ -2835,17 +2860,13 @@ function MedicoFiltroInput({
       </div>
       {aberto && !disabled && sugestoes.length > 0 && (
         <div className="absolute z-50 mt-1 w-full max-h-64 overflow-auto rounded-md border bg-popover shadow-md">
-          {sugestoes.map((m) => (
+          {sugestoes.map((m, idx) => (
             <button
               key={m.id}
               type="button"
-              className="block w-full text-left px-2 py-1.5 text-sm hover:bg-accent"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                onChange(m.id);
-                setTexto(m.nome);
-                setAberto(false);
-              }}
+              className={`block w-full text-left px-2 py-1.5 text-sm hover:bg-accent ${idx === highlight ? "bg-accent" : ""}`}
+              onMouseEnter={() => setHighlight(idx)}
+              onMouseDown={(e) => { e.preventDefault(); selecionar(m); }}
             >
               {m.nome}
             </button>
