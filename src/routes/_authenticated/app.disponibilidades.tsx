@@ -193,18 +193,21 @@ function Page() {
     if (!confirm(`Confirmar criação de ${slotsPreview.length} horários disponíveis?`)) return;
     setGerando(true);
     try {
-      const medicoIdByNome = new Map(medicos.map((m) => [m.nome, m.id]));
+      const medicoByNome = new Map(medicos.map((m) => [m.nome, m]));
       const rows = slotsPreview.map((s) => {
         const inicio = new Date(`${s.data}T${s.inicio}:00`);
         const fim = new Date(`${s.data}T${s.fim}:00`);
+        const med = medicoByNome.get(s.medico)!;
+        const procedimento = med.procedimento_padrao_nome || med.especialidade_nome || null;
         return {
           clinica_id: clinicaAtual.clinica_id,
-          medico_id: medicoIdByNome.get(s.medico)!,
+          medico_id: med.id,
           paciente_nome: "DISPONÍVEL",
           inicio: inicio.toISOString(),
           fim: fim.toISOString(),
           status: "agendado" as const,
           observacoes: "Slot gerado automaticamente",
+          ...(procedimento ? { procedimento } : {}),
         };
       });
       // Inserir em lotes de 500
