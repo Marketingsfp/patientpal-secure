@@ -323,13 +323,19 @@ function transformDate(isoStr: string | null, base: Record<string, any>) {
 }
 
 function sortLabels(labels: string[], fieldKey: string | null): string[] {
+  return labels.slice().sort((a, b) => compareLabels(a, b, fieldKey));
+}
+
+function compareLabels(a: string, b: string, fieldKey: string | null): number {
   const collator = new Intl.Collator("pt-BR", { sensitivity: "base", numeric: true });
-  return labels.slice().sort((a, b) => {
-    if (fieldKey === "mes") return monthLabelToOrder(a) - monthLabelToOrder(b);
-    if (fieldKey === "mes_nome") return monthNameToOrder(a) - monthNameToOrder(b);
-    if (fieldKey === "mes_ano" || fieldKey === "dia" || fieldKey === "ano") return collator.compare(a, b);
-    return collator.compare(a, b);
-  });
+  if (fieldKey === "mes") return monthLabelToOrder(a) - monthLabelToOrder(b);
+  if (fieldKey === "mes_nome") return monthNameToOrder(a) - monthNameToOrder(b);
+  if (fieldKey === "mes_ano" || fieldKey === "dia" || fieldKey === "ano" || fieldKey === "hora") return collator.compare(a, b);
+  return collator.compare(a, b);
+}
+
+function shouldSortDimensionChronologically(fieldKey: string): boolean {
+  return ["dia", "mes", "mes_ano", "ano", "mes_nome", "hora"].includes(fieldKey);
 }
 
 function monthLabelToOrder(label: string): number {
@@ -385,8 +391,11 @@ function pivot(
   });
   const totalByRow = matrix.map((r) => r.reduce((a, b) => a + b, 0));
   const totalByCol = colLabels.map((_, ci) => matrix.reduce((s, r) => s + r[ci], 0));
-  // ordena por total desc
-  const order = totalByRow.map((_, i) => i).sort((a, b) => totalByRow[b] - totalByRow[a]);
+  const order = totalByRow.map((_, i) => i).sort((a, b) => (
+    shouldSortDimensionChronologically(rowKey)
+      ? compareLabels(rowLabels[a], rowLabels[b], rowKey)
+      : totalByRow[b] - totalByRow[a]
+  ));
   return {
     rowLabels: order.map((i) => rowLabels[i]),
     colLabels,
