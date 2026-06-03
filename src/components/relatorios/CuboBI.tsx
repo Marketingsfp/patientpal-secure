@@ -430,8 +430,11 @@ function pivot(
     const rs = rowSet.get(rl)!;
     colLabels.forEach((cl, ci) => {
       const subset = colKey ? rs.filter((r) => String(r[colKey] ?? "—") === cl) : rs;
-      const vals = measureField ? subset.map((r) => Number(r[measureField]) || 0) : [];
-      matrix[ri][ci] = aggregate(subset, vals, measureAgg);
+      const aggregated = subset.some((r) => r.__aggregated);
+      const vals = aggregated
+        ? subset.map((r) => Number(r.__value) || 0)
+        : measureField ? subset.map((r) => Number(r[measureField]) || 0) : [];
+      matrix[ri][ci] = aggregated ? aggregate(subset, vals, measureAgg === "count" ? "sum" : measureAgg) : aggregate(subset, vals, measureAgg);
     });
   });
   const totalByRow = matrix.map((r) => r.reduce((a, b) => a + b, 0));
@@ -572,7 +575,7 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
   }, [rawRows, cfg.rowKey, cfg.colKey, cfg.measureField, cfg.measureAgg]);
 
   const topRows = useMemo(() => {
-    const n = Math.max(1, cfg.topN);
+    const n = Math.min(100, Math.max(1, cfg.topN));
     let order = piv.rowLabels.map((_, i) => i);
     if (sort) {
       const collator = new Intl.Collator("pt-BR", { sensitivity: "base", numeric: true });
@@ -812,7 +815,7 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
             <div className="space-y-1.5">
               <Label htmlFor="topn">Mostrar top</Label>
               <Input id="topn" type="number" min={1} max={100} value={cfg.topN}
-                onChange={(e) => setField("topN", Number(e.target.value) || 10)} />
+                onChange={(e) => setField("topN", Math.min(100, Math.max(1, Number(e.target.value) || 10)))} />
             </div>
           </div>
 
