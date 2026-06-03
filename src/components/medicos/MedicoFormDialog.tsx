@@ -89,6 +89,7 @@ const emptyForm = () => ({
   criarUsuario: false,
   senhaUsuario: "",
   roleUsuario: "medico" as "admin" | "gestor" | "medico" | "enfermeiro" | "recepcao" | "financeiro",
+  ativo: true,
 });
 
 interface Props {
@@ -280,7 +281,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       setLoading(true);
       const { data: m } = await supabase
         .from("medicos")
-        .select("id, user_id, nome, crm, crm_uf, email, telefone, telefone2, nacionalidade, estado_civil, sexo, duracao_consulta_min, usa_sistema, procedimento_padrao_id, cep, logradouro, numero, complemento, bairro, cidade, estado, medico_especialidades(especialidade_id, tem_rqe, rqe_numero, especialidade:especialidades(id, nome))")
+        .select("id, user_id, nome, crm, crm_uf, email, telefone, telefone2, nacionalidade, estado_civil, sexo, duracao_consulta_min, usa_sistema, procedimento_padrao_id, cep, logradouro, numero, complemento, bairro, cidade, estado, ativo, medico_especialidades(especialidade_id, tem_rqe, rqe_numero, especialidade:especialidades(id, nome))")
         .eq("id", editingMedicoId)
         .maybeSingle();
       if (cancelled) return;
@@ -357,6 +358,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         complemento: med.complemento ?? "", bairro: med.bairro ?? "", cidade: med.cidade ?? "", estado: med.estado ?? "",
         banco: sens.banco ?? "", agencia: sens.agencia ?? "", conta: sens.conta ?? "", pix_chave: sens.pix_chave ?? "",
         criarUsuario: false, senhaUsuario: "", roleUsuario: "medico",
+        ativo: (med as { ativo?: boolean }).ativo !== false,
       });
       if (med.user_id) {
         try {
@@ -442,6 +444,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       agencia: form.agencia || null,
       conta: form.conta || null,
       pix_chave: form.pix_chave || null,
+      ativo: form.ativo,
     };
     let medicoId = editId;
     if (editId) {
@@ -594,6 +597,16 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
               </TabsList>
 
               <TabsContent value="dados" className="space-y-4 pt-4 pb-16">
+                <div className="flex items-center gap-2 rounded-md border bg-muted/30 p-3">
+                  <Checkbox
+                    id="medico-ativo"
+                    checked={form.ativo}
+                    onCheckedChange={(v) => setForm({ ...form, ativo: v === true })}
+                  />
+                  <Label htmlFor="medico-ativo" className="cursor-pointer">
+                    Médico ativo {form.ativo ? "" : "(desmarque para inativar)"}
+                  </Label>
+                </div>
                 <div className="space-y-2">
                   <Label>Nome completo *</Label>
                   <Input required value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} />
