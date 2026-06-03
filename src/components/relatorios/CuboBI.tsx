@@ -226,6 +226,21 @@ const CUBOS: CubeSpec[] = [
 const DIAS_SEMANA = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 const MESES_NOMES = ["01-Jan", "02-Fev", "03-Mar", "04-Abr", "05-Mai", "06-Jun", "07-Jul", "08-Ago", "09-Set", "10-Out", "11-Nov", "12-Dez"];
 
+async function fetchAllRows(builder: () => any): Promise<any[]> {
+  const PAGE_SIZE = 1000;
+  const all: any[] = [];
+  let offset = 0;
+  while (true) {
+    const { data, error } = await builder().range(offset, offset + PAGE_SIZE - 1);
+    if (error) throw error;
+    const rows = (data ?? []) as any[];
+    all.push(...rows);
+    if (rows.length < PAGE_SIZE) break;
+    offset += PAGE_SIZE;
+  }
+  return all;
+}
+
 async function lookupNames(
   table: "medicos" | "pacientes" | "fin_categorias" | "fin_contas",
   ids: Array<string | null | undefined>,
