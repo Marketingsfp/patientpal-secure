@@ -597,6 +597,16 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
               </TabsList>
 
               <TabsContent value="dados" className="space-y-4 pt-4 pb-16">
+                <div className="flex items-center gap-2 rounded-md border bg-muted/30 p-3">
+                  <Checkbox
+                    id="medico-ativo"
+                    checked={form.ativo}
+                    onCheckedChange={(v) => setForm({ ...form, ativo: v === true })}
+                  />
+                  <Label htmlFor="medico-ativo" className="cursor-pointer">
+                    Médico ativo {form.ativo ? "" : "(desmarque para inativar)"}
+                  </Label>
+                </div>
                 <div className="space-y-2">
                   <Label>Nome completo *</Label>
                   <Input required value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} />
