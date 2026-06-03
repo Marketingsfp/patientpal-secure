@@ -33,6 +33,7 @@ function EspecialidadesPage() {
   const [rows, setRows] = useState<Esp[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
+  const [statusFiltro, setStatusFiltro] = useState<"todos" | "ativo" | "inativo">("todos");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Esp | null>(null);
   const [form, setForm] = useState({ nome: "", descricao: "", ativo: true });
@@ -91,7 +92,14 @@ function EspecialidadesPage() {
     void load();
   }
 
-  const filtered = rows.filter(r => r.nome.toLowerCase().includes(q.toLowerCase()));
+  const filtered = rows.filter(r => {
+    const matchNome = r.nome.toLowerCase().includes(q.toLowerCase());
+    const matchStatus =
+      statusFiltro === "todos" ||
+      (statusFiltro === "ativo" && r.ativo) ||
+      (statusFiltro === "inativo" && !r.ativo);
+    return matchNome && matchStatus;
+  });
 
   async function confirmarExclusao() {
     if (!toDelete) return;
@@ -168,9 +176,19 @@ function EspecialidadesPage() {
       </div>
 
       <Card className="p-3">
-        <div className="relative">
-          <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input className="pl-9" placeholder="Buscar..." value={q} onChange={e => setQ(e.target.value)} />
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input className="pl-9" placeholder="Buscar..." value={q} onChange={e => setQ(e.target.value)} />
+          </div>
+          <Select value={statusFiltro} onValueChange={(v) => setStatusFiltro(v as "todos" | "ativo" | "inativo")}>
+            <SelectTrigger className="w-44"><SelectValue placeholder="Situação" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todas as situações</SelectItem>
+              <SelectItem value="ativo">Ativos</SelectItem>
+              <SelectItem value="inativo">Inativos</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </Card>
 
