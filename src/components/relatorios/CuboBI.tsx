@@ -30,6 +30,14 @@ interface CubeSpec {
   load: (ctx: { clinicaId: string; ini: string; fim: string }) => Promise<Row[]>;
 }
 
+interface FinanceiroAggregateRow {
+  row_value: string | null;
+  sub_row_value: string | null;
+  sub_sub_row_value: string | null;
+  col_value: string | null;
+  valor: number | string | null;
+}
+
 // ============================================================
 // Cubos disponíveis
 // ============================================================
@@ -238,6 +246,38 @@ async function fetchAllRows(builder: () => any): Promise<any[]> {
     offset += PAGE_SIZE;
   }
   return all;
+}
+
+async function loadFinanceiroAgregado(
+  clinicaId: string,
+  ini: string,
+  fim: string,
+  cfg: CubeConfig,
+): Promise<Row[]> {
+  const { data, error } = await (supabase as any).rpc("cubo_bi_financeiro_agregado", {
+    _clinica_id: clinicaId,
+    _ini: ini,
+    _fim: fim,
+    _row_key: cfg.rowKey,
+    _sub_row_key: cfg.subRowKey,
+    _sub_sub_row_key: cfg.subSubRowKey,
+    _col_key: cfg.colKey,
+    _measure_field: cfg.measureField,
+    _measure_agg: cfg.measureAgg,
+  });
+  if (error) throw error;
+
+  return ((data ?? []) as FinanceiroAggregateRow[]).map((r) => {
+    const row: Row = {
+      [cfg.rowKey]: r.row_value ?? "—",
+      __value: Number(r.valor) || 0,
+      __aggregated: true,
+    };
+    if (cfg.subRowKey) row[cfg.subRowKey] = r.sub_row_value ?? "—";
+    if (cfg.subSubRowKey) row[cfg.subSubRowKey] = r.sub_sub_row_value ?? "—";
+    if (cfg.colKey) row[cfg.colKey] = r.col_value ?? "—";
+    return row;
+  });
 }
 
 async function lookupNames(
