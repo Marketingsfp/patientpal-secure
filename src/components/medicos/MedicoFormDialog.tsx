@@ -71,6 +71,7 @@ const emptyForm = () => ({
   especialidades: [] as EspecialidadeRow[],
   procedimentos: [] as string[],
   procedimento_padrao_id: "" as string,
+  procedimento_padrao_em_branco: false,
   tipo_repasse: "percentual" as "percentual" | "valor",
   percentual: "50",
   valor: "",
