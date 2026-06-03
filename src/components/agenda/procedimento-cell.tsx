@@ -11,11 +11,12 @@ interface Props {
   valor: string | null;
   opcoes: { id: string; nome: string }[]; // já filtrado para este médico
   padrao?: string | null; // serviço padrão do médico — usado como fallback quando vazio
+  semFallback?: boolean; // se true, não usa "CONSULTA" como fallback visual
   disabled?: boolean;
   onChange: (novoNome: string) => void | Promise<void>;
 }
 
-export function ProcedimentoCell({ valor, opcoes, padrao, disabled, onChange }: Props) {
+export function ProcedimentoCell({ valor, opcoes, padrao, semFallback, disabled, onChange }: Props) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -75,8 +76,8 @@ export function ProcedimentoCell({ valor, opcoes, padrao, disabled, onChange }: 
     await onChange(nome);
   };
 
-  const fallback = (padrao && padrao.trim()) || "CONSULTA";
-  const textoAtual = valor || fallback;
+  const fallback = (padrao && padrao.trim()) || (semFallback ? "" : "CONSULTA");
+  const textoAtual = valor || fallback || "—";
 
   if (disabled || lista.length === 0) {
     return <Badge variant="outline" className="text-xs">{textoAtual}</Badge>;

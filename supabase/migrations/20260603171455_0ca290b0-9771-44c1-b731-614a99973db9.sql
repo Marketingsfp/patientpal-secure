@@ -1,0 +1,1 @@
+ALTER TABLE public.medicos ADD COLUMN IF NOT EXISTS procedimento_padrao_em_branco boolean NOT NULL DEFAULT false;

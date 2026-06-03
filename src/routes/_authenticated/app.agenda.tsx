@@ -60,7 +60,7 @@ type Agendamento = {
   medico_nome?: string | null;
   medico_sexo?: string | null;
 };
-type Medico = { id: string; nome: string; sexo?: string | null; usa_sistema?: boolean; especialidade_id?: string | null; procedimento_padrao_id?: string | null; procedimento_padrao_nome?: string | null; especialidade_nome?: string | null };
+type Medico = { id: string; nome: string; sexo?: string | null; usa_sistema?: boolean; especialidade_id?: string | null; procedimento_padrao_id?: string | null; procedimento_padrao_em_branco?: boolean | null; procedimento_padrao_nome?: string | null; especialidade_nome?: string | null };
 type RecursoEnf = { id: string; nome: string };
 type Especialidade = { id: string; nome: string };
 type Paciente = { id: string; nome: string };
@@ -755,7 +755,7 @@ function AgendaPage() {
   const loadRef = async () => {
     if (!clinicaAtual) return;
     const [m, p, e, me, pr, sr, mc, mp, er, erp] = await Promise.all([
-      supabase.from("medicos").select("id,nome,sexo,usa_sistema,especialidade_id,procedimento_padrao_id").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
+      supabase.from("medicos").select("id,nome,sexo,usa_sistema,especialidade_id,procedimento_padrao_id,procedimento_padrao_em_branco").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("pacientes").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome").limit(500),
       supabase.from("especialidades").select("id,nome").order("nome"),
       supabase.from("medico_especialidades").select("medico_id,especialidade_id"),
@@ -963,6 +963,7 @@ function AgendaPage() {
     if (!medicoId) return "";
     const med = medicos.find((m) => m.id === medicoId);
     if (!med) return "";
+    if (med.procedimento_padrao_em_branco) return "";
     return (med.procedimento_padrao_id
       ? med.procedimento_padrao_nome
         ?? procedimentosList.find((p) => p.id === med.procedimento_padrao_id)?.nome
@@ -2641,6 +2642,7 @@ function AgendaPage() {
                       valor={procedimentoEfetivo(a.medico_id, a.procedimento)}
                       opcoes={opcoesProcedimentoMedico(a.medico_id)}
                       padrao={procedimentoPadraoDoMedico(a.medico_id)}
+                      semFallback={!!medicos.find((m) => m.id === a.medico_id)?.procedimento_padrao_em_branco}
                       disabled={isSlotLivre(a.paciente_nome)}
                       onChange={(novo) => atualizarProcedimento(a, novo)}
                     />

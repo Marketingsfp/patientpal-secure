@@ -71,6 +71,7 @@ const emptyForm = () => ({
   especialidades: [] as EspecialidadeRow[],
   procedimentos: [] as string[],
   procedimento_padrao_id: "" as string,
+  procedimento_padrao_em_branco: false,
   tipo_repasse: "percentual" as "percentual" | "valor",
   percentual: "50",
   valor: "",
@@ -338,6 +339,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
           (p: any) => `${p.procedimento_id}|${p.especialidade_id ?? ""}`,
         ),
         procedimento_padrao_id: (med as any).procedimento_padrao_id ?? "",
+        procedimento_padrao_em_branco: !!(med as any).procedimento_padrao_em_branco,
         tipo_repasse: (sens.tipo_repasse as "percentual" | "valor") ?? "percentual",
         percentual: sens.percentual_repasse_padrao != null ? String(sens.percentual_repasse_padrao) : "",
         valor: sens.valor_repasse_padrao != null ? String(sens.valor_repasse_padrao) : "",
@@ -419,6 +421,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       duracao_consulta_min: parseInt(form.duracao_consulta_min || "15") || 15,
       usa_sistema: form.usa_sistema,
       procedimento_padrao_id: form.procedimento_padrao_id || null,
+      procedimento_padrao_em_branco: form.procedimento_padrao_em_branco,
       cpf: form.cpf || null,
       rg: form.rg || null,
       data_nascimento: form.data_nascimento || null,
@@ -1018,12 +1021,23 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                         Ex.: Ortopedista → CONSULTA. Médico que só faz USG → o exame mais comum.
                       </p>
                       <SearchableSelect
-                        value={form.procedimento_padrao_id || "none"}
-                        onChange={(v) => setForm({ ...form, procedimento_padrao_id: v === "none" ? "" : v })}
+                        value={
+                          form.procedimento_padrao_em_branco
+                            ? "blank"
+                            : form.procedimento_padrao_id || "none"
+                        }
+                        onChange={(v) =>
+                          setForm({
+                            ...form,
+                            procedimento_padrao_id: v === "none" || v === "blank" ? "" : v,
+                            procedimento_padrao_em_branco: v === "blank",
+                          })
+                        }
                         placeholder="— Sem padrão (usa CONSULTA) —"
                         searchPlaceholder="Buscar serviço..."
                         options={[
                           { value: "none", label: "— Sem padrão (usa CONSULTA) —" },
+                          { value: "blank", label: "— Em branco (escolher manualmente) —" },
                           ...Array.from(new Set(form.procedimentos.map((it) => splitItem(it).pid).filter(Boolean)))
                             .map((pid) => procs.find((p) => p.id === pid))
                             .filter((p): p is Procedimento => !!p)
