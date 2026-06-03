@@ -1021,12 +1021,23 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                         Ex.: Ortopedista → CONSULTA. Médico que só faz USG → o exame mais comum.
                       </p>
                       <SearchableSelect
-                        value={form.procedimento_padrao_id || "none"}
-                        onChange={(v) => setForm({ ...form, procedimento_padrao_id: v === "none" ? "" : v })}
+                        value={
+                          form.procedimento_padrao_em_branco
+                            ? "blank"
+                            : form.procedimento_padrao_id || "none"
+                        }
+                        onChange={(v) =>
+                          setForm({
+                            ...form,
+                            procedimento_padrao_id: v === "none" || v === "blank" ? "" : v,
+                            procedimento_padrao_em_branco: v === "blank",
+                          })
+                        }
                         placeholder="— Sem padrão (usa CONSULTA) —"
                         searchPlaceholder="Buscar serviço..."
                         options={[
                           { value: "none", label: "— Sem padrão (usa CONSULTA) —" },
+                          { value: "blank", label: "— Em branco (escolher manualmente) —" },
                           ...Array.from(new Set(form.procedimentos.map((it) => splitItem(it).pid).filter(Boolean)))
                             .map((pid) => procs.find((p) => p.id === pid))
                             .filter((p): p is Procedimento => !!p)
