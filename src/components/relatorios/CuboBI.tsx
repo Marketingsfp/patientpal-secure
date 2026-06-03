@@ -324,7 +324,7 @@ function transformDate(isoStr: string | null, base: Record<string, any>) {
   return {
     ...base,
     dia: isoStr.slice(0, 10),
-    mes: `${mesNumero}/${ano}`,
+    mes: mesIdx >= 0 && mesIdx < 12 ? MESES_NOMES[mesIdx] : "",
     mes_ano: isoStr.slice(0, 7),
     ano,
     mes_nome: mesIdx >= 0 && mesIdx < 12 ? MESES_NOMES[mesIdx] : "",
@@ -339,19 +339,13 @@ function sortLabels(labels: string[], fieldKey: string | null): string[] {
 
 function compareLabels(a: string, b: string, fieldKey: string | null): number {
   const collator = new Intl.Collator("pt-BR", { sensitivity: "base", numeric: true });
-  if (fieldKey === "mes") return monthLabelToOrder(a) - monthLabelToOrder(b);
-  if (fieldKey === "mes_nome") return monthNameToOrder(a) - monthNameToOrder(b);
+  if (fieldKey === "mes" || fieldKey === "mes_nome") return monthNameToOrder(a) - monthNameToOrder(b);
   if (fieldKey === "mes_ano" || fieldKey === "dia" || fieldKey === "ano" || fieldKey === "hora") return collator.compare(a, b);
   return collator.compare(a, b);
 }
 
 function shouldSortDimensionChronologically(fieldKey: string): boolean {
   return ["dia", "mes", "mes_ano", "ano", "mes_nome", "hora"].includes(fieldKey);
-}
-
-function monthLabelToOrder(label: string): number {
-  const match = label.match(/^(\d{2})\/(\d{4})$/);
-  return match ? Number(match[2]) * 100 + Number(match[1]) : Number.MAX_SAFE_INTEGER;
 }
 
 function monthNameToOrder(label: string): number {
