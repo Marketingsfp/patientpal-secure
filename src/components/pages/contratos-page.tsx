@@ -1,4 +1,3 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { FileSignature, Plus, Printer, Search, Trash2, Link2, Check, ChevronRight, CreditCard, Camera, ArrowLeft, Ban, XCircle, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
@@ -31,11 +30,6 @@ import { useServerFn } from "@tanstack/react-start";
 import { Barcode, FileText } from "lucide-react";
 import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
 import type { PatientOption } from "@/components/patient-search-input";
-
-export const Route = createFileRoute("/_authenticated/app/contratos")({
-  component: ContratosPage,
-  head: () => ({ meta: [{ title: "Contratos — ClinicaOS" }] }),
-});
 
 const BRL = (v: number) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtD = (s?: string | null) => (s ? new Date(s + (s.length === 10 ? "T00:00:00" : "")).toLocaleDateString("pt-BR") : "—");

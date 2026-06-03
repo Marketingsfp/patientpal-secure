@@ -1,4 +1,3 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { CreditCard, Plus, Save, Trash2, Pencil } from "lucide-react";
 import { toast } from "sonner";
@@ -14,11 +13,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-
-export const Route = createFileRoute("/_authenticated/app/planos")({
-  component: PlanosPage,
-  head: () => ({ meta: [{ title: "Planos de Assinatura — ClinicaOS" }] }),
-});
 
 type Plano = {
   id: string;
