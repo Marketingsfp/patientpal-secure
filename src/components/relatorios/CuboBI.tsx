@@ -305,18 +305,41 @@ async function lookupEspecialidadePorProcedimento(
 }
 
 function transformDate(isoStr: string | null, base: Record<string, any>) {
-  if (!isoStr) return { ...base, dia: "", mes: "", ano: "", mes_nome: "", dia_semana: "", hora: "" };
+  if (!isoStr) return { ...base, dia: "", mes: "", mes_ano: "", ano: "", mes_nome: "", dia_semana: "", hora: "" };
   const d = new Date(isoStr);
   const mesIdx = Number(isoStr.slice(5, 7)) - 1;
+  const ano = isoStr.slice(0, 4);
+  const mesNumero = isoStr.slice(5, 7);
   return {
     ...base,
     dia: isoStr.slice(0, 10),
-    mes: isoStr.slice(0, 7),
-    ano: isoStr.slice(0, 4),
+    mes: `${mesNumero}/${ano}`,
+    mes_ano: isoStr.slice(0, 7),
+    ano,
     mes_nome: mesIdx >= 0 && mesIdx < 12 ? MESES_NOMES[mesIdx] : "",
     dia_semana: DIAS_SEMANA[d.getDay()],
     hora: String(d.getHours()).padStart(2, "0") + ":00",
   };
+}
+
+function sortLabels(labels: string[], fieldKey: string | null): string[] {
+  const collator = new Intl.Collator("pt-BR", { sensitivity: "base", numeric: true });
+  return labels.slice().sort((a, b) => {
+    if (fieldKey === "mes") return monthLabelToOrder(a) - monthLabelToOrder(b);
+    if (fieldKey === "mes_nome") return monthNameToOrder(a) - monthNameToOrder(b);
+    if (fieldKey === "mes_ano" || fieldKey === "dia" || fieldKey === "ano") return collator.compare(a, b);
+    return collator.compare(a, b);
+  });
+}
+
+function monthLabelToOrder(label: string): number {
+  const match = label.match(/^(\d{2})\/(\d{4})$/);
+  return match ? Number(match[2]) * 100 + Number(match[1]) : Number.MAX_SAFE_INTEGER;
+}
+
+function monthNameToOrder(label: string): number {
+  const month = Number(label.slice(0, 2));
+  return Number.isFinite(month) && month >= 1 && month <= 12 ? month : Number.MAX_SAFE_INTEGER;
 }
 
 // ============================================================
@@ -349,7 +372,7 @@ function pivot(
   }
   const colSet = new Set<string>();
   if (colKey) for (const r of rows) colSet.add(String(r[colKey] ?? "—"));
-  const colLabels = colKey ? Array.from(colSet).sort() : ["Total"];
+  const colLabels = colKey ? sortLabels(Array.from(colSet), colKey) : ["Total"];
   const rowLabels = Array.from(rowSet.keys());
   const matrix: number[][] = rowLabels.map(() => colLabels.map(() => 0));
   rowLabels.forEach((rl, ri) => {
