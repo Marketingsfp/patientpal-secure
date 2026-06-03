@@ -89,6 +89,7 @@ const emptyForm = () => ({
   criarUsuario: false,
   senhaUsuario: "",
   roleUsuario: "medico" as "admin" | "gestor" | "medico" | "enfermeiro" | "recepcao" | "financeiro",
+  ativo: true,
 });
 
 interface Props {
