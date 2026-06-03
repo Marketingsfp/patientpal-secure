@@ -666,7 +666,11 @@ function ProcedimentosPage() {
     };
     let procId = editing?.id;
     if (editing) {
-      const { error } = await supabase.from("procedimentos").update(payload).eq("id", editing.id);
+      // Ao atualizar não devemos sobrescrever clinica_id — isso poderia violar
+      // o índice único (clinica_id, upper(btrim(nome))) caso a clínica do
+      // registro original seja diferente da clínica atualmente selecionada.
+      const { clinica_id: _ignoreClinica, ...updatePayload } = payload;
+      const { error } = await supabase.from("procedimentos").update(updatePayload).eq("id", editing.id);
       if (error) { setSaving(false); toast.error(error.message); return; }
     } else {
       const { data, error } = await supabase.from("procedimentos").insert(payload).select("id").single();
