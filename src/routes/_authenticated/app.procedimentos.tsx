@@ -333,6 +333,11 @@ function ProcedimentosPage() {
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [seeding, setSeeding] = useState(false);
+  // Confirmação de cadastro com nome duplicado
+  const [dupConflitos, setDupConflitos] = useState<
+    { id: string; nome: string; especialidades: string[]; valor: number }[]
+  >([]);
+  const [pendingPayload, setPendingPayload] = useState<any | null>(null);
   const [tipos, setTipos] = useState<{ id: string; nome: string }[]>([]);
   const [openTipoPicker, setOpenTipoPicker] = useState(false);
 
