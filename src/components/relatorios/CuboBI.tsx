@@ -540,17 +540,25 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
     } catch { setSaved([]); }
   }, [STORAGE_KEY]);
 
+  const financeLoadKey = cube.id === "financeiro"
+    ? [cfg.rowKey, cfg.subRowKey ?? "", cfg.subSubRowKey ?? "", cfg.colKey ?? "", cfg.measureField ?? "", cfg.measureAgg].join("|")
+    : "";
+
   // fetch data
   useEffect(() => {
     if (!clinicaId) return;
     let cancel = false;
     setLoading(true);
-    cube.load({ clinicaId, ini: effIni, fim: effFim })
+    setRawRows([]);
+    const loadRows = cube.id === "financeiro"
+      ? loadFinanceiroAgregado(clinicaId, effIni, effFim, cfg)
+      : cube.load({ clinicaId, ini: effIni, fim: effFim });
+    loadRows
       .then((rows) => { if (!cancel) setRawRows(rows); })
       .catch((e) => toast.error(e?.message ?? "Erro ao carregar cubo"))
       .finally(() => { if (!cancel) setLoading(false); });
     return () => { cancel = true; };
-  }, [clinicaId, effIni, effFim, cube]);
+  }, [clinicaId, effIni, effFim, cube, financeLoadKey]);
 
   // when cube changes, validate fields
   useEffect(() => {
@@ -814,7 +822,7 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="topn">Mostrar top</Label>
-              <Input id="topn" type="number" min={1} max={100} value={cfg.topN}
+              <Input id="topn" type="number" min={1} max={100} value={Math.min(100, Math.max(1, cfg.topN))}
                 onChange={(e) => setField("topN", Math.min(100, Math.max(1, Number(e.target.value) || 10)))} />
             </div>
           </div>
