@@ -172,12 +172,12 @@ const CUBOS: CubeSpec[] = [
       { key: "ativo", label: "Ativo", kind: "string" },
     ],
     load: async ({ clinicaId }) => {
-      const { data, error } = await supabase
+      const rows = await fetchAllRows(() => supabase
         .from("pacientes")
         .select("sexo, ativo, created_at")
-        .eq("clinica_id", clinicaId);
-      if (error) throw error;
-      return (data ?? []).map((r: any) => {
+        .eq("clinica_id", clinicaId)
+        .order("created_at", { ascending: true }));
+      return rows.map((r: any) => {
         const d = (r.created_at ?? "").slice(0, 10);
         return {
           sexo: r.sexo ?? "—",
@@ -204,14 +204,13 @@ const CUBOS: CubeSpec[] = [
       { key: "desconto", label: "Desconto (R$)", kind: "number" },
     ],
     load: async ({ clinicaId, ini, fim }) => {
-      const { data, error } = await supabase
+      const rows = await fetchAllRows(() => supabase
         .from("orcamentos")
         .select("created_at, status, valor_final, desconto, paciente_id")
         .eq("clinica_id", clinicaId)
         .gte("created_at", ini)
-        .lte("created_at", fim + "T23:59:59");
-      if (error) throw error;
-      const rows = (data ?? []) as any[];
+        .lte("created_at", fim + "T23:59:59")
+        .order("created_at", { ascending: true }));
       const pacMap = await lookupNames("pacientes", rows.map((r) => r.paciente_id));
       return rows.map((r) => transformDate(r.created_at, {
         status: r.status ?? "—",
