@@ -1037,7 +1037,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                         searchPlaceholder="Buscar serviço..."
                         options={[
                           { value: "none", label: "— Sem padrão (usa CONSULTA) —" },
-                          { value: "blank", label: "— Em branco (escolher manualmente) —" },
+                          { value: "blank", label: "— Em branco —" },
                           ...Array.from(new Set(form.procedimentos.map((it) => splitItem(it).pid).filter(Boolean)))
                             .map((pid) => procs.find((p) => p.id === pid))
                             .filter((p): p is Procedimento => !!p)
