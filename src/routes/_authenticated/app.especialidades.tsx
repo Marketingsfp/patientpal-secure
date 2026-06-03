@@ -34,6 +34,7 @@ function EspecialidadesPage() {
   const [rows, setRows] = useState<Esp[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
+  const [qInput, setQInput] = useState("");
   const [statusFiltro, setStatusFiltro] = useState<"todos" | "ativo" | "inativo">("todos");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Esp | null>(null);
@@ -177,11 +178,12 @@ function EspecialidadesPage() {
       </div>
 
       <Card className="p-3">
-        <div className="flex gap-2">
+        <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); setQ(qInput); }}>
           <div className="relative flex-1">
             <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input className="pl-9" placeholder="Buscar..." value={q} onChange={e => setQ(e.target.value)} />
+            <Input className="pl-9" placeholder="Buscar..." value={qInput} onChange={e => setQInput(e.target.value)} />
           </div>
+          <Button type="submit" variant="secondary"><Search className="h-4 w-4 mr-1" /> Buscar</Button>
           <Select value={statusFiltro} onValueChange={(v) => setStatusFiltro(v as "todos" | "ativo" | "inativo")}>
             <SelectTrigger className="w-44"><SelectValue placeholder="Situação" /></SelectTrigger>
             <SelectContent>
@@ -190,7 +192,7 @@ function EspecialidadesPage() {
               <SelectItem value="inativo">Inativos</SelectItem>
             </SelectContent>
           </Select>
-        </div>
+        </form>
       </Card>
 
       <Card>
