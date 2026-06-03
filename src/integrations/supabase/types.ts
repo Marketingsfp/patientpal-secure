@@ -4333,6 +4333,7 @@ export type Database = {
           paytime_recipient_id: string | null
           percentual_repasse_padrao: number
           pix_chave: string | null
+          procedimento_padrao_em_branco: boolean
           procedimento_padrao_id: string | null
           rg: string | null
           rqe_especialidade: string | null
@@ -4382,6 +4383,7 @@ export type Database = {
           paytime_recipient_id?: string | null
           percentual_repasse_padrao?: number
           pix_chave?: string | null
+          procedimento_padrao_em_branco?: boolean
           procedimento_padrao_id?: string | null
           rg?: string | null
           rqe_especialidade?: string | null
@@ -4431,6 +4433,7 @@ export type Database = {
           paytime_recipient_id?: string | null
           percentual_repasse_padrao?: number
           pix_chave?: string | null
+          procedimento_padrao_em_branco?: boolean
           procedimento_padrao_id?: string | null
           rg?: string | null
           rqe_especialidade?: string | null
