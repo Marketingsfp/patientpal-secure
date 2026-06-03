@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { FuncionarioFormDialog } from "@/components/funcionarios/FuncionarioFormDialog";
 import { MedicoFormDialog } from "@/components/medicos/MedicoFormDialog";
@@ -232,28 +233,15 @@ function EquipePage() {
 
         <TabsContent value="medicos" className="mt-4">
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <span className="text-sm text-muted-foreground mr-1">Mostrar:</span>
-            <Button
-              size="sm"
-              variant={medicoStatus === "ativos" ? "default" : "outline"}
-              onClick={() => setMedicoStatus("ativos")}
-            >
-              Ativos <Badge variant="secondary" className="ml-2">{medicosAtivosCount}</Badge>
-            </Button>
-            <Button
-              size="sm"
-              variant={medicoStatus === "inativos" ? "default" : "outline"}
-              onClick={() => setMedicoStatus("inativos")}
-            >
-              Inativos <Badge variant="secondary" className="ml-2">{medicosInativosCount}</Badge>
-            </Button>
-            <Button
-              size="sm"
-              variant={medicoStatus === "todos" ? "default" : "outline"}
-              onClick={() => setMedicoStatus("todos")}
-            >
-              Todos <Badge variant="secondary" className="ml-2">{medicos.length}</Badge>
-            </Button>
+            <span className="text-sm text-muted-foreground mr-1">Status:</span>
+            <Select value={medicoStatus} onValueChange={(v) => setMedicoStatus(v as typeof medicoStatus)}>
+              <SelectTrigger className="w-[200px] h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ativos">Ativos ({medicosAtivosCount})</SelectItem>
+                <SelectItem value="inativos">Inativos ({medicosInativosCount})</SelectItem>
+                <SelectItem value="todos">Todos ({medicos.length})</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           {loading ? (
             <Card><CardContent className="py-12 text-center text-muted-foreground">Carregando…</CardContent></Card>
