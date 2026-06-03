@@ -646,7 +646,6 @@ function ProcedimentosPage() {
     e.preventDefault();
     if (!clinicaAtual) return;
     if (!form.nome.trim()) { toast.error("Informe o nome."); return; }
-    setSaving(true);
     const vDinheiro = Number(form.valor_dinheiro) || 0;
     const vCartao = Number(form.valor_pix_cartao) || 0;
     const payload = {
@@ -669,6 +668,36 @@ function ProcedimentosPage() {
       preparo: form.preparo.trim() || null,
       ativo: form.ativo,
     };
+    // Ao criar (não editar), verifica se já existe procedimento com o mesmo nome
+    // nesta clínica e pergunta antes de cadastrar.
+    if (!editing) {
+      const normalizado = payload.nome.trim().toUpperCase();
+      const conflitos = items
+        .filter(p => (p.nome ?? "").trim().toUpperCase() === normalizado)
+        .map(p => {
+          const espIds = vincEspMap.get(p.id);
+          const espNomes = espIds
+            ? especialidades.filter(e => espIds.has(e.id)).map(e => e.nome)
+            : [];
+          return {
+            id: p.id,
+            nome: p.nome,
+            especialidades: espNomes.length > 0 ? espNomes : (p.grupo ? [p.grupo] : []),
+            valor: Number(p.valor_dinheiro ?? p.valor_padrao ?? 0),
+          };
+        });
+      if (conflitos.length > 0) {
+        setDupConflitos(conflitos);
+        setPendingPayload(payload);
+        return;
+      }
+    }
+    await executarSalvar(payload);
+  };
+
+  const executarSalvar = async (payload: any) => {
+    if (!clinicaAtual) return;
+    setSaving(true);
     let procId = editing?.id;
     if (editing) {
       // Ao atualizar não devemos sobrescrever clinica_id — isso poderia violar
