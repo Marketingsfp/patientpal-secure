@@ -6855,6 +6855,26 @@ export type Database = {
         }
         Returns: string
       }
+      cubo_bi_financeiro_agregado: {
+        Args: {
+          _clinica_id: string
+          _col_key?: string
+          _fim: string
+          _ini: string
+          _measure_agg?: string
+          _measure_field?: string
+          _row_key: string
+          _sub_row_key?: string
+          _sub_sub_row_key?: string
+        }
+        Returns: {
+          col_value: string
+          row_value: string
+          sub_row_value: string
+          sub_sub_row_value: string
+          valor: number
+        }[]
+      }
       emitir_senha: {
         Args: {
           _clinica_id: string

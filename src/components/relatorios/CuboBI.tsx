@@ -30,6 +30,14 @@ interface CubeSpec {
   load: (ctx: { clinicaId: string; ini: string; fim: string }) => Promise<Row[]>;
 }
 
+interface FinanceiroAggregateRow {
+  row_value: string | null;
+  sub_row_value: string | null;
+  sub_sub_row_value: string | null;
+  col_value: string | null;
+  valor: number | string | null;
+}
+
 // ============================================================
 // Cubos disponíveis
 // ============================================================
@@ -240,6 +248,38 @@ async function fetchAllRows(builder: () => any): Promise<any[]> {
   return all;
 }
 
+async function loadFinanceiroAgregado(
+  clinicaId: string,
+  ini: string,
+  fim: string,
+  cfg: CubeConfig,
+): Promise<Row[]> {
+  const { data, error } = await (supabase as any).rpc("cubo_bi_financeiro_agregado", {
+    _clinica_id: clinicaId,
+    _ini: ini,
+    _fim: fim,
+    _row_key: cfg.rowKey,
+    _sub_row_key: cfg.subRowKey,
+    _sub_sub_row_key: cfg.subSubRowKey,
+    _col_key: cfg.colKey,
+    _measure_field: cfg.measureField,
+    _measure_agg: cfg.measureAgg,
+  });
+  if (error) throw error;
+
+  return ((data ?? []) as FinanceiroAggregateRow[]).map((r) => {
+    const row: Row = {
+      [cfg.rowKey]: r.row_value ?? "—",
+      __value: Number(r.valor) || 0,
+      __aggregated: true,
+    };
+    if (cfg.subRowKey) row[cfg.subRowKey] = r.sub_row_value ?? "—";
+    if (cfg.subSubRowKey) row[cfg.subSubRowKey] = r.sub_sub_row_value ?? "—";
+    if (cfg.colKey) row[cfg.colKey] = r.col_value ?? "—";
+    return row;
+  });
+}
+
 async function lookupNames(
   table: "medicos" | "pacientes" | "fin_categorias" | "fin_contas",
   ids: Array<string | null | undefined>,
@@ -390,8 +430,11 @@ function pivot(
     const rs = rowSet.get(rl)!;
     colLabels.forEach((cl, ci) => {
       const subset = colKey ? rs.filter((r) => String(r[colKey] ?? "—") === cl) : rs;
-      const vals = measureField ? subset.map((r) => Number(r[measureField]) || 0) : [];
-      matrix[ri][ci] = aggregate(subset, vals, measureAgg);
+      const aggregated = subset.some((r) => r.__aggregated);
+      const vals = aggregated
+        ? subset.map((r) => Number(r.__value) || 0)
+        : measureField ? subset.map((r) => Number(r[measureField]) || 0) : [];
+      matrix[ri][ci] = aggregated ? aggregate(subset, vals, measureAgg === "count" ? "sum" : measureAgg) : aggregate(subset, vals, measureAgg);
     });
   });
   const totalByRow = matrix.map((r) => r.reduce((a, b) => a + b, 0));
@@ -497,17 +540,25 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
     } catch { setSaved([]); }
   }, [STORAGE_KEY]);
 
+  const financeLoadKey = cube.id === "financeiro"
+    ? [cfg.rowKey, cfg.subRowKey ?? "", cfg.subSubRowKey ?? "", cfg.colKey ?? "", cfg.measureField ?? "", cfg.measureAgg].join("|")
+    : "";
+
   // fetch data
   useEffect(() => {
     if (!clinicaId) return;
     let cancel = false;
     setLoading(true);
-    cube.load({ clinicaId, ini: effIni, fim: effFim })
+    setRawRows([]);
+    const loadRows = cube.id === "financeiro"
+      ? loadFinanceiroAgregado(clinicaId, effIni, effFim, cfg)
+      : cube.load({ clinicaId, ini: effIni, fim: effFim });
+    loadRows
       .then((rows) => { if (!cancel) setRawRows(rows); })
       .catch((e) => toast.error(e?.message ?? "Erro ao carregar cubo"))
       .finally(() => { if (!cancel) setLoading(false); });
     return () => { cancel = true; };
-  }, [clinicaId, effIni, effFim, cube]);
+  }, [clinicaId, effIni, effFim, cube, financeLoadKey]);
 
   // when cube changes, validate fields
   useEffect(() => {
@@ -532,7 +583,7 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
   }, [rawRows, cfg.rowKey, cfg.colKey, cfg.measureField, cfg.measureAgg]);
 
   const topRows = useMemo(() => {
-    const n = Math.max(1, cfg.topN);
+    const n = Math.min(100, Math.max(1, cfg.topN));
     let order = piv.rowLabels.map((_, i) => i);
     if (sort) {
       const collator = new Intl.Collator("pt-BR", { sensitivity: "base", numeric: true });
@@ -771,8 +822,8 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="topn">Mostrar top</Label>
-              <Input id="topn" type="number" min={1} max={100} value={cfg.topN}
-                onChange={(e) => setField("topN", Number(e.target.value) || 10)} />
+              <Input id="topn" type="number" min={1} max={100} value={Math.min(100, Math.max(1, cfg.topN))}
+                onChange={(e) => setField("topN", Math.min(100, Math.max(1, Number(e.target.value) || 10)))} />
             </div>
           </div>
 
