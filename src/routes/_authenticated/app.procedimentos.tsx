@@ -1300,6 +1300,51 @@ function ProcedimentosPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <Dialog
+        open={dupConflitos.length > 0}
+        onOpenChange={(o) => { if (!o) { setDupConflitos([]); setPendingPayload(null); } }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nome já cadastrado</DialogTitle>
+            <DialogDescription>
+              Já existe(m) {dupConflitos.length} serviço(s) com este nome nesta clínica.
+              Deseja cadastrar mesmo assim?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 max-h-64 overflow-auto">
+            {dupConflitos.map((d) => (
+              <div key={d.id} className="rounded-md border p-2 text-sm">
+                <div className="font-medium">{d.nome}</div>
+                <div className="text-muted-foreground">
+                  Especialidade: {d.especialidades.length > 0 ? d.especialidades.join(", ") : "—"}
+                </div>
+                <div className="text-muted-foreground">Valor: {fmtBRL(d.valor)}</div>
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => { setDupConflitos([]); setPendingPayload(null); }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={async () => {
+                const p = pendingPayload;
+                setDupConflitos([]);
+                setPendingPayload(null);
+                if (p) await executarSalvar(p);
+              }}
+              disabled={saving}
+            >
+              {saving ? "Salvando…" : "Cadastrar mesmo assim"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
