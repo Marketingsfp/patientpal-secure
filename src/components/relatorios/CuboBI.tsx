@@ -53,14 +53,13 @@ const CUBOS: CubeSpec[] = [
       { key: "paciente", label: "Paciente", kind: "string" },
     ],
     load: async ({ clinicaId, ini, fim }) => {
-      const { data, error } = await supabase
+      const rows = await fetchAllRows(() => supabase
         .from("agendamentos")
         .select("inicio, status, procedimento, paciente_nome, medico_id, paciente_id")
         .eq("clinica_id", clinicaId)
         .gte("inicio", ini)
-        .lte("inicio", fim + "T23:59:59");
-      if (error) throw error;
-      const rows = (data ?? []) as any[];
+        .lte("inicio", fim + "T23:59:59")
+        .order("inicio", { ascending: true }));
       const [medMap, pacMap, espPorProc, espPorMedico] = await Promise.all([
         lookupNames("medicos", rows.map((r) => r.medico_id)),
         lookupNames("pacientes", rows.map((r) => r.paciente_id)),
@@ -101,14 +100,13 @@ const CUBOS: CubeSpec[] = [
       { key: "valor", label: "Valor (R$)", kind: "number" },
     ],
     load: async ({ clinicaId, ini, fim }) => {
-      const { data, error } = await supabase
+      const rows = await fetchAllRows(() => supabase
         .from("fin_lancamentos")
         .select("data, tipo, valor, status, forma_pagamento, categoria_id, conta_id, paciente_id, medico_id")
         .eq("clinica_id", clinicaId)
         .gte("data", ini)
-        .lte("data", fim);
-      if (error) throw error;
-      const rows = (data ?? []) as any[];
+        .lte("data", fim)
+        .order("data", { ascending: true }));
       const [catMap, contMap, pacMap, medMap, espMap] = await Promise.all([
         lookupNames("fin_categorias", rows.map((r) => r.categoria_id)),
         lookupNames("fin_contas", rows.map((r) => r.conta_id)),
@@ -144,14 +142,13 @@ const CUBOS: CubeSpec[] = [
       { key: "mes_nome", label: "Mês (Jan-Dez)", kind: "string" },
     ],
     load: async ({ clinicaId, ini, fim }) => {
-      const { data, error } = await supabase
+      const rows = await fetchAllRows(() => supabase
         .from("prontuarios")
         .select("data, medico_id, paciente_id")
         .eq("clinica_id", clinicaId)
         .gte("data", ini)
-        .lte("data", fim + "T23:59:59");
-      if (error) throw error;
-      const rows = (data ?? []) as any[];
+        .lte("data", fim + "T23:59:59")
+        .order("data", { ascending: true }));
       const [medMap, pacMap, espMap] = await Promise.all([
         lookupNames("medicos", rows.map((r) => r.medico_id)),
         lookupNames("pacientes", rows.map((r) => r.paciente_id)),
