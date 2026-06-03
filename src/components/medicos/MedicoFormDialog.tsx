@@ -948,23 +948,26 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                             options={(() => {
                               const opts: { value: string; label: string }[] = [];
                               const pushed = new Set<string>();
+                              const selecionados = new Set(
+                                form.procedimentos.filter((x, i) => i !== idx && !!x),
+                              );
                               const addProcOpts = (p: Procedimento) => {
                                 const choices = procEspChoices.get(p.id) ?? [];
                                 if (choices.length === 0) {
                                   const v = joinItem(p.id, null);
-                                  if (!pushed.has(v)) { pushed.add(v); opts.push({ value: v, label: p.nome }); }
+                                  if (!pushed.has(v) && !selecionados.has(v)) { pushed.add(v); opts.push({ value: v, label: p.nome }); }
                                 } else {
                                   for (const c of choices) {
                                     const v = joinItem(p.id, c.id);
-                                    if (pushed.has(v)) continue;
+                                    if (pushed.has(v) || selecionados.has(v)) continue;
                                     pushed.add(v);
                                     opts.push({ value: v, label: `${p.nome} (${c.nome.toUpperCase()})` });
                                   }
                                 }
                               };
                               for (const p of procsFiltradosPorEspecialidade) addProcOpts(p);
-                              // garante que itens já selecionados (mesmo fora do filtro) apareçam com rótulo
-                              for (const sel of form.procedimentos) {
+                              // garante que o item atual (mesmo fora do filtro) apareça com rótulo
+                              for (const sel of [item]) {
                                 if (!sel || pushed.has(sel)) continue;
                                 const { pid, eid } = splitItem(sel);
                                 const extra = procs.find((p) => p.id === pid);
