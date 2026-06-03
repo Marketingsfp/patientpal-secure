@@ -358,6 +358,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         complemento: med.complemento ?? "", bairro: med.bairro ?? "", cidade: med.cidade ?? "", estado: med.estado ?? "",
         banco: sens.banco ?? "", agencia: sens.agencia ?? "", conta: sens.conta ?? "", pix_chave: sens.pix_chave ?? "",
         criarUsuario: false, senhaUsuario: "", roleUsuario: "medico",
+        ativo: (med as { ativo?: boolean }).ativo !== false,
       });
       if (med.user_id) {
         try {
