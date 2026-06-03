@@ -45,6 +45,7 @@ const CUBOS: CubeSpec[] = [
       { key: "procedimento", label: "Serviço", kind: "string" },
       { key: "dia", label: "Dia", kind: "date" },
       { key: "mes", label: "Mês", kind: "string" },
+      { key: "mes_ano", label: "Mês/Ano", kind: "string" },
       { key: "ano", label: "Ano", kind: "string" },
       { key: "mes_nome", label: "Mês (Jan-Dez)", kind: "string" },
       { key: "dia_semana", label: "Dia da semana", kind: "string" },
@@ -52,14 +53,13 @@ const CUBOS: CubeSpec[] = [
       { key: "paciente", label: "Paciente", kind: "string" },
     ],
     load: async ({ clinicaId, ini, fim }) => {
-      const { data, error } = await supabase
+      const rows = await fetchAllRows(() => supabase
         .from("agendamentos")
         .select("inicio, status, procedimento, paciente_nome, medico_id, paciente_id")
         .eq("clinica_id", clinicaId)
         .gte("inicio", ini)
-        .lte("inicio", fim + "T23:59:59");
-      if (error) throw error;
-      const rows = (data ?? []) as any[];
+        .lte("inicio", fim + "T23:59:59")
+        .order("inicio", { ascending: true }));
       const [medMap, pacMap, espPorProc, espPorMedico] = await Promise.all([
         lookupNames("medicos", rows.map((r) => r.medico_id)),
         lookupNames("pacientes", rows.map((r) => r.paciente_id)),
@@ -94,19 +94,19 @@ const CUBOS: CubeSpec[] = [
       { key: "paciente", label: "Paciente", kind: "string" },
       { key: "dia", label: "Dia", kind: "date" },
       { key: "mes", label: "Mês", kind: "string" },
+      { key: "mes_ano", label: "Mês/Ano", kind: "string" },
       { key: "ano", label: "Ano", kind: "string" },
       { key: "mes_nome", label: "Mês (Jan-Dez)", kind: "string" },
       { key: "valor", label: "Valor (R$)", kind: "number" },
     ],
     load: async ({ clinicaId, ini, fim }) => {
-      const { data, error } = await supabase
+      const rows = await fetchAllRows(() => supabase
         .from("fin_lancamentos")
         .select("data, tipo, valor, status, forma_pagamento, categoria_id, conta_id, paciente_id, medico_id")
         .eq("clinica_id", clinicaId)
         .gte("data", ini)
-        .lte("data", fim);
-      if (error) throw error;
-      const rows = (data ?? []) as any[];
+        .lte("data", fim)
+        .order("data", { ascending: true }));
       const [catMap, contMap, pacMap, medMap, espMap] = await Promise.all([
         lookupNames("fin_categorias", rows.map((r) => r.categoria_id)),
         lookupNames("fin_contas", rows.map((r) => r.conta_id)),
@@ -137,18 +137,18 @@ const CUBOS: CubeSpec[] = [
       { key: "paciente", label: "Paciente", kind: "string" },
       { key: "dia", label: "Dia", kind: "date" },
       { key: "mes", label: "Mês", kind: "string" },
+      { key: "mes_ano", label: "Mês/Ano", kind: "string" },
       { key: "ano", label: "Ano", kind: "string" },
       { key: "mes_nome", label: "Mês (Jan-Dez)", kind: "string" },
     ],
     load: async ({ clinicaId, ini, fim }) => {
-      const { data, error } = await supabase
+      const rows = await fetchAllRows(() => supabase
         .from("prontuarios")
         .select("data, medico_id, paciente_id")
         .eq("clinica_id", clinicaId)
         .gte("data", ini)
-        .lte("data", fim + "T23:59:59");
-      if (error) throw error;
-      const rows = (data ?? []) as any[];
+        .lte("data", fim + "T23:59:59")
+        .order("data", { ascending: true }));
       const [medMap, pacMap, espMap] = await Promise.all([
         lookupNames("medicos", rows.map((r) => r.medico_id)),
         lookupNames("pacientes", rows.map((r) => r.paciente_id)),
@@ -172,12 +172,12 @@ const CUBOS: CubeSpec[] = [
       { key: "ativo", label: "Ativo", kind: "string" },
     ],
     load: async ({ clinicaId }) => {
-      const { data, error } = await supabase
+      const rows = await fetchAllRows(() => supabase
         .from("pacientes")
         .select("sexo, ativo, created_at")
-        .eq("clinica_id", clinicaId);
-      if (error) throw error;
-      return (data ?? []).map((r: any) => {
+        .eq("clinica_id", clinicaId)
+        .order("created_at", { ascending: true }));
+      return rows.map((r: any) => {
         const d = (r.created_at ?? "").slice(0, 10);
         return {
           sexo: r.sexo ?? "—",
@@ -197,20 +197,20 @@ const CUBOS: CubeSpec[] = [
       { key: "paciente", label: "Paciente", kind: "string" },
       { key: "dia", label: "Dia", kind: "date" },
       { key: "mes", label: "Mês", kind: "string" },
+      { key: "mes_ano", label: "Mês/Ano", kind: "string" },
       { key: "ano", label: "Ano", kind: "string" },
       { key: "mes_nome", label: "Mês (Jan-Dez)", kind: "string" },
       { key: "valor_final", label: "Valor final (R$)", kind: "number" },
       { key: "desconto", label: "Desconto (R$)", kind: "number" },
     ],
     load: async ({ clinicaId, ini, fim }) => {
-      const { data, error } = await supabase
+      const rows = await fetchAllRows(() => supabase
         .from("orcamentos")
         .select("created_at, status, valor_final, desconto, paciente_id")
         .eq("clinica_id", clinicaId)
         .gte("created_at", ini)
-        .lte("created_at", fim + "T23:59:59");
-      if (error) throw error;
-      const rows = (data ?? []) as any[];
+        .lte("created_at", fim + "T23:59:59")
+        .order("created_at", { ascending: true }));
       const pacMap = await lookupNames("pacientes", rows.map((r) => r.paciente_id));
       return rows.map((r) => transformDate(r.created_at, {
         status: r.status ?? "—",
@@ -224,6 +224,21 @@ const CUBOS: CubeSpec[] = [
 
 const DIAS_SEMANA = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 const MESES_NOMES = ["01-Jan", "02-Fev", "03-Mar", "04-Abr", "05-Mai", "06-Jun", "07-Jul", "08-Ago", "09-Set", "10-Out", "11-Nov", "12-Dez"];
+
+async function fetchAllRows(builder: () => any): Promise<any[]> {
+  const PAGE_SIZE = 1000;
+  const all: any[] = [];
+  let offset = 0;
+  while (true) {
+    const { data, error } = await builder().range(offset, offset + PAGE_SIZE - 1);
+    if (error) throw error;
+    const rows = (data ?? []) as any[];
+    all.push(...rows);
+    if (rows.length < PAGE_SIZE) break;
+    offset += PAGE_SIZE;
+  }
+  return all;
+}
 
 async function lookupNames(
   table: "medicos" | "pacientes" | "fin_categorias" | "fin_contas",
@@ -301,18 +316,41 @@ async function lookupEspecialidadePorProcedimento(
 }
 
 function transformDate(isoStr: string | null, base: Record<string, any>) {
-  if (!isoStr) return { ...base, dia: "", mes: "", ano: "", mes_nome: "", dia_semana: "", hora: "" };
+  if (!isoStr) return { ...base, dia: "", mes: "", mes_ano: "", ano: "", mes_nome: "", dia_semana: "", hora: "" };
   const d = new Date(isoStr);
   const mesIdx = Number(isoStr.slice(5, 7)) - 1;
+  const ano = isoStr.slice(0, 4);
+  const mesNumero = isoStr.slice(5, 7);
   return {
     ...base,
     dia: isoStr.slice(0, 10),
-    mes: isoStr.slice(0, 7),
-    ano: isoStr.slice(0, 4),
+    mes: mesIdx >= 0 && mesIdx < 12 ? MESES_NOMES[mesIdx] : "",
+    mes_ano: isoStr.slice(0, 7),
+    ano,
     mes_nome: mesIdx >= 0 && mesIdx < 12 ? MESES_NOMES[mesIdx] : "",
     dia_semana: DIAS_SEMANA[d.getDay()],
     hora: String(d.getHours()).padStart(2, "0") + ":00",
   };
+}
+
+function sortLabels(labels: string[], fieldKey: string | null): string[] {
+  return labels.slice().sort((a, b) => compareLabels(a, b, fieldKey));
+}
+
+function compareLabels(a: string, b: string, fieldKey: string | null): number {
+  const collator = new Intl.Collator("pt-BR", { sensitivity: "base", numeric: true });
+  if (fieldKey === "mes" || fieldKey === "mes_nome") return monthNameToOrder(a) - monthNameToOrder(b);
+  if (fieldKey === "mes_ano" || fieldKey === "dia" || fieldKey === "ano" || fieldKey === "hora") return collator.compare(a, b);
+  return collator.compare(a, b);
+}
+
+function shouldSortDimensionChronologically(fieldKey: string): boolean {
+  return ["dia", "mes", "mes_ano", "ano", "mes_nome", "hora"].includes(fieldKey);
+}
+
+function monthNameToOrder(label: string): number {
+  const month = Number(label.slice(0, 2));
+  return Number.isFinite(month) && month >= 1 && month <= 12 ? month : Number.MAX_SAFE_INTEGER;
 }
 
 // ============================================================
@@ -345,7 +383,7 @@ function pivot(
   }
   const colSet = new Set<string>();
   if (colKey) for (const r of rows) colSet.add(String(r[colKey] ?? "—"));
-  const colLabels = colKey ? Array.from(colSet).sort() : ["Total"];
+  const colLabels = colKey ? sortLabels(Array.from(colSet), colKey) : ["Total"];
   const rowLabels = Array.from(rowSet.keys());
   const matrix: number[][] = rowLabels.map(() => colLabels.map(() => 0));
   rowLabels.forEach((rl, ri) => {
@@ -358,8 +396,11 @@ function pivot(
   });
   const totalByRow = matrix.map((r) => r.reduce((a, b) => a + b, 0));
   const totalByCol = colLabels.map((_, ci) => matrix.reduce((s, r) => s + r[ci], 0));
-  // ordena por total desc
-  const order = totalByRow.map((_, i) => i).sort((a, b) => totalByRow[b] - totalByRow[a]);
+  const order = totalByRow.map((_, i) => i).sort((a, b) => (
+    shouldSortDimensionChronologically(rowKey)
+      ? compareLabels(rowLabels[a], rowLabels[b], rowKey)
+      : totalByRow[b] - totalByRow[a]
+  ));
   return {
     rowLabels: order.map((i) => rowLabels[i]),
     colLabels,
