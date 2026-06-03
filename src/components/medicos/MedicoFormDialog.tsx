@@ -444,6 +444,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       agencia: form.agencia || null,
       conta: form.conta || null,
       pix_chave: form.pix_chave || null,
+      ativo: form.ativo,
     };
     let medicoId = editId;
     if (editId) {
