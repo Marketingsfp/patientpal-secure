@@ -2642,6 +2642,7 @@ function AgendaPage() {
                       valor={procedimentoEfetivo(a.medico_id, a.procedimento)}
                       opcoes={opcoesProcedimentoMedico(a.medico_id)}
                       padrao={procedimentoPadraoDoMedico(a.medico_id)}
+                      semFallback={!!medicos.find((m) => m.id === a.medico_id)?.procedimento_padrao_em_branco}
                       disabled={isSlotLivre(a.paciente_nome)}
                       onChange={(novo) => atualizarProcedimento(a, novo)}
                     />
