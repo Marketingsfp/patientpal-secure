@@ -1267,6 +1267,8 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                         <tbody>
                           {convenios.map((c, i) => {
                             const catLbl = labelCategoria(c.nome);
+                            const matchesServico = !!c.nome && servicosDoMedico.some((s) => normalizarNome(s.value) === normalizarNome(c.nome));
+                            const showTextInput = !catLbl && (c.avulso === true || (!!c.nome && !matchesServico));
                             return (
                             <tr key={i} className="border-t align-middle">
                               <td className="px-2 py-1">
@@ -1274,7 +1276,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                                   <div className="px-2 py-1.5 text-sm font-medium uppercase tracking-wide text-foreground/80">
                                     {catLbl}
                                   </div>
-                                ) : c.avulso ? (
+                                ) : showTextInput ? (
                                   <Input value={c.nome} placeholder="Ex: Cartão Consulta"
                                     onChange={(e) => setConvenios((cs) => cs.map((x, j) => j === i ? { ...x, nome: e.target.value } : x))} />
                                 ) : (
