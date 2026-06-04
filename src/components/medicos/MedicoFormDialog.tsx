@@ -111,6 +111,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+  const [formClinicaId, setFormClinicaId] = useState(clinicaId);
   const [medicoUserId, setMedicoUserId] = useState<string | null>(null);
   const [existingEmail, setExistingEmail] = useState<string | null>(null);
   const [convenios, setConvenios] = useState<ConvenioRow[]>(CONVENIOS_PADRAO);
@@ -122,6 +123,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
   const [novaSenha, setNovaSenha] = useState("");
   const [confirmarSenha, setConfirmarSenha] = useState("");
   const [savingSenha, setSavingSenha] = useState(false);
+  const activeClinicaId = formClinicaId || clinicaId;
 
   const normalizarNome = (s: string) =>
     s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase();
@@ -288,10 +290,10 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
 
   // Load reference data
   useEffect(() => {
-    if (!open || !clinicaId) return;
+    if (!open || !activeClinicaId) return;
     let cancelled = false;
     void supabase.from("especialidades").select("id, nome").order("nome").then(({ data }) => setEsps(data ?? []));
-    void fetchProcedimentosAtivos(clinicaId)
+    void fetchProcedimentosAtivos(activeClinicaId)
       .then((data) => {
         if (!cancelled) setProcs(data);
       })
@@ -304,7 +306,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
     void supabase
       .from("procedimento_especialidades")
       .select("procedimento_id, especialidade:especialidades(nome)")
-      .eq("clinica_id", clinicaId)
+      .eq("clinica_id", activeClinicaId)
       .then(({ data }) => {
         if (cancelled) return;
         const m = new Map<string, Map<string, string>>();
@@ -321,7 +323,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
     return () => {
       cancelled = true;
     };
-  }, [open, clinicaId]);
+  }, [open, activeClinicaId]);
 
   // Load medico when editing
   useEffect(() => {
@@ -330,6 +332,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
     setShowSenha(false);
     setNovaSenha("");
     setConfirmarSenha("");
+    setFormClinicaId(clinicaId);
     if (!editingMedicoId) {
       setEditId(null);
       setMedicoUserId(null);
@@ -342,7 +345,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       setLoading(true);
       const { data: m } = await supabase
         .from("medicos")
-        .select("id, user_id, nome, crm, crm_uf, email, telefone, telefone2, nacionalidade, estado_civil, sexo, duracao_consulta_min, usa_sistema, procedimento_padrao_id, cep, logradouro, numero, complemento, bairro, cidade, estado, ativo, medico_especialidades(especialidade_id, tem_rqe, rqe_numero, especialidade:especialidades(id, nome))")
+        .select("id, clinica_id, user_id, nome, crm, crm_uf, email, telefone, telefone2, nacionalidade, estado_civil, sexo, duracao_consulta_min, usa_sistema, procedimento_padrao_id, cep, logradouro, numero, complemento, bairro, cidade, estado, ativo, medico_especialidades(especialidade_id, tem_rqe, rqe_numero, especialidade:especialidades(id, nome))")
         .eq("id", editingMedicoId)
         .maybeSingle();
       if (cancelled) return;
@@ -356,6 +359,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         return;
       }
       const med = m as any;
+      setFormClinicaId(med.clinica_id ?? clinicaId);
       // Dados sensíveis (CPF, RG, banco, PIX) vêm via RPC restrita a gestores/próprio médico
       let sens: any = {};
       try {
