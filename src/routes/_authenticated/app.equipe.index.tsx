@@ -40,6 +40,7 @@ interface Medico {
   email: string | null;
   telefone: string | null;
   ativo: boolean;
+  especialidades?: string[];
 }
 
 const limparPrefixoMedico = (nome: string) =>
@@ -113,10 +114,26 @@ function EquipePage() {
         }
       }
       setEnfermeiros(enfRows.map((e) => ({ ...e, agendas: agendasMap.get(e.user_id) ?? [] })));
-      setMedicos(((m.data ?? []) as Medico[]).map((medico) => ({
+      const medicosBase = ((m.data ?? []) as Medico[]).map((medico) => ({
         ...medico,
         nome: limparPrefixoMedico(medico.nome),
-      })));
+      }));
+      const medicoIds = medicosBase.map((x) => x.id);
+      const espMap = new Map<string, string[]>();
+      if (medicoIds.length) {
+        const { data: vincs } = await supabase
+          .from("medico_especialidades")
+          .select("medico_id, especialidade:especialidades(nome)")
+          .in("medico_id", medicoIds);
+        for (const v of (vincs ?? []) as Array<{ medico_id: string; especialidade: { nome: string } | null }>) {
+          const nome = v.especialidade?.nome;
+          if (!nome) continue;
+          const arr = espMap.get(v.medico_id) ?? [];
+          if (!arr.includes(nome)) arr.push(nome);
+          espMap.set(v.medico_id, arr);
+        }
+      }
+      setMedicos(medicosBase.map((md) => ({ ...md, especialidades: espMap.get(md.id) ?? [] })));
       setLoading(false);
     });
   }, [clinicaAtual?.clinica_id, reloadKey]);
@@ -255,7 +272,7 @@ function EquipePage() {
                 <TableHeader><TableRow>
                   <TableHead>Nome</TableHead>
                   <TableHead>CRM</TableHead>
-                  <TableHead>Email</TableHead>
+                  <TableHead>Especialidade</TableHead>
                   <TableHead>Telefone</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-16 text-right">Ações</TableHead>
@@ -265,7 +282,17 @@ function EquipePage() {
                     <TableRow key={m.id}>
                       <TableCell>{m.nome}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{m.crm ? `${m.crm}/${m.crm_uf ?? ""}` : "—"}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{m.email ?? "—"}</TableCell>
+                      <TableCell className="text-sm">
+                        {m.especialidades && m.especialidades.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {m.especialidades.map((e, i) => (
+                              <Badge key={i} variant="outline">{e}</Badge>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{m.telefone ?? "—"}</TableCell>
                       <TableCell>{m.ativo ? <Badge>Ativo</Badge> : <Badge variant="outline">Inativo</Badge>}</TableCell>
                       <TableCell className="text-right">
