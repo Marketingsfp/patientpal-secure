@@ -272,6 +272,25 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
     return tipo;
   };
 
+  // Lista de serviços selecionados pelo médico (para o picker do Manual override).
+  // Cada item: { value: nome do procedimento (usado no lookup), label }.
+  const servicosDoMedico = useMemo(() => {
+    const out: { value: string; label: string }[] = [];
+    const seen = new Set<string>();
+    for (const item of form.procedimentos) {
+      const { pid, eid } = splitItem(item);
+      const proc = procs.find((p) => p.id === pid);
+      if (!proc) continue;
+      const key = normalizarNome(proc.nome);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const esp = eid ? esps.find((e) => e.id === eid) ?? null : null;
+      out.push({ value: proc.nome, label: labelProcedimentoEsp(proc, esp) });
+    }
+    out.sort((a, b) => a.label.localeCompare(b.label));
+    return out;
+  }, [form.procedimentos, procs, esps]);
+
   // Load reference data
   useEffect(() => {
     if (!open || !clinicaId) return;
