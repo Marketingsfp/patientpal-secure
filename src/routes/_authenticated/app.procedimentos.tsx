@@ -535,7 +535,7 @@ function ProcedimentosPage() {
       if (grupoAplicado !== "todos") {
         const matchGrupo = norm(p.grupo ?? "") === norm(grupoAplicado);
         const extras = vincEspMap.get(p.id);
-        const matchExtra = norm(p.tipo ?? "") === "consulta" && !!espIdFiltro && !!extras && extras.has(espIdFiltro);
+        const matchExtra = !!espIdFiltro && !!extras && extras.has(espIdFiltro);
         if (!matchGrupo && !matchExtra) return false;
       }
       if (q && !norm(p.nome).includes(q) && !norm(p.codigo ?? "").includes(q) && !norm(p.grupo ?? "").includes(q)) return false;
@@ -711,8 +711,8 @@ function ProcedimentosPage() {
       if (error) { setSaving(false); toast.error(error.message); return; }
       procId = data?.id;
     }
-    // Sincroniza vínculos N:N de especialidades (apenas quando tipo === 'consulta')
-    if (procId && form.tipo === "consulta") {
+    // Sincroniza vínculos N:N de especialidades (todos os tipos)
+    if (procId) {
       await supabase.from("procedimento_especialidades").delete().eq("procedimento_id", procId);
       if (formEspIds.length > 0) {
         const rows = formEspIds.map(eid => ({
@@ -723,9 +723,6 @@ function ProcedimentosPage() {
         const { error: errVinc } = await supabase.from("procedimento_especialidades").insert(rows);
         if (errVinc) { setSaving(false); toast.error(errVinc.message); return; }
       }
-    } else if (procId && form.tipo !== "consulta") {
-      // se o tipo deixou de ser consulta, limpa vínculos extras
-      await supabase.from("procedimento_especialidades").delete().eq("procedimento_id", procId);
     }
     // Sincroniza valores por convênio (cartão benefícios)
     if (procId && convenios.length > 0) {
@@ -989,7 +986,18 @@ function ProcedimentosPage() {
                   <TableRow><TableCell colSpan={7 + convenios.length} className="text-center py-8 text-muted-foreground">Nenhum serviço.</TableCell></TableRow>
                 ) : visiveis.map(p => (
                   <TableRow key={p.id} className="h-8">
-                    <TableCell className="text-xs text-muted-foreground">{p.grupo ?? "—"}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {(() => {
+                        const extras = vincEspMap.get(p.id);
+                        const nomes = extras
+                          ? especialidades.filter(e => extras.has(e.id)).map(e => e.nome)
+                          : [];
+                        if (p.grupo && !nomes.some(n => n.toLowerCase() === p.grupo!.toLowerCase())) {
+                          nomes.unshift(p.grupo);
+                        }
+                        return nomes.length > 0 ? nomes.join(", ") : "—";
+                      })()}
+                    </TableCell>
                     <TableCell>
                       <span className={`text-[10px] px-1.5 py-0 rounded-full ${tipoCor(p.tipo)}`}>{tipoLabel(p.tipo)}</span>
                     </TableCell>
@@ -1136,13 +1144,12 @@ function ProcedimentosPage() {
               </div>
             </div>
 
-            {form.tipo === "consulta" && (
-              <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
+            <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
                 <p className="text-xs font-medium text-muted-foreground uppercase">
-                  Especialidades em que esta consulta aparece
+                  Especialidades em que este serviço aparece
                 </p>
                 <p className="text-[11px] text-muted-foreground">
-                  Marque todas as especialidades que devem listar esta consulta. A especialidade do campo "Especialidade" acima é a principal e já é incluída automaticamente.
+                  Marque todas as especialidades que devem listar este serviço. A especialidade do campo "Especialidade" acima é a principal e já é incluída automaticamente.
                 </p>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-56 overflow-y-auto pt-1">
                   {especialidades.length === 0 && (
@@ -1165,8 +1172,7 @@ function ProcedimentosPage() {
                     );
                   })}
                 </div>
-              </div>
-            )}
+            </div>
 
             <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
               <p className="text-xs font-medium text-muted-foreground uppercase">Valores por forma de pagamento</p>
