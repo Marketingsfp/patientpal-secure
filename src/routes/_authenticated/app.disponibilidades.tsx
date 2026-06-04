@@ -483,6 +483,7 @@ function Page() {
                         <TableHeader>
                           <TableRow>
                             <TableHead>Dia</TableHead>
+                            <TableHead>Agenda</TableHead>
                             <TableHead>Início</TableHead>
                             <TableHead>Fim</TableHead>
                             <TableHead>Pacientes/dia</TableHead>
@@ -499,6 +500,9 @@ function Page() {
                                     <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
                                     <SelectContent>{DIAS.map((dn, i) => <SelectItem key={i} value={String(i)}>{dn}</SelectItem>)}</SelectContent>
                                   </Select>
+                                </TableCell>
+                                <TableCell className="uppercase text-sm text-muted-foreground">
+                                  {agendasMed.find((a) => a.id === d.agenda_id)?.nome ?? "—"}
                                 </TableCell>
                                 <TableCell>
                                   <Input type="time" className="w-28" value={editRow.hora_inicio} onChange={(e) => setEditRow({ ...editRow, hora_inicio: e.target.value })} />
@@ -522,6 +526,9 @@ function Page() {
                             ) : (
                               <TableRow key={d.id}>
                                 <TableCell className="font-medium">{DIAS[d.dia_semana]}</TableCell>
+                                <TableCell className="uppercase text-sm">
+                                  {agendasMed.find((a) => a.id === d.agenda_id)?.nome ?? "—"}
+                                </TableCell>
                                 <TableCell>{d.hora_inicio.slice(0, 5)}</TableCell>
                                 <TableCell>{d.hora_fim.slice(0, 5)}</TableCell>
                                 <TableCell>{d.limite_pacientes ?? <span className="text-muted-foreground">—</span>}</TableCell>
