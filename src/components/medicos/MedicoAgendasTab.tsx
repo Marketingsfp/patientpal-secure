@@ -174,7 +174,7 @@ export function MedicoAgendasTab({
                   </div>
                   <div className="flex items-center justify-between gap-3 pt-2 border-t">
                     <Label className="text-xs uppercase text-muted-foreground">
-                      Procedimentos vinculados
+                      Serviços vinculados
                     </Label>
                     <Input
                       placeholder="Filtrar procedimento..."
