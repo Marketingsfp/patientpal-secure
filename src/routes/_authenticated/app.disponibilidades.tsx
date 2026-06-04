@@ -40,11 +40,16 @@ function isFeriadoOuDomingo(d: Date): boolean {
 
 interface Disp { id: string; medico_id: string; dia_semana: number; hora_inicio: string; hora_fim: string; observacoes: string | null; limite_pacientes: number | null; intervalo_min: number | null }
 interface Medico { id: string; nome: string; duracao_consulta_min: number | null; procedimento_padrao_id: string | null; procedimento_padrao_nome: string | null; especialidade_nome: string | null }
+interface Agenda { id: string; medico_id: string; nome: string; ativo: boolean; ordem: number }
+interface DispRow extends Disp { agenda_id: string }
 
 function Page() {
   const { clinicaAtual } = useClinica();
   const [medicos, setMedicos] = useState<Medico[]>([]);
-  const [disps, setDisps] = useState<Disp[]>([]);
+  const [disps, setDisps] = useState<DispRow[]>([]);
+  const [agendas, setAgendas] = useState<Agenda[]>([]);
+  const [agendaSel, setAgendaSel] = useState<string>("");
+  const [novaAgendaNome, setNovaAgendaNome] = useState("");
   const [filtro, setFiltro] = useState("");
   const [novo, setNovo] = useState({ medico_id: "", dia_semana: "1", hora_inicio: "08:00", hora_fim: "12:00", limite_pacientes: "", intervalo_min: "" });
   const hojeIso = new Date().toISOString().slice(0, 10);
@@ -57,9 +62,10 @@ function Page() {
 
   const load = async () => {
     if (!clinicaAtual) return;
-    const [m, d] = await Promise.all([
+    const [m, d, a] = await Promise.all([
       supabase.from("medicos").select("id, nome, duracao_consulta_min, procedimento_padrao_id, procedimento:procedimentos!medicos_procedimento_padrao_id_fkey(nome), especialidade:especialidades!medicos_especialidade_id_fkey(nome)" as never).eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
-      supabase.from("medico_disponibilidades").select("id, medico_id, dia_semana, hora_inicio, hora_fim, observacoes, limite_pacientes, intervalo_min" as never).eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("dia_semana").order("hora_inicio"),
+      supabase.from("medico_disponibilidades").select("id, medico_id, agenda_id, dia_semana, hora_inicio, hora_fim, observacoes, limite_pacientes, intervalo_min" as never).eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("dia_semana").order("hora_inicio"),
+      supabase.from("medico_agendas" as never).select("id, medico_id, nome, ativo, ordem").eq("clinica_id", clinicaAtual.clinica_id).order("ordem").order("nome"),
     ]);
     type RawMedico = { id: string; nome: string; duracao_consulta_min: number | null; procedimento_padrao_id: string | null; procedimento?: { nome: string | null } | null; especialidade?: { nome: string | null } | null };
     const rawList = ((m.data as unknown) as RawMedico[]) ?? [];
@@ -71,7 +77,8 @@ function Page() {
       procedimento_padrao_nome: r.procedimento?.nome ?? null,
       especialidade_nome: r.especialidade?.nome ?? null,
     })));
-    setDisps(((d.data as unknown) as Disp[]) ?? []);
+    setDisps(((d.data as unknown) as DispRow[]) ?? []);
+    setAgendas(((a.data as unknown) as Agenda[]) ?? []);
   };
 
   useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clinicaAtual?.clinica_id]);
@@ -107,9 +114,11 @@ function Page() {
 
   const adicionar = async () => {
     if (!clinicaAtual || !novo.medico_id) { toast.error("Selecione um médico"); return; }
+    if (!agendaSel) { toast.error("Selecione uma agenda"); return; }
     const payload = {
       clinica_id: clinicaAtual.clinica_id,
       medico_id: novo.medico_id,
+      agenda_id: agendaSel,
       dia_semana: parseInt(novo.dia_semana),
       hora_inicio: novo.hora_inicio,
       hora_fim: novo.hora_fim,
