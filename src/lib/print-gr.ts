@@ -82,7 +82,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   const [ag, cli] = await Promise.all([
     supabase
       .from("agendamentos")
-      .select("id, paciente_nome, paciente_id, medico_id, inicio, procedimento, observacoes")
+      .select("id, paciente_nome, paciente_id, medico_id, agenda_id, inicio, procedimento, observacoes")
       .eq("id", agendamentoId)
       .maybeSingle(),
     supabase
@@ -98,6 +98,17 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   const a = ag.data;
   const c = cli.data;
 
+  // Se o agendamento não tem medico_id direto, tenta resolver pelo médico vinculado à agenda
+  let medicoIdEfetivo: string | null = a.medico_id ?? null;
+  if (!medicoIdEfetivo && a.agenda_id) {
+    const { data: ag } = await supabase
+      .from("medico_agendas")
+      .select("medico_id")
+      .eq("id", a.agenda_id)
+      .maybeSingle();
+    medicoIdEfetivo = (ag as { medico_id: string | null } | null)?.medico_id ?? null;
+  }
+
   const [pac, med, proc] = await Promise.all([
     a.paciente_id
       ? supabase
@@ -106,11 +117,11 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
           .eq("id", a.paciente_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
-    a.medico_id
+    medicoIdEfetivo
       ? supabase
           .from("medicos")
           .select("nome, especialidade:especialidades(nome)")
-          .eq("id", a.medico_id)
+          .eq("id", medicoIdEfetivo)
           .maybeSingle()
       : Promise.resolve({ data: null }),
     a.procedimento
