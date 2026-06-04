@@ -1116,6 +1116,12 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                 </div>
               </TabsContent>
 
+              <TabsContent value="agendas" className="space-y-4 pt-4 pb-16">
+                {editingMedicoId && (
+                  <MedicoAgendasTab clinicaId={clinicaId} medicoId={editingMedicoId} />
+                )}
+              </TabsContent>
+
               <TabsContent value="banco" className="space-y-4 pt-4 pb-16">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
