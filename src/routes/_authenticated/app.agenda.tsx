@@ -2624,13 +2624,17 @@ function AgendaPage() {
       {viewMode === "dia" && (
       <>
       {pacienteCopia && (
-        <div className="flex items-center justify-between gap-3 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
-          <span>
-            📋 Paciente copiado: <b>{pacienteCopia.nome}</b>. Clique em um horário <b>livre</b> para agendar.
-          </span>
-          <Button variant="ghost" size="sm" className="h-7" onClick={() => setPacienteCopia(null)}>
-            Cancelar
-          </Button>
+        <div className="sticky top-0 z-30 -mx-4 px-4 py-2 border-b bg-primary text-primary-foreground shadow-sm">
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <CalendarDays className="h-4 w-4 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <span className="font-semibold uppercase">Copiando paciente · {pacienteCopia.nome}</span>
+              <span className="ml-2 opacity-90 italic">Clique em um horário livre na agenda para agendar.</span>
+            </div>
+            <Button size="sm" variant="secondary" onClick={() => setPacienteCopia(null)}>
+              Cancelar
+            </Button>
+          </div>
         </div>
       )}
       {/* Totais + paginação topo */}
