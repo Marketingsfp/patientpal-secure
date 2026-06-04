@@ -1341,6 +1341,24 @@ function AgendaPage() {
   };
 
   const [pagamentoValor, setPagamentoValor] = useState("");
+  // Paciente "copiado" via menu Opções para colar no próximo slot livre clicado
+  const [pacienteCopia, setPacienteCopia] = useState<{ id: string; nome: string } | null>(null);
+
+  const copiarPacienteSelecionado = () => {
+    if (selecionados.size !== 1) {
+      toast.error("Selecione apenas 1 agendamento do paciente para copiar.");
+      return;
+    }
+    const id = Array.from(selecionados)[0];
+    const ag = items.find((x) => x.id === id);
+    if (!ag || isSlotLivre(ag.paciente_nome) || !ag.paciente_id) {
+      toast.error("O agendamento selecionado não possui paciente cadastrado.");
+      return;
+    }
+    setPacienteCopia({ id: ag.paciente_id, nome: ag.paciente_nome });
+    setSelecionados(new Set());
+    toast.success(`Paciente copiado: ${ag.paciente_nome}. Clique em um horário livre para agendar.`);
+  };
 
   const openNew = () => {
     setEditing(null);
@@ -1354,8 +1372,8 @@ function AgendaPage() {
     if (reagLoteIds) { void confirmarReagLoteNoSlot(a); return; }
     setEditing(a);
     setForm({
-      paciente_nome: "",
-      paciente_id: "",
+      paciente_nome: pacienteCopia?.nome ?? "",
+      paciente_id: pacienteCopia?.id ?? "",
       medico_id: a.medico_id ?? "",
       inicio: toLocalInput(a.inicio), fim: toLocalInput(a.fim),
       procedimento: procedimentoEfetivo(a.medico_id, a.procedimento) || "CONSULTA",
@@ -1363,6 +1381,7 @@ function AgendaPage() {
       observacoes: a.observacoes ?? "",
       data_pagamento: a.data_pagamento ?? "",
     });
+    if (pacienteCopia) setPacienteCopia(null);
     setOpen(true);
   };
 
@@ -1885,6 +1904,13 @@ function AgendaPage() {
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={cobrarSelecionados}>
                 💳 Cobrar selecionados (1 pagamento)
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={copiarPacienteSelecionado}
+                disabled={selecionados.size !== 1}
+              >
+                📋 Copiar dados do paciente
               </DropdownMenuItem>
               {isManager && (
                 <>
@@ -2597,6 +2623,16 @@ function AgendaPage() {
 
       {viewMode === "dia" && (
       <>
+      {pacienteCopia && (
+        <div className="flex items-center justify-between gap-3 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+          <span>
+            📋 Paciente copiado: <b>{pacienteCopia.nome}</b>. Clique em um horário <b>livre</b> para agendar.
+          </span>
+          <Button variant="ghost" size="sm" className="h-7" onClick={() => setPacienteCopia(null)}>
+            Cancelar
+          </Button>
+        </div>
+      )}
       {/* Totais + paginação topo */}
       <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
         <div className="flex gap-4">
