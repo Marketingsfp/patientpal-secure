@@ -1274,9 +1274,20 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                                   <div className="px-2 py-1.5 text-sm font-medium uppercase tracking-wide text-foreground/80">
                                     {catLbl}
                                   </div>
-                                ) : (
+                                ) : c.avulso ? (
                                   <Input value={c.nome} placeholder="Ex: Cartão Consulta"
                                     onChange={(e) => setConvenios((cs) => cs.map((x, j) => j === i ? { ...x, nome: e.target.value } : x))} />
+                                ) : (
+                                  <select
+                                    className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+                                    value={c.nome}
+                                    onChange={(e) => setConvenios((cs) => cs.map((x, j) => j === i ? { ...x, nome: e.target.value } : x))}
+                                  >
+                                    <option value="">Selecione um serviço…</option>
+                                    {servicosDoMedico.map((s) => (
+                                      <option key={s.value} value={s.value}>{s.label}</option>
+                                    ))}
+                                  </select>
                                 )}
                               </td>
                               <td className="px-2 py-1">
