@@ -223,15 +223,13 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
           const tipo = nome.slice("__CAT__:".length).toUpperCase();
           return tiposSelecionados.has(tipo);
         }
-        const chave = normalizarNome(nome);
-        // Linha cujo nome corresponde a um serviço atualmente selecionado é um
-        // override individual válido — preservar. Linha cujo nome corresponde a
-        // um procedimento NÃO selecionado é órfã — remover. Demais (manuais
-        // avulsas como "Cartão Consulta", ou linhas vazias recém-criadas) são
-        // preservadas.
-        const todosOsProcs = new Set(procs.map((p) => normalizarNome(p.nome)));
-        if (todosOsProcs.has(chave) && !nomesServicosSelecionados.has(chave)) return false;
-        return true;
+        // Linha em branco (acabou de ser criada pelo botão Manual) — preservar
+        // para o usuário escolher o serviço.
+        if (!nome.trim()) return true;
+        // Toda linha individual precisa estar vinculada a um serviço atualmente
+        // selecionado pelo médico. Qualquer outra coisa (procedimento não mais
+        // selecionado, legado avulso como "Cartão Consulta") é descartada.
+        return nomesServicosSelecionados.has(normalizarNome(nome));
       });
 
       const existentesCat = new Set(
