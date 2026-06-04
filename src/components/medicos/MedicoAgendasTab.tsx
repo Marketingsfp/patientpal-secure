@@ -164,10 +164,7 @@ export function MedicoAgendasTab({
         <>
           {agendas.map((a) => {
             const vincSet = vinculos.get(a.id) ?? new Set<string>();
-            const filtro = filtroProc.get(a.id) ?? "";
-            const procsFiltrados = procsDoMedico.filter(
-              (p) => !filtro || p.nome.toLowerCase().includes(filtro.toLowerCase()),
-            );
+            const procsFiltrados = procsDoMedico;
             return (
               <Card key={a.id}>
                 <CardContent className="py-4 space-y-3">
@@ -200,13 +197,13 @@ export function MedicoAgendasTab({
                   </div>
                   <div className="max-h-72 overflow-auto border rounded-md p-2 grid grid-cols-1 sm:grid-cols-2 gap-1">
                     {procsFiltrados.map((p) => (
-                      <label key={p.id} className="flex items-center gap-2 text-sm py-1">
+                      <div key={p.id} className="flex items-center gap-2 text-sm py-1">
                         <Checkbox
                           checked={vincSet.has(p.id)}
                           onCheckedChange={(v) => void toggleProc(a.id, p.id, !!v)}
                         />
                         <span className="uppercase">{p.nome}</span>
-                      </label>
+                      </div>
                     ))}
                     {procsFiltrados.length === 0 && (
                       <p className="text-xs text-muted-foreground col-span-full text-center py-3">
