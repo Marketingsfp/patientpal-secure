@@ -1065,9 +1065,12 @@ function AgendaPage() {
         const set = medicoEspec.get(a.medico_id);
         if (!set || !set.has(filtroEspecialidade)) return false;
       }
+      if (filtroAgenda !== "todos") {
+        if (a.agenda_id !== filtroAgenda) return false;
+      }
       return true;
     });
-  }, [items, mostrarLivres, filtroMedico, filtroStatus, filtroCliente, filtroFicha, filtroDiaSemana, filtroEspecialidade, medicoEspec, fichaPorId]);
+  }, [items, mostrarLivres, filtroMedico, filtroStatus, filtroCliente, filtroFicha, filtroDiaSemana, filtroEspecialidade, filtroAgenda, medicoEspec, fichaPorId]);
 
   const totais = useMemo(() => ({
     total: filtrados.length,
@@ -1083,7 +1086,7 @@ function AgendaPage() {
   const paginados = filtradosOrdenados.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const limparFiltros = () => {
-    setFiltroMedico("todos"); setFiltroEspecialidade("todos"); setFiltroDiaSemana("todos");
+    setFiltroMedico("todos"); setFiltroEspecialidade("todos"); setFiltroDiaSemana("todos"); setFiltroAgenda("todos");
     setFiltroStatus("todos"); setFiltroCliente(""); setFiltroFicha("");
   };
 
