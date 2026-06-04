@@ -318,18 +318,21 @@ function Page() {
     // Carrega valor de tabela dos procedimentos para usar como "total cheio"
     const { data: procs } = await supabase
       .from("procedimentos")
-      .select("nome, valor_padrao, valor_dinheiro")
+      .select("nome, valor_padrao, valor_dinheiro, tipo")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("ativo", true);
     const pmap = new Map<string, number>();
+    const tmap = new Map<string, string>();
     for (const pr of (procs as any[] | null) ?? []) {
       const v = Number(pr.valor_padrao ?? pr.valor_dinheiro ?? 0);
       if (!pr?.nome) continue;
       const key = norm(String(pr.nome));
       // mantém o maior valor caso haja duplicidade entre unidades
       if (v > (pmap.get(key) ?? 0)) pmap.set(key, v);
+      if (pr.tipo && !tmap.has(key)) tmap.set(key, String(pr.tipo));
     }
     setProcValores(pmap);
+    setProcTipos(tmap);
     const ids = ((m.data ?? []) as Medico[]).map((x) => x.id);
     if (ids.length) {
       const { data: cv } = await supabase
