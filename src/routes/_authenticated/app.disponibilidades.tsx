@@ -374,7 +374,14 @@ function Page() {
             const m = medicos.find((x) => x.id === medicoEditando);
             if (!m) { setMedicoEditando(null); return null; }
             const agendasMed = agendas.filter((a) => a.medico_id === m.id).sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome, "pt-BR"));
-            const ds = disps.filter((d) => d.medico_id === m.id && d.agenda_id === agendaSel);
+            const ds = disps
+              .filter((d) => d.medico_id === m.id)
+              .slice()
+              .sort((a, b) => {
+                const an = agendasMed.find((x) => x.id === a.agenda_id)?.nome ?? "";
+                const bn = agendasMed.find((x) => x.id === b.agenda_id)?.nome ?? "";
+                return an.localeCompare(bn, "pt-BR") || a.dia_semana - b.dia_semana || a.hora_inicio.localeCompare(b.hora_inicio);
+              });
             return (
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
@@ -386,65 +393,18 @@ function Page() {
                 </div>
 
                 <Card>
-                  <CardContent className="py-4 space-y-3">
-                    <div className="flex flex-wrap items-end gap-2">
-                      <div className="flex-1 min-w-56">
-                        <label className="text-xs text-muted-foreground">Agenda</label>
-                        <Select value={agendaSel} onValueChange={setAgendaSel}>
-                          <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                          <SelectContent>
-                            {agendasMed.map((a) => (
-                              <SelectItem key={a.id} value={a.id} className="uppercase">{a.nome}{!a.ativo ? " (inativa)" : ""}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="flex-1 min-w-56">
-                        <label className="text-xs text-muted-foreground">Nova agenda</label>
-                        <Input placeholder="Ex.: EXAMES, USG..." value={novaAgendaNome} onChange={(e) => setNovaAgendaNome(e.target.value)} />
-                      </div>
-                      <Button
-                        variant="outline"
-                        onClick={async () => {
-                          const nome = novaAgendaNome.trim();
-                          if (!nome || !clinicaAtual) { toast.error("Informe o nome da agenda"); return; }
-                          const { data, error } = await supabase
-                            .from("medico_agendas")
-                            .insert({ clinica_id: clinicaAtual.clinica_id, medico_id: m.id, nome, ordem: agendasMed.length } as never)
-                            .select("id")
-                            .single();
-                          if (error) { toast.error(error.message); return; }
-                          toast.success("Agenda criada");
-                          setNovaAgendaNome("");
-                          await load();
-                          if (data) setAgendaSel((data as { id: string }).id);
-                        }}
-                      >
-                        <Plus className="h-4 w-4 mr-1" /> Criar agenda
-                      </Button>
-                      {agendaSel && agendasMed.length > 1 && (
-                        <Button
-                          variant="ghost"
-                          className="text-destructive"
-                          onClick={async () => {
-                            if (!confirm("Remover esta agenda e todos os seus horários?")) return;
-                            const { error } = await supabase.from("medico_agendas").delete().eq("id", agendaSel);
-                            if (error) { toast.error(error.message); return; }
-                            toast.success("Agenda removida");
-                            await load();
-                            const rest = agendas.filter((a) => a.medico_id === m.id && a.id !== agendaSel);
-                            setAgendaSel(rest[0]?.id ?? "");
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4 mr-1" /> Remover agenda
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
                   <CardContent className="py-4 flex flex-wrap gap-2 items-end">
+                    <div>
+                      <label className="text-xs text-muted-foreground">Agenda</label>
+                      <Select value={agendaSel} onValueChange={setAgendaSel}>
+                        <SelectTrigger className="w-48"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                        <SelectContent>
+                          {agendasMed.map((a) => (
+                            <SelectItem key={a.id} value={a.id} className="uppercase">{a.nome}{!a.ativo ? " (inativa)" : ""}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <div>
                       <label className="text-xs text-muted-foreground">Dia</label>
                       <Select value={novo.dia_semana} onValueChange={(v) => setNovo({ ...novo, dia_semana: v })}>
@@ -482,8 +442,8 @@ function Page() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Dia</TableHead>
                             <TableHead>Agenda</TableHead>
+                            <TableHead>Dia</TableHead>
                             <TableHead>Início</TableHead>
                             <TableHead>Fim</TableHead>
                             <TableHead>Pacientes/dia</TableHead>
@@ -495,14 +455,14 @@ function Page() {
                           {ds.map((d) => (
                             dispEditando === d.id && editRow ? (
                               <TableRow key={d.id} className="bg-muted/40">
+                                <TableCell className="uppercase text-sm text-muted-foreground">
+                                  {agendasMed.find((a) => a.id === d.agenda_id)?.nome ?? "—"}
+                                </TableCell>
                                 <TableCell>
                                   <Select value={editRow.dia_semana} onValueChange={(v) => setEditRow({ ...editRow, dia_semana: v })}>
                                     <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
                                     <SelectContent>{DIAS.map((dn, i) => <SelectItem key={i} value={String(i)}>{dn}</SelectItem>)}</SelectContent>
                                   </Select>
-                                </TableCell>
-                                <TableCell className="uppercase text-sm text-muted-foreground">
-                                  {agendasMed.find((a) => a.id === d.agenda_id)?.nome ?? "—"}
                                 </TableCell>
                                 <TableCell>
                                   <Input type="time" className="w-28" value={editRow.hora_inicio} onChange={(e) => setEditRow({ ...editRow, hora_inicio: e.target.value })} />
@@ -525,10 +485,10 @@ function Page() {
                               </TableRow>
                             ) : (
                               <TableRow key={d.id}>
-                                <TableCell className="font-medium">{DIAS[d.dia_semana]}</TableCell>
                                 <TableCell className="uppercase text-sm">
                                   {agendasMed.find((a) => a.id === d.agenda_id)?.nome ?? "—"}
                                 </TableCell>
+                                <TableCell className="font-medium">{DIAS[d.dia_semana]}</TableCell>
                                 <TableCell>{d.hora_inicio.slice(0, 5)}</TableCell>
                                 <TableCell>{d.hora_fim.slice(0, 5)}</TableCell>
                                 <TableCell>{d.limite_pacientes ?? <span className="text-muted-foreground">—</span>}</TableCell>
