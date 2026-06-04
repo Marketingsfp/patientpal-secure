@@ -63,6 +63,7 @@ function Page() {
   const [pacientes, setPacientes] = useState<Pac[]>([]);
   const [convenios, setConvenios] = useState<Convenio[]>([]);
   const [procValores, setProcValores] = useState<Map<string, number>>(new Map());
+  const [procTipos, setProcTipos] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -171,7 +172,15 @@ function Page() {
     // 1) Procura convênio cadastrado pelo nome do procedimento (independente de ter pagamento)
     if (procNome) {
       const alvo = norm(procNome);
-      const c = convenios.find((cv) => cv.medico_id === medicoId && norm(cv.nome) === alvo);
+      let c = convenios.find((cv) => cv.medico_id === medicoId && norm(cv.nome) === alvo);
+      // Fallback: repasse por categoria (__CAT__:<TIPO>) usando o tipo do procedimento
+      if (!c) {
+        const tipo = procTipos.get(alvo);
+        if (tipo) {
+          const sentinel = `__CAT__:${String(tipo).toUpperCase()}`;
+          c = convenios.find((cv) => cv.medico_id === medicoId && cv.nome === sentinel);
+        }
+      }
       if (c) {
         // Sem pagamento registrado, mantém total zerado (será preenchido quando o
         // financeiro for lançado). Com pagamento, usa o valor pago como base.
@@ -309,18 +318,21 @@ function Page() {
     // Carrega valor de tabela dos procedimentos para usar como "total cheio"
     const { data: procs } = await supabase
       .from("procedimentos")
-      .select("nome, valor_padrao, valor_dinheiro")
+      .select("nome, valor_padrao, valor_dinheiro, tipo")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("ativo", true);
     const pmap = new Map<string, number>();
+    const tmap = new Map<string, string>();
     for (const pr of (procs as any[] | null) ?? []) {
       const v = Number(pr.valor_padrao ?? pr.valor_dinheiro ?? 0);
       if (!pr?.nome) continue;
       const key = norm(String(pr.nome));
       // mantém o maior valor caso haja duplicidade entre unidades
       if (v > (pmap.get(key) ?? 0)) pmap.set(key, v);
+      if (pr.tipo && !tmap.has(key)) tmap.set(key, String(pr.tipo));
     }
     setProcValores(pmap);
+    setProcTipos(tmap);
     const ids = ((m.data ?? []) as Medico[]).map((x) => x.id);
     if (ids.length) {
       const { data: cv } = await supabase
