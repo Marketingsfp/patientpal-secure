@@ -1228,13 +1228,28 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                     <div>
                       <Label>REPASSE INDIVIDUAL</Label>
                       <p className="text-xs text-muted-foreground">
-                        As <b>categorias</b> dos serviços selecionados na aba <b>Especialidades</b> aparecem aqui automaticamente (Consulta, Exame, Procedimento). Defina o tipo e o valor de repasse por categoria — vale para todos os serviços daquela categoria. Use "Manual" para itens avulsos (ex.: Cartão Consulta).
+                        As <b>categorias</b> dos serviços selecionados na aba <b>Especialidades</b> aparecem aqui automaticamente (Consulta, Exame, Procedimento). Defina o tipo e o valor de repasse por categoria — vale para todos os serviços daquela categoria. Use <b>Manual</b> para sobrescrever o repasse de um <b>serviço específico</b> (prevalece sobre a categoria) ou para itens <b>avulsos</b> (ex.: Cartão Consulta).
                       </p>
                     </div>
-                    <Button type="button" size="sm" variant="outline"
-                      onClick={() => setConvenios((cs) => [...cs, { nome: "", tipo_repasse: "percentual", percentual: "50", valor: "", ativo: true }])}>
-                      <Plus className="h-4 w-4 mr-1" /> Manual
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button type="button" size="sm" variant="outline">
+                          <Plus className="h-4 w-4 mr-1" /> Manual
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => setConvenios((cs) => [...cs, { nome: "", tipo_repasse: "percentual", percentual: "50", valor: "", ativo: true, avulso: false }])}
+                        >
+                          Sobrescrever serviço específico
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => setConvenios((cs) => [...cs, { nome: "", tipo_repasse: "percentual", percentual: "50", valor: "", ativo: true, avulso: true }])}
+                        >
+                          Avulso (texto livre)
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                   {convenios.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-4">Nenhum convênio. Clique em "Manual" para adicionar.</p>
