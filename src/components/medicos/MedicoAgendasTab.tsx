@@ -25,8 +25,8 @@ export function MedicoAgendasTab({
   const [procs, setProcs] = useState<Procedimento[]>([]);
   const [vinculos, setVinculos] = useState<Map<string, Set<string>>>(new Map());
   const [nova, setNova] = useState("");
-  const [filtroProc, setFiltroProc] = useState<Map<string, string>>(new Map());
   const [multipla, setMultipla] = useState<boolean>(false);
+  const procedimentoIdsKey = (procedimentoIds ?? []).slice().sort().join("|");
 
   const load = async () => {
     const [a, p, mp] = await Promise.all([
@@ -41,7 +41,9 @@ export function MedicoAgendasTab({
     const idsFromDb = new Set(
       ((mp.data as { procedimento_id: string }[] | null) ?? []).map((x) => x.procedimento_id),
     );
-    setProcs(idsFromDb.size > 0 ? allProcs.filter((x) => idsFromDb.has(x.id)) : allProcs);
+    const idsDoFormulario = new Set(procedimentoIds ?? []);
+    const idsPermitidos = new Set([...idsFromDb, ...idsDoFormulario]);
+    setProcs(idsPermitidos.size > 0 ? allProcs.filter((x) => idsPermitidos.has(x.id)) : []);
     if (ags.length > 0) {
       const { data: vincs } = await supabase
         .from("medico_agenda_procedimentos")
@@ -58,7 +60,7 @@ export function MedicoAgendasTab({
     }
   };
 
-  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [medicoId, clinicaId]);
+  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [medicoId, clinicaId, procedimentoIdsKey]);
 
   const criar = async () => {
     const nome = nova.trim();
