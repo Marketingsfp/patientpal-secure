@@ -1,20 +1,31 @@
 ## Objetivo
 
-Remover a opção "Avulso (texto livre)" do botão **Manual** no Repasse Individual. Toda linha manual deve estar vinculada a um serviço cadastrado do médico — sem texto solto que não case com nada no sistema.
+Hoje, no cadastro de Serviços, o campo **Especialidade** aceita só uma. Já existe uma tabela auxiliar (`procedimento_especialidades`) com vínculo N:N e até uma seção "Outras especialidades", mas ela está **escondida quando o tipo é Procedimento ou Exame** — só aparece em Consulta.
 
-## Mudanças (somente em `src/components/medicos/MedicoFormDialog.tsx`)
+A mudança é estender esse multi-vínculo para qualquer categoria (Consulta, Exame, Procedimento), mantendo o mesmo registro de serviço, o mesmo nome e os mesmos valores. Assim, "VITAMINA B12" pode aparecer em Endocrinologia, Clínica Geral, etc., sem duplicar.
 
-1. **Botão Manual deixa de ser dropdown** — volta a ser um botão simples que adiciona uma linha de override de serviço (picker dos serviços selecionados na aba Especialidades). Remover o `DropdownMenu` adicionado.
+## Como vai funcionar
 
-2. **Remover renderização de texto livre** na célula "Nome": apagar o ramo `showTextInput` / `c.avulso`. Toda linha não-categoria renderiza apenas o `<select>` com os serviços do médico.
+No diálogo "Editar serviço / Novo serviço":
 
-3. **Migrar linhas avulsas legadas** (ex.: "Cartão Consulta") presentes no banco de médicos já cadastrados:
-   - Ao carregar `medico_convenios`, descartar silenciosamente linhas cujo `nome` não é `__CAT__:*` e não corresponde a nenhum procedimento atualmente selecionado pelo médico. Elas não têm como ser editadas/validadas no novo modelo.
-   - Remover também o seed `CONVENIOS_PADRAO` ("Cartão Consulta", "Cartão Desconto") usado para novos médicos — não faz mais sentido criar linhas sem vínculo a serviço.
+1. **Especialidade principal** (campo já existente) — continua igual, é a especialidade "dona" do serviço, usada como rótulo padrão na listagem.
+2. **Outras especialidades** (seção nova, antes só aparecia para Consulta) — passa a aparecer também para Exame e Procedimento. Lista todas as especialidades cadastradas com checkbox; o que estiver marcado vincula o serviço àquela especialidade.
 
-4. **Limpar tipos**: remover o campo `avulso?: boolean` de `ConvenioRow` (agora não utilizado).
+Na tela de listagem de Serviços, a coluna **Especialidade** mostrará todas as especialidades vinculadas (ex.: "ENDOCRINOLOGIA, CLÍNICA GERAL"), e o filtro por especialidade considerará qualquer um dos vínculos.
 
-## Nada muda
+Na agenda e nos demais lugares onde o serviço é escolhido a partir da especialidade do médico, ele aparecerá se a especialidade do médico bater com **qualquer uma** das especialidades vinculadas ao serviço.
 
-- Lookup em `app.financeiro.atendimentos.tsx` e `print-gr.ts` (continua casando por nome do procedimento e caindo para `__CAT__:<TIPO>`).
-- Categorias automáticas, Repasse Padrão, Cartões Benefícios, schema, demais abas.
+## Detalhes técnicos
+
+- `src/routes/_authenticated/app.procedimentos.tsx`:
+  - Remover a condição que esconde a seção "Outras especialidades" quando `tipo !== 'consulta'`.
+  - No `handleSave`, remover a guarda que só sincroniza `procedimento_especialidades` para consultas — passar a sincronizar para todos os tipos.
+  - Na listagem, exibir todas as especialidades vinculadas (já temos `vincEspMap`); usá-lo também no filtro por especialidade.
+- Nenhuma mudança de schema: a tabela `procedimento_especialidades` e suas policies já existem.
+- Sem mudanças em repasse, cartão benefícios ou financeiro — apenas a relação serviço↔especialidade fica N:N de fato.
+
+## Fora do escopo
+
+- Não duplicar registros existentes.
+- Não alterar valores nem regras de cartão benefícios.
+- Não mexer no cadastro de médico.
