@@ -199,6 +199,7 @@ export function MedicoAgendasTab({
                     ))}
                     {procsFiltrados.length === 0 && (
                       <p className="text-xs text-muted-foreground col-span-full text-center py-3">
+                        Nenhum serviço cadastrado para este médico na aba "Especialidades".
                       </p>
                     )}
                   </div>
