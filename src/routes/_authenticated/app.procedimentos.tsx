@@ -535,7 +535,7 @@ function ProcedimentosPage() {
       if (grupoAplicado !== "todos") {
         const matchGrupo = norm(p.grupo ?? "") === norm(grupoAplicado);
         const extras = vincEspMap.get(p.id);
-        const matchExtra = norm(p.tipo ?? "") === "consulta" && !!espIdFiltro && !!extras && extras.has(espIdFiltro);
+        const matchExtra = !!espIdFiltro && !!extras && extras.has(espIdFiltro);
         if (!matchGrupo && !matchExtra) return false;
       }
       if (q && !norm(p.nome).includes(q) && !norm(p.codigo ?? "").includes(q) && !norm(p.grupo ?? "").includes(q)) return false;
