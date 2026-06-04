@@ -176,16 +176,6 @@ export function MedicoAgendasTab({
                     <Label className="text-xs uppercase text-muted-foreground">
                       Serviços vinculados
                     </Label>
-                    <Input
-                      placeholder="Filtrar procedimento..."
-                      className="max-w-xs"
-                      value={filtro}
-                      onChange={(e) => {
-                        const next = new Map(filtroProc);
-                        next.set(a.id, e.target.value);
-                        setFiltroProc(next);
-                      }}
-                    />
                   </div>
                   <div className="max-h-72 overflow-auto border rounded-md p-2 grid grid-cols-1 sm:grid-cols-2 gap-1">
                     {procsFiltrados.map((p) => (
