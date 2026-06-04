@@ -711,8 +711,8 @@ function ProcedimentosPage() {
       if (error) { setSaving(false); toast.error(error.message); return; }
       procId = data?.id;
     }
-    // Sincroniza vínculos N:N de especialidades (apenas quando tipo === 'consulta')
-    if (procId && form.tipo === "consulta") {
+    // Sincroniza vínculos N:N de especialidades (todos os tipos)
+    if (procId) {
       await supabase.from("procedimento_especialidades").delete().eq("procedimento_id", procId);
       if (formEspIds.length > 0) {
         const rows = formEspIds.map(eid => ({
@@ -723,9 +723,6 @@ function ProcedimentosPage() {
         const { error: errVinc } = await supabase.from("procedimento_especialidades").insert(rows);
         if (errVinc) { setSaving(false); toast.error(errVinc.message); return; }
       }
-    } else if (procId && form.tipo !== "consulta") {
-      // se o tipo deixou de ser consulta, limpa vínculos extras
-      await supabase.from("procedimento_especialidades").delete().eq("procedimento_id", procId);
     }
     // Sincroniza valores por convênio (cartão benefícios)
     if (procId && convenios.length > 0) {
