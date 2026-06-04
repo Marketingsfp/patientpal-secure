@@ -211,13 +211,14 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
     if (!procs.length) return;
     setConvenios((cs) => {
       const tiposSelecionados = new Set<string>();
+      const nomesServicosSelecionados = new Set<string>();
       for (const item of form.procedimentos) {
         const { pid } = splitItem(item);
         if (!pid) continue;
         const proc = procs.find((p) => p.id === pid);
         if (proc?.tipo) tiposSelecionados.add(String(proc.tipo).toUpperCase());
+        if (proc?.nome) nomesServicosSelecionados.add(normalizarNome(proc.nome));
       }
-      const nomesDeProcedimentos = new Set(procs.map((p) => normalizarNome(p.nome)));
 
       // Mantém manuais e sentinelas de categoria ainda usadas.
       const mantidos = cs.filter((c) => {
@@ -227,8 +228,14 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
           return tiposSelecionados.has(tipo);
         }
         const chave = normalizarNome(nome);
-        // Remove linhas legadas por serviço; preserva manuais (Cartão etc.).
-        return !nomesDeProcedimentos.has(chave);
+        // Linha cujo nome corresponde a um serviço atualmente selecionado é um
+        // override individual válido — preservar. Linha cujo nome corresponde a
+        // um procedimento NÃO selecionado é órfã — remover. Demais (manuais
+        // avulsas como "Cartão Consulta", ou linhas vazias recém-criadas) são
+        // preservadas.
+        const todosOsProcs = new Set(procs.map((p) => normalizarNome(p.nome)));
+        if (todosOsProcs.has(chave) && !nomesServicosSelecionados.has(chave)) return false;
+        return true;
       });
 
       const existentesCat = new Set(
