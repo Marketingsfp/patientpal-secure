@@ -1199,7 +1199,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                     <div>
                       <Label>REPASSE INDIVIDUAL</Label>
                       <p className="text-xs text-muted-foreground">
-                        Os serviços selecionados na aba <b>Especialidades</b> aparecem aqui automaticamente. Defina o tipo e o valor de repasse de cada um. Use "Manual" para adicionar itens avulsos (ex: Cartão Consulta).
+                        As <b>categorias</b> dos serviços selecionados na aba <b>Especialidades</b> aparecem aqui automaticamente (Consulta, Exame, Procedimento). Defina o tipo e o valor de repasse por categoria — vale para todos os serviços daquela categoria. Use "Manual" para itens avulsos (ex.: Cartão Consulta).
                       </p>
                     </div>
                     <Button type="button" size="sm" variant="outline"
@@ -1221,11 +1221,19 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                           </tr>
                         </thead>
                         <tbody>
-                          {convenios.map((c, i) => (
+                          {convenios.map((c, i) => {
+                            const catLbl = labelCategoria(c.nome);
+                            return (
                             <tr key={i} className="border-t align-middle">
                               <td className="px-2 py-1">
-                                <Input value={c.nome} placeholder="Ex: Fimose"
-                                  onChange={(e) => setConvenios((cs) => cs.map((x, j) => j === i ? { ...x, nome: e.target.value } : x))} />
+                                {catLbl ? (
+                                  <div className="px-2 py-1.5 text-sm font-medium uppercase tracking-wide text-foreground/80">
+                                    {catLbl}
+                                  </div>
+                                ) : (
+                                  <Input value={c.nome} placeholder="Ex: Cartão Consulta"
+                                    onChange={(e) => setConvenios((cs) => cs.map((x, j) => j === i ? { ...x, nome: e.target.value } : x))} />
+                                )}
                               </td>
                               <td className="px-2 py-1">
                                 <select className="h-9 w-full rounded-md border bg-background px-2 text-sm"
@@ -1241,13 +1249,16 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                                   onChange={(e) => setConvenios((cs) => cs.map((x, j) => j === i ? (c.tipo_repasse === "percentual" ? { ...x, percentual: e.target.value } : { ...x, valor: e.target.value }) : x))} />
                               </td>
                               <td className="px-2 py-1 text-right">
-                                <Button type="button" size="icon" variant="ghost"
-                                  onClick={() => setConvenios((cs) => cs.filter((_, j) => j !== i))} aria-label="Remover">
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
+                                {catLbl ? null : (
+                                  <Button type="button" size="icon" variant="ghost"
+                                    onClick={() => setConvenios((cs) => cs.filter((_, j) => j !== i))} aria-label="Remover">
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
                               </td>
                             </tr>
-                          ))}
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
