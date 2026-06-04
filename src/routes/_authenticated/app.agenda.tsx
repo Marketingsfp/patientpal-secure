@@ -2623,6 +2623,16 @@ function AgendaPage() {
 
       {viewMode === "dia" && (
       <>
+      {pacienteCopia && (
+        <div className="flex items-center justify-between gap-3 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+          <span>
+            📋 Paciente copiado: <b>{pacienteCopia.nome}</b>. Clique em um horário <b>livre</b> para agendar.
+          </span>
+          <Button variant="ghost" size="sm" className="h-7" onClick={() => setPacienteCopia(null)}>
+            Cancelar
+          </Button>
+        </div>
+      )}
       {/* Totais + paginação topo */}
       <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
         <div className="flex gap-4">
