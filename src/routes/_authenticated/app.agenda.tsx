@@ -371,6 +371,7 @@ function AgendaPage() {
   const [filtroEspecialidade, setFiltroEspecialidade] = useState<string>("todos");
   const [filtroAgenda, setFiltroAgenda] = useState<string>("todos");
   const [agendasPorMedico, setAgendasPorMedico] = useState<Map<string, { id: string; nome: string }[]>>(new Map());
+  const [procIdsPorAgenda, setProcIdsPorAgenda] = useState<Map<string, Set<string>>>(new Map());
   const [filtroDiaSemana, setFiltroDiaSemana] = useState<string>("todos");
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [filtroCliente, setFiltroCliente] = useState("");
@@ -785,6 +786,20 @@ function AgendaPage() {
       ag.set(a.medico_id, arr);
     }
     setAgendasPorMedico(ag);
+    // Vínculos serviço↔agenda (para limitar serviços no agendamento conforme agenda escolhida)
+    const agendaIds = (agendasData ?? []).map((a) => (a as { id: string }).id);
+    const vincPorAgenda = new Map<string, Set<string>>();
+    if (agendaIds.length > 0) {
+      const { data: vincs } = await supabase
+        .from("medico_agenda_procedimentos")
+        .select("agenda_id, procedimento_id")
+        .in("agenda_id", agendaIds);
+      for (const v of (vincs ?? []) as Array<{ agenda_id: string; procedimento_id: string }>) {
+        if (!vincPorAgenda.has(v.agenda_id)) vincPorAgenda.set(v.agenda_id, new Set());
+        vincPorAgenda.get(v.agenda_id)!.add(v.procedimento_id);
+      }
+    }
+    setProcIdsPorAgenda(vincPorAgenda);
     const todos = Array.isArray(pr) ? pr : [];
     const procedimentosPorId = new Map(
       todos.map((p) => [p.id, { id: p.id, nome: p.nome, grupo: p.grupo ?? null }]),
@@ -961,12 +976,22 @@ function AgendaPage() {
   };
 
   // Opções de procedimento disponíveis para um médico específico (cadastro do médico)
-  const opcoesProcedimentoMedico = (medicoId: string | null) => {
+  const opcoesProcedimentoMedico = (medicoId: string | null, agendaId?: string | null) => {
     if (!medicoId) return [] as { id: string; nome: string }[];
     const opcoesCadastradas = procOpcoesPorMedico.get(medicoId);
+    const filtrarPorAgenda = (lista: { id: string; nome: string }[]) => {
+      if (!agendaId) return lista;
+      const idsAgenda = procIdsPorAgenda.get(agendaId);
+      if (!idsAgenda || idsAgenda.size === 0) return lista;
+      const nomesAgenda = new Set<string>();
+      for (const p of procedimentosList) {
+        if (idsAgenda.has(p.id)) nomesAgenda.add(normalizar(p.nome));
+      }
+      return lista.filter((p) => idsAgenda.has(p.id) || nomesAgenda.has(normalizar(p.nome)));
+    };
     if (opcoesCadastradas && opcoesCadastradas.length > 0) {
       // Preserva a ordem do cadastro (created_at asc) — Top 10 aparecem primeiro.
-      return [...opcoesCadastradas];
+      return filtrarPorAgenda([...opcoesCadastradas]);
     }
     const ids = procPorMedico.get(medicoId);
     const nomes = procNomesPorMedico.get(medicoId);
@@ -975,7 +1000,7 @@ function AgendaPage() {
     const lista = procedimentosList.filter(
       (p) => (ids?.has(p.id) ?? false) || (nomes?.has(normalizar(p.nome)) ?? false),
     );
-    return lista;
+    return filtrarPorAgenda(lista);
   };
 
   const procedimentoPadraoDoMedico = (medicoId: string | null | undefined) => {
@@ -2052,7 +2077,10 @@ function AgendaPage() {
                   options={[
                     { value: "none", label: "— Selecione —" },
                     ...(form.medico_id
-                      ? opcoesProcedimentoMedico(form.medico_id).map((p) => ({ value: p.nome, label: p.nome }))
+                      ? opcoesProcedimentoMedico(
+                          form.medico_id,
+                          editing?.agenda_id ?? (filtroAgenda !== "todos" ? filtroAgenda : null),
+                        ).map((p) => ({ value: p.nome, label: p.nome }))
                       : []),
                   ]}
                 />
