@@ -2078,7 +2078,10 @@ function AgendaPage() {
                   options={[
                     { value: "none", label: "— Selecione —" },
                     ...(form.medico_id
-                      ? opcoesProcedimentoMedico(form.medico_id).map((p) => ({ value: p.nome, label: p.nome }))
+                      ? opcoesProcedimentoMedico(
+                          form.medico_id,
+                          editing?.agenda_id ?? (filtroAgenda !== "todos" ? filtroAgenda : null),
+                        ).map((p) => ({ value: p.nome, label: p.nome }))
                       : []),
                   ]}
                 />
