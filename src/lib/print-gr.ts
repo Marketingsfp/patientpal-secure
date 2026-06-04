@@ -428,7 +428,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
       .maybeSingle(),
     supabase
       .from("procedimentos")
-      .select("nome, valor_dinheiro_pix, valor_cartao")
+      .select("nome, valor_dinheiro_pix, valor_cartao, tipo")
       .eq("clinica_id", clinicaId),
     supabase
       .from("fin_lancamentos")
@@ -443,7 +443,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   }
   const ags = agsRes.data;
   const c = cliRes.data;
-  const procs = (procsRes.data ?? []) as Array<{ nome: string; valor_dinheiro_pix: number | null; valor_cartao: number | null }>;
+  const procs = (procsRes.data ?? []) as Array<{ nome: string; valor_dinheiro_pix: number | null; valor_cartao: number | null; tipo: string | null }>;
   const procByNome = new Map(procs.map((p) => [normalizar(p.nome ?? ""), p]));
   // Valor efetivamente pago por agendamento (fonte da verdade — usa quando há lançamento confirmado).
   const valorPagoByAg = new Map<string, number>();
@@ -521,7 +521,11 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
       const med = medById.get(a.medico_id);
       const convs = convsByMedico.get(a.medico_id) ?? [];
       const alvo = normalizar(procNomeBase);
-      const conv = convs.find((cv) => normalizar(cv.nome) === alvo);
+      let conv = convs.find((cv) => normalizar(cv.nome) === alvo);
+      if (!conv && proc?.tipo) {
+        const sentinel = `__CAT__:${String(proc.tipo).toUpperCase()}`;
+        conv = convs.find((cv) => cv.nome === sentinel);
+      }
       if (conv) {
         if (conv.tipo_repasse === "valor" && conv.valor != null) {
           prestador = Number(conv.valor);
