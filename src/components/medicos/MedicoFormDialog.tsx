@@ -32,15 +32,11 @@ interface ConvenioRow {
   percentual: string;
   valor: string;
   ativo: boolean;
-  // UI-only: quando true, o usuário quer digitar um nome avulso (ex.: "Cartão Consulta")
-  // em vez de escolher um serviço específico do médico para sobrescrever.
-  avulso?: boolean;
 }
 
-const CONVENIOS_PADRAO: ConvenioRow[] = [
-  { nome: "Cartão Consulta", tipo_repasse: "percentual", percentual: "50", valor: "", ativo: true },
-  { nome: "Cartão Desconto", tipo_repasse: "percentual", percentual: "50", valor: "", ativo: true },
-];
+// Repasse individual agora é sempre vinculado a um serviço (ou categoria
+// sentinela auto-gerada). Não há seed de linhas avulsas.
+const CONVENIOS_PADRAO: ConvenioRow[] = [];
 
 const limparPrefixoMedico = (nome: string) =>
   nome.replace(/^(\s*(dr|dra)\.?\s+)+/i, "").trim();
