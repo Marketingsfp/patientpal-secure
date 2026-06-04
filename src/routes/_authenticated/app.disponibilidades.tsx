@@ -162,43 +162,46 @@ function Page() {
     if (fimD < ini) return [];
     const dias = Math.floor((fimD.getTime() - ini.getTime()) / 86400000) + 1;
     const alvo = gerar.medico_id === "all" ? medicos : medicos.filter((m) => m.id === gerar.medico_id);
-    const out: { data: string; medico: string; inicio: string; fim: string }[] = [];
+    const out: { data: string; medico: string; agenda_id: string; inicio: string; fim: string }[] = [];
     for (let i = 0; i < dias; i++) {
       const d = new Date(ini); d.setDate(d.getDate() + i);
       if (isFeriadoOuDomingo(d)) continue;
       const dow = d.getDay();
       for (const m of alvo) {
-        const ds = disps.filter((x) => x.medico_id === m.id && x.dia_semana === dow);
-        const fallbackDur = m.duracao_consulta_min && m.duracao_consulta_min > 0 ? m.duracao_consulta_min : 15;
-        // Limite diário: override manual do formulário; senão soma das janelas cadastradas
-        const overrideLimite = gerar.limite_fichas ? parseInt(gerar.limite_fichas) : 0;
-        let limiteDia: number;
-        if (overrideLimite > 0) {
-          limiteDia = overrideLimite;
-        } else {
-          const limitesDoDia = ds.map((x) => x.limite_pacientes).filter((n): n is number => typeof n === "number" && n > 0);
-          limiteDia = limitesDoDia.length > 0 ? limitesDoDia.reduce((a, b) => a + b, 0) : Infinity;
-        }
-        let criadosNoDia = 0;
-        for (const disp of ds) {
-          const dur = disp.intervalo_min && disp.intervalo_min > 0 ? disp.intervalo_min : fallbackDur;
-          const [hi, mi] = disp.hora_inicio.split(":").map(Number);
-          const [hf, mf] = disp.hora_fim.split(":").map(Number);
-          let cur = hi * 60 + mi;
-          const end = hf * 60 + mf;
-          while (cur + dur <= end && criadosNoDia < limiteDia) {
-            const inicio = `${String(Math.floor(cur / 60)).padStart(2, "0")}:${String(cur % 60).padStart(2, "0")}`;
-            const fimMin = cur + dur;
-            const fim = `${String(Math.floor(fimMin / 60)).padStart(2, "0")}:${String(fimMin % 60).padStart(2, "0")}`;
-            out.push({ data: d.toISOString().slice(0, 10), medico: m.nome, inicio, fim });
-            cur += dur;
-            criadosNoDia += 1;
+        const agendasDoMedico = agendas.filter((a) => a.medico_id === m.id && a.ativo);
+        for (const ag of agendasDoMedico) {
+          const ds = disps.filter((x) => x.medico_id === m.id && x.agenda_id === ag.id && x.dia_semana === dow);
+          if (ds.length === 0) continue;
+          const fallbackDur = m.duracao_consulta_min && m.duracao_consulta_min > 0 ? m.duracao_consulta_min : 15;
+          const overrideLimite = gerar.limite_fichas ? parseInt(gerar.limite_fichas) : 0;
+          let limiteDia: number;
+          if (overrideLimite > 0) {
+            limiteDia = overrideLimite;
+          } else {
+            const limitesDoDia = ds.map((x) => x.limite_pacientes).filter((n): n is number => typeof n === "number" && n > 0);
+            limiteDia = limitesDoDia.length > 0 ? limitesDoDia.reduce((a, b) => a + b, 0) : Infinity;
+          }
+          let criadosNoDia = 0;
+          for (const disp of ds) {
+            const dur = disp.intervalo_min && disp.intervalo_min > 0 ? disp.intervalo_min : fallbackDur;
+            const [hi, mi] = disp.hora_inicio.split(":").map(Number);
+            const [hf, mf] = disp.hora_fim.split(":").map(Number);
+            let cur = hi * 60 + mi;
+            const end = hf * 60 + mf;
+            while (cur + dur <= end && criadosNoDia < limiteDia) {
+              const inicio = `${String(Math.floor(cur / 60)).padStart(2, "0")}:${String(cur % 60).padStart(2, "0")}`;
+              const fimMin = cur + dur;
+              const fim = `${String(Math.floor(fimMin / 60)).padStart(2, "0")}:${String(fimMin % 60).padStart(2, "0")}`;
+              out.push({ data: d.toISOString().slice(0, 10), medico: m.nome, agenda_id: ag.id, inicio, fim });
+              cur += dur;
+              criadosNoDia += 1;
+            }
           }
         }
       }
     }
     return out;
-  }, [gerar, medicos, disps]);
+  }, [gerar, medicos, disps, agendas]);
 
   if (!clinicaAtual) return <p className="text-muted-foreground">Selecione uma clínica.</p>;
 
@@ -222,6 +225,7 @@ function Page() {
         return {
           clinica_id: clinicaAtual.clinica_id,
           medico_id: med.id,
+          agenda_id: s.agenda_id,
           paciente_nome: "DISPONÍVEL",
           inicio: inicio.toISOString(),
           fim: fim.toISOString(),
