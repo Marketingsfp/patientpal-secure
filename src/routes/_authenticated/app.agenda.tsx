@@ -2445,11 +2445,25 @@ function AgendaPage() {
             <MedicoFiltroInput
               medicos={medicos}
               value={filtroMedico}
-              onChange={(v) => { if (!isMedicoOnly) setFiltroMedico(v); }}
+              onChange={(v) => { if (!isMedicoOnly) { setFiltroMedico(v); setFiltroAgenda("todos"); } }}
               disabled={isMedicoOnly}
               onlyMedicoId={isMedicoOnly ? medicoLogadoId : null}
             />
           </div>
+          {filtroMedico !== "todos" && (agendasPorMedico.get(filtroMedico)?.length ?? 0) > 1 && (
+            <div className="space-y-0.5">
+              <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Agenda</Label>
+              <Select value={filtroAgenda} onValueChange={setFiltroAgenda}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">TODAS</SelectItem>
+                  {(agendasPorMedico.get(filtroMedico) ?? []).map(a => (
+                    <SelectItem key={a.id} value={a.id}>{a.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="space-y-0.5">
             <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Data Ref.</Label>
             <DataRefField
