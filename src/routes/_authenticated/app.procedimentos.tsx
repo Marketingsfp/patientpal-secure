@@ -986,7 +986,18 @@ function ProcedimentosPage() {
                   <TableRow><TableCell colSpan={7 + convenios.length} className="text-center py-8 text-muted-foreground">Nenhum serviço.</TableCell></TableRow>
                 ) : visiveis.map(p => (
                   <TableRow key={p.id} className="h-8">
-                    <TableCell className="text-xs text-muted-foreground">{p.grupo ?? "—"}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {(() => {
+                        const extras = vincEspMap.get(p.id);
+                        const nomes = extras
+                          ? especialidades.filter(e => extras.has(e.id)).map(e => e.nome)
+                          : [];
+                        if (p.grupo && !nomes.some(n => n.toLowerCase() === p.grupo!.toLowerCase())) {
+                          nomes.unshift(p.grupo);
+                        }
+                        return nomes.length > 0 ? nomes.join(", ") : "—";
+                      })()}
+                    </TableCell>
                     <TableCell>
                       <span className={`text-[10px] px-1.5 py-0 rounded-full ${tipoCor(p.tipo)}`}>{tipoLabel(p.tipo)}</span>
                     </TableCell>
