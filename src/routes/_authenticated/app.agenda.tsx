@@ -1905,6 +1905,13 @@ function AgendaPage() {
               <DropdownMenuItem onClick={cobrarSelecionados}>
                 💳 Cobrar selecionados (1 pagamento)
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={copiarPacienteSelecionado}
+                disabled={selecionados.size !== 1}
+              >
+                📋 Copiar dados do paciente
+              </DropdownMenuItem>
               {isManager && (
                 <>
                   <DropdownMenuSeparator />
