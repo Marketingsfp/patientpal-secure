@@ -197,46 +197,49 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
     return p.nome;
   };
 
-  // Sincroniza a aba "Repasse" com os serviços selecionados na aba
-  // Especialidades:
-  //  • Cada serviço selecionado vira automaticamente um item na lista de
-  //    REPASSE INDIVIDUAL (se ainda não existir).
-  //  • Quando um serviço é removido das especialidades, o item correspondente
-  //    é removido da aba Repasse.
-  //  • Itens manuais (cujo nome NÃO corresponde a nenhum procedimento da
-  //    clínica — ex.: "Cartão Consulta", "Cartão Desconto") são sempre
-  //    preservados para ajuste manual.
+  // Sincroniza a aba "Repasse" com as CATEGORIAS dos serviços selecionados:
+  //  • Cada categoria distinta (Consulta / Exame / Procedimento) dos serviços
+  //    selecionados vira automaticamente uma linha em REPASSE INDIVIDUAL,
+  //    armazenada com nome sentinela `__CAT__:<TIPO>`.
+  //  • Linhas antigas por serviço (cujo nome corresponde a um procedimento
+  //    cadastrado) são removidas — agora o repasse é por categoria.
+  //  • Linhas manuais avulsas (ex.: "Cartão Consulta") são preservadas.
   useEffect(() => {
     if (!procs.length) return;
     setConvenios((cs) => {
-      const selecionadosNomes = new Set<string>();
+      const tiposSelecionados = new Set<string>();
       for (const item of form.procedimentos) {
         const { pid } = splitItem(item);
         if (!pid) continue;
         const proc = procs.find((p) => p.id === pid);
-        if (proc) selecionadosNomes.add(normalizarNome(proc.nome));
+        if (proc?.tipo) tiposSelecionados.add(String(proc.tipo).toUpperCase());
       }
       const nomesDeProcedimentos = new Set(procs.map((p) => normalizarNome(p.nome)));
 
-      // Mantém itens manuais e itens cujo serviço ainda está selecionado.
+      // Mantém manuais e sentinelas de categoria ainda usadas.
       const mantidos = cs.filter((c) => {
-        const chave = normalizarNome(c.nome);
-        if (!nomesDeProcedimentos.has(chave)) return true; // manual
-        return selecionadosNomes.has(chave);
+        const nome = c.nome ?? "";
+        if (nome.startsWith("__CAT__:")) {
+          const tipo = nome.slice("__CAT__:".length).toUpperCase();
+          return tiposSelecionados.has(tipo);
+        }
+        const chave = normalizarNome(nome);
+        // Remove linhas legadas por serviço; preserva manuais (Cartão etc.).
+        return !nomesDeProcedimentos.has(chave);
       });
 
-      const existentes = new Set(mantidos.map((c) => normalizarNome(c.nome)));
+      const existentesCat = new Set(
+        mantidos
+          .filter((c) => (c.nome ?? "").startsWith("__CAT__:"))
+          .map((c) => c.nome.slice("__CAT__:".length).toUpperCase()),
+      );
       const novos: ConvenioRow[] = [];
-      for (const item of form.procedimentos) {
-        const { pid } = splitItem(item);
-        if (!pid) continue;
-        const proc = procs.find((p) => p.id === pid);
-        if (!proc) continue;
-        const chave = normalizarNome(proc.nome);
-        if (existentes.has(chave)) continue;
-        existentes.add(chave);
+      const ordem = ["CONSULTA", "EXAME", "PROCEDIMENTO"];
+      for (const tipo of ordem) {
+        if (!tiposSelecionados.has(tipo)) continue;
+        if (existentesCat.has(tipo)) continue;
         novos.push({
-          nome: proc.nome,
+          nome: `__CAT__:${tipo}`,
           tipo_repasse: form.tipo_repasse,
           percentual: "",
           valor: "",
@@ -248,6 +251,16 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       return [...mantidos, ...novos];
     });
   }, [form.procedimentos, procs, form.tipo_repasse]);
+
+  // Rótulo amigável da categoria sentinela.
+  const labelCategoria = (nome: string): string | null => {
+    if (!nome.startsWith("__CAT__:")) return null;
+    const tipo = nome.slice("__CAT__:".length).toUpperCase();
+    if (tipo === "CONSULTA") return "Consultas";
+    if (tipo === "EXAME") return "Exames";
+    if (tipo === "PROCEDIMENTO") return "Procedimentos";
+    return tipo;
+  };
 
   // Load reference data
   useEffect(() => {
