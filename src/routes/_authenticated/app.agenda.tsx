@@ -977,12 +977,22 @@ function AgendaPage() {
   };
 
   // Opções de procedimento disponíveis para um médico específico (cadastro do médico)
-  const opcoesProcedimentoMedico = (medicoId: string | null) => {
+  const opcoesProcedimentoMedico = (medicoId: string | null, agendaId?: string | null) => {
     if (!medicoId) return [] as { id: string; nome: string }[];
     const opcoesCadastradas = procOpcoesPorMedico.get(medicoId);
+    const filtrarPorAgenda = (lista: { id: string; nome: string }[]) => {
+      if (!agendaId) return lista;
+      const idsAgenda = procIdsPorAgenda.get(agendaId);
+      if (!idsAgenda || idsAgenda.size === 0) return lista;
+      const nomesAgenda = new Set<string>();
+      for (const p of procedimentosList) {
+        if (idsAgenda.has(p.id)) nomesAgenda.add(normalizar(p.nome));
+      }
+      return lista.filter((p) => idsAgenda.has(p.id) || nomesAgenda.has(normalizar(p.nome)));
+    };
     if (opcoesCadastradas && opcoesCadastradas.length > 0) {
       // Preserva a ordem do cadastro (created_at asc) — Top 10 aparecem primeiro.
-      return [...opcoesCadastradas];
+      return filtrarPorAgenda([...opcoesCadastradas]);
     }
     const ids = procPorMedico.get(medicoId);
     const nomes = procNomesPorMedico.get(medicoId);
@@ -991,7 +1001,7 @@ function AgendaPage() {
     const lista = procedimentosList.filter(
       (p) => (ids?.has(p.id) ?? false) || (nomes?.has(normalizar(p.nome)) ?? false),
     );
-    return lista;
+    return filtrarPorAgenda(lista);
   };
 
   const procedimentoPadraoDoMedico = (medicoId: string | null | undefined) => {
