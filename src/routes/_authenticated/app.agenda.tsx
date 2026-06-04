@@ -59,6 +59,7 @@ type Agendamento = {
   data_pagamento?: string | null;
   medico_nome?: string | null;
   medico_sexo?: string | null;
+  agenda_id?: string | null;
 };
 type Medico = { id: string; nome: string; sexo?: string | null; usa_sistema?: boolean; especialidade_id?: string | null; procedimento_padrao_id?: string | null; procedimento_padrao_em_branco?: boolean | null; procedimento_padrao_nome?: string | null; especialidade_nome?: string | null };
 type RecursoEnf = { id: string; nome: string };
@@ -368,6 +369,8 @@ function AgendaPage() {
   const [mostrarLivres, setMostrarLivres] = useState(true);
   const [filtroMedico, setFiltroMedico] = useState<string>("todos");
   const [filtroEspecialidade, setFiltroEspecialidade] = useState<string>("todos");
+  const [filtroAgenda, setFiltroAgenda] = useState<string>("todos");
+  const [agendasPorMedico, setAgendasPorMedico] = useState<Map<string, { id: string; nome: string }[]>>(new Map());
   const [filtroDiaSemana, setFiltroDiaSemana] = useState<string>("todos");
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [filtroCliente, setFiltroCliente] = useState("");
@@ -605,7 +608,7 @@ function AgendaPage() {
     setLoading(true);
     let q = supabase
       .from("agendamentos")
-      .select("id,paciente_nome,paciente_id,medico_id,enfermagem_recurso_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,medico:medicos(nome,sexo)" as never)
+      .select("id,paciente_nome,paciente_id,medico_id,enfermagem_recurso_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,medico:medicos(nome,sexo)" as never)
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("inicio", { ascending: false });
     // "agendado" agora significa "qualquer ficha com paciente alocado",
@@ -766,6 +769,22 @@ function AgendaPage() {
       supabase.from("enfermagem_recursos").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("enfermagem_recurso_procedimentos").select("recurso_id,procedimento_id"),
     ]);
+    // Carrega agendas nomeadas por médico (clínica atual)
+    const { data: agendasData } = await supabase
+      .from("medico_agendas")
+      .select("id,nome,medico_id,ativo,ordem")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("ativo", true)
+      .order("ordem", { ascending: true })
+      .order("nome", { ascending: true });
+    const ag = new Map<string, { id: string; nome: string }[]>();
+    for (const a of (agendasData ?? []) as Array<{ id: string; nome: string; medico_id: string | null }>) {
+      if (!a.medico_id) continue;
+      const arr = ag.get(a.medico_id) ?? [];
+      arr.push({ id: a.id, nome: a.nome });
+      ag.set(a.medico_id, arr);
+    }
+    setAgendasPorMedico(ag);
     const todos = Array.isArray(pr) ? pr : [];
     const procedimentosPorId = new Map(
       todos.map((p) => [p.id, { id: p.id, nome: p.nome, grupo: p.grupo ?? null }]),
@@ -1046,9 +1065,12 @@ function AgendaPage() {
         const set = medicoEspec.get(a.medico_id);
         if (!set || !set.has(filtroEspecialidade)) return false;
       }
+      if (filtroAgenda !== "todos") {
+        if (a.agenda_id !== filtroAgenda) return false;
+      }
       return true;
     });
-  }, [items, mostrarLivres, filtroMedico, filtroStatus, filtroCliente, filtroFicha, filtroDiaSemana, filtroEspecialidade, medicoEspec, fichaPorId]);
+  }, [items, mostrarLivres, filtroMedico, filtroStatus, filtroCliente, filtroFicha, filtroDiaSemana, filtroEspecialidade, filtroAgenda, medicoEspec, fichaPorId]);
 
   const totais = useMemo(() => ({
     total: filtrados.length,
@@ -1064,7 +1086,7 @@ function AgendaPage() {
   const paginados = filtradosOrdenados.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const limparFiltros = () => {
-    setFiltroMedico("todos"); setFiltroEspecialidade("todos"); setFiltroDiaSemana("todos");
+    setFiltroMedico("todos"); setFiltroEspecialidade("todos"); setFiltroDiaSemana("todos"); setFiltroAgenda("todos");
     setFiltroStatus("todos"); setFiltroCliente(""); setFiltroFicha("");
   };
 
@@ -2423,11 +2445,25 @@ function AgendaPage() {
             <MedicoFiltroInput
               medicos={medicos}
               value={filtroMedico}
-              onChange={(v) => { if (!isMedicoOnly) setFiltroMedico(v); }}
+              onChange={(v) => { if (!isMedicoOnly) { setFiltroMedico(v); setFiltroAgenda("todos"); } }}
               disabled={isMedicoOnly}
               onlyMedicoId={isMedicoOnly ? medicoLogadoId : null}
             />
           </div>
+          {filtroMedico !== "todos" && (agendasPorMedico.get(filtroMedico)?.length ?? 0) > 1 && (
+            <div className="space-y-0.5">
+              <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Agenda</Label>
+              <Select value={filtroAgenda} onValueChange={setFiltroAgenda}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">TODAS</SelectItem>
+                  {(agendasPorMedico.get(filtroMedico) ?? []).map(a => (
+                    <SelectItem key={a.id} value={a.id}>{a.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="space-y-0.5">
             <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Data Ref.</Label>
             <DataRefField
