@@ -391,13 +391,8 @@ function Page() {
                       <Input type="number" min={1} max={480} placeholder="padrão do médico" className="w-36" value={novo.intervalo_min} onChange={(e) => setNovo({ ...novo, intervalo_min: e.target.value })} />
                     </div>
                     <Button onClick={() => { setNovo({ ...novo, medico_id: m.id }); void adicionar(); }}>
-                      {dispEditando ? (<><Pencil className="h-4 w-4 mr-1" /> Salvar</>) : (<><Plus className="h-4 w-4 mr-1" /> Adicionar</>)}
+                      <Plus className="h-4 w-4 mr-1" /> Adicionar
                     </Button>
-                    {dispEditando ? (
-                      <Button variant="ghost" onClick={() => { setDispEditando(null); setNovo({ ...novo, dia_semana: "1", hora_inicio: "08:00", hora_fim: "12:00", limite_pacientes: "", intervalo_min: "" }); }}>
-                        Cancelar
-                      </Button>
-                    ) : null}
                   </CardContent>
                 </Card>
 
@@ -419,37 +414,65 @@ function Page() {
                         </TableHeader>
                         <TableBody>
                           {ds.map((d) => (
-                            <TableRow key={d.id} className={dispEditando === d.id ? "bg-muted/40" : ""}>
-                              <TableCell className="font-medium">{DIAS[d.dia_semana]}</TableCell>
-                              <TableCell>{d.hora_inicio.slice(0, 5)}</TableCell>
-                              <TableCell>{d.hora_fim.slice(0, 5)}</TableCell>
-                              <TableCell>{d.limite_pacientes ?? <span className="text-muted-foreground">—</span>}</TableCell>
-                              <TableCell>{d.intervalo_min ? `${d.intervalo_min} min` : <span className="text-muted-foreground">—</span>}</TableCell>
-                              <TableCell className="text-right">
-                                <div className="flex justify-end gap-2">
-                                  <button
-                                    onClick={() => {
-                                      setDispEditando(d.id);
-                                      setNovo({
-                                        medico_id: d.medico_id,
-                                        dia_semana: String(d.dia_semana),
-                                        hora_inicio: d.hora_inicio.slice(0, 5),
-                                        hora_fim: d.hora_fim.slice(0, 5),
-                                        limite_pacientes: d.limite_pacientes ? String(d.limite_pacientes) : "",
-                                        intervalo_min: d.intervalo_min ? String(d.intervalo_min) : "",
-                                      });
-                                    }}
-                                    className="text-primary hover:opacity-70"
-                                    aria-label="Editar"
-                                  >
-                                    <Pencil className="h-4 w-4" />
-                                  </button>
-                                  <button onClick={() => remover(d.id)} className="text-destructive hover:opacity-70" aria-label="Remover">
-                                    <Trash2 className="h-4 w-4" />
-                                  </button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
+                            dispEditando === d.id && editRow ? (
+                              <TableRow key={d.id} className="bg-muted/40">
+                                <TableCell>
+                                  <Select value={editRow.dia_semana} onValueChange={(v) => setEditRow({ ...editRow, dia_semana: v })}>
+                                    <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+                                    <SelectContent>{DIAS.map((dn, i) => <SelectItem key={i} value={String(i)}>{dn}</SelectItem>)}</SelectContent>
+                                  </Select>
+                                </TableCell>
+                                <TableCell>
+                                  <Input type="time" className="w-28" value={editRow.hora_inicio} onChange={(e) => setEditRow({ ...editRow, hora_inicio: e.target.value })} />
+                                </TableCell>
+                                <TableCell>
+                                  <Input type="time" className="w-28" value={editRow.hora_fim} onChange={(e) => setEditRow({ ...editRow, hora_fim: e.target.value })} />
+                                </TableCell>
+                                <TableCell>
+                                  <Input type="number" min={1} placeholder="sem limite" className="w-28" value={editRow.limite_pacientes} onChange={(e) => setEditRow({ ...editRow, limite_pacientes: e.target.value })} />
+                                </TableCell>
+                                <TableCell>
+                                  <Input type="number" min={1} max={480} placeholder="padrão" className="w-28" value={editRow.intervalo_min} onChange={(e) => setEditRow({ ...editRow, intervalo_min: e.target.value })} />
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <div className="flex justify-end gap-2">
+                                    <Button size="sm" onClick={() => void salvarEdicao()}>Salvar</Button>
+                                    <Button size="sm" variant="ghost" onClick={() => { setDispEditando(null); setEditRow(null); }}>Cancelar</Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ) : (
+                              <TableRow key={d.id}>
+                                <TableCell className="font-medium">{DIAS[d.dia_semana]}</TableCell>
+                                <TableCell>{d.hora_inicio.slice(0, 5)}</TableCell>
+                                <TableCell>{d.hora_fim.slice(0, 5)}</TableCell>
+                                <TableCell>{d.limite_pacientes ?? <span className="text-muted-foreground">—</span>}</TableCell>
+                                <TableCell>{d.intervalo_min ? `${d.intervalo_min} min` : <span className="text-muted-foreground">—</span>}</TableCell>
+                                <TableCell className="text-right">
+                                  <div className="flex justify-end gap-2">
+                                    <button
+                                      onClick={() => {
+                                        setDispEditando(d.id);
+                                        setEditRow({
+                                          dia_semana: String(d.dia_semana),
+                                          hora_inicio: d.hora_inicio.slice(0, 5),
+                                          hora_fim: d.hora_fim.slice(0, 5),
+                                          limite_pacientes: d.limite_pacientes ? String(d.limite_pacientes) : "",
+                                          intervalo_min: d.intervalo_min ? String(d.intervalo_min) : "",
+                                        });
+                                      }}
+                                      className="text-primary hover:opacity-70"
+                                      aria-label="Editar"
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                    </button>
+                                    <button onClick={() => remover(d.id)} className="text-destructive hover:opacity-70" aria-label="Remover">
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            )
                           ))}
                         </TableBody>
                       </Table>
