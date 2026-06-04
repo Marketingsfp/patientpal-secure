@@ -109,10 +109,25 @@ async function buscarProcedimentoPorNome(
   const nomeBase = (nome ?? "").replace(/\s*\([^()]*\)\s*$/, "").trim();
   const alvo = nomeBase.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
   const norm = (s: string) => (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-  const arr = lista ?? [];
+  // 1) Sempre tentar primeiro uma busca FRESCA no banco pelo nome exato
+  //    (case-insensitive). Isso garante que o valor venha do cadastro atual
+  //    e não de um cache em memória que pode estar desatualizado.
   const temValor = (p: any) =>
     p && [p.valor_dinheiro, p.valor_pix, p.valor_padrao, p.valor_cartao, p.valor_cartao_credito, p.valor_cartao_debito, p.valor_dinheiro_pix]
       .some((v) => Number(v) > 0);
+  try {
+    const { data: exatoDb } = await supabase
+      .from("procedimentos")
+      .select("nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix")
+      .eq("clinica_id", clinicaId)
+      .eq("ativo", true)
+      .ilike("nome", nomeBase)
+      .limit(5);
+    const exatoComValor = (exatoDb ?? []).find((p: any) => norm(p.nome ?? "") === alvo && temValor(p))
+      ?? (exatoDb ?? []).find((p: any) => norm(p.nome ?? "") === alvo);
+    if (exatoComValor) return exatoComValor;
+  } catch { /* segue para fallback */ }
+  const arr = lista ?? [];
   // Prioriza matches que TÊM valores cadastrados, para evitar pegar linhas
   // placeholder (ex.: "CONSULTA 110 E 130" com tudo zerado) na frente da
   // "CONSULTA CLINICA MEDICA" / "CONSULTA" com preços reais.
