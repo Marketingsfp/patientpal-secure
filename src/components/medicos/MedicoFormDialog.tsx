@@ -32,6 +32,9 @@ interface ConvenioRow {
   percentual: string;
   valor: string;
   ativo: boolean;
+  // UI-only: quando true, o usuário quer digitar um nome avulso (ex.: "Cartão Consulta")
+  // em vez de escolher um serviço específico do médico para sobrescrever.
+  avulso?: boolean;
 }
 
 const CONVENIOS_PADRAO: ConvenioRow[] = [
