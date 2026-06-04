@@ -171,7 +171,15 @@ function Page() {
     // 1) Procura convênio cadastrado pelo nome do procedimento (independente de ter pagamento)
     if (procNome) {
       const alvo = norm(procNome);
-      const c = convenios.find((cv) => cv.medico_id === medicoId && norm(cv.nome) === alvo);
+      let c = convenios.find((cv) => cv.medico_id === medicoId && norm(cv.nome) === alvo);
+      // Fallback: repasse por categoria (__CAT__:<TIPO>) usando o tipo do procedimento
+      if (!c) {
+        const tipo = procTipos.get(alvo);
+        if (tipo) {
+          const sentinel = `__CAT__:${String(tipo).toUpperCase()}`;
+          c = convenios.find((cv) => cv.medico_id === medicoId && cv.nome === sentinel);
+        }
+      }
       if (c) {
         // Sem pagamento registrado, mantém total zerado (será preenchido quando o
         // financeiro for lançado). Com pagamento, usa o valor pago como base.
