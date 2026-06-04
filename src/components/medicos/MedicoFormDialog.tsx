@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MedicoAgendasTab } from "@/components/medicos/MedicoAgendasTab";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
@@ -648,9 +649,10 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <Tabs defaultValue="dados">
-              <TabsList className={asPage ? "grid grid-cols-5 w-full" : "grid grid-cols-5 w-full sticky top-[3.25rem] z-10"}>
+              <TabsList className={asPage ? "grid grid-cols-6 w-full" : "grid grid-cols-6 w-full sticky top-[3.25rem] z-10"}>
                 <TabsTrigger value="dados">Dados</TabsTrigger>
                 <TabsTrigger value="especialidades">Especialidades</TabsTrigger>
+                <TabsTrigger value="agendas" disabled={!editingMedicoId}>Agendas</TabsTrigger>
                 <TabsTrigger value="banco">Banco</TabsTrigger>
                 <TabsTrigger value="repasse">Repasse</TabsTrigger>
                 <TabsTrigger value="acesso">Acesso</TabsTrigger>
@@ -1112,6 +1114,12 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                     </div>
                   )}
                 </div>
+              </TabsContent>
+
+              <TabsContent value="agendas" className="space-y-4 pt-4 pb-16">
+                {editingMedicoId && (
+                  <MedicoAgendasTab clinicaId={clinicaId} medicoId={editingMedicoId} />
+                )}
               </TabsContent>
 
               <TabsContent value="banco" className="space-y-4 pt-4 pb-16">

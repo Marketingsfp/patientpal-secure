@@ -40,11 +40,16 @@ function isFeriadoOuDomingo(d: Date): boolean {
 
 interface Disp { id: string; medico_id: string; dia_semana: number; hora_inicio: string; hora_fim: string; observacoes: string | null; limite_pacientes: number | null; intervalo_min: number | null }
 interface Medico { id: string; nome: string; duracao_consulta_min: number | null; procedimento_padrao_id: string | null; procedimento_padrao_nome: string | null; especialidade_nome: string | null }
+interface Agenda { id: string; medico_id: string; nome: string; ativo: boolean; ordem: number }
+interface DispRow extends Disp { agenda_id: string }
 
 function Page() {
   const { clinicaAtual } = useClinica();
   const [medicos, setMedicos] = useState<Medico[]>([]);
-  const [disps, setDisps] = useState<Disp[]>([]);
+  const [disps, setDisps] = useState<DispRow[]>([]);
+  const [agendas, setAgendas] = useState<Agenda[]>([]);
+  const [agendaSel, setAgendaSel] = useState<string>("");
+  const [novaAgendaNome, setNovaAgendaNome] = useState("");
   const [filtro, setFiltro] = useState("");
   const [novo, setNovo] = useState({ medico_id: "", dia_semana: "1", hora_inicio: "08:00", hora_fim: "12:00", limite_pacientes: "", intervalo_min: "" });
   const hojeIso = new Date().toISOString().slice(0, 10);
@@ -57,9 +62,10 @@ function Page() {
 
   const load = async () => {
     if (!clinicaAtual) return;
-    const [m, d] = await Promise.all([
+    const [m, d, a] = await Promise.all([
       supabase.from("medicos").select("id, nome, duracao_consulta_min, procedimento_padrao_id, procedimento:procedimentos!medicos_procedimento_padrao_id_fkey(nome), especialidade:especialidades!medicos_especialidade_id_fkey(nome)" as never).eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
-      supabase.from("medico_disponibilidades").select("id, medico_id, dia_semana, hora_inicio, hora_fim, observacoes, limite_pacientes, intervalo_min" as never).eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("dia_semana").order("hora_inicio"),
+      supabase.from("medico_disponibilidades").select("id, medico_id, agenda_id, dia_semana, hora_inicio, hora_fim, observacoes, limite_pacientes, intervalo_min" as never).eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("dia_semana").order("hora_inicio"),
+      supabase.from("medico_agendas" as never).select("id, medico_id, nome, ativo, ordem").eq("clinica_id", clinicaAtual.clinica_id).order("ordem").order("nome"),
     ]);
     type RawMedico = { id: string; nome: string; duracao_consulta_min: number | null; procedimento_padrao_id: string | null; procedimento?: { nome: string | null } | null; especialidade?: { nome: string | null } | null };
     const rawList = ((m.data as unknown) as RawMedico[]) ?? [];
@@ -71,7 +77,8 @@ function Page() {
       procedimento_padrao_nome: r.procedimento?.nome ?? null,
       especialidade_nome: r.especialidade?.nome ?? null,
     })));
-    setDisps(((d.data as unknown) as Disp[]) ?? []);
+    setDisps(((d.data as unknown) as DispRow[]) ?? []);
+    setAgendas(((a.data as unknown) as Agenda[]) ?? []);
   };
 
   useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clinicaAtual?.clinica_id]);
@@ -107,9 +114,11 @@ function Page() {
 
   const adicionar = async () => {
     if (!clinicaAtual || !novo.medico_id) { toast.error("Selecione um médico"); return; }
+    if (!agendaSel) { toast.error("Selecione uma agenda"); return; }
     const payload = {
       clinica_id: clinicaAtual.clinica_id,
       medico_id: novo.medico_id,
+      agenda_id: agendaSel,
       dia_semana: parseInt(novo.dia_semana),
       hora_inicio: novo.hora_inicio,
       hora_fim: novo.hora_fim,
@@ -147,49 +156,53 @@ function Page() {
 
   // Pré-visualização dos slots gerados
   const slotsPreview = useMemo(() => {
-    if (!gerar.data_inicio || !gerar.data_fim) return [] as { data: string; medico: string; inicio: string; fim: string }[];
+    type Slot = { data: string; medico: string; agenda_id: string; inicio: string; fim: string };
+    if (!gerar.data_inicio || !gerar.data_fim) return [] as Slot[];
     const ini = new Date(`${gerar.data_inicio}T00:00:00`);
     const fimD = new Date(`${gerar.data_fim}T00:00:00`);
-    if (fimD < ini) return [];
+    if (fimD < ini) return [] as Slot[];
     const dias = Math.floor((fimD.getTime() - ini.getTime()) / 86400000) + 1;
     const alvo = gerar.medico_id === "all" ? medicos : medicos.filter((m) => m.id === gerar.medico_id);
-    const out: { data: string; medico: string; inicio: string; fim: string }[] = [];
+    const out: Slot[] = [];
     for (let i = 0; i < dias; i++) {
       const d = new Date(ini); d.setDate(d.getDate() + i);
       if (isFeriadoOuDomingo(d)) continue;
       const dow = d.getDay();
       for (const m of alvo) {
-        const ds = disps.filter((x) => x.medico_id === m.id && x.dia_semana === dow);
-        const fallbackDur = m.duracao_consulta_min && m.duracao_consulta_min > 0 ? m.duracao_consulta_min : 15;
-        // Limite diário: override manual do formulário; senão soma das janelas cadastradas
-        const overrideLimite = gerar.limite_fichas ? parseInt(gerar.limite_fichas) : 0;
-        let limiteDia: number;
-        if (overrideLimite > 0) {
-          limiteDia = overrideLimite;
-        } else {
-          const limitesDoDia = ds.map((x) => x.limite_pacientes).filter((n): n is number => typeof n === "number" && n > 0);
-          limiteDia = limitesDoDia.length > 0 ? limitesDoDia.reduce((a, b) => a + b, 0) : Infinity;
-        }
-        let criadosNoDia = 0;
-        for (const disp of ds) {
-          const dur = disp.intervalo_min && disp.intervalo_min > 0 ? disp.intervalo_min : fallbackDur;
-          const [hi, mi] = disp.hora_inicio.split(":").map(Number);
-          const [hf, mf] = disp.hora_fim.split(":").map(Number);
-          let cur = hi * 60 + mi;
-          const end = hf * 60 + mf;
-          while (cur + dur <= end && criadosNoDia < limiteDia) {
-            const inicio = `${String(Math.floor(cur / 60)).padStart(2, "0")}:${String(cur % 60).padStart(2, "0")}`;
-            const fimMin = cur + dur;
-            const fim = `${String(Math.floor(fimMin / 60)).padStart(2, "0")}:${String(fimMin % 60).padStart(2, "0")}`;
-            out.push({ data: d.toISOString().slice(0, 10), medico: m.nome, inicio, fim });
-            cur += dur;
-            criadosNoDia += 1;
+        const agendasDoMedico = agendas.filter((a) => a.medico_id === m.id && a.ativo);
+        for (const ag of agendasDoMedico) {
+          const ds = disps.filter((x) => x.medico_id === m.id && x.agenda_id === ag.id && x.dia_semana === dow);
+          if (ds.length === 0) continue;
+          const fallbackDur = m.duracao_consulta_min && m.duracao_consulta_min > 0 ? m.duracao_consulta_min : 15;
+          const overrideLimite = gerar.limite_fichas ? parseInt(gerar.limite_fichas) : 0;
+          let limiteDia: number;
+          if (overrideLimite > 0) {
+            limiteDia = overrideLimite;
+          } else {
+            const limitesDoDia = ds.map((x) => x.limite_pacientes).filter((n): n is number => typeof n === "number" && n > 0);
+            limiteDia = limitesDoDia.length > 0 ? limitesDoDia.reduce((a, b) => a + b, 0) : Infinity;
+          }
+          let criadosNoDia = 0;
+          for (const disp of ds) {
+            const dur = disp.intervalo_min && disp.intervalo_min > 0 ? disp.intervalo_min : fallbackDur;
+            const [hi, mi] = disp.hora_inicio.split(":").map(Number);
+            const [hf, mf] = disp.hora_fim.split(":").map(Number);
+            let cur = hi * 60 + mi;
+            const end = hf * 60 + mf;
+            while (cur + dur <= end && criadosNoDia < limiteDia) {
+              const inicio = `${String(Math.floor(cur / 60)).padStart(2, "0")}:${String(cur % 60).padStart(2, "0")}`;
+              const fimMin = cur + dur;
+              const fim = `${String(Math.floor(fimMin / 60)).padStart(2, "0")}:${String(fimMin % 60).padStart(2, "0")}`;
+              out.push({ data: d.toISOString().slice(0, 10), medico: m.nome, agenda_id: ag.id, inicio, fim });
+              cur += dur;
+              criadosNoDia += 1;
+            }
           }
         }
       }
     }
     return out;
-  }, [gerar, medicos, disps]);
+  }, [gerar, medicos, disps, agendas]);
 
   if (!clinicaAtual) return <p className="text-muted-foreground">Selecione uma clínica.</p>;
 
@@ -213,6 +226,7 @@ function Page() {
         return {
           clinica_id: clinicaAtual.clinica_id,
           medico_id: med.id,
+          agenda_id: s.agenda_id,
           paciente_nome: "DISPONÍVEL",
           inicio: inicio.toISOString(),
           fim: fim.toISOString(),
@@ -330,7 +344,12 @@ function Page() {
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                onClick={() => { setMedicoEditando(m.id); setNovo({ ...novo, medico_id: m.id }); }}
+                                onClick={() => {
+                                  setMedicoEditando(m.id);
+                                  setNovo({ ...novo, medico_id: m.id });
+                                  const primeira = agendas.find((a) => a.medico_id === m.id && a.ativo) ?? agendas.find((a) => a.medico_id === m.id);
+                                  setAgendaSel(primeira?.id ?? "");
+                                }}
                                 aria-label="Editar horários"
                               >
                                 <Pencil className="h-4 w-4" />
@@ -354,7 +373,8 @@ function Page() {
           ) : (() => {
             const m = medicos.find((x) => x.id === medicoEditando);
             if (!m) { setMedicoEditando(null); return null; }
-            const ds = disps.filter((d) => d.medico_id === m.id);
+            const agendasMed = agendas.filter((a) => a.medico_id === m.id).sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome, "pt-BR"));
+            const ds = disps.filter((d) => d.medico_id === m.id && d.agenda_id === agendaSel);
             return (
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
@@ -364,6 +384,64 @@ function Page() {
                   <h2 className="text-lg font-semibold uppercase">{m.nome}</h2>
                   <span className="text-xs text-muted-foreground">· {ds.length} horário(s)</span>
                 </div>
+
+                <Card>
+                  <CardContent className="py-4 space-y-3">
+                    <div className="flex flex-wrap items-end gap-2">
+                      <div className="flex-1 min-w-56">
+                        <label className="text-xs text-muted-foreground">Agenda</label>
+                        <Select value={agendaSel} onValueChange={setAgendaSel}>
+                          <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                          <SelectContent>
+                            {agendasMed.map((a) => (
+                              <SelectItem key={a.id} value={a.id} className="uppercase">{a.nome}{!a.ativo ? " (inativa)" : ""}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex-1 min-w-56">
+                        <label className="text-xs text-muted-foreground">Nova agenda</label>
+                        <Input placeholder="Ex.: EXAMES, USG..." value={novaAgendaNome} onChange={(e) => setNovaAgendaNome(e.target.value)} />
+                      </div>
+                      <Button
+                        variant="outline"
+                        onClick={async () => {
+                          const nome = novaAgendaNome.trim();
+                          if (!nome || !clinicaAtual) { toast.error("Informe o nome da agenda"); return; }
+                          const { data, error } = await supabase
+                            .from("medico_agendas")
+                            .insert({ clinica_id: clinicaAtual.clinica_id, medico_id: m.id, nome, ordem: agendasMed.length } as never)
+                            .select("id")
+                            .single();
+                          if (error) { toast.error(error.message); return; }
+                          toast.success("Agenda criada");
+                          setNovaAgendaNome("");
+                          await load();
+                          if (data) setAgendaSel((data as { id: string }).id);
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-1" /> Criar agenda
+                      </Button>
+                      {agendaSel && agendasMed.length > 1 && (
+                        <Button
+                          variant="ghost"
+                          className="text-destructive"
+                          onClick={async () => {
+                            if (!confirm("Remover esta agenda e todos os seus horários?")) return;
+                            const { error } = await supabase.from("medico_agendas").delete().eq("id", agendaSel);
+                            if (error) { toast.error(error.message); return; }
+                            toast.success("Agenda removida");
+                            await load();
+                            const rest = agendas.filter((a) => a.medico_id === m.id && a.id !== agendaSel);
+                            setAgendaSel(rest[0]?.id ?? "");
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" /> Remover agenda
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
 
                 <Card>
                   <CardContent className="py-4 flex flex-wrap gap-2 items-end">
