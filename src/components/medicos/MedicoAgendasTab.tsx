@@ -29,14 +29,19 @@ export function MedicoAgendasTab({
   const [multipla, setMultipla] = useState<boolean>(false);
 
   const load = async () => {
-    const [a, p] = await Promise.all([
+    const [a, p, mp] = await Promise.all([
       supabase.from("medico_agendas").select("id, nome, ativo, ordem").eq("medico_id", medicoId).order("ordem").order("nome"),
       supabase.from("procedimentos").select("id, nome").eq("clinica_id", clinicaId).eq("ativo", true).order("nome"),
+      supabase.from("medico_procedimentos").select("procedimento_id").eq("medico_id", medicoId),
     ]);
     const ags = ((a.data as Agenda[]) ?? []);
     setAgendas(ags);
     setMultipla(ags.length > 1);
-    setProcs(((p.data as Procedimento[]) ?? []));
+    const allProcs = ((p.data as Procedimento[]) ?? []);
+    const idsFromDb = new Set(
+      ((mp.data as { procedimento_id: string }[] | null) ?? []).map((x) => x.procedimento_id),
+    );
+    setProcs(idsFromDb.size > 0 ? allProcs.filter((x) => idsFromDb.has(x.id)) : allProcs);
     if (ags.length > 0) {
       const { data: vincs } = await supabase
         .from("medico_agenda_procedimentos")
@@ -91,24 +96,38 @@ export function MedicoAgendasTab({
 
   const toggleProc = async (agendaId: string, procId: string, checked: boolean) => {
     if (!agendaId) return;
+    // optimistic update to avoid double-click race producing duplicates
+    setVinculos((prev) => {
+      const next = new Map(prev);
+      const set = new Set(next.get(agendaId) ?? new Set<string>());
+      if (checked) set.add(procId); else set.delete(procId);
+      next.set(agendaId, set);
+      return next;
+    });
     if (checked) {
       const { error } = await supabase
         .from("medico_agenda_procedimentos")
-        .insert({ clinica_id: clinicaId, agenda_id: agendaId, procedimento_id: procId } as never);
-      if (error) { toast.error(error.message); return; }
+        .upsert(
+          { clinica_id: clinicaId, agenda_id: agendaId, procedimento_id: procId } as never,
+          { onConflict: "agenda_id,procedimento_id", ignoreDuplicates: true } as never,
+        );
+      if (error) { toast.error(error.message); void load(); return; }
     } else {
       const { error } = await supabase
         .from("medico_agenda_procedimentos")
         .delete()
         .eq("agenda_id", agendaId)
         .eq("procedimento_id", procId);
-      if (error) { toast.error(error.message); return; }
+      if (error) { toast.error(error.message); void load(); return; }
     }
     void load();
   };
 
-  const idsMedico = procedimentoIds && procedimentoIds.length > 0 ? new Set(procedimentoIds) : null;
-  const procsDoMedico = idsMedico ? procs.filter((p) => idsMedico.has(p.id)) : procs;
+  // `procs` is already filtered to services tied to this doctor via medico_procedimentos.
+  // We still merge with `procedimentoIds` from the form so newly-added (unsaved) services also appear.
+  const idsExtras = new Set(procedimentoIds ?? []);
+  const procsDoMedico = procs;
+  void idsExtras;
 
   return (
     <div className="space-y-4">
