@@ -2439,7 +2439,7 @@ function AgendaPage() {
         className="rounded-lg border bg-card p-2 space-y-1.5 text-xs [&_input]:h-7 [&_input]:text-xs [&_button[role=combobox]]:h-7 [&_button[role=combobox]]:text-xs [--clinic:theme(colors.border)]"
         style={{ ["--clinic" as never]: corClinica }}
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-1.5">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-1.5">
           <div className="space-y-0.5">
             <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Profissional</Label>
             <MedicoFiltroInput
@@ -2450,8 +2450,20 @@ function AgendaPage() {
               onlyMedicoId={isMedicoOnly ? medicoLogadoId : null}
             />
           </div>
-          {filtroMedico !== "todos" && (() => {
-            const ags = agendasPorMedico.get(filtroMedico) ?? [];
+          {(() => {
+            let ags: { id: string; nome: string }[];
+            if (filtroMedico !== "todos") {
+              ags = agendasPorMedico.get(filtroMedico) ?? [];
+            } else {
+              const seen = new Set<string>();
+              ags = [];
+              for (const lista of agendasPorMedico.values()) {
+                for (const a of lista) {
+                  if (!seen.has(a.id)) { seen.add(a.id); ags.push(a); }
+                }
+              }
+              ags.sort((a, b) => a.nome.localeCompare(b.nome));
+            }
             const unica = ags.length <= 1;
             return (
               <div className="space-y-0.5">
