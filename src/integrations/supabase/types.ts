@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       agendamentos: {
         Row: {
+          agenda_id: string | null
           clinica_id: string
           created_at: string
           criado_por: string | null
@@ -41,6 +42,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          agenda_id?: string | null
           clinica_id: string
           created_at?: string
           criado_por?: string | null
@@ -66,6 +68,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          agenda_id?: string | null
           clinica_id?: string
           created_at?: string
           criado_por?: string | null
@@ -91,6 +94,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "agendamentos_agenda_id_fkey"
+            columns: ["agenda_id"]
+            isOneToOne: false
+            referencedRelation: "medico_agendas"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "agendamentos_enfermagem_recurso_id_fkey"
             columns: ["enfermagem_recurso_id"]
@@ -4090,6 +4100,103 @@ export type Database = {
           },
         ]
       }
+      medico_agenda_procedimentos: {
+        Row: {
+          agenda_id: string
+          clinica_id: string
+          created_at: string
+          id: string
+          procedimento_id: string
+        }
+        Insert: {
+          agenda_id: string
+          clinica_id: string
+          created_at?: string
+          id?: string
+          procedimento_id: string
+        }
+        Update: {
+          agenda_id?: string
+          clinica_id?: string
+          created_at?: string
+          id?: string
+          procedimento_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medico_agenda_procedimentos_agenda_id_fkey"
+            columns: ["agenda_id"]
+            isOneToOne: false
+            referencedRelation: "medico_agendas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medico_agenda_procedimentos_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medico_agenda_procedimentos_procedimento_id_fkey"
+            columns: ["procedimento_id"]
+            isOneToOne: false
+            referencedRelation: "procedimentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      medico_agendas: {
+        Row: {
+          ativo: boolean
+          clinica_id: string
+          cor: string | null
+          created_at: string
+          id: string
+          medico_id: string
+          nome: string
+          ordem: number
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          clinica_id: string
+          cor?: string | null
+          created_at?: string
+          id?: string
+          medico_id: string
+          nome: string
+          ordem?: number
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          clinica_id?: string
+          cor?: string | null
+          created_at?: string
+          id?: string
+          medico_id?: string
+          nome?: string
+          ordem?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medico_agendas_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medico_agendas_medico_id_fkey"
+            columns: ["medico_id"]
+            isOneToOne: false
+            referencedRelation: "medicos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       medico_biometria: {
         Row: {
           clinica_id: string
@@ -4169,6 +4276,7 @@ export type Database = {
       }
       medico_disponibilidades: {
         Row: {
+          agenda_id: string
           ativo: boolean
           clinica_id: string
           created_at: string
@@ -4183,6 +4291,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          agenda_id: string
           ativo?: boolean
           clinica_id: string
           created_at?: string
@@ -4197,6 +4306,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          agenda_id?: string
           ativo?: boolean
           clinica_id?: string
           created_at?: string
@@ -4210,7 +4320,15 @@ export type Database = {
           observacoes?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "medico_disponibilidades_agenda_id_fkey"
+            columns: ["agenda_id"]
+            isOneToOne: false
+            referencedRelation: "medico_agendas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       medico_especialidades: {
         Row: {
