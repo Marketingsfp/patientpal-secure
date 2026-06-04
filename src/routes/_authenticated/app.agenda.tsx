@@ -787,6 +787,20 @@ function AgendaPage() {
       ag.set(a.medico_id, arr);
     }
     setAgendasPorMedico(ag);
+    // Vínculos serviço↔agenda (para limitar serviços no agendamento conforme agenda escolhida)
+    const agendaIds = (agendasData ?? []).map((a) => (a as { id: string }).id);
+    const vincPorAgenda = new Map<string, Set<string>>();
+    if (agendaIds.length > 0) {
+      const { data: vincs } = await supabase
+        .from("medico_agenda_procedimentos")
+        .select("agenda_id, procedimento_id")
+        .in("agenda_id", agendaIds);
+      for (const v of (vincs ?? []) as Array<{ agenda_id: string; procedimento_id: string }>) {
+        if (!vincPorAgenda.has(v.agenda_id)) vincPorAgenda.set(v.agenda_id, new Set());
+        vincPorAgenda.get(v.agenda_id)!.add(v.procedimento_id);
+      }
+    }
+    setProcIdsPorAgenda(vincPorAgenda);
     const todos = Array.isArray(pr) ? pr : [];
     const procedimentosPorId = new Map(
       todos.map((p) => [p.id, { id: p.id, nome: p.nome, grupo: p.grupo ?? null }]),
