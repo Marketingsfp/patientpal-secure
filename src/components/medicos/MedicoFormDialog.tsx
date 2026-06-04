@@ -197,13 +197,35 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
     return p.nome;
   };
 
-  // Auto-adiciona um item em "REPASSE INDIVIDUAL" (aba Repasse) sempre que um
-  // serviço for selecionado na aba Especialidades. Não remove nada — cadastros
-  // de repasse existentes são preservados para ajuste manual.
+  // Sincroniza a aba "Repasse" com os serviços selecionados na aba
+  // Especialidades:
+  //  • Cada serviço selecionado vira automaticamente um item na lista de
+  //    REPASSE INDIVIDUAL (se ainda não existir).
+  //  • Quando um serviço é removido das especialidades, o item correspondente
+  //    é removido da aba Repasse.
+  //  • Itens manuais (cujo nome NÃO corresponde a nenhum procedimento da
+  //    clínica — ex.: "Cartão Consulta", "Cartão Desconto") são sempre
+  //    preservados para ajuste manual.
   useEffect(() => {
-    if (!form.procedimentos.length || !procs.length) return;
+    if (!procs.length) return;
     setConvenios((cs) => {
-      const existentes = new Set(cs.map((c) => normalizarNome(c.nome)));
+      const selecionadosNomes = new Set<string>();
+      for (const item of form.procedimentos) {
+        const { pid } = splitItem(item);
+        if (!pid) continue;
+        const proc = procs.find((p) => p.id === pid);
+        if (proc) selecionadosNomes.add(normalizarNome(proc.nome));
+      }
+      const nomesDeProcedimentos = new Set(procs.map((p) => normalizarNome(p.nome)));
+
+      // Mantém itens manuais e itens cujo serviço ainda está selecionado.
+      const mantidos = cs.filter((c) => {
+        const chave = normalizarNome(c.nome);
+        if (!nomesDeProcedimentos.has(chave)) return true; // manual
+        return selecionadosNomes.has(chave);
+      });
+
+      const existentes = new Set(mantidos.map((c) => normalizarNome(c.nome)));
       const novos: ConvenioRow[] = [];
       for (const item of form.procedimentos) {
         const { pid } = splitItem(item);
@@ -221,7 +243,9 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
           ativo: true,
         });
       }
-      return novos.length ? [...cs, ...novos] : cs;
+
+      if (mantidos.length === cs.length && novos.length === 0) return cs;
+      return [...mantidos, ...novos];
     });
   }, [form.procedimentos, procs, form.tipo_repasse]);
 
