@@ -371,6 +371,8 @@ function AgendaPage() {
   const [filtroEspecialidade, setFiltroEspecialidade] = useState<string>("todos");
   const [filtroAgenda, setFiltroAgenda] = useState<string>("todos");
   const [agendasPorMedico, setAgendasPorMedico] = useState<Map<string, { id: string; nome: string }[]>>(new Map());
+  const [procIdsPorAgenda, setProcIdsPorAgenda] = useState<Map<string, Set<string>>>(new Map());
+  const [procNomesPorAgenda, setProcNomesPorAgenda] = useState<Map<string, Set<string>>>(new Map());
   const [filtroDiaSemana, setFiltroDiaSemana] = useState<string>("todos");
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [filtroCliente, setFiltroCliente] = useState("");
