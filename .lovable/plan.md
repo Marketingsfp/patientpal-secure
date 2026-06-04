@@ -1,28 +1,20 @@
 ## Objetivo
 
-Permitir que uma linha **Manual** no "Repasse Individual" represente **um serviço específico** e sobrescreva o valor da categoria correspondente para aquele serviço.
-
-A lógica de leitura do repasse no app já prioriza correspondência por **nome do serviço** e só cai para a sentinela de categoria (`__CAT__:<TIPO>`) quando não acha — então a sobrescrita funciona automaticamente assim que existir uma linha manual com o nome do procedimento. Falta ajustar a tela de cadastro para que essa linha manual seja criada corretamente e não seja apagada pela sincronização automática.
+Remover a opção "Avulso (texto livre)" do botão **Manual** no Repasse Individual. Toda linha manual deve estar vinculada a um serviço cadastrado do médico — sem texto solto que não case com nada no sistema.
 
 ## Mudanças (somente em `src/components/medicos/MedicoFormDialog.tsx`)
 
-1. **Linha manual = picker de serviço (com opção "Avulso")**
-   - Hoje o botão "Manual" cria uma linha com campo de texto livre.
-   - Trocar o `Input` de nome (quando a linha não é categoria) por um `Select` com:
-     - todos os serviços já selecionados na aba Especialidades do médico, rotulados `NOME (ESPECIALIDADE)`, com `value` = nome do procedimento (igual ao que o lookup do financeiro/print usa);
-     - uma opção "Avulso (digitar)…" que volta a mostrar o `Input` de texto livre, preservando o uso atual (ex.: "Cartão Consulta").
-   - Texto de ajuda da seção: acrescentar "Use Manual para sobrescrever o repasse de **um serviço específico** (prevalece sobre a categoria) ou para itens avulsos."
+1. **Botão Manual deixa de ser dropdown** — volta a ser um botão simples que adiciona uma linha de override de serviço (picker dos serviços selecionados na aba Especialidades). Remover o `DropdownMenu` adicionado.
 
-2. **Sincronização automática não pode apagar overrides**
-   - No `useEffect` que monta as linhas de categoria (linhas 207–253), o filtro `mantidos` hoje remove qualquer linha cujo nome bate com um procedimento cadastrado.
-   - Ajustar: **preservar** linhas manuais cujo nome corresponde a um procedimento que ainda está selecionado para o médico (são overrides intencionais). Continuar removendo apenas linhas órfãs, isto é, cujo procedimento não está mais selecionado.
+2. **Remover renderização de texto livre** na célula "Nome": apagar o ramo `showTextInput` / `c.avulso`. Toda linha não-categoria renderiza apenas o `<select>` com os serviços do médico.
 
-3. **Nada muda em**:
-   - Schema / migrations (segue usando `medico_convenios.nome`).
-   - Lookup em `src/routes/_authenticated/app.financeiro.atendimentos.tsx` e `src/lib/print-gr.ts` (já fazem match por nome antes de cair na sentinela de categoria).
-   - Repasse padrão, Cartões Benefícios, demais abas.
+3. **Migrar linhas avulsas legadas** (ex.: "Cartão Consulta") presentes no banco de médicos já cadastrados:
+   - Ao carregar `medico_convenios`, descartar silenciosamente linhas cujo `nome` não é `__CAT__:*` e não corresponde a nenhum procedimento atualmente selecionado pelo médico. Elas não têm como ser editadas/validadas no novo modelo.
+   - Remover também o seed `CONVENIOS_PADRAO` ("Cartão Consulta", "Cartão Desconto") usado para novos médicos — não faz mais sentido criar linhas sem vínculo a serviço.
 
-## Resultado para o usuário
+4. **Limpar tipos**: remover o campo `avulso?: boolean` de `ConvenioRow` (agora não utilizado).
 
-- Categoria "Procedimentos" com R$ 100, e uma linha Manual com serviço "POSTECTOMIA / FIMOSE" R$ 250 → todos os procedimentos pagam R$ 100, exceto POSTECTOMIA, que paga R$ 250.
-- Linha Manual avulsa (ex.: "Cartão Consulta") continua funcionando como hoje.
+## Nada muda
+
+- Lookup em `app.financeiro.atendimentos.tsx` e `print-gr.ts` (continua casando por nome do procedimento e caindo para `__CAT__:<TIPO>`).
+- Categorias automáticas, Repasse Padrão, Cartões Benefícios, schema, demais abas.
