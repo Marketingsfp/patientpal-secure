@@ -718,15 +718,6 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Duração da consulta (min)</Label>
-                    <Select value={form.duracao_consulta_min} onValueChange={(v) => setForm({ ...form, duracao_consulta_min: v })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {["5","10","15","20","30","40","45","60"].map((v) => <SelectItem key={v} value={v}>{v} min</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
                 </div>
 
                 <div className="pt-2">
