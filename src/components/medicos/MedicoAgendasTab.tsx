@@ -203,18 +203,26 @@ export function MedicoAgendasTab({
                       Serviços vinculados
                     </Label>
                   </div>
-                  <div className="max-h-72 overflow-auto border rounded-md p-2 grid grid-cols-1 sm:grid-cols-2 gap-1">
-                    {procsFiltrados.map((p) => (
-                      <div key={p.id} className="flex items-center gap-2 text-sm py-1">
-                        <Checkbox
-                          checked={vincSet.has(p.id)}
-                          onCheckedChange={(v) => void toggleProc(a.id, p.id, !!v)}
-                        />
-                        <span className="uppercase">{p.nome}</span>
-                      </div>
-                    ))}
+                  <div className="border rounded-md p-2 flex flex-wrap gap-2">
+                    {procsFiltrados.map((p) => {
+                      const selected = vincSet.has(p.id);
+                      return (
+                        <button
+                          type="button"
+                          key={p.id}
+                          onClick={() => void toggleProc(a.id, p.id, !selected)}
+                          className={`px-3 py-1 rounded-full text-xs uppercase border transition-colors ${
+                            selected
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "bg-background text-foreground border-border hover:bg-muted"
+                          }`}
+                        >
+                          {p.nome}
+                        </button>
+                      );
+                    })}
                     {procsFiltrados.length === 0 && (
-                      <p className="text-xs text-muted-foreground col-span-full text-center py-3">
+                      <p className="text-xs text-muted-foreground w-full text-center py-3">
                         Nenhum serviço cadastrado para este médico na aba "Especialidades".
                       </p>
                     )}
