@@ -343,7 +343,12 @@ function Page() {
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                onClick={() => { setMedicoEditando(m.id); setNovo({ ...novo, medico_id: m.id }); }}
+                                onClick={() => {
+                                  setMedicoEditando(m.id);
+                                  setNovo({ ...novo, medico_id: m.id });
+                                  const primeira = agendas.find((a) => a.medico_id === m.id && a.ativo) ?? agendas.find((a) => a.medico_id === m.id);
+                                  setAgendaSel(primeira?.id ?? "");
+                                }}
                                 aria-label="Editar horários"
                               >
                                 <Pencil className="h-4 w-4" />
@@ -367,7 +372,8 @@ function Page() {
           ) : (() => {
             const m = medicos.find((x) => x.id === medicoEditando);
             if (!m) { setMedicoEditando(null); return null; }
-            const ds = disps.filter((d) => d.medico_id === m.id);
+            const agendasMed = agendas.filter((a) => a.medico_id === m.id).sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome, "pt-BR"));
+            const ds = disps.filter((d) => d.medico_id === m.id && d.agenda_id === agendaSel);
             return (
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
@@ -377,6 +383,64 @@ function Page() {
                   <h2 className="text-lg font-semibold uppercase">{m.nome}</h2>
                   <span className="text-xs text-muted-foreground">· {ds.length} horário(s)</span>
                 </div>
+
+                <Card>
+                  <CardContent className="py-4 space-y-3">
+                    <div className="flex flex-wrap items-end gap-2">
+                      <div className="flex-1 min-w-56">
+                        <label className="text-xs text-muted-foreground">Agenda</label>
+                        <Select value={agendaSel} onValueChange={setAgendaSel}>
+                          <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                          <SelectContent>
+                            {agendasMed.map((a) => (
+                              <SelectItem key={a.id} value={a.id} className="uppercase">{a.nome}{!a.ativo ? " (inativa)" : ""}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex-1 min-w-56">
+                        <label className="text-xs text-muted-foreground">Nova agenda</label>
+                        <Input placeholder="Ex.: EXAMES, USG..." value={novaAgendaNome} onChange={(e) => setNovaAgendaNome(e.target.value)} />
+                      </div>
+                      <Button
+                        variant="outline"
+                        onClick={async () => {
+                          const nome = novaAgendaNome.trim();
+                          if (!nome || !clinicaAtual) { toast.error("Informe o nome da agenda"); return; }
+                          const { data, error } = await supabase
+                            .from("medico_agendas")
+                            .insert({ clinica_id: clinicaAtual.clinica_id, medico_id: m.id, nome, ordem: agendasMed.length } as never)
+                            .select("id")
+                            .single();
+                          if (error) { toast.error(error.message); return; }
+                          toast.success("Agenda criada");
+                          setNovaAgendaNome("");
+                          await load();
+                          if (data) setAgendaSel((data as { id: string }).id);
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-1" /> Criar agenda
+                      </Button>
+                      {agendaSel && agendasMed.length > 1 && (
+                        <Button
+                          variant="ghost"
+                          className="text-destructive"
+                          onClick={async () => {
+                            if (!confirm("Remover esta agenda e todos os seus horários?")) return;
+                            const { error } = await supabase.from("medico_agendas").delete().eq("id", agendaSel);
+                            if (error) { toast.error(error.message); return; }
+                            toast.success("Agenda removida");
+                            await load();
+                            const rest = agendas.filter((a) => a.medico_id === m.id && a.id !== agendaSel);
+                            setAgendaSel(rest[0]?.id ?? "");
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" /> Remover agenda
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
 
                 <Card>
                   <CardContent className="py-4 flex flex-wrap gap-2 items-end">
