@@ -32,6 +32,9 @@ interface ConvenioRow {
   percentual: string;
   valor: string;
   ativo: boolean;
+  // UI-only: quando true, o usuário quer digitar um nome avulso (ex.: "Cartão Consulta")
+  // em vez de escolher um serviço específico do médico para sobrescrever.
+  avulso?: boolean;
 }
 
 const CONVENIOS_PADRAO: ConvenioRow[] = [
@@ -208,13 +211,14 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
     if (!procs.length) return;
     setConvenios((cs) => {
       const tiposSelecionados = new Set<string>();
+      const nomesServicosSelecionados = new Set<string>();
       for (const item of form.procedimentos) {
         const { pid } = splitItem(item);
         if (!pid) continue;
         const proc = procs.find((p) => p.id === pid);
         if (proc?.tipo) tiposSelecionados.add(String(proc.tipo).toUpperCase());
+        if (proc?.nome) nomesServicosSelecionados.add(normalizarNome(proc.nome));
       }
-      const nomesDeProcedimentos = new Set(procs.map((p) => normalizarNome(p.nome)));
 
       // Mantém manuais e sentinelas de categoria ainda usadas.
       const mantidos = cs.filter((c) => {
@@ -224,8 +228,14 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
           return tiposSelecionados.has(tipo);
         }
         const chave = normalizarNome(nome);
-        // Remove linhas legadas por serviço; preserva manuais (Cartão etc.).
-        return !nomesDeProcedimentos.has(chave);
+        // Linha cujo nome corresponde a um serviço atualmente selecionado é um
+        // override individual válido — preservar. Linha cujo nome corresponde a
+        // um procedimento NÃO selecionado é órfã — remover. Demais (manuais
+        // avulsas como "Cartão Consulta", ou linhas vazias recém-criadas) são
+        // preservadas.
+        const todosOsProcs = new Set(procs.map((p) => normalizarNome(p.nome)));
+        if (todosOsProcs.has(chave) && !nomesServicosSelecionados.has(chave)) return false;
+        return true;
       });
 
       const existentesCat = new Set(
@@ -261,6 +271,25 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
     if (tipo === "PROCEDIMENTO") return "Procedimentos";
     return tipo;
   };
+
+  // Lista de serviços selecionados pelo médico (para o picker do Manual override).
+  // Cada item: { value: nome do procedimento (usado no lookup), label }.
+  const servicosDoMedico = useMemo(() => {
+    const out: { value: string; label: string }[] = [];
+    const seen = new Set<string>();
+    for (const item of form.procedimentos) {
+      const { pid, eid } = splitItem(item);
+      const proc = procs.find((p) => p.id === pid);
+      if (!proc) continue;
+      const key = normalizarNome(proc.nome);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const esp = eid ? esps.find((e) => e.id === eid) ?? null : null;
+      out.push({ value: proc.nome, label: labelProcedimentoEsp(proc, esp) });
+    }
+    out.sort((a, b) => a.label.localeCompare(b.label));
+    return out;
+  }, [form.procedimentos, procs, esps]);
 
   // Load reference data
   useEffect(() => {
@@ -1199,13 +1228,28 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                     <div>
                       <Label>REPASSE INDIVIDUAL</Label>
                       <p className="text-xs text-muted-foreground">
-                        As <b>categorias</b> dos serviços selecionados na aba <b>Especialidades</b> aparecem aqui automaticamente (Consulta, Exame, Procedimento). Defina o tipo e o valor de repasse por categoria — vale para todos os serviços daquela categoria. Use "Manual" para itens avulsos (ex.: Cartão Consulta).
+                        As <b>categorias</b> dos serviços selecionados na aba <b>Especialidades</b> aparecem aqui automaticamente (Consulta, Exame, Procedimento). Defina o tipo e o valor de repasse por categoria — vale para todos os serviços daquela categoria. Use <b>Manual</b> para sobrescrever o repasse de um <b>serviço específico</b> (prevalece sobre a categoria) ou para itens <b>avulsos</b> (ex.: Cartão Consulta).
                       </p>
                     </div>
-                    <Button type="button" size="sm" variant="outline"
-                      onClick={() => setConvenios((cs) => [...cs, { nome: "", tipo_repasse: "percentual", percentual: "50", valor: "", ativo: true }])}>
-                      <Plus className="h-4 w-4 mr-1" /> Manual
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button type="button" size="sm" variant="outline">
+                          <Plus className="h-4 w-4 mr-1" /> Manual
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => setConvenios((cs) => [...cs, { nome: "", tipo_repasse: "percentual", percentual: "50", valor: "", ativo: true, avulso: false }])}
+                        >
+                          Sobrescrever serviço específico
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => setConvenios((cs) => [...cs, { nome: "", tipo_repasse: "percentual", percentual: "50", valor: "", ativo: true, avulso: true }])}
+                        >
+                          Avulso (texto livre)
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                   {convenios.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-4">Nenhum convênio. Clique em "Manual" para adicionar.</p>
@@ -1223,6 +1267,8 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                         <tbody>
                           {convenios.map((c, i) => {
                             const catLbl = labelCategoria(c.nome);
+                            const matchesServico = !!c.nome && servicosDoMedico.some((s) => normalizarNome(s.value) === normalizarNome(c.nome));
+                            const showTextInput = !catLbl && (c.avulso === true || (!!c.nome && !matchesServico));
                             return (
                             <tr key={i} className="border-t align-middle">
                               <td className="px-2 py-1">
@@ -1230,9 +1276,20 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                                   <div className="px-2 py-1.5 text-sm font-medium uppercase tracking-wide text-foreground/80">
                                     {catLbl}
                                   </div>
-                                ) : (
+                                ) : showTextInput ? (
                                   <Input value={c.nome} placeholder="Ex: Cartão Consulta"
                                     onChange={(e) => setConvenios((cs) => cs.map((x, j) => j === i ? { ...x, nome: e.target.value } : x))} />
+                                ) : (
+                                  <select
+                                    className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+                                    value={c.nome}
+                                    onChange={(e) => setConvenios((cs) => cs.map((x, j) => j === i ? { ...x, nome: e.target.value } : x))}
+                                  >
+                                    <option value="">Selecione um serviço…</option>
+                                    {servicosDoMedico.map((s) => (
+                                      <option key={s.value} value={s.value}>{s.label}</option>
+                                    ))}
+                                  </select>
                                 )}
                               </td>
                               <td className="px-2 py-1">
