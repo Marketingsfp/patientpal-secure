@@ -1372,8 +1372,8 @@ function AgendaPage() {
     if (reagLoteIds) { void confirmarReagLoteNoSlot(a); return; }
     setEditing(a);
     setForm({
-      paciente_nome: "",
-      paciente_id: "",
+      paciente_nome: pacienteCopia?.nome ?? "",
+      paciente_id: pacienteCopia?.id ?? "",
       medico_id: a.medico_id ?? "",
       inicio: toLocalInput(a.inicio), fim: toLocalInput(a.fim),
       procedimento: procedimentoEfetivo(a.medico_id, a.procedimento) || "CONSULTA",
@@ -1381,6 +1381,7 @@ function AgendaPage() {
       observacoes: a.observacoes ?? "",
       data_pagamento: a.data_pagamento ?? "",
     });
+    if (pacienteCopia) setPacienteCopia(null);
     setOpen(true);
   };
 
