@@ -156,13 +156,14 @@ function Page() {
 
   // Pré-visualização dos slots gerados
   const slotsPreview = useMemo(() => {
-    if (!gerar.data_inicio || !gerar.data_fim) return [] as { data: string; medico: string; inicio: string; fim: string }[];
+    type Slot = { data: string; medico: string; agenda_id: string; inicio: string; fim: string };
+    if (!gerar.data_inicio || !gerar.data_fim) return [] as Slot[];
     const ini = new Date(`${gerar.data_inicio}T00:00:00`);
     const fimD = new Date(`${gerar.data_fim}T00:00:00`);
-    if (fimD < ini) return [];
+    if (fimD < ini) return [] as Slot[];
     const dias = Math.floor((fimD.getTime() - ini.getTime()) / 86400000) + 1;
     const alvo = gerar.medico_id === "all" ? medicos : medicos.filter((m) => m.id === gerar.medico_id);
-    const out: { data: string; medico: string; agenda_id: string; inicio: string; fim: string }[] = [];
+    const out: Slot[] = [];
     for (let i = 0; i < dias; i++) {
       const d = new Date(ini); d.setDate(d.getDate() + i);
       if (isFeriadoOuDomingo(d)) continue;
