@@ -29,21 +29,31 @@ export function MedicoAgendasTab({
   const procedimentoIdsKey = (procedimentoIds ?? []).slice().sort().join("|");
 
   const load = async () => {
-    const [a, p, mp] = await Promise.all([
+    const [a, mp] = await Promise.all([
       supabase.from("medico_agendas").select("id, nome, ativo, ordem").eq("medico_id", medicoId).order("ordem").order("nome"),
-      supabase.from("procedimentos").select("id, nome").eq("clinica_id", clinicaId).eq("ativo", true).order("nome"),
       supabase.from("medico_procedimentos").select("procedimento_id").eq("medico_id", medicoId),
     ]);
     const ags = ((a.data as Agenda[]) ?? []);
     setAgendas(ags);
     setMultipla(ags.length > 1);
-    const allProcs = ((p.data as Procedimento[]) ?? []);
     const idsFromDb = new Set(
       ((mp.data as { procedimento_id: string }[] | null) ?? []).map((x) => x.procedimento_id),
     );
     const idsDoFormulario = new Set(procedimentoIds ?? []);
-    const idsPermitidos = new Set([...idsFromDb, ...idsDoFormulario]);
-    setProcs(idsPermitidos.size > 0 ? allProcs.filter((x) => idsPermitidos.has(x.id)) : []);
+    const idsPermitidos = Array.from(new Set([...idsFromDb, ...idsDoFormulario]));
+    if (idsPermitidos.length > 0) {
+      const { data: ps, error: pe } = await supabase
+        .from("procedimentos")
+        .select("id, nome")
+        .eq("clinica_id", clinicaId)
+        .eq("ativo", true)
+        .in("id", idsPermitidos)
+        .order("nome");
+      if (pe) toast.error(pe.message);
+      setProcs(((ps as Procedimento[]) ?? []));
+    } else {
+      setProcs([]);
+    }
     if (ags.length > 0) {
       const { data: vincs } = await supabase
         .from("medico_agenda_procedimentos")
@@ -125,11 +135,9 @@ export function MedicoAgendasTab({
     void load();
   };
 
-  // `procs` is already filtered to services tied to this doctor via medico_procedimentos.
-  // We still merge with `procedimentoIds` from the form so newly-added (unsaved) services also appear.
-  const idsExtras = new Set(procedimentoIds ?? []);
+  // `procs` is already filtered to services tied to this doctor via medico_procedimentos
+  // plus current unsaved services from the Especialidades tab.
   const procsDoMedico = procs;
-  void idsExtras;
 
   return (
     <div className="space-y-4">
