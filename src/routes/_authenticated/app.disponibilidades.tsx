@@ -53,6 +53,7 @@ function Page() {
   const [gerando, setGerando] = useState(false);
   const [medicoEditando, setMedicoEditando] = useState<string | null>(null);
   const [dispEditando, setDispEditando] = useState<string | null>(null);
+  const [editRow, setEditRow] = useState<{ dia_semana: string; hora_inicio: string; hora_fim: string; limite_pacientes: string; intervalo_min: string } | null>(null);
 
   const load = async () => {
     if (!clinicaAtual) return;
@@ -115,16 +116,26 @@ function Page() {
       limite_pacientes: novo.limite_pacientes ? parseInt(novo.limite_pacientes) : null,
       intervalo_min: novo.intervalo_min ? parseInt(novo.intervalo_min) : null,
     };
-    if (dispEditando) {
-      const { error } = await supabase.from("medico_disponibilidades").update(payload as never).eq("id", dispEditando);
-      if (error) { toast.error(error.message); return; }
-      toast.success("Horário atualizado");
-      setDispEditando(null);
-    } else {
-      const { error } = await supabase.from("medico_disponibilidades").insert(payload as never);
-      if (error) { toast.error(error.message); return; }
-      toast.success("Horário adicionado");
-    }
+    const { error } = await supabase.from("medico_disponibilidades").insert(payload as never);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Horário adicionado");
+    void load();
+  };
+
+  const salvarEdicao = async () => {
+    if (!dispEditando || !editRow) return;
+    const payload = {
+      dia_semana: parseInt(editRow.dia_semana),
+      hora_inicio: editRow.hora_inicio,
+      hora_fim: editRow.hora_fim,
+      limite_pacientes: editRow.limite_pacientes ? parseInt(editRow.limite_pacientes) : null,
+      intervalo_min: editRow.intervalo_min ? parseInt(editRow.intervalo_min) : null,
+    };
+    const { error } = await supabase.from("medico_disponibilidades").update(payload as never).eq("id", dispEditando);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Horário atualizado");
+    setDispEditando(null);
+    setEditRow(null);
     void load();
   };
 
