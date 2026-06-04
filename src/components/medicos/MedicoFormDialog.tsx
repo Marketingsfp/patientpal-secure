@@ -32,15 +32,11 @@ interface ConvenioRow {
   percentual: string;
   valor: string;
   ativo: boolean;
-  // UI-only: quando true, o usuário quer digitar um nome avulso (ex.: "Cartão Consulta")
-  // em vez de escolher um serviço específico do médico para sobrescrever.
-  avulso?: boolean;
 }
 
-const CONVENIOS_PADRAO: ConvenioRow[] = [
-  { nome: "Cartão Consulta", tipo_repasse: "percentual", percentual: "50", valor: "", ativo: true },
-  { nome: "Cartão Desconto", tipo_repasse: "percentual", percentual: "50", valor: "", ativo: true },
-];
+// Repasse individual agora é sempre vinculado a um serviço (ou categoria
+// sentinela auto-gerada). Não há seed de linhas avulsas.
+const CONVENIOS_PADRAO: ConvenioRow[] = [];
 
 const limparPrefixoMedico = (nome: string) =>
   nome.replace(/^(\s*(dr|dra)\.?\s+)+/i, "").trim();
@@ -227,15 +223,13 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
           const tipo = nome.slice("__CAT__:".length).toUpperCase();
           return tiposSelecionados.has(tipo);
         }
-        const chave = normalizarNome(nome);
-        // Linha cujo nome corresponde a um serviço atualmente selecionado é um
-        // override individual válido — preservar. Linha cujo nome corresponde a
-        // um procedimento NÃO selecionado é órfã — remover. Demais (manuais
-        // avulsas como "Cartão Consulta", ou linhas vazias recém-criadas) são
-        // preservadas.
-        const todosOsProcs = new Set(procs.map((p) => normalizarNome(p.nome)));
-        if (todosOsProcs.has(chave) && !nomesServicosSelecionados.has(chave)) return false;
-        return true;
+        // Linha em branco (acabou de ser criada pelo botão Manual) — preservar
+        // para o usuário escolher o serviço.
+        if (!nome.trim()) return true;
+        // Toda linha individual precisa estar vinculada a um serviço atualmente
+        // selecionado pelo médico. Qualquer outra coisa (procedimento não mais
+        // selecionado, legado avulso como "Cartão Consulta") é descartada.
+        return nomesServicosSelecionados.has(normalizarNome(nome));
       });
 
       const existentesCat = new Set(
@@ -1228,31 +1222,16 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                     <div>
                       <Label>REPASSE INDIVIDUAL</Label>
                       <p className="text-xs text-muted-foreground">
-                        As <b>categorias</b> dos serviços selecionados na aba <b>Especialidades</b> aparecem aqui automaticamente (Consulta, Exame, Procedimento). Defina o tipo e o valor de repasse por categoria — vale para todos os serviços daquela categoria. Use <b>Manual</b> para sobrescrever o repasse de um <b>serviço específico</b> (prevalece sobre a categoria) ou para itens <b>avulsos</b> (ex.: Cartão Consulta).
+                        As <b>categorias</b> dos serviços selecionados na aba <b>Especialidades</b> aparecem aqui automaticamente (Consulta, Exame, Procedimento). Defina o tipo e o valor de repasse por categoria — vale para todos os serviços daquela categoria. Use <b>Manual</b> para sobrescrever o repasse de um <b>serviço específico</b> (prevalece sobre a categoria).
                       </p>
                     </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button type="button" size="sm" variant="outline">
-                          <Plus className="h-4 w-4 mr-1" /> Manual
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() => setConvenios((cs) => [...cs, { nome: "", tipo_repasse: "percentual", percentual: "50", valor: "", ativo: true, avulso: false }])}
-                        >
-                          Sobrescrever serviço específico
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => setConvenios((cs) => [...cs, { nome: "", tipo_repasse: "percentual", percentual: "50", valor: "", ativo: true, avulso: true }])}
-                        >
-                          Avulso (texto livre)
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <Button type="button" size="sm" variant="outline"
+                      onClick={() => setConvenios((cs) => [...cs, { nome: "", tipo_repasse: "percentual", percentual: "50", valor: "", ativo: true }])}>
+                      <Plus className="h-4 w-4 mr-1" /> Manual
+                    </Button>
                   </div>
                   {convenios.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-4">Nenhum convênio. Clique em "Manual" para adicionar.</p>
+                    <p className="text-sm text-muted-foreground text-center py-4">Nenhum repasse individual. Clique em "Manual" para sobrescrever o repasse de um serviço específico.</p>
                   ) : (
                     <div className="border rounded-md overflow-hidden">
                       <table className="w-full text-sm">
@@ -1267,8 +1246,6 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                         <tbody>
                           {convenios.map((c, i) => {
                             const catLbl = labelCategoria(c.nome);
-                            const matchesServico = !!c.nome && servicosDoMedico.some((s) => normalizarNome(s.value) === normalizarNome(c.nome));
-                            const showTextInput = !catLbl && (c.avulso === true || (!!c.nome && !matchesServico));
                             return (
                             <tr key={i} className="border-t align-middle">
                               <td className="px-2 py-1">
@@ -1276,9 +1253,6 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                                   <div className="px-2 py-1.5 text-sm font-medium uppercase tracking-wide text-foreground/80">
                                     {catLbl}
                                   </div>
-                                ) : showTextInput ? (
-                                  <Input value={c.nome} placeholder="Ex: Cartão Consulta"
-                                    onChange={(e) => setConvenios((cs) => cs.map((x, j) => j === i ? { ...x, nome: e.target.value } : x))} />
                                 ) : (
                                   <select
                                     className="h-9 w-full rounded-md border bg-background px-2 text-sm"
