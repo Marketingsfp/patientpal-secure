@@ -2450,20 +2450,28 @@ function AgendaPage() {
               onlyMedicoId={isMedicoOnly ? medicoLogadoId : null}
             />
           </div>
-          {filtroMedico !== "todos" && (agendasPorMedico.get(filtroMedico)?.length ?? 0) > 1 && (
-            <div className="space-y-0.5">
-              <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Agenda</Label>
-              <Select value={filtroAgenda} onValueChange={setFiltroAgenda}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">TODAS</SelectItem>
-                  {(agendasPorMedico.get(filtroMedico) ?? []).map(a => (
-                    <SelectItem key={a.id} value={a.id}>{a.nome}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+          {filtroMedico !== "todos" && (() => {
+            const ags = agendasPorMedico.get(filtroMedico) ?? [];
+            const unica = ags.length <= 1;
+            return (
+              <div className="space-y-0.5">
+                <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Agenda</Label>
+                <Select
+                  value={filtroAgenda}
+                  onValueChange={setFiltroAgenda}
+                  disabled={unica}
+                >
+                  <SelectTrigger><SelectValue placeholder={ags[0]?.nome ?? "—"} /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">TODAS</SelectItem>
+                    {ags.map(a => (
+                      <SelectItem key={a.id} value={a.id}>{a.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            );
+          })()}
           <div className="space-y-0.5">
             <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Data Ref.</Label>
             <DataRefField
