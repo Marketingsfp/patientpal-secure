@@ -57,7 +57,7 @@ function Page() {
   const load = async () => {
     if (!clinicaAtual) return;
     const [m, d] = await Promise.all([
-      supabase.from("medicos").select("id, nome, duracao_consulta_min, procedimento_padrao_id, procedimento:procedimentos!medicos_procedimento_padrao_id_fkey(nome), especialidade:especialidades(nome)" as never).eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
+      supabase.from("medicos").select("id, nome, duracao_consulta_min, procedimento_padrao_id, procedimento:procedimentos!medicos_procedimento_padrao_id_fkey(nome), especialidade:especialidades!medicos_especialidade_id_fkey(nome)" as never).eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("medico_disponibilidades").select("id, medico_id, dia_semana, hora_inicio, hora_fim, observacoes, limite_pacientes, intervalo_min" as never).eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("dia_semana").order("hora_inicio"),
     ]);
     type RawMedico = { id: string; nome: string; duracao_consulta_min: number | null; procedimento_padrao_id: string | null; procedimento?: { nome: string | null } | null; especialidade?: { nome: string | null } | null };
