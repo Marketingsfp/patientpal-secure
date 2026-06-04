@@ -49,7 +49,6 @@ function Page() {
   const [disps, setDisps] = useState<DispRow[]>([]);
   const [agendas, setAgendas] = useState<Agenda[]>([]);
   const [agendaSel, setAgendaSel] = useState<string>("");
-  const [novaAgendaNome, setNovaAgendaNome] = useState("");
   const [filtro, setFiltro] = useState("");
   const [novo, setNovo] = useState({ medico_id: "", dia_semana: "1", hora_inicio: "08:00", hora_fim: "12:00", limite_pacientes: "", intervalo_min: "" });
   const hojeIso = new Date().toISOString().slice(0, 10);
