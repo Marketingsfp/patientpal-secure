@@ -769,6 +769,22 @@ function AgendaPage() {
       supabase.from("enfermagem_recursos").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("enfermagem_recurso_procedimentos").select("recurso_id,procedimento_id"),
     ]);
+    // Carrega agendas nomeadas por médico (clínica atual)
+    const { data: agendasData } = await supabase
+      .from("medico_agendas")
+      .select("id,nome,medico_id,ativo,ordem")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("ativo", true)
+      .order("ordem", { ascending: true })
+      .order("nome", { ascending: true });
+    const ag = new Map<string, { id: string; nome: string }[]>();
+    for (const a of (agendasData ?? []) as Array<{ id: string; nome: string; medico_id: string | null }>) {
+      if (!a.medico_id) continue;
+      const arr = ag.get(a.medico_id) ?? [];
+      arr.push({ id: a.id, nome: a.nome });
+      ag.set(a.medico_id, arr);
+    }
+    setAgendasPorMedico(ag);
     const todos = Array.isArray(pr) ? pr : [];
     const procedimentosPorId = new Map(
       todos.map((p) => [p.id, { id: p.id, nome: p.nome, grupo: p.grupo ?? null }]),
