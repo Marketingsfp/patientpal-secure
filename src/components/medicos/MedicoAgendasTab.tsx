@@ -25,8 +25,7 @@ export function MedicoAgendasTab({
   const [procs, setProcs] = useState<Procedimento[]>([]);
   const [vinculos, setVinculos] = useState<Map<string, Set<string>>>(new Map());
   const [nova, setNova] = useState("");
-  const [filtroProc, setFiltroProc] = useState("");
-  const [agendaSel, setAgendaSel] = useState<string>("");
+  const [filtroProc, setFiltroProc] = useState<Map<string, string>>(new Map());
   const [multipla, setMultipla] = useState<boolean>(false);
 
   const load = async () => {
@@ -49,10 +48,8 @@ export function MedicoAgendasTab({
         map.get(v.agenda_id)!.add(v.procedimento_id);
       }
       setVinculos(map);
-      if (!agendaSel || !ags.find((x) => x.id === agendaSel)) setAgendaSel(ags[0].id);
     } else {
       setVinculos(new Map());
-      setAgendaSel("");
     }
   };
 
@@ -69,7 +66,6 @@ export function MedicoAgendasTab({
     if (error) { toast.error(error.message); return; }
     setNova("");
     await load();
-    if (data) setAgendaSel((data as { id: string }).id);
   };
 
   const renomear = async (a: Agenda, novoNome: string) => {
@@ -93,28 +89,26 @@ export function MedicoAgendasTab({
     void load();
   };
 
-  const toggleProc = async (procId: string, checked: boolean) => {
-    if (!agendaSel) return;
+  const toggleProc = async (agendaId: string, procId: string, checked: boolean) => {
+    if (!agendaId) return;
     if (checked) {
       const { error } = await supabase
         .from("medico_agenda_procedimentos")
-        .insert({ clinica_id: clinicaId, agenda_id: agendaSel, procedimento_id: procId } as never);
+        .insert({ clinica_id: clinicaId, agenda_id: agendaId, procedimento_id: procId } as never);
       if (error) { toast.error(error.message); return; }
     } else {
       const { error } = await supabase
         .from("medico_agenda_procedimentos")
         .delete()
-        .eq("agenda_id", agendaSel)
+        .eq("agenda_id", agendaId)
         .eq("procedimento_id", procId);
       if (error) { toast.error(error.message); return; }
     }
     void load();
   };
 
-  const vinculadosSel = vinculos.get(agendaSel) ?? new Set<string>();
   const idsMedico = procedimentoIds && procedimentoIds.length > 0 ? new Set(procedimentoIds) : null;
   const procsDoMedico = idsMedico ? procs.filter((p) => idsMedico.has(p.id)) : procs;
-  const procsFiltrados = procsDoMedico.filter((p) => !filtroProc || p.nome.toLowerCase().includes(filtroProc.toLowerCase()));
 
   return (
     <div className="space-y-4">
@@ -146,67 +140,88 @@ export function MedicoAgendasTab({
       )}
 
       {multipla && (
-      <Card>
-        <CardContent className="py-4 space-y-3">
-          <Label className="text-xs uppercase text-muted-foreground">Agendas</Label>
-          <div className="space-y-2">
-            {agendas.map((a) => (
-              <div key={a.id} className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="agenda_sel"
-                  checked={agendaSel === a.id}
-                  onChange={() => setAgendaSel(a.id)}
-                  className="h-4 w-4"
-                />
-                <Input
-                  defaultValue={a.nome}
-                  className="max-w-xs uppercase"
-                  onBlur={(e) => void renomear(a, e.target.value)}
-                />
-                <label className="flex items-center gap-1 text-xs">
-                  <Checkbox checked={a.ativo} onCheckedChange={() => void toggleAtivo(a)} />
-                  Ativa
-                </label>
-                <Button type="button" size="sm" variant="ghost" className="text-destructive" onClick={() => void remover(a)} disabled={agendas.length <= 1}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
-          </div>
-          <div className="flex gap-2 pt-2 border-t">
-            <Input placeholder="Nome da nova agenda" value={nova} onChange={(e) => setNova(e.target.value)} className="max-w-xs uppercase" />
-            <Button type="button" onClick={() => void criar()}><Plus className="h-4 w-4 mr-1" />Adicionar</Button>
-          </div>
-        </CardContent>
-      </Card>
-      )}
+        <>
+          {agendas.map((a) => {
+            const vincSet = vinculos.get(a.id) ?? new Set<string>();
+            const filtro = filtroProc.get(a.id) ?? "";
+            const procsFiltrados = procsDoMedico.filter(
+              (p) => !filtro || p.nome.toLowerCase().includes(filtro.toLowerCase()),
+            );
+            return (
+              <Card key={a.id}>
+                <CardContent className="py-4 space-y-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Label className="text-xs uppercase text-muted-foreground mr-2">Agenda</Label>
+                    <Input
+                      defaultValue={a.nome}
+                      className="max-w-xs uppercase"
+                      onBlur={(e) => void renomear(a, e.target.value)}
+                    />
+                    <label className="flex items-center gap-1 text-xs ml-2">
+                      <Checkbox checked={a.ativo} onCheckedChange={() => void toggleAtivo(a)} />
+                      Ativa
+                    </label>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="text-destructive"
+                      onClick={() => void remover(a)}
+                      disabled={agendas.length <= 1}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 pt-2 border-t">
+                    <Label className="text-xs uppercase text-muted-foreground">
+                      Procedimentos vinculados
+                    </Label>
+                    <Input
+                      placeholder="Filtrar procedimento..."
+                      className="max-w-xs"
+                      value={filtro}
+                      onChange={(e) => {
+                        const next = new Map(filtroProc);
+                        next.set(a.id, e.target.value);
+                        setFiltroProc(next);
+                      }}
+                    />
+                  </div>
+                  <div className="max-h-72 overflow-auto border rounded-md p-2 grid grid-cols-1 sm:grid-cols-2 gap-1">
+                    {procsFiltrados.map((p) => (
+                      <label key={p.id} className="flex items-center gap-2 text-sm py-1">
+                        <Checkbox
+                          checked={vincSet.has(p.id)}
+                          onCheckedChange={(v) => void toggleProc(a.id, p.id, !!v)}
+                        />
+                        <span className="uppercase">{p.nome}</span>
+                      </label>
+                    ))}
+                    {procsFiltrados.length === 0 && (
+                      <p className="text-xs text-muted-foreground col-span-full text-center py-3">
+                        Nenhum serviço cadastrado para este médico na aba "Especialidades".
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
 
-      {multipla && agendaSel && (
-        <Card>
-          <CardContent className="py-4 space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <Label className="text-xs uppercase text-muted-foreground">Procedimentos vinculados à agenda selecionada</Label>
-              <Input placeholder="Filtrar procedimento..." className="max-w-xs" value={filtroProc} onChange={(e) => setFiltroProc(e.target.value)} />
-            </div>
-            <div className="max-h-80 overflow-auto border rounded-md p-2 grid grid-cols-1 sm:grid-cols-2 gap-1">
-              {procsFiltrados.map((p) => (
-                <label key={p.id} className="flex items-center gap-2 text-sm py-1">
-                  <Checkbox
-                    checked={vinculadosSel.has(p.id)}
-                    onCheckedChange={(v) => void toggleProc(p.id, !!v)}
-                  />
-                  <span className="uppercase">{p.nome}</span>
-                </label>
-              ))}
-              {procsFiltrados.length === 0 && (
-                <p className="text-xs text-muted-foreground col-span-full text-center py-3">
-                  Nenhum serviço cadastrado para este médico na aba "Especialidades".
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardContent className="py-4 flex gap-2">
+              <Input
+                placeholder="Nome da nova agenda"
+                value={nova}
+                onChange={(e) => setNova(e.target.value)}
+                className="max-w-xs uppercase"
+              />
+              <Button type="button" onClick={() => void criar()}>
+                <Plus className="h-4 w-4 mr-1" />Adicionar agenda
+              </Button>
+            </CardContent>
+          </Card>
+        </>
       )}
     </div>
   );
