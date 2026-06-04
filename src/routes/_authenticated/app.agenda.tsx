@@ -1974,6 +1974,7 @@ function AgendaPage() {
                 <Label>Médico ou Exame</Label>
                 <SearchableSelect
                   value={form.medico_id || "none"}
+                  disabled={!!editing}
                   onChange={(v) => {
                     if (v.startsWith("exame:")) {
                       const nome = v.slice(6);
