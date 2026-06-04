@@ -1118,7 +1118,17 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
 
               <TabsContent value="agendas" className="space-y-4 pt-4 pb-16">
                 {editingMedicoId && (
-                  <MedicoAgendasTab clinicaId={clinicaId} medicoId={editingMedicoId} />
+                  <MedicoAgendasTab
+                    clinicaId={clinicaId}
+                    medicoId={editingMedicoId}
+                    procedimentoIds={Array.from(
+                      new Set(
+                        form.procedimentos
+                          .map((it) => splitItem(it).pid)
+                          .filter((x): x is string => !!x),
+                      ),
+                    )}
+                  />
                 )}
               </TabsContent>
 

@@ -6,18 +6,28 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Card, CardContent } from "@/components/ui/card";
 
 interface Agenda { id: string; nome: string; ativo: boolean; ordem: number }
 interface Procedimento { id: string; nome: string }
 
-export function MedicoAgendasTab({ clinicaId, medicoId }: { clinicaId: string; medicoId: string }) {
+export function MedicoAgendasTab({
+  clinicaId,
+  medicoId,
+  procedimentoIds,
+}: {
+  clinicaId: string;
+  medicoId: string;
+  procedimentoIds?: string[];
+}) {
   const [agendas, setAgendas] = useState<Agenda[]>([]);
   const [procs, setProcs] = useState<Procedimento[]>([]);
   const [vinculos, setVinculos] = useState<Map<string, Set<string>>>(new Map());
   const [nova, setNova] = useState("");
   const [filtroProc, setFiltroProc] = useState("");
   const [agendaSel, setAgendaSel] = useState<string>("");
+  const [multipla, setMultipla] = useState<boolean>(false);
 
   const load = async () => {
     const [a, p] = await Promise.all([
@@ -26,6 +36,7 @@ export function MedicoAgendasTab({ clinicaId, medicoId }: { clinicaId: string; m
     ]);
     const ags = ((a.data as Agenda[]) ?? []);
     setAgendas(ags);
+    setMultipla(ags.length > 1);
     setProcs(((p.data as Procedimento[]) ?? []));
     if (ags.length > 0) {
       const { data: vincs } = await supabase
@@ -101,15 +112,40 @@ export function MedicoAgendasTab({ clinicaId, medicoId }: { clinicaId: string; m
   };
 
   const vinculadosSel = vinculos.get(agendaSel) ?? new Set<string>();
-  const procsFiltrados = procs.filter((p) => !filtroProc || p.nome.toLowerCase().includes(filtroProc.toLowerCase()));
+  const idsMedico = procedimentoIds && procedimentoIds.length > 0 ? new Set(procedimentoIds) : null;
+  const procsDoMedico = idsMedico ? procs.filter((p) => idsMedico.has(p.id)) : procs;
+  const procsFiltrados = procsDoMedico.filter((p) => !filtroProc || p.nome.toLowerCase().includes(filtroProc.toLowerCase()));
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">
-        Crie quantas agendas o médico precisar (ex.: "Consultas", "Exames", "USG"). Vincule procedimentos a uma agenda
-        para que o sistema sugira automaticamente a agenda certa ao marcar.
-      </p>
+      <Card>
+        <CardContent className="py-4 flex items-center justify-between gap-3">
+          <div>
+            <Label className="text-sm">Este médico possui mais de uma agenda</Label>
+            <p className="text-xs text-muted-foreground">
+              Por padrão, o médico tem uma única agenda para tudo. Ative apenas se ele atende em agendas separadas (ex.: "Consultas" e "Exames").
+            </p>
+          </div>
+          <Switch
+            checked={multipla}
+            onCheckedChange={(v) => {
+              if (!v && agendas.length > 1) {
+                toast.error("Remova as agendas extras antes de desativar.");
+                return;
+              }
+              setMultipla(!!v);
+            }}
+          />
+        </CardContent>
+      </Card>
 
+      {!multipla && (
+        <p className="text-sm text-muted-foreground">
+          O médico utilizará uma única agenda padrão para todos os atendimentos. Nada mais a configurar aqui.
+        </p>
+      )}
+
+      {multipla && (
       <Card>
         <CardContent className="py-4 space-y-3">
           <Label className="text-xs uppercase text-muted-foreground">Agendas</Label>
@@ -144,8 +180,9 @@ export function MedicoAgendasTab({ clinicaId, medicoId }: { clinicaId: string; m
           </div>
         </CardContent>
       </Card>
+      )}
 
-      {agendaSel && (
+      {multipla && agendaSel && (
         <Card>
           <CardContent className="py-4 space-y-3">
             <div className="flex items-center justify-between gap-3">
@@ -163,7 +200,9 @@ export function MedicoAgendasTab({ clinicaId, medicoId }: { clinicaId: string; m
                 </label>
               ))}
               {procsFiltrados.length === 0 && (
-                <p className="text-xs text-muted-foreground col-span-full text-center py-3">Nenhum procedimento.</p>
+                <p className="text-xs text-muted-foreground col-span-full text-center py-3">
+                  Nenhum serviço cadastrado para este médico na aba "Especialidades".
+                </p>
               )}
             </div>
           </CardContent>
