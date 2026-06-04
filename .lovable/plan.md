@@ -1,62 +1,28 @@
-## Diagnóstico
+## Objetivo
 
-Os cards de **Movimento de Caixa** estão errados porque a página busca a tabela `fin_lancamentos` e soma os valores no navegador (JavaScript). O Supabase tem um limite padrão de **1.000 linhas por consulta**, então quando o período tem mais de 1.000 lançamentos, a soma é calculada só sobre os primeiros 1.000 e o resto é ignorado.
+Permitir que uma linha **Manual** no "Repasse Individual" represente **um serviço específico** e sobrescreva o valor da categoria correspondente para aquele serviço.
 
-**Evidência real (POLICLINICA MENINO JESUS, 03/05/2026 – 02/06/2026):**
+A lógica de leitura do repasse no app já prioriza correspondência por **nome do serviço** e só cai para a sentinela de categoria (`__CAT__:<TIPO>`) quando não acha — então a sobrescrita funciona automaticamente assim que existir uma linha manual com o nome do procedimento. Falta ajustar a tela de cadastro para que essa linha manual seja criada corretamente e não seja apagada pela sincronização automática.
 
-| Tipo | Status | Qtd | Total real no banco | Exibido no card |
-|---|---|---:|---:|---:|
-| Receita | confirmado | 12.299 | **R$ 1.011.125,00** | R$ 59.854,00 |
-| Despesa | confirmado | 976 | **R$ 718.352,00** | R$ 10.765,00 |
+## Mudanças (somente em `src/components/medicos/MedicoFormDialog.tsx`)
 
-Ou seja, os cards estão mostrando ~6% do valor real.
+1. **Linha manual = picker de serviço (com opção "Avulso")**
+   - Hoje o botão "Manual" cria uma linha com campo de texto livre.
+   - Trocar o `Input` de nome (quando a linha não é categoria) por um `Select` com:
+     - todos os serviços já selecionados na aba Especialidades do médico, rotulados `NOME (ESPECIALIDADE)`, com `value` = nome do procedimento (igual ao que o lookup do financeiro/print usa);
+     - uma opção "Avulso (digitar)…" que volta a mostrar o `Input` de texto livre, preservando o uso atual (ex.: "Cartão Consulta").
+   - Texto de ajuda da seção: acrescentar "Use Manual para sobrescrever o repasse de **um serviço específico** (prevalece sobre a categoria) ou para itens avulsos."
 
-O **mesmo erro estrutural** existe em todas as telas de Financeiro que somam `fin_lancamentos` no front:
+2. **Sincronização automática não pode apagar overrides**
+   - No `useEffect` que monta as linhas de categoria (linhas 207–253), o filtro `mantidos` hoje remove qualquer linha cujo nome bate com um procedimento cadastrado.
+   - Ajustar: **preservar** linhas manuais cujo nome corresponde a um procedimento que ainda está selecionado para o médico (são overrides intencionais). Continuar removendo apenas linhas órfãs, isto é, cujo procedimento não está mais selecionado.
 
-- `app.financeiro.movimento.tsx` — cards Receitas / Despesas / Saldo
-- `app.financeiro.index.tsx` — dashboard inicial (Receitas, Despesas, Saldo)
-- `app.financeiro.estatisticas.tsx` — KPIs do mês
-- `app.financeiro.analitico.tsx` — séries por dia/categoria
-- `app.financeiro.bi.tsx` — série Receitas × Despesas
-- `app.financeiro.relatorios.tsx` — totais do relatório
+3. **Nada muda em**:
+   - Schema / migrations (segue usando `medico_convenios.nome`).
+   - Lookup em `src/routes/_authenticated/app.financeiro.atendimentos.tsx` e `src/lib/print-gr.ts` (já fazem match por nome antes de cair na sentinela de categoria).
+   - Repasse padrão, Cartões Benefícios, demais abas.
 
-## Solução
+## Resultado para o usuário
 
-Mover a agregação para o banco com 2 funções SQL (RPC) que somam direto no Postgres, sem limite de 1.000 linhas:
-
-1. **`fin_resumo_periodo(p_clinica, p_ini, p_fim)`** → retorna totais agregados:
-   `tipo, status, qtd, total`. Usada pelos cards e KPIs (Movimento, Dashboard, Estatísticas, Relatórios).
-
-2. **`fin_serie_diaria(p_clinica, p_ini, p_fim)`** → retorna série por dia:
-   `data, tipo, total`. Usada por Analítico e BI Financeiro.
-
-Ambas com `SECURITY DEFINER` e validação de acesso à clínica via `clinica_membros` (mesmo padrão das outras RPCs do projeto).
-
-## Mudanças no front
-
-Em todas as 6 páginas listadas: substituir o `supabase.from("fin_lancamentos").select(...)` + `.reduce()` por uma chamada `supabase.rpc("fin_resumo_periodo", { ... })` (ou `fin_serie_diaria`) para calcular **só os totais/séries**.
-
-A **tabela de lançamentos** em `Movimento de Caixa` continua usando a query atual, mas:
-- Passa a aplicar `.range(0, 499)` (mostrando os 500 mais recentes do período) com aviso "Mostrando 500 de N lançamentos – use o filtro de data para refinar" quando o total exceder 500.
-- O total real do período continua vindo da RPC, então os cards ficam corretos mesmo quando a tabela mostra só um subset.
-
-## Critério dos cards
-
-Por padrão, somar **apenas lançamentos com `status = 'confirmado'`** (que é o significado de "Movimento de Caixa" = caixa realizado). Cancelados e pendentes ficam fora. Hoje a página soma tudo, incluindo cancelados — esse também é um bug.
-
-Se você preferir incluir pendentes (caixa projetado), ajusto depois com uma chave única.
-
-## Validação
-
-Após implementar, abrir Movimento (mesmo período da imagem) e confirmar:
-- Receitas = R$ 1.011.125,00
-- Despesas = R$ 718.352,00
-- Saldo = R$ 292.773,00
-
-E refazer a checagem nas outras 5 telas (Dashboard, Estatísticas, Analítico, BI, Relatórios).
-
-## Fora de escopo
-
-- Permissões / RLS (já estão corretas).
-- Tela de Atendimentos (usa `fin_atendimentos`, não `fin_lancamentos` — preciso verificar separadamente se você confirmar que há números errados lá também).
-- Cadastro e edição de lançamentos.
+- Categoria "Procedimentos" com R$ 100, e uma linha Manual com serviço "POSTECTOMIA / FIMOSE" R$ 250 → todos os procedimentos pagam R$ 100, exceto POSTECTOMIA, que paga R$ 250.
+- Linha Manual avulsa (ex.: "Cartão Consulta") continua funcionando como hoje.
