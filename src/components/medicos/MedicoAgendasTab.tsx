@@ -25,23 +25,35 @@ export function MedicoAgendasTab({
   const [procs, setProcs] = useState<Procedimento[]>([]);
   const [vinculos, setVinculos] = useState<Map<string, Set<string>>>(new Map());
   const [nova, setNova] = useState("");
-  const [filtroProc, setFiltroProc] = useState<Map<string, string>>(new Map());
   const [multipla, setMultipla] = useState<boolean>(false);
+  const procedimentoIdsKey = (procedimentoIds ?? []).slice().sort().join("|");
 
   const load = async () => {
-    const [a, p, mp] = await Promise.all([
+    const [a, mp] = await Promise.all([
       supabase.from("medico_agendas").select("id, nome, ativo, ordem").eq("medico_id", medicoId).order("ordem").order("nome"),
-      supabase.from("procedimentos").select("id, nome").eq("clinica_id", clinicaId).eq("ativo", true).order("nome"),
       supabase.from("medico_procedimentos").select("procedimento_id").eq("medico_id", medicoId),
     ]);
     const ags = ((a.data as Agenda[]) ?? []);
     setAgendas(ags);
     setMultipla(ags.length > 1);
-    const allProcs = ((p.data as Procedimento[]) ?? []);
     const idsFromDb = new Set(
       ((mp.data as { procedimento_id: string }[] | null) ?? []).map((x) => x.procedimento_id),
     );
-    setProcs(idsFromDb.size > 0 ? allProcs.filter((x) => idsFromDb.has(x.id)) : allProcs);
+    const idsDoFormulario = new Set(procedimentoIds ?? []);
+    const idsPermitidos = Array.from(new Set([...idsFromDb, ...idsDoFormulario]));
+    if (idsPermitidos.length > 0) {
+      const { data: ps, error: pe } = await supabase
+        .from("procedimentos")
+        .select("id, nome")
+        .eq("clinica_id", clinicaId)
+        .eq("ativo", true)
+        .in("id", idsPermitidos)
+        .order("nome");
+      if (pe) toast.error(pe.message);
+      setProcs(((ps as Procedimento[]) ?? []));
+    } else {
+      setProcs([]);
+    }
     if (ags.length > 0) {
       const { data: vincs } = await supabase
         .from("medico_agenda_procedimentos")
@@ -58,7 +70,7 @@ export function MedicoAgendasTab({
     }
   };
 
-  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [medicoId, clinicaId]);
+  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [medicoId, clinicaId, procedimentoIdsKey]);
 
   const criar = async () => {
     const nome = nova.trim();
@@ -123,11 +135,9 @@ export function MedicoAgendasTab({
     void load();
   };
 
-  // `procs` is already filtered to services tied to this doctor via medico_procedimentos.
-  // We still merge with `procedimentoIds` from the form so newly-added (unsaved) services also appear.
-  const idsExtras = new Set(procedimentoIds ?? []);
+  // `procs` is already filtered to services tied to this doctor via medico_procedimentos
+  // plus current unsaved services from the Especialidades tab.
   const procsDoMedico = procs;
-  void idsExtras;
 
   return (
     <div className="space-y-4">
@@ -162,10 +172,7 @@ export function MedicoAgendasTab({
         <>
           {agendas.map((a) => {
             const vincSet = vinculos.get(a.id) ?? new Set<string>();
-            const filtro = filtroProc.get(a.id) ?? "";
-            const procsFiltrados = procsDoMedico.filter(
-              (p) => !filtro || p.nome.toLowerCase().includes(filtro.toLowerCase()),
-            );
+            const procsFiltrados = procsDoMedico;
             return (
               <Card key={a.id}>
                 <CardContent className="py-4 space-y-3">
@@ -198,13 +205,13 @@ export function MedicoAgendasTab({
                   </div>
                   <div className="max-h-72 overflow-auto border rounded-md p-2 grid grid-cols-1 sm:grid-cols-2 gap-1">
                     {procsFiltrados.map((p) => (
-                      <label key={p.id} className="flex items-center gap-2 text-sm py-1">
+                      <div key={p.id} className="flex items-center gap-2 text-sm py-1">
                         <Checkbox
                           checked={vincSet.has(p.id)}
                           onCheckedChange={(v) => void toggleProc(a.id, p.id, !!v)}
                         />
                         <span className="uppercase">{p.nome}</span>
-                      </label>
+                      </div>
                     ))}
                     {procsFiltrados.length === 0 && (
                       <p className="text-xs text-muted-foreground col-span-full text-center py-3">
