@@ -469,7 +469,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
     setSaving(true);
     const nomeLimpo = limparPrefixoMedico(form.nome);
     const payload = {
-      clinica_id: clinicaId,
+      clinica_id: activeClinicaId,
       nome: nomeLimpo,
       crm: form.crm,
       crm_uf: form.crm_uf.toUpperCase(),
@@ -624,7 +624,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       try {
         await cadastrarUsuarioFn({
           data: {
-            clinicaId,
+            clinicaId: activeClinicaId,
             email: form.email,
             password: form.senhaUsuario,
             nome: nomeLimpo,
@@ -1123,7 +1123,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
               <TabsContent value="agendas" className="space-y-4 pt-4 pb-16">
                 {editingMedicoId && (
                   <MedicoAgendasTab
-                    clinicaId={clinicaId}
+                    clinicaId={activeClinicaId}
                     medicoId={editingMedicoId}
                     procedimentoIds={Array.from(
                       new Set(
