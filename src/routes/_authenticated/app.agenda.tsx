@@ -1341,6 +1341,24 @@ function AgendaPage() {
   };
 
   const [pagamentoValor, setPagamentoValor] = useState("");
+  // Paciente "copiado" via menu Opções para colar no próximo slot livre clicado
+  const [pacienteCopia, setPacienteCopia] = useState<{ id: string; nome: string } | null>(null);
+
+  const copiarPacienteSelecionado = () => {
+    if (selecionados.size !== 1) {
+      toast.error("Selecione apenas 1 agendamento do paciente para copiar.");
+      return;
+    }
+    const id = Array.from(selecionados)[0];
+    const ag = items.find((x) => x.id === id);
+    if (!ag || isSlotLivre(ag.paciente_nome) || !ag.paciente_id) {
+      toast.error("O agendamento selecionado não possui paciente cadastrado.");
+      return;
+    }
+    setPacienteCopia({ id: ag.paciente_id, nome: ag.paciente_nome });
+    setSelecionados(new Set());
+    toast.success(`Paciente copiado: ${ag.paciente_nome}. Clique em um horário livre para agendar.`);
+  };
 
   const openNew = () => {
     setEditing(null);
