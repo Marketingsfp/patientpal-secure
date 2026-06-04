@@ -427,7 +427,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       });
       if (med.user_id) {
         try {
-          const res = await getLoginFn({ data: { clinicaId, userId: med.user_id } });
+          const res = await getLoginFn({ data: { clinicaId: med.clinica_id ?? clinicaId, userId: med.user_id } });
           setExistingEmail((res as { email?: string | null })?.email ?? null);
         } catch { setExistingEmail(null); }
       } else {
@@ -446,7 +446,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
     if (novaSenha !== confirmarSenha) { toast.error("As senhas não conferem"); return; }
     setSavingSenha(true);
     try {
-      await definirSenhaFn({ data: { clinicaId, userId: medicoUserId, novaSenha } });
+      await definirSenhaFn({ data: { clinicaId: activeClinicaId, userId: medicoUserId, novaSenha } });
       toast.success("Senha atualizada");
       setShowSenha(false);
       setNovaSenha("");
