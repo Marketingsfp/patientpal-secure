@@ -120,7 +120,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     medicoIdEfetivo
       ? supabase
           .from("medicos")
-          .select("nome, especialidade:especialidades(nome)")
+          .select("nome, especialidade:especialidades!medicos_especialidade_id_fkey(nome)")
           .eq("id", medicoIdEfetivo)
           .maybeSingle()
       : Promise.resolve({ data: null }),
@@ -481,7 +481,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     medicoIds.length > 0
       ? supabase
           .from("medicos")
-          .select("id, nome, especialidade:especialidades(nome)")
+          .select("id, nome, especialidade:especialidades!medicos_especialidade_id_fkey(nome)")
           .in("id", medicoIds)
       : Promise.resolve({ data: [] as Array<{ id: string; nome: string; especialidade: { nome: string } | null }> }),
     medicoIds.length > 0
