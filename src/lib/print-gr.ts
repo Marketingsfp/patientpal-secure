@@ -116,7 +116,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     a.procedimento
       ? supabase
           .from("procedimentos")
-          .select("nome, valor_dinheiro_pix, valor_cartao")
+          .select("nome, valor_dinheiro_pix, valor_cartao, tipo")
           .eq("clinica_id", clinicaId)
           .ilike("nome", a.procedimento)
           .maybeSingle()
@@ -135,7 +135,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
       medicoData = { tipo_repasse: s.tipo_repasse ?? null, percentual_repasse_padrao: s.percentual_repasse_padrao ?? null, valor_repasse_padrao: s.valor_repasse_padrao ?? null };
     } catch { medicoData = null; }
   }
-  const procData = proc.data as { nome: string; valor_dinheiro_pix: number | null; valor_cartao: number | null } | null;
+  const procData = proc.data as { nome: string; valor_dinheiro_pix: number | null; valor_cartao: number | null; tipo: string | null } | null;
 
   // Se já temos pagamento informado, usa ele; senão tenta tabela de procedimentos
   const valor = pagamento ? Number(pagamento.valor) : Number(procData?.valor_dinheiro_pix ?? 0);
@@ -163,7 +163,11 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
       .eq("medico_id", a.medico_id)
       .eq("ativo", true);
     const alvo = norm(procNomeBase);
-    const conv = (convs ?? []).find((c) => norm(c.nome) === alvo);
+    let conv = (convs ?? []).find((c) => norm(c.nome) === alvo);
+    if (!conv && procData?.tipo) {
+      const sentinel = `__CAT__:${String(procData.tipo).toUpperCase()}`;
+      conv = (convs ?? []).find((c) => c.nome === sentinel);
+    }
     if (conv) {
       if (conv.tipo_repasse === "valor" && conv.valor != null) {
         prestador = Number(conv.valor);
