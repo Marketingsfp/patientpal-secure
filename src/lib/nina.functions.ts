@@ -45,10 +45,10 @@ export const getContextoClinica = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     await assertMembership(supabase, userId, data.clinicaId);
-    const [medR, dispR, procR] = await Promise.all([
+    const [medR, dispR, procR, meR, espAllR] = await Promise.all([
       supabase
         .from("medicos")
-        .select("id, nome, crm, crm_uf, telefone, email, especialidade_id")
+        .select("id, nome, crm, crm_uf, telefone, email")
         .eq("clinica_id", data.clinicaId)
         .eq("ativo", true)
         .order("nome"),
@@ -65,10 +65,27 @@ export const getContextoClinica = createServerFn({ method: "POST" })
         .eq("clinica_id", data.clinicaId)
         .eq("ativo", true)
         .order("nome"),
+      supabase
+        .from("medico_especialidades")
+        .select("medico_id, especialidade_id"),
+      supabase
+        .from("especialidades")
+        .select("id, nome"),
     ]);
 
+    const espNome = new Map<string, string>();
+    for (const e of espAllR.data ?? []) espNome.set(e.id, e.nome);
+    const medEsp = new Map<string, string[]>();
+    for (const r of meR.data ?? []) {
+      const nome = espNome.get(r.especialidade_id);
+      if (!nome) continue;
+      const arr = medEsp.get(r.medico_id) ?? [];
+      arr.push(nome);
+      medEsp.set(r.medico_id, arr);
+    }
     const medicos = (medR.data ?? []).map((m) => ({
       ...m,
+      especialidades: medEsp.get(m.id) ?? [],
       horarios: (dispR.data ?? [])
         .filter((d) => d.medico_id === m.id)
         .map((d) => ({
