@@ -191,10 +191,10 @@ export const chatNina = createServerFn({ method: "POST" })
     await assertMembership(supabase, userId, data.clinicaId);
     const inicioDia = new Date(); inicioDia.setHours(0, 0, 0, 0);
     const fimDia = new Date(); fimDia.setHours(23, 59, 59, 999);
-    const [medR, dispR, procR, espR, planR, cliR, agR] = await Promise.all([
+    const [medR, dispR, procR, espR, planR, cliR, agR, meR] = await Promise.all([
       supabase
         .from("medicos")
-        .select("id, nome, crm, crm_uf, especialidade_id")
+        .select("id, nome, crm, crm_uf")
         .eq("clinica_id", data.clinicaId)
         .eq("ativo", true),
       supabase
@@ -227,16 +227,28 @@ export const chatNina = createServerFn({ method: "POST" })
         .eq("clinica_id", data.clinicaId)
         .gte("inicio", inicioDia.toISOString())
         .lte("inicio", fimDia.toISOString()),
+      supabase
+        .from("medico_especialidades")
+        .select("medico_id, especialidade_id"),
     ]);
 
     const espMap = new Map<string, string>();
     for (const e of espR.data ?? []) espMap.set(e.id, e.nome);
 
+    const medEsp = new Map<string, string[]>();
+    for (const r of meR.data ?? []) {
+      const nome = espMap.get(r.especialidade_id);
+      if (!nome) continue;
+      const arr = medEsp.get(r.medico_id) ?? [];
+      arr.push(nome);
+      medEsp.set(r.medico_id, arr);
+    }
+
     const medicos = (medR.data ?? []).map((m) => ({
       nome: m.nome,
       crm: m.crm,
       crm_uf: m.crm_uf,
-      especialidade: m.especialidade_id ? espMap.get(m.especialidade_id) ?? null : null,
+      especialidades: medEsp.get(m.id) ?? [],
       horarios: (dispR.data ?? [])
         .filter((d) => d.medico_id === m.id)
         .map((d) => ({
