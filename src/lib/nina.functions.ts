@@ -129,7 +129,7 @@ function montarContextoTexto(ctx: {
     nome: string;
     crm: string;
     crm_uf: string;
-    especialidade?: string | null;
+    especialidades?: string[];
     horarios: Array<{ dia: string; inicio: string; fim: string; obs: string | null }>;
   }>;
   procedimentos: Array<{ nome: string; valor_dinheiro_pix: number; valor_cartao: number; grupo: string | null; preparo?: string | null }>;
@@ -144,7 +144,8 @@ function montarContextoTexto(ctx: {
         m.horarios.length > 0
           ? m.horarios.map((h) => `${h.dia} ${h.inicio}-${h.fim}`).join("; ")
           : "(sem horários cadastrados)";
-      return `- ${m.nome} (CRM ${m.crm}/${m.crm_uf}${m.especialidade ? `, ${m.especialidade}` : ""}): ${horarios}`;
+      const esps = (m.especialidades ?? []).filter(Boolean).join(", ");
+      return `- ${m.nome} (CRM ${m.crm}/${m.crm_uf}${esps ? `, ${esps}` : ""}): ${horarios}`;
     })
     .join("\n");
 
