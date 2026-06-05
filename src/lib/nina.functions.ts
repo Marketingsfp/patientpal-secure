@@ -45,10 +45,10 @@ export const getContextoClinica = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     await assertMembership(supabase, userId, data.clinicaId);
-    const [medR, dispR, procR] = await Promise.all([
+    const [medR, dispR, procR, meR, espAllR] = await Promise.all([
       supabase
         .from("medicos")
-        .select("id, nome, crm, crm_uf, telefone, email, especialidade_id")
+        .select("id, nome, crm, crm_uf, telefone, email")
         .eq("clinica_id", data.clinicaId)
         .eq("ativo", true)
         .order("nome"),
@@ -65,10 +65,27 @@ export const getContextoClinica = createServerFn({ method: "POST" })
         .eq("clinica_id", data.clinicaId)
         .eq("ativo", true)
         .order("nome"),
+      supabase
+        .from("medico_especialidades")
+        .select("medico_id, especialidade_id"),
+      supabase
+        .from("especialidades")
+        .select("id, nome"),
     ]);
 
+    const espNome = new Map<string, string>();
+    for (const e of espAllR.data ?? []) espNome.set(e.id, e.nome);
+    const medEsp = new Map<string, string[]>();
+    for (const r of meR.data ?? []) {
+      const nome = espNome.get(r.especialidade_id);
+      if (!nome) continue;
+      const arr = medEsp.get(r.medico_id) ?? [];
+      arr.push(nome);
+      medEsp.set(r.medico_id, arr);
+    }
     const medicos = (medR.data ?? []).map((m) => ({
       ...m,
+      especialidades: medEsp.get(m.id) ?? [],
       horarios: (dispR.data ?? [])
         .filter((d) => d.medico_id === m.id)
         .map((d) => ({
@@ -112,7 +129,7 @@ function montarContextoTexto(ctx: {
     nome: string;
     crm: string;
     crm_uf: string;
-    especialidade?: string | null;
+    especialidades?: string[];
     horarios: Array<{ dia: string; inicio: string; fim: string; obs: string | null }>;
   }>;
   procedimentos: Array<{ nome: string; valor_dinheiro_pix: number; valor_cartao: number; grupo: string | null; preparo?: string | null }>;
@@ -127,7 +144,8 @@ function montarContextoTexto(ctx: {
         m.horarios.length > 0
           ? m.horarios.map((h) => `${h.dia} ${h.inicio}-${h.fim}`).join("; ")
           : "(sem horários cadastrados)";
-      return `- ${m.nome} (CRM ${m.crm}/${m.crm_uf}${m.especialidade ? `, ${m.especialidade}` : ""}): ${horarios}`;
+      const esps = (m.especialidades ?? []).filter(Boolean).join(", ");
+      return `- ${m.nome} (CRM ${m.crm}/${m.crm_uf}${esps ? `, ${esps}` : ""}): ${horarios}`;
     })
     .join("\n");
 
@@ -173,10 +191,10 @@ export const chatNina = createServerFn({ method: "POST" })
     await assertMembership(supabase, userId, data.clinicaId);
     const inicioDia = new Date(); inicioDia.setHours(0, 0, 0, 0);
     const fimDia = new Date(); fimDia.setHours(23, 59, 59, 999);
-    const [medR, dispR, procR, espR, planR, cliR, agR] = await Promise.all([
+    const [medR, dispR, procR, espR, planR, cliR, agR, meR] = await Promise.all([
       supabase
         .from("medicos")
-        .select("id, nome, crm, crm_uf, especialidade_id")
+        .select("id, nome, crm, crm_uf")
         .eq("clinica_id", data.clinicaId)
         .eq("ativo", true),
       supabase
@@ -209,16 +227,28 @@ export const chatNina = createServerFn({ method: "POST" })
         .eq("clinica_id", data.clinicaId)
         .gte("inicio", inicioDia.toISOString())
         .lte("inicio", fimDia.toISOString()),
+      supabase
+        .from("medico_especialidades")
+        .select("medico_id, especialidade_id"),
     ]);
 
     const espMap = new Map<string, string>();
     for (const e of espR.data ?? []) espMap.set(e.id, e.nome);
 
+    const medEsp = new Map<string, string[]>();
+    for (const r of meR.data ?? []) {
+      const nome = espMap.get(r.especialidade_id);
+      if (!nome) continue;
+      const arr = medEsp.get(r.medico_id) ?? [];
+      arr.push(nome);
+      medEsp.set(r.medico_id, arr);
+    }
+
     const medicos = (medR.data ?? []).map((m) => ({
       nome: m.nome,
       crm: m.crm,
       crm_uf: m.crm_uf,
-      especialidade: m.especialidade_id ? espMap.get(m.especialidade_id) ?? null : null,
+      especialidades: medEsp.get(m.id) ?? [],
       horarios: (dispR.data ?? [])
         .filter((d) => d.medico_id === m.id)
         .map((d) => ({
