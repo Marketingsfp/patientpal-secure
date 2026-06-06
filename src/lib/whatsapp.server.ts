@@ -185,10 +185,31 @@ export async function gerarRespostaNina(clinicaId: string, mensagemPaciente: str
 
   const medicos = (medR.data ?? [])
     .map((m: any) => {
-      const horarios = (dispR.data ?? [])
-        .filter((d: any) => d.medico_id === m.id)
-        .map((d: any) => `${DIAS[d.dia_semana] ?? "?"} ${d.hora_inicio?.slice(0, 5)}-${d.hora_fim?.slice(0, 5)}`)
-        .join(", ");
+      // Agrupa por dia e mescla turnos sobrepostos/contíguos
+      const porDia = new Map<number, Array<[string, string]>>();
+      for (const d of (dispR.data ?? []).filter((d: any) => d.medico_id === m.id)) {
+        const ini = String(d.hora_inicio ?? "").slice(0, 5);
+        const fim = String(d.hora_fim ?? "").slice(0, 5);
+        if (!ini || !fim) continue;
+        const arr = porDia.get(d.dia_semana) ?? [];
+        arr.push([ini, fim]);
+        porDia.set(d.dia_semana, arr);
+      }
+      const partes: string[] = [];
+      for (const [dia, turnos] of [...porDia.entries()].sort((a, b) => a[0] - b[0])) {
+        turnos.sort((a, b) => a[0].localeCompare(b[0]));
+        const merged: Array<[string, string]> = [];
+        for (const [ini, fim] of turnos) {
+          const last = merged[merged.length - 1];
+          if (last && ini <= last[1]) {
+            if (fim > last[1]) last[1] = fim;
+          } else {
+            merged.push([ini, fim]);
+          }
+        }
+        partes.push(`${DIAS[dia] ?? "?"} ${merged.map(([a, b]) => `${a}-${b}`).join(" e ")}`);
+      }
+      const horarios = partes.join(", ");
       return `- ${m.nome}${horarios ? ` | ${horarios}` : ""}`;
     })
     .join("\n");
