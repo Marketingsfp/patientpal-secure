@@ -168,7 +168,7 @@ export async function gerarRespostaNina(clinicaId: string, mensagemPaciente: str
   const [medR, dispR, procR] = await Promise.all([
     supabaseAdmin
       .from("medicos")
-      .select("id, nome, crm, crm_uf")
+      .select("id, nome")
       .eq("clinica_id", clinicaId)
       .eq("ativo", true),
     supabaseAdmin
@@ -201,6 +201,8 @@ export async function gerarRespostaNina(clinicaId: string, mensagemPaciente: str
     .join("\n");
 
   const systemPrompt = `Você é a Nina, assistente virtual da clínica respondendo a PACIENTES via WhatsApp. Responda em português do Brasil, de forma curta (no máximo 4 frases), direta, cordial e acolhedora com TODOS.
+
+NUNCA mencione, cite ou inclua o CRM dos médicos nas respostas. Use apenas o nome do médico.
 
 SUA FUNÇÃO COM PACIENTES é EXCLUSIVAMENTE:
 - Informar livremente sobre TODOS os médicos da clínica: nome, especialidades, horários e dias de atendimento.
