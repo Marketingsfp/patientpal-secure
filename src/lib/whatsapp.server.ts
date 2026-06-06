@@ -189,7 +189,7 @@ export async function gerarRespostaNina(clinicaId: string, mensagemPaciente: str
         .filter((d: any) => d.medico_id === m.id)
         .map((d: any) => `${DIAS[d.dia_semana] ?? "?"} ${d.hora_inicio?.slice(0, 5)}-${d.hora_fim?.slice(0, 5)}`)
         .join(", ");
-      return `- ${m.nome} (CRM ${m.crm}/${m.crm_uf})${horarios ? ` | ${horarios}` : ""}`;
+      return `- ${m.nome}${horarios ? ` | ${horarios}` : ""}`;
     })
     .join("\n");
 

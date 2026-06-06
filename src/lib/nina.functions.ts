@@ -127,8 +127,6 @@ export const getContextoClinica = createServerFn({ method: "POST" })
 function montarContextoTexto(ctx: {
   medicos: Array<{
     nome: string;
-    crm: string;
-    crm_uf: string;
     especialidades?: string[];
     horarios: Array<{ dia: string; inicio: string; fim: string; obs: string | null }>;
   }>;
@@ -145,7 +143,7 @@ function montarContextoTexto(ctx: {
           ? m.horarios.map((h) => `${h.dia} ${h.inicio}-${h.fim}`).join("; ")
           : "(sem horários cadastrados)";
       const esps = (m.especialidades ?? []).filter(Boolean).join(", ");
-      return `- ${m.nome} (CRM ${m.crm}/${m.crm_uf}${esps ? `, ${esps}` : ""}): ${horarios}`;
+      return `- ${m.nome}${esps ? ` (${esps})` : ""}: ${horarios}`;
     })
     .join("\n");
 
