@@ -173,7 +173,7 @@ export async function gerarRespostaNina(clinicaId: string, mensagemPaciente: str
       .eq("ativo", true),
     supabaseAdmin
       .from("medico_disponibilidades")
-      .select("medico_id, dia_semana, hora_inicio, hora_fim, observacoes")
+      .select("medico_id, agenda_id, dia_semana, hora_inicio, hora_fim, observacoes")
       .eq("clinica_id", clinicaId)
       .eq("ativo", true),
     supabaseAdmin
@@ -183,34 +183,77 @@ export async function gerarRespostaNina(clinicaId: string, mensagemPaciente: str
       .eq("ativo", true),
   ]);
 
+  const { data: agendasData } = await supabaseAdmin
+    .from("medico_agendas")
+    .select("id, medico_id, nome, ativo")
+    .eq("clinica_id", clinicaId);
+  const agendaNome = new Map<string, string>();
+  for (const a of (agendasData ?? []) as any[]) agendaNome.set(a.id, a.nome);
+  const agendasPorMedico = new Map<string, number>();
+  for (const a of (agendasData ?? []) as any[]) {
+    if (a.ativo === false) continue;
+    agendasPorMedico.set(a.medico_id, (agendasPorMedico.get(a.medico_id) ?? 0) + 1);
+  }
+
   const medicos = (medR.data ?? [])
     .map((m: any) => {
-      // Agrupa por dia e mescla turnos sobrepostos/contíguos
-      const porDia = new Map<number, Array<[string, string]>>();
-      for (const d of (dispR.data ?? []).filter((d: any) => d.medico_id === m.id)) {
+      const disps = (dispR.data ?? []).filter((d: any) => d.medico_id === m.id);
+      const temMultiplas = (agendasPorMedico.get(m.id) ?? 0) > 1;
+
+      // Agrupa por agenda → dia, mescla turnos sobrepostos/contíguos
+      const porAgenda = new Map<string, Map<number, Array<[string, string]>>>();
+      for (const d of disps) {
         const ini = String(d.hora_inicio ?? "").slice(0, 5);
         const fim = String(d.hora_fim ?? "").slice(0, 5);
         if (!ini || !fim) continue;
+        const ag = d.agenda_id ?? "_";
+        if (!porAgenda.has(ag)) porAgenda.set(ag, new Map());
+        const porDia = porAgenda.get(ag)!;
         const arr = porDia.get(d.dia_semana) ?? [];
         arr.push([ini, fim]);
         porDia.set(d.dia_semana, arr);
       }
-      const partes: string[] = [];
-      for (const [dia, turnos] of [...porDia.entries()].sort((a, b) => a[0] - b[0])) {
-        turnos.sort((a, b) => a[0].localeCompare(b[0]));
-        const merged: Array<[string, string]> = [];
-        for (const [ini, fim] of turnos) {
-          const last = merged[merged.length - 1];
-          if (last && ini <= last[1]) {
-            if (fim > last[1]) last[1] = fim;
-          } else {
-            merged.push([ini, fim]);
+
+      const formatPorDia = (porDia: Map<number, Array<[string, string]>>) => {
+        const partes: string[] = [];
+        for (const [dia, turnos] of [...porDia.entries()].sort((a, b) => a[0] - b[0])) {
+          turnos.sort((a, b) => a[0].localeCompare(b[0]));
+          const merged: Array<[string, string]> = [];
+          for (const [ini, fim] of turnos) {
+            const last = merged[merged.length - 1];
+            if (last && ini <= last[1]) {
+              if (fim > last[1]) last[1] = fim;
+            } else {
+              merged.push([ini, fim]);
+            }
+          }
+          partes.push(`${DIAS[dia] ?? "?"} ${merged.map(([a, b]) => `${a}-${b}`).join(" e ")}`);
+        }
+        return partes.join(", ");
+      };
+
+      if (!temMultiplas) {
+        // Junta tudo num único conjunto
+        const unico = new Map<number, Array<[string, string]>>();
+        for (const porDia of porAgenda.values()) {
+          for (const [dia, turnos] of porDia.entries()) {
+            const arr = unico.get(dia) ?? [];
+            arr.push(...turnos);
+            unico.set(dia, arr);
           }
         }
-        partes.push(`${DIAS[dia] ?? "?"} ${merged.map(([a, b]) => `${a}-${b}`).join(" e ")}`);
+        const horarios = formatPorDia(unico);
+        return `- ${m.nome}${horarios ? ` | ${horarios}` : ""}`;
       }
-      const horarios = partes.join(", ");
-      return `- ${m.nome}${horarios ? ` | ${horarios}` : ""}`;
+
+      // Mostra separado por agenda
+      const blocos: string[] = [];
+      for (const [ag, porDia] of porAgenda.entries()) {
+        const nome = agendaNome.get(ag) ?? "Agenda";
+        const horarios = formatPorDia(porDia);
+        if (horarios) blocos.push(`    • ${nome}: ${horarios}`);
+      }
+      return `- ${m.nome}${blocos.length ? `\n${blocos.join("\n")}` : ""}`;
     })
     .join("\n");
 
