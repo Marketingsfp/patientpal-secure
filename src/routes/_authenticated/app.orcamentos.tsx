@@ -56,15 +56,6 @@ type Item = {
   valores_formas?: Record<string, number> | null;
 };
 
-type PacienteOpt = {
-  id: string;
-  nome: string;
-  cpf: string | null;
-  numero_pasta: number | null;
-  data_nascimento: string | null;
-  telefone: string | null;
-};
-
 type MedicoOpt = {
   id: string;
   nome: string;
