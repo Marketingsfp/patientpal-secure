@@ -1,53 +1,66 @@
-## Recomendação
+## Objetivo
 
-Adotar o **modelo híbrido**: cada médico tem N **agendas nomeadas** (ex.: "Consultas", "Exames", "USG"), e cada agenda pode ter procedimentos vinculados opcionalmente. Ao escolher um procedimento ao marcar, o sistema sugere automaticamente a agenda compatível — sem travar o usuário. É o mais simples para o caso "agenda de consulta + agenda de exames" e flexível o bastante para o caso "agenda por serviço".
+Permitir que um orçamento composto **apenas por procedimentos do tipo "Laboratório"** seja agendado de uma só vez, ocupando apenas **uma ficha** na agenda — em vez de marcar o paciente em vários horários, um por exame.
 
-Permitir sobreposição entre agendas do mesmo médico (já decidido). Visualização única: **dropdown "Agenda"** ao lado do filtro de médico na tela de agenda.
+## Banco
 
-## O que muda
+Migração (uma transação):
 
-### 1. Banco
+- `agendamentos.orcamento_id uuid NULL REFERENCES public.orcamentos(id) ON DELETE SET NULL`
+- Índice em `agendamentos(orcamento_id)`.
+- Nenhuma mudança em RLS (a coluna herda as policies da tabela).
 
-Nova tabela `medico_agendas`:
-- `medico_id`, `clinica_id`, `nome` (ex.: "Consultas", "Exames"), `cor`, `ativo`, `ordem`
-- Para cada médico, criar 1 agenda padrão "Consultas" na migração (back-fill).
+Sem alteração em `orcamentos` — o vínculo é 1 orçamento → N agendamentos (caso o paciente refaça), porém na prática 1↔1.
 
-Nova tabela `medico_agenda_procedimentos` (N:N opcional):
-- `agenda_id`, `procedimento_id`
-- Se um procedimento estiver vinculado a uma agenda, marcar nessa agenda passa a ser a sugestão padrão.
+## UI — Diálogo "Marcar paciente" (`app.agenda`)
 
-Alterações:
-- `medico_disponibilidades.agenda_id` (uuid, FK → `medico_agendas`, NOT NULL após back-fill apontando para a agenda padrão).
-- `agendamentos.agenda_id` (uuid, FK, nullable; back-fill para a agenda padrão do médico).
-- Remover a regra de "1 agenda por médico no mesmo horário" — sobreposição permitida.
+Acima dos campos atuais, novo campo opcional **"Nº do orçamento"**:
 
-### 2. Cadastro de médico
-- Aba/seção "Agendas" no perfil do médico (CRUD simples: nome, cor, ativo).
-- Cada agenda lista os procedimentos vinculados (multi-select de `procedimentos`).
+1. Input numérico + botão "Buscar".
+2. Ao buscar, server fn `getOrcamentoParaAgendar({ numero })` retorna:
+   - dados do orçamento (paciente, total, status);
+   - itens com `procedimento_id`, nome e `tipo`;
+   - validação: **todos** os itens precisam ter `tipo` = "LABORATÓRIO" (case/acento-insensitive). Se algum item não for laboratório → erro "Este fluxo é válido apenas para orçamentos 100% de laboratório."
+   - bloqueia se status do orçamento for `cancelado` ou se já existir agendamento ativo vinculado.
+3. Quando válido:
+   - Preenche automaticamente **paciente** (read-only, com aviso de que veio do orçamento).
+   - Preenche **procedimento** com texto consolidado: `"Laboratório (N exames): EX1, EX2, …"` (sem somar duração — usa o tempo padrão de uma ficha, como o usuário pediu).
+   - Exibe lista compacta dos exames inclusos (apenas leitura, informativa).
+   - Mantém a ficha única já selecionada na grade.
+4. Ao salvar, grava `agendamentos.orcamento_id = <id>` além dos campos normais.
 
-### 3. Tela "Horários médicos" (`app.disponibilidades`)
-- Acima da tabela de disponibilidades, seletor **Agenda** (default: primeira ativa).
-- Tabela e formulário passam a operar sempre dentro da agenda selecionada.
-- Botão "Nova agenda" abre dialog para criar mais agendas do médico.
+Botão "Limpar orçamento" volta o diálogo ao modo manual.
 
-### 4. Tela "Agenda" (`app.agenda`)
-- Novo filtro **Agenda** ao lado do filtro de médico, condicional (só aparece quando o médico tem >1 agenda).
-- Os slots disponíveis passam a vir das disponibilidades da agenda selecionada.
-- Ao marcar: se o procedimento escolhido tem vínculo com uma agenda, pré-seleciona essa agenda; caso contrário, usa a agenda atualmente filtrada (ou a padrão).
+## Visualização na agenda
 
-### 5. Outras telas
-- Perfil do médico, relatórios e financeiro continuam funcionando sem alteração (campo `agenda_id` é opcional para leitura). Onde fizer sentido (relatório de produção, perfil do médico), exibir a agenda como coluna/badge extra.
+- Na ficha agendada, exibir um badge pequeno **"ORÇ #00123"** ao lado do nome do paciente quando `orcamento_id` estiver presente.
+- Tooltip lista os exames do orçamento.
+- No popover/edição da ficha, link "Ver orçamento" abre a tela de orçamentos filtrada por aquele número (rota existente).
 
-## Detalhes técnicos
+## Pagamento
 
-- Migração em uma única transação: cria tabelas → GRANTs (`authenticated`, `service_role`) → RLS (mesmas policies de `medico_disponibilidades`: `is_member` para SELECT, `can_manage_clinica` para INSERT/UPDATE/DELETE) → back-fill da agenda padrão por médico → adiciona `agenda_id` em `medico_disponibilidades` (NOT NULL após back-fill) e em `agendamentos` (nullable).
-- Slot computation: hoje a lógica usa `medico_disponibilidades` filtrada por `medico_id`; passa a filtrar adicionalmente por `agenda_id`.
-- Conflitos: a checagem atual de sobreposição (se existir) por médico deve passar a ser por `(medico_id, agenda_id)`. Entre agendas diferentes do mesmo médico, sobreposição é permitida.
-- Nenhuma mudança em `procedimentos`, `medico_servicos` ou nas regras de repasse.
+Mantém-se **separado**, conforme escolhido. Nada muda no caixa/recepção — o orçamento continua sendo quitado pelo fluxo atual de orçamentos. O vínculo serve só para:
 
-## Fora do escopo (não vou mexer agora)
-- Visualização "colunas lado a lado por agenda".
-- Bloqueio inteligente de sobreposição com aviso.
-- Migração automática dos exames já cadastrados para uma agenda separada — isso pode ser feito depois, agenda por agenda, na UI.
+- rastrear que aquele atendimento veio do orçamento X;
+- evitar marcar o paciente em vários horários;
+- referência cruzada em relatórios futuros (fora deste escopo).
 
-Posso seguir e implementar?
+## Server functions novas (em `src/lib/agenda.functions.ts` ou `orcamentos.functions.ts`)
+
+- `getOrcamentoParaAgendar({ numero, clinicaId })` — valida tipo laboratório de todos os itens, retorna DTO leve.
+- Atualização da função de criar agendamento existente para aceitar `orcamento_id` opcional.
+
+## Tipos / código
+
+- `routeTree.gen.ts` regenera sozinho.
+- Sem mudanças em RLS, sem mudanças em `medico_agendas` / disponibilidades.
+- Detecção do tipo "Laboratório" usa o campo `procedimentos.tipo` (string já existente, comparada via `strip_accents`+`upper`).
+
+## Fora do escopo
+
+- Não cria ficha de tempo proporcional à quantidade de exames (usa 1 ficha padrão).
+- Não muda fluxo de pagamento.
+- Não trata orçamentos mistos (laboratório + outros) — exibe erro e instrui o usuário a desmembrar.
+- Sem alterações em WhatsApp / impressão de comprovante (pode ser feito depois).
+
+Posso seguir?
