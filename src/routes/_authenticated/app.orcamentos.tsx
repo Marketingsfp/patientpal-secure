@@ -414,6 +414,7 @@ function NovoOrcamentoDialog({
   })();
 
   const salvar = async () => {
+    if (!categoria) return toast.error("Selecione o tipo do orçamento");
     if (!pacienteNome.trim()) return toast.error("Informe o nome do paciente");
     if (itens.length === 0) return toast.error("Adicione ao menos um serviço");
     if (formasPagamento.length === 0) return toast.error("Selecione ao menos uma forma de pagamento");
@@ -426,6 +427,7 @@ function NovoOrcamentoDialog({
       .insert({
         clinica_id: clinicaId,
         numero: 0,
+        categoria,
         paciente_nome: pacienteNome.trim(),
         paciente_telefone: pacienteTelefone.trim() || null,
         medico_nome: medicoNome.trim() || null,
