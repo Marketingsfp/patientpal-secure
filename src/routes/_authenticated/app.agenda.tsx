@@ -365,6 +365,9 @@ const EMPTY = {
   inicio: "", fim: "", procedimento: "",
   status: "agendado" as Status, observacoes: "",
   data_pagamento: "",
+  orcamento_id: "",
+  orcamento_numero: "",
+  orcamento_itens: [] as string[],
 };
 
 function AgendaPage() {
