@@ -221,6 +221,7 @@ function NovoOrcamentoDialog({
   const [pacienteNome, setPacienteNome] = useState("");
   const [pacienteTelefone, setPacienteTelefone] = useState("");
   const [medicoNome, setMedicoNome] = useState("");
+  const [categoria, setCategoria] = useState<"laboratorio" | "demais" | null>(null);
   const [pacienteId, setPacienteId] = useState<string>("");
   const [pacienteSelecionado, setPacienteSelecionado] = useState<PatientOption | null>(null);
   const [medicoId, setMedicoId] = useState<string>("");
