@@ -466,8 +466,54 @@ function NovoOrcamentoDialog({
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-3xl max-h-[95vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Novo orçamento</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>
+            Novo orçamento
+            {categoria && (
+              <span className="ml-2 text-xs font-normal text-muted-foreground">
+                · {categoria === "laboratorio" ? "Laboratório" : "Demais Serviços"}
+                <button
+                  type="button"
+                  onClick={() => setCategoria(null)}
+                  className="ml-2 text-primary hover:underline"
+                >alterar</button>
+              </span>
+            )}
+          </DialogTitle>
+        </DialogHeader>
 
+        {!categoria ? (
+          <div className="py-8 space-y-4">
+            <p className="text-center text-sm text-muted-foreground">
+              Qual o tipo deste orçamento? Isso facilita o vínculo com a agenda.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setCategoria("laboratorio")}
+                className="rounded-lg border-2 border-border hover:border-primary hover:bg-primary/5 p-6 text-left transition"
+              >
+                <div className="text-lg font-semibold">🧪 Laboratório</div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Exames de laboratório (1 ficha única na agenda, mesmo com vários exames).
+                </p>
+              </button>
+              <button
+                type="button"
+                onClick={() => setCategoria("demais")}
+                className="rounded-lg border-2 border-border hover:border-primary hover:bg-primary/5 p-6 text-left transition"
+              >
+                <div className="text-lg font-semibold">🩺 Demais Serviços</div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Consultas, procedimentos, exames de imagem e demais serviços.
+                </p>
+              </button>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={onClose}>Cancelar</Button>
+            </DialogFooter>
+          </div>
+        ) : (
         <div className="space-y-4">
           <div className="space-y-1">
             <Label>Buscar paciente cadastrado</Label>
@@ -660,11 +706,14 @@ function NovoOrcamentoDialog({
             </div>
           </div>
         </div>
+        )}
 
-        <DialogFooter className="sticky bottom-0 bg-background border-t -mx-6 -mb-6 px-6 py-5 z-10">
-          <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
-          <Button onClick={salvar} disabled={saving} className="gap-2"><Printer className="h-4 w-4" /> Salvar e imprimir</Button>
-        </DialogFooter>
+        {categoria && (
+          <DialogFooter className="sticky bottom-0 bg-background border-t -mx-6 -mb-6 px-6 py-5 z-10">
+            <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
+            <Button onClick={salvar} disabled={saving} className="gap-2"><Printer className="h-4 w-4" /> Salvar e imprimir</Button>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );
