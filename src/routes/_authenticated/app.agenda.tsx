@@ -1452,13 +1452,32 @@ function AgendaPage() {
       }
       const nomes = its.map(i => i.descricao);
       const procStr = `LABORATÓRIO (${nomes.length} EXAMES): ${nomes.join(", ")}`;
+      // Resolve paciente: se o orçamento não tiver paciente_id, tenta achar
+      // por nome/cpf na clínica para preencher automaticamente (e mantém
+      // o campo editável caso o usuário queira trocar).
+      let pacId: string | null = orc.paciente_id ?? null;
+      let pacNome: string | null = orc.paciente_nome ?? null;
+      if (!pacId && pacNome) {
+        const nomeNorm = pacNome.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+        const { data: pac } = await supabase
+          .from("pacientes")
+          .select("id, nome")
+          .eq("clinica_id", clinicaAtual.clinica_id)
+          .eq("ativo", true)
+          .ilike("nome", nomeNorm)
+          .limit(2);
+        if (pac && pac.length === 1) {
+          pacId = pac[0].id;
+          pacNome = pac[0].nome;
+        }
+      }
       setForm(f => ({
         ...f,
         orcamento_id: orc.id,
         orcamento_numero: String(orc.numero),
         orcamento_itens: nomes,
-        paciente_id: orc.paciente_id ?? f.paciente_id,
-        paciente_nome: orc.paciente_nome ?? f.paciente_nome,
+        paciente_id: pacId ?? f.paciente_id,
+        paciente_nome: pacNome ?? f.paciente_nome,
         procedimento: procStr,
       }));
       toast.success(`Orçamento #${String(orc.numero).padStart(5, "0")} vinculado.`);
@@ -2144,7 +2163,13 @@ function AgendaPage() {
                 <div className="flex gap-2">
                   <div className="flex-1">
                     <PatientSearchInput
-                      value={form.paciente_id ? { id: form.paciente_id, nome: form.paciente_nome, cpf: null, telefone: null, data_nascimento: null, clinica_id: "" } : null}
+                      value={
+                        form.paciente_id
+                          ? { id: form.paciente_id, nome: form.paciente_nome, cpf: null, telefone: null, data_nascimento: null, clinica_id: "" }
+                          : form.paciente_nome
+                            ? { id: "__pendente__", nome: form.paciente_nome, cpf: null, telefone: null, data_nascimento: null, clinica_id: "" }
+                            : null
+                      }
                       onSelect={(p) => {
                         setForm(f => ({
                           ...f,
