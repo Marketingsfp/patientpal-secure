@@ -1400,6 +1400,9 @@ function AgendaPage() {
       status: "agendado",
       observacoes: a.observacoes ?? "",
       data_pagamento: a.data_pagamento ?? "",
+      orcamento_id: "",
+      orcamento_numero: "",
+      orcamento_itens: [],
     });
     if (pacienteCopia) setPacienteCopia(null);
     setOpen(true);
@@ -1418,6 +1421,9 @@ function AgendaPage() {
       status: a.status,
       observacoes: a.observacoes ?? "",
       data_pagamento: a.data_pagamento ?? "",
+      orcamento_id: a.orcamento_id ?? "",
+      orcamento_numero: a.orcamento_numero ? String(a.orcamento_numero) : "",
+      orcamento_itens: [],
     });
     setOpen(true);
   };
