@@ -32,6 +32,7 @@ export type Database = {
           link_teleconsulta: string | null
           medico_id: string | null
           observacoes: string | null
+          orcamento_id: string | null
           paciente_id: string | null
           paciente_nome: string
           prioridade: Database["public"]["Enums"]["agendamento_prioridade"]
@@ -58,6 +59,7 @@ export type Database = {
           link_teleconsulta?: string | null
           medico_id?: string | null
           observacoes?: string | null
+          orcamento_id?: string | null
           paciente_id?: string | null
           paciente_nome: string
           prioridade?: Database["public"]["Enums"]["agendamento_prioridade"]
@@ -84,6 +86,7 @@ export type Database = {
           link_teleconsulta?: string | null
           medico_id?: string | null
           observacoes?: string | null
+          orcamento_id?: string | null
           paciente_id?: string | null
           paciente_nome?: string
           prioridade?: Database["public"]["Enums"]["agendamento_prioridade"]
@@ -113,6 +116,13 @@ export type Database = {
             columns: ["medico_id"]
             isOneToOne: false
             referencedRelation: "medicos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agendamentos_orcamento_id_fkey"
+            columns: ["orcamento_id"]
+            isOneToOne: false
+            referencedRelation: "orcamentos"
             referencedColumns: ["id"]
           },
         ]
