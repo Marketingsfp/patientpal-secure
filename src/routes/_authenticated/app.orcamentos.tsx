@@ -240,6 +240,26 @@ function NovoOrcamentoDialog({
   const [procQuery, setProcQuery] = useState("");
   const [procResults, setProcResults] = useState<Procedimento[]>([]);
   const [searchingProc, setSearchingProc] = useState(false);
+  const [labProcIds, setLabProcIds] = useState<Set<string> | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    (async () => {
+      const { data: esps } = await supabase
+        .from("especialidades")
+        .select("id")
+        .eq("clinica_id", clinicaId)
+        .ilike("nome", "%labor%");
+      const espIds = (esps ?? []).map((e) => e.id);
+      if (espIds.length === 0) { setLabProcIds(new Set()); return; }
+      const { data: pe } = await supabase
+        .from("procedimento_especialidades")
+        .select("procedimento_id")
+        .eq("clinica_id", clinicaId)
+        .in("especialidade_id", espIds);
+      setLabProcIds(new Set((pe ?? []).map((r) => r.procedimento_id as string)));
+    })();
+  }, [open, clinicaId]);
 
   useEffect(() => {
     (async () => {
@@ -291,20 +311,34 @@ function NovoOrcamentoDialog({
   useEffect(() => {
     let cancel = false;
     if (procQuery.trim().length < 2) { setProcResults([]); return; }
+    if (categoria && labProcIds == null) return;
     setSearchingProc(true);
     const t = setTimeout(async () => {
       const norm = procQuery.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-      const { data } = await supabase
+      let q = supabase
         .from("procedimentos")
         .select("id, nome, valor_dinheiro_pix, valor_cartao, valor_dinheiro, valor_pix, valor_cartao_credito, valor_cartao_debito, valor_padrao, preparo")
         .eq("clinica_id", clinicaId)
         .eq("ativo", true)
-        .or(`nome.ilike.%${procQuery}%,nome.ilike.%${norm}%`)
-        .limit(20);
+        .or(`nome.ilike.%${procQuery}%,nome.ilike.%${norm}%`);
+      if (categoria === "laboratorio") {
+        const ids = Array.from(labProcIds ?? []);
+        if (ids.length === 0) {
+          if (!cancel) { setProcResults([]); setSearchingProc(false); }
+          return;
+        }
+        q = q.in("id", ids);
+      } else if (categoria === "demais") {
+        const ids = Array.from(labProcIds ?? []);
+        if (ids.length > 0) {
+          q = q.not("id", "in", `(${ids.join(",")})`);
+        }
+      }
+      const { data } = await q.limit(20);
       if (!cancel) { setProcResults((data ?? []) as Procedimento[]); setSearchingProc(false); }
     }, 250);
     return () => { cancel = true; clearTimeout(t); };
-  }, [procQuery, clinicaId]);
+  }, [procQuery, clinicaId, categoria, labProcIds]);
 
   const valorPorForma = (p: Procedimento, f: string) => {
     if (f === "Dinheiro") return Number(p.valor_dinheiro ?? p.valor_dinheiro_pix ?? p.valor_padrao ?? 0);
