@@ -1414,19 +1414,27 @@ function AgendaPage() {
       const its = (itens ?? []) as { descricao: string; procedimento_id: string | null }[];
       if (its.length === 0) { toast.error("Orçamento sem itens."); return; }
       const procIds = Array.from(new Set(its.map(i => i.procedimento_id).filter((x): x is string => !!x)));
-      let procs: { id: string; grupo: string | null }[] = [];
+      let procs: { id: string; grupo: string | null; tipo: string | null }[] = [];
       if (procIds.length) {
         const { data: pdata, error: e3 } = await supabase
           .from("procedimentos")
-          .select("id, grupo")
+          .select("id, grupo, tipo")
           .in("id", procIds);
         if (e3) { toast.error(e3.message); return; }
-        procs = (pdata ?? []) as { id: string; grupo: string | null }[];
+        procs = (pdata ?? []) as { id: string; grupo: string | null; tipo: string | null }[];
       }
-      const normGrupo = (g: string | null | undefined) =>
+      const norm = (g: string | null | undefined) =>
         (g ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
-      const grupoPorId = new Map(procs.map(p => [p.id, normGrupo(p.grupo)]));
-      const todosLab = its.every(i => i.procedimento_id && grupoPorId.get(i.procedimento_id) === "LABORATORIO");
+      const procPorId = new Map(procs.map(p => [p.id, p]));
+      const isLab = (pid: string | null) => {
+        if (!pid) return false;
+        const p = procPorId.get(pid);
+        if (!p) return false;
+        const g = norm(p.grupo);
+        const t = norm(p.tipo);
+        return g === "LABORATORIO" || t === "EXAME" || t === "LABORATORIO";
+      };
+      const todosLab = its.every(i => isLab(i.procedimento_id));
       if (!todosLab) {
         toast.error("Este fluxo é válido apenas para orçamentos 100% de laboratório.");
         return;
