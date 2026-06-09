@@ -32,6 +32,7 @@ type Orc = {
   valores_pagamento: Record<string, number> | null;
   status: string;
   created_at: string;
+  categoria: "laboratorio" | "demais" | null;
 };
 
 type Procedimento = {
@@ -79,7 +80,7 @@ function OrcamentosPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from("orcamentos")
-      .select("id, numero, paciente_nome, paciente_telefone, medico_nome, forma_pagamento, valor_total, valores_pagamento, status, created_at")
+      .select("id, numero, paciente_nome, paciente_telefone, medico_nome, forma_pagamento, valor_total, valores_pagamento, status, created_at, categoria")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("created_at", { ascending: false })
       .limit(200);
