@@ -248,7 +248,6 @@ function NovoOrcamentoDialog({
       const { data: esps } = await supabase
         .from("especialidades")
         .select("id")
-        .eq("clinica_id", clinicaId)
         .ilike("nome", "%labor%");
       const espIds = (esps ?? []).map((e) => e.id);
       if (espIds.length === 0) { setLabProcIds(new Set()); return; }
