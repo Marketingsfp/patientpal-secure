@@ -151,7 +151,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   // Se já temos pagamento informado, usa ele; senão tenta tabela de procedimentos
   const valor = pagamento ? Number(pagamento.valor) : Number(procData?.valor_dinheiro_pix ?? 0);
   const procNomeBase = (a.procedimento || procData?.nome || "CONSULTA").toUpperCase();
-  const procNome = espNome ? `${espNome} - ${procNomeBase}` : procNomeBase;
+  const procNome = espNome && !procNomeBase.includes(espNome) ? `${espNome} - ${procNomeBase}` : procNomeBase;
 
   // Ficha = sequência do dia (placeholder simples baseado nos minutos)
   const inicioDt = new Date(a.inicio);
@@ -519,7 +519,8 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     const procNomeBase = (a.procedimento || "CONSULTA").toUpperCase();
     const proc = procByNome.get(normalizar(procNomeBase));
     const espNome = a.medico_id ? (medById.get(a.medico_id)?.especialidadeNome ?? null) : null;
-    const procNome = espNome ? `${espNome.toUpperCase()} - ${procNomeBase}` : procNomeBase;
+    const espUp = espNome ? espNome.toUpperCase() : null;
+    const procNome = espUp && !procNomeBase.includes(espUp) ? `${espUp} - ${procNomeBase}` : procNomeBase;
     // Prioriza valor realmente pago (fin_lancamentos); cai para tabela de procedimentos.
     const valorPago = valorPagoByAg.get(a.id);
     const valor = valorPago != null && valorPago > 0
