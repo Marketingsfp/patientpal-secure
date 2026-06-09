@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 import { printOrcamento } from "@/lib/print-orcamento";
 
 export const Route = createFileRoute("/_authenticated/app/orcamentos")({
