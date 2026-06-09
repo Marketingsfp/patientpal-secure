@@ -155,7 +155,16 @@ function OrcamentosPage() {
               <tr key={o.id} className="border-t hover:bg-muted/30">
                 <td className="px-3 py-2 font-mono">#{String(o.numero).padStart(5, "0")}</td>
                 <td className="px-3 py-2">{new Date(o.created_at).toLocaleDateString("pt-BR")}</td>
-                <td className="px-3 py-2 font-medium">{o.paciente_nome}</td>
+                <td className="px-3 py-2 font-medium">
+                  <div className="flex items-center gap-2">
+                    <span>{o.paciente_nome}</span>
+                    {o.categoria === "laboratorio" ? (
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-700 dark:text-blue-300 uppercase">Laboratório</span>
+                    ) : o.categoria === "demais" ? (
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground uppercase">Serviços</span>
+                    ) : null}
+                  </div>
+                </td>
                 <td className="px-3 py-2 text-muted-foreground">{o.medico_nome ?? "—"}</td>
                 <td className="px-3 py-2 text-muted-foreground">{o.forma_pagamento ?? "—"}</td>
                 <td className="px-3 py-2 text-right font-semibold">
