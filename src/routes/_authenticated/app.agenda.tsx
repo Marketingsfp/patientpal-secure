@@ -1386,7 +1386,43 @@ function AgendaPage() {
     setEditing(null);
     const base = new Date(`${dataRef}T09:00:00`);
     const end = new Date(base.getTime() + 30 * 60000);
-    setForm({ ...EMPTY, inicio: toLocalInput(base.toISOString()), fim: toLocalInput(end.toISOString()) });
+    // Pré-preenche a partir dos filtros ativos da agenda.
+    const medicoFiltro =
+      filtroMedico !== "todos" && medicos.some((m) => m.id === filtroMedico)
+        ? filtroMedico
+        : "";
+    let pacienteId = "";
+    let pacienteNome = "";
+    const termoCli = filtroCliente.trim();
+    if (termoCli) {
+      const alvo = normalizar(termoCli);
+      const matches = pacientes.filter((p) => normalizar(p.nome).includes(alvo));
+      if (matches.length === 1) {
+        pacienteId = matches[0].id;
+        pacienteNome = matches[0].nome;
+      } else {
+        pacienteNome = termoCli;
+      }
+    }
+    const fimAuto = medicoFiltro
+      ? calcFimAuto(toLocalInput(base.toISOString()), medicoFiltro)
+      : toLocalInput(end.toISOString());
+    let procedimento = "";
+    if (medicoFiltro) {
+      const med = medicos.find((m) => m.id === medicoFiltro);
+      const padrao = procedimentoPadraoDoMedico(medicoFiltro);
+      if (padrao) procedimento = padrao;
+      else if (med?.especialidade_nome) procedimento = med.especialidade_nome;
+    }
+    setForm({
+      ...EMPTY,
+      inicio: toLocalInput(base.toISOString()),
+      fim: fimAuto,
+      medico_id: medicoFiltro,
+      paciente_id: pacienteId,
+      paciente_nome: pacienteNome,
+      procedimento,
+    });
     setOpen(true);
   };
 
