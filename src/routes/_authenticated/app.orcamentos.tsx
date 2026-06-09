@@ -221,7 +221,7 @@ function NovoOrcamentoDialog({
   const [pacienteTelefone, setPacienteTelefone] = useState("");
   const [medicoNome, setMedicoNome] = useState("");
   const [pacienteId, setPacienteId] = useState<string>("");
-  const [pacientes, setPacientes] = useState<PacienteOpt[]>([]);
+  const [pacienteSelecionado, setPacienteSelecionado] = useState<PatientOption | null>(null);
   const [medicoId, setMedicoId] = useState<string>("");
   const [medicoExterno, setMedicoExterno] = useState(false);
   const [clinicaSolicitante, setClinicaSolicitante] = useState("");
@@ -242,18 +242,6 @@ function NovoOrcamentoDialog({
   useEffect(() => {
     (async () => {
       const { data } = await supabase
-        .from("pacientes")
-        .select("id,nome,cpf,numero_pasta,data_nascimento,telefone")
-        .eq("clinica_id", clinicaId)
-        .order("nome")
-        .limit(2000);
-      setPacientes((data ?? []) as PacienteOpt[]);
-    })();
-  }, [clinicaId]);
-
-  useEffect(() => {
-    (async () => {
-      const { data } = await supabase
         .from("medicos")
         .select("id,nome,crm,crm_uf")
         .eq("clinica_id", clinicaId)
@@ -262,21 +250,6 @@ function NovoOrcamentoDialog({
       setMedicos((data ?? []) as MedicoOpt[]);
     })();
   }, [clinicaId]);
-
-  const pacienteOptions = useMemo(
-    () =>
-      pacientes.map((p) => ({
-        value: p.id,
-        label: [
-          p.nome,
-          p.numero_pasta != null ? `Serviço ${p.numero_pasta}` : null,
-          p.cpf ? `CPF ${p.cpf}` : null,
-          p.data_nascimento ? `Nasc. ${p.data_nascimento}` : null,
-          p.telefone,
-        ].filter(Boolean).join(" · "),
-      })),
-    [pacientes],
-  );
 
   const medicoOptions = useMemo(
     () =>
@@ -304,9 +277,9 @@ function NovoOrcamentoDialog({
     }
   };
 
-  const selecionarPaciente = (id: string) => {
-    setPacienteId(id);
-    const p = pacientes.find((x) => x.id === id);
+  const selecionarPaciente = (p: PatientOption | null) => {
+    setPacienteSelecionado(p);
+    setPacienteId(p?.id ?? "");
     if (p) {
       setPacienteNome(p.nome ?? "");
       setPacienteTelefone(p.telefone ?? "");
