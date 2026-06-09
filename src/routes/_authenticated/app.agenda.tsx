@@ -60,6 +60,8 @@ type Agendamento = {
   medico_nome?: string | null;
   medico_sexo?: string | null;
   agenda_id?: string | null;
+  orcamento_id?: string | null;
+  orcamento_numero?: number | null;
 };
 type Medico = { id: string; nome: string; sexo?: string | null; usa_sistema?: boolean; especialidade_id?: string | null; procedimento_padrao_id?: string | null; procedimento_padrao_em_branco?: boolean | null; procedimento_padrao_nome?: string | null; especialidade_nome?: string | null };
 type RecursoEnf = { id: string; nome: string };
@@ -363,6 +365,9 @@ const EMPTY = {
   inicio: "", fim: "", procedimento: "",
   status: "agendado" as Status, observacoes: "",
   data_pagamento: "",
+  orcamento_id: "",
+  orcamento_numero: "",
+  orcamento_itens: [] as string[],
 };
 
 function AgendaPage() {
@@ -414,6 +419,7 @@ function AgendaPage() {
   const [editing, setEditing] = useState<Agendamento | null>(null);
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
+  const [buscandoOrc, setBuscandoOrc] = useState(false);
   // Reagendamento
   const [reagendandoAg, setReagendandoAg] = useState<Agendamento | null>(null);
   const [reagSalvando, setReagSalvando] = useState(false);
@@ -624,7 +630,7 @@ function AgendaPage() {
     setLoading(true);
     let q = supabase
       .from("agendamentos")
-      .select("id,paciente_nome,paciente_id,medico_id,enfermagem_recurso_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,medico:medicos(nome,sexo)" as never)
+      .select("id,paciente_nome,paciente_id,medico_id,enfermagem_recurso_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as never)
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("inicio", { ascending: false });
     // "agendado" agora significa "qualquer ficha com paciente alocado",
@@ -677,12 +683,13 @@ function AgendaPage() {
     if (error) { toast.error(error.message); return; }
     // Recursos de enfermagem aparecem como "médicos virtuais": mapeamos o
     // enfermagem_recurso_id no campo medico_id para reuso de toda a UI.
-    const mapped = (((data ?? []) as unknown) as Array<Agendamento & { enfermagem_recurso_id?: string | null; medico?: { nome: string | null; sexo: string | null } | null }>).map((a) => ({
+    const mapped = (((data ?? []) as unknown) as Array<Agendamento & { enfermagem_recurso_id?: string | null; medico?: { nome: string | null; sexo: string | null } | null; orcamento?: { numero: number | null } | null }>).map((a) => ({
       ...a,
       paciente_nome: isSlotLivre(a.paciente_nome) ? "DISPONÍVEL" : a.paciente_nome,
       medico_id: a.medico_id ?? a.enfermagem_recurso_id ?? null,
       medico_nome: a.medico_nome ?? a.medico?.nome ?? null,
       medico_sexo: a.medico_sexo ?? a.medico?.sexo ?? null,
+      orcamento_numero: a.orcamento_numero ?? a.orcamento?.numero ?? null,
     }));
     setItems(mapped as Agendamento[]);
     setPage(1);
@@ -1382,6 +1389,80 @@ function AgendaPage() {
     setForm({ ...EMPTY, inicio: toLocalInput(base.toISOString()), fim: toLocalInput(end.toISOString()) });
     setOpen(true);
   };
+
+  const buscarOrcamento = async () => {
+    if (!clinicaAtual) return;
+    const num = parseInt(form.orcamento_numero.replace(/\D/g, ""), 10);
+    if (!num || num <= 0) { toast.error("Informe o nº do orçamento."); return; }
+    setBuscandoOrc(true);
+    try {
+      const { data: orc, error } = await supabase
+        .from("orcamentos")
+        .select("id, numero, paciente_id, paciente_nome, status")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("numero", num)
+        .maybeSingle();
+      if (error) { toast.error(error.message); return; }
+      if (!orc) { toast.error(`Orçamento nº ${num} não encontrado.`); return; }
+      if (orc.status === "cancelado") { toast.error("Orçamento cancelado."); return; }
+      const { data: itens, error: e2 } = await supabase
+        .from("orcamento_itens")
+        .select("descricao, procedimento_id")
+        .eq("orcamento_id", orc.id)
+        .order("ordem");
+      if (e2) { toast.error(e2.message); return; }
+      const its = (itens ?? []) as { descricao: string; procedimento_id: string | null }[];
+      if (its.length === 0) { toast.error("Orçamento sem itens."); return; }
+      const procIds = Array.from(new Set(its.map(i => i.procedimento_id).filter((x): x is string => !!x)));
+      let procs: { id: string; grupo: string | null }[] = [];
+      if (procIds.length) {
+        const { data: pdata, error: e3 } = await supabase
+          .from("procedimentos")
+          .select("id, grupo")
+          .in("id", procIds);
+        if (e3) { toast.error(e3.message); return; }
+        procs = (pdata ?? []) as { id: string; grupo: string | null }[];
+      }
+      const normGrupo = (g: string | null | undefined) =>
+        (g ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+      const grupoPorId = new Map(procs.map(p => [p.id, normGrupo(p.grupo)]));
+      const todosLab = its.every(i => i.procedimento_id && grupoPorId.get(i.procedimento_id) === "LABORATORIO");
+      if (!todosLab) {
+        toast.error("Este fluxo é válido apenas para orçamentos 100% de laboratório.");
+        return;
+      }
+      // Verifica se já existe agendamento ativo vinculado
+      const { data: jaAg } = await supabase
+        .from("agendamentos")
+        .select("id")
+        .eq("orcamento_id", orc.id)
+        .neq("status", "cancelado")
+        .limit(1);
+      if (jaAg && jaAg.length > 0 && (!editing || editing.id !== jaAg[0].id)) {
+        toast.error("Este orçamento já está vinculado a outro agendamento.");
+        return;
+      }
+      const nomes = its.map(i => i.descricao);
+      const procStr = `LABORATÓRIO (${nomes.length} EXAMES): ${nomes.join(", ")}`;
+      setForm(f => ({
+        ...f,
+        orcamento_id: orc.id,
+        orcamento_numero: String(orc.numero),
+        orcamento_itens: nomes,
+        paciente_id: orc.paciente_id ?? f.paciente_id,
+        paciente_nome: orc.paciente_nome ?? f.paciente_nome,
+        procedimento: procStr,
+      }));
+      toast.success(`Orçamento #${String(orc.numero).padStart(5, "0")} vinculado.`);
+    } finally {
+      setBuscandoOrc(false);
+    }
+  };
+
+  const limparOrcamento = () => {
+    setForm(f => ({ ...f, orcamento_id: "", orcamento_numero: "", orcamento_itens: [] }));
+  };
+
   const openSlot = (a: Agendamento) => {
     if (reagendandoAg) { void confirmarReagendamentoNoSlot(a); return; }
     if (reagLoteIds) { void confirmarReagLoteNoSlot(a); return; }
@@ -1395,6 +1476,9 @@ function AgendaPage() {
       status: "agendado",
       observacoes: a.observacoes ?? "",
       data_pagamento: a.data_pagamento ?? "",
+      orcamento_id: "",
+      orcamento_numero: "",
+      orcamento_itens: [],
     });
     if (pacienteCopia) setPacienteCopia(null);
     setOpen(true);
@@ -1413,6 +1497,9 @@ function AgendaPage() {
       status: a.status,
       observacoes: a.observacoes ?? "",
       data_pagamento: a.data_pagamento ?? "",
+      orcamento_id: a.orcamento_id ?? "",
+      orcamento_numero: a.orcamento_numero ? String(a.orcamento_numero) : "",
+      orcamento_itens: [],
     });
     setOpen(true);
   };
@@ -1489,6 +1576,7 @@ function AgendaPage() {
       status: form.status,
       observacoes: form.observacoes.trim() || null,
       data_pagamento: form.data_pagamento ? form.data_pagamento : null,
+      orcamento_id: form.orcamento_id || null,
     };
     let novoId: string | null = editing?.id ?? null;
     if (editing) {
@@ -2003,6 +2091,46 @@ function AgendaPage() {
                 disabled={editing ? pagosSet.has(editing.id) : false}
                 className="space-y-3 contents disabled:opacity-90"
               >
+              <div className="space-y-1 rounded-md border border-dashed border-primary/40 bg-primary/5 p-2">
+                <Label className="text-xs uppercase">Nº do orçamento (laboratório)</Label>
+                <div className="flex gap-2">
+                  <Input
+                    inputMode="numeric"
+                    placeholder="Ex.: 123"
+                    value={form.orcamento_numero}
+                    onChange={(e) => setForm(f => ({ ...f, orcamento_numero: e.target.value.replace(/\D/g, "") }))}
+                    disabled={!!form.orcamento_id || (editing ? pagosSet.has(editing.id) : false)}
+                    className="max-w-[140px]"
+                  />
+                  {form.orcamento_id ? (
+                    <Button type="button" variant="outline" size="sm" onClick={limparOrcamento}
+                      disabled={editing ? pagosSet.has(editing.id) : false}>
+                      Limpar
+                    </Button>
+                  ) : (
+                    <Button type="button" variant="outline" size="sm" onClick={() => void buscarOrcamento()} disabled={buscandoOrc}>
+                      {buscandoOrc ? "Buscando…" : "Buscar"}
+                    </Button>
+                  )}
+                </div>
+                {form.orcamento_id && (
+                  <div className="text-xs text-muted-foreground space-y-1 pt-1">
+                    <p className="font-medium text-foreground">
+                      Marcando {form.orcamento_itens.length} exame(s) em uma única ficha. Pagamento continua pelo orçamento.
+                    </p>
+                    {form.orcamento_itens.length > 0 && (
+                      <ul className="list-disc list-inside max-h-24 overflow-y-auto">
+                        {form.orcamento_itens.map((n, i) => <li key={i}>{n}</li>)}
+                      </ul>
+                    )}
+                  </div>
+                )}
+                {!form.orcamento_id && (
+                  <p className="text-xs text-muted-foreground">
+                    Opcional. Use para marcar vários exames de laboratório em uma única ficha a partir de um orçamento.
+                  </p>
+                )}
+              </div>
               <div className="space-y-1">
                 <Label>Paciente</Label>
                 <div className="flex gap-2">
@@ -2774,6 +2902,14 @@ function AgendaPage() {
                           </span>
                         )}
                         <span className="truncate min-w-0">{a.paciente_nome}</span>
+                        {a.orcamento_numero ? (
+                          <span
+                            title="Vinculado a um orçamento de laboratório"
+                            className="ml-1 inline-flex items-center rounded px-1 py-0.5 text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-300"
+                          >
+                            ORÇ #{String(a.orcamento_numero).padStart(5, "0")}
+                          </span>
+                        ) : null}
                       </button>
                     )}
                   </TableCell>
