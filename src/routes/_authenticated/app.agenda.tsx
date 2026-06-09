@@ -2091,6 +2091,46 @@ function AgendaPage() {
                 disabled={editing ? pagosSet.has(editing.id) : false}
                 className="space-y-3 contents disabled:opacity-90"
               >
+              <div className="space-y-1 rounded-md border border-dashed border-primary/40 bg-primary/5 p-2">
+                <Label className="text-xs uppercase">Nº do orçamento (laboratório)</Label>
+                <div className="flex gap-2">
+                  <Input
+                    inputMode="numeric"
+                    placeholder="Ex.: 123"
+                    value={form.orcamento_numero}
+                    onChange={(e) => setForm(f => ({ ...f, orcamento_numero: e.target.value.replace(/\D/g, "") }))}
+                    disabled={!!form.orcamento_id || (editing ? pagosSet.has(editing.id) : false)}
+                    className="max-w-[140px]"
+                  />
+                  {form.orcamento_id ? (
+                    <Button type="button" variant="outline" size="sm" onClick={limparOrcamento}
+                      disabled={editing ? pagosSet.has(editing.id) : false}>
+                      Limpar
+                    </Button>
+                  ) : (
+                    <Button type="button" variant="outline" size="sm" onClick={() => void buscarOrcamento()} disabled={buscandoOrc}>
+                      {buscandoOrc ? "Buscando…" : "Buscar"}
+                    </Button>
+                  )}
+                </div>
+                {form.orcamento_id && (
+                  <div className="text-xs text-muted-foreground space-y-1 pt-1">
+                    <p className="font-medium text-foreground">
+                      Marcando {form.orcamento_itens.length} exame(s) em uma única ficha. Pagamento continua pelo orçamento.
+                    </p>
+                    {form.orcamento_itens.length > 0 && (
+                      <ul className="list-disc list-inside max-h-24 overflow-y-auto">
+                        {form.orcamento_itens.map((n, i) => <li key={i}>{n}</li>)}
+                      </ul>
+                    )}
+                  </div>
+                )}
+                {!form.orcamento_id && (
+                  <p className="text-xs text-muted-foreground">
+                    Opcional. Use para marcar vários exames de laboratório em uma única ficha a partir de um orçamento.
+                  </p>
+                )}
+              </div>
               <div className="space-y-1">
                 <Label>Paciente</Label>
                 <div className="flex gap-2">
