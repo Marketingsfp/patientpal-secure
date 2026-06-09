@@ -2902,6 +2902,14 @@ function AgendaPage() {
                           </span>
                         )}
                         <span className="truncate min-w-0">{a.paciente_nome}</span>
+                        {a.orcamento_numero ? (
+                          <span
+                            title="Vinculado a um orçamento de laboratório"
+                            className="ml-1 inline-flex items-center rounded px-1 py-0.5 text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-300"
+                          >
+                            ORÇ #{String(a.orcamento_numero).padStart(5, "0")}
+                          </span>
+                        ) : null}
                       </button>
                     )}
                   </TableCell>
