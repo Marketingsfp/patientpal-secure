@@ -419,6 +419,7 @@ function AgendaPage() {
   const [editing, setEditing] = useState<Agendamento | null>(null);
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
+  const [buscandoOrc, setBuscandoOrc] = useState(false);
   // Reagendamento
   const [reagendandoAg, setReagendandoAg] = useState<Agendamento | null>(null);
   const [reagSalvando, setReagSalvando] = useState(false);
