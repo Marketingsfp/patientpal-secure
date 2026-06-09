@@ -2163,7 +2163,13 @@ function AgendaPage() {
                 <div className="flex gap-2">
                   <div className="flex-1">
                     <PatientSearchInput
-                      value={form.paciente_id ? { id: form.paciente_id, nome: form.paciente_nome, cpf: null, telefone: null, data_nascimento: null, clinica_id: "" } : null}
+                      value={
+                        form.paciente_id
+                          ? { id: form.paciente_id, nome: form.paciente_nome, cpf: null, telefone: null, data_nascimento: null, clinica_id: "" }
+                          : form.paciente_nome
+                            ? { id: "__pendente__", nome: form.paciente_nome, cpf: null, telefone: null, data_nascimento: null, clinica_id: "" }
+                            : null
+                      }
                       onSelect={(p) => {
                         setForm(f => ({
                           ...f,
