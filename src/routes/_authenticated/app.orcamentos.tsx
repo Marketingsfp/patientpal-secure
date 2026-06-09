@@ -467,13 +467,10 @@ function NovoOrcamentoDialog({
         <div className="space-y-4">
           <div className="space-y-1">
             <Label>Buscar paciente cadastrado</Label>
-            <SearchableSelect
-              options={pacienteOptions}
-              value={pacienteId}
-              onChange={selecionarPaciente}
-              placeholder="Buscar por nome, CPF, serviço, nascimento ou telefone..."
-              searchPlaceholder="Digite para buscar..."
-              emptyText="Nenhum paciente encontrado."
+            <PatientSearchInput
+              value={pacienteSelecionado}
+              onSelect={selecionarPaciente}
+              placeholder="Buscar por nome, CPF ou prontuário..."
             />
             <p className="text-xs text-muted-foreground">Ou preencha manualmente abaixo para paciente novo.</p>
           </div>
