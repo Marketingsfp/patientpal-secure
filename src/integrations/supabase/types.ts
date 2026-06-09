@@ -5054,6 +5054,7 @@ export type Database = {
       }
       orcamentos: {
         Row: {
+          categoria: string
           clinica_id: string
           clinica_solicitante: string | null
           created_at: string
@@ -5076,6 +5077,7 @@ export type Database = {
           valores_pagamento: Json | null
         }
         Insert: {
+          categoria?: string
           clinica_id: string
           clinica_solicitante?: string | null
           created_at?: string
@@ -5098,6 +5100,7 @@ export type Database = {
           valores_pagamento?: Json | null
         }
         Update: {
+          categoria?: string
           clinica_id?: string
           clinica_solicitante?: string | null
           created_at?: string

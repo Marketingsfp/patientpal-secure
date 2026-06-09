@@ -1,0 +1,2 @@
+ALTER TABLE public.orcamentos ADD COLUMN IF NOT EXISTS categoria text NOT NULL DEFAULT 'demais' CHECK (categoria IN ('laboratorio','demais'));
+CREATE INDEX IF NOT EXISTS idx_orcamentos_categoria ON public.orcamentos(categoria);
