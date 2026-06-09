@@ -32,6 +32,7 @@ type Orc = {
   valores_pagamento: Record<string, number> | null;
   status: string;
   created_at: string;
+  categoria: "laboratorio" | "demais" | null;
 };
 
 type Procedimento = {
@@ -79,7 +80,7 @@ function OrcamentosPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from("orcamentos")
-      .select("id, numero, paciente_nome, paciente_telefone, medico_nome, forma_pagamento, valor_total, valores_pagamento, status, created_at")
+      .select("id, numero, paciente_nome, paciente_telefone, medico_nome, forma_pagamento, valor_total, valores_pagamento, status, created_at, categoria")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("created_at", { ascending: false })
       .limit(200);
@@ -154,7 +155,16 @@ function OrcamentosPage() {
               <tr key={o.id} className="border-t hover:bg-muted/30">
                 <td className="px-3 py-2 font-mono">#{String(o.numero).padStart(5, "0")}</td>
                 <td className="px-3 py-2">{new Date(o.created_at).toLocaleDateString("pt-BR")}</td>
-                <td className="px-3 py-2 font-medium">{o.paciente_nome}</td>
+                <td className="px-3 py-2 font-medium">
+                  <div className="flex items-center gap-2">
+                    <span>{o.paciente_nome}</span>
+                    {o.categoria === "laboratorio" ? (
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-700 dark:text-blue-300 uppercase">Laboratório</span>
+                    ) : o.categoria === "demais" ? (
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground uppercase">Serviços</span>
+                    ) : null}
+                  </div>
+                </td>
                 <td className="px-3 py-2 text-muted-foreground">{o.medico_nome ?? "—"}</td>
                 <td className="px-3 py-2 text-muted-foreground">{o.forma_pagamento ?? "—"}</td>
                 <td className="px-3 py-2 text-right font-semibold">
@@ -211,6 +221,7 @@ function NovoOrcamentoDialog({
   const [pacienteNome, setPacienteNome] = useState("");
   const [pacienteTelefone, setPacienteTelefone] = useState("");
   const [medicoNome, setMedicoNome] = useState("");
+  const [categoria, setCategoria] = useState<"laboratorio" | "demais" | null>(null);
   const [pacienteId, setPacienteId] = useState<string>("");
   const [pacienteSelecionado, setPacienteSelecionado] = useState<PatientOption | null>(null);
   const [medicoId, setMedicoId] = useState<string>("");
@@ -403,6 +414,7 @@ function NovoOrcamentoDialog({
   })();
 
   const salvar = async () => {
+    if (!categoria) return toast.error("Selecione o tipo do orçamento");
     if (!pacienteNome.trim()) return toast.error("Informe o nome do paciente");
     if (itens.length === 0) return toast.error("Adicione ao menos um serviço");
     if (formasPagamento.length === 0) return toast.error("Selecione ao menos uma forma de pagamento");
@@ -415,6 +427,7 @@ function NovoOrcamentoDialog({
       .insert({
         clinica_id: clinicaId,
         numero: 0,
+        categoria,
         paciente_nome: pacienteNome.trim(),
         paciente_telefone: pacienteTelefone.trim() || null,
         medico_nome: medicoNome.trim() || null,
@@ -453,8 +466,54 @@ function NovoOrcamentoDialog({
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-3xl max-h-[95vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Novo orçamento</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>
+            Novo orçamento
+            {categoria && (
+              <span className="ml-2 text-xs font-normal text-muted-foreground">
+                · {categoria === "laboratorio" ? "Laboratório" : "Demais Serviços"}
+                <button
+                  type="button"
+                  onClick={() => setCategoria(null)}
+                  className="ml-2 text-primary hover:underline"
+                >alterar</button>
+              </span>
+            )}
+          </DialogTitle>
+        </DialogHeader>
 
+        {!categoria ? (
+          <div className="py-8 space-y-4">
+            <p className="text-center text-sm text-muted-foreground">
+              Qual o tipo deste orçamento? Isso facilita o vínculo com a agenda.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setCategoria("laboratorio")}
+                className="rounded-lg border-2 border-border hover:border-primary hover:bg-primary/5 p-6 text-left transition"
+              >
+                <div className="text-lg font-semibold">🧪 Laboratório</div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Exames de laboratório (1 ficha única na agenda, mesmo com vários exames).
+                </p>
+              </button>
+              <button
+                type="button"
+                onClick={() => setCategoria("demais")}
+                className="rounded-lg border-2 border-border hover:border-primary hover:bg-primary/5 p-6 text-left transition"
+              >
+                <div className="text-lg font-semibold">🩺 Demais Serviços</div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Consultas, procedimentos, exames de imagem e demais serviços.
+                </p>
+              </button>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={onClose}>Cancelar</Button>
+            </DialogFooter>
+          </div>
+        ) : (
         <div className="space-y-4">
           <div className="space-y-1">
             <Label>Buscar paciente cadastrado</Label>
@@ -647,11 +706,14 @@ function NovoOrcamentoDialog({
             </div>
           </div>
         </div>
+        )}
 
-        <DialogFooter className="sticky bottom-0 bg-background border-t -mx-6 -mb-6 px-6 py-5 z-10">
-          <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
-          <Button onClick={salvar} disabled={saving} className="gap-2"><Printer className="h-4 w-4" /> Salvar e imprimir</Button>
-        </DialogFooter>
+        {categoria && (
+          <DialogFooter className="sticky bottom-0 bg-background border-t -mx-6 -mb-6 px-6 py-5 z-10">
+            <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
+            <Button onClick={salvar} disabled={saving} className="gap-2"><Printer className="h-4 w-4" /> Salvar e imprimir</Button>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );
