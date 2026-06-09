@@ -2732,15 +2732,18 @@ function AgendaPage() {
               ags.sort((a, b) => a.nome.localeCompare(b.nome));
             }
             const unica = ags.length <= 1;
+            const semProfissional = filtroMedico === "todos";
             return (
               <div className="space-y-0.5">
                 <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Agenda</Label>
                 <Select
                   value={filtroAgenda}
                   onValueChange={setFiltroAgenda}
-                  disabled={unica}
+                  disabled={unica || semProfissional}
                 >
-                  <SelectTrigger><SelectValue placeholder={ags[0]?.nome ?? "—"} /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue placeholder={semProfissional ? "Selecione um profissional" : (ags[0]?.nome ?? "—")} />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="todos">TODAS</SelectItem>
                     {ags.map(a => (
