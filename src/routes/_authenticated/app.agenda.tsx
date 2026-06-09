@@ -1501,6 +1501,7 @@ function AgendaPage() {
       status: form.status,
       observacoes: form.observacoes.trim() || null,
       data_pagamento: form.data_pagamento ? form.data_pagamento : null,
+      orcamento_id: form.orcamento_id || null,
     };
     let novoId: string | null = editing?.id ?? null;
     if (editing) {
