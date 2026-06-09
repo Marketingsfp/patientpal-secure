@@ -1389,6 +1389,80 @@ function AgendaPage() {
     setForm({ ...EMPTY, inicio: toLocalInput(base.toISOString()), fim: toLocalInput(end.toISOString()) });
     setOpen(true);
   };
+
+  const buscarOrcamento = async () => {
+    if (!clinicaAtual) return;
+    const num = parseInt(form.orcamento_numero.replace(/\D/g, ""), 10);
+    if (!num || num <= 0) { toast.error("Informe o nº do orçamento."); return; }
+    setBuscandoOrc(true);
+    try {
+      const { data: orc, error } = await supabase
+        .from("orcamentos")
+        .select("id, numero, paciente_id, paciente_nome, status")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("numero", num)
+        .maybeSingle();
+      if (error) { toast.error(error.message); return; }
+      if (!orc) { toast.error(`Orçamento nº ${num} não encontrado.`); return; }
+      if (orc.status === "cancelado") { toast.error("Orçamento cancelado."); return; }
+      const { data: itens, error: e2 } = await supabase
+        .from("orcamento_itens")
+        .select("descricao, procedimento_id")
+        .eq("orcamento_id", orc.id)
+        .order("ordem");
+      if (e2) { toast.error(e2.message); return; }
+      const its = (itens ?? []) as { descricao: string; procedimento_id: string | null }[];
+      if (its.length === 0) { toast.error("Orçamento sem itens."); return; }
+      const procIds = Array.from(new Set(its.map(i => i.procedimento_id).filter((x): x is string => !!x)));
+      let procs: { id: string; grupo: string | null }[] = [];
+      if (procIds.length) {
+        const { data: pdata, error: e3 } = await supabase
+          .from("procedimentos")
+          .select("id, grupo")
+          .in("id", procIds);
+        if (e3) { toast.error(e3.message); return; }
+        procs = (pdata ?? []) as { id: string; grupo: string | null }[];
+      }
+      const normGrupo = (g: string | null | undefined) =>
+        (g ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+      const grupoPorId = new Map(procs.map(p => [p.id, normGrupo(p.grupo)]));
+      const todosLab = its.every(i => i.procedimento_id && grupoPorId.get(i.procedimento_id) === "LABORATORIO");
+      if (!todosLab) {
+        toast.error("Este fluxo é válido apenas para orçamentos 100% de laboratório.");
+        return;
+      }
+      // Verifica se já existe agendamento ativo vinculado
+      const { data: jaAg } = await supabase
+        .from("agendamentos")
+        .select("id")
+        .eq("orcamento_id", orc.id)
+        .neq("status", "cancelado")
+        .limit(1);
+      if (jaAg && jaAg.length > 0 && (!editing || editing.id !== jaAg[0].id)) {
+        toast.error("Este orçamento já está vinculado a outro agendamento.");
+        return;
+      }
+      const nomes = its.map(i => i.descricao);
+      const procStr = `LABORATÓRIO (${nomes.length} EXAMES): ${nomes.join(", ")}`;
+      setForm(f => ({
+        ...f,
+        orcamento_id: orc.id,
+        orcamento_numero: String(orc.numero),
+        orcamento_itens: nomes,
+        paciente_id: orc.paciente_id ?? f.paciente_id,
+        paciente_nome: orc.paciente_nome ?? f.paciente_nome,
+        procedimento: procStr,
+      }));
+      toast.success(`Orçamento #${String(orc.numero).padStart(5, "0")} vinculado.`);
+    } finally {
+      setBuscandoOrc(false);
+    }
+  };
+
+  const limparOrcamento = () => {
+    setForm(f => ({ ...f, orcamento_id: "", orcamento_numero: "", orcamento_itens: [] }));
+  };
+
   const openSlot = (a: Agendamento) => {
     if (reagendandoAg) { void confirmarReagendamentoNoSlot(a); return; }
     if (reagLoteIds) { void confirmarReagLoteNoSlot(a); return; }
