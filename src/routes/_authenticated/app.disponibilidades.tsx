@@ -395,13 +395,28 @@ function Page() {
         <TabsContent value="medicos" className="space-y-6">
           {medicoEditando === null ? (
             <>
-              <Input placeholder="Filtrar médicos..." value={filtro} onChange={(e) => setFiltro(e.target.value)} className="max-w-sm" />
+              <div className="flex flex-wrap gap-2 items-center">
+                <Input placeholder="Filtrar médicos..." value={filtro} onChange={(e) => setFiltro(e.target.value)} className="max-w-sm" />
+                <Select value={filtroCidade} onValueChange={setFiltroCidade}>
+                  <SelectTrigger className="w-56"><SelectValue placeholder="Localização" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as localizações</SelectItem>
+                    {cidadesDisponiveis.map((c) => (
+                      <SelectItem key={c} value={c} className="uppercase">{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {filtroCidade !== "all" && (
+                  <Button variant="ghost" size="sm" onClick={() => setFiltroCidade("all")}>Limpar</Button>
+                )}
+              </div>
               <Card>
                 <CardContent className="p-0">
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Médico</TableHead>
+                        <TableHead>Localização</TableHead>
                         <TableHead className="w-32 text-center">Horários</TableHead>
                         <TableHead className="w-24 text-right">Ações</TableHead>
                       </TableRow>
@@ -412,6 +427,9 @@ function Page() {
                         return (
                           <TableRow key={m.id}>
                             <TableCell className="font-medium uppercase">{m.nome}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground uppercase">
+                              {[m.cidade, m.estado].filter(Boolean).join(" / ") || "—"}
+                            </TableCell>
                             <TableCell className="text-center text-sm text-muted-foreground">{ds.length}</TableCell>
                             <TableCell className="text-right">
                               <Button
@@ -433,7 +451,7 @@ function Page() {
                       })}
                       {medicosFiltrados.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={3} className="text-center text-sm text-muted-foreground py-6">
+                          <TableCell colSpan={4} className="text-center text-sm text-muted-foreground py-6">
                             Nenhum médico encontrado.
                           </TableCell>
                         </TableRow>
