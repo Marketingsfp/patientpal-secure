@@ -960,6 +960,28 @@ function Page() {
                     </Badge>
                   )}
                 </TableCell>
+                <TableCell className="text-center">
+                  {(() => {
+                    const procKey = a.procedimento ? norm(a.procedimento) : "";
+                    const exigeLaudo = procKey && procLaudo.get(procKey);
+                    if (a.laudo_status === "emitido") {
+                      return (
+                        <Badge variant="outline" className="bg-sky-500/10 text-sky-700 border-sky-500/30">
+                          <CheckCircle2 className="h-3 w-3 mr-1" />Emitido
+                        </Badge>
+                      );
+                    }
+                    if (!exigeLaudo) return <span className="text-muted-foreground text-xs">—</span>;
+                    if (!podeEstornar) {
+                      return <span className="text-amber-600 text-xs">Pendente</span>;
+                    }
+                    return (
+                      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => openLaudo(a)}>
+                        Marcar laudo
+                      </Button>
+                    );
+                  })()}
+                </TableCell>
                 {!isMedicoOnly && (
                   <TableCell className="text-right">
                     {a.origem === "agenda" ? (
