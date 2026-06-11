@@ -2118,6 +2118,10 @@ function AgendaPage() {
                 💳 Cobrar selecionados (1 pagamento)
               </DropdownMenuItem>
               <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={baixarLoteRealizado}>
+                ✅ Baixar selecionados como Realizado
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={copiarPacienteSelecionado}
                 disabled={selecionados.size !== 1}
