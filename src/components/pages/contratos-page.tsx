@@ -108,9 +108,11 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
-    if (!s) return list;
-    return list.filter((c) => `${c.numero} ${c.paciente_nome}`.toLowerCase().includes(s));
-  }, [list, q]);
+    const base = !s ? list : list.filter((c) => `${c.numero} ${c.paciente_nome}`.toLowerCase().includes(s));
+    if (!sortPaciente) return base;
+    const ordered = [...base].sort((a, b) => a.paciente_nome.localeCompare(b.paciente_nome, "pt-BR", { sensitivity: "base" }));
+    return sortPaciente === "asc" ? ordered : ordered.reverse();
+  }, [list, q, sortPaciente]);
 
   if (view === "new") {
     return (
