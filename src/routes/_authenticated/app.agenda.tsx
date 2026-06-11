@@ -1475,10 +1475,11 @@ function AgendaPage() {
         toast.error("Este fluxo é válido apenas para orçamentos 100% de laboratório.");
         return;
       }
-      // Verifica se já existe agendamento ativo vinculado
+      // Verifica se já existe agendamento ativo vinculado (mesma clínica)
       const { data: jaAg } = await supabase
         .from("agendamentos")
         .select("id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("orcamento_id", orc.id)
         .neq("status", "cancelado")
         .limit(1);
@@ -1547,10 +1548,20 @@ function AgendaPage() {
     setOpen(true);
   };
 
-  const openEdit = (a: Agendamento) => {
+  const openEdit = async (a: Agendamento) => {
     if (reagendandoAg) { toast.error("Esse horário já está ocupado. Escolha um slot disponível."); return; }
     if (reagLoteIds) { toast.error("Esse horário já está ocupado. Escolha um slot DISPONÍVEL."); return; }
     setEditing(a);
+    // Recarrega itens do orçamento vinculado para exibir a lista de exames no diálogo
+    let itensOrc: string[] = [];
+    if (a.orcamento_id) {
+      const { data: its } = await supabase
+        .from("orcamento_itens")
+        .select("descricao")
+        .eq("orcamento_id", a.orcamento_id)
+        .order("ordem");
+      itensOrc = ((its ?? []) as { descricao: string }[]).map((x) => x.descricao);
+    }
     setForm({
       paciente_nome: a.paciente_nome,
       paciente_id: a.paciente_id ?? "",
@@ -1562,7 +1573,7 @@ function AgendaPage() {
       data_pagamento: a.data_pagamento ?? "",
       orcamento_id: a.orcamento_id ?? "",
       orcamento_numero: a.orcamento_numero ? String(a.orcamento_numero) : "",
-      orcamento_itens: [],
+      orcamento_itens: itensOrc,
     });
     setOpen(true);
   };
@@ -1722,6 +1733,7 @@ function AgendaPage() {
         observacoes: null,
         status: "agendado",
         data_pagamento: null,
+        orcamento_id: null,
       } as never)
       .eq("id", a.id);
     if (error) toast.error(error.message);
