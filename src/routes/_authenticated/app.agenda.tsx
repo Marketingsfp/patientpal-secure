@@ -2118,8 +2118,17 @@ function AgendaPage() {
   };
   const medicoNomeAgendamento = (a: Agendamento) => {
     const m = medicos.find((x) => x.id === a.medico_id);
-    if (m) return m.nome.startsWith("🩺") ? m.nome : `${prefixoMedico(m.sexo)} ${m.nome}`;
-    return a.medico_nome ? `${prefixoMedico(a.medico_sexo)} ${a.medico_nome}` : "—";
+    const isExame = (n?: string | null) => {
+      const s = (n ?? "").trim().toUpperCase();
+      return s === "ECG" || s === "EEG" || s === "ELETROCARDIOGRAMA" || s === "ELETROENCEFALOGRAMA";
+    };
+    if (m) {
+      if (m.nome.startsWith("🩺") || isExame(m.nome)) return m.nome;
+      return `${prefixoMedico(m.sexo)} ${m.nome}`;
+    }
+    if (!a.medico_nome) return "—";
+    if (isExame(a.medico_nome)) return a.medico_nome;
+    return `${prefixoMedico(a.medico_sexo)} ${a.medico_nome}`;
   };
   const fmtHora = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   const fmtData = (iso: string) => {
