@@ -1745,7 +1745,11 @@ function AgendaPage() {
       toast.error("Apenas o médico responsável pode marcar como 'Realizado'.");
       return;
     }
-    const { error } = await supabase.from("agendamentos").update({ status }).eq("id", a.id);
+    // Ao cancelar, libera o vínculo com o orçamento para que ele possa ser
+    // re-agendado em outro horário sem ficar preso a este slot.
+    const payload: { status: Status; orcamento_id?: null } = { status };
+    if (status === "cancelado" && a.orcamento_id) payload.orcamento_id = null;
+    const { error } = await supabase.from("agendamentos").update(payload).eq("id", a.id);
     if (error) toast.error(error.message); else await load();
   };
 
