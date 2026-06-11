@@ -383,23 +383,51 @@ function RelatoriosPage() {
       </div>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Planos — mais vendem</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">Planos / Cartões — catálogo completo</CardTitle>
+          <p className="text-xs text-muted-foreground">Todos os cartões da clínica, com totais acumulados (não dependem do período acima).</p>
+        </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
-              <TableRow><TableHead>Plano</TableHead><TableHead>Tipo</TableHead><TableHead className="text-right">Contratos</TableHead><TableHead className="text-right">Pessoas (tit+dep)</TableHead><TableHead className="text-right">Receita</TableHead></TableRow>
+              <TableRow>
+                <TableHead>Plano</TableHead>
+                <TableHead>Tipo</TableHead>
+                <TableHead className="text-right">Valor mensal</TableHead>
+                <TableHead className="text-right">Titulares</TableHead>
+                <TableHead className="text-right">Ativos</TableHead>
+                <TableHead className="text-right">Dependentes</TableHead>
+                <TableHead className="text-right">Pessoas</TableHead>
+                <TableHead className="text-right">MRR ativos</TableHead>
+                <TableHead className="text-right">Receita acumulada</TableHead>
+              </TableRow>
             </TableHeader>
             <TableBody>
-              {stats.porPlano.length === 0 ? <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-4">Sem dados.</TableCell></TableRow> : null}
-              {stats.porPlano.map((p) => (
+              {stats.porPlanoAll.length === 0 ? <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-4">Sem dados.</TableCell></TableRow> : null}
+              {stats.porPlanoAll.map((p) => (
                 <TableRow key={p.plano}>
                   <TableCell className="font-medium">{p.plano}</TableCell>
                   <TableCell><Badge variant="outline">{p.tipo}</Badge></TableCell>
-                  <TableCell className="text-right">{p.contratos}</TableCell>
+                  <TableCell className="text-right">{BRL(p.valorMensal)}</TableCell>
+                  <TableCell className="text-right">{p.titulares}</TableCell>
+                  <TableCell className="text-right">{p.titularesAtivos}</TableCell>
+                  <TableCell className="text-right">{p.dependentes}</TableCell>
                   <TableCell className="text-right">{p.pessoas}</TableCell>
+                  <TableCell className="text-right">{BRL(p.mrr)}</TableCell>
                   <TableCell className="text-right">{BRL(p.receita)}</TableCell>
                 </TableRow>
               ))}
+              {stats.porPlanoAll.length > 0 ? (
+                <TableRow className="bg-muted/30 font-semibold">
+                  <TableCell colSpan={3}>Total</TableCell>
+                  <TableCell className="text-right">{stats.porPlanoAll.reduce((s,p)=>s+p.titulares,0)}</TableCell>
+                  <TableCell className="text-right">{stats.porPlanoAll.reduce((s,p)=>s+p.titularesAtivos,0)}</TableCell>
+                  <TableCell className="text-right">{stats.porPlanoAll.reduce((s,p)=>s+p.dependentes,0)}</TableCell>
+                  <TableCell className="text-right">{stats.porPlanoAll.reduce((s,p)=>s+p.pessoas,0)}</TableCell>
+                  <TableCell className="text-right">{BRL(stats.porPlanoAll.reduce((s,p)=>s+p.mrr,0))}</TableCell>
+                  <TableCell className="text-right">{BRL(stats.porPlanoAll.reduce((s,p)=>s+p.receita,0))}</TableCell>
+                </TableRow>
+              ) : null}
             </TableBody>
           </Table>
         </CardContent>
