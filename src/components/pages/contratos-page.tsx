@@ -692,6 +692,22 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
         : Promise.resolve({ data: [] }),
     ]);
     setMens((m.data ?? []) as Mens[]);
+    // Pagamentos avulsos importados (ex.: rateios MJ) vinculados ao paciente do contrato
+    const pacienteId = (contrato as any).paciente_id as string | undefined;
+    if (pacienteId) {
+      const { data: avulsos } = await supabase
+        .from("fin_lancamentos")
+        .select("valor")
+        .eq("clinica_id", (contrato as any).clinica_id)
+        .eq("paciente_id", pacienteId)
+        .eq("tipo", "receita")
+        .eq("status", "confirmado");
+      const rows = (avulsos ?? []) as Array<{ valor: number | string }>;
+      const total = rows.reduce((s, r) => s + Number(r.valor || 0), 0);
+      setExtraRecebido({ total, count: rows.length });
+    } else {
+      setExtraRecebido({ total: 0, count: 0 });
+    }
     const rows = (d.data ?? []) as any[];
     const pids = Array.from(new Set(rows.map((r) => r.paciente_id).filter(Boolean)));
     let cpfMap: Record<string, string | null> = {};
