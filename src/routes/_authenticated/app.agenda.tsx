@@ -1853,6 +1853,14 @@ function AgendaPage() {
         return;
       }
     }
+    if (status === "realizado") {
+      const inicio = new Date(a.inicio);
+      const hojeFim = new Date(); hojeFim.setHours(23, 59, 59, 999);
+      if (inicio.getTime() > hojeFim.getTime()) {
+        toast.error("Não é possível baixar como Realizado um atendimento de data futura.");
+        return;
+      }
+    }
     // Ao cancelar, libera o vínculo com o orçamento para que ele possa ser
     // re-agendado em outro horário sem ficar preso a este slot.
     const payload: { status: Status; orcamento_id?: null } = { status };
