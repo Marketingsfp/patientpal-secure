@@ -2114,15 +2114,12 @@ function AgendaPage() {
     const m = medicos.find(x => x.id === id);
     if (!m) return "—";
     const s = m.nome.trim().toUpperCase();
-    if (m.nome.startsWith("🩺") || s === "ECG" || s === "EEG" || s === "ELETROCARDIOGRAMA" || s === "ELETROENCEFALOGRAMA") return m.nome;
+    if (m.nome.startsWith("🩺") || NOMES_EXAME_SEM_PREFIXO.has(s)) return m.nome;
     return `${prefixoMedico(m.sexo)} ${m.nome}`;
   };
   const medicoNomeAgendamento = (a: Agendamento) => {
     const m = medicos.find((x) => x.id === a.medico_id);
-    const isExame = (n?: string | null) => {
-      const s = (n ?? "").trim().toUpperCase();
-      return s === "ECG" || s === "EEG" || s === "ELETROCARDIOGRAMA" || s === "ELETROENCEFALOGRAMA";
-    };
+    const isExame = (n?: string | null) => NOMES_EXAME_SEM_PREFIXO.has((n ?? "").trim().toUpperCase());
     if (m) {
       if (m.nome.startsWith("🩺") || isExame(m.nome)) return m.nome;
       return `${prefixoMedico(m.sexo)} ${m.nome}`;
