@@ -1258,9 +1258,42 @@ h1, h2, h3 { margin: 0 0 6mm; }
             />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <DadosField label="Data início" value={fmtD(contrato.data_inicio)} />
-              <DadosField label="Dia de vencimento" value={contrato.dia_vencimento ?? "—"} />
-              <DadosField label="Valor mensal" value={BRL(Number(valorMensalAtual))} />
+              <div className="space-y-1">
+                <div className="text-xs text-muted-foreground">Dia de vencimento</div>
+                <Input
+                  type="number"
+                  min={1}
+                  max={31}
+                  value={editDia}
+                  onChange={(e) => setEditDia(e.target.value)}
+                  disabled={cancelado || savingDados}
+                />
+              </div>
+              <div className="space-y-1">
+                <div className="text-xs text-muted-foreground">Valor mensal (R$)</div>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  value={editValor}
+                  onChange={(e) => setEditValor(e.target.value)}
+                  disabled={cancelado || savingDados}
+                />
+              </div>
               <DadosField label="Taxa de adesão" value={BRL(Number(contrato.taxa_adesao ?? 0))} />
+            </div>
+            <div className="flex flex-wrap items-center gap-3 rounded-md border bg-muted/30 px-3 py-2">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={regerarFuturas}
+                  onChange={(e) => setRegerarFuturas(e.target.checked)}
+                />
+                Regerar 12 parcelas futuras com este valor e dia
+              </label>
+              <Button size="sm" onClick={salvarDadosFinanceiros} disabled={cancelado || savingDados} className="ml-auto">
+                {savingDados ? "Salvando…" : "Salvar valor e vencimento"}
+              </Button>
             </div>
             <DadosField label="Forma de pagamento" value={formaLabel} />
             <div className="space-y-1">
