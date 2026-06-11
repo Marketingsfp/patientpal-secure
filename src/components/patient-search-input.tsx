@@ -67,7 +67,7 @@ function parseDataBusca(term: string): { iso?: string; partial?: { dia: string; 
 export function PatientSearchInput({
   value,
   onSelect,
-  placeholder = "Buscar paciente por nome, CPF ou prontuário…",
+  placeholder = "Buscar por nome, nascimento (DD/MM/AAAA), CPF, pasta ou prontuário…",
   className,
   autoFocus,
   clinicaIdsOverride,
@@ -244,6 +244,11 @@ export function PatientSearchInput({
                   {p.codigo_prontuario && (
                     <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-muted">
                       Prontuário {p.codigo_prontuario}
+                    </span>
+                  )}
+                  {p.numero_pasta && (
+                    <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-muted">
+                      Pasta {p.numero_pasta}
                     </span>
                   )}
                   <span className="text-xs text-muted-foreground">
