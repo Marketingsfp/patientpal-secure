@@ -375,6 +375,22 @@ function Page() {
                     onChange={(e) => setGerar({ ...gerar, limite_fichas: e.target.value })}
                   />
                 </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Hora início</label>
+                  <Input type="time" className="w-28" value={gerar.hora_inicio}
+                    onChange={(e) => setGerar({ ...gerar, hora_inicio: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Hora fim</label>
+                  <Input type="time" className="w-28" value={gerar.hora_fim}
+                    onChange={(e) => setGerar({ ...gerar, hora_fim: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Intervalo (min)</label>
+                  <Input type="number" min={1} placeholder="padrão" className="w-28"
+                    value={gerar.intervalo_min}
+                    onChange={(e) => setGerar({ ...gerar, intervalo_min: e.target.value })} />
+                </div>
                 <Button onClick={gerarAgenda} disabled={gerando || slotsPreview.length === 0}>
                   <CalendarRange className="h-4 w-4 mr-1" />
                   {gerando ? "Gerando..." : `Gerar ${slotsPreview.length} slots`}
