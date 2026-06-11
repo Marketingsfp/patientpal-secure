@@ -505,7 +505,9 @@ function Page() {
     { total: 0, medico: 0, clinica: 0, pago: 0, aReceber: 0 },
   ), [filteredItems]);
 
-  const selectables = filteredItems.filter((a) => !a.repasse_pago && (a.valor_medico ?? 0) > 0);
+  const isAtendido = (a: Atend) =>
+    a.origem === "manual" ? a.status === "realizado" : a.agendamento_status === "realizado";
+  const selectables = filteredItems.filter((a) => !a.repasse_pago && (a.valor_medico ?? 0) > 0 && isAtendido(a));
   const allSelected = selectables.length > 0 && selectables.every((a) => sel.has(`${a.origem}:${a.id}`));
   const toggleAll = () => {
     if (allSelected) setSel(new Set());
