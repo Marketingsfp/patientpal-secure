@@ -515,12 +515,22 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
     if (editId) {
       const { error } = await supabase.from("medicos").update(payload).eq("id", editId);
       if (error) { setSaving(false); toast.error(error.message); return; }
-      await supabase.from("medico_especialidades").delete().eq("medico_id", editId);
-      await supabase.from("medico_procedimentos").delete().eq("medico_id", editId);
+      const { error: delEsp } = await supabase.from("medico_especialidades").delete().eq("medico_id", editId);
+      if (delEsp) { setSaving(false); toast.error(`Erro ao limpar especialidades: ${delEsp.message}`); return; }
+      const { error: delProc } = await supabase.from("medico_procedimentos").delete().eq("medico_id", editId);
+      if (delProc) { setSaving(false); toast.error(`Erro ao limpar procedimentos: ${delProc.message}`); return; }
     } else {
       const { data: novo, error } = await supabase.from("medicos").insert(payload).select("id").single();
       if (error || !novo) { setSaving(false); toast.error(error?.message ?? "Erro"); return; }
       medicoId = novo.id;
+      // C-2: Cria agenda padrão imediatamente para o novo médico,
+      // garantindo que disponibilidades possam ser cadastradas sem violar a FK.
+      const { error: agErr } = await supabase
+        .from("medico_agendas")
+        .insert({ clinica_id: clinicaId, medico_id: medicoId, nome: "AGENDA", ordem: 0, ativo: true } as never);
+      if (agErr) {
+        toast.warning(`Médico criado, mas agenda padrão falhou: ${agErr.message}`);
+      }
     }
     const especialidadesValidas = form.especialidades.filter((x) => !!x.especialidade_id);
     if (medicoId && especialidadesValidas.length) {
