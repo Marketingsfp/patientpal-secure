@@ -3202,7 +3202,7 @@ function AgendaPage() {
               const fichaNum = fichaPorId.get(a.id) ?? "";
               const realizado = a.status === "realizado";
                 const etapaRow = etapaMap.get(a.id) ?? "aguardando_recepcao";
-                const presente = !realizado && (etapaRow === "recepcao" || etapaRow === "triagem");
+                const presente = !realizado && !["aguardando_recepcao", "finalizado", "cancelado"].includes(etapaRow);
               return (
                   <TableRow
                     key={a.id}
