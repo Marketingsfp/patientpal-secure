@@ -30,10 +30,23 @@ export function MedicoAgendasTab({
 
   const load = async () => {
     const [a, mp] = await Promise.all([
-      supabase.from("medico_agendas").select("id, nome, ativo, ordem").eq("medico_id", medicoId).order("ordem").order("nome"),
+      supabase.from("medico_agendas").select("id, nome, ativo, ordem").eq("medico_id", medicoId).eq("clinica_id", clinicaId).order("ordem").order("nome"),
       supabase.from("medico_procedimentos").select("procedimento_id").eq("medico_id", medicoId),
     ]);
-    const ags = ((a.data as Agenda[]) ?? []);
+    let ags = ((a.data as Agenda[]) ?? []);
+    // C-1: garante agenda padrão para todo médico (necessária para FK de medico_disponibilidades).
+    if (ags.length === 0 && medicoId && clinicaId) {
+      const { data: novaAg, error: errAg } = await supabase
+        .from("medico_agendas")
+        .insert({ clinica_id: clinicaId, medico_id: medicoId, nome: "AGENDA", ordem: 0, ativo: true } as never)
+        .select("id, nome, ativo, ordem")
+        .single();
+      if (errAg) {
+        toast.error(`Falha ao criar agenda padrão: ${errAg.message}`);
+      } else if (novaAg) {
+        ags = [novaAg as Agenda];
+      }
+    }
     setAgendas(ags);
     setMultipla(ags.length > 1);
     const idsFromDb = new Set(
