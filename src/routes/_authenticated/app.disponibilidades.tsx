@@ -177,7 +177,12 @@ function Page() {
       for (const m of alvo) {
         const agendasDoMedico = agendas.filter((a) => a.medico_id === m.id && a.ativo);
         for (const ag of agendasDoMedico) {
-          const ds = disps.filter((x) => x.medico_id === m.id && x.agenda_id === ag.id && x.dia_semana === dow);
+          const diaIso = d.toISOString().slice(0, 10);
+          const ds = disps.filter((x) =>
+            x.medico_id === m.id && x.agenda_id === ag.id && x.dia_semana === dow
+            && (!x.vigencia_inicio || x.vigencia_inicio <= diaIso)
+            && (!x.vigencia_fim || x.vigencia_fim >= diaIso),
+          );
           if (ds.length === 0) continue;
           const fallbackDur = m.duracao_consulta_min && m.duracao_consulta_min > 0 ? m.duracao_consulta_min : 15;
           const overrideLimite = gerar.limite_fichas ? parseInt(gerar.limite_fichas) : 0;
@@ -472,6 +477,14 @@ function Page() {
                       <label className="text-xs text-muted-foreground">Intervalo (min)</label>
                       <Input type="number" min={1} max={480} placeholder="padrão do médico" className="w-36" value={novo.intervalo_min} onChange={(e) => setNovo({ ...novo, intervalo_min: e.target.value })} />
                     </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Vigência de</label>
+                      <Input type="date" className="w-40" value={novo.vigencia_inicio} onChange={(e) => setNovo({ ...novo, vigencia_inicio: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">até</label>
+                      <Input type="date" className="w-40" value={novo.vigencia_fim} onChange={(e) => setNovo({ ...novo, vigencia_fim: e.target.value })} />
+                    </div>
                     <Button onClick={() => { setNovo({ ...novo, medico_id: m.id }); void adicionar(); }}>
                       <Plus className="h-4 w-4 mr-1" /> Adicionar
                     </Button>
@@ -492,6 +505,7 @@ function Page() {
                             <TableHead>Fim</TableHead>
                             <TableHead>Pacientes/dia</TableHead>
                             <TableHead>Intervalo</TableHead>
+                            <TableHead>Vigência</TableHead>
                             <TableHead className="w-28 text-right">Ações</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -520,6 +534,12 @@ function Page() {
                                 <TableCell>
                                   <Input type="number" min={1} max={480} placeholder="padrão" className="w-28" value={editRow.intervalo_min} onChange={(e) => setEditRow({ ...editRow, intervalo_min: e.target.value })} />
                                 </TableCell>
+                                <TableCell>
+                                  <div className="flex gap-1">
+                                    <Input type="date" className="w-36" value={editRow.vigencia_inicio} onChange={(e) => setEditRow({ ...editRow, vigencia_inicio: e.target.value })} />
+                                    <Input type="date" className="w-36" value={editRow.vigencia_fim} onChange={(e) => setEditRow({ ...editRow, vigencia_fim: e.target.value })} />
+                                  </div>
+                                </TableCell>
                                 <TableCell className="text-right">
                                   <div className="flex justify-end gap-2">
                                     <Button size="sm" onClick={() => void salvarEdicao()}>Salvar</Button>
@@ -537,6 +557,11 @@ function Page() {
                                 <TableCell>{d.hora_fim.slice(0, 5)}</TableCell>
                                 <TableCell>{d.limite_pacientes ?? <span className="text-muted-foreground">—</span>}</TableCell>
                                 <TableCell>{d.intervalo_min ? `${d.intervalo_min} min` : <span className="text-muted-foreground">—</span>}</TableCell>
+                                <TableCell className="text-xs text-muted-foreground">
+                                  {d.vigencia_inicio || d.vigencia_fim
+                                    ? `${d.vigencia_inicio ? d.vigencia_inicio.split("-").reverse().join("/") : "—"} a ${d.vigencia_fim ? d.vigencia_fim.split("-").reverse().join("/") : "—"}`
+                                    : <span className="text-muted-foreground">sempre</span>}
+                                </TableCell>
                                 <TableCell className="text-right">
                                   <div className="flex justify-end gap-2">
                                     <button
@@ -548,6 +573,8 @@ function Page() {
                                           hora_fim: d.hora_fim.slice(0, 5),
                                           limite_pacientes: d.limite_pacientes ? String(d.limite_pacientes) : "",
                                           intervalo_min: d.intervalo_min ? String(d.intervalo_min) : "",
+                                          vigencia_inicio: d.vigencia_inicio ?? "",
+                                          vigencia_fim: d.vigencia_fim ?? "",
                                         });
                                       }}
                                       className="text-primary hover:opacity-70"
