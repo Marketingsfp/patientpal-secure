@@ -1,50 +1,60 @@
-# Plano de vistoria e integração do sistema
+## Contexto
 
-Sem erros específicos listados, vou trabalhar em **4 ondas sequenciais**, cada uma focada em um elo do fluxo. Ao fim de cada onda eu te mostro o que encontrei + o que corrigi, e você valida antes de eu seguir para a próxima. Isso evita um patch gigante de risco alto.
+O usuário quer:
+1. Importar as 3 planilhas de relatório de rateio (Cartão Consulta antigo, Cartão Consulta 12/06/2025–11/06/2026, Cartão Consulta + Seguro) da Policlínica Menino Jesus como base de dados de contratos antigos.
+2. Cadastrar titular **e** dependentes pela tela de Cartão Benefícios (hoje só dá pra fazer pelo titular).
+3. Aplicar descontos automaticamente quando o paciente do cartão for atendido (consulta, exame, etc.).
+4. Bloquear **agendamento + check-in** quando houver qualquer mensalidade vencida.
 
-## Onda 1 — Abertura de agenda + disponibilidades
-Arquivos: `app.medicos.tsx`, `app.disponibilidades.tsx`, `MedicoAgendasTab.tsx`, `medico_agendas`, `medico_disponibilidades`, `medico_agenda_procedimentos`.
+Convênios já cadastrados na clínica MJ: CARTÃO CONSULTA, CARTÃO CONSULTA + SEGUROS, CARTÃO TERAPÊUTICO. 0 contratos importados até agora.
 
-Vou verificar:
-- Cadastro de agenda do médico salva especialidade, dias, intervalo de slots e procedimentos vinculados.
-- Disponibilidade respeita feriados/bloqueios e gera os slots corretos na tela de agenda.
-- Médico com 2+ agendas (clínicas/dias diferentes) não duplica nem some.
-- Encaixe respeita os filtros (já corrigido recentemente — vou revalidar).
+## Observações importantes sobre as planilhas
 
-## Onda 2 — Agendamento
-Arquivos: `app.agenda.tsx`, `procedimento-cell.tsx`, `app.checkin.tsx`, tabela `agendamentos`.
+- São relatórios de **rateio de receita** (cada linha é um pagamento), não listas de titulares.
+- Os nomes vêm **truncados** em ~25 caracteres com `...` no final. Isso prejudica matching exato — vou usar prefixo + fuzzy.
+- Vou agrupar por nome+clínica (MJ) para extrair os titulares únicos, somando pagamentos por mês.
+- Valores como R$10/15/20 são adesão; R$25 é mensalidade Cartão Consulta titular; R$15 dep; R$290/490 é Cartão Terapêutico.
+- Pacientes que aparecem só nessas planilhas (não existem em `pacientes`) ficam registrados como contrato com `paciente_nome` em texto livre + flag para o atendente completar o cadastro.
 
-Vou verificar:
-- Criar/editar/remarcar mantém paciente, procedimento, especialidade, médico e valor coerentes.
-- Vínculo com orçamento (recém adicionado: Laboratório x Demais) está exibindo as opções certas.
-- Status (agendado → confirmado → em atendimento → finalizado) atualiza em todas as telas (agenda, fluxo, recepção, painel).
-- Realtime atualiza sem precisar recarregar.
+## Etapas de entrega
 
-## Onda 3 — Caixa / Pagamento do paciente
-Arquivos: `app.caixa.tsx`, `lancamento-dialog.tsx`, `SolicitarEstornoDialog.tsx`, `pagamentos`, `pagamento_splits`, `caixa_sessoes`, `caixa_movimentos`, `fin_lancamentos`.
+### Etapa 1 — Importação (script + migration)
+- Script local em Python que lê as 3 .xlsx, normaliza nomes (sem acentos, uppercase, sem `...`), agrupa por titular e gera registros em `contratos_assinatura` com:
+  - `convenio_id` correto (Cartão Consulta vs Cartão Consulta + Seguros).
+  - `paciente_nome` (texto) + tentativa de match com `pacientes` por prefixo de nome → preenche `paciente_id` quando único.
+  - `data_inicio` = primeira data de pagamento da pessoa naquela planilha; `valor_mensal` inferido pelo maior valor de mensalidade observado.
+  - `observacoes` = "Importado de relatório de rateio MJ <arquivo>".
+- Cria entradas em `contrato_mensalidades` para cada pagamento histórico encontrado (já como `paga`).
+- **Dedup**: antes de inserir, busca contrato existente com mesmo convênio+nome normalizado, mescla histórico em vez de criar novo.
+- Entrega no chat: `/mnt/documents/import-cartao-mj.csv` com o resultado (titulares criados, mesclados, sem match, pagamentos importados).
 
-Vou verificar:
-- Abertura/fechamento de sessão de caixa, conferência de valores.
-- Pagamento vinculado ao agendamento gera lançamento financeiro e split corretos.
-- Múltiplas formas de pagamento (dinheiro, cartão, pix) somam certo e respeitam taxa.
-- Estorno reverte lançamento + split + status do agendamento.
+### Etapa 2 — Tela: cadastrar dependentes junto do titular
+- No `contratos-page.tsx` (já tem aba dependentes ao editar contrato), revisar o fluxo de **criação** do contrato:
+  - Permitir, no mesmo modal de novo contrato, adicionar 1..N dependentes via `PatientSearchInput` (ou cadastro rápido inline para paciente novo).
+  - Salvar dependentes em `contrato_dependentes` após criar o contrato.
+- Aviso visual quando o titular tem mensalidade vencida (badge vermelho).
 
-## Onda 4 — Atendimento → comissão médica
-Arquivos: `app.atendimento-ia.*`, `prontuarios`, `pagamento_splits`, `procedimento_split_regras`, `regras_rateio`, `app.financeiro.atendimentos.tsx`, `app.medico.$medicoId.tsx`.
+### Etapa 3 — Descontos automáticos no atendimento
+- Já existe `procedimento_cb_convenio_valores`, `cb_convenio_regras` e `findRegra/computeValor` em `src/lib/cb-regras.ts`.
+- Vou **popular as regras** dos 3 convênios MJ via migration conforme o informativo:
+  - **Cartão Consulta**: consulta R$25 titular / R$15 dep, exames com tabela própria (uso valor fixo do informativo).
+  - **Cartão Terapêutico**: 40% off em consultas de Pediatria/Neurologia/Ortopedia/Nutrição, 10% off em exames, terapias inclusas no pacote (valor R$0 dentro do limite semanal).
+  - **Cartão Consulta + Seguros**: mesma tabela do Consulta + cobertura adicional.
+- Garantir que `procedimento-cell.tsx` (agenda) e a tela de atendimento já usam essas regras quando o paciente é titular **ou** dependente ativo de contrato.
 
-Vou verificar:
-- Finalizar atendimento dispara cálculo do repasse conforme `procedimento_split_regras` / `regras_rateio`.
-- Comissão considera convênio/particular, descontos e taxa da maquineta.
-- Relatório do médico bate com a soma dos splits.
-- Pagamento ao médico (baixa) atualiza status do split e gera lançamento financeiro de saída.
+### Etapa 4 — Bloqueio por mensalidade vencida
+- Nova função SQL `public.paciente_cartao_inadimplente(paciente_id, clinica_id)` que retorna `true` quando existe `contrato_mensalidades.status='vencida'` em qualquer contrato ativo do paciente (como titular ou dependente).
+- No agendamento (`app.agenda.tsx`) e no check-in (`app.checkin.tsx` / `recepcao.tsx`):
+  - Antes de salvar, chama a função; se inadimplente, mostra toast vermelho **bloqueante** com a lista de mensalidades vencidas e um botão "Ver financeiro".
+  - Usuários com permissão `gerente` veem botão "Liberar mesmo assim" (registra log).
 
-## Como vou trabalhar
-1. Abro a onda, leio os arquivos e o schema, listo achados (bug / inconsistência / integração faltante) com gravidade.
-2. Aplico correções pontuais (sem reescrever módulos inteiros).
-3. Te entrego um resumo curto + testes manuais sugeridos.
-4. Você confirma e eu avanço para a próxima onda.
+## Detalhes técnicos
 
-## Antes de começar — preciso de você
-Para a Onda 1 ser efetiva, me responde:
-- Tem **algum erro/tela específica** que você já viu falhar? (mesmo que vago — "ao salvar agenda some o procedimento", "encaixe vem com hora errada", etc.) Qualquer pista corta horas de auditoria às cegas.
-- Posso começar pela **Onda 1 (Abertura de agenda)** agora?
+- Importação roda local (Python + openpyxl) gerando SQL bulk. Eu rodo o SQL via `supabase--insert` em lotes de ~500 linhas.
+- A função de bloqueio é `SECURITY DEFINER` para não exigir nova policy.
+- Regras de preço já têm UI em `regras-tab.tsx` — não preciso criar UI nova, só popular.
+- Não vou mexer em São Francisco / Consulta Hoje agora (só MJ tem planilha). Os convênios das outras clínicas ficam para uma próxima rodada com planilha delas.
+
+## Entrego em sequência, te mostro cada etapa concluída antes da próxima
+
+Etapa 1 leva mais tempo (parsing + dedup). Posso começar pela Etapa 3+4 (regras + bloqueio) em paralelo se preferir, já que dependem menos dos dados antigos. Confirma que pode seguir nessa ordem (1 → 2 → 3 → 4) ou prefere outra?
