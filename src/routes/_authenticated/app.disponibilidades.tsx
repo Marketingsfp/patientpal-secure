@@ -39,9 +39,10 @@ function isFeriadoOuDomingo(d: Date): boolean {
 }
 
 interface Disp { id: string; medico_id: string; dia_semana: number; hora_inicio: string; hora_fim: string; observacoes: string | null; limite_pacientes: number | null; intervalo_min: number | null }
+type DispExt = Disp & { vigencia_inicio: string | null; vigencia_fim: string | null };
 interface Medico { id: string; nome: string; duracao_consulta_min: number | null; procedimento_padrao_id: string | null; procedimento_padrao_nome: string | null; especialidade_nome: string | null }
 interface Agenda { id: string; medico_id: string; nome: string; ativo: boolean; ordem: number }
-interface DispRow extends Disp { agenda_id: string }
+interface DispRow extends DispExt { agenda_id: string }
 
 function Page() {
   const { clinicaAtual } = useClinica();
@@ -50,7 +51,7 @@ function Page() {
   const [agendas, setAgendas] = useState<Agenda[]>([]);
   const [agendaSel, setAgendaSel] = useState<string>("");
   const [filtro, setFiltro] = useState("");
-  const [novo, setNovo] = useState({ medico_id: "", dia_semana: "1", hora_inicio: "08:00", hora_fim: "12:00", limite_pacientes: "", intervalo_min: "" });
+  const [novo, setNovo] = useState({ medico_id: "", dia_semana: "1", hora_inicio: "08:00", hora_fim: "12:00", limite_pacientes: "", intervalo_min: "", vigencia_inicio: "", vigencia_fim: "" });
   const [diasSel, setDiasSel] = useState<number[]>([1]);
   const hojeIso = new Date().toISOString().slice(0, 10);
   const em30Iso = (() => { const d = new Date(); d.setDate(d.getDate() + 29); return d.toISOString().slice(0, 10); })();
@@ -58,13 +59,13 @@ function Page() {
   const [gerando, setGerando] = useState(false);
   const [medicoEditando, setMedicoEditando] = useState<string | null>(null);
   const [dispEditando, setDispEditando] = useState<string | null>(null);
-  const [editRow, setEditRow] = useState<{ dia_semana: string; hora_inicio: string; hora_fim: string; limite_pacientes: string; intervalo_min: string } | null>(null);
+  const [editRow, setEditRow] = useState<{ dia_semana: string; hora_inicio: string; hora_fim: string; limite_pacientes: string; intervalo_min: string; vigencia_inicio: string; vigencia_fim: string } | null>(null);
 
   const load = async () => {
     if (!clinicaAtual) return;
     const [m, d, a] = await Promise.all([
       supabase.from("medicos").select("id, nome, duracao_consulta_min, procedimento_padrao_id, procedimento:procedimentos!medicos_procedimento_padrao_id_fkey(nome), especialidade:especialidades!medicos_especialidade_id_fkey(nome)" as never).eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
-      supabase.from("medico_disponibilidades").select("id, medico_id, agenda_id, dia_semana, hora_inicio, hora_fim, observacoes, limite_pacientes, intervalo_min" as never).eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("dia_semana").order("hora_inicio"),
+      supabase.from("medico_disponibilidades").select("id, medico_id, agenda_id, dia_semana, hora_inicio, hora_fim, observacoes, limite_pacientes, intervalo_min, vigencia_inicio, vigencia_fim" as never).eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("dia_semana").order("hora_inicio"),
       supabase.from("medico_agendas" as never).select("id, medico_id, nome, ativo, ordem").eq("clinica_id", clinicaAtual.clinica_id).order("ordem").order("nome"),
     ]);
     type RawMedico = { id: string; nome: string; duracao_consulta_min: number | null; procedimento_padrao_id: string | null; procedimento?: { nome: string | null } | null; especialidade?: { nome: string | null } | null };
@@ -125,6 +126,8 @@ function Page() {
       hora_fim: novo.hora_fim,
       limite_pacientes: novo.limite_pacientes ? parseInt(novo.limite_pacientes) : null,
       intervalo_min: novo.intervalo_min ? parseInt(novo.intervalo_min) : null,
+      vigencia_inicio: novo.vigencia_inicio || null,
+      vigencia_fim: novo.vigencia_fim || null,
     }));
     const { error } = await supabase.from("medico_disponibilidades").insert(payload as never);
     if (error) { toast.error(error.message); return; }
@@ -140,6 +143,8 @@ function Page() {
       hora_fim: editRow.hora_fim,
       limite_pacientes: editRow.limite_pacientes ? parseInt(editRow.limite_pacientes) : null,
       intervalo_min: editRow.intervalo_min ? parseInt(editRow.intervalo_min) : null,
+      vigencia_inicio: editRow.vigencia_inicio || null,
+      vigencia_fim: editRow.vigencia_fim || null,
     };
     const { error } = await supabase.from("medico_disponibilidades").update(payload as never).eq("id", dispEditando);
     if (error) { toast.error(error.message); return; }
