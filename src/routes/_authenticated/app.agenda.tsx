@@ -2458,6 +2458,10 @@ function AgendaPage() {
                 {form.medico_id ? (
                   (procOpcoesPorMedico.get(form.medico_id)?.length || procPorMedico.get(form.medico_id)?.size || procNomesPorMedico.get(form.medico_id)?.size) ? (
                     <p className="text-xs text-muted-foreground">Mostrando apenas serviços configurados para este médico.</p>
+                  ) : procedimentoPadraoDoMedico(form.medico_id) ? (
+                    <p className="text-xs text-muted-foreground">
+                      Mostrando o serviço principal do médico. Cadastre mais serviços no cadastro do médico, se necessário.
+                    </p>
                   ) : (
                     <p className="text-xs text-amber-600">
                       Este médico não possui serviços cadastrados. Configure-os no cadastro do médico.
@@ -2471,15 +2475,26 @@ function AgendaPage() {
                   onChange={(v) => setForm(f => ({ ...f, procedimento: v === "none" ? "" : v }))}
                   placeholder="Selecione o serviço"
                   searchPlaceholder="Buscar serviço..."
-                  options={[
-                    { value: "none", label: "— Selecione —" },
-                    ...(form.medico_id
-                      ? opcoesProcedimentoMedico(
-                          form.medico_id,
-                          editing?.agenda_id ?? (filtroAgenda !== "todos" ? filtroAgenda : null),
-                        ).map((p) => ({ value: p.nome, label: p.nome }))
-                      : []),
-                  ]}
+                  options={(() => {
+                    const base: { value: string; label: string }[] = [{ value: "none", label: "— Selecione —" }];
+                    if (!form.medico_id) return base;
+                    const opts = opcoesProcedimentoMedico(
+                      form.medico_id,
+                      editing?.agenda_id ?? (filtroAgenda !== "todos" ? filtroAgenda : null),
+                    ).map((p) => ({ value: p.nome, label: p.nome }));
+                    // Sempre garantir que o serviço principal do médico apareça como opção,
+                    // mesmo quando ele não tem serviços vinculados no cadastro.
+                    const padrao = procedimentoPadraoDoMedico(form.medico_id);
+                    if (padrao && !opts.some((o) => normalizar(o.value) === normalizar(padrao))) {
+                      opts.unshift({ value: padrao, label: `${padrao} (principal)` });
+                    }
+                    // Se o valor atual não estiver na lista (ex.: procedimento legado), inclui também.
+                    const atual = (form.procedimento ?? "").trim();
+                    if (atual && !opts.some((o) => normalizar(o.value) === normalizar(atual))) {
+                      opts.push({ value: atual, label: atual });
+                    }
+                    return [...base, ...opts];
+                  })()}
                 />
               </div>
               <div className="space-y-1">
