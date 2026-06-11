@@ -57,7 +57,7 @@ function Page() {
   const [diasSel, setDiasSel] = useState<number[]>([1]);
   const hojeIso = new Date().toISOString().slice(0, 10);
   const em30Iso = (() => { const d = new Date(); d.setDate(d.getDate() + 29); return d.toISOString().slice(0, 10); })();
-  const [gerar, setGerar] = useState({ medico_id: "all", dias: "30", data_inicio: hojeIso, data_fim: em30Iso, limite_fichas: "" });
+  const [gerar, setGerar] = useState({ medico_id: "all", dias: "30", data_inicio: hojeIso, data_fim: em30Iso, limite_fichas: "", hora_inicio: "", hora_fim: "", intervalo_min: "" });
   const [gerarDias, setGerarDias] = useState<number[]>([1, 2, 3, 4, 5, 6]);
   const [gerando, setGerando] = useState(false);
   const [medicoEditando, setMedicoEditando] = useState<string | null>(null);
@@ -198,7 +198,9 @@ function Page() {
           // Fallback: se o médico não tem disponibilidade semanal cadastrada para o dia,
           // gera um bloco padrão 08:00–17:00 para que o usuário consiga criar a agenda
           // mesmo sem configurar a disponibilidade semanal antes.
-          const dsEfetivo = ds.length > 0
+          const overrideIni = gerar.hora_inicio || "";
+          const overrideFim = gerar.hora_fim || "";
+          const baseDs = ds.length > 0
             ? ds
             : [{
                 id: `__default_${m.id}_${dow}`,
@@ -213,7 +215,14 @@ function Page() {
                 vigencia_inicio: null,
                 vigencia_fim: null,
               } as DispRow];
+          // Aplica filtros/overrides de horário e intervalo do formulário
+          const dsEfetivo = baseDs.map((x) => ({
+            ...x,
+            hora_inicio: overrideIni ? (overrideIni > x.hora_inicio ? overrideIni : x.hora_inicio) : x.hora_inicio,
+            hora_fim: overrideFim ? (overrideFim < x.hora_fim ? overrideFim : x.hora_fim) : x.hora_fim,
+          })).filter((x) => x.hora_inicio < x.hora_fim);
           const overrideLimite = gerar.limite_fichas ? parseInt(gerar.limite_fichas) : 0;
+          const overrideIntervalo = gerar.intervalo_min ? parseInt(gerar.intervalo_min) : 0;
           let limiteDia: number;
           if (overrideLimite > 0) {
             limiteDia = overrideLimite;
@@ -223,7 +232,9 @@ function Page() {
           }
           let criadosNoDia = 0;
           for (const disp of dsEfetivo) {
-            const dur = disp.intervalo_min && disp.intervalo_min > 0 ? disp.intervalo_min : fallbackDur;
+            const dur = overrideIntervalo > 0
+              ? overrideIntervalo
+              : (disp.intervalo_min && disp.intervalo_min > 0 ? disp.intervalo_min : fallbackDur);
             const [hi, mi] = disp.hora_inicio.split(":").map(Number);
             const [hf, mf] = disp.hora_fim.split(":").map(Number);
             let cur = hi * 60 + mi;
@@ -363,6 +374,22 @@ function Page() {
                     value={gerar.limite_fichas}
                     onChange={(e) => setGerar({ ...gerar, limite_fichas: e.target.value })}
                   />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Hora início</label>
+                  <Input type="time" className="w-28" value={gerar.hora_inicio}
+                    onChange={(e) => setGerar({ ...gerar, hora_inicio: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Hora fim</label>
+                  <Input type="time" className="w-28" value={gerar.hora_fim}
+                    onChange={(e) => setGerar({ ...gerar, hora_fim: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Intervalo (min)</label>
+                  <Input type="number" min={1} placeholder="padrão" className="w-28"
+                    value={gerar.intervalo_min}
+                    onChange={(e) => setGerar({ ...gerar, intervalo_min: e.target.value })} />
                 </div>
                 <Button onClick={gerarAgenda} disabled={gerando || slotsPreview.length === 0}>
                   <CalendarRange className="h-4 w-4 mr-1" />

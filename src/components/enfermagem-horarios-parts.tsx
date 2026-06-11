@@ -54,7 +54,7 @@ export function EnfermagemGerarAgendaCard() {
   const { clinicaAtual, recursos, disps } = useEnfermagemHorariosData();
   const hojeIso = new Date().toISOString().slice(0, 10);
   const em30Iso = (() => { const d = new Date(); d.setDate(d.getDate() + 29); return d.toISOString().slice(0,10); })();
-  const [gerar, setGerar] = useState({ recurso_id: "all", data_inicio: hojeIso, data_fim: em30Iso, limite_fichas: "" });
+  const [gerar, setGerar] = useState({ recurso_id: "all", data_inicio: hojeIso, data_fim: em30Iso, limite_fichas: "", hora_inicio: "", hora_fim: "", intervalo_min: "" });
   const [gerarDias, setGerarDias] = useState<number[]>([1, 2, 3, 4, 5, 6]);
   const [gerando, setGerando] = useState(false);
 
@@ -72,8 +72,16 @@ export function EnfermagemGerarAgendaCard() {
       const dow = d.getDay();
       if (!gerarDias.includes(dow)) continue;
       for (const r of alvo) {
-        const ds = disps.filter((x) => x.recurso_id === r.id && x.dia_semana === dow);
+        const baseDs = disps.filter((x) => x.recurso_id === r.id && x.dia_semana === dow);
         const fallbackDur = r.duracao_padrao_min && r.duracao_padrao_min > 0 ? r.duracao_padrao_min : 30;
+        const overrideIni = gerar.hora_inicio || "";
+        const overrideFim = gerar.hora_fim || "";
+        const overrideIntervalo = gerar.intervalo_min ? parseInt(gerar.intervalo_min) : 0;
+        const ds = baseDs.map((x) => ({
+          ...x,
+          hora_inicio: overrideIni && overrideIni > x.hora_inicio ? overrideIni : x.hora_inicio,
+          hora_fim: overrideFim && overrideFim < x.hora_fim ? overrideFim : x.hora_fim,
+        })).filter((x) => x.hora_inicio < x.hora_fim);
         const override = gerar.limite_fichas ? parseInt(gerar.limite_fichas) : 0;
         let limiteDia: number;
         if (override > 0) limiteDia = override;
@@ -83,7 +91,9 @@ export function EnfermagemGerarAgendaCard() {
         }
         let criados = 0;
         for (const disp of ds) {
-          const dur = disp.intervalo_min && disp.intervalo_min > 0 ? disp.intervalo_min : fallbackDur;
+          const dur = overrideIntervalo > 0
+            ? overrideIntervalo
+            : (disp.intervalo_min && disp.intervalo_min > 0 ? disp.intervalo_min : fallbackDur);
           const [hi, mi] = disp.hora_inicio.split(":").map(Number);
           const [hf, mf] = disp.hora_fim.split(":").map(Number);
           let cur = hi*60 + mi; const end = hf*60 + mf;
@@ -159,6 +169,22 @@ export function EnfermagemGerarAgendaCard() {
             <Input type="number" min={1} placeholder="padrão" className="w-32"
               value={gerar.limite_fichas}
               onChange={(e) => setGerar({ ...gerar, limite_fichas: e.target.value })} />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Hora início</label>
+            <Input type="time" className="w-28" value={gerar.hora_inicio}
+              onChange={(e) => setGerar({ ...gerar, hora_inicio: e.target.value })} />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Hora fim</label>
+            <Input type="time" className="w-28" value={gerar.hora_fim}
+              onChange={(e) => setGerar({ ...gerar, hora_fim: e.target.value })} />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Intervalo (min)</label>
+            <Input type="number" min={1} placeholder="padrão" className="w-28"
+              value={gerar.intervalo_min}
+              onChange={(e) => setGerar({ ...gerar, intervalo_min: e.target.value })} />
           </div>
           <Button onClick={gerarAgenda} disabled={gerando || slotsPreview.length === 0}>
             <CalendarRange className="h-4 w-4 mr-1" />
