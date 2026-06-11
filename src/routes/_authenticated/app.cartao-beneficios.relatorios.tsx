@@ -420,6 +420,23 @@ function RelatoriosPage() {
         <KPI onClick={() => openDrill("atendimentos")} icon={<Activity className="h-4 w-4"/>} label="Atendimentos usados" value={stats.usoTotal}/>
       </div>
 
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <KPI
+          icon={stats.resultado >= 0
+            ? <TrendingUp className="h-4 w-4 text-green-600"/>
+            : <TrendingDown className="h-4 w-4 text-red-600"/>}
+          label={stats.resultado >= 0 ? "Lucro (período)" : "Prejuízo (período)"}
+          value={`${BRL(Math.abs(stats.resultado))} (${stats.margemPct.toFixed(1)}%)`}
+        />
+        <KPI icon={<Activity className="h-4 w-4"/>} label="Ticket médio / pagante" value={BRL(stats.ticketMedio)}/>
+        <KPI icon={<Activity className="h-4 w-4"/>} label="Inadimplência" value={`${stats.inadimplenciaPct.toFixed(1)}% (${stats.mensAbertas}/${stats.mensPagas + stats.mensAbertas})`}/>
+        <KPI icon={<Activity className="h-4 w-4"/>} label="Taxa de utilização" value={`${stats.utilizacaoPct.toFixed(1)}%`}/>
+        <KPI icon={<Users className="h-4 w-4"/>} label="Consultas / titulares" value={stats.usosTitulares}/>
+        <KPI icon={<UserPlus className="h-4 w-4"/>} label="Consultas / dependentes" value={stats.usosDependentes}/>
+        <KPI icon={<Activity className="h-4 w-4"/>} label="Média consultas / pessoa" value={stats.mediaConsultasPessoa.toFixed(2)}/>
+        <KPI icon={<Activity className="h-4 w-4"/>} label="Consultas sem vínculo" value={stats.usosSemVinculo}/>
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Planos / Cartões — catálogo completo</CardTitle>
@@ -470,6 +487,82 @@ function RelatoriosPage() {
           </Table>
         </CardContent>
       </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Consultas por titular</CardTitle>
+            <p className="text-xs text-muted-foreground">Atendimentos no período por cada titular de cartão.</p>
+          </CardHeader>
+          <CardContent className="max-h-96 overflow-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Titular</TableHead>
+                  <TableHead>Plano</TableHead>
+                  <TableHead className="text-right">Consultas</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {stats.consultasTitulares.length === 0 ? (
+                  <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-4">Sem titulares no período.</TableCell></TableRow>
+                ) : null}
+                {stats.consultasTitulares.map((t, i) => (
+                  <TableRow key={i}>
+                    <TableCell>{t.nome}</TableCell>
+                    <TableCell><Badge variant="outline">{t.plano}</Badge></TableCell>
+                    <TableCell className="text-right font-semibold">{t.consultas}</TableCell>
+                  </TableRow>
+                ))}
+                {stats.consultasTitulares.length > 0 ? (
+                  <TableRow className="bg-muted/30 font-semibold">
+                    <TableCell colSpan={2}>Total</TableCell>
+                    <TableCell className="text-right">{stats.usosTitulares}</TableCell>
+                  </TableRow>
+                ) : null}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Consultas por dependente</CardTitle>
+            <p className="text-xs text-muted-foreground">Atendimentos no período por cada dependente.</p>
+          </CardHeader>
+          <CardContent className="max-h-96 overflow-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Dependente</TableHead>
+                  <TableHead>Titular</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead className="text-right">Consultas</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {stats.consultasDependentes.length === 0 ? (
+                  <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-4">Sem dependentes no período.</TableCell></TableRow>
+                ) : null}
+                {stats.consultasDependentes.map((d, i) => (
+                  <TableRow key={i}>
+                    <TableCell>{d.nome}</TableCell>
+                    <TableCell>{d.titular}</TableCell>
+                    <TableCell><Badge variant="outline">{d.tipo}</Badge></TableCell>
+                    <TableCell className="text-right font-semibold">{d.consultas}</TableCell>
+                  </TableRow>
+                ))}
+                {stats.consultasDependentes.length > 0 ? (
+                  <TableRow className="bg-muted/30 font-semibold">
+                    <TableCell colSpan={3}>Total</TableCell>
+                    <TableCell className="text-right">{stats.usosDependentes}</TableCell>
+                  </TableRow>
+                ) : null}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
