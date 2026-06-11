@@ -601,6 +601,7 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     </div>
   );
   const [mens, setMens] = useState<Mens[]>([]);
+  const [extraRecebido, setExtraRecebido] = useState<{ total: number; count: number }>({ total: 0, count: 0 });
   const [deps, setDeps] = useState<Dep[]>([]);
   const [convenio, setConvenio] = useState<any>(null);
   const [clinica, setClinica] = useState<any>(null);
@@ -691,6 +692,22 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
         : Promise.resolve({ data: [] }),
     ]);
     setMens((m.data ?? []) as Mens[]);
+    // Pagamentos avulsos importados (ex.: rateios MJ) vinculados ao paciente do contrato
+    const pacienteId = (contrato as any).paciente_id as string | undefined;
+    if (pacienteId) {
+      const { data: avulsos } = await supabase
+        .from("fin_lancamentos")
+        .select("valor")
+        .eq("clinica_id", (contrato as any).clinica_id)
+        .eq("paciente_id", pacienteId)
+        .eq("tipo", "receita")
+        .eq("status", "confirmado");
+      const rows = (avulsos ?? []) as Array<{ valor: number | string }>;
+      const total = rows.reduce((s, r) => s + Number(r.valor || 0), 0);
+      setExtraRecebido({ total, count: rows.length });
+    } else {
+      setExtraRecebido({ total: 0, count: 0 });
+    }
     const rows = (d.data ?? []) as any[];
     const pids = Array.from(new Set(rows.map((r) => r.paciente_id).filter(Boolean)));
     let cpfMap: Record<string, string | null> = {};
@@ -817,7 +834,10 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
   };
 
   const pagas = mens.filter((m) => m.status === "pago").length;
-  const totalPago = mens.filter((m) => m.status === "pago").reduce((s, m) => s + Number(m.valor), 0);
+  const totalPagoMens = mens.filter((m) => m.status === "pago").reduce((s, m) => s + Number(m.valor), 0);
+  const totalPago = totalPagoMens + extraRecebido.total;
+  const pagasTotal = pagas + extraRecebido.count;
+  const totalParcelas = mens.length + extraRecebido.count;
   const aReceber = mens.filter((m) => m.status !== "pago").reduce((s, m) => s + Number(m.valor), 0);
 
   // ---- Dados da venda (aba "Dados") ----
@@ -1112,7 +1132,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
             </div>
           ) : null}
           <div className="grid grid-cols-3 gap-3 text-sm">
-          <div className="rounded-md border p-3"><div className="text-muted-foreground text-xs">Pagas</div><div className="font-bold text-lg">{pagas}/{mens.length}</div></div>
+          <div className="rounded-md border p-3"><div className="text-muted-foreground text-xs">Pagas</div><div className="font-bold text-lg">{pagasTotal}/{totalParcelas}</div></div>
           <div className="rounded-md border p-3"><div className="text-muted-foreground text-xs">Recebido</div><div className="font-bold text-lg text-green-600">{BRL(totalPago)}</div></div>
           <div className="rounded-md border p-3"><div className="text-muted-foreground text-xs">A receber</div><div className="font-bold text-lg text-orange-600">{BRL(aReceber)}</div></div>
           </div>
