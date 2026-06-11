@@ -216,11 +216,29 @@ function Page() {
     if (!confirm(`Confirmar criação de ${slotsPreview.length} horários disponíveis?`)) return;
     setGerando(true);
     try {
-      const medicoByNome = new Map(medicos.map((m) => [m.nome, m]));
+      const medicoById = new Map(medicos.map((m) => [m.id, m]));
+      // A-2: limpar slots "DISPONÍVEL" pré-existentes no intervalo/médico/agenda antes de regerar,
+      // evitando duplicatas ao clicar em "Gerar" mais de uma vez.
+      const iniIso = new Date(`${gerar.data_inicio}T00:00:00`).toISOString();
+      const fimIso = new Date(`${gerar.data_fim}T23:59:59`).toISOString();
+      const agendaIdsSet = new Set(slotsPreview.map((s) => s.agenda_id));
+      const medicoIdsSet = new Set(slotsPreview.map((s) => s.medico_id));
+      if (agendaIdsSet.size > 0 && medicoIdsSet.size > 0) {
+        const { error: delErr } = await supabase
+          .from("agendamentos")
+          .delete()
+          .eq("clinica_id", clinicaAtual.clinica_id)
+          .eq("paciente_nome", "DISPONÍVEL")
+          .in("medico_id", Array.from(medicoIdsSet))
+          .in("agenda_id", Array.from(agendaIdsSet))
+          .gte("inicio", iniIso)
+          .lte("inicio", fimIso);
+        if (delErr) throw delErr;
+      }
       const rows = slotsPreview.map((s) => {
         const inicio = new Date(`${s.data}T${s.inicio}:00`);
         const fim = new Date(`${s.data}T${s.fim}:00`);
-        const med = medicoByNome.get(s.medico)!;
+        const med = medicoById.get(s.medico_id)!;
         const procedimento = med.procedimento_padrao_nome || med.especialidade_nome || null;
         return {
           clinica_id: clinicaAtual.clinica_id,
