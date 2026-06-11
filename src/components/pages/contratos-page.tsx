@@ -601,6 +601,7 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     </div>
   );
   const [mens, setMens] = useState<Mens[]>([]);
+  const [extraRecebido, setExtraRecebido] = useState<{ total: number; count: number }>({ total: 0, count: 0 });
   const [deps, setDeps] = useState<Dep[]>([]);
   const [convenio, setConvenio] = useState<any>(null);
   const [clinica, setClinica] = useState<any>(null);
