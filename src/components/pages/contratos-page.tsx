@@ -173,7 +173,16 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
             {filtered.map((c) => (
               <TableRow key={c.id} className="cursor-pointer" onClick={() => setDetail(c)}>
                 <TableCell className="font-semibold">{c.numero}</TableCell>
-                <TableCell>{c.paciente_nome}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <span>{c.paciente_nome}</span>
+                    {c.tabela_legada ? (
+                      <Badge variant="outline" className="text-amber-700 border-amber-400 bg-amber-50 dark:bg-amber-950/30">
+                        Tabela antiga — migrar {c.migrar_apos ? `em ${fmtD(c.migrar_apos)}` : ""}
+                      </Badge>
+                    ) : null}
+                  </div>
+                </TableCell>
                 <TableCell>{fmtD(c.data_inicio)}</TableCell>
                 <TableCell>{BRL(c.valor_mensal)}</TableCell>
                 <TableCell>{c.forma_pagamento ?? "—"}</TableCell>
