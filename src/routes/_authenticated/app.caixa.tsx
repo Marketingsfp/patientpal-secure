@@ -301,6 +301,8 @@ function Page() {
     if (ids.length) {
       const { data: lancs } = await supabase
         .from("fin_lancamentos").select("agendamento_id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("tipo", "receita")
         .in("agendamento_id", ids);
       (lancs ?? []).forEach((l) => { if (l.agendamento_id) pagos.add(l.agendamento_id); });
     }
@@ -349,6 +351,28 @@ function Page() {
     if (linhasValidadas.length === 0) { toast.error("Adicione ao menos uma forma de pagamento"); return; }
     setSaving(true);
     try {
+      // Re-checa server-side se já foi pago (anti dupla cobrança / race)
+      const { data: jaPago } = await supabase
+        .from("fin_lancamentos")
+        .select("id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("tipo", "receita")
+        .eq("agendamento_id", openCobranca.id)
+        .limit(1)
+        .maybeSingle();
+      if (jaPago) {
+        toast.error("Este agendamento já possui cobrança registrada.");
+        setOpenCobranca(null);
+        void loadFilaCaixa();
+        return;
+      }
+      // Busca medico_id do agendamento para alimentar o repasse médico
+      const { data: ag } = await supabase
+        .from("agendamentos")
+        .select("medico_id")
+        .eq("id", openCobranca.id)
+        .maybeSingle();
+      const medicoId = (ag as { medico_id: string | null } | null)?.medico_id ?? null;
       const hoje = new Date().toISOString().slice(0, 10);
       for (const l of linhasValidadas) {
         const sufixoCartao = montarSufixoCartao(l.forma, l.bandeira, l.parcelas);
@@ -372,6 +396,7 @@ function Page() {
           forma_pagamento: l.forma,
           paciente_id: openCobranca.paciente_id,
           agendamento_id: openCobranca.id,
+          medico_id: medicoId,
           criado_por: user.id,
         } as never);
         if (e2) throw e2;
@@ -469,6 +494,22 @@ function Page() {
     setSaving(true);
     const v = Number(valorAbertura) || 0;
     const nome = user.user_metadata?.nome || user.email || null;
+    // Trava: já existe sessão aberta para este usuário nesta clínica?
+    const { data: existente } = await supabase
+      .from("caixa_sessoes")
+      .select("id")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("user_id", user.id)
+      .eq("status", "aberto")
+      .limit(1)
+      .maybeSingle();
+    if (existente) {
+      setSaving(false);
+      toast.error("Você já possui um caixa aberto.");
+      setOpenAbrir(false);
+      void load();
+      return;
+    }
     const { data: sess, error } = await supabase
       .from("caixa_sessoes")
       .insert({
