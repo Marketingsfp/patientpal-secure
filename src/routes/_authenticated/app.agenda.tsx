@@ -2595,13 +2595,13 @@ function AgendaPage() {
                       return 0;
                     };
                     // Anexa "score" a cada opção (uso real + bônus do curado)
-                    type ScoredOpt = { value: string; label: string; mod: ReturnType<typeof detectModalidade>; score: number };
+                    type ScoredOpt = { value: string; label: string; mod: ReturnType<typeof detectModalidade>; score: number; curado: number };
                     const scored: ScoredOpt[] = opts.map((o) => {
                       const mod = detectModalidade(o.label);
                       const uso = procedimentoUsoMap.get(normalizar(o.value)) ?? 0;
                       const curado = mod ? scoreCurado(o.label, mod) : 0;
-                      // peso histórico domina; curado serve como desempate/fallback
-                      return { ...o, mod, score: uso * 100 + curado };
+                      // curado define quem entra no top; uso só desempata dentro da lista curada
+                      return { ...o, mod, curado, score: curado * 1000 + uso };
                     });
                     // Para cada modalidade alvo, seleciona top 10 (por score desc)
                     // e atribui a posição global 1..N na ordem em que aparecerão.
@@ -2609,7 +2609,7 @@ function AgendaPage() {
                     const topOrdenado: ScoredOpt[] = [];
                     (["us", "rx", "tc", "rm"] as const).forEach((mod) => {
                       const lista = scored
-                        .filter((s) => s.mod === mod && s.score > 0)
+                        .filter((s) => s.mod === mod && s.curado > 0)
                         .sort((a, b) => b.score - a.score)
                         .slice(0, 10);
                       lista.forEach((s) => topOrdenado.push(s));
