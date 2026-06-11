@@ -833,10 +833,36 @@ function Page() {
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap">
-                  <CardTitle className="text-base">Movimentos de hoje</CardTitle>
-                  <span className="text-xs text-muted-foreground">
-                    {new Date().toLocaleDateString("pt-BR")}
-                  </span>
+                  <CardTitle className="text-base">
+                    {isManager ? "Movimentos da sessão" : "Movimentos de hoje"}
+                  </CardTitle>
+                  {isManager ? (
+                    <div className="flex items-end gap-2">
+                      <div>
+                        <Label className="text-xs">Data</Label>
+                        <Input
+                          type="date"
+                          value={meuFiltroData}
+                          onChange={(e) => setMeuFiltroData(e.target.value)}
+                          className="h-8 w-[160px]"
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-xs"
+                        onClick={() => setMeuFiltroData("")}
+                        title="Mostrar todos os movimentos da sessão"
+                      >
+                        Ver todos
+                      </Button>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">
+                      {new Date().toLocaleDateString("pt-BR")}
+                    </span>
+                  )}
                 </CardHeader>
                 <CardContent className="overflow-x-auto">
                   <Table>
@@ -855,7 +881,9 @@ function Page() {
                       {minhasMovsFiltrados.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={7} className="text-center text-muted-foreground">
-                            Sem movimentos hoje
+                            {isManager
+                              ? (meuFiltroData ? "Sem movimentos nesta data" : "Sem movimentos")
+                              : "Sem movimentos hoje"}
                           </TableCell>
                         </TableRow>
                       ) : minhasMovsFiltrados.map((m) => (
