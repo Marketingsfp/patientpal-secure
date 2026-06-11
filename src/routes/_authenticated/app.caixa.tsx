@@ -160,6 +160,14 @@ function Page() {
   const [minhasSessoes, setMinhasSessoes] = useState<Sessao[]>([]);
   // Filtro de data para a tabela "Movimentos da sessão" (padrão: hoje)
   const [meuFiltroData, setMeuFiltroData] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const minhasMovsFiltrados = useMemo<Mov[]>(() => {
+    if (!meuFiltroData) return minhasMovs;
+    return minhasMovs.filter((m) => {
+      const d = new Date(m.created_at);
+      const local = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      return local === meuFiltroData;
+    });
+  }, [minhasMovs, meuFiltroData]);
 
   const [todasSessoes, setTodasSessoes] = useState<Sessao[]>([]);
   const [todosMovs, setTodosMovs] = useState<Mov[]>([]);
