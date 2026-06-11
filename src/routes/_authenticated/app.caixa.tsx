@@ -158,16 +158,39 @@ function Page() {
   const [minhaSessao, setMinhaSessao] = useState<Sessao | null>(null);
   const [minhasMovs, setMinhasMovs] = useState<Mov[]>([]);
   const [minhasSessoes, setMinhasSessoes] = useState<Sessao[]>([]);
-  // Filtro de data para a tabela "Movimentos da sessão" (padrão: hoje)
-  const [meuFiltroData, setMeuFiltroData] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  // Filtro de período para "Movimentos" (padrão: hoje)
+  type PeriodoFiltro = "hoje" | "semana" | "quinzena" | "mes" | "intervalo" | "todos";
+  const [meuPeriodo, setMeuPeriodo] = useState<PeriodoFiltro>("hoje");
+  const [meuDataIni, setMeuDataIni] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const [meuDataFim, setMeuDataFim] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const minhasMovsFiltrados = useMemo<Mov[]>(() => {
-    if (!meuFiltroData) return minhasMovs;
+    if (meuPeriodo === "todos") return minhasMovs;
+    const now = new Date();
+    const fim = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    let ini: Date;
+    if (meuPeriodo === "hoje") {
+      ini = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    } else if (meuPeriodo === "semana") {
+      ini = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6, 0, 0, 0, 0);
+    } else if (meuPeriodo === "quinzena") {
+      ini = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 14, 0, 0, 0, 0);
+    } else if (meuPeriodo === "mes") {
+      ini = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29, 0, 0, 0, 0);
+    } else {
+      const [yi, mi, di] = meuDataIni.split("-").map(Number);
+      const [yf, mf, df] = meuDataFim.split("-").map(Number);
+      ini = new Date(yi, (mi || 1) - 1, di || 1, 0, 0, 0, 0);
+      return minhasMovs.filter((m) => {
+        const d = new Date(m.created_at);
+        const fimP = new Date(yf, (mf || 1) - 1, df || 1, 23, 59, 59, 999);
+        return d >= ini && d <= fimP;
+      });
+    }
     return minhasMovs.filter((m) => {
       const d = new Date(m.created_at);
-      const local = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-      return local === meuFiltroData;
+      return d >= ini && d <= fim;
     });
-  }, [minhasMovs, meuFiltroData]);
+  }, [minhasMovs, meuPeriodo, meuDataIni, meuDataFim]);
 
   const [todasSessoes, setTodasSessoes] = useState<Sessao[]>([]);
   const [todosMovs, setTodosMovs] = useState<Mov[]>([]);
