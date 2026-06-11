@@ -232,10 +232,48 @@ function RelatoriosPage() {
       .sort((a, b) => b.qtd - a.qtd)
       .slice(0, 10);
 
+    // Consultas por titular
+    const titularIds = new Set(contratos.map((c) => c.paciente_id));
+    const depIds = new Set(deps.map((d) => d.paciente_id));
+    const tituPorContrato = new Map(contratos.map((c) => [c.id, c.paciente_nome] as const));
+    const consultasTitulares = contratos.map((c) => ({
+      nome: c.paciente_nome,
+      plano: planos.find((p) => p.id === c.plano_id)?.nome ?? "—",
+      consultas: usoPorPac.get(c.paciente_id) ?? 0,
+    })).sort((a, b) => b.consultas - a.consultas);
+    const consultasDependentes = deps.map((d) => ({
+      nome: d.paciente_nome,
+      titular: tituPorContrato.get(d.contrato_id) ?? "—",
+      tipo: d.tipo ?? "—",
+      consultas: usoPorPac.get(d.paciente_id) ?? 0,
+    })).sort((a, b) => b.consultas - a.consultas);
+    const usosTitulares = consultasTitulares.reduce((s, x) => s + x.consultas, 0);
+    const usosDependentes = consultasDependentes.reduce((s, x) => s + x.consultas, 0);
+    const usosSemVinculo = Math.max(0, usoTotal - usosTitulares - usosDependentes);
+
+    // Financeiro derivado
+    const resultado = receita - despesa;
+    const margemPct = receita > 0 ? (resultado / receita) * 100 : 0;
+    const ticketMedio = pagantes > 0 ? receita / pagantes : 0;
+    const totalMens = mens.length;
+    const mensPagas = mens.filter((m) => m.status === "pago").length;
+    const mensAbertas = totalMens - mensPagas;
+    const inadimplenciaPct = totalMens > 0 ? (mensAbertas / totalMens) * 100 : 0;
+    const utilizacaoPct = (titulares + dependentesCount) > 0
+      ? (usoPorPac.size / (titulares + dependentesCount)) * 100 : 0;
+    const mediaConsultasPessoa = (titulares + dependentesCount) > 0
+      ? usoTotal / (titulares + dependentesCount) : 0;
+    void titularIds; void depIds;
+
     return {
       totalContratos, ativos, titulares, dependentesCount, totalPessoas, pagantes,
       receita, receitaMens, receitaAdesao, aReceber, despesa,
       usoTotal, porPlano, porPlanoAll, porIdade, semData, topUso,
+      consultasTitulares, consultasDependentes,
+      usosTitulares, usosDependentes, usosSemVinculo,
+      resultado, margemPct, ticketMedio,
+      inadimplenciaPct, mensPagas, mensAbertas,
+      utilizacaoPct, mediaConsultasPessoa,
     };
   }, [contratos, planos, mens, deps, pacs, atends, despesas, allContratos, allDeps, allMens, from, to]);
 
@@ -382,6 +420,23 @@ function RelatoriosPage() {
         <KPI onClick={() => openDrill("atendimentos")} icon={<Activity className="h-4 w-4"/>} label="Atendimentos usados" value={stats.usoTotal}/>
       </div>
 
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <KPI
+          icon={stats.resultado >= 0
+            ? <TrendingUp className="h-4 w-4 text-green-600"/>
+            : <TrendingDown className="h-4 w-4 text-red-600"/>}
+          label={stats.resultado >= 0 ? "Lucro (período)" : "Prejuízo (período)"}
+          value={`${BRL(Math.abs(stats.resultado))} (${stats.margemPct.toFixed(1)}%)`}
+        />
+        <KPI icon={<Activity className="h-4 w-4"/>} label="Ticket médio / pagante" value={BRL(stats.ticketMedio)}/>
+        <KPI icon={<Activity className="h-4 w-4"/>} label="Inadimplência" value={`${stats.inadimplenciaPct.toFixed(1)}% (${stats.mensAbertas}/${stats.mensPagas + stats.mensAbertas})`}/>
+        <KPI icon={<Activity className="h-4 w-4"/>} label="Taxa de utilização" value={`${stats.utilizacaoPct.toFixed(1)}%`}/>
+        <KPI icon={<Users className="h-4 w-4"/>} label="Consultas / titulares" value={stats.usosTitulares}/>
+        <KPI icon={<UserPlus className="h-4 w-4"/>} label="Consultas / dependentes" value={stats.usosDependentes}/>
+        <KPI icon={<Activity className="h-4 w-4"/>} label="Média consultas / pessoa" value={stats.mediaConsultasPessoa.toFixed(2)}/>
+        <KPI icon={<Activity className="h-4 w-4"/>} label="Consultas sem vínculo" value={stats.usosSemVinculo}/>
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Planos / Cartões — catálogo completo</CardTitle>
@@ -432,6 +487,82 @@ function RelatoriosPage() {
           </Table>
         </CardContent>
       </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Consultas por titular</CardTitle>
+            <p className="text-xs text-muted-foreground">Atendimentos no período por cada titular de cartão.</p>
+          </CardHeader>
+          <CardContent className="max-h-96 overflow-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Titular</TableHead>
+                  <TableHead>Plano</TableHead>
+                  <TableHead className="text-right">Consultas</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {stats.consultasTitulares.length === 0 ? (
+                  <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-4">Sem titulares no período.</TableCell></TableRow>
+                ) : null}
+                {stats.consultasTitulares.map((t, i) => (
+                  <TableRow key={i}>
+                    <TableCell>{t.nome}</TableCell>
+                    <TableCell><Badge variant="outline">{t.plano}</Badge></TableCell>
+                    <TableCell className="text-right font-semibold">{t.consultas}</TableCell>
+                  </TableRow>
+                ))}
+                {stats.consultasTitulares.length > 0 ? (
+                  <TableRow className="bg-muted/30 font-semibold">
+                    <TableCell colSpan={2}>Total</TableCell>
+                    <TableCell className="text-right">{stats.usosTitulares}</TableCell>
+                  </TableRow>
+                ) : null}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Consultas por dependente</CardTitle>
+            <p className="text-xs text-muted-foreground">Atendimentos no período por cada dependente.</p>
+          </CardHeader>
+          <CardContent className="max-h-96 overflow-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Dependente</TableHead>
+                  <TableHead>Titular</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead className="text-right">Consultas</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {stats.consultasDependentes.length === 0 ? (
+                  <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-4">Sem dependentes no período.</TableCell></TableRow>
+                ) : null}
+                {stats.consultasDependentes.map((d, i) => (
+                  <TableRow key={i}>
+                    <TableCell>{d.nome}</TableCell>
+                    <TableCell>{d.titular}</TableCell>
+                    <TableCell><Badge variant="outline">{d.tipo}</Badge></TableCell>
+                    <TableCell className="text-right font-semibold">{d.consultas}</TableCell>
+                  </TableRow>
+                ))}
+                {stats.consultasDependentes.length > 0 ? (
+                  <TableRow className="bg-muted/30 font-semibold">
+                    <TableCell colSpan={3}>Total</TableCell>
+                    <TableCell className="text-right">{stats.usosDependentes}</TableCell>
+                  </TableRow>
+                ) : null}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
