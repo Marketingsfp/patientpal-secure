@@ -2535,7 +2535,66 @@ function AgendaPage() {
                     if (atual && !opts.some((o) => normalizar(o.value) === normalizar(atual))) {
                       opts.push({ value: atual, label: atual });
                     }
-                    return [...base, ...opts];
+                    // ── Top 10 por modalidade (USG/RX/TC/RM) com base no
+                    // histórico de uso da clínica nos últimos 365 dias.
+                    // Quando não houver histórico, usa uma lista curada
+                    // dos exames mais solicitados no Brasil.
+                    const detectModalidade = (label: string): "us" | "rx" | "tc" | "rm" | null => {
+                      const u = label.toUpperCase();
+                      if (u.includes("ULTRASS") || /\bUSG\b|\bUS\b/.test(u)) return "us";
+                      if (u.includes("TOMOGRAF") || /\bTC\b/.test(u)) return "tc";
+                      if (u.includes("RESSON") || /\bRM\b|\bRNM\b|\bMRI\b/.test(u)) return "rm";
+                      if (u.includes("RAIO") || u.includes("RADIOGRAF") || /\bRX\b|\bR-X\b/.test(u)) return "rx";
+                      return null;
+                    };
+                    // Lista curada (peso de popularidade) — usada como fallback
+                    // quando ainda não há histórico para o exame.
+                    const curadosPorModalidade: Record<"us" | "rx" | "tc" | "rm", string[]> = {
+                      us: ["ABDOME TOTAL", "ABDOME SUPERIOR", "TIREOIDE", "MAMA", "OBSTETRICA", "TRANSVAGINAL", "PELVICA", "RINS", "PROSTATA", "DOPPLER"],
+                      rx: ["TORAX", "COLUNA LOMBAR", "COLUNA CERVICAL", "JOELHO", "MAO", "PE", "PUNHO", "BACIA", "CRANIO", "ABDOME"],
+                      tc: ["CRANIO", "TORAX", "ABDOME TOTAL", "COLUNA LOMBAR", "SEIOS DA FACE", "COLUNA CERVICAL", "ABDOME SUPERIOR", "PESCOCO", "TORAX CONTRASTE", "PELVE"],
+                      rm: ["CRANIO", "COLUNA LOMBAR", "COLUNA CERVICAL", "JOELHO", "OMBRO", "ABDOME", "COLUNA TORACICA", "PELVE", "QUADRIL", "TORNOZELO"],
+                    };
+                    const scoreCurado = (label: string, mod: "us" | "rx" | "tc" | "rm") => {
+                      const L = normalizar(label).toUpperCase();
+                      const lista = curadosPorModalidade[mod];
+                      for (let i = 0; i < lista.length; i++) {
+                        if (L.includes(lista[i])) return lista.length - i; // peso decrescente
+                      }
+                      return 0;
+                    };
+                    // Anexa "score" a cada opção (uso real + bônus do curado)
+                    type ScoredOpt = { value: string; label: string; mod: ReturnType<typeof detectModalidade>; score: number };
+                    const scored: ScoredOpt[] = opts.map((o) => {
+                      const mod = detectModalidade(o.label);
+                      const uso = procedimentoUsoMap.get(normalizar(o.value)) ?? 0;
+                      const curado = mod ? scoreCurado(o.label, mod) : 0;
+                      // peso histórico domina; curado serve como desempate/fallback
+                      return { ...o, mod, score: uso * 100 + curado };
+                    });
+                    // Para cada modalidade alvo, seleciona top 10 e marca com ⭐
+                    const topIds = new Set<string>();
+                    (["us", "rx", "tc", "rm"] as const).forEach((mod) => {
+                      const lista = scored
+                        .filter((s) => s.mod === mod && s.score > 0)
+                        .sort((a, b) => b.score - a.score)
+                        .slice(0, 10);
+                      lista.forEach((s) => topIds.add(s.value));
+                    });
+                    const topOpts: { value: string; label: string }[] = [];
+                    const restoOpts: { value: string; label: string }[] = [];
+                    for (const s of scored) {
+                      if (topIds.has(s.value)) topOpts.push({ value: s.value, label: `⭐ ${s.label}` });
+                      else restoOpts.push({ value: s.value, label: s.label });
+                    }
+                    // Ordena top por score desc; resto por label
+                    topOpts.sort((a, b) => {
+                      const sa = scored.find((x) => x.value === a.value)?.score ?? 0;
+                      const sb = scored.find((x) => x.value === b.value)?.score ?? 0;
+                      return sb - sa;
+                    });
+                    restoOpts.sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
+                    return [...base, ...topOpts, ...restoOpts];
                   })()}
                 />
               </div>
