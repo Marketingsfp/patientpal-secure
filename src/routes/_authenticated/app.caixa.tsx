@@ -860,26 +860,45 @@ function Page() {
                     {isManager ? "Movimentos da sessão" : "Movimentos de hoje"}
                   </CardTitle>
                   {isManager ? (
-                    <div className="flex items-end gap-2">
+                    <div className="flex items-end gap-2 flex-wrap">
                       <div>
-                        <Label className="text-xs">Data</Label>
-                        <Input
-                          type="date"
-                          value={meuFiltroData}
-                          onChange={(e) => setMeuFiltroData(e.target.value)}
-                          className="h-8 w-[160px]"
-                        />
+                        <Label className="text-xs">Período</Label>
+                        <Select value={meuPeriodo} onValueChange={(v) => setMeuPeriodo(v as typeof meuPeriodo)}>
+                          <SelectTrigger className="h-8 w-[160px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="hoje">Hoje</SelectItem>
+                            <SelectItem value="semana">Última semana</SelectItem>
+                            <SelectItem value="quinzena">Última quinzena</SelectItem>
+                            <SelectItem value="mes">Último mês</SelectItem>
+                            <SelectItem value="intervalo">Intervalo personalizado</SelectItem>
+                            <SelectItem value="todos">Todos</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 text-xs"
-                        onClick={() => setMeuFiltroData("")}
-                        title="Mostrar todos os movimentos da sessão"
-                      >
-                        Ver todos
-                      </Button>
+                      {meuPeriodo === "intervalo" && (
+                        <>
+                          <div>
+                            <Label className="text-xs">De</Label>
+                            <Input
+                              type="date"
+                              value={meuDataIni}
+                              onChange={(e) => setMeuDataIni(e.target.value)}
+                              className="h-8 w-[150px]"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Até</Label>
+                            <Input
+                              type="date"
+                              value={meuDataFim}
+                              onChange={(e) => setMeuDataFim(e.target.value)}
+                              className="h-8 w-[150px]"
+                            />
+                          </div>
+                        </>
+                      )}
                     </div>
                   ) : (
                     <span className="text-xs text-muted-foreground">
@@ -905,7 +924,7 @@ function Page() {
                         <TableRow>
                           <TableCell colSpan={7} className="text-center text-muted-foreground">
                             {isManager
-                              ? (meuFiltroData ? "Sem movimentos nesta data" : "Sem movimentos")
+                              ? "Sem movimentos no período"
                               : "Sem movimentos hoje"}
                           </TableCell>
                         </TableRow>
