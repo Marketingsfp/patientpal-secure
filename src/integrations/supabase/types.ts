@@ -6908,6 +6908,10 @@ export type Database = {
           token_publico: string
         }[]
       }
+      paciente_cartao_inadimplente: {
+        Args: { _clinica_id: string; _paciente_id: string }
+        Returns: Json
+      }
       pacientes_face_lista: {
         Args: { _clinica_id: string }
         Returns: {
