@@ -1265,6 +1265,54 @@ function AgendaPage() {
     await load();
   };
 
+  const reabrirAtendimento = async (a: Agendamento) => {
+    if (!clinicaAtual) return;
+    const roleOk = ["admin", "gestor", "financeiro"].includes((clinicaAtual?.role ?? "").toLowerCase());
+    if (!roleOk) { toast.error("Apenas admin/gestor/financeiro pode reabrir um atendimento."); return; }
+    if (a.status !== "realizado") { toast.info("Este atendimento não está marcado como realizado."); return; }
+    // Verifica se há repasse pago vinculado
+    const { data: lanc } = await supabase
+      .from("fin_lancamentos")
+      .select("id, repasse_pago, repasse_lancamento_id")
+      .eq("agendamento_id", a.id)
+      .eq("tipo", "receita")
+      .maybeSingle();
+    const temRepassePago = !!(lanc && (lanc as any).repasse_pago);
+    const msg = temRepassePago
+      ? `Reabrir atendimento de ${a.paciente_nome}?\n\n⚠️ O repasse JÁ foi pago. A despesa do repasse será ESTORNADA e o status voltará para "Confirmado".\n\nO pagamento da receita NÃO será estornado (use Financeiro → Estornar pagamento se necessário).`
+      : `Reabrir atendimento de ${a.paciente_nome}?\n\nO status voltará para "Confirmado".`;
+    if (!confirm(msg)) return;
+    try {
+      if (temRepassePago) {
+        const desp = (lanc as any).repasse_lancamento_id as string | null;
+        if (desp) {
+          const { error: eDel } = await supabase.from("fin_lancamentos").delete().eq("id", desp);
+          if (eDel) throw eDel;
+        }
+        const { error: eUpd } = await supabase
+          .from("fin_lancamentos")
+          .update({
+            repasse_pago: false,
+            repasse_pago_em: null,
+            repasse_forma_pagamento: null,
+            repasse_conta_id: null,
+            repasse_lancamento_id: null,
+          } as never)
+          .eq("id", (lanc as any).id);
+        if (eUpd) throw eUpd;
+      }
+      const { error: eAg } = await supabase
+        .from("agendamentos")
+        .update({ status: "confirmado" } as never)
+        .eq("id", a.id);
+      if (eAg) throw eAg;
+      toast.success(temRepassePago ? "Atendimento reaberto e repasse estornado." : "Atendimento reaberto.");
+      await load();
+    } catch (err: any) {
+      toast.error(err?.message ?? "Falha ao reabrir atendimento.");
+    }
+  };
+
   const excluirSelecionados = async () => {
     if (!clinicaAtual) return;
     if (!isManager) { toast.error("Você não tem permissão para excluir horários."); return; }
