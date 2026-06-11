@@ -67,6 +67,9 @@ function RelatoriosPage() {
   const [pacs, setPacs] = useState<Map<string, Pac>>(new Map());
   const [atends, setAtends] = useState<Atend[]>([]);
   const [despesas, setDespesas] = useState<Lanc[]>([]);
+  const [allContratos, setAllContratos] = useState<Contrato[]>([]);
+  const [allDeps, setAllDeps] = useState<Dep[]>([]);
+  const [allMens, setAllMens] = useState<Mens[]>([]);
 
   const load = async () => {
     if (!clinicaAtual) return;
@@ -82,6 +85,21 @@ function RelatoriosPage() {
     ]);
     const cList = (cs.data ?? []) as Contrato[];
     const cIds = cList.map((c) => c.id);
+
+    // Carregar TODOS contratos da clínica (sem filtro de período) para o painel "Planos — mais vendidos"
+    const allCsRes = await supabase
+      .from("contratos_assinatura")
+      .select("id, numero, paciente_id, paciente_nome, plano_id, valor_mensal, taxa_adesao, status, data_inicio, assinado_em")
+      .eq("clinica_id", cid)
+      .limit(10000);
+    const allCList = (allCsRes.data ?? []) as Contrato[];
+    const allCIds = allCList.map((c) => c.id);
+    const allDepsRes = allCIds.length
+      ? await supabase.from("contrato_dependentes").select("id, contrato_id, paciente_id, paciente_nome, tipo, ativo").in("contrato_id", allCIds).limit(20000)
+      : { data: [] as Dep[] };
+    const allMensRes = allCIds.length
+      ? await supabase.from("contrato_mensalidades").select("id, contrato_id, valor, status, pago_em, vencimento").in("contrato_id", allCIds).eq("status", "pago").limit(50000)
+      : { data: [] as Mens[] };
 
     // Mensalidades para contratos do período
     const mensRes = cIds.length
@@ -114,6 +132,9 @@ function RelatoriosPage() {
     setPacs(pacMap);
     setAtends((atendsRes.data ?? []) as Atend[]);
     setDespesas((ls.data ?? []) as Lanc[]);
+    setAllContratos(allCList);
+    setAllDeps((allDepsRes.data ?? []) as Dep[]);
+    setAllMens((allMensRes.data ?? []) as Mens[]);
     setLoading(false);
   };
 
@@ -165,6 +186,28 @@ function RelatoriosPage() {
       };
     }).sort((a, b) => b.contratos - a.contratos);
 
+    // Por plano — TODOS os cartões da clínica (lifetime)
+    const porPlanoAll = planos.map((p) => {
+      const cs = allContratos.filter((c) => c.plano_id === p.id);
+      const csIds = new Set(cs.map((c) => c.id));
+      const ativos = cs.filter((c) => c.status === "ativo");
+      const depsCount = allDeps.filter((d) => d.ativo && csIds.has(d.contrato_id)).length;
+      const mrr = ativos.reduce((s, c) => s + Number(c.valor_mensal || 0), 0);
+      const receitaPaga = allMens.filter((m) => csIds.has(m.contrato_id)).reduce((s, m) => s + Number(m.valor), 0);
+      const adesao = cs.reduce((s, c) => s + Number(c.taxa_adesao || 0), 0);
+      return {
+        plano: p.nome,
+        tipo: p.tipo,
+        valorMensal: Number(p.valor_mensal || 0),
+        titulares: cs.length,
+        titularesAtivos: ativos.length,
+        dependentes: depsCount,
+        pessoas: cs.length + depsCount,
+        mrr,
+        receita: receitaPaga + adesao,
+      };
+    }).sort((a, b) => b.titulares - a.titulares);
+
     // Por idade
     const todasPessoas: { id: string; tipo: "titular" | "dependente" }[] = [
       ...contratos.map((c) => ({ id: c.paciente_id, tipo: "titular" as const })),
@@ -192,15 +235,20 @@ function RelatoriosPage() {
     return {
       totalContratos, ativos, titulares, dependentesCount, totalPessoas, pagantes,
       receita, receitaMens, receitaAdesao, aReceber, despesa,
-      usoTotal, porPlano, porIdade, semData, topUso,
+      usoTotal, porPlano, porPlanoAll, porIdade, semData, topUso,
     };
-  }, [contratos, planos, mens, deps, pacs, atends, despesas, from, to]);
+  }, [contratos, planos, mens, deps, pacs, atends, despesas, allContratos, allDeps, allMens, from, to]);
 
   const exportarPlanos = () => {
-    exportToExcel(stats.porPlano, `cartao_beneficios_planos_${from}_${to}`, [
+    exportToExcel(stats.porPlanoAll, `cartao_beneficios_planos_${from}_${to}`, [
       { key: "plano", label: "Plano" }, { key: "tipo", label: "Tipo" },
-      { key: "contratos", label: "Contratos" }, { key: "pessoas", label: "Pessoas" },
-      { key: "receita", label: "Receita (R$)" },
+      { key: "valorMensal", label: "Valor mensal (R$)" },
+      { key: "titulares", label: "Titulares" },
+      { key: "titularesAtivos", label: "Titulares ativos" },
+      { key: "dependentes", label: "Dependentes" },
+      { key: "pessoas", label: "Pessoas" },
+      { key: "mrr", label: "Receita mensal recorrente (R$)" },
+      { key: "receita", label: "Receita acumulada (R$)" },
     ]);
     toast.success("CSV gerado");
   };
@@ -335,23 +383,51 @@ function RelatoriosPage() {
       </div>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Planos — mais vendem</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">Planos / Cartões — catálogo completo</CardTitle>
+          <p className="text-xs text-muted-foreground">Todos os cartões da clínica, com totais acumulados (não dependem do período acima).</p>
+        </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
-              <TableRow><TableHead>Plano</TableHead><TableHead>Tipo</TableHead><TableHead className="text-right">Contratos</TableHead><TableHead className="text-right">Pessoas (tit+dep)</TableHead><TableHead className="text-right">Receita</TableHead></TableRow>
+              <TableRow>
+                <TableHead>Plano</TableHead>
+                <TableHead>Tipo</TableHead>
+                <TableHead className="text-right">Valor mensal</TableHead>
+                <TableHead className="text-right">Titulares</TableHead>
+                <TableHead className="text-right">Ativos</TableHead>
+                <TableHead className="text-right">Dependentes</TableHead>
+                <TableHead className="text-right">Pessoas</TableHead>
+                <TableHead className="text-right">MRR ativos</TableHead>
+                <TableHead className="text-right">Receita acumulada</TableHead>
+              </TableRow>
             </TableHeader>
             <TableBody>
-              {stats.porPlano.length === 0 ? <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-4">Sem dados.</TableCell></TableRow> : null}
-              {stats.porPlano.map((p) => (
+              {stats.porPlanoAll.length === 0 ? <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-4">Sem dados.</TableCell></TableRow> : null}
+              {stats.porPlanoAll.map((p) => (
                 <TableRow key={p.plano}>
                   <TableCell className="font-medium">{p.plano}</TableCell>
                   <TableCell><Badge variant="outline">{p.tipo}</Badge></TableCell>
-                  <TableCell className="text-right">{p.contratos}</TableCell>
+                  <TableCell className="text-right">{BRL(p.valorMensal)}</TableCell>
+                  <TableCell className="text-right">{p.titulares}</TableCell>
+                  <TableCell className="text-right">{p.titularesAtivos}</TableCell>
+                  <TableCell className="text-right">{p.dependentes}</TableCell>
                   <TableCell className="text-right">{p.pessoas}</TableCell>
+                  <TableCell className="text-right">{BRL(p.mrr)}</TableCell>
                   <TableCell className="text-right">{BRL(p.receita)}</TableCell>
                 </TableRow>
               ))}
+              {stats.porPlanoAll.length > 0 ? (
+                <TableRow className="bg-muted/30 font-semibold">
+                  <TableCell colSpan={3}>Total</TableCell>
+                  <TableCell className="text-right">{stats.porPlanoAll.reduce((s,p)=>s+p.titulares,0)}</TableCell>
+                  <TableCell className="text-right">{stats.porPlanoAll.reduce((s,p)=>s+p.titularesAtivos,0)}</TableCell>
+                  <TableCell className="text-right">{stats.porPlanoAll.reduce((s,p)=>s+p.dependentes,0)}</TableCell>
+                  <TableCell className="text-right">{stats.porPlanoAll.reduce((s,p)=>s+p.pessoas,0)}</TableCell>
+                  <TableCell className="text-right">{BRL(stats.porPlanoAll.reduce((s,p)=>s+p.mrr,0))}</TableCell>
+                  <TableCell className="text-right">{BRL(stats.porPlanoAll.reduce((s,p)=>s+p.receita,0))}</TableCell>
+                </TableRow>
+              ) : null}
             </TableBody>
           </Table>
         </CardContent>
