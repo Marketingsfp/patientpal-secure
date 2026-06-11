@@ -160,6 +160,14 @@ function Page() {
   const [minhasSessoes, setMinhasSessoes] = useState<Sessao[]>([]);
   // Filtro de data para a tabela "Movimentos da sessão" (padrão: hoje)
   const [meuFiltroData, setMeuFiltroData] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const minhasMovsFiltrados = useMemo<Mov[]>(() => {
+    if (!meuFiltroData) return minhasMovs;
+    return minhasMovs.filter((m) => {
+      const d = new Date(m.created_at);
+      const local = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      return local === meuFiltroData;
+    });
+  }, [minhasMovs, meuFiltroData]);
 
   const [todasSessoes, setTodasSessoes] = useState<Sessao[]>([]);
   const [todosMovs, setTodosMovs] = useState<Mov[]>([]);
@@ -862,24 +870,13 @@ function Page() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {(() => {
-                        const movsFiltrados = meuFiltroData
-                          ? minhasMovs.filter((m) => {
-                              const d = new Date(m.created_at);
-                              const local = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-                              return local === meuFiltroData;
-                            })
-                          : minhasMovs;
-                        if (movsFiltrados.length === 0) {
-                          return (
-                            <TableRow>
-                              <TableCell colSpan={7} className="text-center text-muted-foreground">
-                                {meuFiltroData ? "Sem movimentos nesta data" : "Sem movimentos"}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        }
-                        return movsFiltrados.map((m) => (
+                      {minhasMovsFiltrados.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center text-muted-foreground">
+                            {meuFiltroData ? "Sem movimentos nesta data" : "Sem movimentos"}
+                          </TableCell>
+                        </TableRow>
+                      ) : minhasMovsFiltrados.map((m) => (
                         <TableRow key={m.id}>
                           <TableCell className="whitespace-nowrap">{new Date(m.created_at).toLocaleDateString("pt-BR")}</TableCell>
                           <TableCell className="whitespace-nowrap">{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</TableCell>
@@ -904,8 +901,7 @@ function Page() {
                             )}
                           </TableCell>
                         </TableRow>
-                      ));
-                      })()}
+                      ))}
                     </TableBody>
                   </Table>
                 </CardContent>
