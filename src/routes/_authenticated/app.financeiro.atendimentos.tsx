@@ -91,6 +91,45 @@ function Page() {
   const [payForm, setPayForm] = useState({ data: hoje, conta_id: "", forma_pagamento: "" });
   const [payingNow, setPayingNow] = useState(false);
 
+  // Diálogo de laudo
+  const [laudoOpen, setLaudoOpen] = useState(false);
+  const [laudoTarget, setLaudoTarget] = useState<Atend | null>(null);
+  const [laudoForm, setLaudoForm] = useState({ medico_laudador_id: "", valor_laudo: "" });
+  const [laudoSaving, setLaudoSaving] = useState(false);
+
+  const openLaudo = (a: Atend) => {
+    setLaudoTarget(a);
+    setLaudoForm({
+      medico_laudador_id: a.medico_laudador_id ?? "",
+      valor_laudo: a.valor_laudo ? String(a.valor_laudo) : "",
+    });
+    setLaudoOpen(true);
+  };
+
+  const emitirLaudo = async () => {
+    if (!laudoTarget) return;
+    if (!laudoForm.medico_laudador_id) { toast.error("Selecione o médico laudador"); return; }
+    const valor = Number(laudoForm.valor_laudo);
+    if (!valor || valor <= 0) { toast.error("Informe o valor do laudo"); return; }
+    setLaudoSaving(true);
+    const tabela = laudoTarget.origem === "agenda" ? "fin_lancamentos" : "fin_atendimentos";
+    const { error } = await supabase
+      .from(tabela)
+      .update({
+        medico_laudador_id: laudoForm.medico_laudador_id,
+        valor_laudo: valor,
+        laudo_status: "emitido",
+        laudo_emitido_em: new Date().toISOString(),
+      })
+      .eq("id", laudoTarget.id);
+    setLaudoSaving(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Laudo emitido — repasse do laudador gerado");
+    setLaudoOpen(false);
+    setLaudoTarget(null);
+    await load();
+  };
+
   // Solicitações de estorno pendentes (vindas do caixa/recepção)
   interface SolicEst {
     id: string; paciente_nome: string | null; descricao: string | null;
