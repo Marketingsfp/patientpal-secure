@@ -950,6 +950,43 @@ function AgendaPage() {
   };
 
   useEffect(() => { loadRef(); }, [clinicaAtual?.clinica_id]);
+
+  // Carrega contagem histórica de procedimentos (últimos 365 dias) para
+  // ordenar as opções por popularidade no momento do agendamento.
+  useEffect(() => {
+    if (!clinicaAtual?.clinica_id) return;
+    let cancelled = false;
+    (async () => {
+      const desde = new Date();
+      desde.setDate(desde.getDate() - 365);
+      const desdeIso = desde.toISOString().slice(0, 10);
+      const counts = new Map<string, number>();
+      // Paginar para evitar limite de 1000 linhas do PostgREST
+      const PAGE = 1000;
+      let from = 0;
+      // Limita a 20k linhas (~55 agendamentos/dia) — suficiente para popularidade
+      for (let i = 0; i < 20; i++) {
+        const { data, error } = await supabase
+          .from("agendamentos")
+          .select("procedimento")
+          .eq("clinica_id", clinicaAtual.clinica_id)
+          .gte("data", desdeIso)
+          .not("procedimento", "is", null)
+          .range(from, from + PAGE - 1);
+        if (error || !data || data.length === 0) break;
+        for (const row of data as Array<{ procedimento: string | null }>) {
+          if (!row.procedimento) continue;
+          const k = normalizar(row.procedimento);
+          counts.set(k, (counts.get(k) ?? 0) + 1);
+        }
+        if (data.length < PAGE) break;
+        from += PAGE;
+      }
+      if (!cancelled) setProcedimentoUsoMap(counts);
+    })();
+    return () => { cancelled = true; };
+  }, [clinicaAtual?.clinica_id]);
+
   useEffect(() => { load(); }, [clinicaAtual?.clinica_id, dataRef, dataFim, apenasData, filtroStatus, filtroMedico, filtroCliente]);
 
   // Realtime: recarrega quando agendamentos mudam (outro recepcionista,
