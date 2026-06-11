@@ -634,6 +634,73 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
   const [valorMensalAtual, setValorMensalAtual] = useState<number>(Number(contrato.valor_mensal));
   useEffect(() => { setValorMensalAtual(Number(contrato.valor_mensal)); }, [contrato.id]);
 
+  // Edição manual de valor mensal e dia de vencimento (revisão contrato a contrato)
+  const [editValor, setEditValor] = useState<string>(String(Number(contrato.valor_mensal ?? 0).toFixed(2)));
+  const [editDia, setEditDia] = useState<string>(String(contrato.dia_vencimento ?? 10));
+  const [savingDados, setSavingDados] = useState(false);
+  const [regerarFuturas, setRegerarFuturas] = useState(true);
+  useEffect(() => {
+    setEditValor(String(Number(contrato.valor_mensal ?? 0).toFixed(2)));
+    setEditDia(String(contrato.dia_vencimento ?? 10));
+  }, [contrato.id]);
+
+  const salvarDadosFinanceiros = async () => {
+    const v = Number(String(editValor).replace(",", "."));
+    const dia = Math.max(1, Math.min(31, Number(editDia) || 0));
+    if (!Number.isFinite(v) || v < 0) { toast.error("Valor mensal inválido"); return; }
+    if (!dia) { toast.error("Dia de vencimento inválido"); return; }
+    setSavingDados(true);
+    const { error } = await supabase
+      .from("contratos_assinatura")
+      .update({ valor_mensal: v, dia_vencimento: dia })
+      .eq("id", contrato.id);
+    if (error) { setSavingDados(false); toast.error(error.message); return; }
+    (contrato as any).valor_mensal = v;
+    (contrato as any).dia_vencimento = dia;
+    setValorMensalAtual(v);
+
+    if (regerarFuturas) {
+      const hoje = new Date().toISOString().slice(0, 10);
+      // apaga parcelas pendentes futuras
+      await supabase
+        .from("contrato_mensalidades")
+        .delete()
+        .eq("contrato_id", contrato.id)
+        .eq("status", "pendente")
+        .gt("vencimento", hoje);
+      // próximo número
+      const { data: maxRow } = await supabase
+        .from("contrato_mensalidades")
+        .select("numero_parcela")
+        .eq("contrato_id", contrato.id)
+        .order("numero_parcela", { ascending: false })
+        .limit(1);
+      let prox = ((maxRow?.[0]?.numero_parcela ?? 0) as number) + 1;
+      const inicio = new Date();
+      inicio.setDate(1);
+      const rows: any[] = [];
+      for (let i = 1; i <= 12; i++) {
+        const ref = new Date(inicio.getFullYear(), inicio.getMonth() + i, 1);
+        const lastDay = new Date(ref.getFullYear(), ref.getMonth() + 1, 0).getDate();
+        const d = Math.min(dia, lastDay);
+        const venc = new Date(ref.getFullYear(), ref.getMonth(), d);
+        rows.push({
+          contrato_id: contrato.id,
+          clinica_id: (contrato as any).clinica_id,
+          numero_parcela: prox++,
+          vencimento: venc.toISOString().slice(0, 10),
+          valor: v,
+          status: "pendente",
+        });
+      }
+      const { error: insErr } = await supabase.from("contrato_mensalidades").insert(rows);
+      if (insErr) { setSavingDados(false); toast.error("Dados salvos, mas falha ao gerar parcelas: " + insErr.message); await load(); return; }
+    }
+    setSavingDados(false);
+    toast.success(regerarFuturas ? "Dados salvos e parcelas futuras atualizadas." : "Dados salvos.");
+    await load();
+  };
+
   const confirmarCancelamento = async () => {
     const motivo = cancelMotivo.trim();
     if (!motivo) { toast.error("Informe o motivo do cancelamento"); return; }
@@ -1191,9 +1258,42 @@ h1, h2, h3 { margin: 0 0 6mm; }
             />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <DadosField label="Data início" value={fmtD(contrato.data_inicio)} />
-              <DadosField label="Dia de vencimento" value={contrato.dia_vencimento ?? "—"} />
-              <DadosField label="Valor mensal" value={BRL(Number(valorMensalAtual))} />
+              <div className="space-y-1">
+                <div className="text-xs text-muted-foreground">Dia de vencimento</div>
+                <Input
+                  type="number"
+                  min={1}
+                  max={31}
+                  value={editDia}
+                  onChange={(e) => setEditDia(e.target.value)}
+                  disabled={cancelado || savingDados}
+                />
+              </div>
+              <div className="space-y-1">
+                <div className="text-xs text-muted-foreground">Valor mensal (R$)</div>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  value={editValor}
+                  onChange={(e) => setEditValor(e.target.value)}
+                  disabled={cancelado || savingDados}
+                />
+              </div>
               <DadosField label="Taxa de adesão" value={BRL(Number(contrato.taxa_adesao ?? 0))} />
+            </div>
+            <div className="flex flex-wrap items-center gap-3 rounded-md border bg-muted/30 px-3 py-2">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={regerarFuturas}
+                  onChange={(e) => setRegerarFuturas(e.target.checked)}
+                />
+                Regerar 12 parcelas futuras com este valor e dia
+              </label>
+              <Button size="sm" onClick={salvarDadosFinanceiros} disabled={cancelado || savingDados} className="ml-auto">
+                {savingDados ? "Salvando…" : "Salvar valor e vencimento"}
+              </Button>
             </div>
             <DadosField label="Forma de pagamento" value={formaLabel} />
             <div className="space-y-1">
