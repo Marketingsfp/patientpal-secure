@@ -948,6 +948,28 @@ function AgendaPage() {
   useEffect(() => { loadRef(); }, [clinicaAtual?.clinica_id]);
   useEffect(() => { load(); }, [clinicaAtual?.clinica_id, dataRef, dataFim, apenasData, filtroStatus, filtroMedico, filtroCliente]);
 
+  // Realtime: recarrega quando agendamentos mudam (outro recepcionista,
+  // pagamento no caixa, etc.). Debounce simples para evitar refetch em rajada.
+  useEffect(() => {
+    if (!clinicaAtual) return;
+    let t: ReturnType<typeof setTimeout> | null = null;
+    const schedule = () => {
+      if (t) clearTimeout(t);
+      t = setTimeout(() => { void load(); }, 400);
+    };
+    const ch = supabase
+      .channel(`agenda-rt-${clinicaAtual.clinica_id}`)
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "agendamentos", filter: `clinica_id=eq.${clinicaAtual.clinica_id}` },
+        schedule)
+      .subscribe();
+    return () => {
+      if (t) clearTimeout(t);
+      void supabase.removeChannel(ch);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clinicaAtual?.clinica_id]);
+
   // Perfil de médico: trava o filtro no próprio profissional
   useEffect(() => {
     if (isMedicoOnly && medicoLogadoId) setFiltroMedico(medicoLogadoId);
