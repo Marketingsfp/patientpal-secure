@@ -1244,7 +1244,17 @@ function AgendaPage() {
     const ids = Array.from(selecionados);
     const itens = items.filter(a => ids.includes(a.id));
     if (itens.length === 0) { toast.info("Selecione ao menos um atendimento."); return; }
-    const validos = itens.filter(i => !isSlotLivre(i.paciente_nome) && i.status !== "realizado" && i.status !== "cancelado");
+    const hojeFim = new Date(); hojeFim.setHours(23, 59, 59, 999);
+    const futuros = itens.filter(i => new Date(i.inicio).getTime() > hojeFim.getTime());
+    const validos = itens.filter(i =>
+      !isSlotLivre(i.paciente_nome) &&
+      i.status !== "realizado" &&
+      i.status !== "cancelado" &&
+      new Date(i.inicio).getTime() <= hojeFim.getTime()
+    );
+    if (futuros.length > 0) {
+      toast.error(`${futuros.length} atendimento(s) de data futura ignorado(s) — só é possível baixar atendimentos de hoje ou datas passadas.`);
+    }
     if (validos.length === 0) { toast.info("Nenhum atendimento elegível na seleção."); return; }
     if (!confirm(`Baixar ${validos.length} atendimento(s) como Realizado?`)) return;
     const uid = (await supabase.auth.getUser()).data.user?.id;
@@ -1850,6 +1860,14 @@ function AgendaPage() {
       );
       if (!roleOk) {
         toast.error("Sem permissão para marcar como 'Realizado'.");
+        return;
+      }
+    }
+    if (status === "realizado") {
+      const inicio = new Date(a.inicio);
+      const hojeFim = new Date(); hojeFim.setHours(23, 59, 59, 999);
+      if (inicio.getTime() > hojeFim.getTime()) {
+        toast.error("Não é possível baixar como Realizado um atendimento de data futura.");
         return;
       }
     }
