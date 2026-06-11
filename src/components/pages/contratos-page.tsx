@@ -84,6 +84,7 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
   const [q, setQ] = useState("");
   const [view, setView] = useState<"list" | "new">("list");
   const [detail, setDetail] = useState<Contrato | null>(null);
+  const [sortPaciente, setSortPaciente] = useState<null | "asc" | "desc">(null);
 
   const load = async () => {
     if (!clinicaAtual) return;
