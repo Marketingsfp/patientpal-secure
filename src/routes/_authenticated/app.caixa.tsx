@@ -28,6 +28,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { SolicitarEstornoDialog } from "@/components/financeiro/SolicitarEstornoDialog";
+import { findRegra, computeValor, type CbRegra } from "@/lib/cb-regras";
 
 export const Route = createFileRoute("/_authenticated/app/caixa")({
   component: Page,
@@ -317,18 +318,93 @@ function Page() {
     }>;
     // Procura valores e pagamentos já realizados
     const procNomes = Array.from(new Set(rows.map((r) => r.procedimento).filter(Boolean) as string[]));
-    const valorMap = new Map<string, { dinheiro: number; cartao: number }>();
+    const valorMap = new Map<string, { dinheiro: number; cartao: number; procedimento_id: string }>();
     if (procNomes.length) {
       const { data: procs } = await supabase
-        .from("procedimentos").select("nome, valor_padrao, valor_dinheiro, valor_cartao_credito")
+        .from("procedimentos").select("id, nome, valor_padrao, valor_dinheiro, valor_cartao_credito")
         .eq("clinica_id", clinicaAtual.clinica_id).in("nome", procNomes);
       (procs ?? []).forEach((p) => {
-        const pp = p as { nome: string; valor_padrao?: number; valor_dinheiro?: number; valor_cartao_credito?: number };
+        const pp = p as { id: string; nome: string; valor_padrao?: number; valor_dinheiro?: number; valor_cartao_credito?: number };
         const dinheiro = Number(pp.valor_dinheiro ?? pp.valor_padrao ?? 0);
         const cartao = Number(pp.valor_cartao_credito ?? pp.valor_padrao ?? dinheiro);
-        valorMap.set(pp.nome.toUpperCase(), { dinheiro, cartao });
+        valorMap.set(pp.nome.toUpperCase(), { dinheiro, cartao, procedimento_id: pp.id });
       });
     }
+    // === Aplicação automática dos descontos do Cartão de Benefícios ===
+    // Para cada paciente, busca contrato ativo → convenio. Depois aplica
+    // regra (cb_convenio_regras) ou valor específico (procedimento_cb_convenio_valores).
+    const pacIds = Array.from(new Set(rows.map((r) => r.paciente_id).filter(Boolean) as string[]));
+    const pacConv = new Map<string, string>(); // paciente_id -> convenio_id
+    if (pacIds.length) {
+      const { data: contratos } = await supabase
+        .from("contratos_assinatura")
+        .select("paciente_id, convenio_id, status")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("status", "ativo")
+        .in("paciente_id", pacIds);
+      ((contratos ?? []) as Array<{ paciente_id: string; convenio_id: string | null }>).forEach((c) => {
+        if (c.paciente_id && c.convenio_id && !pacConv.has(c.paciente_id)) {
+          pacConv.set(c.paciente_id, c.convenio_id);
+        }
+      });
+    }
+    const convIds = Array.from(new Set(pacConv.values()));
+    const procIds = Array.from(new Set(Array.from(valorMap.values()).map((v) => v.procedimento_id)));
+    const regrasPorConv = new Map<string, CbRegra[]>();
+    const pcvMap = new Map<string, number>(); // `${proc_id}|${conv_id}` -> valor_dinheiro
+    const procEspec = new Map<string, string>(); // procedimento_id -> especialidade_id (primeira)
+    if (convIds.length && procIds.length) {
+      const [{ data: regras }, { data: pcv }, { data: pe }] = await Promise.all([
+        supabase.from("cb_convenio_regras")
+          .select("id, convenio_id, especialidade_id, tipo, modo, valor, percentual, prioridade, ativo")
+          .in("convenio_id", convIds).eq("ativo", true),
+        supabase.from("procedimento_cb_convenio_valores")
+          .select("procedimento_id, convenio_id, valor_dinheiro")
+          .in("convenio_id", convIds).in("procedimento_id", procIds),
+        supabase.from("procedimento_especialidades")
+          .select("procedimento_id, especialidade_id")
+          .in("procedimento_id", procIds),
+      ]);
+      ((regras ?? []) as CbRegra[]).forEach((r) => {
+        const arr = regrasPorConv.get(r.convenio_id) ?? [];
+        arr.push(r);
+        regrasPorConv.set(r.convenio_id, arr);
+      });
+      ((pcv ?? []) as Array<{ procedimento_id: string; convenio_id: string; valor_dinheiro: number }>).forEach((v) => {
+        pcvMap.set(`${v.procedimento_id}|${v.convenio_id}`, Number(v.valor_dinheiro) || 0);
+      });
+      ((pe ?? []) as Array<{ procedimento_id: string; especialidade_id: string }>).forEach((v) => {
+        if (!procEspec.has(v.procedimento_id)) procEspec.set(v.procedimento_id, v.especialidade_id);
+      });
+    }
+    const aplicarDesconto = (procNome: string | null, pacienteId: string | null): { dinheiro: number; cartao: number; descontoTxt: string | null } | null => {
+      if (!procNome) return null;
+      const base = valorMap.get(procNome.toUpperCase());
+      if (!base) return null;
+      const convId = pacienteId ? pacConv.get(pacienteId) : null;
+      if (!convId) return { dinheiro: base.dinheiro, cartao: base.cartao, descontoTxt: null };
+      // 1) valor específico por procedimento × convenio
+      const fixo = pcvMap.get(`${base.procedimento_id}|${convId}`);
+      if (fixo !== undefined && fixo > 0) {
+        return { dinheiro: fixo, cartao: fixo, descontoTxt: "valor convênio" };
+      }
+      // 2) regra por especialidade/tipo
+      const especId = procEspec.get(base.procedimento_id) ?? null;
+      const regras = regrasPorConv.get(convId) ?? [];
+      // tipo do procedimento: pega da tabela? simplificação: tenta consulta primeiro, depois exame
+      const tentar = ["consulta", "exame", "procedimento"];
+      for (const tipo of tentar) {
+        const regra = findRegra(regras, especId, tipo);
+        if (regra) {
+          const v = computeValor(regra, base.dinheiro, base.cartao);
+          if (v) {
+            const txt = regra.modo === "valor_fixo" ? `R$ ${Number(regra.valor).toFixed(2)}` : `-${Number(regra.percentual).toFixed(0)}%`;
+            return { dinheiro: v.dinheiro, cartao: v.outros, descontoTxt: txt };
+          }
+        }
+      }
+      return { dinheiro: base.dinheiro, cartao: base.cartao, descontoTxt: null };
+    };
     const ids = rows.map((r) => r.id);
     const pagos = new Set<string>();
     if (ids.length) {
@@ -340,16 +416,19 @@ function Page() {
       (lancs ?? []).forEach((l) => { if (l.agendamento_id) pagos.add(l.agendamento_id); });
     }
     setFilaCaixa(rows.map((r) => {
+      const desc = aplicarDesconto(r.procedimento, r.paciente_id);
       const v = valorMap.get((r.procedimento ?? "").toUpperCase());
       return {
       id: r.id,
       paciente_id: r.paciente_id,
       paciente_nome: r.paciente_nome,
-      procedimento: r.procedimento,
+      procedimento: desc?.descontoTxt
+        ? `${r.procedimento} (${desc.descontoTxt})`
+        : r.procedimento,
       inicio: r.inicio,
       medico_nome: r.medicos?.nome ?? null,
-      valor: v?.dinheiro ?? 0,
-      valor_cartao: v?.cartao ?? v?.dinheiro ?? 0,
+      valor: desc?.dinheiro ?? v?.dinheiro ?? 0,
+      valor_cartao: desc?.cartao ?? v?.cartao ?? v?.dinheiro ?? 0,
       ja_pago: pagos.has(r.id),
       };
     }));
