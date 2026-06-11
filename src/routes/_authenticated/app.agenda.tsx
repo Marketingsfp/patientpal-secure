@@ -2373,6 +2373,7 @@ function AgendaPage() {
                         }));
                       }}
                       placeholder="Buscar por nome ou CPF…"
+                      autoFocus
                     />
                   </div>
                   <Button type="button" variant="outline" size="icon" title="Cadastrar novo paciente"
