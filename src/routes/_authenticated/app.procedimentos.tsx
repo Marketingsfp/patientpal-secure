@@ -572,6 +572,17 @@ function ProcedimentosPage() {
   // Reset de página quando filtros aplicados ou ordenação mudam
   useEffect(() => { setPagina(1); }, [buscaAplicada, tipoAplicado, grupoAplicado, situacaoAplicada, sort]);
 
+  // Aplica filtros automaticamente ao digitar/alterar (com debounce na busca)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setBuscaAplicada(busca);
+      setGrupoAplicado(filtroGrupo);
+      setTipoAplicado(filtroTipo);
+      setSituacaoAplicada(filtroSituacao);
+    }, 200);
+    return () => clearTimeout(t);
+  }, [busca, filtroGrupo, filtroTipo, filtroSituacao]);
+
   const aplicarFiltros = () => {
     setBuscaAplicada(busca);
     setGrupoAplicado(filtroGrupo);
