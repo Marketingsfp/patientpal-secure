@@ -113,7 +113,11 @@ export function MedicoAgendasTab({
   };
 
   const remover = async (a: Agenda) => {
-    if (!confirm(`Remover agenda "${a.nome}"? Os horários vinculados também serão removidos.`)) return;
+    if (!confirm(
+      `Remover agenda "${a.nome}"?\n\n` +
+      `- Os horários semanais (disponibilidades) desta agenda serão removidos.\n` +
+      `- Consultas já agendadas NÃO serão excluídas, mas perderão o vínculo com esta agenda.`
+    )) return;
     const { error } = await supabase.from("medico_agendas").delete().eq("id", a.id);
     if (error) { toast.error(error.message); return; }
     void load();
