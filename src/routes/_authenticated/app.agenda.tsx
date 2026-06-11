@@ -1764,8 +1764,16 @@ function AgendaPage() {
 
   const mudarStatus = async (a: Agendamento, status: Status) => {
     if (status === "realizado" && !usuarioEhMedico) {
-      toast.error("Apenas o médico responsável pode marcar como 'Realizado'.");
-      return;
+      // Atendentes do financeiro/recepção também podem baixar como realizado
+      // (necessário p/ exames em que a casa executa e o médico apenas lauda,
+      // e para destravar o fluxo de repasse).
+      const roleOk = ["admin", "gestor", "financeiro", "recepcao"].includes(
+        (clinicaAtual?.role ?? "").toLowerCase(),
+      );
+      if (!roleOk) {
+        toast.error("Sem permissão para marcar como 'Realizado'.");
+        return;
+      }
     }
     // Ao cancelar, libera o vínculo com o orçamento para que ele possa ser
     // re-agendado em outro horário sem ficar preso a este slot.
