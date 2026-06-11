@@ -494,6 +494,22 @@ function Page() {
     setSaving(true);
     const v = Number(valorAbertura) || 0;
     const nome = user.user_metadata?.nome || user.email || null;
+    // Trava: já existe sessão aberta para este usuário nesta clínica?
+    const { data: existente } = await supabase
+      .from("caixa_sessoes")
+      .select("id")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("user_id", user.id)
+      .eq("status", "aberto")
+      .limit(1)
+      .maybeSingle();
+    if (existente) {
+      setSaving(false);
+      toast.error("Você já possui um caixa aberto.");
+      setOpenAbrir(false);
+      void load();
+      return;
+    }
     const { data: sess, error } = await supabase
       .from("caixa_sessoes")
       .insert({
