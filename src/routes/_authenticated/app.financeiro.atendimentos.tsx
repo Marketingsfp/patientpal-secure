@@ -553,6 +553,13 @@ function Page() {
           return;
         }
       }
+      // Mesma validação para atendimentos manuais (fin_atendimentos)
+      const manualBloq = selectedItems.filter((x) => x.origem === "manual" && x.status !== "realizado");
+      if (manualBloq.length) {
+        toast.error(`Não é possível pagar o repasse: ${manualBloq.length} atendimento(s) manual(is) não estão com status 'realizado'.`);
+        setPayingNow(false);
+        return;
+      }
       // Agrupa por médico para gerar um lançamento de despesa por médico
       const byMed = new Map<string, Atend[]>();
       for (const a of selectedItems) {
