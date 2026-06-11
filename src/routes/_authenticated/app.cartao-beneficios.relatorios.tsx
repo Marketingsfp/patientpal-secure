@@ -53,6 +53,7 @@ function RelatoriosPage() {
   const primeiroDoAno = `${new Date().getFullYear()}-01-01`;
   const [from, setFrom] = useState(primeiroDoAno);
   const [to, setTo] = useState(hoje);
+  const [showCustom, setShowCustom] = useState(false);
   const [drill, setDrill] = useState<null | {
     title: string;
     columns: { key: string; label: string; align?: "left" | "right" }[];
@@ -301,14 +302,22 @@ function RelatoriosPage() {
         </CardHeader>
         <CardContent className="flex flex-wrap gap-3 items-end">
           <div className="flex gap-1 flex-wrap">
-            <Button size="sm" variant="outline" onClick={() => setQuick("diario")}>Diário</Button>
-            <Button size="sm" variant="outline" onClick={() => setQuick("semanal")}>Semanal</Button>
-            <Button size="sm" variant="outline" onClick={() => setQuick("quinzenal")}>Quinzenal</Button>
-            <Button size="sm" variant="outline" onClick={() => setQuick("mensal")}>Mensal</Button>
+            <Button size="sm" variant="outline" onClick={() => { setShowCustom(false); setQuick("diario"); }}>Diário</Button>
+            <Button size="sm" variant="outline" onClick={() => { setShowCustom(false); setQuick("semanal"); }}>Semanal</Button>
+            <Button size="sm" variant="outline" onClick={() => { setShowCustom(false); setQuick("quinzenal"); }}>Quinzenal</Button>
+            <Button size="sm" variant="outline" onClick={() => { setShowCustom(false); setQuick("mensal"); }}>Mensal</Button>
+            <Button size="sm" variant={showCustom ? "default" : "outline"} onClick={() => setShowCustom((v) => !v)}>Personalizado</Button>
           </div>
-          <div><Label>De</Label><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)}/></div>
-          <div><Label>Até</Label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)}/></div>
+          {showCustom && (
+            <>
+              <div><Label>De</Label><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)}/></div>
+              <div><Label>Até</Label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)}/></div>
+            </>
+          )}
           <Button variant="outline" onClick={exportarPlanos}><Download className="h-4 w-4 mr-2"/>Exportar planos (CSV)</Button>
+          <div className="text-xs text-muted-foreground ml-auto">
+            Período: {from.split("-").reverse().join("/")} até {to.split("-").reverse().join("/")}
+          </div>
         </CardContent>
       </Card>
 
