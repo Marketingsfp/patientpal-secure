@@ -2550,7 +2550,19 @@ function AgendaPage() {
                     // Lista curada (peso de popularidade) — usada como fallback
                     // quando ainda não há histórico para o exame.
                     const curadosPorModalidade: Record<"us" | "rx" | "tc" | "rm", string[]> = {
-                      us: ["ABDOME TOTAL", "ABDOME SUPERIOR", "TIREOIDE", "MAMA", "OBSTETRICA", "TRANSVAGINAL", "PELVICA", "RINS", "PROSTATA", "DOPPLER"],
+                      // Ordem oficial dos exames de USG mais solicitados na clínica.
+                      // O 1º item ganha o maior peso (fica como nº 1 quando não há histórico).
+                      us: [
+                        "OBSTETRIC", "1 TRIMESTRE", "PRIMEIRO TRIMESTRE",
+                        "MORFOLOGIC", "2 TRIMESTRE", "SEGUNDO TRIMESTRE",
+                        "DOPPLER",
+                        "TRANSVAGINAL",
+                        "MAMA",
+                        "ABDOME TOTAL", "ABDOMEN TOTAL",
+                        "PELVIC",
+                        "VIAS URINARIAS", "RINS",
+                        "TIREOIDE",
+                      ],
                       rx: ["TORAX", "COLUNA LOMBAR", "COLUNA CERVICAL", "JOELHO", "MAO", "PE", "PUNHO", "BACIA", "CRANIO", "ABDOME"],
                       tc: ["CRANIO", "TORAX", "ABDOME TOTAL", "COLUNA LOMBAR", "SEIOS DA FACE", "COLUNA CERVICAL", "ABDOME SUPERIOR", "PESCOCO", "TORAX CONTRASTE", "PELVE"],
                       rm: ["CRANIO", "COLUNA LOMBAR", "COLUNA CERVICAL", "JOELHO", "OMBRO", "ABDOME", "COLUNA TORACICA", "PELVE", "QUADRIL", "TORNOZELO"],
