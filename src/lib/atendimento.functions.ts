@@ -50,7 +50,16 @@ export const listarConversas = createServerFn({ method: "POST" })
       .limit(data.limit);
     if (data.status !== "all") q = q.eq("status", data.status);
     if (data.canal !== "todos") q = q.eq("canal", data.canal);
-    if (data.busca) q = q.or(`contato_nome.ilike.%${data.busca}%,contato_telefone.ilike.%${data.busca}%,protocol_number.ilike.%${data.busca}%`);
+    if (data.busca) {
+      // Sanitiza para evitar injeção de filtros PostgREST via .or()
+      // — remove operadores e separadores reservados.
+      const safe = data.busca.replace(/[%_,.()'"\\:*]/g, "");
+      if (safe.length > 0) {
+        q = q.or(
+          `contato_nome.ilike.%${safe}%,contato_telefone.ilike.%${safe}%,protocol_number.ilike.%${safe}%`,
+        );
+      }
+    }
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
     return rows ?? [];
