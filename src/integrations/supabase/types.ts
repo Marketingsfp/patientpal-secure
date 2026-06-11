@@ -6759,6 +6759,7 @@ export type Database = {
           valor: number
         }[]
       }
+      each: { Args: { hs: unknown }; Returns: Record<string, unknown>[] }
       emitir_senha: {
         Args: {
           _clinica_id: string
