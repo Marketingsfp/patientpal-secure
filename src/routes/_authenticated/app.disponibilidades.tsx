@@ -198,7 +198,9 @@ function Page() {
           // Fallback: se o médico não tem disponibilidade semanal cadastrada para o dia,
           // gera um bloco padrão 08:00–17:00 para que o usuário consiga criar a agenda
           // mesmo sem configurar a disponibilidade semanal antes.
-          const dsEfetivo = ds.length > 0
+          const overrideIni = gerar.hora_inicio || "";
+          const overrideFim = gerar.hora_fim || "";
+          const baseDs = ds.length > 0
             ? ds
             : [{
                 id: `__default_${m.id}_${dow}`,
@@ -213,7 +215,14 @@ function Page() {
                 vigencia_inicio: null,
                 vigencia_fim: null,
               } as DispRow];
+          // Aplica filtros/overrides de horário e intervalo do formulário
+          const dsEfetivo = baseDs.map((x) => ({
+            ...x,
+            hora_inicio: overrideIni ? (overrideIni > x.hora_inicio ? overrideIni : x.hora_inicio) : x.hora_inicio,
+            hora_fim: overrideFim ? (overrideFim < x.hora_fim ? overrideFim : x.hora_fim) : x.hora_fim,
+          })).filter((x) => x.hora_inicio < x.hora_fim);
           const overrideLimite = gerar.limite_fichas ? parseInt(gerar.limite_fichas) : 0;
+          const overrideIntervalo = gerar.intervalo_min ? parseInt(gerar.intervalo_min) : 0;
           let limiteDia: number;
           if (overrideLimite > 0) {
             limiteDia = overrideLimite;
@@ -223,7 +232,9 @@ function Page() {
           }
           let criadosNoDia = 0;
           for (const disp of dsEfetivo) {
-            const dur = disp.intervalo_min && disp.intervalo_min > 0 ? disp.intervalo_min : fallbackDur;
+            const dur = overrideIntervalo > 0
+              ? overrideIntervalo
+              : (disp.intervalo_min && disp.intervalo_min > 0 ? disp.intervalo_min : fallbackDur);
             const [hi, mi] = disp.hora_inicio.split(":").map(Number);
             const [hf, mf] = disp.hora_fim.split(":").map(Number);
             let cur = hi * 60 + mi;
