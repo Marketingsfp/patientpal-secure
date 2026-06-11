@@ -834,7 +834,10 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
   };
 
   const pagas = mens.filter((m) => m.status === "pago").length;
-  const totalPago = mens.filter((m) => m.status === "pago").reduce((s, m) => s + Number(m.valor), 0);
+  const totalPagoMens = mens.filter((m) => m.status === "pago").reduce((s, m) => s + Number(m.valor), 0);
+  const totalPago = totalPagoMens + extraRecebido.total;
+  const pagasTotal = pagas + extraRecebido.count;
+  const totalParcelas = mens.length + extraRecebido.count;
   const aReceber = mens.filter((m) => m.status !== "pago").reduce((s, m) => s + Number(m.valor), 0);
 
   // ---- Dados da venda (aba "Dados") ----
