@@ -260,7 +260,7 @@ function Page() {
       repasse_pago: !!r.repasse_pago, repasse_pago_em: r.repasse_pago_em, repasse_forma_pagamento: r.repasse_forma_pagamento,
     }));
     const agend: Atend[] = (ar.data ?? []).map((r): Atend => {
-      const ag = (r as any).agendamento as { procedimento: string | null; paciente_nome: string | null; paciente_id: string | null; medico_id: string | null; inicio: string | null } | null;
+      const ag = (r as any).agendamento as { procedimento: string | null; paciente_nome: string | null; paciente_id: string | null; medico_id: string | null; inicio: string | null; status: string | null } | null;
       // Procedimento: só usamos o do agendamento. Quando não há agendamento
       // vinculado, a "cauda" da descrição costuma ser tipo de contrato/forma
       // (CONTRATO, RECEBIMENTOS DIVERSOS, AJUSTE…), não o serviço realizado.
@@ -279,6 +279,7 @@ function Page() {
         origem: "agenda",
         repasse_pago: !!r.repasse_pago, repasse_pago_em: r.repasse_pago_em, repasse_forma_pagamento: r.repasse_forma_pagamento,
         agendamento_inicio: ag?.inicio ?? null,
+        agendamento_status: ag?.status ?? null,
       };
     });
     // Filtro client-side por médico para os registros da agenda (cobre os
