@@ -56,6 +56,7 @@ function Page() {
   const hojeIso = new Date().toISOString().slice(0, 10);
   const em30Iso = (() => { const d = new Date(); d.setDate(d.getDate() + 29); return d.toISOString().slice(0, 10); })();
   const [gerar, setGerar] = useState({ medico_id: "all", dias: "30", data_inicio: hojeIso, data_fim: em30Iso, limite_fichas: "" });
+  const [gerarDias, setGerarDias] = useState<number[]>([1, 2, 3, 4, 5, 6]);
   const [gerando, setGerando] = useState(false);
   const [medicoEditando, setMedicoEditando] = useState<string | null>(null);
   const [dispEditando, setDispEditando] = useState<string | null>(null);
@@ -174,6 +175,7 @@ function Page() {
       const d = new Date(ini); d.setDate(d.getDate() + i);
       if (isFeriadoOuDomingo(d)) continue;
       const dow = d.getDay();
+      if (!gerarDias.includes(dow)) continue;
       for (const m of alvo) {
         const agendasDoMedico = agendas.filter((a) => a.medico_id === m.id && a.ativo);
         for (const ag of agendasDoMedico) {
@@ -213,7 +215,7 @@ function Page() {
       }
     }
     return out;
-  }, [gerar, medicos, disps, agendas]);
+  }, [gerar, gerarDias, medicos, disps, agendas]);
 
   if (!clinicaAtual) return <p className="text-muted-foreground">Selecione uma clínica.</p>;
 
@@ -335,6 +337,40 @@ function Page() {
                   <CalendarRange className="h-4 w-4 mr-1" />
                   {gerando ? "Gerando..." : `Gerar ${slotsPreview.length} slots`}
                 </Button>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">Dias da semana</label>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {DIAS.map((d, i) => {
+                    const ativo = gerarDias.includes(i);
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => setGerarDias((xs) => xs.includes(i) ? xs.filter((x) => x !== i) : [...xs, i].sort((a, b) => a - b))}
+                        className={`h-8 px-3 rounded-md border text-xs font-medium transition flex items-center gap-1.5 ${ativo ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted"}`}
+                        aria-pressed={ativo}
+                      >
+                        <span className={`inline-block h-3 w-3 rounded-sm border ${ativo ? "bg-primary-foreground border-primary-foreground" : "border-muted-foreground/50"}`} />
+                        {d}
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => setGerarDias([1, 2, 3, 4, 5, 6])}
+                    className="h-8 px-2 rounded-md border text-xs text-muted-foreground hover:bg-muted ml-1"
+                  >
+                    Seg–Sáb
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGerarDias([0, 1, 2, 3, 4, 5, 6])}
+                    className="h-8 px-2 rounded-md border text-xs text-muted-foreground hover:bg-muted"
+                  >
+                    Todos
+                  </button>
+                </div>
               </div>
               {slotsPreview.length > 0 && (
                 <p className="text-xs text-muted-foreground">
