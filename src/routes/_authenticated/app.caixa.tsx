@@ -158,6 +158,8 @@ function Page() {
   const [minhaSessao, setMinhaSessao] = useState<Sessao | null>(null);
   const [minhasMovs, setMinhasMovs] = useState<Mov[]>([]);
   const [minhasSessoes, setMinhasSessoes] = useState<Sessao[]>([]);
+  // Filtro de data para a tabela "Movimentos da sessão" (padrão: hoje)
+  const [meuFiltroData, setMeuFiltroData] = useState<string>(() => new Date().toISOString().slice(0, 10));
 
   const [todasSessoes, setTodasSessoes] = useState<Sessao[]>([]);
   const [todosMovs, setTodosMovs] = useState<Mov[]>([]);
