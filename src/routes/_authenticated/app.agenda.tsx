@@ -2572,28 +2572,26 @@ function AgendaPage() {
                       // peso histórico domina; curado serve como desempate/fallback
                       return { ...o, mod, score: uso * 100 + curado };
                     });
-                    // Para cada modalidade alvo, seleciona top 10 e marca com ⭐
-                    const topIds = new Set<string>();
+                    // Para cada modalidade alvo, seleciona top 10 (por score desc)
+                    // e atribui a posição global 1..N na ordem em que aparecerão.
+                    const rankByValue = new Map<string, number>();
+                    const topOrdenado: ScoredOpt[] = [];
                     (["us", "rx", "tc", "rm"] as const).forEach((mod) => {
                       const lista = scored
                         .filter((s) => s.mod === mod && s.score > 0)
                         .sort((a, b) => b.score - a.score)
                         .slice(0, 10);
-                      lista.forEach((s) => topIds.add(s.value));
+                      lista.forEach((s) => topOrdenado.push(s));
                     });
-                    const topOpts: { value: string; label: string }[] = [];
-                    const restoOpts: { value: string; label: string }[] = [];
-                    for (const s of scored) {
-                      if (topIds.has(s.value)) topOpts.push({ value: s.value, label: `⭐ ${s.label}` });
-                      else restoOpts.push({ value: s.value, label: s.label });
-                    }
-                    // Ordena top por score desc; resto por label
-                    topOpts.sort((a, b) => {
-                      const sa = scored.find((x) => x.value === a.value)?.score ?? 0;
-                      const sb = scored.find((x) => x.value === b.value)?.score ?? 0;
-                      return sb - sa;
-                    });
-                    restoOpts.sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
+                    topOrdenado.forEach((s, i) => rankByValue.set(s.value, i + 1));
+                    const topOpts = topOrdenado.map((s) => ({
+                      value: s.value,
+                      label: `${rankByValue.get(s.value)}. ${s.label}`,
+                    }));
+                    const restoOpts = scored
+                      .filter((s) => !rankByValue.has(s.value))
+                      .map((s) => ({ value: s.value, label: s.label }))
+                      .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
                     return [...base, ...topOpts, ...restoOpts];
                   })()}
                 />
