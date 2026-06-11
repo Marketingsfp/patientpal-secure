@@ -28,6 +28,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { SolicitarEstornoDialog } from "@/components/financeiro/SolicitarEstornoDialog";
+import { findRegra, computeValor, type CbRegra } from "@/lib/cb-regras";
 
 export const Route = createFileRoute("/_authenticated/app/caixa")({
   component: Page,
