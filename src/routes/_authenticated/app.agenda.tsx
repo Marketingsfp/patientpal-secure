@@ -2114,6 +2114,7 @@ function AgendaPage() {
     "ECG", "EEG", "MAPA", "HOLTER", "ITB",
     "ELETROCARDIOGRAMA", "ELETROENCEFALOGRAMA",
     "TESTE ERGOMETRICO", "TESTE ERGOMÉTRICO", "ERGOMETRIA",
+    "SAO FRANCISCO DE PAULA", "SÃO FRANCISCO DE PAULA",
   ]);
   const medicoNome = (id: string | null) => {
     const m = medicos.find(x => x.id === id);
