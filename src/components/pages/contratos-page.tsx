@@ -84,6 +84,7 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
   const [q, setQ] = useState("");
   const [view, setView] = useState<"list" | "new">("list");
   const [detail, setDetail] = useState<Contrato | null>(null);
+  const [sortPaciente, setSortPaciente] = useState<null | "asc" | "desc">(null);
 
   const load = async () => {
     if (!clinicaAtual) return;
@@ -108,9 +109,11 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
-    if (!s) return list;
-    return list.filter((c) => `${c.numero} ${c.paciente_nome}`.toLowerCase().includes(s));
-  }, [list, q]);
+    const base = !s ? list : list.filter((c) => `${c.numero} ${c.paciente_nome}`.toLowerCase().includes(s));
+    if (!sortPaciente) return base;
+    const ordered = [...base].sort((a, b) => a.paciente_nome.localeCompare(b.paciente_nome, "pt-BR", { sensitivity: "base" }));
+    return sortPaciente === "asc" ? ordered : ordered.reverse();
+  }, [list, q, sortPaciente]);
 
   if (view === "new") {
     return (
@@ -145,7 +148,21 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Nº</TableHead><TableHead>Paciente</TableHead><TableHead>Início</TableHead>
+              <TableHead>Nº</TableHead>
+              <TableHead>
+                <button
+                  type="button"
+                  onClick={() => setSortPaciente((s) => s === "asc" ? "desc" : s === "desc" ? null : "asc")}
+                  className="inline-flex items-center gap-1 font-medium hover:text-primary"
+                  title="Ordenar por paciente"
+                >
+                  Paciente
+                  <span className="text-[10px] text-muted-foreground">
+                    {sortPaciente === "asc" ? "A→Z" : sortPaciente === "desc" ? "Z→A" : "↕"}
+                  </span>
+                </button>
+              </TableHead>
+              <TableHead>Início</TableHead>
               <TableHead>Mensal</TableHead><TableHead>Pagamento</TableHead><TableHead>Status</TableHead>
               <TableHead>Assinado</TableHead><TableHead></TableHead>
             </TableRow>
