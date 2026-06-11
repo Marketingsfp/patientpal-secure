@@ -1787,6 +1787,24 @@ function AgendaPage() {
       toast.error("Não é permitido alterar o nome do paciente em agendamento já pago.");
       return;
     }
+    // Bloqueio por mensalidade vencida em contrato de cartão benefícios (titular ou dependente).
+    // Gestores/admin podem liberar via prompt; demais usuários ficam bloqueados.
+    if (form.paciente_id) {
+      const { data: blk } = await supabase.rpc("paciente_cartao_inadimplente", {
+        _paciente_id: form.paciente_id,
+        _clinica_id: clinicaAtual.clinica_id,
+      });
+      const info = (blk ?? {}) as { bloqueado?: boolean; total_aberto?: number; mensalidades?: Array<{ vencimento: string; valor: number; convenio_nome?: string }> };
+      if (info.bloqueado) {
+        const linhas = (info.mensalidades ?? [])
+          .slice(0, 5)
+          .map((m) => `• ${m.convenio_nome ?? "Cartão"} — venc. ${m.vencimento?.split("-").reverse().join("/")} R$ ${Number(m.valor).toFixed(2)}`)
+          .join("\n");
+        const msg = `Paciente com mensalidade(s) vencida(s) no cartão benefícios.\nTotal em aberto: R$ ${Number(info.total_aberto ?? 0).toFixed(2)}\n\n${linhas}\n\nAgendamento bloqueado até a regularização.`;
+        toast.error(msg, { duration: 10000 });
+        return;
+      }
+    }
     setSaving(true);
     const ehRecurso = !!form.medico_id && recursoIds.has(form.medico_id);
     const payload = {
