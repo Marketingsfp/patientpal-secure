@@ -201,6 +201,20 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       obsExtra = `Recebido ${formatBRL(recebidoNum)}, troco ${formatBRL(trocoDinheiro)}`;
     }
     const obsFinal = [observacoes.trim(), obsExtra].filter(Boolean).join(" | ") || null;
+    // Quando vinculado a um agendamento, busca medico_id e paciente_id
+    // para que o repasse médico e os relatórios por paciente funcionem.
+    let medicoId: string | null = null;
+    let pacienteId: string | null = null;
+    if (agendamentoId) {
+      const { data: ag } = await supabase
+        .from("agendamentos")
+        .select("medico_id, paciente_id")
+        .eq("id", agendamentoId)
+        .maybeSingle();
+      const a = ag as { medico_id: string | null; paciente_id: string | null } | null;
+      medicoId = a?.medico_id ?? null;
+      pacienteId = a?.paciente_id ?? null;
+    }
     const { data: lancInserido, error } = await supabase.from("fin_lancamentos").insert({
       clinica_id: clinicaAtual.clinica_id,
       tipo,
@@ -216,6 +230,8 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       observacoes: obsFinal,
       status: "confirmado",
       agendamento_id: agendamentoId ?? null,
+      medico_id: medicoId,
+      paciente_id: pacienteId,
       criado_por: user?.id ?? null,
     } as never).select("id").single();
     setSaving(false);
