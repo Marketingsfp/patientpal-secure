@@ -405,16 +405,37 @@ function Page() {
     if (!confirm("Estornar este atendimento? O agendamento voltará para o status 'Agendado'.")) return;
     const { data: lanc, error: eLanc } = await supabase
       .from("fin_lancamentos")
-      .select("agendamento_id")
+      .select("agendamento_id, valor, descricao")
       .eq("id", a.id)
       .maybeSingle();
     if (eLanc) { toast.error(eLanc.message); return; }
     const agId = lanc?.agendamento_id;
     if (!agId) { toast.error("Agendamento de origem não encontrado."); return; }
     const { data: agAntes } = await supabase
-      .from("agendamentos").select("id, status").eq("id", agId).maybeSingle();
+      .from("agendamentos").select("id, status, fluxo_etapa").eq("id", agId).maybeSingle();
+    // 1) Remove os movimentos de caixa associados a este lançamento
+    //    (recebimento e eventual abertura automática não são tocados).
+    const { error: eMov } = await supabase
+      .from("caixa_movimentos")
+      .delete()
+      .eq("lancamento_id", a.id);
+    if (eMov) { toast.error(`Falha ao reverter caixa: ${eMov.message}`); return; }
+    // 2) Remove o lançamento de receita (libera ja_pago da fila do caixa
+    //    e zera repasse/relatórios).
+    const { error: eDel } = await supabase
+      .from("fin_lancamentos")
+      .delete()
+      .eq("id", a.id);
+    if (eDel) { toast.error(`Falha ao excluir lançamento: ${eDel.message}`); return; }
+    // 3) Reabre o fluxo do agendamento para que possa ser cobrado de novo.
     const { error: eUpd } = await supabase
-      .from("agendamentos").update({ status: "agendado" }).eq("id", agId);
+      .from("agendamentos")
+      .update({
+        status: "agendado",
+        fluxo_etapa: "aguardando_recepcao",
+        fluxo_atualizado_em: new Date().toISOString(),
+      })
+      .eq("id", agId);
     if (eUpd) { toast.error(eUpd.message); return; }
     try {
       await logAction({
@@ -423,10 +444,10 @@ function Page() {
         action: "ESTORNO",
         clinica_id: clinicaAtual?.clinica_id,
         dados_antes: agAntes ?? { id: agId },
-        dados_depois: { id: agId, status: "agendado" },
+        dados_depois: { id: agId, status: "agendado", fin_lancamentos_id_removido: a.id, valor_estornado: lanc?.valor ?? null },
       });
     } catch { /* auditoria best-effort */ }
-    toast.success("Atendimento estornado — agendamento voltou para 'Agendado'.");
+    toast.success("Atendimento estornado — receita removida e agendamento liberado para nova cobrança.");
     await load();
   };
 
