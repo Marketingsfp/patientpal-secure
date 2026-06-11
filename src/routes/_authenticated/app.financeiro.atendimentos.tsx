@@ -925,6 +925,7 @@ function Page() {
               <TableHead className="text-right">{isMedicoOnly ? "Repasse" : "Médico"}</TableHead>
               {!isMedicoOnly && <TableHead className="text-right">Clínica</TableHead>}
               <TableHead className="text-center">Status</TableHead>
+              <TableHead className="text-center">Laudo</TableHead>
               {!isMedicoOnly && <TableHead className="w-24"></TableHead>}
             </TableRow></TableHeader>
             <TableBody>{filteredItems.map((a) => (
