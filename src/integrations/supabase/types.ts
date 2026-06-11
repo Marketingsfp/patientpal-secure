@@ -4367,6 +4367,8 @@ export type Database = {
           medico_id: string
           observacoes: string | null
           updated_at: string
+          vigencia_fim: string | null
+          vigencia_inicio: string | null
         }
         Insert: {
           agenda_id: string
@@ -4382,6 +4384,8 @@ export type Database = {
           medico_id: string
           observacoes?: string | null
           updated_at?: string
+          vigencia_fim?: string | null
+          vigencia_inicio?: string | null
         }
         Update: {
           agenda_id?: string
@@ -4397,6 +4401,8 @@ export type Database = {
           medico_id?: string
           observacoes?: string | null
           updated_at?: string
+          vigencia_fim?: string | null
+          vigencia_inicio?: string | null
         }
         Relationships: [
           {
