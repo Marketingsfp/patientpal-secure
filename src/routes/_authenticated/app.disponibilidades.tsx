@@ -51,6 +51,7 @@ function Page() {
   const [agendaSel, setAgendaSel] = useState<string>("");
   const [filtro, setFiltro] = useState("");
   const [novo, setNovo] = useState({ medico_id: "", dia_semana: "1", hora_inicio: "08:00", hora_fim: "12:00", limite_pacientes: "", intervalo_min: "" });
+  const [diasSel, setDiasSel] = useState<number[]>([1]);
   const hojeIso = new Date().toISOString().slice(0, 10);
   const em30Iso = (() => { const d = new Date(); d.setDate(d.getDate() + 29); return d.toISOString().slice(0, 10); })();
   const [gerar, setGerar] = useState({ medico_id: "all", dias: "30", data_inicio: hojeIso, data_fim: em30Iso, limite_fichas: "" });
@@ -114,19 +115,20 @@ function Page() {
   const adicionar = async () => {
     if (!clinicaAtual || !novo.medico_id) { toast.error("Selecione um médico"); return; }
     if (!agendaSel) { toast.error("Selecione uma agenda"); return; }
-    const payload = {
+    if (diasSel.length === 0) { toast.error("Selecione ao menos um dia"); return; }
+    const payload = diasSel.map((dia) => ({
       clinica_id: clinicaAtual.clinica_id,
       medico_id: novo.medico_id,
       agenda_id: agendaSel,
-      dia_semana: parseInt(novo.dia_semana),
+      dia_semana: dia,
       hora_inicio: novo.hora_inicio,
       hora_fim: novo.hora_fim,
       limite_pacientes: novo.limite_pacientes ? parseInt(novo.limite_pacientes) : null,
       intervalo_min: novo.intervalo_min ? parseInt(novo.intervalo_min) : null,
-    };
+    }));
     const { error } = await supabase.from("medico_disponibilidades").insert(payload as never);
     if (error) { toast.error(error.message); return; }
-    toast.success("Horário adicionado");
+    toast.success(diasSel.length > 1 ? `${diasSel.length} horários adicionados` : "Horário adicionado");
     void load();
   };
 
@@ -424,10 +426,30 @@ function Page() {
                     </div>
                     <div>
                       <label className="text-xs text-muted-foreground">Dia</label>
-                      <Select value={novo.dia_semana} onValueChange={(v) => setNovo({ ...novo, dia_semana: v })}>
-                        <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
-                        <SelectContent>{DIAS.map((d, i) => <SelectItem key={i} value={String(i)}>{d}</SelectItem>)}</SelectContent>
-                      </Select>
+                      <div className="flex flex-wrap gap-1">
+                        {DIAS.map((d, i) => {
+                          const ativo = diasSel.includes(i);
+                          return (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => setDiasSel((xs) => xs.includes(i) ? xs.filter((x) => x !== i) : [...xs, i].sort((a, b) => a - b))}
+                              className={`h-9 px-2.5 rounded-md border text-xs font-medium transition ${ativo ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted"}`}
+                              aria-pressed={ativo}
+                            >
+                              {d}
+                            </button>
+                          );
+                        })}
+                        <button
+                          type="button"
+                          onClick={() => setDiasSel([1, 2, 3, 4, 5, 6])}
+                          className="h-9 px-2 rounded-md border text-xs text-muted-foreground hover:bg-muted ml-1"
+                          title="Segunda a sábado"
+                        >
+                          Seg–Sáb
+                        </button>
+                      </div>
                     </div>
                     <div>
                       <label className="text-xs text-muted-foreground">Início</label>
