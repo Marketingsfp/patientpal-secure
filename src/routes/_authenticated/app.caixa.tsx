@@ -855,7 +855,7 @@ function Page() {
                       {minhasMovsFiltrados.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={7} className="text-center text-muted-foreground">
-                            {meuFiltroData ? "Sem movimentos nesta data" : "Sem movimentos"}
+                            Sem movimentos hoje
                           </TableCell>
                         </TableRow>
                       ) : minhasMovsFiltrados.map((m) => (
