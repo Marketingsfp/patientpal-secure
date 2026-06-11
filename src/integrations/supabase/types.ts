@@ -2055,6 +2055,7 @@ export type Database = {
           dia_vencimento: number
           forma_pagamento: string | null
           id: string
+          migrar_apos: string | null
           num_parcelas: number
           numero: number
           observacoes: string | null
@@ -2062,6 +2063,7 @@ export type Database = {
           paciente_nome: string
           plano_id: string | null
           status: string
+          tabela_legada: boolean
           taxa_adesao: number
           token_publico: string | null
           updated_at: string
@@ -2082,6 +2084,7 @@ export type Database = {
           dia_vencimento?: number
           forma_pagamento?: string | null
           id?: string
+          migrar_apos?: string | null
           num_parcelas?: number
           numero?: number
           observacoes?: string | null
@@ -2089,6 +2092,7 @@ export type Database = {
           paciente_nome: string
           plano_id?: string | null
           status?: string
+          tabela_legada?: boolean
           taxa_adesao?: number
           token_publico?: string | null
           updated_at?: string
@@ -2109,6 +2113,7 @@ export type Database = {
           dia_vencimento?: number
           forma_pagamento?: string | null
           id?: string
+          migrar_apos?: string | null
           num_parcelas?: number
           numero?: number
           observacoes?: string | null
@@ -2116,6 +2121,7 @@ export type Database = {
           paciente_nome?: string
           plano_id?: string | null
           status?: string
+          tabela_legada?: boolean
           taxa_adesao?: number
           token_publico?: string | null
           updated_at?: string

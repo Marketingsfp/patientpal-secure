@@ -61,7 +61,7 @@ type Beneficio = {
   pessoa: string;
 };
 type Paciente = { id: string; nome: string; cpf: string | null; telefone: string | null; email: string | null; face_descriptor?: number[] | null };
-type Contrato = { id: string; numero: number; paciente_nome: string; convenio_id: string | null; plano_id: string | null; valor_mensal: number; status: string; data_inicio: string; data_fim: string | null; assinado_em: string | null; token_publico: string; forma_pagamento: string | null; dia_vencimento?: number | null; taxa_adesao?: number | null; num_parcelas?: number | null; paciente_id?: string | null; clinica_id?: string | null; observacoes?: string | null; cancelado_em?: string | null; cancelamento_motivo?: string | null };
+type Contrato = { id: string; numero: number; paciente_nome: string; convenio_id: string | null; plano_id: string | null; valor_mensal: number; status: string; data_inicio: string; data_fim: string | null; assinado_em: string | null; token_publico: string; forma_pagamento: string | null; dia_vencimento?: number | null; taxa_adesao?: number | null; num_parcelas?: number | null; paciente_id?: string | null; clinica_id?: string | null; observacoes?: string | null; cancelado_em?: string | null; cancelamento_motivo?: string | null; tabela_legada?: boolean | null; migrar_apos?: string | null };
 type Mens = { id: string; numero_parcela: number; vencimento: string; valor: number; status: string; pago_em: string | null; forma_pagamento: string | null };
 type Dep = {
   id: string;
@@ -173,7 +173,16 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
             {filtered.map((c) => (
               <TableRow key={c.id} className="cursor-pointer" onClick={() => setDetail(c)}>
                 <TableCell className="font-semibold">{c.numero}</TableCell>
-                <TableCell>{c.paciente_nome}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <span>{c.paciente_nome}</span>
+                    {c.tabela_legada ? (
+                      <Badge variant="outline" className="text-amber-700 border-amber-400 bg-amber-50 dark:bg-amber-950/30">
+                        Tabela antiga — migrar {c.migrar_apos ? `em ${fmtD(c.migrar_apos)}` : ""}
+                      </Badge>
+                    ) : null}
+                  </div>
+                </TableCell>
                 <TableCell>{fmtD(c.data_inicio)}</TableCell>
                 <TableCell>{BRL(c.valor_mensal)}</TableCell>
                 <TableCell>{c.forma_pagamento ?? "—"}</TableCell>
@@ -1239,6 +1248,14 @@ h1, h2, h3 { margin: 0 0 6mm; }
           <Button size="sm" variant="outline" onClick={copiarLink}><Link2 className="h-4 w-4 mr-1"/>Link de assinatura</Button>
           {contrato.assinado_em ? <Badge variant="default"><Check className="h-3 w-3 mr-1"/>Assinado em {fmtD(contrato.assinado_em)}</Badge> : <Badge variant="outline">Aguardando assinatura</Badge>}
         </div>
+
+        {contrato.tabela_legada ? (
+          <div className="rounded-md border border-amber-400 bg-amber-50 dark:bg-amber-950/30 p-3 text-sm text-amber-900 dark:text-amber-100">
+            <strong>Atenção:</strong> este contrato está na tabela <strong>antiga</strong> do Cartão Consulta.
+            Avisar o titular e migrar para a tabela atual a partir de{" "}
+            <strong>{contrato.migrar_apos ? fmtD(contrato.migrar_apos) : "01/07/2026"}</strong>.
+          </div>
+        ) : null}
 
         <div>
           <h3 className="font-semibold text-sm mb-1">Mensalidades</h3>
