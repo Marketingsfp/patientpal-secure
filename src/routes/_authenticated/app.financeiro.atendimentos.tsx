@@ -528,6 +528,31 @@ function Page() {
     if (!clinicaAtual || !selectedItems.length) return;
     setPayingNow(true);
     try {
+      // Validação servidor-side: só pode pagar repasse de atendimentos efetivamente
+      // realizados (lançamento confirmado + agendamento com status 'realizado').
+      // Bloqueia o bug de repassar antes do paciente ter sido atendido.
+      const agendaIdsCheck = selectedItems.filter((x) => x.origem === "agenda").map((x) => x.id);
+      if (agendaIdsCheck.length) {
+        const { data: lancs, error: eChk } = await supabase
+          .from("fin_lancamentos")
+          .select("id, status, agendamento_id, agendamento:agendamentos(status)")
+          .in("id", agendaIdsCheck);
+        if (eChk) throw eChk;
+        const bloq: string[] = [];
+        for (const l of (lancs ?? []) as Array<{ id: string; status: string | null; agendamento_id: string | null; agendamento: { status: string | null } | null }>) {
+          const lancOk = l.status === "confirmado";
+          const agStatus = l.agendamento?.status ?? null;
+          const agOk = agStatus === "realizado";
+          if (!lancOk || !agOk) bloq.push(l.id);
+        }
+        if (bloq.length) {
+          toast.error(
+            `Não é possível pagar o repasse: ${bloq.length} atendimento(s) ainda não foram baixados/realizados. Confirme o pagamento no Caixa e marque o atendimento como realizado antes de gerar o repasse.`,
+          );
+          setPayingNow(false);
+          return;
+        }
+      }
       // Agrupa por médico para gerar um lançamento de despesa por médico
       const byMed = new Map<string, Atend[]>();
       for (const a of selectedItems) {
