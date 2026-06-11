@@ -235,13 +235,13 @@ function Page() {
     // Une atendimentos manuais (fin_atendimentos) com pagamentos da agenda (fin_lancamentos receita).
     let qManual = supabase
       .from("fin_atendimentos")
-      .select("id, data, procedimento, valor_total, valor_medico, valor_clinica, status, forma_pagamento, medico_id, paciente_id, repasse_pago, repasse_pago_em, repasse_forma_pagamento")
+      .select("id, data, procedimento, valor_total, valor_medico, valor_clinica, status, forma_pagamento, medico_id, paciente_id, repasse_pago, repasse_pago_em, repasse_forma_pagamento, laudo_status, medico_laudador_id, valor_laudo")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .gte("data", fIni)
       .lte("data", fFim);
     let qAgenda = supabase
       .from("fin_lancamentos")
-      .select("id, data, descricao, valor, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_forma_pagamento, agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)")
+      .select("id, data, descricao, valor, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_forma_pagamento, laudo_status, medico_laudador_id, valor_laudo, agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("tipo", "receita")
       .eq("status", "confirmado")
