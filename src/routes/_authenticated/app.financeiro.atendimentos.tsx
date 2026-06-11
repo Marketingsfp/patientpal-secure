@@ -37,6 +37,7 @@ interface Atend {
   repasse_forma_pagamento?: string | null;
   paciente_nome_extra?: string | null;
   agendamento_inicio?: string | null;
+  agendamento_status?: string | null;
 }
 interface Medico {
   id: string; nome: string;
@@ -236,7 +237,7 @@ function Page() {
       .lte("data", fFim);
     let qAgenda = supabase
       .from("fin_lancamentos")
-      .select("id, data, descricao, valor, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_forma_pagamento, agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio)")
+      .select("id, data, descricao, valor, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_forma_pagamento, agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("tipo", "receita")
       .eq("status", "confirmado")
@@ -259,7 +260,7 @@ function Page() {
       repasse_pago: !!r.repasse_pago, repasse_pago_em: r.repasse_pago_em, repasse_forma_pagamento: r.repasse_forma_pagamento,
     }));
     const agend: Atend[] = (ar.data ?? []).map((r): Atend => {
-      const ag = (r as any).agendamento as { procedimento: string | null; paciente_nome: string | null; paciente_id: string | null; medico_id: string | null; inicio: string | null } | null;
+      const ag = (r as any).agendamento as { procedimento: string | null; paciente_nome: string | null; paciente_id: string | null; medico_id: string | null; inicio: string | null; status: string | null } | null;
       // Procedimento: só usamos o do agendamento. Quando não há agendamento
       // vinculado, a "cauda" da descrição costuma ser tipo de contrato/forma
       // (CONTRATO, RECEBIMENTOS DIVERSOS, AJUSTE…), não o serviço realizado.
@@ -278,6 +279,7 @@ function Page() {
         origem: "agenda",
         repasse_pago: !!r.repasse_pago, repasse_pago_em: r.repasse_pago_em, repasse_forma_pagamento: r.repasse_forma_pagamento,
         agendamento_inicio: ag?.inicio ?? null,
+        agendamento_status: ag?.status ?? null,
       };
     });
     // Filtro client-side por médico para os registros da agenda (cobre os
@@ -503,7 +505,9 @@ function Page() {
     { total: 0, medico: 0, clinica: 0, pago: 0, aReceber: 0 },
   ), [filteredItems]);
 
-  const selectables = filteredItems.filter((a) => !a.repasse_pago && (a.valor_medico ?? 0) > 0);
+  const isAtendido = (a: Atend) =>
+    a.origem === "manual" ? a.status === "realizado" : a.agendamento_status === "realizado";
+  const selectables = filteredItems.filter((a) => !a.repasse_pago && (a.valor_medico ?? 0) > 0 && isAtendido(a));
   const allSelected = selectables.length > 0 && selectables.every((a) => sel.has(`${a.origem}:${a.id}`));
   const toggleAll = () => {
     if (allSelected) setSel(new Set());
@@ -528,6 +532,38 @@ function Page() {
     if (!clinicaAtual || !selectedItems.length) return;
     setPayingNow(true);
     try {
+      // Validação servidor-side: só pode pagar repasse de atendimentos efetivamente
+      // realizados (lançamento confirmado + agendamento com status 'realizado').
+      // Bloqueia o bug de repassar antes do paciente ter sido atendido.
+      const agendaIdsCheck = selectedItems.filter((x) => x.origem === "agenda").map((x) => x.id);
+      if (agendaIdsCheck.length) {
+        const { data: lancs, error: eChk } = await supabase
+          .from("fin_lancamentos")
+          .select("id, status, agendamento_id, agendamento:agendamentos(status)")
+          .in("id", agendaIdsCheck);
+        if (eChk) throw eChk;
+        const bloq: string[] = [];
+        for (const l of (lancs ?? []) as Array<{ id: string; status: string | null; agendamento_id: string | null; agendamento: { status: string | null } | null }>) {
+          const lancOk = l.status === "confirmado";
+          const agStatus = l.agendamento?.status ?? null;
+          const agOk = agStatus === "realizado";
+          if (!lancOk || !agOk) bloq.push(l.id);
+        }
+        if (bloq.length) {
+          toast.error(
+            `Não é possível pagar o repasse: ${bloq.length} atendimento(s) ainda não foram baixados/realizados. Confirme o pagamento no Caixa e marque o atendimento como realizado antes de gerar o repasse.`,
+          );
+          setPayingNow(false);
+          return;
+        }
+      }
+      // Mesma validação para atendimentos manuais (fin_atendimentos)
+      const manualBloq = selectedItems.filter((x) => x.origem === "manual" && x.status !== "realizado");
+      if (manualBloq.length) {
+        toast.error(`Não é possível pagar o repasse: ${manualBloq.length} atendimento(s) manual(is) não estão com status 'realizado'.`);
+        setPayingNow(false);
+        return;
+      }
       // Agrupa por médico para gerar um lançamento de despesa por médico
       const byMed = new Map<string, Atend[]>();
       for (const a of selectedItems) {
@@ -843,7 +879,11 @@ function Page() {
                 {!isMedicoOnly && (
                   <TableCell>
                     {!a.repasse_pago && (a.valor_medico ?? 0) > 0 ? (
-                      <Checkbox checked={sel.has(`${a.origem}:${a.id}`)} onCheckedChange={() => toggleOne(a)} aria-label="Selecionar" />
+                      isAtendido(a) ? (
+                        <Checkbox checked={sel.has(`${a.origem}:${a.id}`)} onCheckedChange={() => toggleOne(a)} aria-label="Selecionar" />
+                      ) : (
+                        <span title="Aguardando o atendimento ser marcado como realizado" className="text-[10px] text-amber-600">⏳</span>
+                      )
                     ) : null}
                   </TableCell>
                 )}
