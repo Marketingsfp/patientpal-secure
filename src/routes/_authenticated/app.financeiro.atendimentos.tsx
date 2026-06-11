@@ -38,6 +38,10 @@ interface Atend {
   paciente_nome_extra?: string | null;
   agendamento_inicio?: string | null;
   agendamento_status?: string | null;
+  requer_laudo?: boolean;
+  laudo_status?: string | null;
+  medico_laudador_id?: string | null;
+  valor_laudo?: number;
 }
 interface Medico {
   id: string; nome: string;
@@ -65,6 +69,7 @@ function Page() {
   const [convenios, setConvenios] = useState<Convenio[]>([]);
   const [procValores, setProcValores] = useState<Map<string, number>>(new Map());
   const [procTipos, setProcTipos] = useState<Map<string, string>>(new Map());
+  const [procLaudo, setProcLaudo] = useState<Map<string, boolean>>(new Map());
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -85,6 +90,45 @@ function Page() {
   const [payOpen, setPayOpen] = useState(false);
   const [payForm, setPayForm] = useState({ data: hoje, conta_id: "", forma_pagamento: "" });
   const [payingNow, setPayingNow] = useState(false);
+
+  // Diálogo de laudo
+  const [laudoOpen, setLaudoOpen] = useState(false);
+  const [laudoTarget, setLaudoTarget] = useState<Atend | null>(null);
+  const [laudoForm, setLaudoForm] = useState({ medico_laudador_id: "", valor_laudo: "" });
+  const [laudoSaving, setLaudoSaving] = useState(false);
+
+  const openLaudo = (a: Atend) => {
+    setLaudoTarget(a);
+    setLaudoForm({
+      medico_laudador_id: a.medico_laudador_id ?? "",
+      valor_laudo: a.valor_laudo ? String(a.valor_laudo) : "",
+    });
+    setLaudoOpen(true);
+  };
+
+  const emitirLaudo = async () => {
+    if (!laudoTarget) return;
+    if (!laudoForm.medico_laudador_id) { toast.error("Selecione o médico laudador"); return; }
+    const valor = Number(laudoForm.valor_laudo);
+    if (!valor || valor <= 0) { toast.error("Informe o valor do laudo"); return; }
+    setLaudoSaving(true);
+    const tabela = laudoTarget.origem === "agenda" ? "fin_lancamentos" : "fin_atendimentos";
+    const { error } = await supabase
+      .from(tabela)
+      .update({
+        medico_laudador_id: laudoForm.medico_laudador_id,
+        valor_laudo: valor,
+        laudo_status: "emitido",
+        laudo_emitido_em: new Date().toISOString(),
+      })
+      .eq("id", laudoTarget.id);
+    setLaudoSaving(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Laudo emitido — repasse do laudador gerado");
+    setLaudoOpen(false);
+    setLaudoTarget(null);
+    await load();
+  };
 
   // Solicitações de estorno pendentes (vindas do caixa/recepção)
   interface SolicEst {
@@ -231,13 +275,13 @@ function Page() {
     // Une atendimentos manuais (fin_atendimentos) com pagamentos da agenda (fin_lancamentos receita).
     let qManual = supabase
       .from("fin_atendimentos")
-      .select("id, data, procedimento, valor_total, valor_medico, valor_clinica, status, forma_pagamento, medico_id, paciente_id, repasse_pago, repasse_pago_em, repasse_forma_pagamento")
+      .select("id, data, procedimento, valor_total, valor_medico, valor_clinica, status, forma_pagamento, medico_id, paciente_id, repasse_pago, repasse_pago_em, repasse_forma_pagamento, laudo_status, medico_laudador_id, valor_laudo")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .gte("data", fIni)
       .lte("data", fFim);
     let qAgenda = supabase
       .from("fin_lancamentos")
-      .select("id, data, descricao, valor, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_forma_pagamento, agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)")
+      .select("id, data, descricao, valor, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_forma_pagamento, laudo_status, medico_laudador_id, valor_laudo, agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("tipo", "receita")
       .eq("status", "confirmado")
@@ -258,6 +302,9 @@ function Page() {
       status: r.status, forma_pagamento: r.forma_pagamento, medico_id: r.medico_id, paciente_id: r.paciente_id,
       origem: "manual",
       repasse_pago: !!r.repasse_pago, repasse_pago_em: r.repasse_pago_em, repasse_forma_pagamento: r.repasse_forma_pagamento,
+      laudo_status: (r as any).laudo_status ?? null,
+      medico_laudador_id: (r as any).medico_laudador_id ?? null,
+      valor_laudo: Number((r as any).valor_laudo ?? 0),
     }));
     const agend: Atend[] = (ar.data ?? []).map((r): Atend => {
       const ag = (r as any).agendamento as { procedimento: string | null; paciente_nome: string | null; paciente_id: string | null; medico_id: string | null; inicio: string | null; status: string | null } | null;
@@ -280,6 +327,9 @@ function Page() {
         repasse_pago: !!r.repasse_pago, repasse_pago_em: r.repasse_pago_em, repasse_forma_pagamento: r.repasse_forma_pagamento,
         agendamento_inicio: ag?.inicio ?? null,
         agendamento_status: ag?.status ?? null,
+        laudo_status: (r as any).laudo_status ?? null,
+        medico_laudador_id: (r as any).medico_laudador_id ?? null,
+        valor_laudo: Number((r as any).valor_laudo ?? 0),
       };
     });
     // Filtro client-side por médico para os registros da agenda (cobre os
@@ -320,11 +370,12 @@ function Page() {
     // Carrega valor de tabela dos procedimentos para usar como "total cheio"
     const { data: procs } = await supabase
       .from("procedimentos")
-      .select("nome, valor_padrao, valor_dinheiro, tipo")
+      .select("nome, valor_padrao, valor_dinheiro, tipo, requer_laudo")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("ativo", true);
     const pmap = new Map<string, number>();
     const tmap = new Map<string, string>();
+    const lmap = new Map<string, boolean>();
     for (const pr of (procs as any[] | null) ?? []) {
       const v = Number(pr.valor_padrao ?? pr.valor_dinheiro ?? 0);
       if (!pr?.nome) continue;
@@ -332,9 +383,11 @@ function Page() {
       // mantém o maior valor caso haja duplicidade entre unidades
       if (v > (pmap.get(key) ?? 0)) pmap.set(key, v);
       if (pr.tipo && !tmap.has(key)) tmap.set(key, String(pr.tipo));
+      if (pr.requer_laudo) lmap.set(key, true);
     }
     setProcValores(pmap);
     setProcTipos(tmap);
+    setProcLaudo(lmap);
     const ids = ((m.data ?? []) as Medico[]).map((x) => x.id);
     if (ids.length) {
       const { data: cv } = await supabase
@@ -872,6 +925,7 @@ function Page() {
               <TableHead className="text-right">{isMedicoOnly ? "Repasse" : "Médico"}</TableHead>
               {!isMedicoOnly && <TableHead className="text-right">Clínica</TableHead>}
               <TableHead className="text-center">Status</TableHead>
+              <TableHead className="text-center">Laudo</TableHead>
               {!isMedicoOnly && <TableHead className="w-24"></TableHead>}
             </TableRow></TableHeader>
             <TableBody>{filteredItems.map((a) => (
@@ -905,6 +959,28 @@ function Page() {
                       <Clock className="h-3 w-3 mr-1" />A receber
                     </Badge>
                   )}
+                </TableCell>
+                <TableCell className="text-center">
+                  {(() => {
+                    const procKey = a.procedimento ? norm(a.procedimento) : "";
+                    const exigeLaudo = procKey && procLaudo.get(procKey);
+                    if (a.laudo_status === "emitido") {
+                      return (
+                        <Badge variant="outline" className="bg-sky-500/10 text-sky-700 border-sky-500/30">
+                          <CheckCircle2 className="h-3 w-3 mr-1" />Emitido
+                        </Badge>
+                      );
+                    }
+                    if (!exigeLaudo) return <span className="text-muted-foreground text-xs">—</span>;
+                    if (!podeEstornar) {
+                      return <span className="text-amber-600 text-xs">Pendente</span>;
+                    }
+                    return (
+                      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => openLaudo(a)}>
+                        Marcar laudo
+                      </Button>
+                    );
+                  })()}
                 </TableCell>
                 {!isMedicoOnly && (
                   <TableCell className="text-right">
@@ -972,6 +1048,43 @@ function Page() {
             <Button variant="outline" onClick={() => setPayOpen(false)}>Cancelar</Button>
             <Button onClick={confirmarPagamento} disabled={payingNow}>
               {payingNow ? "Registrando..." : "Confirmar pagamento"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo: marcar laudo emitido */}
+      <Dialog open={laudoOpen} onOpenChange={setLaudoOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Marcar laudo emitido</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            {laudoTarget && (
+              <div className="rounded-md border bg-muted/40 p-3 text-xs">
+                <div><span className="text-muted-foreground">Paciente:</span> {laudoTarget.paciente_nome_extra ?? (laudoTarget.paciente_id ? pacMap.get(laudoTarget.paciente_id) : "—")}</div>
+                <div><span className="text-muted-foreground">Serviço:</span> {laudoTarget.procedimento ?? "—"}</div>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>Médico laudador</Label>
+              <Select value={laudoForm.medico_laudador_id || undefined} onValueChange={(v) => setLaudoForm({ ...laudoForm, medico_laudador_id: v })}>
+                <SelectTrigger><SelectValue placeholder="Selecione o médico..." /></SelectTrigger>
+                <SelectContent>
+                  {medicos.map((m) => <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Valor do laudo (R$)</Label>
+              <CurrencyInput value={laudoForm.valor_laudo} onChange={(v) => setLaudoForm({ ...laudoForm, valor_laudo: v })} />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Ao confirmar, o sistema gera automaticamente um lançamento de repasse para o laudador no valor informado.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLaudoOpen(false)}>Cancelar</Button>
+            <Button onClick={emitirLaudo} disabled={laudoSaving}>
+              {laudoSaving ? "Salvando..." : "Confirmar laudo emitido"}
             </Button>
           </DialogFooter>
         </DialogContent>
