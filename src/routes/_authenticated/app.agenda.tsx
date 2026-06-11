@@ -3406,6 +3406,11 @@ function AgendaPage() {
                         <DropdownMenuItem onClick={() => cobrarAgendamento(a)}>
                           <DollarSign className="h-4 w-4 mr-2" /> Pagamento
                         </DropdownMenuItem>
+                        {!isSlotLivre(a.paciente_nome) && a.status !== "realizado" && (
+                          <DropdownMenuItem onClick={() => confirmarPresenca(a)}>
+                            <BadgeCheck className="h-4 w-4 mr-2 text-emerald-600" /> Presente na clínica
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem
                           onClick={() => imprimirGR(a)}
                           disabled={!pagosSet.has(a.id)}
