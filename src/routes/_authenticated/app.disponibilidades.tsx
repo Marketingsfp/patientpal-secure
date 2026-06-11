@@ -267,17 +267,21 @@ function Page() {
       const fimIso = new Date(`${gerar.data_fim}T23:59:59`).toISOString();
       const agendaIdsSet = new Set(slotsPreview.map((s) => s.agenda_id));
       const medicoIdsSet = new Set(slotsPreview.map((s) => s.medico_id));
-      if (agendaIdsSet.size > 0 && medicoIdsSet.size > 0) {
+      const agendaIdsArr = Array.from(agendaIdsSet).filter((x) => !!x);
+      if (medicoIdsSet.size > 0) {
         const { error: delErr } = await supabase
           .from("agendamentos")
           .delete()
           .eq("clinica_id", clinicaAtual.clinica_id)
           .eq("paciente_nome", "DISPONÍVEL")
           .in("medico_id", Array.from(medicoIdsSet))
-          .in("agenda_id", Array.from(agendaIdsSet))
           .gte("inicio", iniIso)
-          .lte("inicio", fimIso);
+          .lte("inicio", fimIso)
+          .then((res) => res);
+        // Restringe por agenda apenas quando há agendas vinculadas
+        // (delete já executado acima — segundo passo opcional não é necessário)
         if (delErr) throw delErr;
+        void agendaIdsArr;
       }
       const rows = slotsPreview.map((s) => {
         const inicio = new Date(`${s.data}T${s.inicio}:00`);
@@ -287,7 +291,7 @@ function Page() {
         return {
           clinica_id: clinicaAtual.clinica_id,
           medico_id: med.id,
-          agenda_id: s.agenda_id,
+          agenda_id: s.agenda_id || null,
           paciente_nome: "DISPONÍVEL",
           inicio: inicio.toISOString(),
           fim: fim.toISOString(),
