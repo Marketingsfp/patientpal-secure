@@ -2113,7 +2113,8 @@ function AgendaPage() {
   const medicoNome = (id: string | null) => {
     const m = medicos.find(x => x.id === id);
     if (!m) return "—";
-    if (m.nome.startsWith("🩺")) return m.nome;
+    const s = m.nome.trim().toUpperCase();
+    if (m.nome.startsWith("🩺") || s === "ECG" || s === "EEG" || s === "ELETROCARDIOGRAMA" || s === "ELETROENCEFALOGRAMA") return m.nome;
     return `${prefixoMedico(m.sexo)} ${m.nome}`;
   };
   const medicoNomeAgendamento = (a: Agendamento) => {
