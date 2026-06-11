@@ -3247,6 +3247,11 @@ function AgendaPage() {
                         <DropdownMenuItem onClick={() => abrirAuditoria(a)}>
                           <ShieldCheck className="h-4 w-4 mr-2" /> Auditoria
                         </DropdownMenuItem>
+                        {a.status === "realizado" && (
+                          <DropdownMenuItem onClick={() => reabrirAtendimento(a)}>
+                            <Flag className="h-4 w-4 mr-2" /> Reabrir atendimento
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuSeparator />
                         {(Object.keys(STATUS_LABEL) as Status[]).map(s => (
                           <DropdownMenuItem key={s} onClick={() => mudarStatus(a, s)}>
