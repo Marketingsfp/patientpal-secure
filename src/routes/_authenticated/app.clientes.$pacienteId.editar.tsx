@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Button } from "@/components/ui/button";
 import { ClienteForm, type Paciente } from "@/components/clientes/cliente-form";
+import { PacienteCartoesBeneficios } from "@/components/clientes/paciente-cartoes-beneficios";
 
 export const Route = createFileRoute("/_authenticated/app/clientes/$pacienteId/editar")({
   component: EditarClientePage,
@@ -80,6 +81,9 @@ function EditarClientePage() {
           />
         )}
       </div>
+      {!loading && paciente && clinicaAtual && (
+        <PacienteCartoesBeneficios pacienteId={paciente.id} clinicaId={clinicaAtual.clinica_id} />
+      )}
     </div>
   );
 }
