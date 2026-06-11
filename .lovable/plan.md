@@ -1,66 +1,50 @@
-## Objetivo
+# Plano de vistoria e integração do sistema
 
-Permitir que um orçamento composto **apenas por procedimentos do tipo "Laboratório"** seja agendado de uma só vez, ocupando apenas **uma ficha** na agenda — em vez de marcar o paciente em vários horários, um por exame.
+Sem erros específicos listados, vou trabalhar em **4 ondas sequenciais**, cada uma focada em um elo do fluxo. Ao fim de cada onda eu te mostro o que encontrei + o que corrigi, e você valida antes de eu seguir para a próxima. Isso evita um patch gigante de risco alto.
 
-## Banco
+## Onda 1 — Abertura de agenda + disponibilidades
+Arquivos: `app.medicos.tsx`, `app.disponibilidades.tsx`, `MedicoAgendasTab.tsx`, `medico_agendas`, `medico_disponibilidades`, `medico_agenda_procedimentos`.
 
-Migração (uma transação):
+Vou verificar:
+- Cadastro de agenda do médico salva especialidade, dias, intervalo de slots e procedimentos vinculados.
+- Disponibilidade respeita feriados/bloqueios e gera os slots corretos na tela de agenda.
+- Médico com 2+ agendas (clínicas/dias diferentes) não duplica nem some.
+- Encaixe respeita os filtros (já corrigido recentemente — vou revalidar).
 
-- `agendamentos.orcamento_id uuid NULL REFERENCES public.orcamentos(id) ON DELETE SET NULL`
-- Índice em `agendamentos(orcamento_id)`.
-- Nenhuma mudança em RLS (a coluna herda as policies da tabela).
+## Onda 2 — Agendamento
+Arquivos: `app.agenda.tsx`, `procedimento-cell.tsx`, `app.checkin.tsx`, tabela `agendamentos`.
 
-Sem alteração em `orcamentos` — o vínculo é 1 orçamento → N agendamentos (caso o paciente refaça), porém na prática 1↔1.
+Vou verificar:
+- Criar/editar/remarcar mantém paciente, procedimento, especialidade, médico e valor coerentes.
+- Vínculo com orçamento (recém adicionado: Laboratório x Demais) está exibindo as opções certas.
+- Status (agendado → confirmado → em atendimento → finalizado) atualiza em todas as telas (agenda, fluxo, recepção, painel).
+- Realtime atualiza sem precisar recarregar.
 
-## UI — Diálogo "Marcar paciente" (`app.agenda`)
+## Onda 3 — Caixa / Pagamento do paciente
+Arquivos: `app.caixa.tsx`, `lancamento-dialog.tsx`, `SolicitarEstornoDialog.tsx`, `pagamentos`, `pagamento_splits`, `caixa_sessoes`, `caixa_movimentos`, `fin_lancamentos`.
 
-Acima dos campos atuais, novo campo opcional **"Nº do orçamento"**:
+Vou verificar:
+- Abertura/fechamento de sessão de caixa, conferência de valores.
+- Pagamento vinculado ao agendamento gera lançamento financeiro e split corretos.
+- Múltiplas formas de pagamento (dinheiro, cartão, pix) somam certo e respeitam taxa.
+- Estorno reverte lançamento + split + status do agendamento.
 
-1. Input numérico + botão "Buscar".
-2. Ao buscar, server fn `getOrcamentoParaAgendar({ numero })` retorna:
-   - dados do orçamento (paciente, total, status);
-   - itens com `procedimento_id`, nome e `tipo`;
-   - validação: **todos** os itens precisam ter `tipo` = "LABORATÓRIO" (case/acento-insensitive). Se algum item não for laboratório → erro "Este fluxo é válido apenas para orçamentos 100% de laboratório."
-   - bloqueia se status do orçamento for `cancelado` ou se já existir agendamento ativo vinculado.
-3. Quando válido:
-   - Preenche automaticamente **paciente** (read-only, com aviso de que veio do orçamento).
-   - Preenche **procedimento** com texto consolidado: `"Laboratório (N exames): EX1, EX2, …"` (sem somar duração — usa o tempo padrão de uma ficha, como o usuário pediu).
-   - Exibe lista compacta dos exames inclusos (apenas leitura, informativa).
-   - Mantém a ficha única já selecionada na grade.
-4. Ao salvar, grava `agendamentos.orcamento_id = <id>` além dos campos normais.
+## Onda 4 — Atendimento → comissão médica
+Arquivos: `app.atendimento-ia.*`, `prontuarios`, `pagamento_splits`, `procedimento_split_regras`, `regras_rateio`, `app.financeiro.atendimentos.tsx`, `app.medico.$medicoId.tsx`.
 
-Botão "Limpar orçamento" volta o diálogo ao modo manual.
+Vou verificar:
+- Finalizar atendimento dispara cálculo do repasse conforme `procedimento_split_regras` / `regras_rateio`.
+- Comissão considera convênio/particular, descontos e taxa da maquineta.
+- Relatório do médico bate com a soma dos splits.
+- Pagamento ao médico (baixa) atualiza status do split e gera lançamento financeiro de saída.
 
-## Visualização na agenda
+## Como vou trabalhar
+1. Abro a onda, leio os arquivos e o schema, listo achados (bug / inconsistência / integração faltante) com gravidade.
+2. Aplico correções pontuais (sem reescrever módulos inteiros).
+3. Te entrego um resumo curto + testes manuais sugeridos.
+4. Você confirma e eu avanço para a próxima onda.
 
-- Na ficha agendada, exibir um badge pequeno **"ORÇ #00123"** ao lado do nome do paciente quando `orcamento_id` estiver presente.
-- Tooltip lista os exames do orçamento.
-- No popover/edição da ficha, link "Ver orçamento" abre a tela de orçamentos filtrada por aquele número (rota existente).
-
-## Pagamento
-
-Mantém-se **separado**, conforme escolhido. Nada muda no caixa/recepção — o orçamento continua sendo quitado pelo fluxo atual de orçamentos. O vínculo serve só para:
-
-- rastrear que aquele atendimento veio do orçamento X;
-- evitar marcar o paciente em vários horários;
-- referência cruzada em relatórios futuros (fora deste escopo).
-
-## Server functions novas (em `src/lib/agenda.functions.ts` ou `orcamentos.functions.ts`)
-
-- `getOrcamentoParaAgendar({ numero, clinicaId })` — valida tipo laboratório de todos os itens, retorna DTO leve.
-- Atualização da função de criar agendamento existente para aceitar `orcamento_id` opcional.
-
-## Tipos / código
-
-- `routeTree.gen.ts` regenera sozinho.
-- Sem mudanças em RLS, sem mudanças em `medico_agendas` / disponibilidades.
-- Detecção do tipo "Laboratório" usa o campo `procedimentos.tipo` (string já existente, comparada via `strip_accents`+`upper`).
-
-## Fora do escopo
-
-- Não cria ficha de tempo proporcional à quantidade de exames (usa 1 ficha padrão).
-- Não muda fluxo de pagamento.
-- Não trata orçamentos mistos (laboratório + outros) — exibe erro e instrui o usuário a desmembrar.
-- Sem alterações em WhatsApp / impressão de comprovante (pode ser feito depois).
-
-Posso seguir?
+## Antes de começar — preciso de você
+Para a Onda 1 ser efetiva, me responde:
+- Tem **algum erro/tela específica** que você já viu falhar? (mesmo que vago — "ao salvar agenda some o procedimento", "encaixe vem com hora errada", etc.) Qualquer pista corta horas de auditoria às cegas.
+- Posso começar pela **Onda 1 (Abertura de agenda)** agora?
