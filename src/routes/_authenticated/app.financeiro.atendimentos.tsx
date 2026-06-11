@@ -237,8 +237,7 @@ function Page() {
       .lte("data", fFim);
     let qAgenda = supabase
       .from("fin_lancamentos")
-      .select("id, data, descricao, valor, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_forma_pagamento, agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio)")
-      // status do agendamento entra em getter abaixo via select agendamentos.status
+      .select("id, data, descricao, valor, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_forma_pagamento, agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("tipo", "receita")
       .eq("status", "confirmado")
