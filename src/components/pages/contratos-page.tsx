@@ -148,7 +148,21 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Nº</TableHead><TableHead>Paciente</TableHead><TableHead>Início</TableHead>
+              <TableHead>Nº</TableHead>
+              <TableHead>
+                <button
+                  type="button"
+                  onClick={() => setSortPaciente((s) => s === "asc" ? "desc" : s === "desc" ? null : "asc")}
+                  className="inline-flex items-center gap-1 font-medium hover:text-primary"
+                  title="Ordenar por paciente"
+                >
+                  Paciente
+                  <span className="text-[10px] text-muted-foreground">
+                    {sortPaciente === "asc" ? "A→Z" : sortPaciente === "desc" ? "Z→A" : "↕"}
+                  </span>
+                </button>
+              </TableHead>
+              <TableHead>Início</TableHead>
               <TableHead>Mensal</TableHead><TableHead>Pagamento</TableHead><TableHead>Status</TableHead>
               <TableHead>Assinado</TableHead><TableHead></TableHead>
             </TableRow>
