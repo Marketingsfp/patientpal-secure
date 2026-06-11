@@ -232,10 +232,48 @@ function RelatoriosPage() {
       .sort((a, b) => b.qtd - a.qtd)
       .slice(0, 10);
 
+    // Consultas por titular
+    const titularIds = new Set(contratos.map((c) => c.paciente_id));
+    const depIds = new Set(deps.map((d) => d.paciente_id));
+    const tituPorContrato = new Map(contratos.map((c) => [c.id, c.paciente_nome] as const));
+    const consultasTitulares = contratos.map((c) => ({
+      nome: c.paciente_nome,
+      plano: planos.find((p) => p.id === c.plano_id)?.nome ?? "—",
+      consultas: usoPorPac.get(c.paciente_id) ?? 0,
+    })).sort((a, b) => b.consultas - a.consultas);
+    const consultasDependentes = deps.map((d) => ({
+      nome: d.paciente_nome,
+      titular: tituPorContrato.get(d.contrato_id) ?? "—",
+      tipo: d.tipo ?? "—",
+      consultas: usoPorPac.get(d.paciente_id) ?? 0,
+    })).sort((a, b) => b.consultas - a.consultas);
+    const usosTitulares = consultasTitulares.reduce((s, x) => s + x.consultas, 0);
+    const usosDependentes = consultasDependentes.reduce((s, x) => s + x.consultas, 0);
+    const usosSemVinculo = Math.max(0, usoTotal - usosTitulares - usosDependentes);
+
+    // Financeiro derivado
+    const resultado = receita - despesa;
+    const margemPct = receita > 0 ? (resultado / receita) * 100 : 0;
+    const ticketMedio = pagantes > 0 ? receita / pagantes : 0;
+    const totalMens = mens.length;
+    const mensPagas = mens.filter((m) => m.status === "pago").length;
+    const mensAbertas = totalMens - mensPagas;
+    const inadimplenciaPct = totalMens > 0 ? (mensAbertas / totalMens) * 100 : 0;
+    const utilizacaoPct = (titulares + dependentesCount) > 0
+      ? (usoPorPac.size / (titulares + dependentesCount)) * 100 : 0;
+    const mediaConsultasPessoa = (titulares + dependentesCount) > 0
+      ? usoTotal / (titulares + dependentesCount) : 0;
+    void titularIds; void depIds;
+
     return {
       totalContratos, ativos, titulares, dependentesCount, totalPessoas, pagantes,
       receita, receitaMens, receitaAdesao, aReceber, despesa,
       usoTotal, porPlano, porPlanoAll, porIdade, semData, topUso,
+      consultasTitulares, consultasDependentes,
+      usosTitulares, usosDependentes, usosSemVinculo,
+      resultado, margemPct, ticketMedio,
+      inadimplenciaPct, mensPagas, mensAbertas,
+      utilizacaoPct, mediaConsultasPessoa,
     };
   }, [contratos, planos, mens, deps, pacs, atends, despesas, allContratos, allDeps, allMens, from, to]);
 
