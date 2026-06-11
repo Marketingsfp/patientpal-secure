@@ -1,0 +1,1 @@
+UPDATE public.medicos SET procedimento_padrao_id='8be65814-3217-49fc-8dc5-af3d17a3fe7c', procedimento_padrao_em_branco=false WHERE id='728baa3b-5725-4f43-aac1-57505ab8d723';
