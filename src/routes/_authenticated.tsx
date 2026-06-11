@@ -7,13 +7,10 @@ export const Route = createFileRoute("/_authenticated")({
   // Gate executado antes de renderizar qualquer rota /app/*.
   // SSR desligado porque a sessão Supabase vive em localStorage.
   ssr: false,
-  beforeLoad: async ({ location }) => {
+  beforeLoad: async () => {
     const { data, error } = await supabase.auth.getSession();
     if (error || !data.session) {
-      throw redirect({
-        to: "/login",
-        search: { redirect: location.href },
-      });
+      throw redirect({ to: "/login" });
     }
   },
   component: AuthenticatedApp,
