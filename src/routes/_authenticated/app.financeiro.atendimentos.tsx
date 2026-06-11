@@ -37,6 +37,7 @@ interface Atend {
   repasse_forma_pagamento?: string | null;
   paciente_nome_extra?: string | null;
   agendamento_inicio?: string | null;
+  agendamento_status?: string | null;
 }
 interface Medico {
   id: string; nome: string;
