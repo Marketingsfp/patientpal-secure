@@ -262,6 +262,9 @@ function Page() {
       status: r.status, forma_pagamento: r.forma_pagamento, medico_id: r.medico_id, paciente_id: r.paciente_id,
       origem: "manual",
       repasse_pago: !!r.repasse_pago, repasse_pago_em: r.repasse_pago_em, repasse_forma_pagamento: r.repasse_forma_pagamento,
+      laudo_status: (r as any).laudo_status ?? null,
+      medico_laudador_id: (r as any).medico_laudador_id ?? null,
+      valor_laudo: Number((r as any).valor_laudo ?? 0),
     }));
     const agend: Atend[] = (ar.data ?? []).map((r): Atend => {
       const ag = (r as any).agendamento as { procedimento: string | null; paciente_nome: string | null; paciente_id: string | null; medico_id: string | null; inicio: string | null; status: string | null } | null;
@@ -284,6 +287,9 @@ function Page() {
         repasse_pago: !!r.repasse_pago, repasse_pago_em: r.repasse_pago_em, repasse_forma_pagamento: r.repasse_forma_pagamento,
         agendamento_inicio: ag?.inicio ?? null,
         agendamento_status: ag?.status ?? null,
+        laudo_status: (r as any).laudo_status ?? null,
+        medico_laudador_id: (r as any).medico_laudador_id ?? null,
+        valor_laudo: Number((r as any).valor_laudo ?? 0),
       };
     });
     // Filtro client-side por médico para os registros da agenda (cobre os
