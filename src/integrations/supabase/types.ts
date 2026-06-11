@@ -3001,7 +3001,11 @@ export type Database = {
           empresa_id: string | null
           forma_pagamento: string | null
           id: string
+          laudo_emitido_em: string | null
+          laudo_lancamento_id: string | null
+          laudo_status: string | null
           medico_id: string | null
+          medico_laudador_id: string | null
           observacoes: string | null
           paciente_id: string | null
           parcelas: number | null
@@ -3015,6 +3019,7 @@ export type Database = {
           tipo: Database["public"]["Enums"]["fin_tipo_lancamento"]
           updated_at: string
           valor: number
+          valor_laudo: number
         }
         Insert: {
           agendamento_id?: string | null
@@ -3031,7 +3036,11 @@ export type Database = {
           empresa_id?: string | null
           forma_pagamento?: string | null
           id?: string
+          laudo_emitido_em?: string | null
+          laudo_lancamento_id?: string | null
+          laudo_status?: string | null
           medico_id?: string | null
+          medico_laudador_id?: string | null
           observacoes?: string | null
           paciente_id?: string | null
           parcelas?: number | null
@@ -3045,6 +3054,7 @@ export type Database = {
           tipo: Database["public"]["Enums"]["fin_tipo_lancamento"]
           updated_at?: string
           valor: number
+          valor_laudo?: number
         }
         Update: {
           agendamento_id?: string | null
@@ -3061,7 +3071,11 @@ export type Database = {
           empresa_id?: string | null
           forma_pagamento?: string | null
           id?: string
+          laudo_emitido_em?: string | null
+          laudo_lancamento_id?: string | null
+          laudo_status?: string | null
           medico_id?: string | null
+          medico_laudador_id?: string | null
           observacoes?: string | null
           paciente_id?: string | null
           parcelas?: number | null
@@ -3075,6 +3089,7 @@ export type Database = {
           tipo?: Database["public"]["Enums"]["fin_tipo_lancamento"]
           updated_at?: string
           valor?: number
+          valor_laudo?: number
         }
         Relationships: [
           {
@@ -3106,8 +3121,22 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "fin_lancamentos_laudo_lancamento_id_fkey"
+            columns: ["laudo_lancamento_id"]
+            isOneToOne: false
+            referencedRelation: "fin_atendimentos"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "fin_lancamentos_medico_id_fkey"
             columns: ["medico_id"]
+            isOneToOne: false
+            referencedRelation: "medicos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fin_lancamentos_medico_laudador_id_fkey"
+            columns: ["medico_laudador_id"]
             isOneToOne: false
             referencedRelation: "medicos"
             referencedColumns: ["id"]
