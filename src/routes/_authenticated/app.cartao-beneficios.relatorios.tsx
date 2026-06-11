@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { exportToExcel } from "@/lib/export-csv";
 
 export const Route = createFileRoute("/_authenticated/app/cartao-beneficios/relatorios")({
@@ -25,7 +26,7 @@ type Mens = { id: string; contrato_id: string; valor: number; status: string; pa
 type Dep = { id: string; contrato_id: string; paciente_id: string; paciente_nome: string; tipo: string; ativo: boolean };
 type Pac = { id: string; data_nascimento: string | null };
 type Atend = { id: string; paciente_id: string | null; data: string };
-type Lanc = { id: string; tipo: string; valor: number; data: string };
+type Lanc = { id: string; tipo: string; valor: number; data: string; descricao?: string | null };
 
 function idade(dn: string | null): number | null {
   if (!dn) return null;
@@ -52,6 +53,11 @@ function RelatoriosPage() {
   const primeiroDoAno = `${new Date().getFullYear()}-01-01`;
   const [from, setFrom] = useState(primeiroDoAno);
   const [to, setTo] = useState(hoje);
+  const [drill, setDrill] = useState<null | {
+    title: string;
+    columns: { key: string; label: string; align?: "left" | "right" }[];
+    rows: Array<Record<string, string | number>>;
+  }>(null);
   const [loading, setLoading] = useState(true);
   const [contratos, setContratos] = useState<Contrato[]>([]);
   const [planos, setPlanos] = useState<Plano[]>([]);
@@ -71,7 +77,7 @@ function RelatoriosPage() {
       supabase.from("planos_assinatura").select("id, nome, tipo, valor_mensal").eq("clinica_id", cid),
       // dependents and lancamentos parallel
       supabase.from("contrato_dependentes").select("id, contrato_id, paciente_id, paciente_nome, tipo, ativo").eq("ativo", true).limit(5000),
-      supabase.from("fin_lancamentos").select("id, tipo, valor, data").eq("clinica_id", cid).eq("tipo", "despesa").gte("data", from).lte("data", to).limit(5000),
+      supabase.from("fin_lancamentos").select("id, tipo, valor, data, descricao").eq("clinica_id", cid).eq("tipo", "despesa").gte("data", from).lte("data", to).limit(5000),
     ]);
     const cList = (cs.data ?? []) as Contrato[];
     const cIds = cList.map((c) => c.id);
@@ -200,6 +206,93 @@ function RelatoriosPage() {
 
   if (!clinicaAtual) return <p className="text-sm text-muted-foreground">Selecione uma clínica.</p>;
 
+  const setQuick = (kind: "diario" | "semanal" | "quinzenal" | "mensal") => {
+    const end = new Date();
+    const start = new Date();
+    if (kind === "diario") { /* mesmo dia */ }
+    else if (kind === "semanal") start.setDate(end.getDate() - 6);
+    else if (kind === "quinzenal") start.setDate(end.getDate() - 14);
+    else if (kind === "mensal") start.setDate(end.getDate() - 29);
+    setFrom(start.toISOString().slice(0, 10));
+    setTo(end.toISOString().slice(0, 10));
+  };
+
+  const planoNome = new Map(planos.map((p) => [p.id, p.nome] as const));
+  const pessoaNomeAll = new Map<string, string>();
+  contratos.forEach((c) => pessoaNomeAll.set(c.paciente_id, c.paciente_nome));
+  deps.forEach((d) => pessoaNomeAll.set(d.paciente_id, d.paciente_nome));
+
+  const openDrill = (which: string) => {
+    const fmtDate = (d: string) => d ? d.slice(0,10).split("-").reverse().join("/") : "—";
+    if (which === "titulares") {
+      setDrill({
+        title: `Titulares (${contratos.length})`,
+        columns: [{key:"nome",label:"Titular"},{key:"plano",label:"Plano"},{key:"status",label:"Status"},{key:"valor",label:"Mensal",align:"right"}],
+        rows: contratos.map((c) => ({ nome: c.paciente_nome, plano: planoNome.get(c.plano_id) ?? "—", status: c.status, valor: BRL(c.valor_mensal) })),
+      });
+    } else if (which === "dependentes") {
+      const tituPorContrato = new Map(contratos.map((c) => [c.id, c.paciente_nome] as const));
+      setDrill({
+        title: `Dependentes (${deps.length})`,
+        columns: [{key:"nome",label:"Dependente"},{key:"titular",label:"Titular"},{key:"tipo",label:"Tipo"}],
+        rows: deps.map((d) => ({ nome: d.paciente_nome, titular: tituPorContrato.get(d.contrato_id) ?? "—", tipo: d.tipo ?? "—" })),
+      });
+    } else if (which === "totalPessoas") {
+      const tituPorContrato = new Map(contratos.map((c) => [c.id, c.paciente_nome] as const));
+      const rows = [
+        ...contratos.map((c) => ({ nome: c.paciente_nome, tipo: "Titular", vinculo: planoNome.get(c.plano_id) ?? "—" })),
+        ...deps.map((d) => ({ nome: d.paciente_nome, tipo: "Dependente", vinculo: `Titular: ${tituPorContrato.get(d.contrato_id) ?? "—"}` })),
+      ];
+      setDrill({
+        title: `Total de pessoas (${rows.length})`,
+        columns: [{key:"nome",label:"Pessoa"},{key:"tipo",label:"Tipo"},{key:"vinculo",label:"Plano / Titular"}],
+        rows,
+      });
+    } else if (which === "pagantes") {
+      const contratosComPag = new Set(
+        mens.filter((m) => m.status === "pago" && m.pago_em && m.pago_em >= from && m.pago_em <= to).map((m) => m.contrato_id),
+      );
+      const lista = contratos.filter((c) => contratosComPag.has(c.id));
+      setDrill({
+        title: `Pagantes no período (${lista.length})`,
+        columns: [{key:"nome",label:"Titular"},{key:"plano",label:"Plano"},{key:"valor",label:"Mensal",align:"right"}],
+        rows: lista.map((c) => ({ nome: c.paciente_nome, plano: planoNome.get(c.plano_id) ?? "—", valor: BRL(c.valor_mensal) })),
+      });
+    } else if (which === "receita") {
+      const contratoNome = new Map(contratos.map((c) => [c.id, c.paciente_nome] as const));
+      const pagas = mens.filter((m) => m.status === "pago" && m.pago_em && m.pago_em >= from && m.pago_em <= to);
+      const rows = [
+        ...pagas.map((m) => ({ data: fmtDate(m.pago_em ?? ""), descricao: `Mensalidade — ${contratoNome.get(m.contrato_id) ?? "—"}`, valor: BRL(m.valor) })),
+        ...contratos.filter((c) => Number(c.taxa_adesao || 0) > 0).map((c) => ({ data: fmtDate(c.data_inicio), descricao: `Adesão — ${c.paciente_nome}`, valor: BRL(c.taxa_adesao) })),
+      ];
+      setDrill({
+        title: `Receita do período (${rows.length})`,
+        columns: [{key:"data",label:"Data"},{key:"descricao",label:"Descrição"},{key:"valor",label:"Valor",align:"right"}],
+        rows,
+      });
+    } else if (which === "aReceber") {
+      const contratoNome = new Map(contratos.map((c) => [c.id, c.paciente_nome] as const));
+      const lista = mens.filter((m) => m.status !== "pago");
+      setDrill({
+        title: `A receber (${lista.length})`,
+        columns: [{key:"venc",label:"Vencimento"},{key:"titular",label:"Titular"},{key:"status",label:"Status"},{key:"valor",label:"Valor",align:"right"}],
+        rows: lista.map((m) => ({ venc: fmtDate(m.vencimento), titular: contratoNome.get(m.contrato_id) ?? "—", status: m.status, valor: BRL(m.valor) })),
+      });
+    } else if (which === "despesas") {
+      setDrill({
+        title: `Despesas do período (${despesas.length})`,
+        columns: [{key:"data",label:"Data"},{key:"descricao",label:"Descrição"},{key:"valor",label:"Valor",align:"right"}],
+        rows: despesas.map((l) => ({ data: fmtDate(l.data), descricao: l.descricao ?? "—", valor: BRL(l.valor) })),
+      });
+    } else if (which === "atendimentos") {
+      setDrill({
+        title: `Atendimentos usados (${atends.length})`,
+        columns: [{key:"data",label:"Data"},{key:"paciente",label:"Paciente"}],
+        rows: atends.map((a) => ({ data: fmtDate(a.data), paciente: a.paciente_id ? (pessoaNomeAll.get(a.paciente_id) ?? "—") : "—" })),
+      });
+    }
+  };
+
   return (
     <div className="space-y-4">
       <Card>
@@ -207,6 +300,12 @@ function RelatoriosPage() {
           <CardTitle className="text-base flex items-center gap-2"><BarChart3 className="h-4 w-4"/>Período</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-3 items-end">
+          <div className="flex gap-1 flex-wrap">
+            <Button size="sm" variant="outline" onClick={() => setQuick("diario")}>Diário</Button>
+            <Button size="sm" variant="outline" onClick={() => setQuick("semanal")}>Semanal</Button>
+            <Button size="sm" variant="outline" onClick={() => setQuick("quinzenal")}>Quinzenal</Button>
+            <Button size="sm" variant="outline" onClick={() => setQuick("mensal")}>Mensal</Button>
+          </div>
           <div><Label>De</Label><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)}/></div>
           <div><Label>Até</Label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)}/></div>
           <Button variant="outline" onClick={exportarPlanos}><Download className="h-4 w-4 mr-2"/>Exportar planos (CSV)</Button>
@@ -216,14 +315,14 @@ function RelatoriosPage() {
       {loading ? <p className="text-sm text-muted-foreground">Carregando…</p> : null}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KPI icon={<Users className="h-4 w-4"/>} label="Titulares" value={stats.titulares}/>
-        <KPI icon={<UserPlus className="h-4 w-4"/>} label="Dependentes" value={stats.dependentesCount}/>
-        <KPI icon={<Users className="h-4 w-4"/>} label="Total pessoas" value={stats.totalPessoas}/>
-        <KPI icon={<Activity className="h-4 w-4"/>} label="Pagantes no período" value={stats.pagantes}/>
-        <KPI icon={<TrendingUp className="h-4 w-4 text-green-600"/>} label="Receita (mensal. + adesão)" value={BRL(stats.receita)}/>
-        <KPI icon={<TrendingUp className="h-4 w-4 text-orange-600"/>} label="A receber" value={BRL(stats.aReceber)}/>
-        <KPI icon={<TrendingDown className="h-4 w-4 text-red-600"/>} label="Despesas (período)" value={BRL(stats.despesa)}/>
-        <KPI icon={<Activity className="h-4 w-4"/>} label="Atendimentos usados" value={stats.usoTotal}/>
+        <KPI onClick={() => openDrill("titulares")} icon={<Users className="h-4 w-4"/>} label="Titulares" value={stats.titulares}/>
+        <KPI onClick={() => openDrill("dependentes")} icon={<UserPlus className="h-4 w-4"/>} label="Dependentes" value={stats.dependentesCount}/>
+        <KPI onClick={() => openDrill("totalPessoas")} icon={<Users className="h-4 w-4"/>} label="Total pessoas" value={stats.totalPessoas}/>
+        <KPI onClick={() => openDrill("pagantes")} icon={<Activity className="h-4 w-4"/>} label="Pagantes no período" value={stats.pagantes}/>
+        <KPI onClick={() => openDrill("receita")} icon={<TrendingUp className="h-4 w-4 text-green-600"/>} label="Receita (mensal. + adesão)" value={BRL(stats.receita)}/>
+        <KPI onClick={() => openDrill("aReceber")} icon={<TrendingUp className="h-4 w-4 text-orange-600"/>} label="A receber" value={BRL(stats.aReceber)}/>
+        <KPI onClick={() => openDrill("despesas")} icon={<TrendingDown className="h-4 w-4 text-red-600"/>} label="Despesas (período)" value={BRL(stats.despesa)}/>
+        <KPI onClick={() => openDrill("atendimentos")} icon={<Activity className="h-4 w-4"/>} label="Atendimentos usados" value={stats.usoTotal}/>
       </div>
 
       <Card>
@@ -282,13 +381,43 @@ function RelatoriosPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={drill !== null} onOpenChange={(o) => { if (!o) setDrill(null); }}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader><DialogTitle>{drill?.title}</DialogTitle></DialogHeader>
+          <div className="overflow-auto flex-1">
+            {drill && drill.rows.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-6 text-center">Nenhum registro.</p>
+            ) : drill ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    {drill.columns.map((c) => (
+                      <TableHead key={c.key} className={c.align === "right" ? "text-right" : ""}>{c.label}</TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {drill.rows.map((r, i) => (
+                    <TableRow key={i}>
+                      {drill.columns.map((c) => (
+                        <TableCell key={c.key} className={c.align === "right" ? "text-right" : ""}>{r[c.key]}</TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-function KPI({ icon, label, value }: { icon: React.ReactNode; label: string; value: string | number }) {
+function KPI({ icon, label, value, onClick }: { icon: React.ReactNode; label: string; value: string | number; onClick?: () => void }) {
   return (
-    <Card>
+    <Card onClick={onClick} className={onClick ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}>
       <CardContent className="p-4">
         <div className="flex items-center gap-2 text-xs text-muted-foreground">{icon}{label}</div>
         <div className="text-xl font-bold mt-1">{value}</div>
