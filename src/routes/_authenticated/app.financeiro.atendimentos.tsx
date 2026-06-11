@@ -1052,6 +1052,43 @@ function Page() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Diálogo: marcar laudo emitido */}
+      <Dialog open={laudoOpen} onOpenChange={setLaudoOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Marcar laudo emitido</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            {laudoTarget && (
+              <div className="rounded-md border bg-muted/40 p-3 text-xs">
+                <div><span className="text-muted-foreground">Paciente:</span> {laudoTarget.paciente_nome_extra ?? (laudoTarget.paciente_id ? pacMap.get(laudoTarget.paciente_id) : "—")}</div>
+                <div><span className="text-muted-foreground">Serviço:</span> {laudoTarget.procedimento ?? "—"}</div>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>Médico laudador</Label>
+              <Select value={laudoForm.medico_laudador_id || undefined} onValueChange={(v) => setLaudoForm({ ...laudoForm, medico_laudador_id: v })}>
+                <SelectTrigger><SelectValue placeholder="Selecione o médico..." /></SelectTrigger>
+                <SelectContent>
+                  {medicos.map((m) => <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Valor do laudo (R$)</Label>
+              <CurrencyInput value={laudoForm.valor_laudo} onChange={(v) => setLaudoForm({ ...laudoForm, valor_laudo: v })} />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Ao confirmar, o sistema gera automaticamente um lançamento de repasse para o laudador no valor informado.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLaudoOpen(false)}>Cancelar</Button>
+            <Button onClick={emitirLaudo} disabled={laudoSaving}>
+              {laudoSaving ? "Salvando..." : "Confirmar laudo emitido"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
