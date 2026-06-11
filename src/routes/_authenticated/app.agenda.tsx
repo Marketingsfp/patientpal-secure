@@ -1235,6 +1235,36 @@ function AgendaPage() {
 
   const isManager = clinicaAtual?.role === "admin" || clinicaAtual?.role === "gestor";
 
+  const baixarLoteRealizado = async () => {
+    if (!clinicaAtual) return;
+    const roleOk = usuarioEhMedico || ["admin", "gestor", "financeiro", "recepcao"].includes(
+      (clinicaAtual?.role ?? "").toLowerCase(),
+    );
+    if (!roleOk) { toast.error("Sem permissão para marcar como 'Realizado'."); return; }
+    const ids = Array.from(selecionados);
+    const itens = items.filter(a => ids.includes(a.id));
+    if (itens.length === 0) { toast.info("Selecione ao menos um atendimento."); return; }
+    const validos = itens.filter(i => !isSlotLivre(i.paciente_nome) && i.status !== "realizado" && i.status !== "cancelado");
+    if (validos.length === 0) { toast.info("Nenhum atendimento elegível na seleção."); return; }
+    if (!confirm(`Baixar ${validos.length} atendimento(s) como Realizado?`)) return;
+    const uid = (await supabase.auth.getUser()).data.user?.id;
+    const nowIso = new Date().toISOString();
+    const { error } = await supabase
+      .from("agendamentos")
+      .update({
+        status: "realizado",
+        fluxo_etapa: "finalizado",
+        fluxo_atualizado_em: nowIso,
+        executado_por: uid,
+        executado_em: nowIso,
+      } as never)
+      .in("id", validos.map(v => v.id));
+    if (error) { toast.error(error.message); return; }
+    toast.success(`${validos.length} atendimento(s) baixado(s) como Realizado.`);
+    setSelecionados(new Set());
+    await load();
+  };
+
   const excluirSelecionados = async () => {
     if (!clinicaAtual) return;
     if (!isManager) { toast.error("Você não tem permissão para excluir horários."); return; }
