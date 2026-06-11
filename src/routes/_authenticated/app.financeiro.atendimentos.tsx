@@ -38,6 +38,10 @@ interface Atend {
   paciente_nome_extra?: string | null;
   agendamento_inicio?: string | null;
   agendamento_status?: string | null;
+  requer_laudo?: boolean;
+  laudo_status?: string | null;
+  medico_laudador_id?: string | null;
+  valor_laudo?: number;
 }
 interface Medico {
   id: string; nome: string;
