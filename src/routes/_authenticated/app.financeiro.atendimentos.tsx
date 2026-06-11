@@ -879,7 +879,11 @@ function Page() {
                 {!isMedicoOnly && (
                   <TableCell>
                     {!a.repasse_pago && (a.valor_medico ?? 0) > 0 ? (
-                      <Checkbox checked={sel.has(`${a.origem}:${a.id}`)} onCheckedChange={() => toggleOne(a)} aria-label="Selecionar" />
+                      isAtendido(a) ? (
+                        <Checkbox checked={sel.has(`${a.origem}:${a.id}`)} onCheckedChange={() => toggleOne(a)} aria-label="Selecionar" />
+                      ) : (
+                        <span title="Aguardando o atendimento ser marcado como realizado" className="text-[10px] text-amber-600">⏳</span>
+                      )
                     ) : null}
                   </TableCell>
                 )}
