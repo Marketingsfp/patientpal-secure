@@ -158,6 +158,8 @@ function Page() {
   const [minhaSessao, setMinhaSessao] = useState<Sessao | null>(null);
   const [minhasMovs, setMinhasMovs] = useState<Mov[]>([]);
   const [minhasSessoes, setMinhasSessoes] = useState<Sessao[]>([]);
+  // Filtro de data para a tabela "Movimentos da sessão" (padrão: hoje)
+  const [meuFiltroData, setMeuFiltroData] = useState<string>(() => new Date().toISOString().slice(0, 10));
 
   const [todasSessoes, setTodasSessoes] = useState<Sessao[]>([]);
   const [todosMovs, setTodosMovs] = useState<Mov[]>([]);
@@ -822,7 +824,30 @@ function Page() {
               </Card>
 
               <Card>
-                <CardHeader><CardTitle className="text-base">Movimentos da sessão</CardTitle></CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap">
+                  <CardTitle className="text-base">Movimentos da sessão</CardTitle>
+                  <div className="flex items-end gap-2">
+                    <div>
+                      <Label className="text-xs">Data</Label>
+                      <Input
+                        type="date"
+                        value={meuFiltroData}
+                        onChange={(e) => setMeuFiltroData(e.target.value)}
+                        className="h-8 w-[160px]"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-xs"
+                      onClick={() => setMeuFiltroData("")}
+                      title="Mostrar todos os movimentos da sessão"
+                    >
+                      Ver todos
+                    </Button>
+                  </div>
+                </CardHeader>
                 <CardContent className="overflow-x-auto">
                   <Table>
                     <TableHeader>
@@ -837,10 +862,24 @@ function Page() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {minhasMovs.length === 0 && (
-                        <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Sem movimentos</TableCell></TableRow>
-                      )}
-                      {minhasMovs.map((m) => (
+                      {(() => {
+                        const movsFiltrados = meuFiltroData
+                          ? minhasMovs.filter((m) => {
+                              const d = new Date(m.created_at);
+                              const local = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+                              return local === meuFiltroData;
+                            })
+                          : minhasMovs;
+                        if (movsFiltrados.length === 0) {
+                          return (
+                            <TableRow>
+                              <TableCell colSpan={7} className="text-center text-muted-foreground">
+                                {meuFiltroData ? "Sem movimentos nesta data" : "Sem movimentos"}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        }
+                        return movsFiltrados.map((m) => (
                         <TableRow key={m.id}>
                           <TableCell className="whitespace-nowrap">{new Date(m.created_at).toLocaleDateString("pt-BR")}</TableCell>
                           <TableCell className="whitespace-nowrap">{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</TableCell>
@@ -865,7 +904,8 @@ function Page() {
                             )}
                           </TableCell>
                         </TableRow>
-                      ))}
+                      ));
+                      })()}
                     </TableBody>
                   </Table>
                 </CardContent>
