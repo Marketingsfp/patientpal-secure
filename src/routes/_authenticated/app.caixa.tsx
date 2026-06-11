@@ -932,7 +932,7 @@ function Page() {
                     <SelectContent>
                       <SelectItem value="all">Todos</SelectItem>
                       {usersList.map((u) => (
-                        <SelectItem key={u.user_id} value={u.user_id}>{u.nome}</SelectItem>
+                        <SelectItem key={u.user_id} value={u.user_id} className="uppercase">{u.nome?.toUpperCase()}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -970,7 +970,7 @@ function Page() {
                       const estorno = calcEstornoSessao(s.id);
                       return (
                         <TableRow key={s.id}>
-                          <TableCell className="font-medium">{s.user_nome || s.user_id.slice(0, 8)}</TableCell>
+                          <TableCell className="font-medium uppercase">{(s.user_nome || s.user_id.slice(0, 8)).toUpperCase()}</TableCell>
                           <TableCell>{fmtDT(s.aberto_em)}</TableCell>
                           <TableCell>{fmtDT(s.fechado_em)}</TableCell>
                           <TableCell><Badge variant={s.status === "aberto" ? "default" : "secondary"}>{s.status}</Badge></TableCell>
