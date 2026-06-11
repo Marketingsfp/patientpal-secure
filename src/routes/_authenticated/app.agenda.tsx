@@ -411,6 +411,10 @@ function AgendaPage() {
   const [procPorMedico, setProcPorMedico] = useState<Map<string, Set<string>>>(new Map());
   const [procOpcoesPorMedico, setProcOpcoesPorMedico] = useState<Map<string, { id: string; nome: string }[]>>(new Map());
   const [procNomesPorMedico, setProcNomesPorMedico] = useState<Map<string, Set<string>>>(new Map());
+  // Contagem histórica de uso de cada procedimento na clínica (últimos 365 dias).
+  // Chave: normalizar(nome). Usado para ordenar as opções no agendamento
+  // colocando os exames mais solicitados no topo (ex.: Top 10 USG/RX/TC/RM).
+  const [procedimentoUsoMap, setProcedimentoUsoMap] = useState<Map<string, number>>(new Map());
   const [especialidades, setEspecialidades] = useState<Especialidade[]>([]);
   const [medicoEspec, setMedicoEspec] = useState<Map<string, Set<string>>>(new Map());
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
