@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EnfermagemGerarAgendaCard, EnfermagemRecursosHorariosEditor } from "@/components/enfermagem-horarios-parts";
@@ -314,13 +315,16 @@ function Page() {
               <div className="flex flex-wrap gap-2 items-end">
                 <div className="flex-1 min-w-48">
                   <label className="text-xs text-muted-foreground">Médico</label>
-                  <Select value={gerar.medico_id} onValueChange={(v) => setGerar({ ...gerar, medico_id: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos os médicos</SelectItem>
-                      {medicos.map((m) => <SelectItem key={m.id} value={m.id} className="uppercase">{m.nome}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    value={gerar.medico_id}
+                    onChange={(v) => setGerar({ ...gerar, medico_id: v })}
+                    placeholder="Selecione"
+                    searchPlaceholder="Buscar médico..."
+                    options={[
+                      { value: "all", label: "Todos os médicos" },
+                      ...medicos.map((m) => ({ value: m.id, label: m.nome.toUpperCase() })),
+                    ]}
+                  />
                 </div>
                 <div>
                   <label className="text-xs text-muted-foreground">De</label>
