@@ -13,6 +13,7 @@ export interface PatientOption {
   data_nascimento: string | null;
   clinica_id: string;
   codigo_prontuario?: string | null;
+  numero_pasta?: string | null;
 }
 
 interface PatientSearchInputProps {
@@ -43,10 +44,30 @@ function normalizarBusca(s: string) {
     .trim();
 }
 
+// Tenta interpretar o termo como uma data de nascimento.
+// Aceita: DD/MM/AAAA, DD-MM-AAAA, DDMMAAAA, AAAA-MM-DD, DD/MM (ano qualquer).
+// Retorna { iso?: "YYYY-MM-DD", partial?: { dia, mes } } ou null.
+function parseDataBusca(term: string): { iso?: string; partial?: { dia: string; mes: string } } | null {
+  const t = term.trim();
+  // AAAA-MM-DD
+  let m = t.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (m) return { iso: `${m[1]}-${m[2]}-${m[3]}` };
+  // DD/MM/AAAA ou DD-MM-AAAA
+  m = t.match(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})$/);
+  if (m) return { iso: `${m[3]}-${m[2]}-${m[1]}` };
+  // DDMMAAAA (8 dígitos contínuos)
+  m = t.match(/^(\d{2})(\d{2})(\d{4})$/);
+  if (m) return { iso: `${m[3]}-${m[2]}-${m[1]}` };
+  // DD/MM (dia/mês sem ano)
+  m = t.match(/^(\d{2})[\/\-](\d{2})$/);
+  if (m) return { partial: { dia: m[1], mes: m[2] } };
+  return null;
+}
+
 export function PatientSearchInput({
   value,
   onSelect,
-  placeholder = "Buscar paciente por nome, CPF ou prontuário…",
+  placeholder = "Buscar por nome, nascimento (DD/MM/AAAA), CPF, pasta ou prontuário…",
   className,
   autoFocus,
   clinicaIdsOverride,
@@ -87,6 +108,7 @@ export function PatientSearchInput({
       setLoading(true);
       const digits = term.replace(/\D/g, "");
       const termoSemAcento = normalizarBusca(term);
+      const dataBusca = parseDataBusca(term);
       // Prioriza prefixo (rápido — usa índice btree em nome) tanto no
       // início do nome quanto no início de qualquer parte (sobrenome).
       // Ex.: "rodrigo" pega "RODRIGO ..." e "DAVI RODRIGO ...".
@@ -97,26 +119,51 @@ export function PatientSearchInput({
       if (digits.length >= 3) {
         parts.push(`cpf.ilike.%${digits}%`);
         parts.push(`codigo_prontuario.ilike.%${digits}%`);
+        parts.push(`numero_pasta.ilike.%${digits}%`);
       } else if (term.length >= 1) {
         parts.push(`codigo_prontuario.ilike.%${term}%`);
+        parts.push(`numero_pasta.ilike.%${term}%`);
+      }
+      // Busca por data de nascimento (formato completo)
+      if (dataBusca?.iso) {
+        parts.push(`data_nascimento.eq.${dataBusca.iso}`);
       }
       const filter = parts.join(",");
-      const { data } = await supabase
+      let queryBuilder = supabase
         .from("pacientes")
-        .select("id, nome, cpf, telefone, data_nascimento, clinica_id, codigo_prontuario")
+        .select("id, nome, cpf, telefone, data_nascimento, clinica_id, codigo_prontuario, numero_pasta")
         .in("clinica_id", scope)
         .eq("ativo", true)
         .or(filter)
         .order("nome", { ascending: true })
         .limit(30);
+      const { data } = await queryBuilder;
       // Ignora respostas obsoletas (digitação rápida -> várias requests)
       if (myReq !== reqIdRef.current) return;
       // Reordena: nomes que COMEÇAM com o termo aparecem primeiro
       // (match de "primeiro nome" tem prioridade sobre meio/sobrenome).
       const todas = (data ?? []) as PatientOption[];
+      // Se busca for DD/MM sem ano, filtra em memória pelo mês/dia
+      let base = todas;
+      if (dataBusca?.partial) {
+        const { dia, mes } = dataBusca.partial;
+        base = todas.filter(p => {
+          if (!p.data_nascimento) return false;
+          const [, m2, d2] = p.data_nascimento.split("-");
+          return m2 === mes && d2 === dia;
+        });
+        // Quando a busca é claramente uma data, queremos só esses
+        if (base.length > 0) {
+          setOptions(base.slice(0, 20));
+          if (cacheRef.current.size > 50) cacheRef.current.clear();
+          cacheRef.current.set(cacheKey, base);
+          setLoading(false);
+          return;
+        }
+      }
       const prefixo: PatientOption[] = [];
       const meio: PatientOption[] = [];
-      for (const p of todas) {
+      for (const p of base) {
         const nomeNorm = normalizarBusca(p.nome ?? "");
         if (nomeNorm.startsWith(termoSemAcento)) prefixo.push(p);
         else meio.push(p);
@@ -197,6 +244,11 @@ export function PatientSearchInput({
                   {p.codigo_prontuario && (
                     <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-muted">
                       Prontuário {p.codigo_prontuario}
+                    </span>
+                  )}
+                  {p.numero_pasta && (
+                    <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-muted">
+                      Pasta {p.numero_pasta}
                     </span>
                   )}
                   <span className="text-xs text-muted-foreground">
