@@ -1249,6 +1249,14 @@ h1, h2, h3 { margin: 0 0 6mm; }
           {contrato.assinado_em ? <Badge variant="default"><Check className="h-3 w-3 mr-1"/>Assinado em {fmtD(contrato.assinado_em)}</Badge> : <Badge variant="outline">Aguardando assinatura</Badge>}
         </div>
 
+        {contrato.tabela_legada ? (
+          <div className="rounded-md border border-amber-400 bg-amber-50 dark:bg-amber-950/30 p-3 text-sm text-amber-900 dark:text-amber-100">
+            <strong>Atenção:</strong> este contrato está na tabela <strong>antiga</strong> do Cartão Consulta.
+            Avisar o titular e migrar para a tabela atual a partir de{" "}
+            <strong>{contrato.migrar_apos ? fmtD(contrato.migrar_apos) : "01/07/2026"}</strong>.
+          </div>
+        ) : null}
+
         <div>
           <h3 className="font-semibold text-sm mb-1">Mensalidades</h3>
           <div className="rounded-md border">
