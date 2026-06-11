@@ -153,6 +153,25 @@ function CheckinPage() {
   const limparBusca = () => { setBusca(""); setBuscaAplicada(""); setBuscaAmpla(false); };
 
   const confirmar = async (a: Item) => {
+    // Bloqueia check-in se houver mensalidade vencida no cartão benefícios
+    if (a.paciente_id && clinicaAtual) {
+      const { data: blk } = await supabase.rpc("paciente_cartao_inadimplente", {
+        _paciente_id: a.paciente_id,
+        _clinica_id: clinicaAtual.clinica_id,
+      });
+      const info = (blk ?? {}) as { bloqueado?: boolean; total_aberto?: number; mensalidades?: Array<{ vencimento: string; valor: number; convenio_nome?: string }> };
+      if (info.bloqueado) {
+        const linhas = (info.mensalidades ?? [])
+          .slice(0, 5)
+          .map((m) => `• ${m.convenio_nome ?? "Cartão"} venc. ${m.vencimento?.split("-").reverse().join("/")} — R$ ${Number(m.valor).toFixed(2)}`)
+          .join("\n");
+        toast.error(
+          `Check-in bloqueado: ${a.paciente_nome} tem mensalidade(s) vencida(s).\nTotal em aberto: R$ ${Number(info.total_aberto ?? 0).toFixed(2)}\n\n${linhas}`,
+          { duration: 10000 },
+        );
+        return;
+      }
+    }
     const { error } = await supabase
       .from("agendamentos")
       .update({ fluxo_etapa: "triagem", fluxo_atualizado_em: new Date().toISOString() } as never)
