@@ -183,25 +183,46 @@ function Page() {
       if (!gerarDias.includes(dow)) continue;
       for (const m of alvo) {
         const agendasDoMedico = agendas.filter((a) => a.medico_id === m.id && a.ativo);
-        for (const ag of agendasDoMedico) {
+        // Fallback: se o médico não possui agenda cadastrada, gera sem vínculo de agenda
+        const agendasAlvo: Array<{ id: string | null }> = agendasDoMedico.length > 0
+          ? agendasDoMedico
+          : [{ id: null }];
+        for (const ag of agendasAlvo) {
           const diaIso = d.toISOString().slice(0, 10);
           const ds = disps.filter((x) =>
-            x.medico_id === m.id && x.agenda_id === ag.id && x.dia_semana === dow
+            x.medico_id === m.id && (ag.id === null || x.agenda_id === ag.id) && x.dia_semana === dow
             && (!x.vigencia_inicio || x.vigencia_inicio <= diaIso)
             && (!x.vigencia_fim || x.vigencia_fim >= diaIso),
           );
-          if (ds.length === 0) continue;
           const fallbackDur = m.duracao_consulta_min && m.duracao_consulta_min > 0 ? m.duracao_consulta_min : 15;
+          // Fallback: se o médico não tem disponibilidade semanal cadastrada para o dia,
+          // gera um bloco padrão 08:00–17:00 para que o usuário consiga criar a agenda
+          // mesmo sem configurar a disponibilidade semanal antes.
+          const dsEfetivo = ds.length > 0
+            ? ds
+            : [{
+                id: `__default_${m.id}_${dow}`,
+                medico_id: m.id,
+                agenda_id: ag.id ?? "",
+                dia_semana: dow,
+                hora_inicio: "08:00",
+                hora_fim: "17:00",
+                observacoes: null,
+                limite_pacientes: null,
+                intervalo_min: null,
+                vigencia_inicio: null,
+                vigencia_fim: null,
+              } as DispRow];
           const overrideLimite = gerar.limite_fichas ? parseInt(gerar.limite_fichas) : 0;
           let limiteDia: number;
           if (overrideLimite > 0) {
             limiteDia = overrideLimite;
           } else {
-            const limitesDoDia = ds.map((x) => x.limite_pacientes).filter((n): n is number => typeof n === "number" && n > 0);
+            const limitesDoDia = dsEfetivo.map((x) => x.limite_pacientes).filter((n): n is number => typeof n === "number" && n > 0);
             limiteDia = limitesDoDia.length > 0 ? limitesDoDia.reduce((a, b) => a + b, 0) : Infinity;
           }
           let criadosNoDia = 0;
-          for (const disp of ds) {
+          for (const disp of dsEfetivo) {
             const dur = disp.intervalo_min && disp.intervalo_min > 0 ? disp.intervalo_min : fallbackDur;
             const [hi, mi] = disp.hora_inicio.split(":").map(Number);
             const [hf, mf] = disp.hora_fim.split(":").map(Number);
@@ -211,7 +232,7 @@ function Page() {
               const inicio = `${String(Math.floor(cur / 60)).padStart(2, "0")}:${String(cur % 60).padStart(2, "0")}`;
               const fimMin = cur + dur;
               const fim = `${String(Math.floor(fimMin / 60)).padStart(2, "0")}:${String(fimMin % 60).padStart(2, "0")}`;
-              out.push({ data: d.toISOString().slice(0, 10), medico_id: m.id, agenda_id: ag.id, inicio, fim });
+              out.push({ data: d.toISOString().slice(0, 10), medico_id: m.id, agenda_id: ag.id ?? "", inicio, fim });
               cur += dur;
               criadosNoDia += 1;
             }
