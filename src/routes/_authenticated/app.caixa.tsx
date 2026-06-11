@@ -158,16 +158,39 @@ function Page() {
   const [minhaSessao, setMinhaSessao] = useState<Sessao | null>(null);
   const [minhasMovs, setMinhasMovs] = useState<Mov[]>([]);
   const [minhasSessoes, setMinhasSessoes] = useState<Sessao[]>([]);
-  // Filtro de data para a tabela "Movimentos da sessão" (padrão: hoje)
-  const [meuFiltroData, setMeuFiltroData] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  // Filtro de período para "Movimentos" (padrão: hoje)
+  type PeriodoFiltro = "hoje" | "semana" | "quinzena" | "mes" | "intervalo" | "todos";
+  const [meuPeriodo, setMeuPeriodo] = useState<PeriodoFiltro>("hoje");
+  const [meuDataIni, setMeuDataIni] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const [meuDataFim, setMeuDataFim] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const minhasMovsFiltrados = useMemo<Mov[]>(() => {
-    if (!meuFiltroData) return minhasMovs;
+    if (meuPeriodo === "todos") return minhasMovs;
+    const now = new Date();
+    const fim = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    let ini: Date;
+    if (meuPeriodo === "hoje") {
+      ini = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    } else if (meuPeriodo === "semana") {
+      ini = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6, 0, 0, 0, 0);
+    } else if (meuPeriodo === "quinzena") {
+      ini = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 14, 0, 0, 0, 0);
+    } else if (meuPeriodo === "mes") {
+      ini = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29, 0, 0, 0, 0);
+    } else {
+      const [yi, mi, di] = meuDataIni.split("-").map(Number);
+      const [yf, mf, df] = meuDataFim.split("-").map(Number);
+      ini = new Date(yi, (mi || 1) - 1, di || 1, 0, 0, 0, 0);
+      return minhasMovs.filter((m) => {
+        const d = new Date(m.created_at);
+        const fimP = new Date(yf, (mf || 1) - 1, df || 1, 23, 59, 59, 999);
+        return d >= ini && d <= fimP;
+      });
+    }
     return minhasMovs.filter((m) => {
       const d = new Date(m.created_at);
-      const local = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-      return local === meuFiltroData;
+      return d >= ini && d <= fim;
     });
-  }, [minhasMovs, meuFiltroData]);
+  }, [minhasMovs, meuPeriodo, meuDataIni, meuDataFim]);
 
   const [todasSessoes, setTodasSessoes] = useState<Sessao[]>([]);
   const [todosMovs, setTodosMovs] = useState<Mov[]>([]);
@@ -837,26 +860,45 @@ function Page() {
                     {isManager ? "Movimentos da sessão" : "Movimentos de hoje"}
                   </CardTitle>
                   {isManager ? (
-                    <div className="flex items-end gap-2">
+                    <div className="flex items-end gap-2 flex-wrap">
                       <div>
-                        <Label className="text-xs">Data</Label>
-                        <Input
-                          type="date"
-                          value={meuFiltroData}
-                          onChange={(e) => setMeuFiltroData(e.target.value)}
-                          className="h-8 w-[160px]"
-                        />
+                        <Label className="text-xs">Período</Label>
+                        <Select value={meuPeriodo} onValueChange={(v) => setMeuPeriodo(v as typeof meuPeriodo)}>
+                          <SelectTrigger className="h-8 w-[160px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="hoje">Hoje</SelectItem>
+                            <SelectItem value="semana">Última semana</SelectItem>
+                            <SelectItem value="quinzena">Última quinzena</SelectItem>
+                            <SelectItem value="mes">Último mês</SelectItem>
+                            <SelectItem value="intervalo">Intervalo personalizado</SelectItem>
+                            <SelectItem value="todos">Todos</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 text-xs"
-                        onClick={() => setMeuFiltroData("")}
-                        title="Mostrar todos os movimentos da sessão"
-                      >
-                        Ver todos
-                      </Button>
+                      {meuPeriodo === "intervalo" && (
+                        <>
+                          <div>
+                            <Label className="text-xs">De</Label>
+                            <Input
+                              type="date"
+                              value={meuDataIni}
+                              onChange={(e) => setMeuDataIni(e.target.value)}
+                              className="h-8 w-[150px]"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Até</Label>
+                            <Input
+                              type="date"
+                              value={meuDataFim}
+                              onChange={(e) => setMeuDataFim(e.target.value)}
+                              className="h-8 w-[150px]"
+                            />
+                          </div>
+                        </>
+                      )}
                     </div>
                   ) : (
                     <span className="text-xs text-muted-foreground">
@@ -882,7 +924,7 @@ function Page() {
                         <TableRow>
                           <TableCell colSpan={7} className="text-center text-muted-foreground">
                             {isManager
-                              ? (meuFiltroData ? "Sem movimentos nesta data" : "Sem movimentos")
+                              ? "Sem movimentos no período"
                               : "Sem movimentos hoje"}
                           </TableCell>
                         </TableRow>
