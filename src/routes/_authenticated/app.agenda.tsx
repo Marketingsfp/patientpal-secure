@@ -2562,6 +2562,7 @@ function AgendaPage() {
                         "PELVIC",
                         "VIAS URINARIAS", "RINS",
                         "TIREOIDE",
+                        "PROSTATA",
                       ],
                       rx: ["TORAX", "COLUNA LOMBAR", "COLUNA CERVICAL", "JOELHO", "MAO", "PE", "PUNHO", "BACIA", "CRANIO", "ABDOME"],
                       tc: ["CRANIO", "TORAX", "ABDOME TOTAL", "COLUNA LOMBAR", "SEIOS DA FACE", "COLUNA CERVICAL", "ABDOME SUPERIOR", "PESCOCO", "TORAX CONTRASTE", "PELVE"],
