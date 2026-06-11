@@ -2110,6 +2110,11 @@ function AgendaPage() {
     if (s.startsWith("M")) return "Dr.";
     return "Dr(a).";
   };
+  const NOMES_EXAME_SEM_PREFIXO = new Set<string>([
+    "ECG", "EEG", "MAPA", "HOLTER", "ITB",
+    "ELETROCARDIOGRAMA", "ELETROENCEFALOGRAMA",
+    "TESTE ERGOMETRICO", "TESTE ERGOMÉTRICO", "ERGOMETRIA",
+  ]);
   const medicoNome = (id: string | null) => {
     const m = medicos.find(x => x.id === id);
     if (!m) return "—";
