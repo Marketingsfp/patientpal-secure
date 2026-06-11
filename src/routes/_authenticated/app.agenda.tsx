@@ -2549,30 +2549,48 @@ function AgendaPage() {
                     };
                     // Lista curada (peso de popularidade) — usada como fallback
                     // quando ainda não há histórico para o exame.
-                    const curadosPorModalidade: Record<"us" | "rx" | "tc" | "rm", string[]> = {
-                      // Ordem oficial dos exames de USG mais solicitados na clínica.
-                      // O 1º item ganha o maior peso (fica como nº 1 quando não há histórico).
+                    // Cada item do top 10 pode exigir 1+ palavras-chave (todas presentes)
+                    // e opcionalmente excluir labels que contenham certas palavras.
+                    type Curado = { all: string[]; not?: string[] };
+                    const curadosPorModalidade: Record<"us" | "rx" | "tc" | "rm", Curado[]> = {
+                      // Top 10 oficial de USG (ordem = ranking). 1º = maior peso.
                       us: [
-                        "OBSTETRIC", "1 TRIMESTRE", "PRIMEIRO TRIMESTRE",
-                        "MORFOLOGIC", "2 TRIMESTRE", "SEGUNDO TRIMESTRE",
-                        "DOPPLER",
-                        "TRANSVAGINAL",
-                        "MAMA",
-                        "ABDOME TOTAL", "ABDOMEN TOTAL",
-                        "PELVIC",
-                        "VIAS URINARIAS", "RINS",
-                        "TIREOIDE",
-                        "PROSTATA",
+                        { all: ["OBSTETRIC", "1"], not: ["MORFOLOG", "DOPPLER"] },        // 1. Obstétrico 1º Trim.
+                        { all: ["MORFOLOG", "1"], not: ["GEMELAR", "DOPPLER"] },          // 2. Morfológico 1º Trim.
+                        { all: ["MORFOLOG", "2"], not: ["GEMELAR", "DOPPLER"] },          // 3. Morfológico 2º Trim.
+                        { all: ["OBSTETRIC", "DOPPLER"], not: ["MORFOLOG"] },             // 4. Obstétrico c/ Doppler
+                        { all: ["TRANSVAGINAL"] },                                        // 5. Transvaginal
+                        { all: ["MAMA"] },                                                // 6. Mamas
+                        { all: ["ABDOME TOTAL"] },                                        // 7. Abdome Total
+                        { all: ["PELV"], not: ["TRANSVAGINAL"] },                         // 8. Pélvica
+                        { all: ["VIAS URINARIAS"] },                                      // 9. Vias Urinárias
+                        { all: ["TIREOIDE"] },                                            // 10. Tireoide
+                        { all: ["PROSTATA"] },
+                        { all: ["RINS"] },
                       ],
-                      rx: ["TORAX", "COLUNA LOMBAR", "COLUNA CERVICAL", "JOELHO", "MAO", "PE", "PUNHO", "BACIA", "CRANIO", "ABDOME"],
-                      tc: ["CRANIO", "TORAX", "ABDOME TOTAL", "COLUNA LOMBAR", "SEIOS DA FACE", "COLUNA CERVICAL", "ABDOME SUPERIOR", "PESCOCO", "TORAX CONTRASTE", "PELVE"],
-                      rm: ["CRANIO", "COLUNA LOMBAR", "COLUNA CERVICAL", "JOELHO", "OMBRO", "ABDOME", "COLUNA TORACICA", "PELVE", "QUADRIL", "TORNOZELO"],
+                      rx: [
+                        { all: ["TORAX"] }, { all: ["COLUNA LOMBAR"] }, { all: ["COLUNA CERVICAL"] },
+                        { all: ["JOELHO"] }, { all: ["MAO"] }, { all: ["PE"] }, { all: ["PUNHO"] },
+                        { all: ["BACIA"] }, { all: ["CRANIO"] }, { all: ["ABDOME"] },
+                      ],
+                      tc: [
+                        { all: ["CRANIO"] }, { all: ["TORAX"], not: ["CONTRASTE"] }, { all: ["ABDOME TOTAL"] },
+                        { all: ["COLUNA LOMBAR"] }, { all: ["SEIOS DA FACE"] }, { all: ["COLUNA CERVICAL"] },
+                        { all: ["ABDOME SUPERIOR"] }, { all: ["PESCOCO"] }, { all: ["TORAX", "CONTRASTE"] }, { all: ["PELVE"] },
+                      ],
+                      rm: [
+                        { all: ["CRANIO"] }, { all: ["COLUNA LOMBAR"] }, { all: ["COLUNA CERVICAL"] },
+                        { all: ["JOELHO"] }, { all: ["OMBRO"] }, { all: ["ABDOME"] },
+                        { all: ["COLUNA TORACICA"] }, { all: ["PELVE"] }, { all: ["QUADRIL"] }, { all: ["TORNOZELO"] },
+                      ],
                     };
                     const scoreCurado = (label: string, mod: "us" | "rx" | "tc" | "rm") => {
                       const L = normalizar(label).toUpperCase();
                       const lista = curadosPorModalidade[mod];
                       for (let i = 0; i < lista.length; i++) {
-                        if (L.includes(lista[i])) return lista.length - i; // peso decrescente
+                        const c = lista[i];
+                        if (c.not && c.not.some((n) => L.includes(n))) continue;
+                        if (c.all.every((k) => L.includes(k))) return lista.length - i;
                       }
                       return 0;
                     };
