@@ -40,7 +40,7 @@ function isFeriadoOuDomingo(d: Date): boolean {
 
 interface Disp { id: string; medico_id: string; dia_semana: number; hora_inicio: string; hora_fim: string; observacoes: string | null; limite_pacientes: number | null; intervalo_min: number | null }
 type DispExt = Disp & { vigencia_inicio: string | null; vigencia_fim: string | null };
-interface Medico { id: string; nome: string; duracao_consulta_min: number | null; procedimento_padrao_id: string | null; procedimento_padrao_nome: string | null; especialidade_nome: string | null }
+interface Medico { id: string; nome: string; duracao_consulta_min: number | null; procedimento_padrao_id: string | null; procedimento_padrao_nome: string | null; especialidade_nome: string | null; cidade: string | null; estado: string | null; bairro: string | null }
 interface Agenda { id: string; medico_id: string; nome: string; ativo: boolean; ordem: number }
 interface DispRow extends DispExt { agenda_id: string }
 
@@ -51,6 +51,7 @@ function Page() {
   const [agendas, setAgendas] = useState<Agenda[]>([]);
   const [agendaSel, setAgendaSel] = useState<string>("");
   const [filtro, setFiltro] = useState("");
+  const [filtroCidade, setFiltroCidade] = useState<string>("all");
   const [novo, setNovo] = useState({ medico_id: "", dia_semana: "1", hora_inicio: "08:00", hora_fim: "12:00", limite_pacientes: "", intervalo_min: "", vigencia_inicio: "", vigencia_fim: "" });
   const [diasSel, setDiasSel] = useState<number[]>([1]);
   const hojeIso = new Date().toISOString().slice(0, 10);
@@ -65,11 +66,11 @@ function Page() {
   const load = async () => {
     if (!clinicaAtual) return;
     const [m, d, a] = await Promise.all([
-      supabase.from("medicos").select("id, nome, duracao_consulta_min, procedimento_padrao_id, procedimento:procedimentos!medicos_procedimento_padrao_id_fkey(nome), especialidade:especialidades!medicos_especialidade_id_fkey(nome)" as never).eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
+      supabase.from("medicos").select("id, nome, duracao_consulta_min, procedimento_padrao_id, cidade, estado, bairro, procedimento:procedimentos!medicos_procedimento_padrao_id_fkey(nome), especialidade:especialidades!medicos_especialidade_id_fkey(nome)" as never).eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("medico_disponibilidades").select("id, medico_id, agenda_id, dia_semana, hora_inicio, hora_fim, observacoes, limite_pacientes, intervalo_min, vigencia_inicio, vigencia_fim" as never).eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("dia_semana").order("hora_inicio"),
       supabase.from("medico_agendas" as never).select("id, medico_id, nome, ativo, ordem").eq("clinica_id", clinicaAtual.clinica_id).order("ordem").order("nome"),
     ]);
-    type RawMedico = { id: string; nome: string; duracao_consulta_min: number | null; procedimento_padrao_id: string | null; procedimento?: { nome: string | null } | null; especialidade?: { nome: string | null } | null };
+    type RawMedico = { id: string; nome: string; duracao_consulta_min: number | null; procedimento_padrao_id: string | null; cidade: string | null; estado: string | null; bairro: string | null; procedimento?: { nome: string | null } | null; especialidade?: { nome: string | null } | null };
     const rawList = ((m.data as unknown) as RawMedico[]) ?? [];
     setMedicos(rawList.map((r) => ({
       id: r.id,
@@ -78,6 +79,9 @@ function Page() {
       procedimento_padrao_id: r.procedimento_padrao_id,
       procedimento_padrao_nome: r.procedimento?.nome ?? null,
       especialidade_nome: r.especialidade?.nome ?? null,
+      cidade: r.cidade,
+      estado: r.estado,
+      bairro: r.bairro,
     })));
     setDisps(((d.data as unknown) as DispRow[]) ?? []);
     setAgendas(((a.data as unknown) as Agenda[]) ?? []);
@@ -219,8 +223,12 @@ function Page() {
 
   if (!clinicaAtual) return <p className="text-muted-foreground">Selecione uma clínica.</p>;
 
+  const cidadesDisponiveis = Array.from(
+    new Set(medicos.map((m) => (m.cidade ?? "").trim()).filter((c) => c.length > 0)),
+  ).sort((a, b) => a.localeCompare(b, "pt-BR", { sensitivity: "base" }));
   const medicosFiltrados = medicos
     .filter((m) => !filtro || m.nome.toLowerCase().includes(filtro.toLowerCase()))
+    .filter((m) => filtroCidade === "all" || (m.cidade ?? "").trim().toLowerCase() === filtroCidade.toLowerCase())
     .slice()
     .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" }));
 
