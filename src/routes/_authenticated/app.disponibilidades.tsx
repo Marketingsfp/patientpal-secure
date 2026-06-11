@@ -155,7 +155,7 @@ function Page() {
 
   // Pré-visualização dos slots gerados
   const slotsPreview = useMemo(() => {
-    type Slot = { data: string; medico: string; agenda_id: string; inicio: string; fim: string };
+    type Slot = { data: string; medico_id: string; agenda_id: string; inicio: string; fim: string };
     if (!gerar.data_inicio || !gerar.data_fim) return [] as Slot[];
     const ini = new Date(`${gerar.data_inicio}T00:00:00`);
     const fimD = new Date(`${gerar.data_fim}T00:00:00`);
@@ -192,7 +192,7 @@ function Page() {
               const inicio = `${String(Math.floor(cur / 60)).padStart(2, "0")}:${String(cur % 60).padStart(2, "0")}`;
               const fimMin = cur + dur;
               const fim = `${String(Math.floor(fimMin / 60)).padStart(2, "0")}:${String(fimMin % 60).padStart(2, "0")}`;
-              out.push({ data: d.toISOString().slice(0, 10), medico: m.nome, agenda_id: ag.id, inicio, fim });
+              out.push({ data: d.toISOString().slice(0, 10), medico_id: m.id, agenda_id: ag.id, inicio, fim });
               cur += dur;
               criadosNoDia += 1;
             }
