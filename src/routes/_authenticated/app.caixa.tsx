@@ -103,6 +103,7 @@ function Page() {
 
   const [tab, setTab] = useState<"meu" | "todos" | "repasse">("meu");
   const [estornoFor, setEstornoFor] = useState<Mov | null>(null);
+  const [caixaDrill, setCaixaDrill] = useState<null | "saldo" | "abertura" | "entradas" | "saidas">(null);
 
   // ====== Resumo de repasse do dia (para a aba "Repasse") ======
   const [repHoje, setRepHoje] = useState<{ pendente: number; pago: number; medicos: number; qtd_pend: number }>({
