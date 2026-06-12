@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { formatDatePura, formatDateTime, calcularIdade } from "@/lib/date-utils";
 
 export const Route = createFileRoute("/_authenticated/app/medico/$medicoId")({
@@ -44,6 +45,7 @@ function PerfilMedicoPage() {
   const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
   const [atendimentos, setAtendimentos] = useState<Atendimento[]>([]);
   const [loading, setLoading] = useState(true);
+  const [drill, setDrill] = useState<null | "agend" | "faturado" | "repasse">(null);
 
   useEffect(() => {
     let cancel = false;
@@ -127,9 +129,9 @@ function PerfilMedicoPage() {
       </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card><CardContent className="pt-6"><div className="flex items-center gap-2 text-muted-foreground text-sm"><Calendar className="h-4 w-4" />Agendamentos</div><p className="text-2xl font-bold mt-1">{agendamentos.length}</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><div className="flex items-center gap-2 text-muted-foreground text-sm"><DollarSign className="h-4 w-4" />Faturado (últimos 50)</div><p className="text-2xl font-bold mt-1">{fmtMoeda(totalFaturado)}</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><div className="flex items-center gap-2 text-muted-foreground text-sm"><CreditCard className="h-4 w-4" />Repasse (últimos 50)</div><p className="text-2xl font-bold mt-1">{fmtMoeda(totalRepasse)}</p></CardContent></Card>
+        <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setDrill("agend")}><CardContent className="pt-6"><div className="flex items-center gap-2 text-muted-foreground text-sm"><Calendar className="h-4 w-4" />Agendamentos</div><p className="text-2xl font-bold mt-1">{agendamentos.length}</p></CardContent></Card>
+        <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setDrill("faturado")}><CardContent className="pt-6"><div className="flex items-center gap-2 text-muted-foreground text-sm"><DollarSign className="h-4 w-4" />Faturado (últimos 50)</div><p className="text-2xl font-bold mt-1">{fmtMoeda(totalFaturado)}</p></CardContent></Card>
+        <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setDrill("repasse")}><CardContent className="pt-6"><div className="flex items-center gap-2 text-muted-foreground text-sm"><CreditCard className="h-4 w-4" />Repasse (últimos 50)</div><p className="text-2xl font-bold mt-1">{fmtMoeda(totalRepasse)}</p></CardContent></Card>
       </div>
 
       <Tabs defaultValue="dados">
@@ -189,6 +191,37 @@ function PerfilMedicoPage() {
           </CardContent></Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={!!drill} onOpenChange={(v) => { if (!v) setDrill(null); }}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>
+              {drill === "agend" && "Agendamentos do médico"}
+              {drill === "faturado" && "Atendimentos faturados (últimos 50)"}
+              {drill === "repasse" && "Repasse por atendimento (últimos 50)"}
+            </DialogTitle>
+            <DialogDescription>Detalhamento dos registros.</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-auto">
+            {drill === "agend" && (
+              <Table>
+                <TableHeader><TableRow><TableHead>Quando</TableHead><TableHead>Paciente</TableHead><TableHead>Procedimento</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                <TableBody>{agendamentos.map((a) => (
+                  <TableRow key={a.id}><TableCell>{formatDateTime(a.inicio)}</TableCell><TableCell>{a.paciente_nome}</TableCell><TableCell>{a.procedimento ?? "—"}</TableCell><TableCell><Badge variant="outline">{a.status}</Badge></TableCell></TableRow>
+                ))}</TableBody>
+              </Table>
+            )}
+            {(drill === "faturado" || drill === "repasse") && (
+              <Table>
+                <TableHeader><TableRow><TableHead>Data</TableHead><TableHead>Procedimento</TableHead><TableHead className="text-right">{drill === "faturado" ? "Valor total" : "Repasse"}</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                <TableBody>{atendimentos.map((a) => (
+                  <TableRow key={a.id}><TableCell>{formatDatePura(a.data)}</TableCell><TableCell>{a.procedimento ?? "—"}</TableCell><TableCell className="text-right font-semibold">{fmtMoeda(drill === "faturado" ? a.valor_total : a.valor_medico)}</TableCell><TableCell><Badge variant="outline">{a.status}</Badge></TableCell></TableRow>
+                ))}</TableBody>
+              </Table>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
