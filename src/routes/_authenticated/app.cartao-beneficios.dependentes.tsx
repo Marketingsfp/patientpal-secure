@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 
 export const Route = createFileRoute("/_authenticated/app/cartao-beneficios/dependentes")({
@@ -49,6 +50,7 @@ function DependentesPage() {
   const [novoDep, setNovoDep] = useState<PatientOption | null>(null);
   const [parentesco, setParentesco] = useState("");
   const [saving, setSaving] = useState(false);
+  const [drill, setDrill] = useState<null | "total" | "com" | "sem" | "totalDeps">(null);
 
   const load = async () => {
     if (!clinicaAtual) return;
@@ -147,10 +149,10 @@ function DependentesPage() {
     <div className="space-y-4">
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KPI label="Titulares (contratos)" value={stats.total} icon={<Users className="h-4 w-4" />} />
-        <KPI label="Com dependentes" value={stats.com} icon={<CheckCircle2 className="h-4 w-4 text-green-600" />} />
-        <KPI label="Sem dependentes" value={stats.sem} icon={<AlertCircle className="h-4 w-4 text-orange-600" />} />
-        <KPI label="Total de dependentes" value={stats.totalDeps} icon={<Users className="h-4 w-4 text-primary" />} />
+        <KPI onClick={() => setDrill("total")} label="Titulares (contratos)" value={stats.total} icon={<Users className="h-4 w-4" />} />
+        <KPI onClick={() => setDrill("com")} label="Com dependentes" value={stats.com} icon={<CheckCircle2 className="h-4 w-4 text-green-600" />} />
+        <KPI onClick={() => setDrill("sem")} label="Sem dependentes" value={stats.sem} icon={<AlertCircle className="h-4 w-4 text-orange-600" />} />
+        <KPI onClick={() => setDrill("totalDeps")} label="Total de dependentes" value={stats.totalDeps} icon={<Users className="h-4 w-4 text-primary" />} />
       </div>
 
       {/* Filtros */}
@@ -292,13 +294,70 @@ function DependentesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Drill-down KPIs */}
+      <Dialog open={drill !== null} onOpenChange={(o) => { if (!o) setDrill(null); }}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>
+              {drill === "total" && `Todos os titulares (${stats.total})`}
+              {drill === "com" && `Titulares com dependentes (${stats.com})`}
+              {drill === "sem" && `Titulares sem dependentes (${stats.sem})`}
+              {drill === "totalDeps" && `Todos os dependentes (${stats.totalDeps})`}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="overflow-auto flex-1">
+            {drill === "totalDeps" ? (
+              <Table>
+                <TableHeader><TableRow><TableHead>Dependente</TableHead><TableHead>Titular</TableHead><TableHead>Parentesco</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {deps.length === 0 ? <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-6">Nenhum registro.</TableCell></TableRow> : null}
+                  {deps.map((d) => {
+                    const titular = contratos.find((c) => c.id === d.contrato_id);
+                    return (
+                      <TableRow key={d.id}>
+                        <TableCell>{d.paciente_nome}</TableCell>
+                        <TableCell>{titular?.paciente_nome ?? "—"}</TableCell>
+                        <TableCell>{d.parentesco ?? "—"}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            ) : drill ? (
+              <Table>
+                <TableHeader><TableRow><TableHead>Titular</TableHead><TableHead>Nº</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Dependentes</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {(() => {
+                    const lista = contratos.filter((c) => {
+                      const has = (depsPorContrato.get(c.id)?.length ?? 0) > 0;
+                      if (drill === "com") return has;
+                      if (drill === "sem") return !has;
+                      return true;
+                    });
+                    if (lista.length === 0) return <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Nenhum registro.</TableCell></TableRow>;
+                    return lista.map((c) => (
+                      <TableRow key={c.id}>
+                        <TableCell>{c.paciente_nome}</TableCell>
+                        <TableCell>#{c.numero}</TableCell>
+                        <TableCell><Badge variant="outline">{c.status}</Badge></TableCell>
+                        <TableCell className="text-right font-semibold">{depsPorContrato.get(c.id)?.length ?? 0}</TableCell>
+                      </TableRow>
+                    ));
+                  })()}
+                </TableBody>
+              </Table>
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-function KPI({ label, value, icon }: { label: string; value: number | string; icon: React.ReactNode }) {
+function KPI({ label, value, icon, onClick }: { label: string; value: number | string; icon: React.ReactNode; onClick?: () => void }) {
   return (
-    <Card>
+    <Card onClick={onClick} className={onClick ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}>
       <CardContent className="p-4">
         <div className="flex items-center gap-2 text-xs text-muted-foreground">{icon}{label}</div>
         <div className="text-2xl font-bold mt-1">{value}</div>
