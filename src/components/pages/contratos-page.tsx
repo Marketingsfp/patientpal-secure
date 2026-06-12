@@ -1425,6 +1425,73 @@ h1, h2, h3 { margin: 0 0 6mm; }
         </CardContent>
       </Card>
 
+      <Dialog open={drill !== null} onOpenChange={(o) => !o && setDrill(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {drill === "pagas" && `Parcelas pagas — ${pagasTotal} de ${totalParcelas}`}
+              {drill === "recebido" && `Recebido — ${BRL(totalPago)}`}
+              {drill === "areceber" && `A receber — ${BRL(aReceber)}`}
+            </DialogTitle>
+            <DialogDescription>
+              {drill === "areceber" ? "Parcelas em aberto deste contrato." : "Demonstrativo detalhado das parcelas."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-md border max-h-[60vh] overflow-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>#</TableHead>
+                  <TableHead>Vencimento</TableHead>
+                  <TableHead>Valor</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Pago em</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(() => {
+                  const list = drill === "areceber"
+                    ? mens.filter((m) => m.status !== "pago")
+                    : drill === "pagas" || drill === "recebido"
+                    ? mens.filter((m) => m.status === "pago")
+                    : mens;
+                  if (list.length === 0) {
+                    return (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
+                          Nenhum lançamento.
+                        </TableCell>
+                      </TableRow>
+                    );
+                  }
+                  return list.map((m, i) => (
+                    <TableRow key={m.id}>
+                      <TableCell>{i + 1}</TableCell>
+                      <TableCell>{fmtD(m.vencimento)}</TableCell>
+                      <TableCell>{BRL(Number(m.valor))}</TableCell>
+                      <TableCell>
+                        <Badge variant={m.status === "pago" ? "default" : new Date(m.vencimento) < new Date() ? "destructive" : "outline"}>
+                          {m.status === "pago" ? "Pago" : new Date(m.vencimento) < new Date() ? "Atrasado" : "Pendente"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{m.pago_em ? fmtD(m.pago_em) : "—"}</TableCell>
+                    </TableRow>
+                  ));
+                })()}
+              </TableBody>
+            </Table>
+          </div>
+          {(drill === "recebido" || drill === "pagas") && extraRecebido.count > 0 ? (
+            <div className="text-xs text-muted-foreground">
+              + {extraRecebido.count} recebimento(s) avulso(s) totalizando {BRL(extraRecebido.total)}.
+            </div>
+          ) : null}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDrill(null)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={formaPagOpen} onOpenChange={setFormaPagOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
