@@ -1226,9 +1226,21 @@ h1, h2, h3 { margin: 0 0 6mm; }
             </div>
           ) : null}
           <div className="grid grid-cols-3 gap-3 text-sm">
-          <div className="rounded-md border p-3"><div className="text-muted-foreground text-xs">Pagas</div><div className="font-bold text-lg">{pagasTotal}/{totalParcelas}</div></div>
-          <div className="rounded-md border p-3"><div className="text-muted-foreground text-xs">Recebido</div><div className="font-bold text-lg text-green-600">{BRL(totalPago)}</div></div>
-          <div className="rounded-md border p-3"><div className="text-muted-foreground text-xs">A receber</div><div className="font-bold text-lg text-orange-600">{BRL(aReceber)}</div></div>
+          <button type="button" onClick={() => setDrill("pagas")} className="rounded-md border p-3 text-left hover:bg-muted/40 transition-colors cursor-pointer">
+            <div className="text-muted-foreground text-xs">Pagas</div>
+            <div className="font-bold text-lg">{pagasTotal}/{totalParcelas}</div>
+            <div className="text-[10px] text-muted-foreground mt-1">Clique para ver detalhes</div>
+          </button>
+          <button type="button" onClick={() => setDrill("recebido")} className="rounded-md border p-3 text-left hover:bg-muted/40 transition-colors cursor-pointer">
+            <div className="text-muted-foreground text-xs">Recebido</div>
+            <div className="font-bold text-lg text-green-600">{BRL(totalPago)}</div>
+            <div className="text-[10px] text-muted-foreground mt-1">Clique para ver detalhes</div>
+          </button>
+          <button type="button" onClick={() => setDrill("areceber")} className="rounded-md border p-3 text-left hover:bg-muted/40 transition-colors cursor-pointer">
+            <div className="text-muted-foreground text-xs">A receber</div>
+            <div className="font-bold text-lg text-orange-600">{BRL(aReceber)}</div>
+            <div className="text-[10px] text-muted-foreground mt-1">Clique para ver detalhes</div>
+          </button>
           </div>
         <div className="flex gap-2 flex-wrap">
           <Button size="sm" onClick={() => printContrato(contrato.id)}><Printer className="h-4 w-4 mr-1"/>Imprimir A4</Button>
