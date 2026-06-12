@@ -725,12 +725,12 @@ function DashboardView({
       {/* KPIs */}
       {kpiVisible > 0 && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {on("kpi_agend") && <Kpi icon={<CalendarDays className="h-5 w-5" />} label="Agendamentos" value={data.totalAgend.toString()} tint="text-blue-600" />}
-          {on("kpi_novos") && <Kpi icon={<Users className="h-5 w-5" />} label="Novos pacientes" value={data.novosPacientes.toString()} tint="text-purple-600" />}
-          {on("kpi_pront") && <Kpi icon={<FileHeart className="h-5 w-5" />} label="Prontuários" value={data.prontuariosCount.toString()} tint="text-pink-600" />}
-          {on("kpi_saldo") && <Kpi icon={<Wallet className="h-5 w-5" />} label="Saldo" value={fmtBRL(saldo)} tint={saldo >= 0 ? "text-emerald-600" : "text-red-600"} />}
-          {on("kpi_rec") && <Kpi icon={<TrendingUp className="h-5 w-5" />} label="Receitas" value={fmtBRL(data.receitas)} tint="text-emerald-600" />}
-          {on("kpi_desp") && <Kpi icon={<TrendingDown className="h-5 w-5" />} label="Despesas" value={fmtBRL(data.despesas)} tint="text-red-600" />}
+          {on("kpi_agend") && <Kpi icon={<CalendarDays className="h-5 w-5" />} label="Agendamentos" value={data.totalAgend.toString()} tint="text-blue-600" onClick={() => setDrill("agend")} />}
+          {on("kpi_novos") && <Kpi icon={<Users className="h-5 w-5" />} label="Novos pacientes" value={data.novosPacientes.toString()} tint="text-purple-600" onClick={() => setDrill("novos")} />}
+          {on("kpi_pront") && <Kpi icon={<FileHeart className="h-5 w-5" />} label="Prontuários" value={data.prontuariosCount.toString()} tint="text-pink-600" onClick={() => setDrill("pront")} />}
+          {on("kpi_saldo") && <Kpi icon={<Wallet className="h-5 w-5" />} label="Saldo" value={fmtBRL(saldo)} tint={saldo >= 0 ? "text-emerald-600" : "text-red-600"} onClick={() => setDrill("saldo")} />}
+          {on("kpi_rec") && <Kpi icon={<TrendingUp className="h-5 w-5" />} label="Receitas" value={fmtBRL(data.receitas)} tint="text-emerald-600" onClick={() => setDrill("receitas")} />}
+          {on("kpi_desp") && <Kpi icon={<TrendingDown className="h-5 w-5" />} label="Despesas" value={fmtBRL(data.despesas)} tint="text-red-600" onClick={() => setDrill("despesas")} />}
         </div>
       )}
 
@@ -786,15 +786,67 @@ function DashboardView({
           </CardContent>
         </Card>
       )}
+
+      <Dialog open={!!drill} onOpenChange={(v) => { if (!v) setDrill(null); }}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>
+              {drill === "agend" && "Agendamentos no período"}
+              {drill === "novos" && "Novos pacientes no período"}
+              {drill === "pront" && "Prontuários no período"}
+              {drill === "saldo" && "Lançamentos do período (saldo)"}
+              {drill === "receitas" && "Receitas no período"}
+              {drill === "despesas" && "Despesas no período"}
+            </DialogTitle>
+            <DialogDescription>Detalhamento dos registros do período selecionado.</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-auto">
+            {drill === "agend" && raw && (
+              <Table>
+                <TableHeader><TableRow><TableHead>Início</TableHead><TableHead>Paciente</TableHead><TableHead>Médico</TableHead><TableHead>Procedimento</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                <TableBody>{raw.agend.map((a) => (
+                  <TableRow key={a.id}><TableCell className="whitespace-nowrap">{new Date(a.inicio).toLocaleString("pt-BR")}</TableCell><TableCell>{a.paciente_nome ?? "—"}</TableCell><TableCell>{a.medico ?? "—"}</TableCell><TableCell>{a.procedimento ?? "—"}</TableCell><TableCell>{a.status ?? "—"}</TableCell></TableRow>
+                ))}</TableBody>
+              </Table>
+            )}
+            {drill === "novos" && raw && (
+              <Table>
+                <TableHeader><TableRow><TableHead>Nome</TableHead><TableHead>Cadastrado em</TableHead></TableRow></TableHeader>
+                <TableBody>{raw.pacientes.map((p) => (
+                  <TableRow key={p.id}><TableCell>{p.nome}</TableCell><TableCell>{new Date(p.created_at).toLocaleString("pt-BR")}</TableCell></TableRow>
+                ))}</TableBody>
+              </Table>
+            )}
+            {drill === "pront" && raw && (
+              <Table>
+                <TableHeader><TableRow><TableHead>Data</TableHead><TableHead>Paciente</TableHead></TableRow></TableHeader>
+                <TableBody>{raw.prontuarios.map((p) => (
+                  <TableRow key={p.id}><TableCell>{new Date(p.data_atendimento).toLocaleString("pt-BR")}</TableCell><TableCell>{p.paciente ?? "—"}</TableCell></TableRow>
+                ))}</TableBody>
+              </Table>
+            )}
+            {(drill === "saldo" || drill === "receitas" || drill === "despesas") && raw && (
+              <Table>
+                <TableHeader><TableRow><TableHead>Data</TableHead><TableHead>Tipo</TableHead><TableHead>Descrição</TableHead><TableHead>Categoria</TableHead><TableHead className="text-right">Valor</TableHead></TableRow></TableHeader>
+                <TableBody>{raw.fin
+                  .filter((f) => drill === "saldo" ? true : drill === "receitas" ? f.tipo === "receita" : f.tipo === "despesa")
+                  .map((f) => (
+                  <TableRow key={f.id}><TableCell className="whitespace-nowrap">{f.data.slice(0,10).split("-").reverse().join("/")}</TableCell><TableCell>{f.tipo}</TableCell><TableCell>{f.descricao ?? "—"}</TableCell><TableCell>{f.categoria ?? "—"}</TableCell><TableCell className={`text-right font-semibold ${f.tipo === "receita" ? "text-emerald-600" : "text-rose-600"}`}>{f.tipo === "despesa" ? "-" : ""}{fmtBRL(f.valor)}</TableCell></TableRow>
+                ))}</TableBody>
+              </Table>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
 function Kpi({
-  icon, label, value, tint,
-}: { icon: React.ReactNode; label: string; value: string; tint: string }) {
+  icon, label, value, tint, onClick,
+}: { icon: React.ReactNode; label: string; value: string; tint: string; onClick?: () => void }) {
   return (
-    <Card>
+    <Card onClick={onClick} className={onClick ? "cursor-pointer hover:bg-muted/50 transition-colors" : undefined}>
       <CardContent className="pt-6">
         <div className={`flex items-center gap-2 ${tint}`}>{icon}<span className="text-sm text-muted-foreground">{label}</span></div>
         <p className={`text-2xl font-semibold mt-1 ${tint}`}>{value}</p>
