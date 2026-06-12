@@ -20,6 +20,8 @@ import {
   HeartPulse, LayoutDashboard, TrendingUp, TrendingDown, Wallet, Settings2, RotateCcw, Boxes,
 } from "lucide-react";
 import { CuboBI } from "@/components/relatorios/CuboBI";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export const Route = createFileRoute("/_authenticated/app/relatorios")({
   component: RelatoriosPage,
@@ -479,6 +481,13 @@ interface DashboardData {
   prontuariosCount: number;
 }
 
+interface RawData {
+  agend: Array<{ id: string; paciente_nome: string | null; procedimento: string | null; inicio: string; status: string | null; medico: string | null }>;
+  fin: Array<{ id: string; data: string; tipo: string; valor: number; descricao: string | null; categoria: string | null; status: string | null }>;
+  pacientes: Array<{ id: string; nome: string; created_at: string }>;
+  prontuarios: Array<{ id: string; data_atendimento: string; paciente: string | null }>;
+}
+
 function DashboardView({
   clinicaId,
   ini,
@@ -490,6 +499,8 @@ function DashboardView({
 }) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [raw, setRaw] = useState<RawData | null>(null);
+  const [drill, setDrill] = useState<null | "agend" | "novos" | "pront" | "saldo" | "receitas" | "despesas">(null);
 
   useEffect(() => {
     if (!clinicaId) return;
@@ -500,25 +511,25 @@ function DashboardView({
         const [agend, fin, pac, pront] = await Promise.all([
           supabase
             .from("agendamentos")
-            .select("status, medicos(nome)")
+            .select("id, paciente_nome, procedimento, inicio, status, medicos(nome)")
             .eq("clinica_id", clinicaId)
             .gte("inicio", ini)
             .lte("inicio", fim + "T23:59:59"),
           supabase
             .from("fin_lancamentos")
-            .select("data, tipo, valor, status, fin_categorias(nome)")
+            .select("id, data, tipo, valor, status, descricao, fin_categorias(nome)")
             .eq("clinica_id", clinicaId)
             .gte("data", ini)
             .lte("data", fim),
           supabase
             .from("pacientes")
-            .select("id", { count: "exact", head: true })
+            .select("id, nome, created_at")
             .eq("clinica_id", clinicaId)
             .gte("created_at", ini)
             .lte("created_at", fim + "T23:59:59"),
           supabase
             .from("prontuarios")
-            .select("id", { count: "exact", head: true })
+            .select("id, data_atendimento, pacientes(nome)")
             .eq("clinica_id", clinicaId)
             .gte("data_atendimento", ini)
             .lte("data_atendimento", fim + "T23:59:59"),
@@ -565,6 +576,18 @@ function DashboardView({
           }));
 
         if (cancel) return;
+        setRaw({
+          agend: agendRows.map((r: any) => ({
+            id: r.id, paciente_nome: r.paciente_nome ?? null, procedimento: r.procedimento ?? null,
+            inicio: r.inicio, status: r.status ?? null, medico: r.medicos?.nome ?? null,
+          })),
+          fin: finRows.map((r: any) => ({
+            id: r.id, data: r.data, tipo: r.tipo, valor: Number(r.valor) || 0,
+            descricao: r.descricao ?? null, categoria: r.fin_categorias?.nome ?? null, status: r.status ?? null,
+          })),
+          pacientes: ((pac.data ?? []) as any[]).map((p) => ({ id: p.id, nome: p.nome, created_at: p.created_at })),
+          prontuarios: ((pront.data ?? []) as any[]).map((p) => ({ id: p.id, data_atendimento: p.data_atendimento, paciente: p.pacientes?.nome ?? null })),
+        });
         setData({
           totalAgend: agendRows.length,
           agendPorStatus: Array.from(statusMap, ([name, value]) => ({ name, value })),
@@ -577,8 +600,8 @@ function DashboardView({
             .sort((a, b) => b.value - a.value)
             .slice(0, 8),
           finPorDia,
-          novosPacientes: pac.count ?? 0,
-          prontuariosCount: pront.count ?? 0,
+          novosPacientes: (pac.data ?? []).length,
+          prontuariosCount: (pront.data ?? []).length,
         });
       } catch (e: any) {
         console.error("dashboard relatorios:", e);
@@ -702,12 +725,12 @@ function DashboardView({
       {/* KPIs */}
       {kpiVisible > 0 && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {on("kpi_agend") && <Kpi icon={<CalendarDays className="h-5 w-5" />} label="Agendamentos" value={data.totalAgend.toString()} tint="text-blue-600" />}
-          {on("kpi_novos") && <Kpi icon={<Users className="h-5 w-5" />} label="Novos pacientes" value={data.novosPacientes.toString()} tint="text-purple-600" />}
-          {on("kpi_pront") && <Kpi icon={<FileHeart className="h-5 w-5" />} label="Prontuários" value={data.prontuariosCount.toString()} tint="text-pink-600" />}
-          {on("kpi_saldo") && <Kpi icon={<Wallet className="h-5 w-5" />} label="Saldo" value={fmtBRL(saldo)} tint={saldo >= 0 ? "text-emerald-600" : "text-red-600"} />}
-          {on("kpi_rec") && <Kpi icon={<TrendingUp className="h-5 w-5" />} label="Receitas" value={fmtBRL(data.receitas)} tint="text-emerald-600" />}
-          {on("kpi_desp") && <Kpi icon={<TrendingDown className="h-5 w-5" />} label="Despesas" value={fmtBRL(data.despesas)} tint="text-red-600" />}
+          {on("kpi_agend") && <Kpi icon={<CalendarDays className="h-5 w-5" />} label="Agendamentos" value={data.totalAgend.toString()} tint="text-blue-600" onClick={() => setDrill("agend")} />}
+          {on("kpi_novos") && <Kpi icon={<Users className="h-5 w-5" />} label="Novos pacientes" value={data.novosPacientes.toString()} tint="text-purple-600" onClick={() => setDrill("novos")} />}
+          {on("kpi_pront") && <Kpi icon={<FileHeart className="h-5 w-5" />} label="Prontuários" value={data.prontuariosCount.toString()} tint="text-pink-600" onClick={() => setDrill("pront")} />}
+          {on("kpi_saldo") && <Kpi icon={<Wallet className="h-5 w-5" />} label="Saldo" value={fmtBRL(saldo)} tint={saldo >= 0 ? "text-emerald-600" : "text-red-600"} onClick={() => setDrill("saldo")} />}
+          {on("kpi_rec") && <Kpi icon={<TrendingUp className="h-5 w-5" />} label="Receitas" value={fmtBRL(data.receitas)} tint="text-emerald-600" onClick={() => setDrill("receitas")} />}
+          {on("kpi_desp") && <Kpi icon={<TrendingDown className="h-5 w-5" />} label="Despesas" value={fmtBRL(data.despesas)} tint="text-red-600" onClick={() => setDrill("despesas")} />}
         </div>
       )}
 
@@ -763,15 +786,67 @@ function DashboardView({
           </CardContent>
         </Card>
       )}
+
+      <Dialog open={!!drill} onOpenChange={(v) => { if (!v) setDrill(null); }}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>
+              {drill === "agend" && "Agendamentos no período"}
+              {drill === "novos" && "Novos pacientes no período"}
+              {drill === "pront" && "Prontuários no período"}
+              {drill === "saldo" && "Lançamentos do período (saldo)"}
+              {drill === "receitas" && "Receitas no período"}
+              {drill === "despesas" && "Despesas no período"}
+            </DialogTitle>
+            <DialogDescription>Detalhamento dos registros do período selecionado.</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-auto">
+            {drill === "agend" && raw && (
+              <Table>
+                <TableHeader><TableRow><TableHead>Início</TableHead><TableHead>Paciente</TableHead><TableHead>Médico</TableHead><TableHead>Procedimento</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                <TableBody>{raw.agend.map((a) => (
+                  <TableRow key={a.id}><TableCell className="whitespace-nowrap">{new Date(a.inicio).toLocaleString("pt-BR")}</TableCell><TableCell>{a.paciente_nome ?? "—"}</TableCell><TableCell>{a.medico ?? "—"}</TableCell><TableCell>{a.procedimento ?? "—"}</TableCell><TableCell>{a.status ?? "—"}</TableCell></TableRow>
+                ))}</TableBody>
+              </Table>
+            )}
+            {drill === "novos" && raw && (
+              <Table>
+                <TableHeader><TableRow><TableHead>Nome</TableHead><TableHead>Cadastrado em</TableHead></TableRow></TableHeader>
+                <TableBody>{raw.pacientes.map((p) => (
+                  <TableRow key={p.id}><TableCell>{p.nome}</TableCell><TableCell>{new Date(p.created_at).toLocaleString("pt-BR")}</TableCell></TableRow>
+                ))}</TableBody>
+              </Table>
+            )}
+            {drill === "pront" && raw && (
+              <Table>
+                <TableHeader><TableRow><TableHead>Data</TableHead><TableHead>Paciente</TableHead></TableRow></TableHeader>
+                <TableBody>{raw.prontuarios.map((p) => (
+                  <TableRow key={p.id}><TableCell>{new Date(p.data_atendimento).toLocaleString("pt-BR")}</TableCell><TableCell>{p.paciente ?? "—"}</TableCell></TableRow>
+                ))}</TableBody>
+              </Table>
+            )}
+            {(drill === "saldo" || drill === "receitas" || drill === "despesas") && raw && (
+              <Table>
+                <TableHeader><TableRow><TableHead>Data</TableHead><TableHead>Tipo</TableHead><TableHead>Descrição</TableHead><TableHead>Categoria</TableHead><TableHead className="text-right">Valor</TableHead></TableRow></TableHeader>
+                <TableBody>{raw.fin
+                  .filter((f) => drill === "saldo" ? true : drill === "receitas" ? f.tipo === "receita" : f.tipo === "despesa")
+                  .map((f) => (
+                  <TableRow key={f.id}><TableCell className="whitespace-nowrap">{f.data.slice(0,10).split("-").reverse().join("/")}</TableCell><TableCell>{f.tipo}</TableCell><TableCell>{f.descricao ?? "—"}</TableCell><TableCell>{f.categoria ?? "—"}</TableCell><TableCell className={`text-right font-semibold ${f.tipo === "receita" ? "text-emerald-600" : "text-rose-600"}`}>{f.tipo === "despesa" ? "-" : ""}{fmtBRL(f.valor)}</TableCell></TableRow>
+                ))}</TableBody>
+              </Table>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
 function Kpi({
-  icon, label, value, tint,
-}: { icon: React.ReactNode; label: string; value: string; tint: string }) {
+  icon, label, value, tint, onClick,
+}: { icon: React.ReactNode; label: string; value: string; tint: string; onClick?: () => void }) {
   return (
-    <Card>
+    <Card onClick={onClick} className={onClick ? "cursor-pointer hover:bg-muted/50 transition-colors" : undefined}>
       <CardContent className="pt-6">
         <div className={`flex items-center gap-2 ${tint}`}>{icon}<span className="text-sm text-muted-foreground">{label}</span></div>
         <p className={`text-2xl font-semibold mt-1 ${tint}`}>{value}</p>
