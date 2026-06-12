@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS idx_pacientes_nome_norm ON public.pacientes (clinica_id, (upper(public.strip_accents(trim(nome)))));
