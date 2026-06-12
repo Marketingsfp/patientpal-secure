@@ -1608,6 +1608,66 @@ function Page() {
           return idx > 0 ? d.slice(0, idx).trim() : null;
         })()}
       />
+      <Dialog open={!!caixaDrill} onOpenChange={(v) => { if (!v) setCaixaDrill(null); }}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>
+              {caixaDrill === "saldo" && "Detalhamento do saldo atual"}
+              {caixaDrill === "abertura" && "Abertura do caixa"}
+              {caixaDrill === "entradas" && "Entradas do caixa"}
+              {caixaDrill === "saidas" && "Saídas do caixa"}
+            </DialogTitle>
+            <DialogDescription>
+              {caixaDrill === "saldo" && "Todas as movimentações da sessão atual."}
+              {caixaDrill === "abertura" && "Valor e observações da abertura."}
+              {caixaDrill === "entradas" && "Recebimentos e suprimentos."}
+              {caixaDrill === "saidas" && "Despesas e sangrias."}
+            </DialogDescription>
+          </DialogHeader>
+          {caixaDrill === "abertura" && minhaSessao && (
+            <div className="space-y-2 text-sm">
+              <div><span className="text-muted-foreground">Aberto em:</span> {fmtDT(minhaSessao.aberto_em)}</div>
+              <div><span className="text-muted-foreground">Valor de abertura:</span> <span className="font-semibold">{fmt(minhaSessao.valor_abertura)}</span></div>
+              <div><span className="text-muted-foreground">Operador:</span> {minhaSessao.user_nome ?? "—"}</div>
+              {minhaSessao.observacoes && <div><span className="text-muted-foreground">Observações:</span> {minhaSessao.observacoes}</div>}
+            </div>
+          )}
+          {caixaDrill && caixaDrill !== "abertura" && (
+            <div className="max-h-[60vh] overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Quando</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Descrição</TableHead>
+                    <TableHead>Forma</TableHead>
+                    <TableHead className="text-right">Valor</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {minhasMovs
+                    .filter((m) => {
+                      if (caixaDrill === "entradas") return m.tipo === "suprimento" || m.tipo === "recebimento";
+                      if (caixaDrill === "saidas") return m.tipo === "sangria" || m.tipo === "despesa";
+                      return true;
+                    })
+                    .map((m) => (
+                      <TableRow key={m.id}>
+                        <TableCell className="whitespace-nowrap">{fmtDT(m.created_at)}</TableCell>
+                        <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
+                        <TableCell>{m.descricao ?? "—"}</TableCell>
+                        <TableCell>{m.forma_pagamento ?? "—"}</TableCell>
+                        <TableCell className={`text-right font-semibold ${TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : ""}`}>
+                          {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
