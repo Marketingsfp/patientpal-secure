@@ -377,6 +377,90 @@ function RelatoriosPage() {
         columns: [{key:"data",label:"Data"},{key:"paciente",label:"Paciente"}],
         rows: atends.map((a) => ({ data: fmtDate(a.data), paciente: a.paciente_id ? (pessoaNomeAll.get(a.paciente_id) ?? "—") : "—" })),
       });
+    } else if (which === "resultado") {
+      const contratoNome = new Map(contratos.map((c) => [c.id, c.paciente_nome] as const));
+      const pagas = mens.filter((m) => m.status === "pago" && m.pago_em && m.pago_em >= from && m.pago_em <= to);
+      const rows = [
+        ...pagas.map((m) => ({ data: fmtDate(m.pago_em ?? ""), tipo: "Receita", descricao: `Mensalidade — ${contratoNome.get(m.contrato_id) ?? "—"}`, valor: BRL(m.valor) })),
+        ...contratos.filter((c) => Number(c.taxa_adesao || 0) > 0).map((c) => ({ data: fmtDate(c.data_inicio), tipo: "Receita", descricao: `Adesão — ${c.paciente_nome}`, valor: BRL(c.taxa_adesao) })),
+        ...despesas.map((l) => ({ data: fmtDate(l.data), tipo: "Despesa", descricao: l.descricao ?? "—", valor: `- ${BRL(l.valor)}` })),
+      ];
+      setDrill({
+        title: `${stats.resultado >= 0 ? "Lucro" : "Prejuízo"} do período (${BRL(Math.abs(stats.resultado))})`,
+        columns: [{key:"data",label:"Data"},{key:"tipo",label:"Tipo"},{key:"descricao",label:"Descrição"},{key:"valor",label:"Valor",align:"right"}],
+        rows,
+      });
+    } else if (which === "ticket") {
+      const contratosComPag = new Set(
+        mens.filter((m) => m.status === "pago" && m.pago_em && m.pago_em >= from && m.pago_em <= to).map((m) => m.contrato_id),
+      );
+      const lista = contratos.filter((c) => contratosComPag.has(c.id));
+      const totalPorContrato = new Map<string, number>();
+      mens.filter((m) => m.status === "pago" && m.pago_em && m.pago_em >= from && m.pago_em <= to)
+        .forEach((m) => totalPorContrato.set(m.contrato_id, (totalPorContrato.get(m.contrato_id) ?? 0) + Number(m.valor)));
+      contratos.forEach((c) => {
+        const ad = Number(c.taxa_adesao || 0);
+        if (ad > 0) totalPorContrato.set(c.id, (totalPorContrato.get(c.id) ?? 0) + ad);
+      });
+      setDrill({
+        title: `Ticket médio — ${BRL(stats.ticketMedio)} (${lista.length} pagantes)`,
+        columns: [{key:"nome",label:"Titular"},{key:"plano",label:"Plano"},{key:"total",label:"Total no período",align:"right"}],
+        rows: lista.map((c) => ({ nome: c.paciente_nome, plano: planoNome.get(c.plano_id) ?? "—", total: BRL(totalPorContrato.get(c.id) ?? 0) })),
+      });
+    } else if (which === "inadimplencia") {
+      const contratoNome = new Map(contratos.map((c) => [c.id, c.paciente_nome] as const));
+      const lista = mens.filter((m) => m.status !== "pago");
+      setDrill({
+        title: `Inadimplência — ${stats.mensAbertas} aberta(s) de ${stats.mensPagas + stats.mensAbertas}`,
+        columns: [{key:"venc",label:"Vencimento"},{key:"titular",label:"Titular"},{key:"status",label:"Status"},{key:"valor",label:"Valor",align:"right"}],
+        rows: lista.map((m) => ({ venc: fmtDate(m.vencimento), titular: contratoNome.get(m.contrato_id) ?? "—", status: m.status, valor: BRL(m.valor) })),
+      });
+    } else if (which === "utilizacao") {
+      const tituPorContrato = new Map(contratos.map((c) => [c.id, c.paciente_nome] as const));
+      const usoPorPac = new Map<string, number>();
+      atends.forEach((a) => { if (a.paciente_id) usoPorPac.set(a.paciente_id, (usoPorPac.get(a.paciente_id) ?? 0) + 1); });
+      const todas = [
+        ...contratos.map((c) => ({ nome: c.paciente_nome, tipo: "Titular", vinculo: planoNome.get(c.plano_id) ?? "—", usou: (usoPorPac.get(c.paciente_id) ?? 0) > 0 ? "Sim" : "Não", consultas: usoPorPac.get(c.paciente_id) ?? 0 })),
+        ...deps.map((d) => ({ nome: d.paciente_nome, tipo: "Dependente", vinculo: `Titular: ${tituPorContrato.get(d.contrato_id) ?? "—"}`, usou: (usoPorPac.get(d.paciente_id) ?? 0) > 0 ? "Sim" : "Não", consultas: usoPorPac.get(d.paciente_id) ?? 0 })),
+      ].sort((a, b) => b.consultas - a.consultas);
+      setDrill({
+        title: `Taxa de utilização — ${stats.utilizacaoPct.toFixed(1)}%`,
+        columns: [{key:"nome",label:"Pessoa"},{key:"tipo",label:"Tipo"},{key:"vinculo",label:"Plano / Titular"},{key:"usou",label:"Utilizou?"},{key:"consultas",label:"Consultas",align:"right"}],
+        rows: todas,
+      });
+    } else if (which === "consTit") {
+      setDrill({
+        title: `Consultas por titular (${stats.usosTitulares})`,
+        columns: [{key:"nome",label:"Titular"},{key:"plano",label:"Plano"},{key:"consultas",label:"Consultas",align:"right"}],
+        rows: stats.consultasTitulares.map((t) => ({ nome: t.nome, plano: t.plano, consultas: t.consultas })),
+      });
+    } else if (which === "consDep") {
+      setDrill({
+        title: `Consultas por dependente (${stats.usosDependentes})`,
+        columns: [{key:"nome",label:"Dependente"},{key:"titular",label:"Titular"},{key:"tipo",label:"Tipo"},{key:"consultas",label:"Consultas",align:"right"}],
+        rows: stats.consultasDependentes.map((d) => ({ nome: d.nome, titular: d.titular, tipo: d.tipo, consultas: d.consultas })),
+      });
+    } else if (which === "mediaConsultas") {
+      const tituPorContrato = new Map(contratos.map((c) => [c.id, c.paciente_nome] as const));
+      const usoPorPac = new Map<string, number>();
+      atends.forEach((a) => { if (a.paciente_id) usoPorPac.set(a.paciente_id, (usoPorPac.get(a.paciente_id) ?? 0) + 1); });
+      const rows = [
+        ...contratos.map((c) => ({ nome: c.paciente_nome, tipo: "Titular", vinculo: planoNome.get(c.plano_id) ?? "—", consultas: usoPorPac.get(c.paciente_id) ?? 0 })),
+        ...deps.map((d) => ({ nome: d.paciente_nome, tipo: "Dependente", vinculo: `Titular: ${tituPorContrato.get(d.contrato_id) ?? "—"}`, consultas: usoPorPac.get(d.paciente_id) ?? 0 })),
+      ].sort((a, b) => b.consultas - a.consultas);
+      setDrill({
+        title: `Média consultas / pessoa — ${stats.mediaConsultasPessoa.toFixed(2)}`,
+        columns: [{key:"nome",label:"Pessoa"},{key:"tipo",label:"Tipo"},{key:"vinculo",label:"Plano / Titular"},{key:"consultas",label:"Consultas",align:"right"}],
+        rows,
+      });
+    } else if (which === "semVinculo") {
+      const vinc = new Set<string>([...contratos.map((c) => c.paciente_id), ...deps.map((d) => d.paciente_id)]);
+      const lista = atends.filter((a) => !a.paciente_id || !vinc.has(a.paciente_id));
+      setDrill({
+        title: `Consultas sem vínculo (${lista.length})`,
+        columns: [{key:"data",label:"Data"},{key:"paciente",label:"Paciente"}],
+        rows: lista.map((a) => ({ data: fmtDate(a.data), paciente: a.paciente_id ? (pessoaNomeAll.get(a.paciente_id) ?? "—") : "—" })),
+      });
     }
   };
 
@@ -422,19 +506,20 @@ function RelatoriosPage() {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KPI
+          onClick={() => openDrill("resultado")}
           icon={stats.resultado >= 0
             ? <TrendingUp className="h-4 w-4 text-green-600"/>
             : <TrendingDown className="h-4 w-4 text-red-600"/>}
           label={stats.resultado >= 0 ? "Lucro (período)" : "Prejuízo (período)"}
           value={`${BRL(Math.abs(stats.resultado))} (${stats.margemPct.toFixed(1)}%)`}
         />
-        <KPI icon={<Activity className="h-4 w-4"/>} label="Ticket médio / pagante" value={BRL(stats.ticketMedio)}/>
-        <KPI icon={<Activity className="h-4 w-4"/>} label="Inadimplência" value={`${stats.inadimplenciaPct.toFixed(1)}% (${stats.mensAbertas}/${stats.mensPagas + stats.mensAbertas})`}/>
-        <KPI icon={<Activity className="h-4 w-4"/>} label="Taxa de utilização" value={`${stats.utilizacaoPct.toFixed(1)}%`}/>
-        <KPI icon={<Users className="h-4 w-4"/>} label="Consultas / titulares" value={stats.usosTitulares}/>
-        <KPI icon={<UserPlus className="h-4 w-4"/>} label="Consultas / dependentes" value={stats.usosDependentes}/>
-        <KPI icon={<Activity className="h-4 w-4"/>} label="Média consultas / pessoa" value={stats.mediaConsultasPessoa.toFixed(2)}/>
-        <KPI icon={<Activity className="h-4 w-4"/>} label="Consultas sem vínculo" value={stats.usosSemVinculo}/>
+        <KPI onClick={() => openDrill("ticket")} icon={<Activity className="h-4 w-4"/>} label="Ticket médio / pagante" value={BRL(stats.ticketMedio)}/>
+        <KPI onClick={() => openDrill("inadimplencia")} icon={<Activity className="h-4 w-4"/>} label="Inadimplência" value={`${stats.inadimplenciaPct.toFixed(1)}% (${stats.mensAbertas}/${stats.mensPagas + stats.mensAbertas})`}/>
+        <KPI onClick={() => openDrill("utilizacao")} icon={<Activity className="h-4 w-4"/>} label="Taxa de utilização" value={`${stats.utilizacaoPct.toFixed(1)}%`}/>
+        <KPI onClick={() => openDrill("consTit")} icon={<Users className="h-4 w-4"/>} label="Consultas / titulares" value={stats.usosTitulares}/>
+        <KPI onClick={() => openDrill("consDep")} icon={<UserPlus className="h-4 w-4"/>} label="Consultas / dependentes" value={stats.usosDependentes}/>
+        <KPI onClick={() => openDrill("mediaConsultas")} icon={<Activity className="h-4 w-4"/>} label="Média consultas / pessoa" value={stats.mediaConsultasPessoa.toFixed(2)}/>
+        <KPI onClick={() => openDrill("semVinculo")} icon={<Activity className="h-4 w-4"/>} label="Consultas sem vínculo" value={stats.usosSemVinculo}/>
       </div>
 
       <Card>
