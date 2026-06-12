@@ -5,6 +5,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MiniBarChart } from "@/components/charts/MiniBarChart";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro/bi")({
   component: Page,
@@ -18,6 +20,7 @@ function Page() {
   const { clinicaAtual } = useClinica();
   const [data, setData] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
+  const [drill, setDrill] = useState<null | "receitas" | "despesas" | "saldo">(null);
 
   useEffect(() => {
     (async () => {
@@ -53,9 +56,9 @@ function Page() {
       <div><h1 className="text-2xl font-semibold flex items-center gap-2"><BarChart3 className="h-6 w-6 text-primary" />BI Financeiro</h1>
         <p className="text-sm text-muted-foreground">Comparativo dos últimos 6 meses</p></div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Receitas (6m)</p><p className="text-2xl font-semibold text-green-600">{fmt(totalR)}</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Despesas (6m)</p><p className="text-2xl font-semibold text-red-600">{fmt(totalD)}</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Saldo (6m)</p><p className={`text-2xl font-semibold ${totalR - totalD >= 0 ? "text-green-600" : "text-red-600"}`}>{fmt(totalR - totalD)}</p></CardContent></Card>
+        <Card className="cursor-pointer hover:bg-muted/40" onClick={() => setDrill("receitas")}><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Receitas (6m)</p><p className="text-2xl font-semibold text-green-600">{fmt(totalR)}</p><p className="text-[10px] text-muted-foreground mt-1">Clique para ver detalhes</p></CardContent></Card>
+        <Card className="cursor-pointer hover:bg-muted/40" onClick={() => setDrill("despesas")}><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Despesas (6m)</p><p className="text-2xl font-semibold text-red-600">{fmt(totalD)}</p><p className="text-[10px] text-muted-foreground mt-1">Clique para ver detalhes</p></CardContent></Card>
+        <Card className="cursor-pointer hover:bg-muted/40" onClick={() => setDrill("saldo")}><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Saldo (6m)</p><p className={`text-2xl font-semibold ${totalR - totalD >= 0 ? "text-green-600" : "text-red-600"}`}>{fmt(totalR - totalD)}</p><p className="text-[10px] text-muted-foreground mt-1">Clique para ver detalhes</p></CardContent></Card>
       </div>
       <Card><CardHeader><CardTitle>Receitas vs Despesas</CardTitle></CardHeader>
         <CardContent>
@@ -71,6 +74,38 @@ function Page() {
               />}
         </CardContent>
       </Card>
+
+      <Dialog open={drill !== null} onOpenChange={(o) => { if (!o) setDrill(null); }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {drill === "receitas" && `Receitas — últimos 6 meses (${fmt(totalR)})`}
+              {drill === "despesas" && `Despesas — últimos 6 meses (${fmt(totalD)})`}
+              {drill === "saldo" && `Saldo — últimos 6 meses (${fmt(totalR - totalD)})`}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-auto">
+            <Table>
+              <TableHeader><TableRow>
+                <TableHead>Mês</TableHead>
+                <TableHead className="text-right">Receitas</TableHead>
+                <TableHead className="text-right">Despesas</TableHead>
+                <TableHead className="text-right">Saldo</TableHead>
+              </TableRow></TableHeader>
+              <TableBody>
+                {data.map((r) => (
+                  <TableRow key={r.mes}>
+                    <TableCell className="capitalize">{r.mes}</TableCell>
+                    <TableCell className="text-right text-green-600">{fmt(r.Receitas)}</TableCell>
+                    <TableCell className="text-right text-red-600">{fmt(r.Despesas)}</TableCell>
+                    <TableCell className={`text-right font-medium ${r.Receitas - r.Despesas >= 0 ? "text-green-600" : "text-red-600"}`}>{fmt(r.Receitas - r.Despesas)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
