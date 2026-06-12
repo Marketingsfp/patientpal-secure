@@ -481,6 +481,13 @@ interface DashboardData {
   prontuariosCount: number;
 }
 
+interface RawData {
+  agend: Array<{ id: string; paciente_nome: string | null; procedimento: string | null; inicio: string; status: string | null; medico: string | null }>;
+  fin: Array<{ id: string; data: string; tipo: string; valor: number; descricao: string | null; categoria: string | null; status: string | null }>;
+  pacientes: Array<{ id: string; nome: string; created_at: string }>;
+  prontuarios: Array<{ id: string; data_atendimento: string; paciente: string | null }>;
+}
+
 function DashboardView({
   clinicaId,
   ini,
