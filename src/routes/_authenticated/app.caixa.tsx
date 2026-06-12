@@ -844,21 +844,21 @@ function Page() {
           {!loading && minhaSessao && (
             <>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <Card>
+                <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setCaixaDrill("saldo")}>
                   <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Saldo atual</CardTitle></CardHeader>
                   <CardContent className="text-2xl font-bold text-primary">{fmt(saldoAtual)}</CardContent>
                 </Card>
-                <Card>
+                <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setCaixaDrill("abertura")}>
                   <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Abertura</CardTitle></CardHeader>
                   <CardContent className="text-lg">{fmt(minhaSessao.valor_abertura)}</CardContent>
                 </Card>
-                <Card>
+                <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setCaixaDrill("entradas")}>
                   <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Entradas</CardTitle></CardHeader>
                   <CardContent className="text-lg text-emerald-600">
                     {fmt(resumoTipos.suprimento + resumoTipos.recebimento)}
                   </CardContent>
                 </Card>
-                <Card>
+                <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setCaixaDrill("saidas")}>
                   <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Saídas</CardTitle></CardHeader>
                   <CardContent className="text-lg text-rose-600">
                     {fmt(resumoTipos.sangria + resumoTipos.despesa)}
