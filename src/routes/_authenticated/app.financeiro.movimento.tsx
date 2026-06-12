@@ -49,7 +49,7 @@ function Page() {
   const [filterTipo, setFilterTipo] = useState<"todos" | "receita" | "despesa">("todos");
   const [fromDate, setFromDate] = useState(new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10));
   const [toDate, setToDate] = useState(new Date().toISOString().slice(0, 10));
-  const [detalhe, setDetalhe] = useState<null | "receita" | "despesa">(null);
+  const [detalhe, setDetalhe] = useState<null | "receita" | "despesa" | "saldo">(null);
   const [resumo, setResumo] = useState<{ r: number; d: number; saldo: number; totalRows: number }>({ r: 0, d: 0, saldo: 0, totalRows: 0 });
   const [filterStatus, setFilterStatus] = useState<"confirmado" | "todos" | "pendente">("confirmado");
 
@@ -231,25 +231,28 @@ function Page() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <Card className="cursor-pointer hover:bg-muted/40 transition" onClick={() => setDetalhe("receita")}><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Receitas</p><p className="text-2xl font-semibold text-green-600">{fmt(totais.r)}</p><p className="text-[10px] text-muted-foreground mt-1">Clique para ver detalhes</p></CardContent></Card>
         <Card className="cursor-pointer hover:bg-muted/40 transition" onClick={() => setDetalhe("despesa")}><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Despesas</p><p className="text-2xl font-semibold text-red-600">{fmt(totais.d)}</p><p className="text-[10px] text-muted-foreground mt-1">Clique para ver detalhes</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Saldo</p><p className={`text-2xl font-semibold ${totais.saldo >= 0 ? "text-green-600" : "text-red-600"}`}>{fmt(totais.saldo)}</p></CardContent></Card>
+        <Card className="cursor-pointer hover:bg-muted/40 transition" onClick={() => setDetalhe("saldo")}><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Saldo</p><p className={`text-2xl font-semibold ${totais.saldo >= 0 ? "text-green-600" : "text-red-600"}`}>{fmt(totais.saldo)}</p><p className="text-[10px] text-muted-foreground mt-1">Clique para ver detalhes</p></CardContent></Card>
       </div>
 
       <Dialog open={detalhe !== null} onOpenChange={(v) => !v && setDetalhe(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>
-              {detalhe === "receita" ? "Receitas" : "Despesas"} do período — {fmt(detalhe === "receita" ? totais.r : totais.d)}
+              {detalhe === "saldo"
+                ? `Saldo do período — ${fmt(totais.saldo)}`
+                : `${detalhe === "receita" ? "Receitas" : "Despesas"} do período — ${fmt(detalhe === "receita" ? totais.r : totais.d)}`}
             </DialogTitle>
           </DialogHeader>
           <div className="max-h-[60vh] overflow-auto">
             {(() => {
-              const list = items.filter((i) => i.tipo === detalhe);
+              const list = detalhe === "saldo" ? items : items.filter((i) => i.tipo === detalhe);
               if (list.length === 0) return <p className="text-sm text-muted-foreground py-6 text-center">Sem lançamentos.</p>;
               const catMap = new Map(cats.map((c) => [c.id, c.nome]));
               return (
                 <Table>
                   <TableHeader><TableRow>
                     <TableHead>Data</TableHead>
+                    {detalhe === "saldo" && <TableHead>Tipo</TableHead>}
                     <TableHead>Descrição</TableHead>
                     <TableHead>Categoria</TableHead>
                     <TableHead className="text-right">Valor</TableHead>
@@ -258,9 +261,10 @@ function Page() {
                     {list.map((l) => (
                       <TableRow key={l.id}>
                         <TableCell className="text-sm whitespace-nowrap">{new Date(l.data).toLocaleDateString("pt-BR")}</TableCell>
+                        {detalhe === "saldo" && <TableCell className="capitalize">{l.tipo}</TableCell>}
                         <TableCell>{l.descricao}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">{l.categoria_id ? catMap.get(l.categoria_id) ?? "—" : "—"}</TableCell>
-                        <TableCell className={`text-right font-medium ${detalhe === "receita" ? "text-green-600" : "text-red-600"}`}>{fmt(Number(l.valor))}</TableCell>
+                        <TableCell className={`text-right font-medium ${l.tipo === "receita" ? "text-green-600" : "text-red-600"}`}>{fmt(Number(l.valor))}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
