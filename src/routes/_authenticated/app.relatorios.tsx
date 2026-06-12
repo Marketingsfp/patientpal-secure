@@ -20,6 +20,8 @@ import {
   HeartPulse, LayoutDashboard, TrendingUp, TrendingDown, Wallet, Settings2, RotateCcw, Boxes,
 } from "lucide-react";
 import { CuboBI } from "@/components/relatorios/CuboBI";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export const Route = createFileRoute("/_authenticated/app/relatorios")({
   component: RelatoriosPage,
