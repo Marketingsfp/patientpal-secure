@@ -13,6 +13,8 @@ import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export const Route = createFileRoute("/_authenticated/app/painel")({
   component: DashboardPage,
@@ -26,6 +28,15 @@ const pct = (num: number, den: number) => (den > 0 ? `${((num / den) * 100).toFi
 type Periodo = { de: string; ate: string };
 
 const hojeISO = () => new Date().toISOString().slice(0, 10);
+
+type DrillSpec = {
+  title: string;
+  columns: { key: string; label: string; align?: "left" | "right" }[];
+  rows: Array<Record<string, string | number>>;
+};
+type RawAg = { id: string; status: string; medico_id: string | null; paciente_id: string | null; procedimento: string | null; inicio: string | null };
+type RawLanc = { id: string; tipo: string; status: string; valor: number; medico_id: string | null };
+type RawAtend = { id: string; valor_total: number; valor_medico: number; medico_id: string | null; status: string };
 
 function DashboardPage() {
   const { memberships, clinicaAtual, loading } = useClinica();
@@ -50,6 +61,13 @@ function DashboardPage() {
     comissoes: { pagas: 0, pendentes: 0, percentReceita: 0 },
     porMedico: [] as { nome: string; total: number; pagos: number; novos: number }[],
   });
+  const [rawAgs, setRawAgs] = useState<RawAg[]>([]);
+  const [rawLancs, setRawLancs] = useState<RawLanc[]>([]);
+  const [rawAtends, setRawAtends] = useState<RawAtend[]>([]);
+  const [novosIds, setNovosIds] = useState<Set<string>>(new Set());
+  const [pacNomes, setPacNomes] = useState<Map<string, string>>(new Map());
+  const [medNomes, setMedNomes] = useState<Map<string, string>>(new Map());
+  const [drill, setDrill] = useState<DrillSpec | null>(null);
 
   // Conjunto efetivo de medico_ids após filtros (intersecção médicos x especialidades)
   const medicosFiltradosIds = useMemo(() => {
@@ -194,6 +212,19 @@ function DashboardPage() {
       comissoes: { pagas: comissoesPagas, pendentes: 0, percentReceita: recebRealizado > 0 ? (comissoesPagas / recebRealizado) * 100 : 0 },
       porMedico,
     });
+    setRawAgs(ags as RawAg[]);
+    setRawLancs(lancs as RawLanc[]);
+    setRawAtends(atends as RawAtend[]);
+    const novosSet = new Set(pacIds.filter(p => !setExistentes.has(p)));
+    setNovosIds(novosSet);
+    setMedNomes(new Map(medsAll.map(m => [m.id, m.nome] as const)));
+    // Buscar nomes de pacientes
+    if (pacIds.length > 0) {
+      const { data: pacs } = await supabase.from("pacientes").select("id,nome").in("id", pacIds).limit(5000);
+      setPacNomes(new Map(((pacs ?? []) as { id: string; nome: string }[]).map(p => [p.id, p.nome] as const)));
+    } else {
+      setPacNomes(new Map());
+    }
     setCarregando(false);
   };
 
@@ -215,6 +246,121 @@ function DashboardPage() {
   }
 
   const a = data.agend;
+
+  const fmtDt = (iso: string | null) => {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    return d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  };
+  const pacNome = (id: string | null) => (id ? (pacNomes.get(id) ?? "—") : "—");
+  const medNome = (id: string | null) => (id ? (medNomes.get(id) ?? "—") : "Sem profissional");
+  const moneyBRL = (n: number) => `R$ ${fmtMoney(Number(n || 0))}`;
+
+  const openDrill = (kind: string, ctx?: Record<string, string>) => {
+    if (kind === "alertas") {
+      setDrill({
+        title: `Central de alertas (${data.alertas.length})`,
+        columns: [{ key: "mensagem", label: "Mensagem" }],
+        rows: data.alertas.map(al => ({ mensagem: al.mensagem })),
+      });
+    } else if (kind.startsWith("agend")) {
+      const filtroFn = (g: RawAg) => {
+        if (kind === "agend_total") return true;
+        if (kind === "agend_atendidos") return g.status === "realizado";
+        if (kind === "agend_faltas") return g.status === "faltou";
+        if (kind === "agend_pagos") {
+          const atIds = new Set(rawAtends.filter(at => at.status === "pago" || at.status === "realizado").map(at => at.id));
+          // approximate: agendamentos com status realizado/pago
+          return g.status === "realizado" || atIds.has(g.id);
+        }
+        if (kind === "agend_naopagos") return g.status !== "realizado" && g.status !== "pago";
+        return true;
+      };
+      const titulos: Record<string, string> = {
+        agend_total: "Todos os agendamentos",
+        agend_atendidos: "Agendamentos atendidos",
+        agend_faltas: "Faltas",
+        agend_pagos: "Agendamentos pagos",
+        agend_naopagos: "Agendamentos não pagos",
+      };
+      const lista = rawAgs.filter(filtroFn);
+      setDrill({
+        title: `${titulos[kind] ?? "Agendamentos"} (${lista.length})`,
+        columns: [
+          { key: "data", label: "Quando" }, { key: "paciente", label: "Paciente" },
+          { key: "medico", label: "Profissional" }, { key: "proc", label: "Procedimento" },
+          { key: "status", label: "Status" },
+        ],
+        rows: lista.map(g => ({ data: fmtDt(g.inicio), paciente: pacNome(g.paciente_id), medico: medNome(g.medico_id), proc: g.procedimento ?? "—", status: g.status })),
+      });
+    } else if (kind === "clientes_novos" || kind === "clientes_regulares" || kind === "clientes_total") {
+      const pacsAg = Array.from(new Set(rawAgs.map(g => g.paciente_id).filter(Boolean) as string[]));
+      const lista = pacsAg.filter(p => kind === "clientes_total" ? true : (kind === "clientes_novos" ? novosIds.has(p) : !novosIds.has(p)));
+      const titulos: Record<string, string> = { clientes_total: "Clientes agendados", clientes_novos: "Clientes novos", clientes_regulares: "Clientes regulares" };
+      setDrill({
+        title: `${titulos[kind]} (${lista.length})`,
+        columns: [{ key: "paciente", label: "Paciente" }, { key: "tipo", label: "Tipo" }],
+        rows: lista.map(p => ({ paciente: pacNome(p), tipo: novosIds.has(p) ? "Novo" : "Regular" })),
+      });
+    } else if (kind === "retornos") {
+      const lista = rawAgs.filter(g => (g.procedimento ?? "").toLowerCase().includes("retorno"));
+      setDrill({
+        title: `Retornos agendados (${lista.length})`,
+        columns: [{ key: "data", label: "Quando" }, { key: "paciente", label: "Paciente" }, { key: "medico", label: "Profissional" }, { key: "status", label: "Status" }],
+        rows: lista.map(g => ({ data: fmtDt(g.inicio), paciente: pacNome(g.paciente_id), medico: medNome(g.medico_id), status: g.status })),
+      });
+    } else if (kind === "retornos_sem") {
+      const lista = rawAgs.filter(g => !g.medico_id);
+      setDrill({
+        title: `Sem profissional definido (${lista.length})`,
+        columns: [{ key: "data", label: "Quando" }, { key: "paciente", label: "Paciente" }, { key: "proc", label: "Procedimento" }],
+        rows: lista.map(g => ({ data: fmtDt(g.inicio), paciente: pacNome(g.paciente_id), proc: g.procedimento ?? "—" })),
+      });
+    } else if (kind === "conf_pres" || kind === "conf_aus" || kind === "conf_total") {
+      const lista = rawAgs.filter(g => kind === "conf_total" ? (g.status === "realizado" || g.status === "faltou") : kind === "conf_pres" ? g.status === "realizado" : g.status === "faltou");
+      const titulos: Record<string, string> = { conf_total: "Confirmações", conf_pres: "Presenças", conf_aus: "Ausências" };
+      setDrill({
+        title: `${titulos[kind]} (${lista.length})`,
+        columns: [{ key: "data", label: "Quando" }, { key: "paciente", label: "Paciente" }, { key: "medico", label: "Profissional" }, { key: "status", label: "Status" }],
+        rows: lista.map(g => ({ data: fmtDt(g.inicio), paciente: pacNome(g.paciente_id), medico: medNome(g.medico_id), status: g.status })),
+      });
+    } else if (kind === "vendas") {
+      setDrill({
+        title: `Vendas / atendimentos (${rawAtends.length})`,
+        columns: [{ key: "medico", label: "Profissional" }, { key: "status", label: "Status" }, { key: "valor", label: "Valor", align: "right" }, { key: "comissao", label: "Comissão médico", align: "right" }],
+        rows: rawAtends.map(at => ({ medico: medNome(at.medico_id), status: at.status, valor: moneyBRL(at.valor_total), comissao: moneyBRL(at.valor_medico) })),
+      });
+    } else if (kind.startsWith("pag_") || kind.startsWith("rec_")) {
+      const isRec = kind.startsWith("rec_");
+      const tipo = isRec ? "receita" : "despesa";
+      const status = kind.endsWith("real") ? "confirmado" : "pendente";
+      const lista = rawLancs.filter(l => l.tipo === tipo && l.status === status);
+      const tot = lista.reduce((s, l) => s + Number(l.valor || 0), 0);
+      const titulos: Record<string, string> = {
+        pag_real: "Pagamentos realizados", pag_apagar: "Pagamentos a pagar",
+        rec_real: "Recebimentos realizados", rec_areceber: "Recebimentos a receber",
+      };
+      setDrill({
+        title: `${titulos[kind] ?? "Lançamentos"} — ${moneyBRL(tot)} (${lista.length})`,
+        columns: [{ key: "medico", label: "Profissional" }, { key: "status", label: "Status" }, { key: "valor", label: "Valor", align: "right" }],
+        rows: lista.map(l => ({ medico: medNome(l.medico_id), status: l.status, valor: moneyBRL(l.valor) })),
+      });
+    } else if (kind === "comissoes") {
+      const lista = rawAtends.filter(at => Number(at.valor_medico || 0) > 0);
+      setDrill({
+        title: `Comissões (${lista.length})`,
+        columns: [{ key: "medico", label: "Profissional" }, { key: "status", label: "Status" }, { key: "valor", label: "Atendimento", align: "right" }, { key: "comissao", label: "Comissão", align: "right" }],
+        rows: lista.map(at => ({ medico: medNome(at.medico_id), status: at.status, valor: moneyBRL(at.valor_total), comissao: moneyBRL(at.valor_medico) })),
+      });
+    } else if (kind === "medico" && ctx?.nome) {
+      const lista = rawAgs.filter(g => medNome(g.medico_id) === ctx.nome);
+      setDrill({
+        title: `Agendamentos — ${ctx.nome} (${lista.length})`,
+        columns: [{ key: "data", label: "Quando" }, { key: "paciente", label: "Paciente" }, { key: "proc", label: "Procedimento" }, { key: "status", label: "Status" }],
+        rows: lista.map(g => ({ data: fmtDt(g.inicio), paciente: pacNome(g.paciente_id), proc: g.procedimento ?? "—", status: g.status })),
+      });
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -321,32 +467,32 @@ function DashboardPage() {
         </Card>
 
         {/* Alertas */}
-        <KpiCard icon={Bell} title="Central de Alertas">
+        <KpiCard icon={Bell} title="Central de Alertas" onClick={() => openDrill("alertas")}>
           {data.alertas.length === 0
             ? <p className="text-sm text-muted-foreground">Oba! Nenhum alerta.</p>
             : <ul className="space-y-1 text-sm">{data.alertas.map(al => <li key={al.id} className="truncate">• {al.mensagem}</li>)}</ul>}
         </KpiCard>
 
-        <KpiCard icon={CalendarDays} title="Agendamentos" big={fmtInt(a.total)}>
+        <KpiCard icon={CalendarDays} title="Agendamentos" big={fmtInt(a.total)} onClick={() => openDrill("agend_total")}>
           <SubGrid items={[
-            { label: "Atendidos", value: fmtInt(a.atendidos), pct: pct(a.atendidos, a.total) },
-            { label: "Faltas", value: fmtInt(a.faltas), pct: pct(a.faltas, a.total) },
-            { label: "Pagos", value: fmtInt(a.pagos), pct: pct(a.pagos, a.total) },
-            { label: "Não Pagos", value: fmtInt(a.naoPagos), pct: pct(a.naoPagos, a.total) },
+            { label: "Atendidos", value: fmtInt(a.atendidos), pct: pct(a.atendidos, a.total), onClick: () => openDrill("agend_atendidos") },
+            { label: "Faltas", value: fmtInt(a.faltas), pct: pct(a.faltas, a.total), onClick: () => openDrill("agend_faltas") },
+            { label: "Pagos", value: fmtInt(a.pagos), pct: pct(a.pagos, a.total), onClick: () => openDrill("agend_pagos") },
+            { label: "Não Pagos", value: fmtInt(a.naoPagos), pct: pct(a.naoPagos, a.total), onClick: () => openDrill("agend_naopagos") },
           ]} />
         </KpiCard>
 
-        <KpiCard icon={Users} title="Clientes Agendados" big={fmtInt(a.novos + a.regulares)}>
+        <KpiCard icon={Users} title="Clientes Agendados" big={fmtInt(a.novos + a.regulares)} onClick={() => openDrill("clientes_total")}>
           <SubGrid items={[
-            { label: "Novos", value: fmtInt(a.novos), pct: pct(a.novos, a.novos + a.regulares) },
-            { label: "Regulares", value: fmtInt(a.regulares), pct: pct(a.regulares, a.novos + a.regulares) },
+            { label: "Novos", value: fmtInt(a.novos), pct: pct(a.novos, a.novos + a.regulares), onClick: () => openDrill("clientes_novos") },
+            { label: "Regulares", value: fmtInt(a.regulares), pct: pct(a.regulares, a.novos + a.regulares), onClick: () => openDrill("clientes_regulares") },
           ]} />
         </KpiCard>
 
-        <KpiCard icon={RotateCcw} title="Retornos" big={fmtInt(a.retornos)}>
+        <KpiCard icon={RotateCcw} title="Retornos" big={fmtInt(a.retornos)} onClick={() => openDrill("retornos")}>
           <SubGrid items={[
-            { label: "Sem Agenda", value: fmtInt(a.semAgenda) },
-            { label: "Agendados", value: fmtInt(a.retornos) },
+            { label: "Sem Agenda", value: fmtInt(a.semAgenda), onClick: () => openDrill("retornos_sem") },
+            { label: "Agendados", value: fmtInt(a.retornos), onClick: () => openDrill("retornos") },
           ]} />
         </KpiCard>
 
@@ -357,15 +503,15 @@ function DashboardPage() {
           ]} />
         </KpiCard>
 
-        <KpiCard icon={CheckCircle2} title="Confirmações das Agendas" big={fmtInt(data.conf.presencas + data.conf.ausencias)}>
+        <KpiCard icon={CheckCircle2} title="Confirmações das Agendas" big={fmtInt(data.conf.presencas + data.conf.ausencias)} onClick={() => openDrill("conf_total")}>
           <SubGrid items={[
-            { label: "Presenças", value: fmtInt(data.conf.presencas), pct: pct(data.conf.presencas, data.conf.presencas + data.conf.ausencias) },
-            { label: "Ausências", value: fmtInt(data.conf.ausencias), pct: pct(data.conf.ausencias, data.conf.presencas + data.conf.ausencias) },
+            { label: "Presenças", value: fmtInt(data.conf.presencas), pct: pct(data.conf.presencas, data.conf.presencas + data.conf.ausencias), onClick: () => openDrill("conf_pres") },
+            { label: "Ausências", value: fmtInt(data.conf.ausencias), pct: pct(data.conf.ausencias, data.conf.presencas + data.conf.ausencias), onClick: () => openDrill("conf_aus") },
           ]} />
         </KpiCard>
 
         {podeVerFinanceiro && (
-        <KpiCard icon={Handshake} title="Vendas" big={fmtMoney(data.vendas.total)}>
+        <KpiCard icon={Handshake} title="Vendas" big={fmtMoney(data.vendas.total)} onClick={() => openDrill("vendas")}>
           <SubGrid items={[
             { label: "Conversão", value: "—" },
             { label: "Orçamentos", value: fmtMoney(data.vendas.orcamentos) },
@@ -374,34 +520,34 @@ function DashboardPage() {
         )}
 
         {podeVerFinanceiro && (
-        <KpiCard icon={CreditCard} title="Pagamentos" big={fmtMoney(data.pagamentos.realizado + data.pagamentos.aPagar)}>
+        <KpiCard icon={CreditCard} title="Pagamentos" big={fmtMoney(data.pagamentos.realizado + data.pagamentos.aPagar)} onClick={() => openDrill("pag_real")}>
           <SubGrid items={[
-            { label: "Realizado", value: fmtMoney(data.pagamentos.realizado) },
-            { label: "À pagar", value: fmtMoney(data.pagamentos.aPagar) },
+            { label: "Realizado", value: fmtMoney(data.pagamentos.realizado), onClick: () => openDrill("pag_real") },
+            { label: "À pagar", value: fmtMoney(data.pagamentos.aPagar), onClick: () => openDrill("pag_apagar") },
           ]} />
         </KpiCard>
         )}
 
         {podeVerFinanceiro && (
-        <KpiCard icon={Banknote} title="Recebimentos" big={fmtMoney(data.recebimentos.realizado + data.recebimentos.aReceber)}>
+        <KpiCard icon={Banknote} title="Recebimentos" big={fmtMoney(data.recebimentos.realizado + data.recebimentos.aReceber)} onClick={() => openDrill("rec_real")}>
           <SubGrid items={[
-            { label: "Realizado", value: fmtMoney(data.recebimentos.realizado) },
-            { label: "À receber", value: fmtMoney(data.recebimentos.aReceber) },
+            { label: "Realizado", value: fmtMoney(data.recebimentos.realizado), onClick: () => openDrill("rec_real") },
+            { label: "À receber", value: fmtMoney(data.recebimentos.aReceber), onClick: () => openDrill("rec_areceber") },
           ]} />
         </KpiCard>
         )}
 
         {podeVerFinanceiro && (
-        <KpiCard icon={Receipt} title="Recebimentos Qtd." big={fmtInt(data.recebimentos.qtdRealizado + data.recebimentos.qtdAReceber)}>
+        <KpiCard icon={Receipt} title="Recebimentos Qtd." big={fmtInt(data.recebimentos.qtdRealizado + data.recebimentos.qtdAReceber)} onClick={() => openDrill("rec_real")}>
           <SubGrid items={[
-            { label: "Realizado", value: fmtInt(data.recebimentos.qtdRealizado) },
-            { label: "À receber", value: fmtInt(data.recebimentos.qtdAReceber) },
+            { label: "Realizado", value: fmtInt(data.recebimentos.qtdRealizado), onClick: () => openDrill("rec_real") },
+            { label: "À receber", value: fmtInt(data.recebimentos.qtdAReceber), onClick: () => openDrill("rec_areceber") },
           ]} />
         </KpiCard>
         )}
 
         {podeVerFinanceiro && (
-        <KpiCard icon={BadgeDollarSign} title="Comissões Pagas" big={fmtMoney(data.comissoes.pagas)}>
+        <KpiCard icon={BadgeDollarSign} title="Comissões Pagas" big={fmtMoney(data.comissoes.pagas)} onClick={() => openDrill("comissoes")}>
           <SubGrid items={[
             { label: "% da Receita", value: `${data.comissoes.percentReceita.toFixed(1)}%` },
             { label: "Pendentes", value: fmtMoney(data.comissoes.pendentes) },
@@ -415,7 +561,7 @@ function DashboardPage() {
           <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase mb-3">Total de Agendamentos por médico</h2>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {data.porMedico.map((m) => (
-              <KpiCard key={m.nome} icon={Stethoscope} title={m.nome} big={fmtInt(m.total)} small>
+              <KpiCard key={m.nome} icon={Stethoscope} title={m.nome} big={fmtInt(m.total)} small onClick={() => openDrill("medico", { nome: m.nome })}>
                 <SubGrid items={[
                   { label: "Pagos", value: fmtInt(m.pagos), pct: pct(m.pagos, m.total) },
                   { label: "Clientes Novos", value: fmtInt(m.novos), pct: pct(m.novos, m.total) },
@@ -425,15 +571,45 @@ function DashboardPage() {
           </div>
         </div>
       )}
+
+      <Dialog open={drill !== null} onOpenChange={(o) => { if (!o) setDrill(null); }}>
+        <DialogContent className="max-w-5xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader><DialogTitle>{drill?.title}</DialogTitle></DialogHeader>
+          <div className="overflow-auto flex-1">
+            {drill && drill.rows.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-6 text-center">Nenhum registro.</p>
+            ) : drill ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    {drill.columns.map((c) => (
+                      <TableHead key={c.key} className={c.align === "right" ? "text-right" : ""}>{c.label}</TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {drill.rows.map((r, i) => (
+                    <TableRow key={i}>
+                      {drill.columns.map((c) => (
+                        <TableCell key={c.key} className={c.align === "right" ? "text-right" : ""}>{r[c.key]}</TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-function KpiCard({ icon: Icon, title, big, small, children }: {
-  icon: ElementType; title: string; big?: string; small?: boolean; children?: React.ReactNode;
+function KpiCard({ icon: Icon, title, big, small, children, onClick }: {
+  icon: ElementType; title: string; big?: string; small?: boolean; children?: React.ReactNode; onClick?: () => void;
 }) {
   return (
-    <Card className="overflow-hidden">
+    <Card className={`overflow-hidden ${onClick ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}`} onClick={onClick}>
       <CardContent className="p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2 text-sm text-muted-foreground min-w-0 flex-1">
@@ -448,11 +624,15 @@ function KpiCard({ icon: Icon, title, big, small, children }: {
   );
 }
 
-function SubGrid({ items }: { items: { label: string; value: string; pct?: string }[] }) {
+function SubGrid({ items }: { items: { label: string; value: string; pct?: string; onClick?: () => void }[] }) {
   return (
     <div className="grid grid-cols-2 gap-3">
       {items.map((it) => (
-        <div key={it.label}>
+        <div
+          key={it.label}
+          onClick={it.onClick ? (e) => { e.stopPropagation(); it.onClick!(); } : undefined}
+          className={it.onClick ? "cursor-pointer rounded px-1 -mx-1 hover:bg-accent" : ""}
+        >
           <div className="text-xs text-muted-foreground">{it.label}</div>
           <div className="text-sm font-medium tabular-nums">
             {it.value}{it.pct && <span className="ml-1 text-xs text-muted-foreground">{it.pct}</span>}
