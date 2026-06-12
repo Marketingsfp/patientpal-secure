@@ -499,6 +499,8 @@ function DashboardView({
 }) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [raw, setRaw] = useState<RawData | null>(null);
+  const [drill, setDrill] = useState<null | "agend" | "novos" | "pront" | "saldo" | "receitas" | "despesas">(null);
 
   useEffect(() => {
     if (!clinicaId) return;
@@ -509,25 +511,25 @@ function DashboardView({
         const [agend, fin, pac, pront] = await Promise.all([
           supabase
             .from("agendamentos")
-            .select("status, medicos(nome)")
+            .select("id, paciente_nome, procedimento, inicio, status, medicos(nome)")
             .eq("clinica_id", clinicaId)
             .gte("inicio", ini)
             .lte("inicio", fim + "T23:59:59"),
           supabase
             .from("fin_lancamentos")
-            .select("data, tipo, valor, status, fin_categorias(nome)")
+            .select("id, data, tipo, valor, status, descricao, fin_categorias(nome)")
             .eq("clinica_id", clinicaId)
             .gte("data", ini)
             .lte("data", fim),
           supabase
             .from("pacientes")
-            .select("id", { count: "exact", head: true })
+            .select("id, nome, created_at")
             .eq("clinica_id", clinicaId)
             .gte("created_at", ini)
             .lte("created_at", fim + "T23:59:59"),
           supabase
             .from("prontuarios")
-            .select("id", { count: "exact", head: true })
+            .select("id, data_atendimento, pacientes(nome)")
             .eq("clinica_id", clinicaId)
             .gte("data_atendimento", ini)
             .lte("data_atendimento", fim + "T23:59:59"),
@@ -574,6 +576,18 @@ function DashboardView({
           }));
 
         if (cancel) return;
+        setRaw({
+          agend: agendRows.map((r: any) => ({
+            id: r.id, paciente_nome: r.paciente_nome ?? null, procedimento: r.procedimento ?? null,
+            inicio: r.inicio, status: r.status ?? null, medico: r.medicos?.nome ?? null,
+          })),
+          fin: finRows.map((r: any) => ({
+            id: r.id, data: r.data, tipo: r.tipo, valor: Number(r.valor) || 0,
+            descricao: r.descricao ?? null, categoria: r.fin_categorias?.nome ?? null, status: r.status ?? null,
+          })),
+          pacientes: ((pac.data ?? []) as any[]).map((p) => ({ id: p.id, nome: p.nome, created_at: p.created_at })),
+          prontuarios: ((pront.data ?? []) as any[]).map((p) => ({ id: p.id, data_atendimento: p.data_atendimento, paciente: p.pacientes?.nome ?? null })),
+        });
         setData({
           totalAgend: agendRows.length,
           agendPorStatus: Array.from(statusMap, ([name, value]) => ({ name, value })),
@@ -586,8 +600,8 @@ function DashboardView({
             .sort((a, b) => b.value - a.value)
             .slice(0, 8),
           finPorDia,
-          novosPacientes: pac.count ?? 0,
-          prontuariosCount: pront.count ?? 0,
+          novosPacientes: (pac.data ?? []).length,
+          prontuariosCount: (pront.data ?? []).length,
         });
       } catch (e: any) {
         console.error("dashboard relatorios:", e);
