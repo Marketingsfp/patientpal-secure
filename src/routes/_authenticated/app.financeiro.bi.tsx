@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MiniBarChart } from "@/components/charts/MiniBarChart";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { classifyAtendimento, type AtendCat } from "@/lib/atendimento-classify";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro/bi")({
   component: Page,
@@ -22,8 +23,8 @@ function Page() {
   const [data, setData] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [drill, setDrill] = useState<null | "receitas" | "despesas" | "saldo">(null);
-  const [atend12, setAtend12] = useState<Array<{ label: string; qtd: number }>>([]);
-  const [atendMatriz, setAtendMatriz] = useState<{ anos: number[]; linhas: Array<{ mesIdx: number; porAno: Record<number, number> }>; totalPorAno: Record<number, number>; totalGeral: number }>({ anos: [], linhas: [], totalPorAno: {}, totalGeral: 0 });
+  const [atend12, setAtend12] = useState<Array<{ label: string; cartao: number; particular: number; exames: number }>>([]);
+  const [atendMatriz, setAtendMatriz] = useState<{ anos: number[]; linhas: Array<{ mesIdx: number; porAno: Record<number, { cartao: number; particular: number; exames: number; total: number }> }>; totalPorAno: Record<number, { cartao: number; particular: number; exames: number; total: number }>; totalGeral: number }>({ anos: [], linhas: [], totalPorAno: {}, totalGeral: 0 });
   const [atendDrill, setAtendDrill] = useState(false);
 
   useEffect(() => {
@@ -55,51 +56,69 @@ function Page() {
   useEffect(() => {
     (async () => {
       if (!clinicaAtual) { setAtend12([]); setAtendMatriz({ anos: [], linhas: [], totalPorAno: {}, totalGeral: 0 }); return; }
-      // Busca TODOS os atendimentos da clínica (paginado) — agrupa por mês/ano da coluna `data`
-      const all: Array<{ data: string }> = [];
+      // Busca lançamentos de receita (paginado) e classifica como atendimento (cartão/particular/exame).
+      // Mensalidades de contrato, adesões e venda de cartão NÃO entram.
+      const all: Array<{ data: string; cat: AtendCat }> = [];
       let from = 0; const pageSize = 1000;
-      // hard cap de 50k para segurança
-      for (let i = 0; i < 50; i++) {
+      for (let i = 0; i < 100; i++) {
         const { data: chunk, error } = await supabase
-          .from("fin_atendimentos")
-          .select("data")
+          .from("fin_lancamentos")
+          .select("data, descricao, tipo, status")
           .eq("clinica_id", clinicaAtual.clinica_id)
+          .eq("tipo", "receita")
+          .neq("status", "cancelado")
           .order("data", { ascending: false })
           .range(from, from + pageSize - 1);
         if (error || !chunk || chunk.length === 0) break;
-        all.push(...(chunk as Array<{ data: string }>));
+        for (const r of chunk as Array<{ data: string; descricao: string }>) {
+          const cat = classifyAtendimento(r.descricao);
+          if (cat) all.push({ data: r.data, cat });
+        }
         if (chunk.length < pageSize) break;
         from += pageSize;
       }
-      // Agrega ano/mês
-      const matriz: Record<number, Record<number, number>> = {}; // ano -> mes(0..11) -> qtd
+      // Agrega ano/mês com breakdown
+      type Cell = { cartao: number; particular: number; exames: number; total: number };
+      const empty = (): Cell => ({ cartao: 0, particular: 0, exames: 0, total: 0 });
+      const matriz: Record<number, Record<number, Cell>> = {};
       for (const r of all) {
         if (!r.data) continue;
         const d = new Date(r.data);
         const ano = d.getFullYear();
         const mes = d.getMonth();
         if (!matriz[ano]) matriz[ano] = {};
-        matriz[ano][mes] = (matriz[ano][mes] ?? 0) + 1;
+        if (!matriz[ano][mes]) matriz[ano][mes] = empty();
+        const c = matriz[ano][mes];
+        if (r.cat === "cartao_consulta") c.cartao++;
+        else if (r.cat === "consulta_particular") c.particular++;
+        else if (r.cat === "exame") c.exames++;
+        c.total++;
       }
       const anos = Object.keys(matriz).map(Number).sort((a, b) => a - b);
       const linhas = Array.from({ length: 12 }, (_, m) => {
-        const porAno: Record<number, number> = {};
-        for (const a of anos) porAno[a] = matriz[a][m] ?? 0;
+        const porAno: Record<number, Cell> = {};
+        for (const a of anos) porAno[a] = matriz[a][m] ?? empty();
         return { mesIdx: m, porAno };
       });
-      const totalPorAno: Record<number, number> = {};
-      for (const a of anos) totalPorAno[a] = linhas.reduce((s, l) => s + (l.porAno[a] ?? 0), 0);
-      const totalGeral = Object.values(totalPorAno).reduce((s, v) => s + v, 0);
+      const totalPorAno: Record<number, Cell> = {};
+      for (const a of anos) {
+        const t = empty();
+        for (const l of linhas) {
+          const c = l.porAno[a]; t.cartao += c.cartao; t.particular += c.particular; t.exames += c.exames; t.total += c.total;
+        }
+        totalPorAno[a] = t;
+      }
+      const totalGeral = Object.values(totalPorAno).reduce((s, v) => s + v.total, 0);
       setAtendMatriz({ anos, linhas, totalPorAno, totalGeral });
 
       // Série dos últimos 12 meses
-      const serie: Array<{ label: string; qtd: number }> = [];
+      const serie: Array<{ label: string; cartao: number; particular: number; exames: number }> = [];
       const hoje = new Date();
       for (let i = 11; i >= 0; i--) {
         const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
         const ano = d.getFullYear(); const mes = d.getMonth();
-        const q = matriz[ano]?.[mes] ?? 0;
-        serie.push({ label: `${MESES_PT[mes]}/${String(ano).slice(2)}`, qtd: q });
+        const c = matriz[ano]?.[mes] ?? empty();
+        serie.push({ label: `${MESES_PT[mes]}/${String(ano).slice(2)}`, cartao: c.cartao, particular: c.particular, exames: c.exames });
       }
       setAtend12(serie);
     })();
@@ -151,13 +170,18 @@ function Page() {
           ) : (
             <MiniBarChart
               labels={atend12.map((r) => r.label)}
-              series={[{ name: "Atendimentos", color: "#3b82f6", values: atend12.map((r) => r.qtd) }]}
+              series={[
+                { name: "Cartão", color: "#3b82f6", values: atend12.map((r) => r.cartao) },
+                { name: "Particular", color: "#10b981", values: atend12.map((r) => r.particular) },
+                { name: "Exames", color: "#f59e0b", values: atend12.map((r) => r.exames) },
+              ]}
               height={280}
               formatY={(n) => String(Math.round(n))}
             />
           )}
           <p className="text-[11px] text-muted-foreground mt-2">
-            Total no período exibido: <b>{atend12.reduce((s, r) => s + r.qtd, 0)}</b> atendimentos.
+            Total no período exibido: <b>{atend12.reduce((s, r) => s + r.cartao + r.particular + r.exames, 0)}</b> atendimentos
+            {" "}(cartão: {atend12.reduce((s, r) => s + r.cartao, 0)}, particular: {atend12.reduce((s, r) => s + r.particular, 0)}, exames: {atend12.reduce((s, r) => s + r.exames, 0)}).
           </p>
         </CardContent>
       </Card>
@@ -208,7 +232,18 @@ function Page() {
                   <TableRow>
                     <TableHead>Mês</TableHead>
                     {atendMatriz.anos.map((a) => (
-                      <TableHead key={a} className="text-right">{a}</TableHead>
+                      <TableHead key={a} className="text-right" colSpan={4}>{a}</TableHead>
+                    ))}
+                  </TableRow>
+                  <TableRow>
+                    <TableHead></TableHead>
+                    {atendMatriz.anos.map((a) => (
+                      <>
+                        <TableHead key={`${a}-c`} className="text-right text-[10px]">Cartão</TableHead>
+                        <TableHead key={`${a}-p`} className="text-right text-[10px]">Part.</TableHead>
+                        <TableHead key={`${a}-e`} className="text-right text-[10px]">Exames</TableHead>
+                        <TableHead key={`${a}-t`} className="text-right text-[10px] font-bold">Total</TableHead>
+                      </>
                     ))}
                   </TableRow>
                 </TableHeader>
@@ -216,20 +251,32 @@ function Page() {
                   {atendMatriz.linhas.map((l) => (
                     <TableRow key={l.mesIdx}>
                       <TableCell className="font-medium">{MESES_PT[l.mesIdx]}</TableCell>
-                      {atendMatriz.anos.map((a) => (
-                        <TableCell key={a} className="text-right tabular-nums">
-                          {l.porAno[a] ? l.porAno[a].toLocaleString("pt-BR") : "—"}
-                        </TableCell>
-                      ))}
+                      {atendMatriz.anos.map((a) => {
+                        const c = l.porAno[a];
+                        return (
+                          <>
+                            <TableCell key={`${a}-c`} className="text-right tabular-nums text-xs">{c.cartao || "—"}</TableCell>
+                            <TableCell key={`${a}-p`} className="text-right tabular-nums text-xs">{c.particular || "—"}</TableCell>
+                            <TableCell key={`${a}-e`} className="text-right tabular-nums text-xs">{c.exames || "—"}</TableCell>
+                            <TableCell key={`${a}-t`} className="text-right tabular-nums font-semibold">{c.total || "—"}</TableCell>
+                          </>
+                        );
+                      })}
                     </TableRow>
                   ))}
                   <TableRow className="bg-muted/50 font-semibold">
                     <TableCell>Total</TableCell>
-                    {atendMatriz.anos.map((a) => (
-                      <TableCell key={a} className="text-right tabular-nums">
-                        {(atendMatriz.totalPorAno[a] ?? 0).toLocaleString("pt-BR")}
-                      </TableCell>
-                    ))}
+                    {atendMatriz.anos.map((a) => {
+                      const t = atendMatriz.totalPorAno[a] ?? { cartao: 0, particular: 0, exames: 0, total: 0 };
+                      return (
+                        <>
+                          <TableCell key={`${a}-c`} className="text-right tabular-nums text-xs">{t.cartao.toLocaleString("pt-BR")}</TableCell>
+                          <TableCell key={`${a}-p`} className="text-right tabular-nums text-xs">{t.particular.toLocaleString("pt-BR")}</TableCell>
+                          <TableCell key={`${a}-e`} className="text-right tabular-nums text-xs">{t.exames.toLocaleString("pt-BR")}</TableCell>
+                          <TableCell key={`${a}-t`} className="text-right tabular-nums">{t.total.toLocaleString("pt-BR")}</TableCell>
+                        </>
+                      );
+                    })}
                   </TableRow>
                 </TableBody>
               </Table>
