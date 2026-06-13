@@ -226,13 +226,11 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
           const tipo = nome.slice("__CAT__:".length).toUpperCase();
           return tiposSelecionados.has(tipo);
         }
-        // Linha em branco (acabou de ser criada pelo botão Manual) — preservar
-        // para o usuário escolher o serviço.
-        if (!nome.trim()) return true;
-        // Toda linha individual precisa estar vinculada a um serviço atualmente
-        // selecionado pelo médico. Qualquer outra coisa (procedimento não mais
-        // selecionado, legado avulso como "Cartão Consulta") é descartada.
-        return nomesServicosSelecionados.has(normalizarNome(nome));
+        // Preserva TODAS as linhas manuais (em branco ou preenchidas).
+        // Não descartamos mais linhas cujo serviço não esteja selecionado em
+        // Especialidades — isso causava o sumiço silencioso de repasses
+        // cadastrados manualmente.
+        return true;
       });
 
       const existentesCat = new Set(
