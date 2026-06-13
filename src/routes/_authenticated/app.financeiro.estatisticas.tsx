@@ -32,7 +32,7 @@ function Page() {
       const hoje = new Date().toISOString().slice(0, 10);
       const [resumoRes, atend, notas, lancRes, notasFull] = await Promise.all([
         supabase.rpc("fin_resumo_periodo", { p_clinica: clinicaAtual.clinica_id, p_ini: since, p_fim: hoje }),
-        supabase.from("fin_atendimentos").select("id, data, procedimento, valor_total, status").eq("clinica_id", clinicaAtual.clinica_id).gte("data", since).order("data", { ascending: false }).limit(2000),
+        supabase.from("fin_atendimentos").select("id, data, procedimento, valor_total, status").eq("clinica_id", clinicaAtual.clinica_id).gte("created_at", since + "T00:00:00").order("created_at", { ascending: false }).limit(2000),
         supabase.from("fin_notas_pacientes").select("id", { count: "exact", head: true }).eq("clinica_id", clinicaAtual.clinica_id).gte("data_emissao", since),
         supabase.from("fin_lancamentos").select("id, tipo, descricao, valor, data, status").eq("clinica_id", clinicaAtual.clinica_id).gte("data", since).lte("data", hoje).order("data", { ascending: false }).limit(3000),
         supabase.from("fin_notas_pacientes").select("id, numero, serie, data_emissao, valor, status").eq("clinica_id", clinicaAtual.clinica_id).gte("data_emissao", since).order("data_emissao", { ascending: false }).limit(1000),
