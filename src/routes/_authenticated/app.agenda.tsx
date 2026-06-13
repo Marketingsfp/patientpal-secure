@@ -2799,7 +2799,7 @@ function AgendaPage() {
 
       <LancamentoDialog
         open={pagamentoOpen}
-        onOpenChange={(v) => { setPagamentoOpen(v); if (!v) { setPagamentoAgId(null); setPagamentoExtraIds([]); } }}
+        onOpenChange={(v) => { setPagamentoOpen(v); if (!v) { setPagamentoAgId(null); setPagamentoExtraIds([]); setDescontoPendente(null); } }}
         tipo="receita"
         initialDescricao={pagamentoDesc}
         initialValor={pagamentoValor}
@@ -2888,6 +2888,109 @@ function AgendaPage() {
           }
           setPagamentoAgId(null);
           setPagamentoExtraIds([]);
+          setDescontoPendente(null);
+        }}
+      />
+
+      {/* Diálogo de desconto (acionado pelo botão no formulário de agendamento). */}
+      <Dialog open={descontoDlgOpen} onOpenChange={setDescontoDlgOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Aplicar desconto</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label>Tipo</Label>
+                <Select value={descForm.tipo} onValueChange={(v) => setDescForm((f) => ({ ...f, tipo: v as "valor" | "percentual" }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="valor">R$ (fixo)</SelectItem>
+                    <SelectItem value="percentual">% (percentual)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>{descForm.tipo === "percentual" ? "Percentual (%)" : "Valor (R$)"}</Label>
+                <Input
+                  inputMode="decimal"
+                  value={descForm.input}
+                  onChange={(e) => setDescForm((f) => ({ ...f, input: e.target.value.replace(/[^\d.,]/g, "") }))}
+                  placeholder={descForm.tipo === "percentual" ? "10" : "20,00"}
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Autorizado por {ehSupervisorDesc ? "" : "*"}</Label>
+              <Input
+                value={descForm.autorizadoPor}
+                readOnly={!ehSupervisorDesc}
+                onChange={(e) => setDescForm((f) => ({ ...f, autorizadoPor: e.target.value }))}
+                placeholder={ehSupervisorDesc ? "Você (supervisor)" : "Será preenchido após autorização"}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Motivo</Label>
+              <Textarea
+                rows={2}
+                value={descForm.motivo}
+                onChange={(e) => setDescForm((f) => ({ ...f, motivo: e.target.value }))}
+                placeholder="Opcional"
+              />
+            </div>
+            {!ehSupervisorDesc && (
+              <p className="text-xs text-amber-700 dark:text-amber-400">
+                Exige autorização do supervisor (admin, gestor ou financeiro). Ao confirmar, será solicitada a senha.
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            {descontoPendente && (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => { setDescontoPendente(null); setDescontoDlgOpen(false); toast.success("Desconto removido."); }}
+              >
+                Remover
+              </Button>
+            )}
+            <Button type="button" variant="ghost" onClick={() => setDescontoDlgOpen(false)}>Cancelar</Button>
+            <Button
+              type="button"
+              onClick={() => {
+                const n = Number(String(descForm.input).replace(",", ".")) || 0;
+                if (n <= 0) { toast.error("Informe um valor de desconto maior que zero."); return; }
+                if (descForm.tipo === "percentual" && n > 100) { toast.error("Percentual não pode passar de 100%."); return; }
+                if (ehSupervisorDesc) {
+                  const autor = descForm.autorizadoPor.trim() || (clinicaAtual?.role ?? "supervisor");
+                  setDescontoPendente({ tipo: descForm.tipo, input: descForm.input, autorizadoPor: autor, motivo: descForm.motivo.trim() });
+                  setDescontoDlgOpen(false);
+                  toast.success("Desconto aplicado.");
+                } else {
+                  setSupervisorOpen(true);
+                }
+              }}
+            >
+              {ehSupervisorDesc ? "Aplicar" : "Autorizar e aplicar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <SupervisorAuthDialog
+        open={supervisorOpen}
+        onOpenChange={setSupervisorOpen}
+        acao="aplicar desconto"
+        onAuthorized={(info) => {
+          setDescontoPendente({
+            tipo: descForm.tipo,
+            input: descForm.input,
+            autorizadoPor: info.nome,
+            motivo: descForm.motivo.trim(),
+          });
+          setDescForm((f) => ({ ...f, autorizadoPor: info.nome }));
+          setDescontoDlgOpen(false);
+          toast.success("Desconto aplicado com autorização da supervisão.");
         }}
       />
 
