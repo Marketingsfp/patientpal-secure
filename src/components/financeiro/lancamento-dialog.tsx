@@ -405,17 +405,35 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
               <Input type="date" value={data} onChange={(e) => setData(e.target.value)} />
             </div>
           </div>
-          {tipo === "receita" && podeDarDesconto && !!initialValor && (
+          {tipo === "receita" && !!initialValor && (
             <div className="space-y-2 rounded-md border border-dashed p-3 bg-muted/20">
               <div className="flex items-center gap-2">
                 <Checkbox
                   id="aplicar-desconto"
                   checked={descontoAtivo}
-                  onCheckedChange={(v) => setDescontoAtivo(!!v)}
+                  onCheckedChange={(v) => {
+                    if (!v) {
+                      setDescontoAtivo(false);
+                      setSupervisorInfo(null);
+                      setDescontoInput("");
+                      setDescontoAutorizado("");
+                      setDescontoMotivo("");
+                      return;
+                    }
+                    // Supervisores aplicam direto; demais precisam autorização.
+                    if (ehSupervisor) {
+                      setDescontoAtivo(true);
+                    } else {
+                      setSupervisorOpen(true);
+                    }
+                  }}
                 />
                 <Label htmlFor="aplicar-desconto" className="cursor-pointer">
-                  Aplicar desconto (somente gerente/admin/financeiro)
+                  Aplicar desconto {ehSupervisor ? "" : "(exige autorização do supervisor)"}
                 </Label>
+                {supervisorInfo && (
+                  <span className="ml-auto text-xs text-success">✓ Autorizado por {supervisorInfo.nome}</span>
+                )}
               </div>
               {descontoAtivo && (
                 <div className="space-y-2">
@@ -455,6 +473,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
                       value={descontoAutorizado}
                       onChange={(e) => setDescontoAutorizado(e.target.value)}
                       placeholder="Nome do supervisor ou financeiro"
+                      readOnly={!!supervisorInfo}
                     />
                   </div>
                   <div className="space-y-1">
