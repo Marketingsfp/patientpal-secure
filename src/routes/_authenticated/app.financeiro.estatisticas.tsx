@@ -6,6 +6,7 @@ import { useClinica } from "@/hooks/use-clinica";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { classifyAtendimento } from "@/lib/atendimento-classify";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro/estatisticas")({
   component: Page,
@@ -18,7 +19,7 @@ function Page() {
   const { clinicaAtual } = useClinica();
   const [stats, setStats] = useState({ receita: 0, despesa: 0, atendimentos: 0, notas: 0, pendentes: 0, ticket: 0 });
   const [loading, setLoading] = useState(true);
-  const [lancs, setLancs] = useState<Array<{ id: string; tipo: string; descricao: string; valor: number; data: string; status: string }>>([]);
+  const [lancs, setLancs] = useState<Array<{ id: string; tipo: string; descricao: string; valor: number; data: string; status: string; paciente_id: string | null }>>([]);
   const [atends, setAtends] = useState<Array<{ id: string; data: string; procedimento: string | null; valor_total: number; status: string }>>([]);
   const [notasList, setNotasList] = useState<Array<{ id: string; numero: number | null; serie: string | null; data_emissao: string; valor: number; status: string }>>([]);
   const [drill, setDrill] = useState<null | "receita" | "despesa" | "saldo" | "atendimentos" | "notas" | "ticket" | "pendentes">(null);
@@ -32,9 +33,9 @@ function Page() {
       const hoje = new Date().toISOString().slice(0, 10);
       const [resumoRes, atend, notas, lancRes, notasFull] = await Promise.all([
         supabase.rpc("fin_resumo_periodo", { p_clinica: clinicaAtual.clinica_id, p_ini: since, p_fim: hoje }),
-        supabase.from("fin_atendimentos").select("id, data, procedimento, valor_total, status").eq("clinica_id", clinicaAtual.clinica_id).gte("created_at", since + "T00:00:00").order("created_at", { ascending: false }).limit(2000),
+        supabase.from("fin_atendimentos").select("id, data, procedimento, valor_total, status").eq("clinica_id", clinicaAtual.clinica_id).gte("data", since).lte("data", hoje).order("data", { ascending: false }).limit(2000),
         supabase.from("fin_notas_pacientes").select("id", { count: "exact", head: true }).eq("clinica_id", clinicaAtual.clinica_id).gte("data_emissao", since),
-        supabase.from("fin_lancamentos").select("id, tipo, descricao, valor, data, status").eq("clinica_id", clinicaAtual.clinica_id).gte("data", since).lte("data", hoje).order("data", { ascending: false }).limit(3000),
+        supabase.from("fin_lancamentos").select("id, tipo, descricao, valor, data, status, paciente_id").eq("clinica_id", clinicaAtual.clinica_id).gte("data", since).lte("data", hoje).order("data", { ascending: false }).limit(5000),
         supabase.from("fin_notas_pacientes").select("id, numero, serie, data_emissao, valor, status").eq("clinica_id", clinicaAtual.clinica_id).gte("data_emissao", since).order("data_emissao", { ascending: false }).limit(1000),
       ]);
       let r = 0, d = 0, p = 0;
@@ -45,14 +46,31 @@ function Page() {
           if (row.tipo === "receita") r += v; else if (row.tipo === "despesa") d += v;
         }
       }
-      const totA = (atend.data ?? []).reduce((s, a) => s + Number(a.valor_total), 0);
-      const cntA = (atend.data ?? []).length;
+      // Atendimentos = visitas únicas (paciente × dia) com receita classificada como atendimento
+      // Cobre tanto o fluxo nativo (fin_atendimentos) quanto lançamentos importados (fin_lancamentos)
+      const visitas = new Set<string>();
+      let totA = 0;
+      const lancRows = (lancRes.data ?? []) as Array<{ tipo: string; descricao: string; valor: number; data: string; status: string; paciente_id: string | null }>;
+      for (const l of lancRows) {
+        if (l.tipo !== "receita" || l.status === "cancelado") continue;
+        if (classifyAtendimento(l.descricao) === null) continue; // ignora mensalidade/adesão/venda de cartão
+        const key = (l.paciente_id ?? `_${l.descricao}`) + "|" + l.data;
+        if (!visitas.has(key)) { visitas.add(key); }
+        totA += Number(l.valor) || 0;
+      }
+      for (const a of ((atend.data ?? []) as Array<{ id: string; data: string; valor_total: number; status: string }>)) {
+        if (a.status === "cancelado") continue;
+        const key = "AT|" + a.id;
+        visitas.add(key);
+        totA += Number(a.valor_total) || 0;
+      }
+      const cntA = visitas.size;
       setStats({
         receita: r, despesa: d, atendimentos: cntA, notas: notas.count ?? 0,
         pendentes: p, ticket: cntA > 0 ? totA / cntA : 0,
       });
       setAtends((atend.data ?? []) as typeof atends);
-      setLancs((lancRes.data ?? []) as typeof lancs);
+      setLancs(lancRows as typeof lancs);
       setNotasList((notasFull.data ?? []) as typeof notasList);
       setLoading(false);
     })();
