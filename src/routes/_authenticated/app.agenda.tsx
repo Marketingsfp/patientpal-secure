@@ -29,6 +29,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import { ProcedimentoCell } from "@/components/agenda/procedimento-cell";
 import { PatientSearchInput } from "@/components/patient-search-input";
+import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
 import {
   CalendarDays, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X,
   MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, Clock, DollarSign, ShieldCheck, BadgeCheck, IdCard, Play, FileText,
@@ -490,6 +491,34 @@ function AgendaPage() {
   const [pagamentoAgId, setPagamentoAgId] = useState<string | null>(null);
   const [pagamentoExtraIds, setPagamentoExtraIds] = useState<string[]>([]);
   const [pagamentoForma, setPagamentoForma] = useState<string>("");
+  // ── Desconto aplicado ANTES de "Salvar e Pagar" (com autorização da supervisão).
+  type DescontoPendente = { tipo: "valor" | "percentual"; input: string; autorizadoPor: string; motivo: string };
+  const [descontoPendente, setDescontoPendente] = useState<DescontoPendente | null>(null);
+  const [descontoDlgOpen, setDescontoDlgOpen] = useState(false);
+  const [supervisorOpen, setSupervisorOpen] = useState(false);
+  const [descForm, setDescForm] = useState<{ tipo: "valor" | "percentual"; input: string; motivo: string; autorizadoPor: string }>({ tipo: "valor", input: "", motivo: "", autorizadoPor: "" });
+  const ehSupervisorDesc = ["admin", "gestor", "financeiro"].includes(clinicaAtual?.role ?? "");
+  // Aplica desconto pendente a um valor (R$).
+  const aplicarDescontoPendente = (valor: number): number => {
+    if (!descontoPendente) return valor;
+    const n = Number(String(descontoPendente.input).replace(",", ".")) || 0;
+    if (n <= 0) return valor;
+    const d = descontoPendente.tipo === "percentual"
+      ? valor * (Math.min(100, n) / 100)
+      : Math.min(valor, n);
+    return Math.max(0, valor - d);
+  };
+  const descricaoComDesconto = (desc: string): string => {
+    if (!descontoPendente) return desc;
+    const n = Number(String(descontoPendente.input).replace(",", ".")) || 0;
+    const txt = descontoPendente.tipo === "percentual" ? `${n}%` : `R$ ${n.toFixed(2)}`;
+    const partes = [
+      `Desconto: ${txt}`,
+      `Autorizado por: ${descontoPendente.autorizadoPor}`,
+      descontoPendente.motivo ? `Motivo: ${descontoPendente.motivo}` : null,
+    ].filter(Boolean).join(" — ");
+    return desc ? `${desc}\n${partes}` : partes;
+  };
   const [pacInfoOpen, setPacInfoOpen] = useState(false);
   const [pacInfoLoading, setPacInfoLoading] = useState(false);
   const [pacInfo, setPacInfo] = useState<Record<string, any> | null>(null);
@@ -2064,8 +2093,9 @@ function AgendaPage() {
     const ids = formaPagCtx.agId.split(",").filter(Boolean);
     const principal = ids[0] ?? null;
     const extras = ids.slice(1);
-    setPagamentoDesc(formaPagCtx.desc);
-    setPagamentoValor(op.valor > 0 ? op.valor.toFixed(2) : "");
+    const valorFinal = aplicarDescontoPendente(op.valor);
+    setPagamentoDesc(descricaoComDesconto(formaPagCtx.desc));
+    setPagamentoValor(valorFinal > 0 ? valorFinal.toFixed(2) : "");
     setPagamentoForma(op.forma);
     setPagamentoAgId(principal);
     setPagamentoExtraIds(extras);
@@ -2080,8 +2110,9 @@ function AgendaPage() {
     const extras = ids.slice(1);
     // pega o maior valor disponível como referência (geralmente todas as formas têm valor próximo)
     const valorRef = Math.max(0, ...formaPagOpcoes.map((o) => o.valor));
-    setPagamentoDesc(formaPagCtx.desc);
-    setPagamentoValor(valorRef > 0 ? valorRef.toFixed(2) : "");
+    const valorFinal = aplicarDescontoPendente(valorRef);
+    setPagamentoDesc(descricaoComDesconto(formaPagCtx.desc));
+    setPagamentoValor(valorFinal > 0 ? valorFinal.toFixed(2) : "");
     setPagamentoForma("__misto__");
     setPagamentoAgId(principal);
     setPagamentoExtraIds(extras);
