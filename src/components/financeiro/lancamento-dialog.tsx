@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
+import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
 
 type Tipo = "receita" | "despesa";
 
@@ -40,8 +41,10 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
   const role = clinicaAtual?.role ?? null;
-  // Apenas administradores, gestores e financeiro podem aplicar desconto.
-  const podeDarDesconto = role === "admin" || role === "gestor" || role === "financeiro";
+  // Qualquer atendente pode SOLICITAR desconto, mas a aplicação exige
+  // autorização (e-mail + senha) de admin, gestor ou financeiro.
+  // Quando o próprio usuário já é supervisor, dispensamos o segundo login.
+  const ehSupervisor = role === "admin" || role === "gestor" || role === "financeiro";
   const [descricao, setDescricao] = useState("");
   const [valor, setValor] = useState("");
   const [data, setData] = useState(() => new Date().toISOString().slice(0, 10));
@@ -67,6 +70,8 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
   const [descontoAutorizado, setDescontoAutorizado] = useState("");
   const [descontoMotivo, setDescontoMotivo] = useState("");
   const [valorOriginal, setValorOriginal] = useState<string>("");
+  const [supervisorOpen, setSupervisorOpen] = useState(false);
+  const [supervisorInfo, setSupervisorInfo] = useState<{ userId: string; nome: string; role: string } | null>(null);
 
   useEffect(() => {
     if (!open || !clinicaAtual) return;
@@ -76,6 +81,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     // Reseta desconto a cada abertura
     setDescontoAtivo(false); setDescontoTipo("valor");
     setDescontoInput(""); setDescontoAutorizado(""); setDescontoMotivo("");
+    setSupervisorInfo(null); setSupervisorOpen(false);
     if (initialFormaPagamento !== undefined) {
       if (initialFormaPagamento === "__misto__") {
         setPagamentoMisto(true);
@@ -170,8 +176,8 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     }
     setSaving(true);
     if (descontoAtivo) {
-      if (!podeDarDesconto) {
-        toast.error("Você não tem permissão para aplicar desconto.");
+      if (!supervisorInfo && !ehSupervisor) {
+        toast.error("É necessária a autorização de um supervisor para aplicar desconto.");
         setSaving(false); return;
       }
       if (descontoNum <= 0) {
@@ -369,6 +375,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md max-h-[90vh] flex flex-col">
         <DialogHeader>
@@ -399,17 +406,35 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
               <Input type="date" value={data} onChange={(e) => setData(e.target.value)} />
             </div>
           </div>
-          {tipo === "receita" && podeDarDesconto && !!initialValor && (
+          {tipo === "receita" && !!initialValor && (
             <div className="space-y-2 rounded-md border border-dashed p-3 bg-muted/20">
               <div className="flex items-center gap-2">
                 <Checkbox
                   id="aplicar-desconto"
                   checked={descontoAtivo}
-                  onCheckedChange={(v) => setDescontoAtivo(!!v)}
+                  onCheckedChange={(v) => {
+                    if (!v) {
+                      setDescontoAtivo(false);
+                      setSupervisorInfo(null);
+                      setDescontoInput("");
+                      setDescontoAutorizado("");
+                      setDescontoMotivo("");
+                      return;
+                    }
+                    // Supervisores aplicam direto; demais precisam autorização.
+                    if (ehSupervisor) {
+                      setDescontoAtivo(true);
+                    } else {
+                      setSupervisorOpen(true);
+                    }
+                  }}
                 />
                 <Label htmlFor="aplicar-desconto" className="cursor-pointer">
-                  Aplicar desconto (somente gerente/admin/financeiro)
+                  Aplicar desconto {ehSupervisor ? "" : "(exige autorização do supervisor)"}
                 </Label>
+                {supervisorInfo && (
+                  <span className="ml-auto text-xs text-success">✓ Autorizado por {supervisorInfo.nome}</span>
+                )}
               </div>
               {descontoAtivo && (
                 <div className="space-y-2">
@@ -449,6 +474,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
                       value={descontoAutorizado}
                       onChange={(e) => setDescontoAutorizado(e.target.value)}
                       placeholder="Nome do supervisor ou financeiro"
+                      readOnly={!!supervisorInfo}
                     />
                   </div>
                   <div className="space-y-1">
@@ -663,5 +689,16 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    <SupervisorAuthDialog
+      open={supervisorOpen}
+      onOpenChange={setSupervisorOpen}
+      acao="aplicar desconto"
+      onAuthorized={(info) => {
+        setSupervisorInfo({ userId: info.userId, nome: info.nome, role: info.role });
+        setDescontoAutorizado(info.nome);
+        setDescontoAtivo(true);
+      }}
+    />
+    </>
   );
 }
