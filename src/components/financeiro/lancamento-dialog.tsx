@@ -39,6 +39,9 @@ interface Props {
 export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWithData, initialDescricao, initialValor, agendamentoId, initialFormaPagamento }: Props) {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
+  const role = clinicaAtual?.role ?? null;
+  // Apenas administradores, gestores e financeiro podem aplicar desconto.
+  const podeDarDesconto = role === "admin" || role === "gestor" || role === "financeiro";
   const [descricao, setDescricao] = useState("");
   const [valor, setValor] = useState("");
   const [data, setData] = useState(() => new Date().toISOString().slice(0, 10));
@@ -57,11 +60,22 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
   const [pagamentos, setPagamentos] = useState<Array<{ forma: string; recebido: string }>>([
     { forma: "dinheiro", recebido: "" },
   ]);
+  // ----- Desconto (apenas para gerente/admin/financeiro) -----
+  const [descontoAtivo, setDescontoAtivo] = useState(false);
+  const [descontoTipo, setDescontoTipo] = useState<"valor" | "percentual">("valor");
+  const [descontoInput, setDescontoInput] = useState("");
+  const [descontoAutorizado, setDescontoAutorizado] = useState("");
+  const [descontoMotivo, setDescontoMotivo] = useState("");
+  const [valorOriginal, setValorOriginal] = useState<string>("");
 
   useEffect(() => {
     if (!open || !clinicaAtual) return;
     if (initialDescricao !== undefined) setDescricao(initialDescricao);
     if (initialValor !== undefined) setValor(initialValor);
+    if (initialValor !== undefined) setValorOriginal(initialValor);
+    // Reseta desconto a cada abertura
+    setDescontoAtivo(false); setDescontoTipo("valor");
+    setDescontoInput(""); setDescontoAutorizado(""); setDescontoMotivo("");
     if (initialFormaPagamento !== undefined) {
       if (initialFormaPagamento === "__misto__") {
         setPagamentoMisto(true);
@@ -90,6 +104,25 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
   const formatBRL = (n: number) =>
     n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   const valorNum = Number(valor || 0);
+  // Calcula desconto efetivo em R$ a partir do tipo selecionado.
+  const origNum = Number(valorOriginal || initialValor || 0);
+  const descontoNum = (() => {
+    if (!descontoAtivo) return 0;
+    const n = Number(descontoInput || 0);
+    if (!isFinite(n) || n <= 0) return 0;
+    if (descontoTipo === "percentual") {
+      const pct = Math.min(100, Math.max(0, n));
+      return Math.round((origNum * pct) / 100 * 100) / 100;
+    }
+    return Math.min(origNum, Math.round(n * 100) / 100);
+  })();
+  // Mantém o `valor` (total a pagar) sincronizado com o desconto.
+  useEffect(() => {
+    if (!open) return;
+    if (!valorOriginal) return;
+    const novo = Math.max(0, origNum - descontoNum);
+    setValor(novo.toFixed(2));
+  }, [descontoAtivo, descontoInput, descontoTipo, valorOriginal, origNum, descontoNum, open]);
   const recebidoNum = Number(valorRecebido || 0);
   const trocoDinheiro = formaPagamento === "dinheiro" && recebidoNum > valorNum
     ? recebidoNum - valorNum
@@ -136,6 +169,20 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       return;
     }
     setSaving(true);
+    if (descontoAtivo) {
+      if (!podeDarDesconto) {
+        toast.error("Você não tem permissão para aplicar desconto.");
+        setSaving(false); return;
+      }
+      if (descontoNum <= 0) {
+        toast.error("Informe um valor de desconto maior que zero.");
+        setSaving(false); return;
+      }
+      if (!descontoAutorizado.trim()) {
+        toast.error("Informe quem autorizou o desconto.");
+        setSaving(false); return;
+      }
+    }
     if (agendamentoId && tipo === "receita") {
       const { data: jaPago } = await supabase
         .from("fin_lancamentos")
@@ -200,7 +247,15 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     } else if (formaPagamento === "dinheiro" && recebidoNum > 0) {
       obsExtra = `Recebido ${formatBRL(recebidoNum)}, troco ${formatBRL(trocoDinheiro)}`;
     }
-    const obsFinal = [observacoes.trim(), obsExtra].filter(Boolean).join(" | ") || null;
+    let descontoObs = "";
+    if (descontoAtivo && descontoNum > 0) {
+      const tipoTxt = descontoTipo === "percentual"
+        ? `${Number(descontoInput).toLocaleString("pt-BR")}% = ${formatBRL(descontoNum)}`
+        : formatBRL(descontoNum);
+      descontoObs = `Desconto aplicado: ${tipoTxt} sobre ${formatBRL(origNum)} — Autorizado por: ${descontoAutorizado.trim()}`
+        + (descontoMotivo.trim() ? ` — Motivo: ${descontoMotivo.trim()}` : "");
+    }
+    const obsFinal = [observacoes.trim(), descontoObs, obsExtra].filter(Boolean).join(" | ") || null;
     // Quando vinculado a um agendamento, busca medico_id e paciente_id
     // para que o repasse médico e os relatórios por paciente funcionem.
     let medicoId: string | null = null;
@@ -344,6 +399,75 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
               <Input type="date" value={data} onChange={(e) => setData(e.target.value)} />
             </div>
           </div>
+          {tipo === "receita" && podeDarDesconto && !!initialValor && (
+            <div className="space-y-2 rounded-md border border-dashed p-3 bg-muted/20">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="aplicar-desconto"
+                  checked={descontoAtivo}
+                  onCheckedChange={(v) => setDescontoAtivo(!!v)}
+                />
+                <Label htmlFor="aplicar-desconto" className="cursor-pointer">
+                  Aplicar desconto (somente gerente/admin/financeiro)
+                </Label>
+              </div>
+              {descontoAtivo && (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-[120px_1fr] gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Tipo</Label>
+                      <Select value={descontoTipo} onValueChange={(v) => setDescontoTipo(v as "valor" | "percentual")}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="valor">R$ (valor)</SelectItem>
+                          <SelectItem value="percentual">% (percentual)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">
+                        {descontoTipo === "percentual" ? "Percentual de desconto" : "Valor do desconto"}
+                      </Label>
+                      {descontoTipo === "percentual" ? (
+                        <Input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step="0.01"
+                          value={descontoInput}
+                          onChange={(e) => setDescontoInput(e.target.value)}
+                          placeholder="Ex: 10"
+                        />
+                      ) : (
+                        <CurrencyInput value={descontoInput} onChange={setDescontoInput} />
+                      )}
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Autorizado por *</Label>
+                    <Input
+                      value={descontoAutorizado}
+                      onChange={(e) => setDescontoAutorizado(e.target.value)}
+                      placeholder="Nome do supervisor ou financeiro"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Motivo (opcional)</Label>
+                    <Input
+                      value={descontoMotivo}
+                      onChange={(e) => setDescontoMotivo(e.target.value)}
+                      placeholder="Ex: paciente recorrente"
+                    />
+                  </div>
+                  <div className="flex justify-between text-xs pt-1 border-t">
+                    <span className="text-muted-foreground">Valor original: <strong>{formatBRL(origNum)}</strong></span>
+                    <span className="text-destructive">- {formatBRL(descontoNum)}</span>
+                    <span className="text-success font-medium">Total: {formatBRL(Math.max(0, origNum - descontoNum))}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           <div className="space-y-1.5">
             <Label>Categoria</Label>
             <Select value={categoriaId} onValueChange={setCategoriaId}>
