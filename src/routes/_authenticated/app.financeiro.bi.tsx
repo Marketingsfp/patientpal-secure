@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Fragment } from "react";
 import { BarChart3 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -238,12 +238,12 @@ function Page() {
                   <TableRow>
                     <TableHead></TableHead>
                     {atendMatriz.anos.map((a) => (
-                      <>
-                        <TableHead key={`${a}-c`} className="text-right text-[10px]">Cartão</TableHead>
-                        <TableHead key={`${a}-p`} className="text-right text-[10px]">Part.</TableHead>
-                        <TableHead key={`${a}-e`} className="text-right text-[10px]">Exames</TableHead>
-                        <TableHead key={`${a}-t`} className="text-right text-[10px] font-bold">Total</TableHead>
-                      </>
+                      <Fragment key={a}>
+                        <TableHead className="text-right text-[10px]">Cartão</TableHead>
+                        <TableHead className="text-right text-[10px]">Part.</TableHead>
+                        <TableHead className="text-right text-[10px]">Exames</TableHead>
+                        <TableHead className="text-right text-[10px] font-bold">Total</TableHead>
+                      </Fragment>
                     ))}
                   </TableRow>
                 </TableHeader>
@@ -254,12 +254,12 @@ function Page() {
                       {atendMatriz.anos.map((a) => {
                         const c = l.porAno[a];
                         return (
-                          <>
-                            <TableCell key={`${a}-c`} className="text-right tabular-nums text-xs">{c.cartao || "—"}</TableCell>
-                            <TableCell key={`${a}-p`} className="text-right tabular-nums text-xs">{c.particular || "—"}</TableCell>
-                            <TableCell key={`${a}-e`} className="text-right tabular-nums text-xs">{c.exames || "—"}</TableCell>
-                            <TableCell key={`${a}-t`} className="text-right tabular-nums font-semibold">{c.total || "—"}</TableCell>
-                          </>
+                          <Fragment key={a}>
+                            <TableCell className="text-right tabular-nums text-xs">{c.cartao || "—"}</TableCell>
+                            <TableCell className="text-right tabular-nums text-xs">{c.particular || "—"}</TableCell>
+                            <TableCell className="text-right tabular-nums text-xs">{c.exames || "—"}</TableCell>
+                            <TableCell className="text-right tabular-nums font-semibold">{c.total || "—"}</TableCell>
+                          </Fragment>
                         );
                       })}
                     </TableRow>
@@ -269,12 +269,12 @@ function Page() {
                     {atendMatriz.anos.map((a) => {
                       const t = atendMatriz.totalPorAno[a] ?? { cartao: 0, particular: 0, exames: 0, total: 0 };
                       return (
-                        <>
-                          <TableCell key={`${a}-c`} className="text-right tabular-nums text-xs">{t.cartao.toLocaleString("pt-BR")}</TableCell>
-                          <TableCell key={`${a}-p`} className="text-right tabular-nums text-xs">{t.particular.toLocaleString("pt-BR")}</TableCell>
-                          <TableCell key={`${a}-e`} className="text-right tabular-nums text-xs">{t.exames.toLocaleString("pt-BR")}</TableCell>
-                          <TableCell key={`${a}-t`} className="text-right tabular-nums">{t.total.toLocaleString("pt-BR")}</TableCell>
-                        </>
+                        <Fragment key={a}>
+                          <TableCell className="text-right tabular-nums text-xs">{t.cartao.toLocaleString("pt-BR")}</TableCell>
+                          <TableCell className="text-right tabular-nums text-xs">{t.particular.toLocaleString("pt-BR")}</TableCell>
+                          <TableCell className="text-right tabular-nums text-xs">{t.exames.toLocaleString("pt-BR")}</TableCell>
+                          <TableCell className="text-right tabular-nums">{t.total.toLocaleString("pt-BR")}</TableCell>
+                        </Fragment>
                       );
                     })}
                   </TableRow>
