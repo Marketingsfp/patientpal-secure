@@ -399,6 +399,75 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
               <Input type="date" value={data} onChange={(e) => setData(e.target.value)} />
             </div>
           </div>
+          {tipo === "receita" && podeDarDesconto && !!initialValor && (
+            <div className="space-y-2 rounded-md border border-dashed p-3 bg-muted/20">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="aplicar-desconto"
+                  checked={descontoAtivo}
+                  onCheckedChange={(v) => setDescontoAtivo(!!v)}
+                />
+                <Label htmlFor="aplicar-desconto" className="cursor-pointer">
+                  Aplicar desconto (somente gerente/admin/financeiro)
+                </Label>
+              </div>
+              {descontoAtivo && (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-[120px_1fr] gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Tipo</Label>
+                      <Select value={descontoTipo} onValueChange={(v) => setDescontoTipo(v as "valor" | "percentual")}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="valor">R$ (valor)</SelectItem>
+                          <SelectItem value="percentual">% (percentual)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">
+                        {descontoTipo === "percentual" ? "Percentual de desconto" : "Valor do desconto"}
+                      </Label>
+                      {descontoTipo === "percentual" ? (
+                        <Input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step="0.01"
+                          value={descontoInput}
+                          onChange={(e) => setDescontoInput(e.target.value)}
+                          placeholder="Ex: 10"
+                        />
+                      ) : (
+                        <CurrencyInput value={descontoInput} onChange={setDescontoInput} />
+                      )}
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Autorizado por *</Label>
+                    <Input
+                      value={descontoAutorizado}
+                      onChange={(e) => setDescontoAutorizado(e.target.value)}
+                      placeholder="Nome do supervisor ou financeiro"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Motivo (opcional)</Label>
+                    <Input
+                      value={descontoMotivo}
+                      onChange={(e) => setDescontoMotivo(e.target.value)}
+                      placeholder="Ex: paciente recorrente"
+                    />
+                  </div>
+                  <div className="flex justify-between text-xs pt-1 border-t">
+                    <span className="text-muted-foreground">Valor original: <strong>{formatBRL(origNum)}</strong></span>
+                    <span className="text-destructive">- {formatBRL(descontoNum)}</span>
+                    <span className="text-success font-medium">Total: {formatBRL(Math.max(0, origNum - descontoNum))}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           <div className="space-y-1.5">
             <Label>Categoria</Label>
             <Select value={categoriaId} onValueChange={setCategoriaId}>
