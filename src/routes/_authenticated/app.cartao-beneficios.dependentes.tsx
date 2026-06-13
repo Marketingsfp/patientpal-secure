@@ -56,24 +56,38 @@ function DependentesPage() {
     if (!clinicaAtual) return;
     setLoading(true);
     const cid = clinicaAtual.clinica_id;
-    const { data: cs } = await supabase
-      .from("contratos_assinatura")
-      .select("id, numero, paciente_id, paciente_nome, status, plano_id, convenio_id")
-      .eq("clinica_id", cid)
-      .neq("status", "cancelado")
-      .order("paciente_nome")
-      .limit(5000);
-    const cList = (cs ?? []) as Contrato[];
-    const cIds = cList.map((c) => c.id);
-    const { data: ds } = cIds.length
-      ? await supabase
-          .from("contrato_dependentes")
-          .select("id, contrato_id, paciente_id, paciente_nome, parentesco")
-          .in("contrato_id", cIds)
-          .eq("ativo", true)
-      : { data: [] as Dep[] };
+    // Pagina contratos (Supabase limita a 1000 por request)
+    const cList: Contrato[] = [];
+    const PAGE = 1000;
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await supabase
+        .from("contratos_assinatura")
+        .select("id, numero, paciente_id, paciente_nome, status, plano_id, convenio_id")
+        .eq("clinica_id", cid)
+        .neq("status", "cancelado")
+        .order("paciente_nome")
+        .range(from, from + PAGE - 1);
+      if (error) { toast.error(error.message); break; }
+      const batch = (data ?? []) as Contrato[];
+      cList.push(...batch);
+      if (batch.length < PAGE) break;
+    }
+    // Pagina dependentes via join filtrando pela clínica do contrato
+    const dList: Dep[] = [];
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await supabase
+        .from("contrato_dependentes")
+        .select("id, contrato_id, paciente_id, paciente_nome, parentesco, contratos_assinatura!inner(clinica_id)")
+        .eq("contratos_assinatura.clinica_id", cid)
+        .eq("ativo", true)
+        .range(from, from + PAGE - 1);
+      if (error) { toast.error(error.message); break; }
+      const batch = (data ?? []) as Dep[];
+      dList.push(...batch);
+      if (batch.length < PAGE) break;
+    }
     setContratos(cList);
-    setDeps((ds ?? []) as Dep[]);
+    setDeps(dList);
     setLoading(false);
   };
 
