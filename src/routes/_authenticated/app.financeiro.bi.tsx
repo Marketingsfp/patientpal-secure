@@ -15,12 +15,16 @@ export const Route = createFileRoute("/_authenticated/app/financeiro/bi")({
 
 interface Row { mes: string; Receitas: number; Despesas: number }
 const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const MESES_PT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
 function Page() {
   const { clinicaAtual } = useClinica();
   const [data, setData] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [drill, setDrill] = useState<null | "receitas" | "despesas" | "saldo">(null);
+  const [atend12, setAtend12] = useState<Array<{ label: string; qtd: number }>>([]);
+  const [atendMatriz, setAtendMatriz] = useState<{ anos: number[]; linhas: Array<{ mesIdx: number; porAno: Record<number, number> }>; totalPorAno: Record<number, number>; totalGeral: number }>({ anos: [], linhas: [], totalPorAno: {}, totalGeral: 0 });
+  const [atendDrill, setAtendDrill] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -48,6 +52,59 @@ function Page() {
     })();
   }, [clinicaAtual?.clinica_id]);
 
+  useEffect(() => {
+    (async () => {
+      if (!clinicaAtual) { setAtend12([]); setAtendMatriz({ anos: [], linhas: [], totalPorAno: {}, totalGeral: 0 }); return; }
+      // Busca TODOS os atendimentos da clínica (paginado) — agrupa por mês/ano da coluna `data`
+      const all: Array<{ data: string }> = [];
+      let from = 0; const pageSize = 1000;
+      // hard cap de 50k para segurança
+      for (let i = 0; i < 50; i++) {
+        const { data: chunk, error } = await supabase
+          .from("fin_atendimentos")
+          .select("data")
+          .eq("clinica_id", clinicaAtual.clinica_id)
+          .order("data", { ascending: false })
+          .range(from, from + pageSize - 1);
+        if (error || !chunk || chunk.length === 0) break;
+        all.push(...(chunk as Array<{ data: string }>));
+        if (chunk.length < pageSize) break;
+        from += pageSize;
+      }
+      // Agrega ano/mês
+      const matriz: Record<number, Record<number, number>> = {}; // ano -> mes(0..11) -> qtd
+      for (const r of all) {
+        if (!r.data) continue;
+        const d = new Date(r.data);
+        const ano = d.getFullYear();
+        const mes = d.getMonth();
+        if (!matriz[ano]) matriz[ano] = {};
+        matriz[ano][mes] = (matriz[ano][mes] ?? 0) + 1;
+      }
+      const anos = Object.keys(matriz).map(Number).sort((a, b) => a - b);
+      const linhas = Array.from({ length: 12 }, (_, m) => {
+        const porAno: Record<number, number> = {};
+        for (const a of anos) porAno[a] = matriz[a][m] ?? 0;
+        return { mesIdx: m, porAno };
+      });
+      const totalPorAno: Record<number, number> = {};
+      for (const a of anos) totalPorAno[a] = linhas.reduce((s, l) => s + (l.porAno[a] ?? 0), 0);
+      const totalGeral = Object.values(totalPorAno).reduce((s, v) => s + v, 0);
+      setAtendMatriz({ anos, linhas, totalPorAno, totalGeral });
+
+      // Série dos últimos 12 meses
+      const serie: Array<{ label: string; qtd: number }> = [];
+      const hoje = new Date();
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+        const ano = d.getFullYear(); const mes = d.getMonth();
+        const q = matriz[ano]?.[mes] ?? 0;
+        serie.push({ label: `${MESES_PT[mes]}/${String(ano).slice(2)}`, qtd: q });
+      }
+      setAtend12(serie);
+    })();
+  }, [clinicaAtual?.clinica_id]);
+
   const totalR = data.reduce((s, r) => s + r.Receitas, 0);
   const totalD = data.reduce((s, r) => s + r.Despesas, 0);
 
@@ -72,6 +129,36 @@ function Page() {
                 height={320}
                 formatY={fmt}
               />}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span>Atendimentos por mês — últimos 12 meses</span>
+            <button
+              type="button"
+              onClick={() => setAtendDrill(true)}
+              className="text-xs font-normal text-primary hover:underline"
+            >
+              Ver tabela ano × mês
+            </button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {atend12.length === 0 ? (
+            <div className="py-12 text-center text-muted-foreground text-sm">Sem dados.</div>
+          ) : (
+            <MiniBarChart
+              labels={atend12.map((r) => r.label)}
+              series={[{ name: "Atendimentos", color: "#3b82f6", values: atend12.map((r) => r.qtd) }]}
+              height={280}
+              formatY={(n) => String(Math.round(n))}
+            />
+          )}
+          <p className="text-[11px] text-muted-foreground mt-2">
+            Total no período exibido: <b>{atend12.reduce((s, r) => s + r.qtd, 0)}</b> atendimentos.
+          </p>
         </CardContent>
       </Card>
 
@@ -103,6 +190,50 @@ function Page() {
                 ))}
               </TableBody>
             </Table>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={atendDrill} onOpenChange={setAtendDrill}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Atendimentos por ano × mês — Total: {atendMatriz.totalGeral}</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[65vh] overflow-auto">
+            {atendMatriz.anos.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-6 text-center">Sem atendimentos cadastrados.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Mês</TableHead>
+                    {atendMatriz.anos.map((a) => (
+                      <TableHead key={a} className="text-right">{a}</TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {atendMatriz.linhas.map((l) => (
+                    <TableRow key={l.mesIdx}>
+                      <TableCell className="font-medium">{MESES_PT[l.mesIdx]}</TableCell>
+                      {atendMatriz.anos.map((a) => (
+                        <TableCell key={a} className="text-right tabular-nums">
+                          {l.porAno[a] ? l.porAno[a].toLocaleString("pt-BR") : "—"}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                  <TableRow className="bg-muted/50 font-semibold">
+                    <TableCell>Total</TableCell>
+                    {atendMatriz.anos.map((a) => (
+                      <TableCell key={a} className="text-right tabular-nums">
+                        {(atendMatriz.totalPorAno[a] ?? 0).toLocaleString("pt-BR")}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                </TableBody>
+              </Table>
+            )}
           </div>
         </DialogContent>
       </Dialog>
