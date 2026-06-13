@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Plus, Minus, TrendingUp, TrendingDown, Wallet, Users, Calendar, Activity, Stethoscope } from "lucide-react";
+import { Plus, Minus, TrendingUp, TrendingDown, Wallet, Users, Calendar, Stethoscope, CreditCard, FlaskConical } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,6 +9,7 @@ import { brl, rangeFromPeriodo, type Periodo } from "@/lib/financeiro/format";
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { classifyAtendimento, type AtendCat } from "@/lib/atendimento-classify";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro/")({
   component: FinDashboard,
@@ -17,12 +18,12 @@ export const Route = createFileRoute("/_authenticated/app/financeiro/")({
 function FinDashboard() {
   const { clinicaAtual } = useClinica();
   const [periodo, setPeriodo] = useState<Periodo>("mes");
-  const [stats, setStats] = useState({ receitas: 0, despesas: 0, atendimentos: 0, repasse: 0 });
+  const [stats, setStats] = useState({ receitas: 0, despesas: 0, repasse: 0, cartaoConsulta: 0, consultaPart: 0, exames: 0 });
   const [open, setOpen] = useState<null | "receita" | "despesa">(null);
   const [reload, setReload] = useState(0);
-  const [rawLancs, setRawLancs] = useState<Array<{ id: string; tipo: string; descricao: string; valor: number; data: string; status: string }>>([]);
+  const [rawLancs, setRawLancs] = useState<Array<{ id: string; tipo: string; descricao: string; valor: number; data: string; status: string; cat: AtendCat | null }>>([]);
   const [rawAtends, setRawAtends] = useState<Array<{ id: string; data: string; procedimento: string | null; valor_total: number; valor_medico: number; status: string }>>([]);
-  const [drill, setDrill] = useState<null | "saldo" | "receitas" | "despesas" | "atendimentos" | "ticket" | "repasse">(null);
+  const [drill, setDrill] = useState<null | "saldo" | "receitas" | "despesas" | "atendTotal" | "cartaoConsulta" | "consultaPart" | "exames" | "ticket" | "repasse">(null);
 
   useEffect(() => {
     if (!clinicaAtual) return;
@@ -33,7 +34,7 @@ function FinDashboard() {
         supabase.from("fin_atendimentos").select("id, data, procedimento, valor_total, valor_medico, status")
           .eq("clinica_id", clinicaAtual.clinica_id).gte("created_at", from + "T00:00:00").lte("created_at", to + "T23:59:59"),
         supabase.from("fin_lancamentos").select("id, tipo, descricao, valor, data, status")
-          .eq("clinica_id", clinicaAtual.clinica_id).eq("status", "confirmado").gte("data", from).lte("data", to).order("data", { ascending: false }).limit(2000),
+          .eq("clinica_id", clinicaAtual.clinica_id).eq("status", "confirmado").gte("data", from).lte("data", to).order("data", { ascending: false }).limit(10000),
       ]);
       let receitas = 0, despesas = 0;
       for (const row of ((resumoRes.data ?? []) as Array<{ tipo: string; status: string; total: number }>)) {
@@ -42,14 +43,23 @@ function FinDashboard() {
         else if (row.tipo === "despesa") despesas += Number(row.total) || 0;
       }
       const repasse = (at ?? []).reduce((s, a) => s + Number(a.valor_medico ?? 0), 0);
-      setStats({ receitas, despesas, atendimentos: at?.length ?? 0, repasse });
+      const lancsList = (lancs ?? []) as Array<{ id: string; tipo: string; descricao: string; valor: number; data: string; status: string }>;
+      const classified = lancsList.map((l) => ({ ...l, cat: l.tipo === "receita" ? classifyAtendimento(l.descricao) : null }));
+      let cartaoConsulta = 0, consultaPart = 0, exames = 0;
+      for (const l of classified) {
+        if (l.cat === "cartao_consulta") cartaoConsulta++;
+        else if (l.cat === "consulta_particular") consultaPart++;
+        else if (l.cat === "exame") exames++;
+      }
+      setStats({ receitas, despesas, repasse, cartaoConsulta, consultaPart, exames });
       setRawAtends((at ?? []) as typeof rawAtends);
-      setRawLancs((lancs ?? []) as typeof rawLancs);
+      setRawLancs(classified);
     })();
   }, [clinicaAtual, periodo, reload]);
 
   const saldo = stats.receitas - stats.despesas;
-  const media = stats.atendimentos > 0 ? stats.receitas / stats.atendimentos : 0;
+  const atendTotal = stats.cartaoConsulta + stats.consultaPart + stats.exames;
+  const media = atendTotal > 0 ? stats.receitas / atendTotal : 0;
 
   const fmtDt = (d: string) => new Date(d).toLocaleDateString("pt-BR");
 
@@ -82,7 +92,10 @@ function FinDashboard() {
         <KpiCard onClick={() => setDrill("saldo")} icon={Wallet} label="Saldo do período" value={brl(saldo)} accent={saldo >= 0 ? "primary" : "destructive"} />
         <KpiCard onClick={() => setDrill("receitas")} icon={TrendingUp} label="Receitas" value={brl(stats.receitas)} accent="success" />
         <KpiCard onClick={() => setDrill("despesas")} icon={TrendingDown} label="Despesas" value={brl(stats.despesas)} accent="destructive" />
-        <KpiCard onClick={() => setDrill("atendimentos")} icon={Users} label="Atendimentos" value={String(stats.atendimentos)} accent="primary" />
+        <KpiCard onClick={() => setDrill("atendTotal")} icon={Users} label="Atendimentos (total)" value={String(atendTotal)} accent="primary" />
+        <KpiCard onClick={() => setDrill("cartaoConsulta")} icon={CreditCard} label="Consultas Cartão" value={String(stats.cartaoConsulta)} accent="primary" />
+        <KpiCard onClick={() => setDrill("consultaPart")} icon={Stethoscope} label="Consultas Particulares" value={String(stats.consultaPart)} accent="success" />
+        <KpiCard onClick={() => setDrill("exames")} icon={FlaskConical} label="Exames" value={String(stats.exames)} accent="warning" />
         <KpiCard onClick={() => setDrill("ticket")} icon={Calendar} label="Ticket médio" value={brl(media)} accent="primary" />
         <KpiCard onClick={() => setDrill("repasse")} icon={Stethoscope} label="Repasse médicos" value={brl(stats.repasse)} accent="warning" />
       </div>
@@ -96,7 +109,10 @@ function FinDashboard() {
               {drill === "saldo" && `Saldo do período — ${brl(saldo)}`}
               {drill === "receitas" && `Receitas — ${brl(stats.receitas)}`}
               {drill === "despesas" && `Despesas — ${brl(stats.despesas)}`}
-              {drill === "atendimentos" && `Atendimentos — ${stats.atendimentos}`}
+              {drill === "atendTotal" && `Atendimentos (total) — ${atendTotal}`}
+              {drill === "cartaoConsulta" && `Consultas Cartão — ${stats.cartaoConsulta}`}
+              {drill === "consultaPart" && `Consultas Particulares — ${stats.consultaPart}`}
+              {drill === "exames" && `Exames — ${stats.exames}`}
               {drill === "ticket" && `Ticket médio — ${brl(media)}`}
               {drill === "repasse" && `Repasse a médicos — ${brl(stats.repasse)}`}
             </DialogTitle>
@@ -120,7 +136,29 @@ function FinDashboard() {
                   </TableBody>
                 </Table>
               );
-            })() : (drill === "atendimentos" || drill === "ticket" || drill === "repasse") ? (() => {
+            })() : (drill === "atendTotal" || drill === "cartaoConsulta" || drill === "consultaPart" || drill === "exames" || drill === "ticket") ? (() => {
+              const catFiltro: AtendCat | null =
+                drill === "cartaoConsulta" ? "cartao_consulta" :
+                drill === "consultaPart" ? "consulta_particular" :
+                drill === "exames" ? "exame" : null;
+              const lista = rawLancs.filter(l => l.cat !== null && (catFiltro === null || l.cat === catFiltro));
+              if (lista.length === 0) return <p className="text-sm text-muted-foreground py-6 text-center">Sem atendimentos.</p>;
+              return (
+                <Table>
+                  <TableHeader><TableRow><TableHead>Data</TableHead><TableHead>Descrição</TableHead><TableHead>Categoria</TableHead><TableHead className="text-right">Valor</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {lista.map(l => (
+                      <TableRow key={l.id}>
+                        <TableCell className="whitespace-nowrap">{fmtDt(l.data)}</TableCell>
+                        <TableCell>{l.descricao}</TableCell>
+                        <TableCell className="text-xs">{l.cat === "cartao_consulta" ? "Cartão" : l.cat === "consulta_particular" ? "Consulta Part." : "Exame"}</TableCell>
+                        <TableCell className="text-right">{brl(Number(l.valor))}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              );
+            })() : (drill === "repasse") ? (() => {
               if (rawAtends.length === 0) return <p className="text-sm text-muted-foreground py-6 text-center">Sem atendimentos.</p>;
               return (
                 <Table>
