@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
+import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
 
 type Tipo = "receita" | "despesa";
 
@@ -40,8 +41,10 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
   const role = clinicaAtual?.role ?? null;
-  // Apenas administradores, gestores e financeiro podem aplicar desconto.
-  const podeDarDesconto = role === "admin" || role === "gestor" || role === "financeiro";
+  // Qualquer atendente pode SOLICITAR desconto, mas a aplicação exige
+  // autorização (e-mail + senha) de admin, gestor ou financeiro.
+  // Quando o próprio usuário já é supervisor, dispensamos o segundo login.
+  const ehSupervisor = role === "admin" || role === "gestor" || role === "financeiro";
   const [descricao, setDescricao] = useState("");
   const [valor, setValor] = useState("");
   const [data, setData] = useState(() => new Date().toISOString().slice(0, 10));
@@ -67,6 +70,8 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
   const [descontoAutorizado, setDescontoAutorizado] = useState("");
   const [descontoMotivo, setDescontoMotivo] = useState("");
   const [valorOriginal, setValorOriginal] = useState<string>("");
+  const [supervisorOpen, setSupervisorOpen] = useState(false);
+  const [supervisorInfo, setSupervisorInfo] = useState<{ userId: string; nome: string; role: string } | null>(null);
 
   useEffect(() => {
     if (!open || !clinicaAtual) return;
@@ -76,6 +81,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     // Reseta desconto a cada abertura
     setDescontoAtivo(false); setDescontoTipo("valor");
     setDescontoInput(""); setDescontoAutorizado(""); setDescontoMotivo("");
+    setSupervisorInfo(null); setSupervisorOpen(false);
     if (initialFormaPagamento !== undefined) {
       if (initialFormaPagamento === "__misto__") {
         setPagamentoMisto(true);
@@ -170,8 +176,8 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     }
     setSaving(true);
     if (descontoAtivo) {
-      if (!podeDarDesconto) {
-        toast.error("Você não tem permissão para aplicar desconto.");
+      if (!supervisorInfo && !ehSupervisor) {
+        toast.error("É necessária a autorização de um supervisor para aplicar desconto.");
         setSaving(false); return;
       }
       if (descontoNum <= 0) {
