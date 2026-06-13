@@ -39,6 +39,9 @@ interface Props {
 export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWithData, initialDescricao, initialValor, agendamentoId, initialFormaPagamento }: Props) {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
+  const role = clinicaAtual?.role ?? null;
+  // Apenas administradores, gestores e financeiro podem aplicar desconto.
+  const podeDarDesconto = role === "admin" || role === "gestor" || role === "financeiro";
   const [descricao, setDescricao] = useState("");
   const [valor, setValor] = useState("");
   const [data, setData] = useState(() => new Date().toISOString().slice(0, 10));
@@ -57,11 +60,22 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
   const [pagamentos, setPagamentos] = useState<Array<{ forma: string; recebido: string }>>([
     { forma: "dinheiro", recebido: "" },
   ]);
+  // ----- Desconto (apenas para gerente/admin/financeiro) -----
+  const [descontoAtivo, setDescontoAtivo] = useState(false);
+  const [descontoTipo, setDescontoTipo] = useState<"valor" | "percentual">("valor");
+  const [descontoInput, setDescontoInput] = useState("");
+  const [descontoAutorizado, setDescontoAutorizado] = useState("");
+  const [descontoMotivo, setDescontoMotivo] = useState("");
+  const [valorOriginal, setValorOriginal] = useState<string>("");
 
   useEffect(() => {
     if (!open || !clinicaAtual) return;
     if (initialDescricao !== undefined) setDescricao(initialDescricao);
     if (initialValor !== undefined) setValor(initialValor);
+    if (initialValor !== undefined) setValorOriginal(initialValor);
+    // Reseta desconto a cada abertura
+    setDescontoAtivo(false); setDescontoTipo("valor");
+    setDescontoInput(""); setDescontoAutorizado(""); setDescontoMotivo("");
     if (initialFormaPagamento !== undefined) {
       if (initialFormaPagamento === "__misto__") {
         setPagamentoMisto(true);
@@ -90,6 +104,25 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
   const formatBRL = (n: number) =>
     n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   const valorNum = Number(valor || 0);
+  // Calcula desconto efetivo em R$ a partir do tipo selecionado.
+  const origNum = Number(valorOriginal || initialValor || 0);
+  const descontoNum = (() => {
+    if (!descontoAtivo) return 0;
+    const n = Number(descontoInput || 0);
+    if (!isFinite(n) || n <= 0) return 0;
+    if (descontoTipo === "percentual") {
+      const pct = Math.min(100, Math.max(0, n));
+      return Math.round((origNum * pct) / 100 * 100) / 100;
+    }
+    return Math.min(origNum, Math.round(n * 100) / 100);
+  })();
+  // Mantém o `valor` (total a pagar) sincronizado com o desconto.
+  useEffect(() => {
+    if (!open) return;
+    if (!valorOriginal) return;
+    const novo = Math.max(0, origNum - descontoNum);
+    setValor(novo.toFixed(2));
+  }, [descontoAtivo, descontoInput, descontoTipo, valorOriginal, origNum, descontoNum, open]);
   const recebidoNum = Number(valorRecebido || 0);
   const trocoDinheiro = formaPagamento === "dinheiro" && recebidoNum > valorNum
     ? recebidoNum - valorNum
@@ -136,6 +169,20 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       return;
     }
     setSaving(true);
+    if (descontoAtivo) {
+      if (!podeDarDesconto) {
+        toast.error("Você não tem permissão para aplicar desconto.");
+        setSaving(false); return;
+      }
+      if (descontoNum <= 0) {
+        toast.error("Informe um valor de desconto maior que zero.");
+        setSaving(false); return;
+      }
+      if (!descontoAutorizado.trim()) {
+        toast.error("Informe quem autorizou o desconto.");
+        setSaving(false); return;
+      }
+    }
     if (agendamentoId && tipo === "receita") {
       const { data: jaPago } = await supabase
         .from("fin_lancamentos")
@@ -200,7 +247,15 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     } else if (formaPagamento === "dinheiro" && recebidoNum > 0) {
       obsExtra = `Recebido ${formatBRL(recebidoNum)}, troco ${formatBRL(trocoDinheiro)}`;
     }
-    const obsFinal = [observacoes.trim(), obsExtra].filter(Boolean).join(" | ") || null;
+    let descontoObs = "";
+    if (descontoAtivo && descontoNum > 0) {
+      const tipoTxt = descontoTipo === "percentual"
+        ? `${Number(descontoInput).toLocaleString("pt-BR")}% = ${formatBRL(descontoNum)}`
+        : formatBRL(descontoNum);
+      descontoObs = `Desconto aplicado: ${tipoTxt} sobre ${formatBRL(origNum)} — Autorizado por: ${descontoAutorizado.trim()}`
+        + (descontoMotivo.trim() ? ` — Motivo: ${descontoMotivo.trim()}` : "");
+    }
+    const obsFinal = [observacoes.trim(), descontoObs, obsExtra].filter(Boolean).join(" | ") || null;
     // Quando vinculado a um agendamento, busca medico_id e paciente_id
     // para que o repasse médico e os relatórios por paciente funcionem.
     let medicoId: string | null = null;
