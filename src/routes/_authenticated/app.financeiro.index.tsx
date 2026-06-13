@@ -31,7 +31,7 @@ function FinDashboard() {
       const [resumoRes, { data: at }, { data: lancs }] = await Promise.all([
         supabase.rpc("fin_resumo_periodo", { p_clinica: clinicaAtual.clinica_id, p_ini: from, p_fim: to }),
         supabase.from("fin_atendimentos").select("id, data, procedimento, valor_total, valor_medico, status")
-          .eq("clinica_id", clinicaAtual.clinica_id).gte("data", from).lte("data", to),
+          .eq("clinica_id", clinicaAtual.clinica_id).gte("created_at", from + "T00:00:00").lte("created_at", to + "T23:59:59"),
         supabase.from("fin_lancamentos").select("id, tipo, descricao, valor, data, status")
           .eq("clinica_id", clinicaAtual.clinica_id).eq("status", "confirmado").gte("data", from).lte("data", to).order("data", { ascending: false }).limit(2000),
       ]);
