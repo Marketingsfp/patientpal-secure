@@ -688,5 +688,16 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    <SupervisorAuthDialog
+      open={supervisorOpen}
+      onOpenChange={setSupervisorOpen}
+      acao="aplicar desconto"
+      onAuthorized={(info) => {
+        setSupervisorInfo({ userId: info.userId, nome: info.nome, role: info.role });
+        setDescontoAutorizado(info.nome);
+        setDescontoAtivo(true);
+      }}
+    />
+    </>
   );
 }
