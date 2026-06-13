@@ -14,6 +14,21 @@ export type Database = {
   }
   public: {
     Tables: {
+      _mj_match_plan: {
+        Row: {
+          lanc_id: string | null
+          pid: string | null
+        }
+        Insert: {
+          lanc_id?: string | null
+          pid?: string | null
+        }
+        Update: {
+          lanc_id?: string | null
+          pid?: string | null
+        }
+        Relationships: []
+      }
       agendamentos: {
         Row: {
           agenda_id: string | null
@@ -6938,6 +6953,7 @@ export type Database = {
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       strip_accents: { Args: { _text: string }; Returns: string }
+      unaccent: { Args: { "": string }; Returns: string }
       user_is_any_manager: { Args: { _user_id: string }; Returns: boolean }
       verificar_certificado: { Args: { _codigo: string }; Returns: Json }
     }
