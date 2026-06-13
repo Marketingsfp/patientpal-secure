@@ -6718,7 +6718,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      _mj_apply_batch: { Args: { p_limit?: number }; Returns: number }
+      _mj_apply_batch: { Args: { _limite?: number }; Returns: number }
       assinar_contrato_publico: {
         Args: { _assinatura_svg: string; _ip: string; _token: string }
         Returns: string
