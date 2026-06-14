@@ -995,7 +995,7 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
     <div class="sep"></div>
     <div class="row sm">
       <div>DATA IMPRESSÃO</div>
-      <div>${fmtData(new Date().toISOString())}</div>
+      <div>${fmtData(new Date().toISOString())}${viaNumero >= 2 ? ` — ${viaTexto}` : ""}</div>
     </div>
   </div>
   <script>
