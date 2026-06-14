@@ -3602,7 +3602,7 @@ function AgendaPage() {
                               size="icon"
                               disabled
                               title="Check-in já realizado"
-                              className="h-5 w-5 border rounded-md bg-green-800 text-white border-green-900 disabled:opacity-100"
+                              className="h-5 w-5 border rounded-md bg-emerald-500 text-white border-emerald-600 disabled:opacity-100"
                             >
                               <BadgeCheck className="h-2.5 w-2.5" />
                             </Button>
@@ -3623,7 +3623,7 @@ function AgendaPage() {
                         })()}
                         onClick={() => cobrarAgendamento(a)}
                         className={`h-7 w-7 border-2 rounded-md shadow-sm ${pagosSet.has(a.id)
-                          ? "bg-emerald-950 text-white border-emerald-950 hover:bg-emerald-900 hover:text-white ring-2 ring-emerald-400"
+                          ? "bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-700 hover:text-white ring-2 ring-emerald-300"
                           : "text-rose-600 border-rose-600 hover:text-rose-700 hover:bg-rose-50"}`}
                       >
                         <DollarSign className="h-4 w-4" strokeWidth={pagosSet.has(a.id) ? 3 : 2.5} />
