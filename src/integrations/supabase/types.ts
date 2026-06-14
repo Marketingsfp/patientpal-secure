@@ -5279,6 +5279,7 @@ export type Database = {
           complemento: string | null
           consentimento_lgpd_em: string | null
           cpf: string | null
+          cpf_digits: string | null
           created_at: string
           data_nascimento: string | null
           email: string | null
@@ -5313,6 +5314,7 @@ export type Database = {
           complemento?: string | null
           consentimento_lgpd_em?: string | null
           cpf?: string | null
+          cpf_digits?: string | null
           created_at?: string
           data_nascimento?: string | null
           email?: string | null
@@ -5347,6 +5349,7 @@ export type Database = {
           complemento?: string | null
           consentimento_lgpd_em?: string | null
           cpf?: string | null
+          cpf_digits?: string | null
           created_at?: string
           data_nascimento?: string | null
           email?: string | null
