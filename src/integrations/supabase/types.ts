@@ -29,6 +29,36 @@ export type Database = {
         }
         Relationships: []
       }
+      _pasta_import_cpf: {
+        Row: {
+          cpf: string
+          pasta: string
+        }
+        Insert: {
+          cpf: string
+          pasta: string
+        }
+        Update: {
+          cpf?: string
+          pasta?: string
+        }
+        Relationships: []
+      }
+      _pasta_import_nome: {
+        Row: {
+          nome: string
+          pasta: string
+        }
+        Insert: {
+          nome: string
+          pasta: string
+        }
+        Update: {
+          nome?: string
+          pasta?: string
+        }
+        Relationships: []
+      }
       agendamentos: {
         Row: {
           agenda_id: string | null
@@ -5275,6 +5305,7 @@ export type Database = {
           cidade: string | null
           clinica_id: string
           codigo_prontuario: string | null
+          codigo_prontuario_anterior: string | null
           complemento: string | null
           consentimento_lgpd_em: string | null
           cpf: string | null
@@ -5308,6 +5339,7 @@ export type Database = {
           cidade?: string | null
           clinica_id: string
           codigo_prontuario?: string | null
+          codigo_prontuario_anterior?: string | null
           complemento?: string | null
           consentimento_lgpd_em?: string | null
           cpf?: string | null
@@ -5341,6 +5373,7 @@ export type Database = {
           cidade?: string | null
           clinica_id?: string
           codigo_prontuario?: string | null
+          codigo_prontuario_anterior?: string | null
           complemento?: string | null
           consentimento_lgpd_em?: string | null
           cpf?: string | null
