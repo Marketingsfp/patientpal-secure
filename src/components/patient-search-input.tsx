@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { VoiceInput } from "@/components/voice-input";
 
 export interface PatientOption {
   id: string;
@@ -24,6 +25,8 @@ interface PatientSearchInputProps {
   autoFocus?: boolean;
   /** Limita busca à clínica informada; padrão: clínica atual + modo "Todas". */
   clinicaIdsOverride?: string[];
+  /** Mostra um botão de microfone para ditar a busca por voz. */
+  enableVoice?: boolean;
 }
 
 /**
@@ -71,6 +74,7 @@ export function PatientSearchInput({
   className,
   autoFocus,
   clinicaIdsOverride,
+  enableVoice = false,
 }: PatientSearchInputProps) {
   const { clinicaIds } = useClinica();
   const scope = useMemo(
