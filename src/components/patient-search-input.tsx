@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { VoiceInput } from "@/components/voice-input";
 
 export interface PatientOption {
   id: string;
@@ -24,6 +25,8 @@ interface PatientSearchInputProps {
   autoFocus?: boolean;
   /** Limita busca à clínica informada; padrão: clínica atual + modo "Todas". */
   clinicaIdsOverride?: string[];
+  /** Mostra um botão de microfone para ditar a busca por voz. */
+  enableVoice?: boolean;
 }
 
 /**
@@ -71,6 +74,7 @@ export function PatientSearchInput({
   className,
   autoFocus,
   clinicaIdsOverride,
+  enableVoice = false,
 }: PatientSearchInputProps) {
   const { clinicaIds } = useClinica();
   const scope = useMemo(
@@ -214,8 +218,24 @@ export function PatientSearchInput({
           }
         }}
         placeholder={placeholder}
-        className="pl-9"
+        className={cn("pl-9", enableVoice && "pr-12")}
       />
+      {enableVoice && (
+        <div className="absolute right-1 top-1/2 -translate-y-1/2">
+          <VoiceInput
+            size="sm"
+            title="Ditar busca de paciente"
+            append={false}
+            onTranscript={(text) => {
+              // Limpa pontuação típica que o STT pode inserir
+              const limpo = text.replace(/[.,;:!?]+$/g, "").trim();
+              setQuery(limpo);
+              setOpen(true);
+              if (value) onSelect(null);
+            }}
+          />
+        </div>
+      )}
       {open && query.trim().length >= 2 && (
         <div className="absolute z-50 mt-1 w-full rounded-md border border-input bg-popover shadow-lg max-h-72 overflow-auto">
           {loading && (

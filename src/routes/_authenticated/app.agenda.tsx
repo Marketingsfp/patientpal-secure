@@ -29,6 +29,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import { ProcedimentoCell } from "@/components/agenda/procedimento-cell";
 import { PatientSearchInput } from "@/components/patient-search-input";
+import { PacienteQuickActions } from "@/components/agenda/paciente-quick-actions";
 import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
 import {
   CalendarDays, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X,
@@ -2521,6 +2522,7 @@ function AgendaPage() {
                       }}
                       placeholder="Nome, CPF, nascimento (DD/MM/AAAA) ou prontuário…"
                       autoFocus
+                      enableVoice
                     />
                   </div>
                   <Button type="button" variant="outline" size="icon" title="Cadastrar novo paciente"
@@ -2538,6 +2540,13 @@ function AgendaPage() {
                   <p className="text-xs text-amber-600 font-medium">
                     Paciente não cadastrado — use o botão ao lado para cadastrar antes de salvar.
                   </p>
+                )}
+                {form.paciente_id && clinicaAtual && (
+                  <PacienteQuickActions
+                    key={form.paciente_id}
+                    pacienteId={form.paciente_id}
+                    clinicaId={clinicaAtual.clinica_id}
+                  />
                 )}
               </div>
               <div className="space-y-1">
