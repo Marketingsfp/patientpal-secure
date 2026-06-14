@@ -2472,7 +2472,14 @@ function AgendaPage() {
                 className="space-y-2 contents disabled:opacity-90"
               >
               <div className="space-y-1 rounded-md border border-dashed border-primary/40 bg-primary/5 p-2 text-xs">
-                <Label className="text-xs uppercase">Nº do orçamento (laboratório)</Label>
+                <div className="flex items-baseline justify-between gap-2">
+                  <Label className="text-xs uppercase">Nº do orçamento (laboratório)</Label>
+                  {!form.orcamento_id && (
+                    <span className="text-[10px] text-muted-foreground leading-tight text-right">
+                      Opcional — marca vários exames em uma única ficha a partir de um orçamento.
+                    </span>
+                  )}
+                </div>
                 <div className="flex gap-2">
                   <Input
                     inputMode="numeric"
@@ -2504,11 +2511,6 @@ function AgendaPage() {
                       </ul>
                     )}
                   </div>
-                )}
-                {!form.orcamento_id && (
-                  <p className="text-xs text-muted-foreground">
-                    Opcional. Use para marcar vários exames de laboratório em uma única ficha a partir de um orçamento.
-                  </p>
                 )}
               </div>
               <div className="space-y-1">
