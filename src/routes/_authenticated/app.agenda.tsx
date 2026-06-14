@@ -2472,22 +2472,15 @@ function AgendaPage() {
                 className="space-y-2 contents disabled:opacity-90"
               >
               <div className="space-y-1 rounded-md border border-dashed border-primary/40 bg-primary/5 p-2 text-xs">
-                <div className="flex items-baseline justify-between gap-2">
-                  <Label className="text-xs uppercase">Nº do orçamento</Label>
-                  {!form.orcamento_id && (
-                    <span className="text-[10px] text-muted-foreground leading-tight text-right">
-                      Opcional — vincula qualquer orçamento (exames, consultas, procedimentos) em uma única ficha.
-                    </span>
-                  )}
-                </div>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs uppercase whitespace-nowrap">Nº do orçamento</Label>
                   <Input
                     inputMode="numeric"
                     placeholder="Ex.: 123"
                     value={form.orcamento_numero}
                     onChange={(e) => setForm(f => ({ ...f, orcamento_numero: e.target.value.replace(/\D/g, "") }))}
                     disabled={!!form.orcamento_id || (editing ? pagosSet.has(editing.id) : false)}
-                    className="max-w-[140px]"
+                    className="max-w-[120px] h-8"
                   />
                   {form.orcamento_id ? (
                     <Button type="button" variant="outline" size="sm" onClick={limparOrcamento}
@@ -2498,6 +2491,11 @@ function AgendaPage() {
                     <Button type="button" variant="outline" size="sm" onClick={() => void buscarOrcamento()} disabled={buscandoOrc}>
                       {buscandoOrc ? "Buscando…" : "Buscar"}
                     </Button>
+                  )}
+                  {!form.orcamento_id && (
+                    <span className="text-[10px] text-muted-foreground leading-tight flex-1">
+                      Opcional — vincula qualquer orçamento (exames, consultas, procedimentos) em uma única ficha.
+                    </span>
                   )}
                 </div>
                 {form.orcamento_id && (
