@@ -340,7 +340,7 @@ async function obterInfoConvenioPaciente(params: {
   // 4) Benefícios aplicáveis para o convênio
   const { data: beneficios } = await supabase
     .from("cb_beneficios")
-    .select("escopo,procedimento_id,especialidade_id,tipo_desconto,valor_desconto,ativo")
+    .select("escopo,procedimento_id,especialidade_id,tipo_desconto,valor_desconto,valor_outros,ativo")
     .eq("clinica_id", clinicaId)
     .eq("convenio_id", contrato.convenio_id)
     .eq("ativo", true);
@@ -356,12 +356,21 @@ async function obterInfoConvenioPaciente(params: {
   if (grat) {
     desconto = { tipo: "gratuidade", valor: 0 };
   } else {
+    const fixo = aplicaveis.find((b) => b.tipo_desconto === "valor_fixo");
+    if (fixo) {
+      desconto = {
+        tipo: "valor_fixo",
+        valor: Number(fixo.valor_desconto) || 0,
+        valorOutros: Number(fixo.valor_outros ?? fixo.valor_desconto) || 0,
+      };
+    } else {
     const perc = aplicaveis.filter((b) => b.tipo_desconto === "percentual");
     const vals = aplicaveis.filter((b) => b.tipo_desconto === "valor");
     const maiorPerc = perc.reduce((m, b) => Math.max(m, Number(b.valor_desconto) || 0), 0);
     const maiorVal = vals.reduce((m, b) => Math.max(m, Number(b.valor_desconto) || 0), 0);
     if (maiorPerc > 0) desconto = { tipo: "percentual", valor: maiorPerc };
     else if (maiorVal > 0) desconto = { tipo: "valor", valor: maiorVal };
+    }
   }
 
   return { convenioNome, emDia, parcelasAtrasadas, desconto };
