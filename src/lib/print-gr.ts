@@ -72,9 +72,6 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   if (reimpressao) {
     viaNumero = ultimaVia > 0 ? ultimaVia : 1;
   } else {
-    if (ultimaVia >= 2) {
-      throw new Error("Limite de 2 vias atingido. Use 'Reimprimir última via' para uma cópia.");
-    }
     viaNumero = ultimaVia + 1;
   }
 
@@ -148,8 +145,27 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   }
   const procData = proc.data as { nome: string; valor_dinheiro_pix: number | null; valor_cartao: number | null; tipo: string | null } | null;
 
-  // Se já temos pagamento informado, usa ele; senão tenta tabela de procedimentos
-  const valor = pagamento ? Number(pagamento.valor) : Number(procData?.valor_dinheiro_pix ?? 0);
+  // Se já temos pagamento informado, usa ele; senão busca valor REALMENTE pago
+  // (fin_lancamentos confirmado) — garante que reimpressões usem o mesmo
+  // valor base de cálculo da 1ª via, mantendo o repasse do médico correto.
+  let valor: number;
+  if (pagamento) {
+    valor = Number(pagamento.valor);
+  } else {
+    let valorPago = 0;
+    try {
+      const { data: lancs } = await supabase
+        .from("fin_lancamentos")
+        .select("valor")
+        .eq("agendamento_id", agendamentoId)
+        .eq("tipo", "receita")
+        .eq("status", "confirmado");
+      for (const l of ((lancs ?? []) as Array<{ valor: number | string }>)) {
+        valorPago += Number(l.valor);
+      }
+    } catch { /* segue para fallback */ }
+    valor = valorPago > 0 ? valorPago : Number(procData?.valor_dinheiro_pix ?? 0);
+  }
   const procNomeBase = (a.procedimento || procData?.nome || "CONSULTA").toUpperCase();
   const procNome = espNome && !procNomeBase.includes(espNome) ? `${espNome} - ${procNomeBase}` : procNomeBase;
 
