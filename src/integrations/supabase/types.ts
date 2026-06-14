@@ -5275,6 +5275,7 @@ export type Database = {
           cidade: string | null
           clinica_id: string
           codigo_prontuario: string | null
+          codigo_prontuario_anterior: string | null
           complemento: string | null
           consentimento_lgpd_em: string | null
           cpf: string | null
@@ -5308,6 +5309,7 @@ export type Database = {
           cidade?: string | null
           clinica_id: string
           codigo_prontuario?: string | null
+          codigo_prontuario_anterior?: string | null
           complemento?: string | null
           consentimento_lgpd_em?: string | null
           cpf?: string | null
@@ -5341,6 +5343,7 @@ export type Database = {
           cidade?: string | null
           clinica_id?: string
           codigo_prontuario?: string | null
+          codigo_prontuario_anterior?: string | null
           complemento?: string | null
           consentimento_lgpd_em?: string | null
           cpf?: string | null
