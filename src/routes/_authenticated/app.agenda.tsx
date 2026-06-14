@@ -79,7 +79,7 @@ const STATUS_LABEL: Record<Status, string> = {
 const STATUS_COR: Record<Status, string> = {
   agendado: "bg-[#dbe7fb] text-slate-800 border border-[#b6cdf5]",
   confirmado: "bg-[#cfe3fb] text-slate-800 border border-[#9fc3f3]",
-  realizado: "bg-[#6fbf7c] text-white border border-[#2f8a3f]",
+  realizado: "bg-[#a8dcb0] text-slate-900 border border-[#5fb36e]",
   cancelado: "bg-[#f8d2d6] text-slate-800 border border-[#eea1a8]",
   faltou: "bg-[#f7b6c0] text-slate-800 border border-[#e88594]",
 };
@@ -3617,7 +3617,7 @@ function AgendaPage() {
                         })()}
                         onClick={() => cobrarAgendamento(a)}
                         className={`h-7 w-7 border-2 rounded-md shadow-sm ${pagosSet.has(a.id)
-                          ? "bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-700 hover:text-white ring-2 ring-emerald-200"
+                          ? "bg-emerald-800 text-white border-emerald-900 hover:bg-emerald-900 hover:text-white ring-2 ring-emerald-300"
                           : "text-rose-600 border-rose-600 hover:text-rose-700 hover:bg-rose-50"}`}
                       >
                         <DollarSign className="h-4 w-4" strokeWidth={pagosSet.has(a.id) ? 3 : 2.5} />
