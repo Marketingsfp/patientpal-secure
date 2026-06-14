@@ -2129,6 +2129,8 @@ function AgendaPage() {
       desc: `${a.paciente_nome} — ${a.procedimento ?? "CONSULTA"}${descSuffix}`,
       paciente: a.paciente_nome ?? "",
       procedimento: `${a.procedimento ?? "CONSULTA"}${descSuffix}`,
+      medico: medicos.find((m) => m.id === a.medico_id)?.nome ?? undefined,
+      especialidade: medicos.find((m) => m.id === a.medico_id)?.especialidade_nome ?? undefined,
     });
     setFormaPagOpen(true);
   };
