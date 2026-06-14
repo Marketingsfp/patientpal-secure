@@ -29,6 +29,21 @@ export type Database = {
         }
         Relationships: []
       }
+      _pasta_import_nome2: {
+        Row: {
+          nome_norm: string
+          pasta: string
+        }
+        Insert: {
+          nome_norm: string
+          pasta: string
+        }
+        Update: {
+          nome_norm?: string
+          pasta?: string
+        }
+        Relationships: []
+      }
       agendamentos: {
         Row: {
           agenda_id: string | null
