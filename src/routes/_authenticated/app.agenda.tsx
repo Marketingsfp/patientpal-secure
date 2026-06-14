@@ -1959,6 +1959,8 @@ function AgendaPage() {
         desc: `${payload.paciente_nome} — ${payload.procedimento ?? "CONSULTA"}${descSuffix}`,
         paciente: payload.paciente_nome ?? "",
         procedimento: `${payload.procedimento ?? "CONSULTA"}${descSuffix}`,
+        medico: medicos.find((m) => m.id === payload.medico_id)?.nome ?? undefined,
+        especialidade: medicos.find((m) => m.id === payload.medico_id)?.especialidade_nome ?? undefined,
       });
       setFormaPagOpen(true);
     }
