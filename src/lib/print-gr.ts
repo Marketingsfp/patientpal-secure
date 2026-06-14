@@ -113,7 +113,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     a.paciente_id
       ? supabase
           .from("pacientes")
-          .select("nome, cpf, telefone, data_nascimento")
+          .select("nome, cpf, telefone, data_nascimento, codigo_prontuario, numero_pasta")
           .eq("id", a.paciente_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
@@ -134,7 +134,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
       : Promise.resolve({ data: null }),
   ]);
 
-  const paciente = pac.data as { nome: string; cpf: string | null; telefone: string | null; data_nascimento: string | null } | null;
+  const paciente = pac.data as { nome: string; cpf: string | null; telefone: string | null; data_nascimento: string | null; codigo_prontuario: string | null; numero_pasta: string | null } | null;
   const medicoBasic = med.data as { nome: string; especialidade: { nome: string } | null } | null;
   const medicoNome = medicoBasic?.nome ?? "—";
   const espNome = medicoBasic?.especialidade?.nome?.toUpperCase() ?? "";
@@ -153,9 +153,35 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   const procNomeBase = (a.procedimento || procData?.nome || "CONSULTA").toUpperCase();
   const procNome = espNome && !procNomeBase.includes(espNome) ? `${espNome} - ${procNomeBase}` : procNomeBase;
 
-  // Ficha = sequência do dia (placeholder simples baseado nos minutos)
+  // Ficha = posição do paciente na agenda do médico no dia (ex.: nº 1 da Dr. Valéria)
+  // Conta a ordem cronológica entre agendamentos VÁLIDOS (com paciente real),
+  // ignorando blocos de "Bloqueio"/"Disponível" e horários sem paciente.
   const inicioDt = new Date(a.inicio);
-  const ficha = String(inicioDt.getHours() * 60 + inicioDt.getMinutes()).padStart(3, "0");
+  const diaIni = new Date(inicioDt); diaIni.setHours(0, 0, 0, 0);
+  const diaFim = new Date(inicioDt); diaFim.setHours(23, 59, 59, 999);
+  let fichaNum = 0;
+  try {
+    let qFicha = supabase
+      .from("agendamentos")
+      .select("id, inicio, paciente_id, paciente_nome")
+      .gte("inicio", diaIni.toISOString())
+      .lte("inicio", diaFim.toISOString())
+      .order("inicio", { ascending: true });
+    if (a.agenda_id) qFicha = qFicha.eq("agenda_id", a.agenda_id);
+    else if (medicoIdEfetivo) qFicha = qFicha.eq("medico_id", medicoIdEfetivo);
+    const { data: lista } = await qFicha;
+    const validos = (lista ?? []).filter((r: any) => {
+      const n = String(r.paciente_nome ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+      if (!r.paciente_id && (n === "disponivel" || n === "bloqueio" || n === "")) return false;
+      return true;
+    });
+    const idx = validos.findIndex((r: any) => r.id === a.id);
+    fichaNum = idx >= 0 ? idx + 1 : 0;
+  } catch { fichaNum = 0; }
+  const ficha = fichaNum > 0
+    ? String(fichaNum).padStart(3, "0")
+    : String(inicioDt.getHours() * 60 + inicioDt.getMinutes()).padStart(3, "0");
+  const prontuario = paciente?.codigo_prontuario || paciente?.numero_pasta || "";
 
   // Repasse conforme cadastro: tenta primeiro medico_convenios pelo nome do procedimento,
   // senão usa o padrão do médico (tipo_repasse / percentual / valor).
@@ -265,6 +291,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     <div class="sep"></div>
 
     <div class="center bold">${esc(paciente?.nome ?? a.paciente_nome)}</div>
+    ${prontuario ? `<div class="center sm">PRONTUÁRIO: <span class="v">${esc(prontuario)}</span></div>` : ""}
     ${paciente?.cpf ? `<div class="center sm">CPF: <span class="v">${esc(paciente.cpf)}</span></div>` : ""}
     ${paciente?.telefone ? `<div class="center sm">FONE: <span class="v">${esc(paciente.telefone)}</span></div>` : ""}
     ${paciente?.data_nascimento ? `<div class="center sm">NASC: <span class="v">${fmtDataSimples(paciente.data_nascimento)}</span></div>` : ""}
