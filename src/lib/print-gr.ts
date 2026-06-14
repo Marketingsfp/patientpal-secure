@@ -72,9 +72,6 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   if (reimpressao) {
     viaNumero = ultimaVia > 0 ? ultimaVia : 1;
   } else {
-    if (ultimaVia >= 2) {
-      throw new Error("Limite de 2 vias atingido. Use 'Reimprimir última via' para uma cópia.");
-    }
     viaNumero = ultimaVia + 1;
   }
 
@@ -148,8 +145,27 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   }
   const procData = proc.data as { nome: string; valor_dinheiro_pix: number | null; valor_cartao: number | null; tipo: string | null } | null;
 
-  // Se já temos pagamento informado, usa ele; senão tenta tabela de procedimentos
-  const valor = pagamento ? Number(pagamento.valor) : Number(procData?.valor_dinheiro_pix ?? 0);
+  // Se já temos pagamento informado, usa ele; senão busca valor REALMENTE pago
+  // (fin_lancamentos confirmado) — garante que reimpressões usem o mesmo
+  // valor base de cálculo da 1ª via, mantendo o repasse do médico correto.
+  let valor: number;
+  if (pagamento) {
+    valor = Number(pagamento.valor);
+  } else {
+    let valorPago = 0;
+    try {
+      const { data: lancs } = await supabase
+        .from("fin_lancamentos")
+        .select("valor")
+        .eq("agendamento_id", agendamentoId)
+        .eq("tipo", "receita")
+        .eq("status", "confirmado");
+      for (const l of ((lancs ?? []) as Array<{ valor: number | string }>)) {
+        valorPago += Number(l.valor);
+      }
+    } catch { /* segue para fallback */ }
+    valor = valorPago > 0 ? valorPago : Number(procData?.valor_dinheiro_pix ?? 0);
+  }
   const procNomeBase = (a.procedimento || procData?.nome || "CONSULTA").toUpperCase();
   const procNome = espNome && !procNomeBase.includes(espNome) ? `${espNome} - ${procNomeBase}` : procNomeBase;
 
@@ -247,7 +263,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
 
   const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado].filter(Boolean).join("<br/>");
 
-  const viaTexto = viaNumero === 1 ? "1ª VIA" : "2ª VIA — REIMPRESSÃO";
+  const viaTexto = `IMPRESSÃO Nº ${viaNumero}`;
 
   const html = `<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8" />
@@ -447,9 +463,6 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   if (reimpressao) {
     viaNumero = ultimaVia > 0 ? ultimaVia : 1;
   } else {
-    if (ultimaVia >= 2) {
-      throw new Error("Limite de 2 vias atingido. Use 'Reimprimir última via' para uma cópia.");
-    }
     viaNumero = ultimaVia + 1;
   }
 
@@ -639,7 +652,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     : "";
 
   const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado].filter(Boolean).join("<br/>");
-  const viaTexto = viaNumero === 1 ? "1ª VIA" : "2ª VIA — REIMPRESSÃO";
+  const viaTexto = `IMPRESSÃO Nº ${viaNumero}`;
 
   // Cabeçalho da clínica (reutilizado em cada GR)
   const headerClinica = `
@@ -835,9 +848,6 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
   if (reimpressao) {
     viaNumero = ultimaVia > 0 ? ultimaVia : 1;
   } else {
-    if (ultimaVia >= 2) {
-      throw new Error("Limite de 2 vias atingido. Use 'Reimprimir última via' para uma cópia.");
-    }
     viaNumero = ultimaVia + 1;
   }
 
@@ -896,7 +906,7 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
     : "";
 
   const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado].filter(Boolean).join("<br/>");
-  const viaTexto = viaNumero === 1 ? "1ª VIA" : "2ª VIA — REIMPRESSÃO";
+  const viaTexto = `IMPRESSÃO Nº ${viaNumero}`;
   const descricao = `MENSALIDADE ${m.numero_parcela}/${totalParcelas} — CONTRATO #${contrato.numero}${plano?.nome ? ` — ${plano.nome.toUpperCase()}` : ""}`;
   const tituloPac = paciente?.nome ?? contrato.paciente_nome;
 
