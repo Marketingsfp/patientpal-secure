@@ -1435,6 +1435,7 @@ export type Database = {
           tipo_desconto: string
           updated_at: string
           valor_desconto: number | null
+          valor_outros: number | null
         }
         Insert: {
           ativo?: boolean
@@ -1456,6 +1457,7 @@ export type Database = {
           tipo_desconto?: string
           updated_at?: string
           valor_desconto?: number | null
+          valor_outros?: number | null
         }
         Update: {
           ativo?: boolean
@@ -1477,6 +1479,7 @@ export type Database = {
           tipo_desconto?: string
           updated_at?: string
           valor_desconto?: number | null
+          valor_outros?: number | null
         }
         Relationships: [
           {
