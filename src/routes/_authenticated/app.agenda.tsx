@@ -2823,6 +2823,13 @@ function AgendaPage() {
             ) : (
               <div className="text-muted-foreground">{formaPagCtx?.desc}</div>
             )}
+            {(formaPagCtx?.medico || formaPagCtx?.especialidade) ? (
+              <div className="text-xs text-muted-foreground leading-tight">
+                {formaPagCtx?.medico ? <span className="font-medium text-foreground/80">{formaPagCtx.medico}</span> : null}
+                {formaPagCtx?.medico && formaPagCtx?.especialidade ? " · " : ""}
+                {formaPagCtx?.especialidade ? <span>{formaPagCtx.especialidade}</span> : null}
+              </div>
+            ) : null}
             <span className="block text-xs mt-1 text-muted-foreground opacity-80">Dica: use as teclas 1–5 para escolher rapidamente.</span>
           </div>
           <div className="grid gap-2 mt-2">
