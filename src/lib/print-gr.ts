@@ -591,7 +591,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
 
     const key = a.medico_id ?? "__sem_medico__";
     const medicoNome = a.medico_id ? (medById.get(a.medico_id)?.nome ?? "—") : "SEM PROFISSIONAL";
-    const g = grupos.get(key) ?? { medicoId: a.medico_id ?? null, agendaId: (a as any).agenda_id ?? null, agIdRef: a.id, medicoNome, itens: [], subtotal: 0, prestador: 0, clinica: 0, inicioRef: a.inicio };
+    const g: Grupo = grupos.get(key) ?? { medicoId: a.medico_id ?? null, agendaId: (a as any).agenda_id ?? null, agIdRef: a.id, medicoNome, itens: [] as Item[], subtotal: 0, prestador: 0, clinica: 0, inicioRef: a.inicio };
     g.itens.push({ procNome, valor, prestador, clinica: clin, inicio: a.inicio });
     if (a.inicio < g.inicioRef) { g.inicioRef = a.inicio; g.agIdRef = a.id; }
     g.subtotal = +(g.subtotal + valor).toFixed(2);
