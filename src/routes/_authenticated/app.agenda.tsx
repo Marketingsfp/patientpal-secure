@@ -238,7 +238,8 @@ async function fetchMedicoProcedimentosAgenda(): Promise<MedicoProcedimentoRef[]
 type DescontoConvenio =
   | { tipo: "percentual"; valor: number }
   | { tipo: "valor"; valor: number }
-  | { tipo: "gratuidade"; valor: 0 };
+  | { tipo: "gratuidade"; valor: 0 }
+  | { tipo: "valor_fixo"; valor: number; valorOutros: number };
 
 type ConvenioInfo = {
   convenioNome: string;
@@ -250,7 +251,18 @@ type ConvenioInfo = {
 function aplicarDesconto(valor: number, d: DescontoConvenio): number {
   if (d.tipo === "gratuidade") return 0;
   if (d.tipo === "percentual") return Math.max(0, valor * (1 - Number(d.valor) / 100));
+  if (d.tipo === "valor_fixo") return Math.max(0, Number(d.valor) || 0);
   return Math.max(0, valor - Number(d.valor));
+}
+
+/** Aplica desconto considerando o canal de pagamento (dinheiro vs outros). */
+function aplicarDescontoPorForma(valor: number, forma: string, d: DescontoConvenio): number {
+  if (d.tipo === "valor_fixo") {
+    const ehDinheiro = forma === "dinheiro";
+    const v = ehDinheiro ? Number(d.valor) : Number(d.valorOutros);
+    return Math.max(0, v || 0);
+  }
+  return aplicarDesconto(valor, d);
 }
 
 async function obterInfoConvenioPaciente(params: {
