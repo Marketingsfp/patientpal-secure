@@ -2473,10 +2473,10 @@ function AgendaPage() {
               >
               <div className="space-y-1 rounded-md border border-dashed border-primary/40 bg-primary/5 p-2 text-xs">
                 <div className="flex items-baseline justify-between gap-2">
-                  <Label className="text-xs uppercase">Nº do orçamento (laboratório)</Label>
+                  <Label className="text-xs uppercase">Nº do orçamento</Label>
                   {!form.orcamento_id && (
                     <span className="text-[10px] text-muted-foreground leading-tight text-right">
-                      Opcional — marca vários exames em uma única ficha a partir de um orçamento.
+                      Opcional — vincula qualquer orçamento (exames, consultas, procedimentos) em uma única ficha.
                     </span>
                   )}
                 </div>
