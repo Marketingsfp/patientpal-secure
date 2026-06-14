@@ -79,7 +79,7 @@ const STATUS_LABEL: Record<Status, string> = {
 const STATUS_COR: Record<Status, string> = {
   agendado: "bg-[#dbe7fb] text-slate-800 border border-[#b6cdf5]",
   confirmado: "bg-[#cfe3fb] text-slate-800 border border-[#9fc3f3]",
-  realizado: "bg-[#a8dcb0] text-slate-900 border border-[#5fb36e]",
+  realizado: "bg-[#3d8c4d] text-white border border-[#1f5a2c]",
   cancelado: "bg-[#f8d2d6] text-slate-800 border border-[#eea1a8]",
   faltou: "bg-[#f7b6c0] text-slate-800 border border-[#e88594]",
 };
