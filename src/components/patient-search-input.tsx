@@ -117,7 +117,7 @@ export function PatientSearchInput({
         `nome.ilike.% ${termoSemAcento}%`,
       ];
       if (digits.length >= 3) {
-        parts.push(`cpf.ilike.%${digits}%`);
+        parts.push(`cpf_digits.ilike.%${digits}%`);
         parts.push(`codigo_prontuario.ilike.%${digits}%`);
         parts.push(`numero_pasta.ilike.%${digits}%`);
       } else if (term.length >= 1) {
