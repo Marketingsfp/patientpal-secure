@@ -337,6 +337,24 @@ async function obterInfoConvenioPaciente(params: {
     especialidadeId = (med as any)?.especialidade_id ?? null;
   }
 
+  // Fallback: alguns médicos têm a especialidade somente na tabela N:N
+  // medico_especialidades (e não na coluna medicos.especialidade_id).
+  // Sem esse fallback, o benefício por especialidade não era encontrado e
+  // o sistema exibia "sem benefício para este procedimento" mesmo com a
+  // especialidade configurada no Cartão Consulta.
+  let especialidadesMedico: string[] = especialidadeId ? [especialidadeId] : [];
+  if (medicoId) {
+    const { data: medEsps } = await supabase
+      .from("medico_especialidades")
+      .select("especialidade_id")
+      .eq("medico_id", medicoId);
+    const extras = ((medEsps ?? []) as Array<{ especialidade_id: string | null }>)
+      .map((r) => r.especialidade_id)
+      .filter((x): x is string => !!x);
+    especialidadesMedico = Array.from(new Set([...especialidadesMedico, ...extras]));
+    if (!especialidadeId && extras[0]) especialidadeId = extras[0];
+  }
+
   // 4) Benefícios aplicáveis para o convênio
   const { data: beneficios } = await supabase
     .from("cb_beneficios")
@@ -346,7 +364,9 @@ async function obterInfoConvenioPaciente(params: {
     .eq("ativo", true);
   const aplicaveis = ((beneficios ?? []) as any[]).filter((b) => {
     if (b.escopo === "servico") return procedimentoId && b.procedimento_id === procedimentoId;
-    if (b.escopo === "especialidade") return especialidadeId && b.especialidade_id === especialidadeId;
+    if (b.escopo === "especialidade") {
+      return b.especialidade_id && especialidadesMedico.includes(b.especialidade_id);
+    }
     return false;
   });
 
