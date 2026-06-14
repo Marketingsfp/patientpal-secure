@@ -610,7 +610,7 @@ function AgendaPage() {
   type FormaOpcao = { forma: string; label: string; valor: number };
   const [formaPagOpen, setFormaPagOpen] = useState(false);
   const [formaPagOpcoes, setFormaPagOpcoes] = useState<FormaOpcao[]>([]);
-  const [formaPagCtx, setFormaPagCtx] = useState<{ agId: string; desc: string; paciente?: string; procedimento?: string } | null>(null);
+  const [formaPagCtx, setFormaPagCtx] = useState<{ agId: string; desc: string; paciente?: string; procedimento?: string; medico?: string; especialidade?: string } | null>(null);
   const [novoPacOpen, setNovoPacOpen] = useState(false);
   const [novoPac, setNovoPac] = useState({ nome: "", cpf: "", telefone: "", data_nascimento: "", email: "" });
   const [savingPac, setSavingPac] = useState(false);
