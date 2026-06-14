@@ -610,7 +610,7 @@ function AgendaPage() {
   type FormaOpcao = { forma: string; label: string; valor: number };
   const [formaPagOpen, setFormaPagOpen] = useState(false);
   const [formaPagOpcoes, setFormaPagOpcoes] = useState<FormaOpcao[]>([]);
-  const [formaPagCtx, setFormaPagCtx] = useState<{ agId: string; desc: string; paciente?: string; procedimento?: string } | null>(null);
+  const [formaPagCtx, setFormaPagCtx] = useState<{ agId: string; desc: string; paciente?: string; procedimento?: string; medico?: string; especialidade?: string } | null>(null);
   const [novoPacOpen, setNovoPacOpen] = useState(false);
   const [novoPac, setNovoPac] = useState({ nome: "", cpf: "", telefone: "", data_nascimento: "", email: "" });
   const [savingPac, setSavingPac] = useState(false);
@@ -1340,6 +1340,14 @@ function AgendaPage() {
       desc,
       paciente,
       procedimento: `${itens.map(i => (i.procedimento ?? "CONSULTA")).join(" + ")} (${itens.length} serviços)`,
+      medico: (() => {
+        const m = medicos.find((mm) => mm.id === itens[0].medico_id);
+        return m?.nome ?? undefined;
+      })(),
+      especialidade: (() => {
+        const m = medicos.find((mm) => mm.id === itens[0].medico_id);
+        return m?.especialidade_nome ?? undefined;
+      })(),
     });
     setFormaPagOpen(true);
   };
@@ -1951,6 +1959,8 @@ function AgendaPage() {
         desc: `${payload.paciente_nome} — ${payload.procedimento ?? "CONSULTA"}${descSuffix}`,
         paciente: payload.paciente_nome ?? "",
         procedimento: `${payload.procedimento ?? "CONSULTA"}${descSuffix}`,
+        medico: medicos.find((m) => m.id === payload.medico_id)?.nome ?? undefined,
+        especialidade: medicos.find((m) => m.id === payload.medico_id)?.especialidade_nome ?? undefined,
       });
       setFormaPagOpen(true);
     }
@@ -2119,6 +2129,8 @@ function AgendaPage() {
       desc: `${a.paciente_nome} — ${a.procedimento ?? "CONSULTA"}${descSuffix}`,
       paciente: a.paciente_nome ?? "",
       procedimento: `${a.procedimento ?? "CONSULTA"}${descSuffix}`,
+      medico: medicos.find((m) => m.id === a.medico_id)?.nome ?? undefined,
+      especialidade: medicos.find((m) => m.id === a.medico_id)?.especialidade_nome ?? undefined,
     });
     setFormaPagOpen(true);
   };
@@ -2811,6 +2823,13 @@ function AgendaPage() {
             ) : (
               <div className="text-muted-foreground">{formaPagCtx?.desc}</div>
             )}
+            {(formaPagCtx?.medico || formaPagCtx?.especialidade) ? (
+              <div className="text-xs text-muted-foreground leading-tight">
+                {formaPagCtx?.medico ? <span className="font-medium text-foreground/80">{formaPagCtx.medico}</span> : null}
+                {formaPagCtx?.medico && formaPagCtx?.especialidade ? " · " : ""}
+                {formaPagCtx?.especialidade ? <span>{formaPagCtx.especialidade}</span> : null}
+              </div>
+            ) : null}
             <span className="block text-xs mt-1 text-muted-foreground opacity-80">Dica: use as teclas 1–5 para escolher rapidamente.</span>
           </div>
           <div className="grid gap-2 mt-2">
