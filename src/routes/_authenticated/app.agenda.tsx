@@ -3468,12 +3468,18 @@ function AgendaPage() {
                     key={a.id}
                     className={
                       realizado
-                        ? "bg-emerald-50 dark:bg-emerald-950/20 [&>td]:py-1 [&>td]:h-9 text-xs"
+                        ? "[&>td]:py-1 [&>td]:h-9 text-xs [&>td]:bg-[#d1f0d6] hover:[&>td]:bg-[#d1f0d6]"
                         : presente
                           ? "[&>td]:py-1 [&>td]:h-9 text-xs [&>td]:bg-[#a8c8ed] hover:[&>td]:bg-[#a8c8ed]"
                           : "[&>td]:py-1 [&>td]:h-9 text-xs"
                     }
-                    style={presente ? { backgroundColor: "#a8c8ed", borderLeft: "3px solid #7aa9d8" } : undefined}
+                    style={
+                      realizado
+                        ? { backgroundColor: "#d1f0d6", borderLeft: "3px solid #8fd49a" }
+                        : presente
+                          ? { backgroundColor: "#a8c8ed", borderLeft: "3px solid #7aa9d8" }
+                          : undefined
+                    }
                     title={presente ? "Cliente presente na clínica" : undefined}
                   >
                   <TableCell title="Marque para cobrar este atendimento em um pagamento agrupado">
