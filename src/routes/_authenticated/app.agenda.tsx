@@ -2521,6 +2521,7 @@ function AgendaPage() {
                       }}
                       placeholder="Nome, CPF, nascimento (DD/MM/AAAA) ou prontuário…"
                       autoFocus
+                      enableVoice
                     />
                   </div>
                   <Button type="button" variant="outline" size="icon" title="Cadastrar novo paciente"
@@ -2538,6 +2539,13 @@ function AgendaPage() {
                   <p className="text-xs text-amber-600 font-medium">
                     Paciente não cadastrado — use o botão ao lado para cadastrar antes de salvar.
                   </p>
+                )}
+                {form.paciente_id && clinicaAtual && (
+                  <PacienteQuickActions
+                    key={form.paciente_id}
+                    pacienteId={form.paciente_id}
+                    clinicaId={clinicaAtual.clinica_id}
+                  />
                 )}
               </div>
               <div className="space-y-1">
