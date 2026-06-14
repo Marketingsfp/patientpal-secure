@@ -2519,7 +2519,7 @@ function AgendaPage() {
                           paciente_id: p?.id ?? "",
                         }));
                       }}
-                      placeholder="Buscar por nome ou CPF…"
+                      placeholder="Nome, CPF, nascimento (DD/MM/AAAA) ou prontuário…"
                       autoFocus
                     />
                   </div>
