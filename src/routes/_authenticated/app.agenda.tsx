@@ -2453,15 +2453,15 @@ function AgendaPage() {
               <Plus className="h-3 w-3 mr-1.5" /> Adicionar Encaixe
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
+          <DialogContent className="max-w-lg max-h-[95vh] overflow-y-auto p-4 gap-2">
+            <DialogHeader className="space-y-0">
               <DialogTitle>
                 {editing
                   ? (pagosSet.has(editing.id) ? "Visualizar agendamento (pago)" : "Editar agendamento")
                   : "Novo agendamento"}
               </DialogTitle>
             </DialogHeader>
-            <form onSubmit={submit} className="space-y-3">
+            <form onSubmit={submit} className="space-y-2">
               {editing && pagosSet.has(editing.id) && (
                 <div className="rounded-md border border-amber-300 bg-amber-50 text-amber-800 px-3 py-2 text-xs">
                   Este agendamento já foi pago. Para alterações, estorne o pagamento no Financeiro.
@@ -2469,7 +2469,7 @@ function AgendaPage() {
               )}
               <fieldset
                 disabled={editing ? pagosSet.has(editing.id) : false}
-                className="space-y-3 contents disabled:opacity-90"
+                className="space-y-2 contents disabled:opacity-90"
               >
               <div className="space-y-1 rounded-md border border-dashed border-primary/40 bg-primary/5 p-2">
                 <Label className="text-xs uppercase">Nº do orçamento (laboratório)</Label>
