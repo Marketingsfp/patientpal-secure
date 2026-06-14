@@ -218,8 +218,24 @@ export function PatientSearchInput({
           }
         }}
         placeholder={placeholder}
-        className="pl-9"
+        className={cn("pl-9", enableVoice && "pr-12")}
       />
+      {enableVoice && (
+        <div className="absolute right-1 top-1/2 -translate-y-1/2">
+          <VoiceInput
+            size="sm"
+            title="Ditar busca de paciente"
+            append={false}
+            onTranscript={(text) => {
+              // Limpa pontuação típica que o STT pode inserir
+              const limpo = text.replace(/[.,;:!?]+$/g, "").trim();
+              setQuery(limpo);
+              setOpen(true);
+              if (value) onSelect(null);
+            }}
+          />
+        </div>
+      )}
       {open && query.trim().length >= 2 && (
         <div className="absolute z-50 mt-1 w-full rounded-md border border-input bg-popover shadow-lg max-h-72 overflow-auto">
           {loading && (
