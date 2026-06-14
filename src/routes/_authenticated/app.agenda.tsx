@@ -426,7 +426,12 @@ function AgendaPage() {
   })();
   const bordaClinica = { borderColor: corClinica, borderWidth: 2 } as const;
   const { user } = useAuth();
-  const [dataRef, setDataRef] = useState(() => new Date().toISOString().slice(0, 10));
+  const [dataRef, setDataRef] = useState(() => {
+    const d = new Date();
+    // se hoje for sáb/dom, avança para o próximo dia útil (funcionamento)
+    while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
   const [dataFim, setDataFim] = useState<string | null>(null);
   const [apenasData, setApenasData] = useState(true);
   const [mostrarLivres, setMostrarLivres] = useState(true);
