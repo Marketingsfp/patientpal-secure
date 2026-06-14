@@ -2471,7 +2471,7 @@ function AgendaPage() {
                 disabled={editing ? pagosSet.has(editing.id) : false}
                 className="space-y-2 contents disabled:opacity-90"
               >
-              <div className="space-y-1 rounded-md border border-dashed border-primary/40 bg-primary/5 p-2">
+              <div className="space-y-1 rounded-md border border-dashed border-primary/40 bg-primary/5 p-2 text-xs">
                 <Label className="text-xs uppercase">Nº do orçamento (laboratório)</Label>
                 <div className="flex gap-2">
                   <Input
@@ -2783,7 +2783,7 @@ function AgendaPage() {
                 <Textarea value={form.observacoes} onChange={(e) => setForm(f => ({ ...f, observacoes: e.target.value }))} rows={2} />
               </div>
               </fieldset>
-              <DialogFooter>
+              <DialogFooter className="sticky bottom-0 bg-background pt-2 -mx-4 px-4 border-t mt-2">
                 {editing && pagosSet.has(editing.id) ? (
                   <Button type="button" variant="outline" onClick={() => setOpen(false)}>Fechar</Button>
                 ) : (
