@@ -238,7 +238,8 @@ async function fetchMedicoProcedimentosAgenda(): Promise<MedicoProcedimentoRef[]
 type DescontoConvenio =
   | { tipo: "percentual"; valor: number }
   | { tipo: "valor"; valor: number }
-  | { tipo: "gratuidade"; valor: 0 };
+  | { tipo: "gratuidade"; valor: 0 }
+  | { tipo: "valor_fixo"; valor: number; valorOutros: number };
 
 type ConvenioInfo = {
   convenioNome: string;
@@ -250,7 +251,18 @@ type ConvenioInfo = {
 function aplicarDesconto(valor: number, d: DescontoConvenio): number {
   if (d.tipo === "gratuidade") return 0;
   if (d.tipo === "percentual") return Math.max(0, valor * (1 - Number(d.valor) / 100));
+  if (d.tipo === "valor_fixo") return Math.max(0, Number(d.valor) || 0);
   return Math.max(0, valor - Number(d.valor));
+}
+
+/** Aplica desconto considerando o canal de pagamento (dinheiro vs outros). */
+function aplicarDescontoPorForma(valor: number, forma: string, d: DescontoConvenio): number {
+  if (d.tipo === "valor_fixo") {
+    const ehDinheiro = forma === "dinheiro";
+    const v = ehDinheiro ? Number(d.valor) : Number(d.valorOutros);
+    return Math.max(0, v || 0);
+  }
+  return aplicarDesconto(valor, d);
 }
 
 async function obterInfoConvenioPaciente(params: {
@@ -328,7 +340,7 @@ async function obterInfoConvenioPaciente(params: {
   // 4) Benefícios aplicáveis para o convênio
   const { data: beneficios } = await supabase
     .from("cb_beneficios")
-    .select("escopo,procedimento_id,especialidade_id,tipo_desconto,valor_desconto,ativo")
+    .select("escopo,procedimento_id,especialidade_id,tipo_desconto,valor_desconto,valor_outros,ativo")
     .eq("clinica_id", clinicaId)
     .eq("convenio_id", contrato.convenio_id)
     .eq("ativo", true);
@@ -344,12 +356,21 @@ async function obterInfoConvenioPaciente(params: {
   if (grat) {
     desconto = { tipo: "gratuidade", valor: 0 };
   } else {
+    const fixo = aplicaveis.find((b) => b.tipo_desconto === "valor_fixo");
+    if (fixo) {
+      desconto = {
+        tipo: "valor_fixo",
+        valor: Number(fixo.valor_desconto) || 0,
+        valorOutros: Number(fixo.valor_outros ?? fixo.valor_desconto) || 0,
+      };
+    } else {
     const perc = aplicaveis.filter((b) => b.tipo_desconto === "percentual");
     const vals = aplicaveis.filter((b) => b.tipo_desconto === "valor");
     const maiorPerc = perc.reduce((m, b) => Math.max(m, Number(b.valor_desconto) || 0), 0);
     const maiorVal = vals.reduce((m, b) => Math.max(m, Number(b.valor_desconto) || 0), 0);
     if (maiorPerc > 0) desconto = { tipo: "percentual", valor: maiorPerc };
     else if (maiorVal > 0) desconto = { tipo: "valor", valor: maiorVal };
+    }
   }
 
   return { convenioNome, emDia, parcelasAtrasadas, desconto };
@@ -1889,13 +1910,15 @@ function AgendaPage() {
           toast.error(`Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.`);
           descSuffix = ` — ${info.convenioNome} EM ATRASO`;
         } else if (info.desconto) {
-          opcoes = opcoes.map((o) => ({ ...o, valor: aplicarDesconto(o.valor, info.desconto!) }));
+          opcoes = opcoes.map((o) => ({ ...o, valor: aplicarDescontoPorForma(o.valor, o.forma, info.desconto!) }));
           const rotulo =
             info.desconto.tipo === "gratuidade"
               ? "GRATUIDADE"
               : info.desconto.tipo === "percentual"
                 ? `-${info.desconto.valor}%`
-                : `-R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+                : info.desconto.tipo === "valor_fixo"
+                  ? `R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} dinheiro / R$ ${Number(info.desconto.valorOutros).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} outros`
+                  : `-R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
           descSuffix = ` — Convênio ${info.convenioNome} (${rotulo})`;
           toast.success(`Desconto do convênio ${info.convenioNome} aplicado (${rotulo}).`);
         } else {
@@ -2055,13 +2078,15 @@ function AgendaPage() {
         toast.error(`Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.`);
         descSuffix = ` — ${info.convenioNome} EM ATRASO`;
       } else if (info.desconto) {
-        opcoes = opcoes.map((o) => ({ ...o, valor: aplicarDesconto(o.valor, info.desconto!) }));
+        opcoes = opcoes.map((o) => ({ ...o, valor: aplicarDescontoPorForma(o.valor, o.forma, info.desconto!) }));
         const rotulo =
           info.desconto.tipo === "gratuidade"
             ? "GRATUIDADE"
             : info.desconto.tipo === "percentual"
               ? `-${info.desconto.valor}%`
-              : `-R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+              : info.desconto.tipo === "valor_fixo"
+                ? `R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} dinheiro / R$ ${Number(info.desconto.valorOutros).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} outros`
+                : `-R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
         descSuffix = ` — Convênio ${info.convenioNome} (${rotulo})`;
         toast.success(`Desconto do convênio ${info.convenioNome} aplicado (${rotulo}).`);
       } else {
