@@ -3596,7 +3596,7 @@ function AgendaPage() {
                               size="icon"
                               disabled
                               title="Check-in já realizado"
-                              className="h-5 w-5 border rounded-md bg-emerald-600 text-white border-emerald-600 disabled:opacity-100"
+                              className="h-5 w-5 border rounded-md bg-green-800 text-white border-green-900 disabled:opacity-100"
                             >
                               <BadgeCheck className="h-2.5 w-2.5" />
                             </Button>
