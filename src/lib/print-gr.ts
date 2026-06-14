@@ -263,7 +263,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
 
   const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado].filter(Boolean).join("<br/>");
 
-  const viaTexto = viaNumero === 1 ? "1ª VIA" : "2ª VIA — REIMPRESSÃO";
+  const viaTexto = `IMPRESSÃO Nº ${viaNumero}`;
 
   const html = `<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8" />
@@ -463,9 +463,6 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   if (reimpressao) {
     viaNumero = ultimaVia > 0 ? ultimaVia : 1;
   } else {
-    if (ultimaVia >= 2) {
-      throw new Error("Limite de 2 vias atingido. Use 'Reimprimir última via' para uma cópia.");
-    }
     viaNumero = ultimaVia + 1;
   }
 
@@ -655,7 +652,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     : "";
 
   const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado].filter(Boolean).join("<br/>");
-  const viaTexto = viaNumero === 1 ? "1ª VIA" : "2ª VIA — REIMPRESSÃO";
+  const viaTexto = `IMPRESSÃO Nº ${viaNumero}`;
 
   // Cabeçalho da clínica (reutilizado em cada GR)
   const headerClinica = `
