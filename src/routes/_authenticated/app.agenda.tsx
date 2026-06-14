@@ -3617,7 +3617,7 @@ function AgendaPage() {
                         })()}
                         onClick={() => cobrarAgendamento(a)}
                         className={`h-7 w-7 border-2 rounded-md shadow-sm ${pagosSet.has(a.id)
-                          ? "bg-emerald-800 text-white border-emerald-900 hover:bg-emerald-900 hover:text-white ring-2 ring-emerald-300"
+                          ? "bg-emerald-950 text-white border-emerald-950 hover:bg-emerald-900 hover:text-white ring-2 ring-emerald-400"
                           : "text-rose-600 border-rose-600 hover:text-rose-700 hover:bg-rose-50"}`}
                       >
                         <DollarSign className="h-4 w-4" strokeWidth={pagosSet.has(a.id) ? 3 : 2.5} />
