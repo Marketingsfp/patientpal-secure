@@ -429,7 +429,7 @@ function AgendaPage() {
   const [dataRef, setDataRef] = useState(() => {
     const d = new Date();
     // se hoje for sáb/dom, avança para o próximo dia útil (funcionamento)
-    while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+    while (d.getDay() === 0) d.setDate(d.getDate() + 1);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   });
   const [dataFim, setDataFim] = useState<string | null>(null);
@@ -2256,7 +2256,7 @@ function AgendaPage() {
     d.setDate(d.getDate() + delta);
     // pula para o próximo dia de funcionamento (sáb/dom)
     const step = delta >= 0 ? 1 : -1;
-    while (d.getDay() === 0 || d.getDay() === 6) {
+    while (d.getDay() === 0) {
       d.setDate(d.getDate() + step);
     }
     setDataRef(d.toISOString().slice(0, 10));
@@ -4124,7 +4124,7 @@ function DataRefField({
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const proxDiaUtil = () => {
     const d = new Date();
-    while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+    while (d.getDay() === 0) d.setDate(d.getDate() + 1);
     return d;
   };
   const fmt = (s: string) => {
