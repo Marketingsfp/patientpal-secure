@@ -29,36 +29,6 @@ export type Database = {
         }
         Relationships: []
       }
-      _pasta_import_cpf: {
-        Row: {
-          cpf: string
-          pasta: string
-        }
-        Insert: {
-          cpf: string
-          pasta: string
-        }
-        Update: {
-          cpf?: string
-          pasta?: string
-        }
-        Relationships: []
-      }
-      _pasta_import_nome: {
-        Row: {
-          nome: string
-          pasta: string
-        }
-        Insert: {
-          nome: string
-          pasta: string
-        }
-        Update: {
-          nome?: string
-          pasta?: string
-        }
-        Relationships: []
-      }
       agendamentos: {
         Row: {
           agenda_id: string | null
