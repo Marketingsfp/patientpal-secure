@@ -426,7 +426,12 @@ function AgendaPage() {
   })();
   const bordaClinica = { borderColor: corClinica, borderWidth: 2 } as const;
   const { user } = useAuth();
-  const [dataRef, setDataRef] = useState(() => new Date().toISOString().slice(0, 10));
+  const [dataRef, setDataRef] = useState(() => {
+    const d = new Date();
+    // se hoje for sáb/dom, avança para o próximo dia útil (funcionamento)
+    while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
   const [dataFim, setDataFim] = useState<string | null>(null);
   const [apenasData, setApenasData] = useState(true);
   const [mostrarLivres, setMostrarLivres] = useState(true);
@@ -2249,6 +2254,11 @@ function AgendaPage() {
   const shiftData = (delta: number) => {
     const d = new Date(`${dataRef}T12:00:00`);
     d.setDate(d.getDate() + delta);
+    // pula para o próximo dia de funcionamento (sáb/dom)
+    const step = delta >= 0 ? 1 : -1;
+    while (d.getDay() === 0 || d.getDay() === 6) {
+      d.setDate(d.getDate() + step);
+    }
     setDataRef(d.toISOString().slice(0, 10));
   };
 
@@ -4112,6 +4122,11 @@ function DataRefField({
 
   const toIso = (d: Date) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const proxDiaUtil = () => {
+    const d = new Date();
+    while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+    return d;
+  };
   const fmt = (s: string) => {
     const d = new Date(`${s}T12:00:00`);
     return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
@@ -4151,7 +4166,7 @@ function DataRefField({
               size="sm"
               variant="ghost"
               onClick={() => {
-                setDataRef(toIso(new Date()));
+                setDataRef(toIso(proxDiaUtil()));
                 setDataFim(null);
                 setMode("single");
                 setOpen(false);
@@ -4163,7 +4178,7 @@ function DataRefField({
               size="sm"
               variant="ghost"
               onClick={() => {
-                setDataRef(toIso(new Date()));
+                setDataRef(toIso(proxDiaUtil()));
                 setDataFim(null);
                 setMode("single");
               }}
