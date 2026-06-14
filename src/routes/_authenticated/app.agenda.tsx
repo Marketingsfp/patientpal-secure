@@ -2249,6 +2249,11 @@ function AgendaPage() {
   const shiftData = (delta: number) => {
     const d = new Date(`${dataRef}T12:00:00`);
     d.setDate(d.getDate() + delta);
+    // pula para o próximo dia de funcionamento (sáb/dom)
+    const step = delta >= 0 ? 1 : -1;
+    while (d.getDay() === 0 || d.getDay() === 6) {
+      d.setDate(d.getDate() + step);
+    }
     setDataRef(d.toISOString().slice(0, 10));
   };
 
