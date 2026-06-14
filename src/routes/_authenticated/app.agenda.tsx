@@ -3727,7 +3727,7 @@ function AgendaPage() {
             { cor: "#cfe3fb", borda: "#9fc3f3", label: "Confirmado pelo cliente" },
             { cor: "#a8c8ed", borda: "#7aa9d8", label: "Presente na clínica" },
             { cor: "#7fbfc2", borda: "#5a9ea1", label: "Em atendimento" },
-            { cor: "#3d8c4d", borda: "#1f5a2c", label: "Atendido com sucesso" },
+            { cor: "#d1f0d6", borda: "#8fd49a", label: "Atendido com sucesso" },
             { cor: "#fde2c4", borda: "#f5c890", label: "Agenda de telemedicina" },
             { cor: "#f8d2d6", borda: "#eea1a8", label: "Cancelado pelo cliente" },
             { cor: "#fef3b6", borda: "#f0dc7a", label: "Atrasado para consulta" },
