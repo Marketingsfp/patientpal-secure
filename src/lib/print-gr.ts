@@ -457,7 +457,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   const [agsRes, cliRes, procsRes, lancsRes] = await Promise.all([
     supabase
       .from("agendamentos")
-      .select("id, paciente_nome, paciente_id, medico_id, inicio, procedimento")
+      .select("id, paciente_nome, paciente_id, medico_id, agenda_id, inicio, procedimento")
       .in("id", ids),
     supabase
       .from("clinicas")
@@ -495,12 +495,13 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   const pacienteRes = pacIdRef
     ? await supabase
         .from("pacientes")
-        .select("nome, cpf, telefone, data_nascimento")
+        .select("nome, cpf, telefone, data_nascimento, codigo_prontuario, numero_pasta")
         .eq("id", pacIdRef)
         .maybeSingle()
     : { data: null };
-  const paciente = pacienteRes.data as { nome: string; cpf: string | null; telefone: string | null; data_nascimento: string | null } | null;
+  const paciente = pacienteRes.data as { nome: string; cpf: string | null; telefone: string | null; data_nascimento: string | null; codigo_prontuario: string | null; numero_pasta: string | null } | null;
   const pacienteNome = paciente?.nome ?? ags[0].paciente_nome ?? "—";
+  const prontuarioPac = paciente?.codigo_prontuario || paciente?.numero_pasta || "";
 
   // Busca dados de todos os médicos envolvidos + seus convênios
   const medicoIds = Array.from(new Set(ags.map((a) => a.medico_id).filter((x): x is string => !!x)));
@@ -539,7 +540,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
 
   // Agrupa por médico
   type Item = { procNome: string; valor: number; prestador: number; clinica: number; inicio: string };
-  type Grupo = { medicoId: string | null; medicoNome: string; itens: Item[]; subtotal: number; prestador: number; clinica: number; inicioRef: string };
+  type Grupo = { medicoId: string | null; agendaId: string | null; agIdRef: string; medicoNome: string; itens: Item[]; subtotal: number; prestador: number; clinica: number; inicioRef: string };
   const grupos = new Map<string, Grupo>();
 
   for (const a of ags) {
@@ -590,14 +591,39 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
 
     const key = a.medico_id ?? "__sem_medico__";
     const medicoNome = a.medico_id ? (medById.get(a.medico_id)?.nome ?? "—") : "SEM PROFISSIONAL";
-    const g = grupos.get(key) ?? { medicoId: a.medico_id ?? null, medicoNome, itens: [], subtotal: 0, prestador: 0, clinica: 0, inicioRef: a.inicio };
+    const g = grupos.get(key) ?? { medicoId: a.medico_id ?? null, agendaId: (a as any).agenda_id ?? null, agIdRef: a.id, medicoNome, itens: [], subtotal: 0, prestador: 0, clinica: 0, inicioRef: a.inicio };
     g.itens.push({ procNome, valor, prestador, clinica: clin, inicio: a.inicio });
-    if (a.inicio < g.inicioRef) g.inicioRef = a.inicio;
+    if (a.inicio < g.inicioRef) { g.inicioRef = a.inicio; g.agIdRef = a.id; }
     g.subtotal = +(g.subtotal + valor).toFixed(2);
     g.prestador = +(g.prestador + prestador).toFixed(2);
     g.clinica = +(g.clinica + clin).toFixed(2);
     grupos.set(key, g);
   }
+
+  // Calcula a ficha (posição no dia) para cada grupo
+  const fichaByGrupo = new Map<string, number>();
+  await Promise.all(Array.from(grupos.entries()).map(async ([key, g]) => {
+    try {
+      const dt = new Date(g.inicioRef);
+      const ini = new Date(dt); ini.setHours(0,0,0,0);
+      const fim = new Date(dt); fim.setHours(23,59,59,999);
+      let q = supabase.from("agendamentos")
+        .select("id, paciente_id, paciente_nome, inicio")
+        .gte("inicio", ini.toISOString())
+        .lte("inicio", fim.toISOString())
+        .order("inicio", { ascending: true });
+      if (g.agendaId) q = q.eq("agenda_id", g.agendaId);
+      else if (g.medicoId) q = q.eq("medico_id", g.medicoId);
+      const { data } = await q;
+      const validos = (data ?? []).filter((r: any) => {
+        const n = String(r.paciente_nome ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+        if (!r.paciente_id && (n === "disponivel" || n === "bloqueio" || n === "")) return false;
+        return true;
+      });
+      const idx = validos.findIndex((r: any) => r.id === g.agIdRef);
+      fichaByGrupo.set(key, idx >= 0 ? idx + 1 : 0);
+    } catch { fichaByGrupo.set(key, 0); }
+  }));
 
   const formaLbl = pagamento.forma_pagamento ? (FORMA_LABEL[pagamento.forma_pagamento] ?? pagamento.forma_pagamento.toUpperCase()) : "DINHEIRO";
   const bandeiraTxt = pagamento.bandeira_cartao ? pagamento.bandeira_cartao.toUpperCase() : "";
@@ -624,6 +650,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   `;
   const headerPaciente = `
     <div class="center bold">${esc(pacienteNome)}</div>
+    ${prontuarioPac ? `<div class="center sm">PRONTUÁRIO: <span class="v">${esc(prontuarioPac)}</span></div>` : ""}
     ${paciente?.cpf ? `<div class="center sm">CPF: <span class="v">${esc(paciente.cpf)}</span></div>` : ""}
     ${paciente?.telefone ? `<div class="center sm">FONE: <span class="v">${esc(paciente.telefone)}</span></div>` : ""}
     ${paciente?.data_nascimento ? `<div class="center sm">NASC: <span class="v">${fmtDataSimples(paciente.data_nascimento)}</span></div>` : ""}
@@ -635,7 +662,10 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   // Uma GR completa por médico, separadas por linha tracejada bem visível
   const grsHtml = gruposArr.map((g, idx) => {
     const isLast = idx === gruposArr.length - 1;
+    const key = g.medicoId ?? "__sem_medico__";
     const ficha = (() => {
+      const num = fichaByGrupo.get(key) ?? 0;
+      if (num > 0) return String(num).padStart(3, "0");
       const d = new Date(g.inicioRef);
       return String(d.getHours() * 60 + d.getMinutes()).padStart(3, "0");
     })();
