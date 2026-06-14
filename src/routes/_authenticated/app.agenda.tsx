@@ -1340,6 +1340,14 @@ function AgendaPage() {
       desc,
       paciente,
       procedimento: `${itens.map(i => (i.procedimento ?? "CONSULTA")).join(" + ")} (${itens.length} serviços)`,
+      medico: (() => {
+        const m = medicos.find((mm) => mm.id === itens[0].medico_id);
+        return m?.nome ?? undefined;
+      })(),
+      especialidade: (() => {
+        const m = medicos.find((mm) => mm.id === itens[0].medico_id);
+        return m?.especialidade_nome ?? undefined;
+      })(),
     });
     setFormaPagOpen(true);
   };
