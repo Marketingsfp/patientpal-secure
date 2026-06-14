@@ -848,9 +848,6 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
   if (reimpressao) {
     viaNumero = ultimaVia > 0 ? ultimaVia : 1;
   } else {
-    if (ultimaVia >= 2) {
-      throw new Error("Limite de 2 vias atingido. Use 'Reimprimir última via' para uma cópia.");
-    }
     viaNumero = ultimaVia + 1;
   }
 
@@ -909,7 +906,7 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
     : "";
 
   const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado].filter(Boolean).join("<br/>");
-  const viaTexto = viaNumero === 1 ? "1ª VIA" : "2ª VIA — REIMPRESSÃO";
+  const viaTexto = `IMPRESSÃO Nº ${viaNumero}`;
   const descricao = `MENSALIDADE ${m.numero_parcela}/${totalParcelas} — CONTRATO #${contrato.numero}${plano?.nome ? ` — ${plano.nome.toUpperCase()}` : ""}`;
   const tituloPac = paciente?.nome ?? contrato.paciente_nome;
 
