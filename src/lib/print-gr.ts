@@ -303,7 +303,6 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
 
     <div class="sep"></div>
     <div class="center lg">GUIA DE ATENDIMENTO</div>
-    <div class="center sm" style="margin-top:2px">${viaTexto}</div>
     <div class="sep"></div>
 
     <div class="center bold">${esc(paciente?.nome ?? a.paciente_nome)}</div>
@@ -698,7 +697,6 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
         ${headerClinica}
         <div class="sep"></div>
         <div class="center lg">GUIA DE ATENDIMENTO</div>
-        <div class="center sm" style="margin-top:2px">${viaTexto}</div>
         <div class="sep"></div>
         ${headerPaciente}
         <div class="sep"></div>
@@ -948,7 +946,6 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
     <div class="sep"></div>
     <div class="center lg">GUIA DE RECEBIMENTO</div>
     <div class="center sm">MENSALIDADE DE CONVÊNIO</div>
-    <div class="center sm" style="margin-top:2px">${viaTexto}</div>
     <div class="sep"></div>
 
     <div class="center bold">${esc(tituloPac)}</div>
