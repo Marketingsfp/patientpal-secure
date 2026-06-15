@@ -525,9 +525,10 @@ export function AppShell() {
                           const active = leafIsActive(child.to, child.hash);
                           const linkKey = `${child.to}#${child.hash ?? ""}`;
                           return (
-                            <a
+                            <Link
                               key={linkKey}
-                              href={navHref(child.to, child.hash)}
+                              to={child.to as any}
+                              hash={child.hash}
                               title={collapsed ? child.label : undefined}
                               data-nav-to={child.to}
                               data-nav-active={active ? "true" : undefined}
@@ -539,7 +540,7 @@ export function AppShell() {
                             >
                               <child.icon className="h-4 w-4 shrink-0" />
                               {!collapsed && <span className="truncate">{child.label}</span>}
-                            </a>
+                            </Link>
                           );
                         })}
                       </div>
@@ -550,9 +551,9 @@ export function AppShell() {
                     (item.to !== "/app" && location.pathname.startsWith(item.to)) ||
                     aliases.some((a) => location.pathname === a || location.pathname.startsWith(`${a}/`));
                   return (
-                    <a
+                    <Link
                       key={item.to}
-                      href={navHref(item.to)}
+                      to={item.to as any}
                       title={collapsed ? item.label : undefined}
                       data-nav-to={item.to}
                       data-nav-active={active ? "true" : undefined}
@@ -564,7 +565,7 @@ export function AppShell() {
                     >
                       <item.icon className="h-4 w-4 shrink-0" />
                       {!collapsed && <span className="truncate">{item.label}</span>}
-                    </a>
+                    </Link>
                   );
                 })}
               </div>
