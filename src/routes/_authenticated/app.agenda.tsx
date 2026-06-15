@@ -3921,6 +3921,20 @@ function AgendaPage() {
           ) : null}
         </DialogContent>
       </Dialog>
+      {dividirCtx && (
+        <DividirOrcamentoDialog
+          open={dividirOpen}
+          onOpenChange={(v) => { setDividirOpen(v); if (!v) setDividirCtx(null); }}
+          clinicaId={clinicaAtual?.clinica_id ?? ""}
+          orcamento={dividirCtx.orcamento}
+          itens={dividirCtx.itens}
+          inicioPadrao={dividirCtx.inicioPadrao}
+          medicos={[
+            ...medicos.map((m) => ({ id: m.id, nome: m.nome, isRecurso: recursoIds.has(m.id) })),
+          ]}
+          onCreated={() => { void load(); }}
+        />
+      )}
     </div>
   );
 }
