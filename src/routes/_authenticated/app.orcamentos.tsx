@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { FileText, Plus, Printer, Trash2, Search, AlertTriangle, Calendar, Columns2 } from "lucide-react";
+import { FileText, Plus, Printer, Trash2, Search, AlertTriangle, Calendar, Columns2, CheckCircle2, Download } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -33,6 +33,8 @@ type Orc = {
   status: string;
   created_at: string;
   categoria: "laboratorio" | "demais" | null;
+  agendamentos_total?: number;
+  agendamentos_realizados?: number;
 };
 
 type Procedimento = {
@@ -75,6 +77,7 @@ function OrcamentosPage() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
+  const [filtroRealizacao, setFiltroRealizacao] = useState<"todos" | "realizados" | "nao_realizados">("todos");
 
   const load = async () => {
     if (!clinicaAtual) return;
@@ -86,7 +89,26 @@ function OrcamentosPage() {
       .order("created_at", { ascending: false })
       .limit(200);
     if (error) toast.error(error.message);
-    setList((data ?? []) as Orc[]);
+    const orcs = (data ?? []) as Orc[];
+    const ids = orcs.map((o) => o.id);
+    if (ids.length > 0) {
+      const { data: ags } = await supabase
+        .from("agendamentos")
+        .select("orcamento_id, status")
+        .in("orcamento_id", ids)
+        .neq("status", "cancelado");
+      const tot = new Map<string, number>();
+      const real = new Map<string, number>();
+      for (const a of (ags ?? []) as { orcamento_id: string; status: string }[]) {
+        tot.set(a.orcamento_id, (tot.get(a.orcamento_id) ?? 0) + 1);
+        if (a.status === "realizado") real.set(a.orcamento_id, (real.get(a.orcamento_id) ?? 0) + 1);
+      }
+      for (const o of orcs) {
+        o.agendamentos_total = tot.get(o.id) ?? 0;
+        o.agendamentos_realizados = real.get(o.id) ?? 0;
+      }
+    }
+    setList(orcs);
     setLoading(false);
   };
 
@@ -94,13 +116,45 @@ function OrcamentosPage() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return list;
-    return list.filter((o) =>
-      o.paciente_nome.toLowerCase().includes(q) ||
-      String(o.numero).includes(q) ||
-      (o.medico_nome ?? "").toLowerCase().includes(q),
-    );
-  }, [list, query]);
+    return list.filter((o) => {
+      if (q && !(
+        o.paciente_nome.toLowerCase().includes(q) ||
+        String(o.numero).includes(q) ||
+        (o.medico_nome ?? "").toLowerCase().includes(q)
+      )) return false;
+      const realizado = (o.agendamentos_total ?? 0) > 0;
+      if (filtroRealizacao === "realizados" && !realizado) return false;
+      if (filtroRealizacao === "nao_realizados" && realizado) return false;
+      return true;
+    });
+  }, [list, query, filtroRealizacao]);
+
+  const exportarCsv = () => {
+    const header = ["Numero","Data","Paciente","Telefone","Medico","Pagamento","Total","Categoria","Realizado","Agendamentos","Realizados"];
+    const rows = filtered.map((o) => [
+      o.numero,
+      new Date(o.created_at).toLocaleDateString("pt-BR"),
+      o.paciente_nome,
+      o.paciente_telefone ?? "",
+      o.medico_nome ?? "",
+      o.forma_pagamento ?? "",
+      Number(o.valor_total).toFixed(2).replace(".", ","),
+      o.categoria ?? "",
+      (o.agendamentos_total ?? 0) > 0 ? "Sim" : "Nao",
+      o.agendamentos_total ?? 0,
+      o.agendamentos_realizados ?? 0,
+    ]);
+    const csv = [header, ...rows]
+      .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(";"))
+      .join("\n");
+    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `orcamentos-${filtroRealizacao}-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const remover = async (id: string) => {
     if (!confirm("Excluir este orçamento?")) return;
@@ -135,13 +189,40 @@ function OrcamentosPage() {
           >
             <Columns2 className="h-4 w-4" /> Abrir c/ agenda
           </Button>
+          <Button variant="outline" onClick={exportarCsv} className="gap-2" title="Exportar relatório CSV">
+            <Download className="h-4 w-4" /> Exportar
+          </Button>
           <Button onClick={() => setOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> Novo orçamento</Button>
         </div>
       </div>
 
-      <div className="relative">
-        <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-        <Input className="pl-9" placeholder="Buscar por paciente, número ou médico…" value={query} onChange={(e) => setQuery(e.target.value)} />
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="relative flex-1 min-w-[240px]">
+          <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input className="pl-9" placeholder="Buscar por paciente, número ou médico…" value={query} onChange={(e) => setQuery(e.target.value)} />
+        </div>
+        <div className="flex items-center gap-1 rounded-md border bg-card p-0.5 text-xs">
+          {([
+            ["todos", "Todos"],
+            ["realizados", "Realizados"],
+            ["nao_realizados", "Não realizados"],
+          ] as const).map(([k, label]) => (
+            <button
+              key={k}
+              onClick={() => setFiltroRealizacao(k)}
+              className={`px-3 py-1.5 rounded ${filtroRealizacao === k ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+            >
+              {label}
+              {k !== "todos" && (
+                <span className="ml-1 opacity-70">
+                  ({k === "realizados"
+                    ? list.filter((o) => (o.agendamentos_total ?? 0) > 0).length
+                    : list.filter((o) => (o.agendamentos_total ?? 0) === 0).length})
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="rounded-md border bg-card">
@@ -164,7 +245,22 @@ function OrcamentosPage() {
               <tr><td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">Nenhum orçamento</td></tr>
             ) : filtered.map((o) => (
               <tr key={o.id} className="border-t hover:bg-muted/30">
-                <td className="px-3 py-2 font-mono">#{String(o.numero).padStart(5, "0")}</td>
+                <td className="px-3 py-2 font-mono">
+                  <div className="flex items-center gap-1.5">
+                    <span>#{String(o.numero).padStart(5, "0")}</span>
+                    {(o.agendamentos_total ?? 0) > 0 && (
+                      <span
+                        title={`Realizado · ${o.agendamentos_total} agendamento(s)${(o.agendamentos_realizados ?? 0) > 0 ? `, ${o.agendamentos_realizados} realizado(s)` : ""}`}
+                        className="inline-flex items-center gap-0.5 text-emerald-600"
+                      >
+                        <CheckCircle2 className="h-4 w-4" />
+                        {(o.agendamentos_total ?? 0) > 1 && (
+                          <span className="text-[10px] font-semibold">{o.agendamentos_total}</span>
+                        )}
+                      </span>
+                    )}
+                  </div>
+                </td>
                 <td className="px-3 py-2">{new Date(o.created_at).toLocaleDateString("pt-BR")}</td>
                 <td className="px-3 py-2 font-medium">
                   <div className="flex items-center gap-2">
