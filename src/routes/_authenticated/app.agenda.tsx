@@ -1724,9 +1724,9 @@ function AgendaPage() {
     setOpen(true);
   };
 
-  const buscarOrcamento = async () => {
+  const buscarOrcamento = async (numeroOverride?: number) => {
     if (!clinicaAtual) return;
-    const num = parseInt(form.orcamento_numero.replace(/\D/g, ""), 10);
+    const num = numeroOverride ?? parseInt(form.orcamento_numero.replace(/\D/g, ""), 10);
     if (!num || num <= 0) { toast.error("Informe o nº do orçamento."); return; }
     setBuscandoOrc(true);
     try {
