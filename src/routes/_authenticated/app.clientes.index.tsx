@@ -28,6 +28,10 @@ function fmtNasc(d: string | null): string {
   return `${day}/${m}/${y}`;
 }
 
+function normalizarBusca(s: string): string {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+}
+
 function IdadeCell({ nascimento }: { nascimento: string | null }) {
   const idade = calcIdadeAnos(nascimento);
   if (idade === null || idade < 0) return <>—</>;
@@ -80,36 +84,42 @@ function ClientesPage() {
       .eq("clinica_id", clinicaAtual.clinica_id);
     const q = termo.trim();
     if (q) {
-      const like = `%${q}%`;
+      const digits = q.replace(/\D/g, "");
+      if (q.length < 3 && digits.length < 3) {
+        setItems([]);
+        setLoading(false);
+        return;
+      }
+      const termoNorm = normalizarBusca(q);
       const dataIso = /^\d{2}\/\d{2}\/\d{4}$/.test(q)
         ? q.split("/").reverse().join("-")
         : null;
-      const ors = [
-        `nome.ilike.${like}`,
-        `cpf.ilike.${like}`,
-        `telefone.ilike.${like}`,
-        `email.ilike.${like}`,
-        `codigo_prontuario.ilike.${like}`,
-      ];
+      const ors = [`nome.ilike.${termoNorm}%`];
+      if (termoNorm.length >= 4) ors.push(`nome.ilike.% ${termoNorm}%`);
+      if (digits.length >= 3) {
+        ors.push(`cpf.ilike.${digits}%`);
+        ors.push(`telefone.ilike.%${digits}%`);
+        ors.push(`codigo_prontuario.ilike.${digits}%`);
+      }
+      if (q.includes("@") && q.length >= 5) ors.push(`email.ilike.%${q}%`);
       if (dataIso) ors.push(`data_nascimento.eq.${dataIso}`);
       query = query.or(ors.join(","));
     }
-    const [{ data, error }, { count, error: countError }] = await Promise.all([
-      query
-        .order("codigo_prontuario", { ascending: true, nullsFirst: false })
-        .limit(500),
-      supabase
+    const dataRequest = query
+      .order("codigo_prontuario", { ascending: true, nullsFirst: false })
+      .limit(q ? 80 : 120);
+    const countRequest = q
+      ? Promise.resolve({ count: totalPacientes, error: null })
+      : supabase
         .from("pacientes")
-        .select("id", { count: "exact", head: true })
-        .eq("clinica_id", clinicaAtual.clinica_id),
-    ]);
+        .select("id", { count: "planned", head: true })
+        .eq("clinica_id", clinicaAtual.clinica_id);
+    const [{ data, error }, { count, error: countError }] = await Promise.all([dataRequest, countRequest]);
     setLoading(false);
     if (error) { toast.error(error.message); return; }
     if (countError) { toast.error(countError.message); } else { setTotalPacientes(count ?? 0); }
     setItems((data ?? []) as any);
   };
-
-  useEffect(() => { void load(busca); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clinicaAtual?.clinica_id]);
 
   // Debounced server-side search
   useEffect(() => {

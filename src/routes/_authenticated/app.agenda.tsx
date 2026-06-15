@@ -777,31 +777,28 @@ function AgendaPage() {
     const agendaRows = (((mapped ?? []) as unknown) as Array<Agendamento & { fluxo_etapa?: string | null }>);
     setEtapaMap(new Map(agendaRows
       .map((r) => [r.id, r.fluxo_etapa ?? "aguardando_recepcao"] as [string, string])));
-    // Busca data_nascimento dos pacientes para exibir ícone de idade
+    // Busca dados auxiliares dos pacientes em paralelo para não atrasar a agenda.
     const pacIds = Array.from(new Set(
       agendaRows
         .map((a) => a.paciente_id as string | null)
         .filter((x): x is string => !!x),
     ));
     if (pacIds.length) {
-      const { data: nasc } = await supabase
-        .from("pacientes")
-        .select("id,data_nascimento")
-        .in("id", pacIds);
+      const [{ data: nasc }, { data: contratos }] = await Promise.all([
+        supabase
+          .from("pacientes")
+          .select("id,data_nascimento")
+          .in("id", pacIds),
+        supabase
+          .from("contratos_assinatura")
+          .select("paciente_id,status,cb_convenios(nome)")
+          .eq("clinica_id", clinicaAtual.clinica_id)
+          .eq("status", "ativo")
+          .in("paciente_id", pacIds),
+      ]);
       const map = new Map<string, string | null>();
       (nasc ?? []).forEach((p: any) => map.set(p.id, p.data_nascimento ?? null));
       setNascMap(map);
-    } else {
-      setNascMap(new Map());
-    }
-    // Busca contratos de convênio (cartão benefícios) ativos para sinalizar na agenda
-    if (pacIds.length) {
-      const { data: contratos } = await supabase
-        .from("contratos_assinatura")
-        .select("paciente_id,status,cb_convenios(nome)")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("status", "ativo")
-        .in("paciente_id", pacIds);
       const cmap = new Map<string, string>();
       ((contratos ?? []) as Array<{ paciente_id: string; cb_convenios: { nome: string } | null }>)
         .forEach((c) => {
@@ -811,6 +808,7 @@ function AgendaPage() {
         });
       setConvenioMap(cmap);
     } else {
+      setNascMap(new Map());
       setConvenioMap(new Map());
     }
     // Marca agendamentos pagos (receita vinculada em fin_lancamentos)
@@ -823,14 +821,15 @@ function AgendaPage() {
         .filter((a) => !isSlotLivre(a.paciente_nome))
         .map((a) => a.id),
     );
-    if (ids.length) {
+    const idsParaPagamento = Array.from(idsComPaciente);
+    if (idsParaPagamento.length) {
       // Batch em lotes para não estourar o limite de URL do PostgREST
       // quando há muitos agendamentos no dia.
       const CHUNK = 200;
       const pagosIds: string[] = [];
       const infoMap = new Map<string, { valor: number; forma: string | null }>();
-      for (let i = 0; i < ids.length; i += CHUNK) {
-        const slice = ids.slice(i, i + CHUNK);
+      for (let i = 0; i < idsParaPagamento.length; i += CHUNK) {
+        const slice = idsParaPagamento.slice(i, i + CHUNK);
         const { data: pg, error: pgErr } = await supabase
           .from("fin_lancamentos")
           .select("agendamento_id, valor, forma_pagamento")

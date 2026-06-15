@@ -83,6 +83,9 @@ const TIPO_CLASS: Record<MovTipo, string> = {
   fechamento: "bg-slate-200 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700",
 };
 
+const SESSAO_FIELDS = "id, clinica_id, user_id, user_nome, aberto_em, valor_abertura, fechado_em, valor_fechamento_informado, valor_fechamento_calculado, diferenca, status, observacoes";
+const MOV_FIELDS = "id, sessao_id, user_id, tipo, valor, descricao, forma_pagamento, created_at, lancamento_id";
+
 const BANDEIRAS_CARTAO = [
   "Visa", "Mastercard", "Elo", "Hipercard", "American Express", "Diners", "Outra",
 ];
@@ -266,21 +269,31 @@ function Page() {
     if (!clinicaAtual || !user) return;
     setLoading(true);
     // Sessao aberta do usuario
-    const { data: aberta } = await supabase
+    const [abertaRes, histRes] = await Promise.all([
+      supabase
       .from("caixa_sessoes")
-      .select("*")
+      .select(SESSAO_FIELDS)
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("user_id", user.id)
       .eq("status", "aberto")
       .order("aberto_em", { ascending: false })
       .limit(1)
-      .maybeSingle();
+      .maybeSingle(),
+      supabase
+        .from("caixa_sessoes")
+        .select(SESSAO_FIELDS)
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("user_id", user.id)
+        .order("aberto_em", { ascending: false })
+        .limit(20),
+    ]);
+    const aberta = abertaRes.data;
     setMinhaSessao((aberta ?? null) as Sessao | null);
 
     if (aberta) {
       const { data: movs } = await supabase
         .from("caixa_movimentos")
-        .select("*")
+        .select(MOV_FIELDS)
         .eq("sessao_id", (aberta as Sessao).id)
         .order("created_at", { ascending: true });
       setMinhasMovs((movs ?? []) as Mov[]);
@@ -288,15 +301,7 @@ function Page() {
       setMinhasMovs([]);
     }
 
-    // Historico do usuario (ultimas 20)
-    const { data: hist } = await supabase
-      .from("caixa_sessoes")
-      .select("*")
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .eq("user_id", user.id)
-      .order("aberto_em", { ascending: false })
-      .limit(20);
-    setMinhasSessoes((hist ?? []) as Sessao[]);
+    setMinhasSessoes((histRes.data ?? []) as Sessao[]);
     setLoading(false);
   }, [clinicaAtual, user]);
 
@@ -533,7 +538,7 @@ function Page() {
     const fim = new Date(fFim + "T23:59:59").toISOString();
     let q = supabase
       .from("caixa_sessoes")
-      .select("*")
+      .select(SESSAO_FIELDS)
       .eq("clinica_id", clinicaAtual.clinica_id)
       .gte("aberto_em", ini)
       .lte("aberto_em", fim)
@@ -547,7 +552,7 @@ function Page() {
       const ids = sess.map((s) => s.id);
       const { data: movs } = await supabase
         .from("caixa_movimentos")
-        .select("*")
+        .select(MOV_FIELDS)
         .in("sessao_id", ids);
       setTodosMovs((movs ?? []) as Mov[]);
     } else {
@@ -632,7 +637,7 @@ function Page() {
         valor_abertura: v,
         observacoes: obsAbertura || null,
       })
-      .select("*")
+      .select(SESSAO_FIELDS)
       .single();
     if (error || !sess) {
       setSaving(false);
@@ -726,7 +731,7 @@ function Page() {
     setOpenDetalhe(s);
     const { data } = await supabase
       .from("caixa_movimentos")
-      .select("*")
+      .select(MOV_FIELDS)
       .eq("sessao_id", s.id)
       .order("created_at", { ascending: true });
     setDetalheMovs((data ?? []) as Mov[]);
