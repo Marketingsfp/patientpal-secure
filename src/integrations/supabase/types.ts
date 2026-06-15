@@ -14,6 +14,75 @@ export type Database = {
   }
   public: {
     Tables: {
+      _mj_dedup: {
+        Row: {
+          bairro: string | null
+          cep: string | null
+          chave: string | null
+          cidade: string | null
+          codigo_pessoa: string | null
+          complemento: string | null
+          cpf_cnpj: string | null
+          cpf_digits: string | null
+          ddd_1: string | null
+          ddd_2: string | null
+          email: string | null
+          endereco: string | null
+          fone_1: string | null
+          fone_2: string | null
+          nascimento_abertura: string | null
+          nome: string | null
+          nome_u: string | null
+          numero: string | null
+          sexo: string | null
+          uf: string | null
+        }
+        Insert: {
+          bairro?: string | null
+          cep?: string | null
+          chave?: string | null
+          cidade?: string | null
+          codigo_pessoa?: string | null
+          complemento?: string | null
+          cpf_cnpj?: string | null
+          cpf_digits?: string | null
+          ddd_1?: string | null
+          ddd_2?: string | null
+          email?: string | null
+          endereco?: string | null
+          fone_1?: string | null
+          fone_2?: string | null
+          nascimento_abertura?: string | null
+          nome?: string | null
+          nome_u?: string | null
+          numero?: string | null
+          sexo?: string | null
+          uf?: string | null
+        }
+        Update: {
+          bairro?: string | null
+          cep?: string | null
+          chave?: string | null
+          cidade?: string | null
+          codigo_pessoa?: string | null
+          complemento?: string | null
+          cpf_cnpj?: string | null
+          cpf_digits?: string | null
+          ddd_1?: string | null
+          ddd_2?: string | null
+          email?: string | null
+          endereco?: string | null
+          fone_1?: string | null
+          fone_2?: string | null
+          nascimento_abertura?: string | null
+          nome?: string | null
+          nome_u?: string | null
+          numero?: string | null
+          sexo?: string | null
+          uf?: string | null
+        }
+        Relationships: []
+      }
       _mj_import_csv: {
         Row: {
           ativo: string | null
