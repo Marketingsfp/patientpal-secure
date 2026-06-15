@@ -201,7 +201,7 @@ export function DividirOrcamentoDialog({
                   <Label className="text-xs">Profissional / Recurso</Label>
                   <SearchableSelect
                     value={g.medico_id}
-                    onChange={(v) => updateGrupo(idx, { medico_id: v ?? "" })}
+                    onChange={(v) => updateGrupo(idx, { medico_id: v })}
                     options={medicoOpts}
                     placeholder="Selecione…"
                   />
