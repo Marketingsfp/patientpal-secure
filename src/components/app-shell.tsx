@@ -303,6 +303,7 @@ export function AppShell() {
 
   const subsystem = useSyncExternalStore(subscribeSubsystem, getSubsystem, () => null);
   const isChooser = location.pathname === "/app" || location.pathname === "/app/";
+  const isEmbed = typeof location.search === "string" && /(?:^|[?&])embed=1(?:&|$)/.test(location.search);
 
   const initial = (userName || user?.email || "?").trim().charAt(0).toUpperCase();
 
@@ -432,6 +433,14 @@ export function AppShell() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
         Entrando…
+      </div>
+    );
+  }
+
+  if (isEmbed) {
+    return (
+      <div className="h-screen w-full overflow-auto bg-background" style={{ background: "var(--surface-cream)" }}>
+        <Outlet />
       </div>
     );
   }
