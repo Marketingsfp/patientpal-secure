@@ -17,7 +17,7 @@ import {
   Download, CalendarDays, Users, ClipboardList, FileText, DollarSign,
   Stethoscope, Clock, Brain, FlaskConical, BellRing, FileHeart, Target,
   CreditCard, ShieldCheck, Building2, BookOpen, MessageCircle, Bell, Workflow,
-  HeartPulse, LayoutDashboard, TrendingUp, TrendingDown, Wallet, Settings2, RotateCcw, Boxes,
+  HeartPulse, LayoutDashboard, TrendingUp, TrendingDown, Wallet, Settings2, RotateCcw, Boxes, PhoneCall,
 } from "lucide-react";
 import { CuboBI } from "@/components/relatorios/CuboBI";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -401,6 +401,9 @@ function RelatoriosPage() {
             <TabsTrigger value="cubo" className="gap-2">
               <Boxes className="h-4 w-4" /> Cubo BI
             </TabsTrigger>
+            <TabsTrigger value="agendamentos-diario" className="gap-2">
+              <PhoneCall className="h-4 w-4" /> Agendamentos do Dia
+            </TabsTrigger>
             <TabsTrigger value="downloads" className="gap-2">
               <Download className="h-4 w-4" /> Baixar planilhas
             </TabsTrigger>
@@ -423,6 +426,10 @@ function RelatoriosPage() {
 
         <TabsContent value="cubo" className="mt-4">
           <CuboBI clinicaId={clinicaAtual?.clinica_id} ini={ini} fim={fim} />
+        </TabsContent>
+
+        <TabsContent value="agendamentos-diario" className="mt-4">
+          <AgendamentosDiarioView clinicaId={clinicaAtual?.clinica_id} ini={ini} fim={fim} />
         </TabsContent>
 
         <TabsContent value="downloads" className="mt-4">
@@ -852,5 +859,219 @@ function Kpi({
         <p className={`text-2xl font-semibold mt-1 ${tint}`}>{value}</p>
       </CardContent>
     </Card>
+  );
+}
+
+// ============= AGENDAMENTOS DO DIA (por Atendente / Setor) =============
+type AgendDiaRow = {
+  id: string;
+  created_at: string;
+  criado_por: string | null;
+  paciente_nome: string | null;
+  inicio: string;
+  procedimento: string | null;
+  status: string | null;
+  medico_id: string | null;
+};
+
+function AgendamentosDiarioView({ clinicaId, ini, fim }: { clinicaId?: string; ini: string; fim: string }) {
+  const [loading, setLoading] = useState(false);
+  const [rows, setRows] = useState<AgendDiaRow[]>([]);
+  const [profMap, setProfMap] = useState<Map<string, string>>(new Map());
+  const [setorMap, setSetorMap] = useState<Map<string, string>>(new Map()); // user_id -> setor nome
+  const [medMap, setMedMap] = useState<Map<string, string>>(new Map());
+
+  useEffect(() => {
+    if (!clinicaId) return;
+    let cancel = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const iniISO = `${ini}T00:00:00`;
+        const fimISO = `${fim}T23:59:59`;
+        const { data: ags, error } = await supabase
+          .from("agendamentos")
+          .select("id, created_at, criado_por, paciente_nome, inicio, procedimento, status, medico_id")
+          .eq("clinica_id", clinicaId)
+          .gte("created_at", iniISO)
+          .lte("created_at", fimISO)
+          .order("created_at", { ascending: false });
+        if (error) throw error;
+        const list = (ags ?? []) as AgendDiaRow[];
+        const userIds = Array.from(new Set(list.map((r) => r.criado_por).filter(Boolean) as string[]));
+        const medIds = Array.from(new Set(list.map((r) => r.medico_id).filter(Boolean) as string[]));
+        const [profsRes, contratosRes, medsRes] = await Promise.all([
+          userIds.length
+            ? supabase.from("profiles").select("id, nome").in("id", userIds)
+            : Promise.resolve({ data: [] as any[] }),
+          userIds.length
+            ? supabase
+                .from("hr_contratos")
+                .select("user_id, setor_id, status, data_admissao")
+                .eq("clinica_id", clinicaId)
+                .in("user_id", userIds)
+            : Promise.resolve({ data: [] as any[] }),
+          medIds.length
+            ? supabase.from("medicos").select("id, nome").in("id", medIds)
+            : Promise.resolve({ data: [] as any[] }),
+        ]);
+        const pMap = new Map<string, string>();
+        ((profsRes.data ?? []) as any[]).forEach((p) => pMap.set(p.id, p.nome ?? "—"));
+        const mMap = new Map<string, string>();
+        ((medsRes.data ?? []) as any[]).forEach((m) => mMap.set(m.id, m.nome ?? "—"));
+        // Pega o contrato ativo mais recente por usuário
+        const userSetor = new Map<string, string | null>();
+        const ordered = ((contratosRes.data ?? []) as any[]).sort((a, b) =>
+          String(b.data_admissao ?? "").localeCompare(String(a.data_admissao ?? "")),
+        );
+        for (const c of ordered) {
+          if (!userSetor.has(c.user_id)) userSetor.set(c.user_id, c.setor_id ?? null);
+        }
+        const setorIds = Array.from(new Set(Array.from(userSetor.values()).filter(Boolean) as string[]));
+        const setorNome = new Map<string, string>();
+        if (setorIds.length) {
+          const { data: secs } = await supabase.from("setores").select("id, nome").in("id", setorIds);
+          ((secs ?? []) as any[]).forEach((s) => setorNome.set(s.id, s.nome ?? "—"));
+        }
+        const sMap = new Map<string, string>();
+        for (const [uid, sid] of userSetor) {
+          sMap.set(uid, sid ? (setorNome.get(sid) ?? "Sem setor") : "Sem setor");
+        }
+        if (cancel) return;
+        setRows(list);
+        setProfMap(pMap);
+        setMedMap(mMap);
+        setSetorMap(sMap);
+      } catch (e: any) {
+        toast.error(e?.message ?? "Erro ao carregar relatório");
+      } finally {
+        if (!cancel) setLoading(false);
+      }
+    })();
+    return () => { cancel = true; };
+  }, [clinicaId, ini, fim]);
+
+  const agrupado = useMemo(() => {
+    const bySetor = new Map<string, Map<string, AgendDiaRow[]>>();
+    for (const r of rows) {
+      const uid = r.criado_por ?? "";
+      const setor = uid ? (setorMap.get(uid) ?? "Sem setor") : "Sem usuário";
+      const atendente = uid ? (profMap.get(uid) ?? "—") : "Sistema / Sem usuário";
+      if (!bySetor.has(setor)) bySetor.set(setor, new Map());
+      const byAt = bySetor.get(setor)!;
+      if (!byAt.has(atendente)) byAt.set(atendente, []);
+      byAt.get(atendente)!.push(r);
+    }
+    return Array.from(bySetor.entries())
+      .map(([setor, m]) => ({
+        setor,
+        total: Array.from(m.values()).reduce((acc, l) => acc + l.length, 0),
+        atendentes: Array.from(m.entries())
+          .map(([nome, lista]) => ({ nome, lista }))
+          .sort((a, b) => b.lista.length - a.lista.length),
+      }))
+      .sort((a, b) => b.total - a.total);
+  }, [rows, profMap, setorMap]);
+
+  const totalGeral = rows.length;
+
+  function exportar() {
+    const flat = rows.map((r) => {
+      const uid = r.criado_por ?? "";
+      return {
+        "Data Criação": new Date(r.created_at).toLocaleString("pt-BR"),
+        Setor: uid ? (setorMap.get(uid) ?? "Sem setor") : "Sem usuário",
+        Atendente: uid ? (profMap.get(uid) ?? "—") : "Sistema",
+        Paciente: r.paciente_nome ?? "",
+        "Data Consulta": new Date(r.inicio).toLocaleString("pt-BR"),
+        Procedimento: r.procedimento ?? "",
+        Médico: r.medico_id ? (medMap.get(r.medico_id) ?? "—") : "",
+        Status: r.status ?? "",
+      };
+    });
+    if (!flat.length) { toast.info("Nada para exportar."); return; }
+    exportToExcel(flat, `agendamentos-diario-${ini}-a-${fim}`);
+  }
+
+  if (!clinicaId) {
+    return <Card><CardContent className="py-10 text-center text-muted-foreground">Selecione uma clínica.</CardContent></Card>;
+  }
+  if (loading) {
+    return <Card><CardContent className="py-10 text-center text-muted-foreground">Carregando…</CardContent></Card>;
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold">Agendamentos criados no período</h2>
+          <p className="text-sm text-muted-foreground">
+            Conta pelo dia em que o agendamento foi <b>registrado no sistema</b> (não pela data da consulta).
+            Agrupado por setor e atendente.
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="text-right">
+            <div className="text-xs text-muted-foreground">Total no período</div>
+            <div className="text-2xl font-bold">{totalGeral}</div>
+          </div>
+          <Button onClick={exportar} variant="outline" size="sm" className="gap-2">
+            <Download className="h-4 w-4" /> Exportar Excel
+          </Button>
+        </div>
+      </div>
+
+      {agrupado.length === 0 ? (
+        <Card><CardContent className="py-10 text-center text-muted-foreground">Nenhum agendamento registrado no período.</CardContent></Card>
+      ) : agrupado.map((g) => (
+        <Card key={g.setor}>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-muted-foreground" />
+                {g.setor}
+              </CardTitle>
+              <span className="text-sm font-semibold">{g.total} agendamento{g.total === 1 ? "" : "s"}</span>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {g.atendentes.map((a) => (
+              <div key={a.nome} className="rounded-md border">
+                <div className="flex items-center justify-between bg-muted/40 px-3 py-2">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <Users className="h-4 w-4 text-muted-foreground" /> {a.nome}
+                  </div>
+                  <span className="text-sm font-semibold">{a.lista.length}</span>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-40">Criado em</TableHead>
+                      <TableHead>Paciente</TableHead>
+                      <TableHead className="w-44">Data consulta</TableHead>
+                      <TableHead>Procedimento</TableHead>
+                      <TableHead>Médico</TableHead>
+                      <TableHead className="w-28">Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {a.lista.map((r) => (
+                      <TableRow key={r.id}>
+                        <TableCell className="text-xs">{new Date(r.created_at).toLocaleString("pt-BR")}</TableCell>
+                        <TableCell className="text-sm">{r.paciente_nome ?? "—"}</TableCell>
+                        <TableCell className="text-xs">{new Date(r.inicio).toLocaleString("pt-BR")}</TableCell>
+                        <TableCell className="text-sm">{r.procedimento ?? "—"}</TableCell>
+                        <TableCell className="text-sm">{r.medico_id ? (medMap.get(r.medico_id) ?? "—") : "—"}</TableCell>
+                        <TableCell className="text-xs">{r.status ?? "—"}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ))}
+    </div>
   );
 }
