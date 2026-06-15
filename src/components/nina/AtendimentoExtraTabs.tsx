@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Send, Search, Loader2, Eye, ArrowRightLeft, CheckCircle2, Plus, Pencil, Trash2,
   Clock, AlertTriangle, Users, FileText, Phone, MessageSquare,
-  Circle, Coffee, PowerOff, Lock, Unlock,
+  Circle, Coffee, PowerOff, Lock, Unlock, CalendarPlus,
 } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
@@ -377,6 +377,24 @@ export function AtendInbox() {
                   </p>
                 </div>
                 <div className="flex gap-1 shrink-0">
+                  <Button
+                    size="sm"
+                    variant="default"
+                    className="bg-emerald-500 hover:bg-emerald-600"
+                    onClick={() => {
+                      const params = new URLSearchParams();
+                      params.set("novo", "1");
+                      const pacId = contato?.paciente?.id;
+                      const pacNome = contato?.paciente?.nome || sel.contato_nome || "";
+                      const tel = sel.contato_telefone || contato?.paciente?.telefone || "";
+                      if (pacId) params.set("novoPacId", pacId);
+                      if (pacNome) params.set("novoPacNome", pacNome);
+                      if (tel) params.set("novoTelefone", tel);
+                      window.open(`/app/agenda?${params.toString()}`, "_blank", "noopener");
+                    }}
+                  >
+                    <CalendarPlus className="h-3.5 w-3.5 mr-1" /> Agendar
+                  </Button>
                   <Button size="sm" variant="outline" onClick={() => setTransferOpen(true)}>
                     <ArrowRightLeft className="h-3.5 w-3.5 mr-1" /> Transferir
                   </Button>
