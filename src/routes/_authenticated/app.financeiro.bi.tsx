@@ -60,7 +60,7 @@ function Page() {
       type Cell = { cartao: number; particular: number; exames: number; total: number };
       const empty = (): Cell => ({ cartao: 0, particular: 0, exames: 0, total: 0 });
       const matriz: Record<number, Record<number, Cell>> = {};
-      const { data: rows } = await supabase.rpc("fin_atendimentos_matriz", { _clinica: clinicaAtual.clinica_id });
+      const { data: rows } = await (supabase.rpc as unknown as (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown[] | null; error: unknown }>)("fin_atendimentos_matriz", { _clinica: clinicaAtual.clinica_id });
       for (const r of (rows ?? []) as Array<{ ano: number; mes: number; cartao: number; particular: number; exames: number }>) {
         if (!matriz[r.ano]) matriz[r.ano] = {};
         const cartao = Number(r.cartao) || 0;
