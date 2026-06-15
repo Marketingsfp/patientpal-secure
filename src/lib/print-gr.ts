@@ -62,11 +62,11 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   // Controle de vias: máximo 2 (1ª e 2ª via). Reimpressão repete a última sem incrementar.
   const { data: visExistentes, error: errVias } = await supabase
     .from("gr_impressoes" as never)
-    .select("via_numero")
+    .select("via_numero, impresso_por_nome")
     .eq("agendamento_id", agendamentoId)
     .order("via_numero", { ascending: false });
   if (errVias) throw new Error(errVias.message);
-  const existentes = (visExistentes as Array<{ via_numero: number }> | null) ?? [];
+  const existentes = (visExistentes as Array<{ via_numero: number; impresso_por_nome: string | null }> | null) ?? [];
   const ultimaVia = existentes[0]?.via_numero ?? 0;
   let viaNumero: number;
   if (reimpressao) {
@@ -74,6 +74,8 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   } else {
     viaNumero = ultimaVia + 1;
   }
+  const primeiraVia = existentes.length ? existentes[existentes.length - 1] : null;
+  const usuarioFinalNome = primeiraVia?.impresso_por_nome ?? usuarioNome;
 
   // Busca dados em paralelo
   const [ag, cli] = await Promise.all([
@@ -452,11 +454,11 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   const chaveVia = ids[0];
   const { data: visExistentes, error: errVias } = await supabase
     .from("gr_impressoes" as never)
-    .select("via_numero")
+    .select("via_numero, impresso_por_nome")
     .eq("agendamento_id", chaveVia)
     .order("via_numero", { ascending: false });
   if (errVias) throw new Error(errVias.message);
-  const existentes = (visExistentes as Array<{ via_numero: number }> | null) ?? [];
+  const existentes = (visExistentes as Array<{ via_numero: number; impresso_por_nome: string | null }> | null) ?? [];
   const ultimaVia = existentes[0]?.via_numero ?? 0;
   let viaNumero: number;
   if (reimpressao) {
@@ -464,6 +466,8 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   } else {
     viaNumero = ultimaVia + 1;
   }
+  const primeiraVia = existentes.length ? existentes[existentes.length - 1] : null;
+  const usuarioFinalNome = primeiraVia?.impresso_por_nome ?? usuarioNome;
 
   // Busca agendamentos + clínica + tabela de procedimentos da clínica
   const [agsRes, cliRes, procsRes, lancsRes] = await Promise.all([
@@ -836,11 +840,11 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
   // Controle de vias 1ª/2ª via por mensalidade
   const { data: visExistentes, error: errVias } = await supabase
     .from("gr_impressoes" as never)
-    .select("via_numero")
+    .select("via_numero, impresso_por_nome")
     .eq("mensalidade_id", mensalidadeId)
     .order("via_numero", { ascending: false });
   if (errVias) throw new Error(errVias.message);
-  const existentes = (visExistentes as Array<{ via_numero: number }> | null) ?? [];
+  const existentes = (visExistentes as Array<{ via_numero: number; impresso_por_nome: string | null }> | null) ?? [];
   const ultimaVia = existentes[0]?.via_numero ?? 0;
   let viaNumero: number;
   if (reimpressao) {
@@ -848,6 +852,8 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
   } else {
     viaNumero = ultimaVia + 1;
   }
+  const primeiraVia = existentes.length ? existentes[existentes.length - 1] : null;
+  const usuarioFinalNome = primeiraVia?.impresso_por_nome ?? usuarioNome;
 
   const [mensRes, cliRes] = await Promise.all([
     supabase
