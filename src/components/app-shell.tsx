@@ -278,6 +278,13 @@ export function AppShell() {
   const handleMenuNavigate = (event: MouseEvent<HTMLAnchorElement>, to: string, hash?: string) => {
     event.preventDefault();
     navigate(hash ? ({ to, hash } as any) : ({ to } as any));
+    if (typeof window !== "undefined") {
+      const target = `${to}${hash ? `#${hash}` : ""}`;
+      window.setTimeout(() => {
+        const current = `${window.location.pathname}${window.location.hash}`;
+        if (current !== target) window.location.assign(target);
+      }, 80);
+    }
   };
 
   const clinicColor = useMemo(() => (
