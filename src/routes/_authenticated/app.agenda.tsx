@@ -218,23 +218,22 @@ async function fetchProcedimentosAgenda(clinicaId: string): Promise<Procedimento
   return rows;
 }
 
-async function fetchMedicoProcedimentosAgenda(): Promise<MedicoProcedimentoRef[]> {
-  const pageSize = 1000;
+async function fetchMedicoProcedimentosAgenda(clinicaId: string): Promise<MedicoProcedimentoRef[]> {
+  // Filtra por clínica via inner join em medicos (evita carregar dados de
+  // outras clínicas e usa o índice idx_medicos_clinica_ativo).
+  const pageSize = 5000;
   const rows: MedicoProcedimentoRef[] = [];
-
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await supabase
       .from("medico_procedimentos")
-      .select("medico_id,procedimento_id,especialidade_id,created_at")
-      .order("created_at")
+      .select("medico_id,procedimento_id,especialidade_id,created_at,medicos!inner(clinica_id)")
+      .eq("medicos.clinica_id", clinicaId)
       .range(from, from + pageSize - 1);
-
     if (error) throw error;
-    const page = (data ?? []) as MedicoProcedimentoRef[];
+    const page = (data ?? []) as unknown as MedicoProcedimentoRef[];
     rows.push(...page);
     if (page.length < pageSize) break;
   }
-
   return rows;
 }
 
@@ -927,13 +926,13 @@ function AgendaPage() {
       supabase.from("medicos").select("id,nome,sexo,usa_sistema,especialidade_id,procedimento_padrao_id,procedimento_padrao_em_branco").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("pacientes").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome").limit(500),
       supabase.from("especialidades").select("id,nome").order("nome"),
-      supabase.from("medico_especialidades").select("medico_id,especialidade_id"),
+      supabase.from("medico_especialidades").select("medico_id,especialidade_id,medicos!inner(clinica_id)").eq("medicos.clinica_id", clinicaAtual.clinica_id),
       fetchProcedimentosAgenda(clinicaAtual.clinica_id),
       supabase.from("procedimento_split_regras").select("medico_id,procedimento_id").eq("clinica_id", clinicaAtual.clinica_id).not("medico_id", "is", null),
-      supabase.from("medico_convenios").select("medico_id,nome,ativo").eq("ativo", true),
-      fetchMedicoProcedimentosAgenda(),
+      supabase.from("medico_convenios").select("medico_id,nome,ativo,medicos!inner(clinica_id)").eq("ativo", true).eq("medicos.clinica_id", clinicaAtual.clinica_id),
+      fetchMedicoProcedimentosAgenda(clinicaAtual.clinica_id),
       supabase.from("enfermagem_recursos").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
-      supabase.from("enfermagem_recurso_procedimentos").select("recurso_id,procedimento_id"),
+      supabase.from("enfermagem_recurso_procedimentos").select("recurso_id,procedimento_id,enfermagem_recursos!inner(clinica_id)").eq("enfermagem_recursos.clinica_id", clinicaAtual.clinica_id),
     ]);
     // Carrega agendas nomeadas por médico (clínica atual)
     const { data: agendasData } = await supabase
