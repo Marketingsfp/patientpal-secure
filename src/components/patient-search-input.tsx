@@ -113,46 +113,60 @@ export function PatientSearchInput({
       setLoading(true);
       const termoSemAcento = normalizarBusca(term);
       const dataBusca = parseDataBusca(term);
-      // Prioriza prefixo (rápido — usa índice btree text_pattern_ops em nome).
-      // Como nome/codigo_prontuario/numero_pasta já são salvos em UPPERCASE
-      // (trigger uppercase_text_fields), usamos LIKE (case-sensitive) em vez
-      // de ILIKE — isso permite o planner usar o índice btree de prefixo
-      // (idx_pacientes_nome_prefix) em vez de cair para Seq Scan.
-      const parts: string[] = [
-        `nome.like.${termoSemAcento}%`,
-      ];
-      if (termoSemAcento.length >= 4) parts.push(`nome.like.% ${termoSemAcento}%`);
+      // Dispara várias consultas em paralelo (uma por estratégia) em vez de
+      // um único OR gigante — assim cada consulta usa o índice ideal e
+      // evita timeout quando o termo casa muitas linhas.
+      const SELECT =
+        "id, nome, cpf, telefone, data_nascimento, clinica_id, codigo_prontuario, numero_pasta";
+      const mkQ = () =>
+        supabase
+          .from("pacientes")
+          .select(SELECT)
+          .in("clinica_id", scope)
+          .eq("ativo", true)
+          .limit(30);
+      const queries: Promise<{ data: PatientOption[] | null; error: any }>[] = [];
+      // 1) Prefixo do nome (índice btree text_pattern_ops — rápido)
+      queries.push(
+        mkQ().like("nome", `${termoSemAcento}%`).order("nome", { ascending: true }) as any,
+      );
+      // 2) Substring no nome (índice GIN trigram)
+      if (termoSemAcento.length >= 4) {
+        queries.push(mkQ().ilike("nome", `%${termoSemAcento}%`) as any);
+      }
+      // 3) Dígitos: CPF / prontuário / pasta
       if (digits.length >= 3) {
-        parts.push(`cpf_digits.like.${digits}%`);
-        parts.push(`codigo_prontuario.like.${digits}%`);
-        parts.push(`numero_pasta.like.${digits}%`);
+        queries.push(mkQ().like("cpf_digits", `${digits}%`) as any);
+        queries.push(mkQ().like("codigo_prontuario", `${digits}%`) as any);
+        queries.push(mkQ().like("numero_pasta", `${digits}%`) as any);
       }
-      // Busca por data de nascimento (formato completo)
+      // 4) Data completa
       if (dataBusca?.iso) {
-        parts.push(`data_nascimento.eq.${dataBusca.iso}`);
+        queries.push(mkQ().eq("data_nascimento", dataBusca.iso) as any);
       }
-      const filter = parts.join(",");
-      let queryBuilder = supabase
-        .from("pacientes")
-        .select("id, nome, cpf, telefone, data_nascimento, clinica_id, codigo_prontuario, numero_pasta")
-        .in("clinica_id", scope)
-        .eq("ativo", true)
-        .or(filter)
-        .order("nome", { ascending: true })
-        .limit(30);
-      const { data, error } = await queryBuilder;
-      if (error) {
+      const results = await Promise.all(queries);
+      const merged = new Map<string, PatientOption>();
+      let firstError: any = null;
+      for (const r of results) {
+        if (r.error) {
+          firstError = firstError ?? r.error;
+          continue;
+        }
+        for (const p of r.data ?? []) merged.set(p.id, p);
+      }
+      const data = Array.from(merged.values());
+      if (firstError && data.length === 0) {
         // eslint-disable-next-line no-console
-        console.error("[patient-search] error", { term, filter, scope, error });
+        console.error("[patient-search] error", { term, scope, error: firstError });
       } else {
         // eslint-disable-next-line no-console
-        console.debug("[patient-search] ok", { term, filter, scope, count: data?.length ?? 0 });
+        console.debug("[patient-search] ok", { term, scope, count: data.length });
       }
       // Ignora respostas obsoletas (digitação rápida -> várias requests)
       if (myReq !== reqIdRef.current) return;
       // Reordena: nomes que COMEÇAM com o termo aparecem primeiro
       // (match de "primeiro nome" tem prioridade sobre meio/sobrenome).
-      const todas = (data ?? []) as PatientOption[];
+      const todas = data as PatientOption[];
       // Se busca for DD/MM sem ano, filtra em memória pelo mês/dia
       let base = todas;
       if (dataBusca?.partial) {
