@@ -317,7 +317,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
       <tr><td class="label">FICHA:</td><td class="v right">${ficha}</td></tr>
       <tr><td class="label">PROFISSIONAL:</td><td class="v right">${esc(medicoNome)}</td></tr>
       <tr><td class="label">HORÁRIO:</td><td class="v right">${fmtData(a.inicio)}</td></tr>
-      ${usuarioNome ? `<tr><td class="label">USUÁRIO:</td><td class="v right">${esc(usuarioNome)}</td></tr>` : ""}
+      ${usuarioNome ? `<tr><td class="label">USUÁRIO:</td><td class="v">${esc(usuarioNome)}</td></tr>` : ""}
     </table>
 
     <div class="sep"></div>
@@ -704,7 +704,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
           <tr><td class="label">FICHA:</td><td class="v right">${ficha}</td></tr>
           <tr><td class="label">PROFISSIONAL:</td><td class="v right">${esc(g.medicoNome)}</td></tr>
           <tr><td class="label">HORÁRIO:</td><td class="v right">${fmtData(g.inicioRef)}</td></tr>
-          ${usuarioNome ? `<tr><td class="label">USUÁRIO:</td><td class="v right">${esc(usuarioNome)}</td></tr>` : ""}
+          ${usuarioNome ? `<tr><td class="label">USUÁRIO:</td><td class="v">${esc(usuarioNome)}</td></tr>` : ""}
         </table>
         <div class="sep"></div>
         <table>
@@ -958,7 +958,7 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
       <tr><td class="label">CONTRATO:</td><td class="v right">#${contrato.numero}</td></tr>
       <tr><td class="label">PARCELA:</td><td class="v right">${m.numero_parcela}/${totalParcelas}</td></tr>
       <tr><td class="label">VENCIMENTO:</td><td class="v right">${fmtDataSimples(m.vencimento)}</td></tr>
-      ${usuarioNome ? `<tr><td class="label">USUÁRIO:</td><td class="v right">${esc(usuarioNome)}</td></tr>` : ""}
+      ${usuarioNome ? `<tr><td class="label">USUÁRIO:</td><td class="v">${esc(usuarioNome)}</td></tr>` : ""}
     </table>
 
     <div class="sep"></div>
