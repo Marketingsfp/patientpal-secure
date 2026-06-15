@@ -5351,6 +5351,7 @@ export type Database = {
           nome: string
           numero: string | null
           numero_pasta: string | null
+          prontuarios_anteriores: string | null
           responsavel_cpf: string | null
           responsavel_nome: string | null
           responsavel_parentesco: string | null
@@ -5386,6 +5387,7 @@ export type Database = {
           nome: string
           numero?: string | null
           numero_pasta?: string | null
+          prontuarios_anteriores?: string | null
           responsavel_cpf?: string | null
           responsavel_nome?: string | null
           responsavel_parentesco?: string | null
@@ -5421,6 +5423,7 @@ export type Database = {
           nome?: string
           numero?: string | null
           numero_pasta?: string | null
+          prontuarios_anteriores?: string | null
           responsavel_cpf?: string | null
           responsavel_nome?: string | null
           responsavel_parentesco?: string | null
@@ -6784,6 +6787,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _do_fix_phones_prontuarios_mj: {
+        Args: never
+        Returns: {
+          atualizados: number
+        }[]
+      }
       _do_import_pacientes_mj: { Args: never; Returns: number }
       _do_merge_pacientes_dup_mj: {
         Args: never
