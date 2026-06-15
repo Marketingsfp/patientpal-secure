@@ -17,7 +17,7 @@ import {
   Download, CalendarDays, Users, ClipboardList, FileText, DollarSign,
   Stethoscope, Clock, Brain, FlaskConical, BellRing, FileHeart, Target,
   CreditCard, ShieldCheck, Building2, BookOpen, MessageCircle, Bell, Workflow,
-  HeartPulse, LayoutDashboard, TrendingUp, TrendingDown, Wallet, Settings2, RotateCcw, Boxes,
+  HeartPulse, LayoutDashboard, TrendingUp, TrendingDown, Wallet, Settings2, RotateCcw, Boxes, PhoneCall,
 } from "lucide-react";
 import { CuboBI } from "@/components/relatorios/CuboBI";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -401,6 +401,9 @@ function RelatoriosPage() {
             <TabsTrigger value="cubo" className="gap-2">
               <Boxes className="h-4 w-4" /> Cubo BI
             </TabsTrigger>
+            <TabsTrigger value="agendamentos-diario" className="gap-2">
+              <PhoneCall className="h-4 w-4" /> Agendamentos do Dia
+            </TabsTrigger>
             <TabsTrigger value="downloads" className="gap-2">
               <Download className="h-4 w-4" /> Baixar planilhas
             </TabsTrigger>
@@ -423,6 +426,10 @@ function RelatoriosPage() {
 
         <TabsContent value="cubo" className="mt-4">
           <CuboBI clinicaId={clinicaAtual?.clinica_id} ini={ini} fim={fim} />
+        </TabsContent>
+
+        <TabsContent value="agendamentos-diario" className="mt-4">
+          <AgendamentosDiarioView clinicaId={clinicaAtual?.clinica_id} ini={ini} fim={fim} />
         </TabsContent>
 
         <TabsContent value="downloads" className="mt-4">
