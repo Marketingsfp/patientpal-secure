@@ -929,10 +929,10 @@ function AgendaPage() {
       supabase.from("medico_especialidades").select("medico_id,especialidade_id"),
       fetchProcedimentosAgenda(clinicaAtual.clinica_id),
       supabase.from("procedimento_split_regras").select("medico_id,procedimento_id").eq("clinica_id", clinicaAtual.clinica_id).not("medico_id", "is", null),
-      supabase.from("medico_convenios").select("medico_id,nome,ativo").eq("ativo", true),
-      fetchMedicoProcedimentosAgenda(),
+      supabase.from("medico_convenios").select("medico_id,nome,ativo,medicos!inner(clinica_id)").eq("ativo", true).eq("medicos.clinica_id", clinicaAtual.clinica_id),
+      fetchMedicoProcedimentosAgenda(clinicaAtual.clinica_id),
       supabase.from("enfermagem_recursos").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
-      supabase.from("enfermagem_recurso_procedimentos").select("recurso_id,procedimento_id"),
+      supabase.from("enfermagem_recurso_procedimentos").select("recurso_id,procedimento_id,enfermagem_recursos!inner(clinica_id)").eq("enfermagem_recursos.clinica_id", clinicaAtual.clinica_id),
     ]);
     // Carrega agendas nomeadas por médico (clínica atual)
     const { data: agendasData } = await supabase
