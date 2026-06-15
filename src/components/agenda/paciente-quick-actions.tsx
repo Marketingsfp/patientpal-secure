@@ -137,18 +137,42 @@ export function PacienteQuickActions({ pacienteId, clinicaId }: Props) {
 
   return (
     <div className="rounded-md border bg-muted/30 p-2 space-y-2">
-      <div className="flex items-center gap-2">
-        <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
-        <Input
-          value={data.telefone ?? ""}
-          placeholder="Telefone"
-          onChange={(e) => { setData(d => ({ ...d, telefone: e.target.value })); setPhoneEdited(true); }}
-          className="h-8"
-        />
-        {phoneEdited && (
-          <Button type="button" size="sm" onClick={salvarTelefone} disabled={savingPhone}>
+      <div className="grid grid-cols-12 gap-2 items-center">
+        <div className="col-span-12 sm:col-span-4 flex items-center gap-1">
+          <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
+          <Input
+            value={data.telefone ?? ""}
+            placeholder="Telefone *"
+            onChange={(e) => { setData(d => ({ ...d, telefone: e.target.value })); setEdited(true); }}
+            className="h-8"
+          />
+        </div>
+        <div className="col-span-7 sm:col-span-4 flex items-center gap-1">
+          <IdCard className="h-4 w-4 text-muted-foreground shrink-0" />
+          <Input
+            value={data.cpf ?? ""}
+            placeholder="CPF"
+            inputMode="numeric"
+            onChange={(e) => { setData(d => ({ ...d, cpf: e.target.value })); setEdited(true); }}
+            className="h-8"
+          />
+        </div>
+        <div className="col-span-5 sm:col-span-4 flex items-center gap-1">
+          <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+          <Input
+            type="date"
+            value={data.data_nascimento ?? ""}
+            placeholder="Nascimento *"
+            onChange={(e) => { setData(d => ({ ...d, data_nascimento: e.target.value })); setEdited(true); }}
+            className="h-8"
+          />
+        </div>
+      </div>
+      <div className="flex items-center gap-2 flex-wrap">
+        {edited && (
+          <Button type="button" size="sm" onClick={salvarDadosBasicos} disabled={savingPhone}>
             {savingPhone ? <Loader2 className="h-3 w-3 animate-spin"/> : <Check className="h-3 w-3"/>}
-            <span className="ml-1">Confirmar</span>
+            <span className="ml-1">Confirmar dados</span>
           </Button>
         )}
         <Button type="button" size="sm" variant="outline" onClick={() => setEndOpen(true)} title="Endereço e outros dados">
@@ -163,6 +187,11 @@ export function PacienteQuickActions({ pacienteId, clinicaId }: Props) {
           )}
           <span className="ml-1 hidden sm:inline">Foto</span>
         </Button>
+        {(!data.telefone?.trim() || !data.data_nascimento) && (
+          <span className="text-xs text-amber-600 font-medium ml-auto">
+            Telefone e nascimento são obrigatórios para agendar.
+          </span>
+        )}
       </div>
 
       <EnderecoDialog
