@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Camera, Check, Loader2, MapPin, Phone, Save, X } from "lucide-react";
+import { Calendar, Camera, Check, IdCard, Loader2, MapPin, Phone, Save, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +15,8 @@ interface Props {
 interface PacData {
   telefone: string | null;
   telefone2: string | null;
+  cpf: string | null;
+  data_nascimento: string | null;
   cep: string | null;
   logradouro: string | null;
   numero: string | null;
@@ -26,7 +28,7 @@ interface PacData {
 }
 
 const EMPTY: PacData = {
-  telefone: "", telefone2: "", cep: "", logradouro: "", numero: "",
+  telefone: "", telefone2: "", cpf: "", data_nascimento: "", cep: "", logradouro: "", numero: "",
   complemento: "", bairro: "", cidade: "", estado: "", foto_url: null,
 };
 
@@ -34,7 +36,7 @@ export function PacienteQuickActions({ pacienteId, clinicaId }: Props) {
   const [data, setData] = useState<PacData>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [savingPhone, setSavingPhone] = useState(false);
-  const [phoneEdited, setPhoneEdited] = useState(false);
+  const [edited, setEdited] = useState(false);
   const [endOpen, setEndOpen] = useState(false);
   const [fotoOpen, setFotoOpen] = useState(false);
   const [fotoPreviewUrl, setFotoPreviewUrl] = useState<string | null>(null);
@@ -45,7 +47,7 @@ export function PacienteQuickActions({ pacienteId, clinicaId }: Props) {
       setLoading(true);
       const { data: row } = await supabase
         .from("pacientes")
-        .select("telefone,telefone2,cep,logradouro,numero,complemento,bairro,cidade,estado,foto_url")
+        .select("telefone,telefone2,cpf,data_nascimento,cep,logradouro,numero,complemento,bairro,cidade,estado,foto_url")
         .eq("id", pacienteId)
         .maybeSingle();
       if (cancelled) return;
@@ -53,6 +55,8 @@ export function PacienteQuickActions({ pacienteId, clinicaId }: Props) {
         setData({
           telefone: row.telefone ?? "",
           telefone2: row.telefone2 ?? "",
+          cpf: row.cpf ?? "",
+          data_nascimento: row.data_nascimento ?? "",
           cep: row.cep ?? "",
           logradouro: row.logradouro ?? "",
           numero: row.numero ?? "",
@@ -69,22 +73,27 @@ export function PacienteQuickActions({ pacienteId, clinicaId }: Props) {
           if (!cancelled && signed?.signedUrl) setFotoPreviewUrl(signed.signedUrl);
         }
       }
-      setPhoneEdited(false);
+      setEdited(false);
       setLoading(false);
     })();
     return () => { cancelled = true; };
   }, [pacienteId]);
 
-  async function salvarTelefone() {
+  async function salvarDadosBasicos() {
     setSavingPhone(true);
+    const cpfDigits = (data.cpf ?? "").replace(/\D/g, "");
     const { error } = await supabase
       .from("pacientes")
-      .update({ telefone: data.telefone?.trim() || null })
+      .update({
+        telefone: data.telefone?.trim() || null,
+        cpf: cpfDigits || null,
+        data_nascimento: data.data_nascimento || null,
+      })
       .eq("id", pacienteId);
     setSavingPhone(false);
     if (error) { toast.error(error.message); return; }
-    toast.success("Telefone atualizado.");
-    setPhoneEdited(false);
+    toast.success("Dados do paciente atualizados.");
+    setEdited(false);
   }
 
   async function salvarEndereco() {
