@@ -6785,6 +6785,13 @@ export type Database = {
     }
     Functions: {
       _do_import_pacientes_mj: { Args: never; Returns: number }
+      _do_merge_pacientes_dup_mj: {
+        Args: never
+        Returns: {
+          grupos: number
+          mesclados: number
+        }[]
+      }
       _mj_apply_batch: { Args: { _limite?: number }; Returns: number }
       assinar_contrato_publico: {
         Args: { _assinatura_svg: string; _ip: string; _token: string }
