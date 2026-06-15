@@ -472,6 +472,42 @@ function AgendaPage() {
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [buscandoOrc, setBuscandoOrc] = useState(false);
+  // Abre o diálogo "Novo agendamento" pré-preenchido a partir de querystring
+  // (usado pelo botão "Agendar" da conversa do WhatsApp).
+  const novoFromUrlConsumido = useRef(false);
+  useEffect(() => {
+    if (novoFromUrlConsumido.current) return;
+    if (typeof window === "undefined") return;
+    if (pacientes.length === 0) return;
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get("novo") !== "1") return;
+    novoFromUrlConsumido.current = true;
+    const pacIdParam = sp.get("novoPacId") || "";
+    const pacNomeParam = sp.get("novoPacNome") || "";
+    const telParam = sp.get("novoTelefone") || "";
+    let pacienteId = "";
+    let pacienteNome = pacNomeParam;
+    if (pacIdParam && pacientes.some((p) => p.id === pacIdParam)) {
+      pacienteId = pacIdParam;
+      pacienteNome = pacientes.find((p) => p.id === pacIdParam)?.nome ?? pacNomeParam;
+    }
+    const base = new Date(`${dataRef}T09:00:00`);
+    const end = new Date(base.getTime() + 30 * 60000);
+    setEditing(null);
+    setForm({
+      ...EMPTY,
+      inicio: toLocalInput(base.toISOString()),
+      fim: toLocalInput(end.toISOString()),
+      paciente_id: pacienteId,
+      paciente_nome: pacienteNome,
+      observacoes: !pacienteId && telParam ? `Contato WhatsApp: ${telParam}` : "",
+    });
+    setOpen(true);
+    // Limpa os params da URL para não reabrir ao recarregar.
+    const url = new URL(window.location.href);
+    ["novo", "novoPacId", "novoPacNome", "novoTelefone"].forEach((k) => url.searchParams.delete(k));
+    window.history.replaceState({}, "", url.pathname + (url.search ? `?${url.searchParams}` : ""));
+  }, [pacientes, dataRef]);
   // Reagendamento
   const [reagendandoAg, setReagendandoAg] = useState<Agendamento | null>(null);
   const [reagSalvando, setReagSalvando] = useState(false);
