@@ -540,8 +540,8 @@ export function AppShell() {
                           const active = leafIsActive(child.to, child.hash);
                           const linkKey = `${child.to}#${child.hash ?? ""}`;
                           const openInNewTab = child.to === "/app/nina";
+                          const href = `${child.to}${child.hash ? `#${child.hash}` : ""}`;
                           if (openInNewTab) {
-                            const href = `${child.to}${child.hash ? `#${child.hash}` : ""}`;
                             return (
                               <a
                                 key={linkKey}
@@ -558,13 +558,17 @@ export function AppShell() {
                             );
                           }
                           return (
-                            <Link
+                            <a
                               key={linkKey}
-                              to={child.to as any}
-                              hash={child.hash}
+                              href={href}
                               title={collapsed ? child.label : undefined}
                               data-nav-to={child.to}
                               data-nav-active={active ? "true" : undefined}
+                              onClick={(event) => {
+                                if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+                                event.preventDefault();
+                                window.location.assign(href);
+                              }}
                               className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "pl-8 pr-3"} py-2 text-sm font-medium transition-all ${
                                 active
                                   ? "bg-white text-slate-900 shadow-sm"
@@ -573,7 +577,7 @@ export function AppShell() {
                             >
                               <child.icon className="h-4 w-4 shrink-0" />
                               {!collapsed && <span className="truncate">{child.label}</span>}
-                            </Link>
+                            </a>
                           );
                         })}
                       </div>
@@ -583,13 +587,19 @@ export function AppShell() {
                   const active = location.pathname === item.to ||
                     (item.to !== "/app" && location.pathname.startsWith(item.to)) ||
                     aliases.some((a) => location.pathname === a || location.pathname.startsWith(`${a}/`));
+                  const href = item.to;
                   return (
-                    <Link
+                    <a
                       key={item.to}
-                      to={item.to as any}
+                      href={href}
                       title={collapsed ? item.label : undefined}
                       data-nav-to={item.to}
                       data-nav-active={active ? "true" : undefined}
+                      onClick={(event) => {
+                        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+                        event.preventDefault();
+                        window.location.assign(href);
+                      }}
                       className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "px-3"} py-2 text-sm font-medium transition-all ${
                         active
                           ? "bg-white text-slate-900 shadow-sm"
@@ -598,7 +608,7 @@ export function AppShell() {
                     >
                       <item.icon className="h-4 w-4 shrink-0" />
                       {!collapsed && <span className="truncate">{item.label}</span>}
-                    </Link>
+                    </a>
                   );
                 })}
               </div>
