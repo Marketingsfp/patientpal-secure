@@ -187,16 +187,22 @@ export type Database = {
       }
       _mj_match_plan: {
         Row: {
-          lanc_id: string | null
+          chave: string
           pid: string | null
+          processed: boolean
+          source: string | null
         }
         Insert: {
-          lanc_id?: string | null
+          chave: string
           pid?: string | null
+          processed?: boolean
+          source?: string | null
         }
         Update: {
-          lanc_id?: string | null
+          chave?: string
           pid?: string | null
+          processed?: boolean
+          source?: string | null
         }
         Relationships: []
       }
