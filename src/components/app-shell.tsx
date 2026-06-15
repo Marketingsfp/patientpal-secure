@@ -1,5 +1,6 @@
 import { Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import type { MouseEvent } from "react";
 import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet, ChevronLeft, ChevronRight, ChevronDown, Search, HeartPulse, Contact, ConciergeBell, Briefcase, MapPin, Palmtree, GraduationCap, Sparkles, Filter, Send, Megaphone, KeyRound, BadgeCheck, LayoutGrid, Gift, Zap, Coffee, Play, Eye, ArrowRightLeft, Inbox, HandCoins } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -274,6 +275,18 @@ export function AppShell() {
     navigate({ to: "/login", replace: true });
   };
 
+  const handleMenuNavigate = (event: MouseEvent<HTMLAnchorElement>, to: string, hash?: string) => {
+    event.preventDefault();
+    navigate(hash ? ({ to, hash } as any) : ({ to } as any));
+    if (typeof window !== "undefined") {
+      const target = `${to}${hash ? `#${hash}` : ""}`;
+      window.setTimeout(() => {
+        const current = `${window.location.pathname}${window.location.hash}`;
+        if (current !== target) window.location.href = `${target}${window.location.search}`;
+      }, 2500);
+    }
+  };
+
   const clinicColor = useMemo(() => (
     modoTodas
       ? "#0f172a"
@@ -350,7 +363,7 @@ export function AppShell() {
     const leaves: string[] = [];
     for (const row of visibleNavRows) {
       const hideLabel = subsystem === "gestao-pessoas" && row.label === "RH";
-      const open = collapsed || hideLabel ? true : (openGroups[row.label] ?? false);
+      const open = collapsed || hideLabel || row.label === "Operação" ? true : (openGroups[row.label] ?? false);
       if (!open) continue;
       for (const item of row.items) {
         if (isParent(item)) {
@@ -480,7 +493,7 @@ export function AppShell() {
             const itemHasActive = (it: NavItem): boolean => isParent(it) ? it.children.some((c) => leafIsActive(c.to, c.hash)) : leafIsActive(it.to);
             const groupHasActive = row.items.some(itemHasActive);
             const hideLabel = subsystem === "gestao-pessoas" && row.label === "RH";
-            const open = collapsed || hideLabel ? true : (openGroups[row.label] ?? false);
+            const open = collapsed || hideLabel || row.label === "Operação" ? true : (openGroups[row.label] ?? false);
             return (
               <div key={row.label} className="space-y-1">
                 {!collapsed && !hideLabel && (
@@ -525,6 +538,7 @@ export function AppShell() {
                               key={linkKey}
                               to={child.to}
                               hash={child.hash}
+                              onClick={(event) => handleMenuNavigate(event, child.to, child.hash)}
                               title={collapsed ? child.label : undefined}
                               data-nav-to={child.to}
                               data-nav-active={active ? "true" : undefined}
@@ -550,6 +564,7 @@ export function AppShell() {
                     <Link
                       key={item.to}
                       to={item.to}
+                      onClick={(event) => handleMenuNavigate(event, item.to)}
                       title={collapsed ? item.label : undefined}
                       data-nav-to={item.to}
                       data-nav-active={active ? "true" : undefined}
