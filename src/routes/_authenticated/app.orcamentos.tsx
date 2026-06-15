@@ -200,7 +200,7 @@ function OrcamentosPage() {
                         if (window.parent && window.parent !== window) {
                           window.parent.postMessage({ type: "agendar-orcamento", numero }, "*");
                         } else {
-                          window.open(`/app/agenda?orc=${numero}`, "_blank", "noopener");
+                          navigate({ to: "/app/orcamentos-agenda", search: { orc: numero } as never });
                         }
                       }}
                       title="Agendar este orçamento"
