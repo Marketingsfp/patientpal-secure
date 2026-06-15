@@ -1803,6 +1803,41 @@ function AgendaPage() {
           pacNome = pac[0].nome;
         }
       }
+      // Agrupa por "grupo" (mais específico) ou tipo. Se houver mais de um grupo
+      // distinto, abre o painel de divisão em vez de criar um único agendamento.
+      const grupoDe = (pid: string | null): string => {
+        if (!pid) return "OUTROS";
+        const p = procPorId.get(pid);
+        if (!p) return "OUTROS";
+        return norm(p.grupo) || norm(p.tipo) || "OUTROS";
+      };
+      const gruposDistintos = new Set(its.map(i => grupoDe(i.procedimento_id)));
+      if (gruposDistintos.size > 1) {
+        // Constrói lista de itens enriquecidos para o dialog
+        const itensRicos: DividirItem[] = its.map(i => {
+          const p = i.procedimento_id ? procPorId.get(i.procedimento_id) : null;
+          return {
+            descricao: i.descricao,
+            procedimento_id: i.procedimento_id,
+            grupo: p?.grupo ?? null,
+            tipo: p?.tipo ?? null,
+          };
+        });
+        const inicioPadrao = form.inicio || toLocalInput(new Date(`${dataRef}T09:00:00`).toISOString());
+        setDividirCtx({
+          orcamento: {
+            id: orc.id,
+            numero: orc.numero,
+            paciente_id: pacId,
+            paciente_nome: pacNome,
+          },
+          itens: itensRicos,
+          inicioPadrao,
+        });
+        setOpen(false); // fecha o modal de "novo agendamento" se estiver aberto
+        setDividirOpen(true);
+        return;
+      }
       setForm(f => ({
         ...f,
         orcamento_id: orc.id,
