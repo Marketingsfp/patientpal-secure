@@ -218,23 +218,22 @@ async function fetchProcedimentosAgenda(clinicaId: string): Promise<Procedimento
   return rows;
 }
 
-async function fetchMedicoProcedimentosAgenda(): Promise<MedicoProcedimentoRef[]> {
-  const pageSize = 1000;
+async function fetchMedicoProcedimentosAgenda(clinicaId: string): Promise<MedicoProcedimentoRef[]> {
+  // Filtra por clínica via inner join em medicos (evita carregar dados de
+  // outras clínicas e usa o índice idx_medicos_clinica_ativo).
+  const pageSize = 5000;
   const rows: MedicoProcedimentoRef[] = [];
-
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await supabase
       .from("medico_procedimentos")
-      .select("medico_id,procedimento_id,especialidade_id,created_at")
-      .order("created_at")
+      .select("medico_id,procedimento_id,especialidade_id,created_at,medicos!inner(clinica_id)")
+      .eq("medicos.clinica_id", clinicaId)
       .range(from, from + pageSize - 1);
-
     if (error) throw error;
-    const page = (data ?? []) as MedicoProcedimentoRef[];
+    const page = (data ?? []) as unknown as MedicoProcedimentoRef[];
     rows.push(...page);
     if (page.length < pageSize) break;
   }
-
   return rows;
 }
 
