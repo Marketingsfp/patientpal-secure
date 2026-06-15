@@ -94,22 +94,21 @@ function ClientesPage() {
       if (dataIso) ors.push(`data_nascimento.eq.${dataIso}`);
       query = query.or(ors.join(","));
     }
-    const [{ data, error }, { count, error: countError }] = await Promise.all([
-      query
-        .order("codigo_prontuario", { ascending: true, nullsFirst: false })
-        .limit(500),
-      supabase
+    const dataRequest = query
+      .order("codigo_prontuario", { ascending: true, nullsFirst: false })
+      .limit(q ? 80 : 120);
+    const countRequest = q
+      ? Promise.resolve({ count: totalPacientes, error: null })
+      : supabase
         .from("pacientes")
-        .select("id", { count: "exact", head: true })
-        .eq("clinica_id", clinicaAtual.clinica_id),
-    ]);
+        .select("id", { count: "planned", head: true })
+        .eq("clinica_id", clinicaAtual.clinica_id);
+    const [{ data, error }, { count, error: countError }] = await Promise.all([dataRequest, countRequest]);
     setLoading(false);
     if (error) { toast.error(error.message); return; }
     if (countError) { toast.error(countError.message); } else { setTotalPacientes(count ?? 0); }
     setItems((data ?? []) as any);
   };
-
-  useEffect(() => { void load(busca); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clinicaAtual?.clinica_id]);
 
   // Debounced server-side search
   useEffect(() => {
