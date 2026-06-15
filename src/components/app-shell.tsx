@@ -277,7 +277,7 @@ export function AppShell() {
 
   const handleMenuNavigate = (event: MouseEvent<HTMLAnchorElement>, to: string, hash?: string) => {
     event.preventDefault();
-    navigate(hash ? { to, hash } : { to });
+    navigate(hash ? ({ to, hash } as any) : ({ to } as any));
   };
 
   const clinicColor = useMemo(() => (
@@ -356,7 +356,7 @@ export function AppShell() {
     const leaves: string[] = [];
     for (const row of visibleNavRows) {
       const hideLabel = subsystem === "gestao-pessoas" && row.label === "RH";
-      const open = collapsed || hideLabel ? true : (openGroups[row.label] ?? false);
+      const open = collapsed || hideLabel || row.label === "Operação" ? true : (openGroups[row.label] ?? false);
       if (!open) continue;
       for (const item of row.items) {
         if (isParent(item)) {
@@ -486,7 +486,7 @@ export function AppShell() {
             const itemHasActive = (it: NavItem): boolean => isParent(it) ? it.children.some((c) => leafIsActive(c.to, c.hash)) : leafIsActive(it.to);
             const groupHasActive = row.items.some(itemHasActive);
             const hideLabel = subsystem === "gestao-pessoas" && row.label === "RH";
-            const open = collapsed || hideLabel ? true : (openGroups[row.label] ?? false);
+            const open = collapsed || hideLabel || row.label === "Operação" ? true : (openGroups[row.label] ?? false);
             return (
               <div key={row.label} className="space-y-1">
                 {!collapsed && !hideLabel && (
