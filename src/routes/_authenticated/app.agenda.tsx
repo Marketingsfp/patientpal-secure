@@ -731,7 +731,26 @@ function AgendaPage() {
     // janela de 30 dias pode trazer mais que o limite do PostgREST e
     // descartar justamente o paciente buscado.
     const termoCli = filtroCliente.trim();
-    if (termoCli.length >= 2) {
+    const digitosCli = termoCli.replace(/\D/g, "");
+    // Se o usuário digitou 3+ dígitos, tratamos como busca por CPF:
+    // buscamos os pacientes com cpf_digits casando e filtramos os
+    // agendamentos por esses paciente_id. Caso contrário, busca por nome.
+    if (digitosCli.length >= 3) {
+      const { data: pacsCpf } = await supabase
+        .from("pacientes")
+        .select("id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .ilike("cpf_digits", `${digitosCli}%`)
+        .limit(200);
+      const ids = (pacsCpf ?? []).map((p: { id: string }) => p.id);
+      if (ids.length === 0) {
+        setLoading(false);
+        setItems([]);
+        setPage(1);
+        return;
+      }
+      q = q.in("paciente_id", ids);
+    } else if (termoCli.length >= 2) {
       const termo = termoCli
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "")
