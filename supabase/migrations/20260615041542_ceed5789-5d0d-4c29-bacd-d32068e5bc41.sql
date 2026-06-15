@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS idx_pacientes_numero_pasta_trgm ON public.pacientes USING gin (numero_pasta gin_trgm_ops) WHERE numero_pasta IS NOT NULL; ANALYZE public.pacientes;
