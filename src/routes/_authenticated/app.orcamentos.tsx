@@ -197,7 +197,9 @@ function OrcamentosPage() {
                       variant="ghost"
                       onClick={() => {
                         const numero = o.numero;
-                        if (window.parent && window.parent !== window) {
+                        const isEmbed = typeof window !== "undefined" &&
+                          new URLSearchParams(window.location.search).get("embed") === "1";
+                        if (isEmbed && window.parent && window.parent !== window) {
                           window.parent.postMessage({ type: "agendar-orcamento", numero }, "*");
                         } else {
                           navigate({ to: "/app/orcamentos-agenda", search: { orc: numero } as never });
