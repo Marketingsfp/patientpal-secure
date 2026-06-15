@@ -70,6 +70,7 @@ const BRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", curren
 function OrcamentosPage() {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [list, setList] = useState<Orc[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
