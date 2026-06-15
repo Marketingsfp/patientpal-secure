@@ -118,7 +118,7 @@ export function PatientSearchInput({
       // evita timeout quando o termo casa muitas linhas.
       const SELECT =
         "id, nome, cpf, telefone, data_nascimento, clinica_id, codigo_prontuario, numero_pasta";
-      const base = () =>
+      const mkQ = () =>
         supabase
           .from("pacientes")
           .select(SELECT)
@@ -128,21 +128,21 @@ export function PatientSearchInput({
       const queries: Promise<{ data: PatientOption[] | null; error: any }>[] = [];
       // 1) Prefixo do nome (índice btree text_pattern_ops — rápido)
       queries.push(
-        base().like("nome", `${termoSemAcento}%`).order("nome", { ascending: true }) as any,
+        mkQ().like("nome", `${termoSemAcento}%`).order("nome", { ascending: true }) as any,
       );
       // 2) Substring no nome (índice GIN trigram)
       if (termoSemAcento.length >= 4) {
-        queries.push(base().ilike("nome", `%${termoSemAcento}%`) as any);
+        queries.push(mkQ().ilike("nome", `%${termoSemAcento}%`) as any);
       }
       // 3) Dígitos: CPF / prontuário / pasta
       if (digits.length >= 3) {
-        queries.push(base().like("cpf_digits", `${digits}%`) as any);
-        queries.push(base().like("codigo_prontuario", `${digits}%`) as any);
-        queries.push(base().like("numero_pasta", `${digits}%`) as any);
+        queries.push(mkQ().like("cpf_digits", `${digits}%`) as any);
+        queries.push(mkQ().like("codigo_prontuario", `${digits}%`) as any);
+        queries.push(mkQ().like("numero_pasta", `${digits}%`) as any);
       }
       // 4) Data completa
       if (dataBusca?.iso) {
-        queries.push(base().eq("data_nascimento", dataBusca.iso) as any);
+        queries.push(mkQ().eq("data_nascimento", dataBusca.iso) as any);
       }
       const results = await Promise.all(queries);
       const merged = new Map<string, PatientOption>();
