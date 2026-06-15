@@ -138,33 +138,32 @@ export function PacienteQuickActions({ pacienteId, clinicaId }: Props) {
   return (
     <div className="rounded-md border bg-muted/30 p-2 space-y-2">
       <div className="grid grid-cols-12 gap-2 items-center">
-        <div className="col-span-12 sm:col-span-4 flex items-center gap-1">
+        <div className="col-span-12 sm:col-span-4 flex items-center gap-1 min-w-0">
           <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
           <Input
             value={data.telefone ?? ""}
             placeholder="Telefone *"
             onChange={(e) => { setData(d => ({ ...d, telefone: e.target.value })); setEdited(true); }}
-            className="h-8"
+            className="h-8 w-full min-w-0"
           />
         </div>
-        <div className="col-span-7 sm:col-span-4 flex items-center gap-1">
+        <div className="col-span-7 sm:col-span-3 flex items-center gap-1 min-w-0">
           <IdCard className="h-4 w-4 text-muted-foreground shrink-0" />
           <Input
             value={data.cpf ?? ""}
             placeholder="CPF"
             inputMode="numeric"
             onChange={(e) => { setData(d => ({ ...d, cpf: e.target.value })); setEdited(true); }}
-            className="h-8"
+            className="h-8 w-full min-w-0"
           />
         </div>
-        <div className="col-span-5 sm:col-span-4 flex items-center gap-1">
+        <div className="col-span-5 sm:col-span-5 flex items-center gap-1 min-w-0">
           <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
           <Input
             type="date"
             value={data.data_nascimento ?? ""}
-            placeholder="Nascimento *"
             onChange={(e) => { setData(d => ({ ...d, data_nascimento: e.target.value })); setEdited(true); }}
-            className="h-8"
+            className="h-8 w-full min-w-0"
           />
         </div>
       </div>
