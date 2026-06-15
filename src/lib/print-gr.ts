@@ -317,7 +317,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
       <tr><td class="label">FICHA:</td><td class="v right">${ficha}</td></tr>
       <tr><td class="label">PROFISSIONAL:</td><td class="v right">${esc(medicoNome)}</td></tr>
       <tr><td class="label">HORÁRIO:</td><td class="v right">${fmtData(a.inicio)}</td></tr>
-      ${usuarioNome ? `<tr><td class="label">USUÁRIO:</td><td class="v">${esc(usuarioNome)}</td></tr>` : ""}
+      ${usuarioNome ? `<tr><td class="label" colspan="2" style="white-space:nowrap">USUÁRIO: <span class="v">${esc(usuarioNome)}</span></td></tr>` : ""}
     </table>
 
     <div class="sep"></div>
