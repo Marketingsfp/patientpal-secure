@@ -96,7 +96,7 @@ function OrcamentosAgendaPage() {
             </div>
             <iframe
               key={leftKey}
-              src="/app/orcamentos"
+              src="/app/orcamentos?embed=1"
               className="flex-1 w-full border-0"
               title="Orçamentos"
             />
