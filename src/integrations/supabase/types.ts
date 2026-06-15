@@ -6831,6 +6831,16 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      fin_atendimentos_matriz: {
+        Args: { _clinica: string }
+        Returns: {
+          ano: number
+          cartao: number
+          exames: number
+          mes: number
+          particular: number
+        }[]
+      }
       fin_resumo_categoria: {
         Args: {
           p_clinica: string
