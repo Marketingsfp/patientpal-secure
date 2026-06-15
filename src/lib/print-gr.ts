@@ -319,7 +319,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
       <tr><td class="label" colspan="2" style="white-space:nowrap">FICHA: <span class="v">${ficha}</span></td></tr>
       <tr><td class="label" colspan="2" style="white-space:nowrap">PROFISSIONAL: <span class="v">${esc(medicoNome)}</span></td></tr>
       <tr><td class="label" colspan="2" style="white-space:nowrap">HORÁRIO: <span class="v">${fmtData(a.inicio)}</span></td></tr>
-      ${usuarioNome ? `<tr><td class="label" colspan="2" style="white-space:nowrap">USUÁRIO: <span class="v">${esc(usuarioNome)}</span></td></tr>` : ""}
+      ${usuarioFinalNome ? `<tr><td class="label" colspan="2" style="white-space:nowrap">USUÁRIO: <span class="v">${esc(usuarioFinalNome)}</span></td></tr>` : ""}
     </table>
 
     <div class="sep"></div>
@@ -708,7 +708,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
           <tr><td class="label" colspan="2" style="white-space:nowrap">FICHA: <span class="v">${ficha}</span></td></tr>
           <tr><td class="label" colspan="2" style="white-space:nowrap">PROFISSIONAL: <span class="v">${esc(g.medicoNome)}</span></td></tr>
           <tr><td class="label" colspan="2" style="white-space:nowrap">HORÁRIO: <span class="v">${fmtData(g.inicioRef)}</span></td></tr>
-          ${usuarioNome ? `<tr><td class="label" colspan="2" style="white-space:nowrap">USUÁRIO: <span class="v">${esc(usuarioNome)}</span></td></tr>` : ""}
+          ${usuarioFinalNome ? `<tr><td class="label" colspan="2" style="white-space:nowrap">USUÁRIO: <span class="v">${esc(usuarioFinalNome)}</span></td></tr>` : ""}
         </table>
         <div class="sep"></div>
         <table>
@@ -964,7 +964,7 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
       <tr><td class="label">CONTRATO:</td><td class="v right">#${contrato.numero}</td></tr>
       <tr><td class="label">PARCELA:</td><td class="v right">${m.numero_parcela}/${totalParcelas}</td></tr>
       <tr><td class="label">VENCIMENTO:</td><td class="v right">${fmtDataSimples(m.vencimento)}</td></tr>
-      ${usuarioNome ? `<tr><td class="label" colspan="2" style="white-space:nowrap">USUÁRIO: <span class="v">${esc(usuarioNome)}</span></td></tr>` : ""}
+      ${usuarioFinalNome ? `<tr><td class="label" colspan="2" style="white-space:nowrap">USUÁRIO: <span class="v">${esc(usuarioFinalNome)}</span></td></tr>` : ""}
     </table>
 
     <div class="sep"></div>
