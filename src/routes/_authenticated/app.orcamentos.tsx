@@ -192,6 +192,21 @@ function OrcamentosPage() {
                 </td>
                 <td className="px-3 py-2">
                   <div className="flex justify-end gap-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        const numero = o.numero;
+                        if (window.parent && window.parent !== window) {
+                          window.parent.postMessage({ type: "agendar-orcamento", numero }, "*");
+                        } else {
+                          window.open(`/app/agenda?orc=${numero}`, "_blank", "noopener");
+                        }
+                      }}
+                      title="Agendar este orçamento"
+                    >
+                      <Calendar className="h-4 w-4 text-emerald-600" />
+                    </Button>
                     <Button size="sm" variant="ghost" onClick={() => imprimir(o.id)} title="Imprimir"><Printer className="h-4 w-4" /></Button>
                     <Button size="sm" variant="ghost" onClick={() => remover(o.id)} title="Excluir"><Trash2 className="h-4 w-4 text-destructive" /></Button>
                   </div>
