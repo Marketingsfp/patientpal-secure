@@ -1,5 +1,6 @@
 import { Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import type { MouseEvent } from "react";
 import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet, ChevronLeft, ChevronRight, ChevronDown, Search, HeartPulse, Contact, ConciergeBell, Briefcase, MapPin, Palmtree, GraduationCap, Sparkles, Filter, Send, Megaphone, KeyRound, BadgeCheck, LayoutGrid, Gift, Zap, Coffee, Play, Eye, ArrowRightLeft, Inbox, HandCoins } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -274,6 +275,11 @@ export function AppShell() {
     navigate({ to: "/login", replace: true });
   };
 
+  const handleMenuNavigate = (event: MouseEvent<HTMLAnchorElement>, to: string, hash?: string) => {
+    event.preventDefault();
+    navigate(hash ? { to, hash } : { to });
+  };
+
   const clinicColor = useMemo(() => (
     modoTodas
       ? "#0f172a"
@@ -525,6 +531,7 @@ export function AppShell() {
                               key={linkKey}
                               to={child.to}
                               hash={child.hash}
+                              onClick={(event) => handleMenuNavigate(event, child.to, child.hash)}
                               title={collapsed ? child.label : undefined}
                               data-nav-to={child.to}
                               data-nav-active={active ? "true" : undefined}
@@ -550,6 +557,7 @@ export function AppShell() {
                     <Link
                       key={item.to}
                       to={item.to}
+                      onClick={(event) => handleMenuNavigate(event, item.to)}
                       title={collapsed ? item.label : undefined}
                       data-nav-to={item.to}
                       data-nav-active={active ? "true" : undefined}
