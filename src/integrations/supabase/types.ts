@@ -6984,7 +6984,7 @@ export type Database = {
           mesclados: number
         }[]
       }
-      _mj_apply_batch: { Args: { _limite?: number }; Returns: number }
+      _mj_apply_batch: { Args: { _limit?: number }; Returns: number }
       assinar_contrato_publico: {
         Args: { _assinatura_svg: string; _ip: string; _token: string }
         Returns: string
