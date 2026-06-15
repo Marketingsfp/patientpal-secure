@@ -1724,9 +1724,9 @@ function AgendaPage() {
     setOpen(true);
   };
 
-  const buscarOrcamento = async () => {
+  const buscarOrcamento = async (numeroOverride?: number) => {
     if (!clinicaAtual) return;
-    const num = parseInt(form.orcamento_numero.replace(/\D/g, ""), 10);
+    const num = numeroOverride ?? parseInt(form.orcamento_numero.replace(/\D/g, ""), 10);
     if (!num || num <= 0) { toast.error("Informe o nº do orçamento."); return; }
     setBuscandoOrc(true);
     try {
@@ -1857,6 +1857,48 @@ function AgendaPage() {
   const limparOrcamento = () => {
     setForm(f => ({ ...f, orcamento_id: "", orcamento_numero: "", orcamento_itens: [] }));
   };
+
+  // Abre o diálogo de novo agendamento já com o nº de orçamento preenchido
+  // e dispara a busca automaticamente. Usado por:
+  //  - URL: /app/agenda?orc=123
+  //  - postMessage: { type: 'agendar-orcamento', numero: 123 } (split view)
+  const abrirNovoComOrcamento = (numero: number) => {
+    if (!clinicaAtual) return;
+    const inicio = toLocalInput(new Date(`${dataRef}T09:00:00`).toISOString());
+    const fim = toLocalInput(new Date(`${dataRef}T09:30:00`).toISOString());
+    setEditing(null);
+    setForm({ ...EMPTY, inicio, fim, orcamento_numero: String(numero) });
+    setOpen(true);
+    void buscarOrcamento(numero);
+  };
+
+  useEffect(() => {
+    if (!clinicaAtual) return;
+    // Param da URL (apenas na primeira carga válida)
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      const orcParam = sp.get("orc");
+      if (orcParam) {
+        const n = parseInt(orcParam.replace(/\D/g, ""), 10);
+        if (n > 0) {
+          abrirNovoComOrcamento(n);
+          sp.delete("orc");
+          const novo = `${window.location.pathname}${sp.toString() ? `?${sp.toString()}` : ""}${window.location.hash}`;
+          window.history.replaceState(null, "", novo);
+        }
+      }
+    } catch { /* ignore */ }
+    const onMsg = (ev: MessageEvent) => {
+      const d = ev.data;
+      if (!d || typeof d !== "object") return;
+      if (d.type === "agendar-orcamento" && typeof d.numero === "number") {
+        abrirNovoComOrcamento(d.numero);
+      }
+    };
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clinicaAtual?.clinica_id]);
 
   const openSlot = (a: Agendamento) => {
     if (reagendandoAg) { void confirmarReagendamentoNoSlot(a); return; }

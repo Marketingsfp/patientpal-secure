@@ -1,6 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { FileText, Plus, Printer, Trash2, Search, AlertTriangle } from "lucide-react";
+import { FileText, Plus, Printer, Trash2, Search, AlertTriangle, Calendar, Columns2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -70,6 +70,7 @@ const BRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", curren
 function OrcamentosPage() {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [list, setList] = useState<Orc[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
@@ -125,7 +126,17 @@ function OrcamentosPage() {
             <p className="text-sm text-muted-foreground">Orçamentos rápidos com impressão térmica 80mm</p>
           </div>
         </div>
-        <Button onClick={() => setOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> Novo orçamento</Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => navigate({ to: "/app/orcamentos-agenda" })}
+            className="gap-2"
+            title="Abrir orçamentos e agenda lado a lado"
+          >
+            <Columns2 className="h-4 w-4" /> Abrir c/ agenda
+          </Button>
+          <Button onClick={() => setOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> Novo orçamento</Button>
+        </div>
       </div>
 
       <div className="relative">
@@ -181,6 +192,21 @@ function OrcamentosPage() {
                 </td>
                 <td className="px-3 py-2">
                   <div className="flex justify-end gap-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        const numero = o.numero;
+                        if (window.parent && window.parent !== window) {
+                          window.parent.postMessage({ type: "agendar-orcamento", numero }, "*");
+                        } else {
+                          window.open(`/app/agenda?orc=${numero}`, "_blank", "noopener");
+                        }
+                      }}
+                      title="Agendar este orçamento"
+                    >
+                      <Calendar className="h-4 w-4 text-emerald-600" />
+                    </Button>
                     <Button size="sm" variant="ghost" onClick={() => imprimir(o.id)} title="Imprimir"><Printer className="h-4 w-4" /></Button>
                     <Button size="sm" variant="ghost" onClick={() => remover(o.id)} title="Excluir"><Trash2 className="h-4 w-4 text-destructive" /></Button>
                   </div>
