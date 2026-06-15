@@ -6784,6 +6784,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _do_import_pacientes_mj: { Args: never; Returns: number }
       _mj_apply_batch: { Args: { _limite?: number }; Returns: number }
       assinar_contrato_publico: {
         Args: { _assinatura_svg: string; _ip: string; _token: string }
