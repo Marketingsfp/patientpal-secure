@@ -1,6 +1,5 @@
 import { Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import type { MouseEvent } from "react";
 import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet, ChevronLeft, ChevronRight, ChevronDown, Search, HeartPulse, Contact, ConciergeBell, Briefcase, MapPin, Palmtree, GraduationCap, Sparkles, Filter, Send, Megaphone, KeyRound, BadgeCheck, LayoutGrid, Gift, Zap, Coffee, Play, Eye, ArrowRightLeft, Inbox, HandCoins } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -97,6 +96,10 @@ function leafAllowed(to: string, allowed: Set<string> | null): boolean {
   const mod = ROUTE_TO_MODULE[to];
   if (!mod) return true; // rota não mapeada → sempre visível
   return allowed.has(mod);
+}
+
+function navHref(to: string, hash?: string): string {
+  return hash ? `${to}#${hash}` : to;
 }
 const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> = [
   {
@@ -273,18 +276,6 @@ export function AppShell() {
   const handleSignOut = async () => {
     await signOut();
     navigate({ to: "/login", replace: true });
-  };
-
-  const handleMenuNavigate = (event: MouseEvent<HTMLAnchorElement>, to: string, hash?: string) => {
-    event.preventDefault();
-    navigate(hash ? ({ to, hash } as any) : ({ to } as any));
-    if (typeof window !== "undefined") {
-      const target = `${to}${hash ? `#${hash}` : ""}`;
-      window.setTimeout(() => {
-        const current = `${window.location.pathname}${window.location.hash}`;
-        if (current !== target) window.location.href = `${target}${window.location.search}`;
-      }, 2500);
-    }
   };
 
   const clinicColor = useMemo(() => (
@@ -534,11 +525,9 @@ export function AppShell() {
                           const active = leafIsActive(child.to, child.hash);
                           const linkKey = `${child.to}#${child.hash ?? ""}`;
                           return (
-                            <Link
+                            <a
                               key={linkKey}
-                              to={child.to}
-                              hash={child.hash}
-                              onClick={(event) => handleMenuNavigate(event, child.to, child.hash)}
+                              href={navHref(child.to, child.hash)}
                               title={collapsed ? child.label : undefined}
                               data-nav-to={child.to}
                               data-nav-active={active ? "true" : undefined}
@@ -550,7 +539,7 @@ export function AppShell() {
                             >
                               <child.icon className="h-4 w-4 shrink-0" />
                               {!collapsed && <span className="truncate">{child.label}</span>}
-                            </Link>
+                            </a>
                           );
                         })}
                       </div>
@@ -561,10 +550,9 @@ export function AppShell() {
                     (item.to !== "/app" && location.pathname.startsWith(item.to)) ||
                     aliases.some((a) => location.pathname === a || location.pathname.startsWith(`${a}/`));
                   return (
-                    <Link
+                    <a
                       key={item.to}
-                      to={item.to}
-                      onClick={(event) => handleMenuNavigate(event, item.to)}
+                      href={navHref(item.to)}
                       title={collapsed ? item.label : undefined}
                       data-nav-to={item.to}
                       data-nav-active={active ? "true" : undefined}
@@ -576,7 +564,7 @@ export function AppShell() {
                     >
                       <item.icon className="h-4 w-4 shrink-0" />
                       {!collapsed && <span className="truncate">{item.label}</span>}
-                    </Link>
+                    </a>
                   );
                 })}
               </div>
