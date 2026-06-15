@@ -2133,8 +2133,30 @@ function AgendaPage() {
     // re-agendado em outro horário sem ficar preso a este slot.
     const payload: { status: Status; orcamento_id?: null } = { status };
     if (status === "cancelado" && a.orcamento_id) payload.orcamento_id = null;
-    const { error } = await supabase.from("agendamentos").update(payload).eq("id", a.id);
-    if (error) toast.error(error.message); else await load();
+    // Cancelamento em cascata: se o agendamento faz parte de um pacote (orçamento dividido),
+    // pergunta se deve cancelar todos os agendamentos vinculados.
+    let idsParaAtualizar: string[] = [a.id];
+    if (status === "cancelado" && a.pacote_id) {
+      const { data: irmaos } = await supabase
+        .from("agendamentos")
+        .select("id,inicio,procedimento,status")
+        .eq("pacote_id", a.pacote_id)
+        .neq("status", "cancelado");
+      const outros = ((irmaos ?? []) as Array<{ id: string; inicio: string; procedimento: string | null }>).filter(x => x.id !== a.id);
+      if (outros.length > 0) {
+        const lista = outros
+          .sort((x, y) => new Date(x.inicio).getTime() - new Date(y.inicio).getTime())
+          .map(x => `• ${new Date(x.inicio).toLocaleString("pt-BR")} — ${x.procedimento ?? ""}`)
+          .join("\n");
+        const ok = confirm(`Este agendamento faz parte de um pacote do orçamento, com mais ${outros.length} item(ns) vinculado(s):\n\n${lista}\n\nClique OK para cancelar TODOS do pacote.\nClique Cancelar para cancelar APENAS este.`);
+        if (ok) idsParaAtualizar = [a.id, ...outros.map(x => x.id)];
+      }
+    }
+    const { error } = await supabase.from("agendamentos").update(payload).in("id", idsParaAtualizar);
+    if (error) toast.error(error.message); else {
+      if (idsParaAtualizar.length > 1) toast.success(`${idsParaAtualizar.length} agendamentos do pacote cancelados.`);
+      await load();
+    }
   };
 
   const iniciarAtendimentoEnf = async (a: Agendamento) => {
