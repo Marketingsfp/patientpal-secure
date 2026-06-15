@@ -539,6 +539,24 @@ export function AppShell() {
                         {subOpen && item.children.map((child) => {
                           const active = leafIsActive(child.to, child.hash);
                           const linkKey = `${child.to}#${child.hash ?? ""}`;
+                          const openInNewTab = child.to === "/app/nina";
+                          if (openInNewTab) {
+                            const href = `${child.to}${child.hash ? `#${child.hash}` : ""}`;
+                            return (
+                              <a
+                                key={linkKey}
+                                href={href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={collapsed ? child.label : undefined}
+                                data-nav-to={child.to}
+                                className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "pl-8 pr-3"} py-2 text-sm font-medium transition-all text-white/85 hover:bg-white/10 hover:text-white`}
+                              >
+                                <child.icon className="h-4 w-4 shrink-0" />
+                                {!collapsed && <span className="truncate">{child.label}</span>}
+                              </a>
+                            );
+                          }
                           return (
                             <Link
                               key={linkKey}
