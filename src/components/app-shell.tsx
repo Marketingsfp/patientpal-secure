@@ -525,11 +525,9 @@ export function AppShell() {
                           const active = leafIsActive(child.to, child.hash);
                           const linkKey = `${child.to}#${child.hash ?? ""}`;
                           return (
-                            <Link
+                            <a
                               key={linkKey}
-                              to={child.to}
-                              hash={child.hash}
-                              onClick={(event) => handleMenuNavigate(event, child.to, child.hash)}
+                              href={navHref(child.to, child.hash)}
                               title={collapsed ? child.label : undefined}
                               data-nav-to={child.to}
                               data-nav-active={active ? "true" : undefined}
@@ -541,7 +539,7 @@ export function AppShell() {
                             >
                               <child.icon className="h-4 w-4 shrink-0" />
                               {!collapsed && <span className="truncate">{child.label}</span>}
-                            </Link>
+                            </a>
                           );
                         })}
                       </div>
@@ -552,10 +550,9 @@ export function AppShell() {
                     (item.to !== "/app" && location.pathname.startsWith(item.to)) ||
                     aliases.some((a) => location.pathname === a || location.pathname.startsWith(`${a}/`));
                   return (
-                    <Link
+                    <a
                       key={item.to}
-                      to={item.to}
-                      onClick={(event) => handleMenuNavigate(event, item.to)}
+                      href={navHref(item.to)}
                       title={collapsed ? item.label : undefined}
                       data-nav-to={item.to}
                       data-nav-active={active ? "true" : undefined}
@@ -567,7 +564,7 @@ export function AppShell() {
                     >
                       <item.icon className="h-4 w-4 shrink-0" />
                       {!collapsed && <span className="truncate">{item.label}</span>}
-                    </Link>
+                    </a>
                   );
                 })}
               </div>
