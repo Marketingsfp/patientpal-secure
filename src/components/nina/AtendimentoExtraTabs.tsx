@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Send, Search, Loader2, Eye, ArrowRightLeft, CheckCircle2, Plus, Pencil, Trash2,
   Clock, AlertTriangle, Users, FileText, Phone, MessageSquare,
-  Circle, Coffee, PowerOff, Lock, Unlock,
+  Circle, Coffee, PowerOff, Lock, Unlock, CalendarPlus,
 } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
