@@ -103,6 +103,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     label: "Operação",
     items: [
     { to: "/app/agenda", label: "Agenda", icon: CalendarDays },
+    { to: "/app/whatsapp-agenda", label: "WhatsApp + Agenda", icon: MessageCircle },
     { to: "/app/checkin", label: "Check-in", icon: BadgeCheck },
     { to: "/app/caixa", label: "Caixa", icon: Wallet },
     { to: "/app/financeiro/atendimentos", label: "Repasse médico", icon: HandCoins },

@@ -28,6 +28,7 @@ import { Route as CheckinTokenRouteImport } from './routes/checkin.$token'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
 import { Route as AuthenticatedAppIndexRouteImport } from './routes/_authenticated/app.index'
 import { Route as PContratoTokenRouteImport } from './routes/p.contrato.$token'
+import { Route as AuthenticatedAppWhatsappAgendaRouteImport } from './routes/_authenticated/app.whatsapp-agenda'
 import { Route as AuthenticatedAppUnidadesRouteImport } from './routes/_authenticated/app.unidades'
 import { Route as AuthenticatedAppTriagemEnfermagemRouteImport } from './routes/_authenticated/app.triagem-enfermagem'
 import { Route as AuthenticatedAppTreinamentosRouteImport } from './routes/_authenticated/app.treinamentos'
@@ -211,6 +212,12 @@ const PContratoTokenRoute = PContratoTokenRouteImport.update({
   path: '/p/contrato/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedAppWhatsappAgendaRoute =
+  AuthenticatedAppWhatsappAgendaRouteImport.update({
+    id: '/whatsapp-agenda',
+    path: '/whatsapp-agenda',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppUnidadesRoute =
   AuthenticatedAppUnidadesRouteImport.update({
     id: '/unidades',
@@ -794,6 +801,7 @@ export interface FileRoutesByFullPath {
   '/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
   '/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/app/unidades': typeof AuthenticatedAppUnidadesRoute
+  '/app/whatsapp-agenda': typeof AuthenticatedAppWhatsappAgendaRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
   '/app/': typeof AuthenticatedAppIndexRoute
   '/app/atendimento-ia/$agendamentoId': typeof AuthenticatedAppAtendimentoIaAgendamentoIdRoute
@@ -898,6 +906,7 @@ export interface FileRoutesByTo {
   '/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
   '/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/app/unidades': typeof AuthenticatedAppUnidadesRoute
+  '/app/whatsapp-agenda': typeof AuthenticatedAppWhatsappAgendaRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
   '/app': typeof AuthenticatedAppIndexRoute
   '/app/atendimento-ia/$agendamentoId': typeof AuthenticatedAppAtendimentoIaAgendamentoIdRoute
@@ -1008,6 +1017,7 @@ export interface FileRoutesById {
   '/_authenticated/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
   '/_authenticated/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/_authenticated/app/unidades': typeof AuthenticatedAppUnidadesRoute
+  '/_authenticated/app/whatsapp-agenda': typeof AuthenticatedAppWhatsappAgendaRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
   '/_authenticated/app/': typeof AuthenticatedAppIndexRoute
   '/_authenticated/app/atendimento-ia/$agendamentoId': typeof AuthenticatedAppAtendimentoIaAgendamentoIdRoute
@@ -1118,6 +1128,7 @@ export interface FileRouteTypes {
     | '/app/treinamentos'
     | '/app/triagem-enfermagem'
     | '/app/unidades'
+    | '/app/whatsapp-agenda'
     | '/p/contrato/$token'
     | '/app/'
     | '/app/atendimento-ia/$agendamentoId'
@@ -1222,6 +1233,7 @@ export interface FileRouteTypes {
     | '/app/treinamentos'
     | '/app/triagem-enfermagem'
     | '/app/unidades'
+    | '/app/whatsapp-agenda'
     | '/p/contrato/$token'
     | '/app'
     | '/app/atendimento-ia/$agendamentoId'
@@ -1331,6 +1343,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/treinamentos'
     | '/_authenticated/app/triagem-enfermagem'
     | '/_authenticated/app/unidades'
+    | '/_authenticated/app/whatsapp-agenda'
     | '/p/contrato/$token'
     | '/_authenticated/app/'
     | '/_authenticated/app/atendimento-ia/$agendamentoId'
@@ -1522,6 +1535,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/p/contrato/$token'
       preLoaderRoute: typeof PContratoTokenRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/app/whatsapp-agenda': {
+      id: '/_authenticated/app/whatsapp-agenda'
+      path: '/whatsapp-agenda'
+      fullPath: '/app/whatsapp-agenda'
+      preLoaderRoute: typeof AuthenticatedAppWhatsappAgendaRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/unidades': {
       id: '/_authenticated/app/unidades'
@@ -2321,6 +2341,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppTreinamentosRoute: typeof AuthenticatedAppTreinamentosRoute
   AuthenticatedAppTriagemEnfermagemRoute: typeof AuthenticatedAppTriagemEnfermagemRoute
   AuthenticatedAppUnidadesRoute: typeof AuthenticatedAppUnidadesRoute
+  AuthenticatedAppWhatsappAgendaRoute: typeof AuthenticatedAppWhatsappAgendaRoute
   AuthenticatedAppIndexRoute: typeof AuthenticatedAppIndexRoute
   AuthenticatedAppFuncionarioUserIdRoute: typeof AuthenticatedAppFuncionarioUserIdRoute
   AuthenticatedAppImprimirAgendamentoIdRoute: typeof AuthenticatedAppImprimirAgendamentoIdRoute
@@ -2394,6 +2415,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppTriagemEnfermagemRoute:
     AuthenticatedAppTriagemEnfermagemRoute,
   AuthenticatedAppUnidadesRoute: AuthenticatedAppUnidadesRoute,
+  AuthenticatedAppWhatsappAgendaRoute: AuthenticatedAppWhatsappAgendaRoute,
   AuthenticatedAppIndexRoute: AuthenticatedAppIndexRoute,
   AuthenticatedAppFuncionarioUserIdRoute:
     AuthenticatedAppFuncionarioUserIdRoute,
