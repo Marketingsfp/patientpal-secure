@@ -3665,6 +3665,27 @@ function AgendaPage() {
                             ORÇ #{String(a.orcamento_numero).padStart(5, "0")}
                           </span>
                         ) : null}
+                        {a.pacote_id ? (() => {
+                          const irmaos = items.filter(x => x.pacote_id === a.pacote_id);
+                          const total = irmaos.length;
+                          const indice = irmaos
+                            .slice()
+                            .sort((x, y) => new Date(x.inicio).getTime() - new Date(y.inicio).getTime())
+                            .findIndex(x => x.id === a.id) + 1;
+                          const tooltip = irmaos
+                            .slice()
+                            .sort((x, y) => new Date(x.inicio).getTime() - new Date(y.inicio).getTime())
+                            .map(x => `• ${new Date(x.inicio).toLocaleString("pt-BR", { hour: "2-digit", minute: "2-digit" })} — ${x.procedimento ?? ""}`)
+                            .join("\n");
+                          return (
+                            <span
+                              title={`Pacote do orçamento (${total} agendamentos):\n${tooltip}`}
+                              className="ml-1 inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-semibold bg-violet-100 text-violet-800 border border-violet-300"
+                            >
+                              📦 {indice}/{total > 0 ? total : "?"}
+                            </span>
+                          );
+                        })() : null}
                       </button>
                     )}
                   </TableCell>
