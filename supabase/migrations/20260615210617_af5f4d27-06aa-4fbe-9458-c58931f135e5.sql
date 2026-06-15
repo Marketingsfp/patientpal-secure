@@ -1,0 +1,36 @@
+DROP TABLE IF EXISTS public._mj_import_csv;
+CREATE TABLE public._mj_import_csv (
+  codigo_pessoa text,
+  chave text,
+  nome text,
+  cpf_cnpj text,
+  sexo text,
+  email text,
+  ddd_1 text,
+  fone_1 text,
+  ddd_2 text,
+  fone_2 text,
+  nascimento_abertura text,
+  endereco text,
+  numero text,
+  complemento text,
+  bairro text,
+  cidade text,
+  uf text,
+  cep text,
+  rg_ie text,
+  profissao text,
+  estado_civil text,
+  nome_pai text,
+  nome_mae text,
+  pessoa_cliente text,
+  pessoa_profissional text,
+  pessoa_usuario text,
+  ativo text,
+  data_cadastro text,
+  crm_cro text,
+  codigo_especialidade text,
+  profissional_cor text
+);
+GRANT ALL ON public._mj_import_csv TO service_role;
+ALTER TABLE public._mj_import_csv ENABLE ROW LEVEL SECURITY;

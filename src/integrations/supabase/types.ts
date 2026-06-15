@@ -14,6 +14,177 @@ export type Database = {
   }
   public: {
     Tables: {
+      _mj_dedup: {
+        Row: {
+          bairro: string | null
+          cep: string | null
+          chave: string | null
+          cidade: string | null
+          codigo_pessoa: string | null
+          complemento: string | null
+          cpf_cnpj: string | null
+          cpf_digits: string | null
+          ddd_1: string | null
+          ddd_2: string | null
+          email: string | null
+          endereco: string | null
+          fone_1: string | null
+          fone_2: string | null
+          nascimento_abertura: string | null
+          nome: string | null
+          nome_u: string | null
+          numero: string | null
+          sexo: string | null
+          uf: string | null
+        }
+        Insert: {
+          bairro?: string | null
+          cep?: string | null
+          chave?: string | null
+          cidade?: string | null
+          codigo_pessoa?: string | null
+          complemento?: string | null
+          cpf_cnpj?: string | null
+          cpf_digits?: string | null
+          ddd_1?: string | null
+          ddd_2?: string | null
+          email?: string | null
+          endereco?: string | null
+          fone_1?: string | null
+          fone_2?: string | null
+          nascimento_abertura?: string | null
+          nome?: string | null
+          nome_u?: string | null
+          numero?: string | null
+          sexo?: string | null
+          uf?: string | null
+        }
+        Update: {
+          bairro?: string | null
+          cep?: string | null
+          chave?: string | null
+          cidade?: string | null
+          codigo_pessoa?: string | null
+          complemento?: string | null
+          cpf_cnpj?: string | null
+          cpf_digits?: string | null
+          ddd_1?: string | null
+          ddd_2?: string | null
+          email?: string | null
+          endereco?: string | null
+          fone_1?: string | null
+          fone_2?: string | null
+          nascimento_abertura?: string | null
+          nome?: string | null
+          nome_u?: string | null
+          numero?: string | null
+          sexo?: string | null
+          uf?: string | null
+        }
+        Relationships: []
+      }
+      _mj_import_csv: {
+        Row: {
+          ativo: string | null
+          bairro: string | null
+          cep: string | null
+          chave: string | null
+          cidade: string | null
+          codigo_especialidade: string | null
+          codigo_pessoa: string | null
+          complemento: string | null
+          cpf_cnpj: string | null
+          crm_cro: string | null
+          data_cadastro: string | null
+          ddd_1: string | null
+          ddd_2: string | null
+          email: string | null
+          endereco: string | null
+          estado_civil: string | null
+          fone_1: string | null
+          fone_2: string | null
+          nascimento_abertura: string | null
+          nome: string | null
+          nome_mae: string | null
+          nome_pai: string | null
+          numero: string | null
+          pessoa_cliente: string | null
+          pessoa_profissional: string | null
+          pessoa_usuario: string | null
+          profissao: string | null
+          profissional_cor: string | null
+          rg_ie: string | null
+          sexo: string | null
+          uf: string | null
+        }
+        Insert: {
+          ativo?: string | null
+          bairro?: string | null
+          cep?: string | null
+          chave?: string | null
+          cidade?: string | null
+          codigo_especialidade?: string | null
+          codigo_pessoa?: string | null
+          complemento?: string | null
+          cpf_cnpj?: string | null
+          crm_cro?: string | null
+          data_cadastro?: string | null
+          ddd_1?: string | null
+          ddd_2?: string | null
+          email?: string | null
+          endereco?: string | null
+          estado_civil?: string | null
+          fone_1?: string | null
+          fone_2?: string | null
+          nascimento_abertura?: string | null
+          nome?: string | null
+          nome_mae?: string | null
+          nome_pai?: string | null
+          numero?: string | null
+          pessoa_cliente?: string | null
+          pessoa_profissional?: string | null
+          pessoa_usuario?: string | null
+          profissao?: string | null
+          profissional_cor?: string | null
+          rg_ie?: string | null
+          sexo?: string | null
+          uf?: string | null
+        }
+        Update: {
+          ativo?: string | null
+          bairro?: string | null
+          cep?: string | null
+          chave?: string | null
+          cidade?: string | null
+          codigo_especialidade?: string | null
+          codigo_pessoa?: string | null
+          complemento?: string | null
+          cpf_cnpj?: string | null
+          crm_cro?: string | null
+          data_cadastro?: string | null
+          ddd_1?: string | null
+          ddd_2?: string | null
+          email?: string | null
+          endereco?: string | null
+          estado_civil?: string | null
+          fone_1?: string | null
+          fone_2?: string | null
+          nascimento_abertura?: string | null
+          nome?: string | null
+          nome_mae?: string | null
+          nome_pai?: string | null
+          numero?: string | null
+          pessoa_cliente?: string | null
+          pessoa_profissional?: string | null
+          pessoa_usuario?: string | null
+          profissao?: string | null
+          profissional_cor?: string | null
+          rg_ie?: string | null
+          sexo?: string | null
+          uf?: string | null
+        }
+        Relationships: []
+      }
       _mj_match_plan: {
         Row: {
           lanc_id: string | null
