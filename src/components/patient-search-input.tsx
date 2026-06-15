@@ -113,17 +113,19 @@ export function PatientSearchInput({
       setLoading(true);
       const termoSemAcento = normalizarBusca(term);
       const dataBusca = parseDataBusca(term);
-      // Prioriza prefixo (rápido — usa índice btree em nome) tanto no
-      // início do nome quanto no início de qualquer parte (sobrenome).
-      // Ex.: "rodrigo" pega "RODRIGO ..." e "DAVI RODRIGO ...".
+      // Prioriza prefixo (rápido — usa índice btree text_pattern_ops em nome).
+      // Como nome/codigo_prontuario/numero_pasta já são salvos em UPPERCASE
+      // (trigger uppercase_text_fields), usamos LIKE (case-sensitive) em vez
+      // de ILIKE — isso permite o planner usar o índice btree de prefixo
+      // (idx_pacientes_nome_prefix) em vez de cair para Seq Scan.
       const parts: string[] = [
-        `nome.ilike.${termoSemAcento}%`,
+        `nome.like.${termoSemAcento}%`,
       ];
-      if (termoSemAcento.length >= 4) parts.push(`nome.ilike.% ${termoSemAcento}%`);
+      if (termoSemAcento.length >= 4) parts.push(`nome.like.% ${termoSemAcento}%`);
       if (digits.length >= 3) {
-        parts.push(`cpf_digits.ilike.${digits}%`);
-        parts.push(`codigo_prontuario.ilike.${digits}%`);
-        parts.push(`numero_pasta.ilike.${digits}%`);
+        parts.push(`cpf_digits.like.${digits}%`);
+        parts.push(`codigo_prontuario.like.${digits}%`);
+        parts.push(`numero_pasta.like.${digits}%`);
       }
       // Busca por data de nascimento (formato completo)
       if (dataBusca?.iso) {
