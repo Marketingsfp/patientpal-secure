@@ -538,7 +538,7 @@ function Page() {
     const fim = new Date(fFim + "T23:59:59").toISOString();
     let q = supabase
       .from("caixa_sessoes")
-      .select("*")
+      .select(SESSAO_FIELDS)
       .eq("clinica_id", clinicaAtual.clinica_id)
       .gte("aberto_em", ini)
       .lte("aberto_em", fim)
@@ -552,7 +552,7 @@ function Page() {
       const ids = sess.map((s) => s.id);
       const { data: movs } = await supabase
         .from("caixa_movimentos")
-        .select("*")
+        .select(MOV_FIELDS)
         .in("sessao_id", ids);
       setTodosMovs((movs ?? []) as Mov[]);
     } else {
@@ -637,7 +637,7 @@ function Page() {
         valor_abertura: v,
         observacoes: obsAbertura || null,
       })
-      .select("*")
+      .select(SESSAO_FIELDS)
       .single();
     if (error || !sess) {
       setSaving(false);
@@ -731,7 +731,7 @@ function Page() {
     setOpenDetalhe(s);
     const { data } = await supabase
       .from("caixa_movimentos")
-      .select("*")
+      .select(MOV_FIELDS)
       .eq("sessao_id", s.id)
       .order("created_at", { ascending: true });
     setDetalheMovs((data ?? []) as Mov[]);
