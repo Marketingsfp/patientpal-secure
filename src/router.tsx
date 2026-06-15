@@ -27,11 +27,11 @@ export const getRouter = () => {
     context: { queryClient },
     scrollRestoration: true,
     defaultPreloadStaleTime: 0,
-    // Preload no hover (intent). "viewport" estava disparando
-    // loadRouteMatch em matches ainda n o inicializados e quebrando a
-    // navega o com "Cannot read properties of undefined (reading '_nonReactive')".
-    defaultPreload: "intent",
-    defaultPreloadDelay: 150,
+    // Preload desabilitado: tanto "viewport" quanto "intent" estavam
+    // disparando loadRouteMatch em matches ainda não inicializados e
+    // quebrando navegação com "Cannot read properties of undefined
+    // (reading '_nonReactive')", deixando cliques de menu sem resposta.
+    defaultPreload: false,
   });
 
   return router;
