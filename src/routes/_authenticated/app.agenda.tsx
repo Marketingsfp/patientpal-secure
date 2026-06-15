@@ -65,6 +65,7 @@ type Agendamento = {
   agenda_id?: string | null;
   orcamento_id?: string | null;
   orcamento_numero?: number | null;
+  pacote_id?: string | null;
 };
 type Medico = { id: string; nome: string; sexo?: string | null; usa_sistema?: boolean; especialidade_id?: string | null; procedimento_padrao_id?: string | null; procedimento_padrao_em_branco?: boolean | null; procedimento_padrao_nome?: string | null; especialidade_nome?: string | null };
 type RecursoEnf = { id: string; nome: string };
@@ -754,7 +755,7 @@ function AgendaPage() {
     setLoading(true);
     let q = supabase
       .from("agendamentos")
-      .select("id,paciente_nome,paciente_id,medico_id,enfermagem_recurso_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as never)
+      .select("id,paciente_nome,paciente_id,medico_id,enfermagem_recurso_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as never)
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("inicio", { ascending: false });
     // "agendado" agora significa "qualquer ficha com paciente alocado",
@@ -2132,8 +2133,30 @@ function AgendaPage() {
     // re-agendado em outro horário sem ficar preso a este slot.
     const payload: { status: Status; orcamento_id?: null } = { status };
     if (status === "cancelado" && a.orcamento_id) payload.orcamento_id = null;
-    const { error } = await supabase.from("agendamentos").update(payload).eq("id", a.id);
-    if (error) toast.error(error.message); else await load();
+    // Cancelamento em cascata: se o agendamento faz parte de um pacote (orçamento dividido),
+    // pergunta se deve cancelar todos os agendamentos vinculados.
+    let idsParaAtualizar: string[] = [a.id];
+    if (status === "cancelado" && a.pacote_id) {
+      const { data: irmaos } = await supabase
+        .from("agendamentos")
+        .select("id,inicio,procedimento,status")
+        .eq("pacote_id", a.pacote_id)
+        .neq("status", "cancelado");
+      const outros = ((irmaos ?? []) as Array<{ id: string; inicio: string; procedimento: string | null }>).filter(x => x.id !== a.id);
+      if (outros.length > 0) {
+        const lista = outros
+          .sort((x, y) => new Date(x.inicio).getTime() - new Date(y.inicio).getTime())
+          .map(x => `• ${new Date(x.inicio).toLocaleString("pt-BR")} — ${x.procedimento ?? ""}`)
+          .join("\n");
+        const ok = confirm(`Este agendamento faz parte de um pacote do orçamento, com mais ${outros.length} item(ns) vinculado(s):\n\n${lista}\n\nClique OK para cancelar TODOS do pacote.\nClique Cancelar para cancelar APENAS este.`);
+        if (ok) idsParaAtualizar = [a.id, ...outros.map(x => x.id)];
+      }
+    }
+    const { error } = await supabase.from("agendamentos").update(payload).in("id", idsParaAtualizar);
+    if (error) toast.error(error.message); else {
+      if (idsParaAtualizar.length > 1) toast.success(`${idsParaAtualizar.length} agendamentos do pacote cancelados.`);
+      await load();
+    }
   };
 
   const iniciarAtendimentoEnf = async (a: Agendamento) => {
@@ -3664,6 +3687,27 @@ function AgendaPage() {
                             ORÇ #{String(a.orcamento_numero).padStart(5, "0")}
                           </span>
                         ) : null}
+                        {a.pacote_id ? (() => {
+                          const irmaos = items.filter(x => x.pacote_id === a.pacote_id);
+                          const total = irmaos.length;
+                          const indice = irmaos
+                            .slice()
+                            .sort((x, y) => new Date(x.inicio).getTime() - new Date(y.inicio).getTime())
+                            .findIndex(x => x.id === a.id) + 1;
+                          const tooltip = irmaos
+                            .slice()
+                            .sort((x, y) => new Date(x.inicio).getTime() - new Date(y.inicio).getTime())
+                            .map(x => `• ${new Date(x.inicio).toLocaleString("pt-BR", { hour: "2-digit", minute: "2-digit" })} — ${x.procedimento ?? ""}`)
+                            .join("\n");
+                          return (
+                            <span
+                              title={`Pacote do orçamento (${total} agendamentos):\n${tooltip}`}
+                              className="ml-1 inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-semibold bg-violet-100 text-violet-800 border border-violet-300"
+                            >
+                              📦 {indice}/{total > 0 ? total : "?"}
+                            </span>
+                          );
+                        })() : null}
                       </button>
                     )}
                   </TableCell>
