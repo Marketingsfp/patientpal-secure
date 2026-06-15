@@ -1760,10 +1760,6 @@ function AgendaPage() {
         return g === "LABORATORIO" || t === "EXAME" || t === "LABORATORIO";
       };
       const todosLab = its.every(i => isLab(i.procedimento_id));
-      if (!todosLab) {
-        toast.error("Este fluxo é válido apenas para orçamentos 100% de laboratório.");
-        return;
-      }
       // Verifica se já existe agendamento ativo vinculado (mesma clínica)
       const { data: jaAg } = await supabase
         .from("agendamentos")
@@ -1777,7 +1773,9 @@ function AgendaPage() {
         return;
       }
       const nomes = its.map(i => i.descricao);
-      const procStr = `LABORATÓRIO (${nomes.length} EXAMES): ${nomes.join(", ")}`;
+      const procStr = todosLab
+        ? `LABORATÓRIO (${nomes.length} EXAMES): ${nomes.join(", ")}`
+        : (nomes.length === 1 ? nomes[0] : `${nomes.length} ITENS: ${nomes.join(", ")}`);
       // Resolve paciente: se o orçamento não tiver paciente_id, tenta achar
       // por nome/cpf na clínica para preencher automaticamente (e mantém
       // o campo editável caso o usuário queira trocar).
