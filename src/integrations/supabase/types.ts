@@ -6813,6 +6813,19 @@ export type Database = {
         Returns: string
       }
       atend_gerar_protocolo: { Args: { _clinica_id: string }; Returns: string }
+      buscar_pacientes_agenda: {
+        Args: { _clinica_ids: string[]; _limite?: number; _termo: string }
+        Returns: {
+          clinica_id: string
+          codigo_prontuario: string
+          cpf: string
+          data_nascimento: string
+          id: string
+          nome: string
+          numero_pasta: string
+          telefone: string
+        }[]
+      }
       can_manage_clinica: {
         Args: { _clinica_id: string; _user_id: string }
         Returns: boolean
