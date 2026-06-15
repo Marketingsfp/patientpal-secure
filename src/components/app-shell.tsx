@@ -98,9 +98,6 @@ function leafAllowed(to: string, allowed: Set<string> | null): boolean {
   return allowed.has(mod);
 }
 
-function navHref(to: string, hash?: string): string {
-  return hash ? `${to}#${hash}` : to;
-}
 const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> = [
   {
     label: "Operação",
