@@ -3354,7 +3354,7 @@ function AgendaPage() {
           <div className="space-y-0.5">
             <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Cliente</Label>
             <div className="flex gap-1">
-              <Input data-quick-search value={filtroCliente} onChange={(e) => setFiltroCliente(e.target.value)} placeholder="Buscar paciente…" />
+              <Input data-quick-search value={filtroCliente} onChange={(e) => setFiltroCliente(e.target.value)} placeholder="Nome ou CPF…" />
               <Button
                 type="button"
                 variant="outline"
