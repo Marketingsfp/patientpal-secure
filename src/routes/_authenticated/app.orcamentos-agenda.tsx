@@ -16,7 +16,7 @@ function OrcamentosAgendaPage() {
   const [rightKey, setRightKey] = useState(0);
   const [leftPct, setLeftPct] = useState(45);
   const [agendaSrc, setAgendaSrc] = useState(
-    search.orc ? `/app/agenda?orc=${search.orc}` : "/app/agenda"
+    search.orc ? `/app/agenda?embed=1&orc=${search.orc}` : "/app/agenda?embed=1"
   );
   const draggingRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -52,7 +52,7 @@ function OrcamentosAgendaPage() {
           win.postMessage({ type: "agendar-orcamento", numero: d.numero }, "*");
         } else {
           // fallback: recarrega o iframe com ?orc=
-          setAgendaSrc(`/app/agenda?orc=${d.numero}&t=${Date.now()}`);
+          setAgendaSrc(`/app/agenda?embed=1&orc=${d.numero}&t=${Date.now()}`);
           setRightKey((k) => k + 1);
         }
       }
@@ -121,7 +121,7 @@ function OrcamentosAgendaPage() {
                 Agenda
               </div>
               <div className="flex items-center gap-1">
-                <Button size="sm" variant="ghost" onClick={() => { setAgendaSrc("/app/agenda"); setRightKey((k) => k + 1); }} title="Recarregar">
+                <Button size="sm" variant="ghost" onClick={() => { setAgendaSrc("/app/agenda?embed=1"); setRightKey((k) => k + 1); }} title="Recarregar">
                   <RefreshCw className="h-3.5 w-3.5" />
                 </Button>
                 <Button
