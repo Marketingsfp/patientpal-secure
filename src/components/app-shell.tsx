@@ -303,6 +303,16 @@ export function AppShell() {
 
   const subsystem = useSyncExternalStore(subscribeSubsystem, getSubsystem, () => null);
   const isChooser = location.pathname === "/app" || location.pathname === "/app/";
+  const isEmbed = (() => {
+    const s = (location as unknown as { search?: unknown }).search;
+    if (s && typeof s === "object" && (s as Record<string, unknown>).embed != null) {
+      return String((s as Record<string, unknown>).embed) === "1";
+    }
+    if (typeof window !== "undefined") {
+      return new URLSearchParams(window.location.search).get("embed") === "1";
+    }
+    return false;
+  })();
 
   const initial = (userName || user?.email || "?").trim().charAt(0).toUpperCase();
 
@@ -432,6 +442,14 @@ export function AppShell() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
         Entrando…
+      </div>
+    );
+  }
+
+  if (isEmbed) {
+    return (
+      <div className="h-screen w-full overflow-auto bg-background" style={{ background: "var(--surface-cream)" }}>
+        <Outlet />
       </div>
     );
   }
