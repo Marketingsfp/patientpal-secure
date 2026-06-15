@@ -473,6 +473,13 @@ function AgendaPage() {
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [buscandoOrc, setBuscandoOrc] = useState(false);
+  // Dialog de divisão de orçamento (vários grupos de procedimentos → vários agendamentos vinculados)
+  const [dividirOpen, setDividirOpen] = useState(false);
+  const [dividirCtx, setDividirCtx] = useState<{
+    orcamento: { id: string; numero: number; paciente_id: string | null; paciente_nome: string | null };
+    itens: DividirItem[];
+    inicioPadrao: string;
+  } | null>(null);
   // Abre o diálogo "Novo agendamento" pré-preenchido a partir de querystring
   // (usado pelo botão "Agendar" da conversa do WhatsApp).
   const novoFromUrlConsumido = useRef(false);
