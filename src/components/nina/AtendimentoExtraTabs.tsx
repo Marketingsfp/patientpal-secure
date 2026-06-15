@@ -390,7 +390,7 @@ export function AtendInbox() {
                       if (pacId) params.set("novoPacId", pacId);
                       if (pacNome) params.set("novoPacNome", pacNome);
                       if (tel) params.set("novoTelefone", tel);
-                      window.open(`/app/agenda?${params.toString()}`, "_blank", "noopener");
+                      window.location.assign(`/app/agenda?${params.toString()}`);
                     }}
                   >
                     <CalendarPlus className="h-3.5 w-3.5 mr-1" /> Agendar
