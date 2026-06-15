@@ -96,7 +96,8 @@ export function PatientSearchInput({
   useEffect(() => {
     if (!open || scope.length === 0) return;
     const term = query.trim();
-    if (term.length < 2) {
+    const digits = term.replace(/\D/g, "");
+    if (term.length < 3 && digits.length < 3) {
       setOptions([]);
       return;
     }
@@ -110,7 +111,6 @@ export function PatientSearchInput({
     const handle = setTimeout(async () => {
       const myReq = ++reqIdRef.current;
       setLoading(true);
-      const digits = term.replace(/\D/g, "");
       const termoSemAcento = normalizarBusca(term);
       const dataBusca = parseDataBusca(term);
       // Prioriza prefixo (rápido — usa índice btree em nome) tanto no
@@ -118,15 +118,12 @@ export function PatientSearchInput({
       // Ex.: "rodrigo" pega "RODRIGO ..." e "DAVI RODRIGO ...".
       const parts: string[] = [
         `nome.ilike.${termoSemAcento}%`,
-        `nome.ilike.% ${termoSemAcento}%`,
       ];
+      if (termoSemAcento.length >= 4) parts.push(`nome.ilike.% ${termoSemAcento}%`);
       if (digits.length >= 3) {
-        parts.push(`cpf_digits.ilike.%${digits}%`);
-        parts.push(`codigo_prontuario.ilike.%${digits}%`);
-        parts.push(`numero_pasta.ilike.%${digits}%`);
-      } else if (term.length >= 1) {
-        parts.push(`codigo_prontuario.ilike.%${term}%`);
-        parts.push(`numero_pasta.ilike.%${term}%`);
+        parts.push(`cpf_digits.ilike.${digits}%`);
+        parts.push(`codigo_prontuario.ilike.${digits}%`);
+        parts.push(`numero_pasta.ilike.${digits}%`);
       }
       // Busca por data de nascimento (formato completo)
       if (dataBusca?.iso) {
@@ -178,7 +175,7 @@ export function PatientSearchInput({
       cacheRef.current.set(cacheKey, rows);
       setOptions(rows);
       setLoading(false);
-    }, 150);
+    }, 350);
     return () => clearTimeout(handle);
   }, [query, open, scope]);
 
