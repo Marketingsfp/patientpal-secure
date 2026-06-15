@@ -6793,6 +6793,12 @@ export type Database = {
           atualizados: number
         }[]
       }
+      _do_fix_prontuario_oldest_mj: {
+        Args: never
+        Returns: {
+          atualizados: number
+        }[]
+      }
       _do_import_pacientes_mj: { Args: never; Returns: number }
       _do_merge_pacientes_dup_mj: {
         Args: never

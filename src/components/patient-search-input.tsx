@@ -140,7 +140,14 @@ export function PatientSearchInput({
         .or(filter)
         .order("nome", { ascending: true })
         .limit(30);
-      const { data } = await queryBuilder;
+      const { data, error } = await queryBuilder;
+      if (error) {
+        // eslint-disable-next-line no-console
+        console.error("[patient-search] error", { term, filter, scope, error });
+      } else {
+        // eslint-disable-next-line no-console
+        console.debug("[patient-search] ok", { term, filter, scope, count: data?.length ?? 0 });
+      }
       // Ignora respostas obsoletas (digitação rápida -> várias requests)
       if (myReq !== reqIdRef.current) return;
       // Reordena: nomes que COMEÇAM com o termo aparecem primeiro
