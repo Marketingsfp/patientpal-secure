@@ -303,7 +303,16 @@ export function AppShell() {
 
   const subsystem = useSyncExternalStore(subscribeSubsystem, getSubsystem, () => null);
   const isChooser = location.pathname === "/app" || location.pathname === "/app/";
-  const isEmbed = typeof location.search === "string" && /(?:^|[?&])embed=1(?:&|$)/.test(location.search);
+  const isEmbed = (() => {
+    const s = (location as unknown as { search?: unknown }).search;
+    if (s && typeof s === "object" && (s as Record<string, unknown>).embed != null) {
+      return String((s as Record<string, unknown>).embed) === "1";
+    }
+    if (typeof window !== "undefined") {
+      return new URLSearchParams(window.location.search).get("embed") === "1";
+    }
+    return false;
+  })();
 
   const initial = (userName || user?.email || "?").trim().charAt(0).toUpperCase();
 
