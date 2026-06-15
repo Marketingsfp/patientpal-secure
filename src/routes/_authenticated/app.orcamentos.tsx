@@ -78,6 +78,10 @@ function OrcamentosPage() {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [filtroRealizacao, setFiltroRealizacao] = useState<"todos" | "realizados" | "nao_realizados">("todos");
+  const [periodo, setPeriodo] = useState<"hoje" | "semana" | "quinzena" | "mes" | "personalizado" | "todos">("todos");
+  const hojeIso = new Date().toISOString().slice(0, 10);
+  const [dataIni, setDataIni] = useState<string>(hojeIso);
+  const [dataFim, setDataFim] = useState<string>(hojeIso);
 
   const load = async () => {
     if (!clinicaAtual) return;
@@ -116,6 +120,22 @@ function OrcamentosPage() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
+    // calcula intervalo do período
+    let ini: Date | null = null;
+    let fim: Date | null = null;
+    if (periodo !== "todos") {
+      const now = new Date();
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+      const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+      if (periodo === "hoje") { ini = start; fim = end; }
+      else if (periodo === "semana") { ini = new Date(start); ini.setDate(ini.getDate() - 6); fim = end; }
+      else if (periodo === "quinzena") { ini = new Date(start); ini.setDate(ini.getDate() - 14); fim = end; }
+      else if (periodo === "mes") { ini = new Date(start); ini.setDate(ini.getDate() - 29); fim = end; }
+      else if (periodo === "personalizado") {
+        ini = new Date(`${dataIni}T00:00:00`);
+        fim = new Date(`${dataFim}T23:59:59.999`);
+      }
+    }
     return list.filter((o) => {
       if (q && !(
         o.paciente_nome.toLowerCase().includes(q) ||
@@ -125,9 +145,13 @@ function OrcamentosPage() {
       const realizado = (o.agendamentos_total ?? 0) > 0;
       if (filtroRealizacao === "realizados" && !realizado) return false;
       if (filtroRealizacao === "nao_realizados" && realizado) return false;
+      if (ini && fim) {
+        const d = new Date(o.created_at);
+        if (d < ini || d > fim) return false;
+      }
       return true;
     });
-  }, [list, query, filtroRealizacao]);
+  }, [list, query, filtroRealizacao, periodo, dataIni, dataFim]);
 
   const exportarCsv = () => {
     const header = ["Numero","Data","Paciente","Telefone","Medico","Pagamento","Total","Categoria","Realizado","Agendamentos","Realizados"];
@@ -201,6 +225,32 @@ function OrcamentosPage() {
           <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input className="pl-9" placeholder="Buscar por paciente, número ou médico…" value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
+        <div className="flex items-center gap-1 rounded-md border bg-card p-0.5 text-xs">
+          {([
+            ["hoje", "Dia"],
+            ["semana", "Semana"],
+            ["quinzena", "Quinzena"],
+            ["mes", "Mês"],
+            ["personalizado", "Período"],
+            ["todos", "Todos"],
+          ] as const).map(([k, label]) => (
+            <button
+              key={k}
+              onClick={() => setPeriodo(k)}
+              className={`px-3 py-1.5 rounded ${periodo === k ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+              title={label}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {periodo === "personalizado" && (
+          <div className="flex items-center gap-1">
+            <Input type="date" value={dataIni} onChange={(e) => setDataIni(e.target.value)} className="h-8 w-[150px] text-xs" />
+            <span className="text-xs text-muted-foreground">até</span>
+            <Input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)} className="h-8 w-[150px] text-xs" />
+          </div>
+        )}
         <div className="flex items-center gap-1 rounded-md border bg-card p-0.5 text-xs">
           {([
             ["todos", "Todos"],
