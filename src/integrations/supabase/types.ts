@@ -29,21 +29,6 @@ export type Database = {
         }
         Relationships: []
       }
-      _tmp_prontuario_updates: {
-        Row: {
-          novo: string
-          paciente_id: string
-        }
-        Insert: {
-          novo: string
-          paciente_id: string
-        }
-        Update: {
-          novo?: string
-          paciente_id?: string
-        }
-        Relationships: []
-      }
       agendamentos: {
         Row: {
           agenda_id: string | null
