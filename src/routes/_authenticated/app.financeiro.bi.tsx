@@ -56,43 +56,17 @@ function Page() {
   useEffect(() => {
     (async () => {
       if (!clinicaAtual) { setAtend12([]); setAtendMatriz({ anos: [], linhas: [], totalPorAno: {}, totalGeral: 0 }); return; }
-      // Busca lançamentos de receita (paginado) e classifica como atendimento (cartão/particular/exame).
-      // Mensalidades de contrato, adesões e venda de cartão NÃO entram.
-      const all: Array<{ data: string; cat: AtendCat }> = [];
-      let from = 0; const pageSize = 1000;
-      for (let i = 0; i < 100; i++) {
-        const { data: chunk, error } = await supabase
-          .from("fin_lancamentos")
-          .select("data, descricao, tipo, status")
-          .eq("clinica_id", clinicaAtual.clinica_id)
-          .eq("tipo", "receita")
-          .neq("status", "cancelado")
-          .order("data", { ascending: false })
-          .range(from, from + pageSize - 1);
-        if (error || !chunk || chunk.length === 0) break;
-        for (const r of chunk as Array<{ data: string; descricao: string }>) {
-          const cat = classifyAtendimento(r.descricao);
-          if (cat) all.push({ data: r.data, cat });
-        }
-        if (chunk.length < pageSize) break;
-        from += pageSize;
-      }
-      // Agrega ano/mês com breakdown
+      // Agregação feita server-side via RPC (a tabela tem centenas de milhares de linhas).
       type Cell = { cartao: number; particular: number; exames: number; total: number };
       const empty = (): Cell => ({ cartao: 0, particular: 0, exames: 0, total: 0 });
       const matriz: Record<number, Record<number, Cell>> = {};
-      for (const r of all) {
-        if (!r.data) continue;
-        const d = new Date(r.data);
-        const ano = d.getFullYear();
-        const mes = d.getMonth();
-        if (!matriz[ano]) matriz[ano] = {};
-        if (!matriz[ano][mes]) matriz[ano][mes] = empty();
-        const c = matriz[ano][mes];
-        if (r.cat === "cartao_consulta") c.cartao++;
-        else if (r.cat === "consulta_particular") c.particular++;
-        else if (r.cat === "exame") c.exames++;
-        c.total++;
+      const { data: rows } = await supabase.rpc("fin_atendimentos_matriz", { _clinica: clinicaAtual.clinica_id });
+      for (const r of (rows ?? []) as Array<{ ano: number; mes: number; cartao: number; particular: number; exames: number }>) {
+        if (!matriz[r.ano]) matriz[r.ano] = {};
+        const cartao = Number(r.cartao) || 0;
+        const particular = Number(r.particular) || 0;
+        const exames = Number(r.exames) || 0;
+        matriz[r.ano][r.mes] = { cartao, particular, exames, total: cartao + particular + exames };
       }
       const anos = Object.keys(matriz).map(Number).sort((a, b) => a - b);
       const linhas = Array.from({ length: 12 }, (_, m) => {
