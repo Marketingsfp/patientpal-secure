@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS public._mj_match_plan; CREATE TABLE public._mj_match_plan (chave text PRIMARY KEY, pid uuid, source text, processed boolean NOT NULL DEFAULT false); GRANT ALL ON public._mj_match_plan TO service_role;
