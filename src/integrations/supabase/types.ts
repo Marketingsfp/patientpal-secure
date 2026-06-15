@@ -50,6 +50,7 @@ export type Database = {
           orcamento_id: string | null
           paciente_id: string | null
           paciente_nome: string
+          pacote_id: string | null
           prioridade: Database["public"]["Enums"]["agendamento_prioridade"]
           procedimento: string | null
           status: Database["public"]["Enums"]["agendamento_status"]
@@ -77,6 +78,7 @@ export type Database = {
           orcamento_id?: string | null
           paciente_id?: string | null
           paciente_nome: string
+          pacote_id?: string | null
           prioridade?: Database["public"]["Enums"]["agendamento_prioridade"]
           procedimento?: string | null
           status?: Database["public"]["Enums"]["agendamento_status"]
@@ -104,6 +106,7 @@ export type Database = {
           orcamento_id?: string | null
           paciente_id?: string | null
           paciente_nome?: string
+          pacote_id?: string | null
           prioridade?: Database["public"]["Enums"]["agendamento_prioridade"]
           procedimento?: string | null
           status?: Database["public"]["Enums"]["agendamento_status"]
