@@ -29,6 +29,60 @@ export type Database = {
         }
         Relationships: []
       }
+      _tmp_import_pacientes: {
+        Row: {
+          bairro: string | null
+          cep: string | null
+          cidade: string | null
+          codigo_prontuario_anterior: string | null
+          complemento: string | null
+          cpf: string | null
+          data_nascimento: string | null
+          email: string | null
+          estado: string | null
+          logradouro: string | null
+          nome: string | null
+          numero: string | null
+          sexo: string | null
+          telefone: string | null
+          telefone2: string | null
+        }
+        Insert: {
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
+          codigo_prontuario_anterior?: string | null
+          complemento?: string | null
+          cpf?: string | null
+          data_nascimento?: string | null
+          email?: string | null
+          estado?: string | null
+          logradouro?: string | null
+          nome?: string | null
+          numero?: string | null
+          sexo?: string | null
+          telefone?: string | null
+          telefone2?: string | null
+        }
+        Update: {
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
+          codigo_prontuario_anterior?: string | null
+          complemento?: string | null
+          cpf?: string | null
+          data_nascimento?: string | null
+          email?: string | null
+          estado?: string | null
+          logradouro?: string | null
+          nome?: string | null
+          numero?: string | null
+          sexo?: string | null
+          telefone?: string | null
+          telefone2?: string | null
+        }
+        Relationships: []
+      }
       agendamentos: {
         Row: {
           agenda_id: string | null
