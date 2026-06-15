@@ -126,7 +126,17 @@ function OrcamentosPage() {
             <p className="text-sm text-muted-foreground">Orçamentos rápidos com impressão térmica 80mm</p>
           </div>
         </div>
-        <Button onClick={() => setOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> Novo orçamento</Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => navigate({ to: "/app/orcamentos-agenda" })}
+            className="gap-2"
+            title="Abrir orçamentos e agenda lado a lado"
+          >
+            <Columns2 className="h-4 w-4" /> Abrir c/ agenda
+          </Button>
+          <Button onClick={() => setOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> Novo orçamento</Button>
+        </div>
       </div>
 
       <div className="relative">
