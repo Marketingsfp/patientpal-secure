@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Camera, Check, Loader2, MapPin, Phone, Save, X } from "lucide-react";
+import { Calendar, Camera, Check, IdCard, Loader2, MapPin, Phone, Save, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +15,8 @@ interface Props {
 interface PacData {
   telefone: string | null;
   telefone2: string | null;
+  cpf: string | null;
+  data_nascimento: string | null;
   cep: string | null;
   logradouro: string | null;
   numero: string | null;
@@ -26,7 +28,7 @@ interface PacData {
 }
 
 const EMPTY: PacData = {
-  telefone: "", telefone2: "", cep: "", logradouro: "", numero: "",
+  telefone: "", telefone2: "", cpf: "", data_nascimento: "", cep: "", logradouro: "", numero: "",
   complemento: "", bairro: "", cidade: "", estado: "", foto_url: null,
 };
 
@@ -34,7 +36,7 @@ export function PacienteQuickActions({ pacienteId, clinicaId }: Props) {
   const [data, setData] = useState<PacData>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [savingPhone, setSavingPhone] = useState(false);
-  const [phoneEdited, setPhoneEdited] = useState(false);
+  const [edited, setEdited] = useState(false);
   const [endOpen, setEndOpen] = useState(false);
   const [fotoOpen, setFotoOpen] = useState(false);
   const [fotoPreviewUrl, setFotoPreviewUrl] = useState<string | null>(null);
@@ -45,7 +47,7 @@ export function PacienteQuickActions({ pacienteId, clinicaId }: Props) {
       setLoading(true);
       const { data: row } = await supabase
         .from("pacientes")
-        .select("telefone,telefone2,cep,logradouro,numero,complemento,bairro,cidade,estado,foto_url")
+        .select("telefone,telefone2,cpf,data_nascimento,cep,logradouro,numero,complemento,bairro,cidade,estado,foto_url")
         .eq("id", pacienteId)
         .maybeSingle();
       if (cancelled) return;
@@ -53,6 +55,8 @@ export function PacienteQuickActions({ pacienteId, clinicaId }: Props) {
         setData({
           telefone: row.telefone ?? "",
           telefone2: row.telefone2 ?? "",
+          cpf: row.cpf ?? "",
+          data_nascimento: row.data_nascimento ?? "",
           cep: row.cep ?? "",
           logradouro: row.logradouro ?? "",
           numero: row.numero ?? "",
@@ -69,22 +73,27 @@ export function PacienteQuickActions({ pacienteId, clinicaId }: Props) {
           if (!cancelled && signed?.signedUrl) setFotoPreviewUrl(signed.signedUrl);
         }
       }
-      setPhoneEdited(false);
+      setEdited(false);
       setLoading(false);
     })();
     return () => { cancelled = true; };
   }, [pacienteId]);
 
-  async function salvarTelefone() {
+  async function salvarDadosBasicos() {
     setSavingPhone(true);
+    const cpfDigits = (data.cpf ?? "").replace(/\D/g, "");
     const { error } = await supabase
       .from("pacientes")
-      .update({ telefone: data.telefone?.trim() || null })
+      .update({
+        telefone: data.telefone?.trim() || null,
+        cpf: cpfDigits || null,
+        data_nascimento: data.data_nascimento || null,
+      })
       .eq("id", pacienteId);
     setSavingPhone(false);
     if (error) { toast.error(error.message); return; }
-    toast.success("Telefone atualizado.");
-    setPhoneEdited(false);
+    toast.success("Dados do paciente atualizados.");
+    setEdited(false);
   }
 
   async function salvarEndereco() {
@@ -128,18 +137,42 @@ export function PacienteQuickActions({ pacienteId, clinicaId }: Props) {
 
   return (
     <div className="rounded-md border bg-muted/30 p-2 space-y-2">
-      <div className="flex items-center gap-2">
-        <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
-        <Input
-          value={data.telefone ?? ""}
-          placeholder="Telefone"
-          onChange={(e) => { setData(d => ({ ...d, telefone: e.target.value })); setPhoneEdited(true); }}
-          className="h-8"
-        />
-        {phoneEdited && (
-          <Button type="button" size="sm" onClick={salvarTelefone} disabled={savingPhone}>
+      <div className="grid grid-cols-12 gap-2 items-center">
+        <div className="col-span-12 sm:col-span-4 flex items-center gap-1">
+          <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
+          <Input
+            value={data.telefone ?? ""}
+            placeholder="Telefone *"
+            onChange={(e) => { setData(d => ({ ...d, telefone: e.target.value })); setEdited(true); }}
+            className="h-8"
+          />
+        </div>
+        <div className="col-span-7 sm:col-span-4 flex items-center gap-1">
+          <IdCard className="h-4 w-4 text-muted-foreground shrink-0" />
+          <Input
+            value={data.cpf ?? ""}
+            placeholder="CPF"
+            inputMode="numeric"
+            onChange={(e) => { setData(d => ({ ...d, cpf: e.target.value })); setEdited(true); }}
+            className="h-8"
+          />
+        </div>
+        <div className="col-span-5 sm:col-span-4 flex items-center gap-1">
+          <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+          <Input
+            type="date"
+            value={data.data_nascimento ?? ""}
+            placeholder="Nascimento *"
+            onChange={(e) => { setData(d => ({ ...d, data_nascimento: e.target.value })); setEdited(true); }}
+            className="h-8"
+          />
+        </div>
+      </div>
+      <div className="flex items-center gap-2 flex-wrap">
+        {edited && (
+          <Button type="button" size="sm" onClick={salvarDadosBasicos} disabled={savingPhone}>
             {savingPhone ? <Loader2 className="h-3 w-3 animate-spin"/> : <Check className="h-3 w-3"/>}
-            <span className="ml-1">Confirmar</span>
+            <span className="ml-1">Confirmar dados</span>
           </Button>
         )}
         <Button type="button" size="sm" variant="outline" onClick={() => setEndOpen(true)} title="Endereço e outros dados">
@@ -154,6 +187,11 @@ export function PacienteQuickActions({ pacienteId, clinicaId }: Props) {
           )}
           <span className="ml-1 hidden sm:inline">Foto</span>
         </Button>
+        {(!data.telefone?.trim() || !data.data_nascimento) && (
+          <span className="text-xs text-amber-600 font-medium ml-auto">
+            Telefone e nascimento são obrigatórios para agendar.
+          </span>
+        )}
       </div>
 
       <EnderecoDialog

@@ -1843,6 +1843,21 @@ function AgendaPage() {
       toast.error("Selecione um paciente cadastrado na lista ou clique em \"Cadastrar agora\" para criar o cadastro antes de salvar.");
       return;
     }
+    // Bloqueia agendamento sem telefone e data de nascimento no cadastro do paciente
+    {
+      const { data: pacCheck } = await supabase
+        .from("pacientes")
+        .select("telefone,data_nascimento")
+        .eq("id", form.paciente_id)
+        .maybeSingle();
+      const semTel = !pacCheck?.telefone || !String(pacCheck.telefone).trim();
+      const semNasc = !pacCheck?.data_nascimento;
+      if (semTel || semNasc) {
+        const faltando = [semTel && "telefone", semNasc && "data de nascimento"].filter(Boolean).join(" e ");
+        toast.error(`Preencha ${faltando} do paciente (campos abaixo do nome) e clique em "Confirmar dados" antes de salvar.`);
+        return;
+      }
+    }
     if (!form.inicio || !form.fim) { toast.error("Defina início e fim"); return; }
     if (new Date(form.fim) <= new Date(form.inicio)) { toast.error("O horário final deve ser após o inicial"); return; }
     if (!form.procedimento.trim()) { toast.error("Selecione o serviço"); return; }
