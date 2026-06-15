@@ -5,13 +5,19 @@ import { RefreshCw, ExternalLink, FileText, CalendarDays, GripVertical } from "l
 
 export const Route = createFileRoute("/_authenticated/app/orcamentos-agenda")({
   component: OrcamentosAgendaPage,
+  validateSearch: (s: Record<string, unknown>) => ({
+    orc: s.orc != null ? Number(s.orc) : undefined,
+  }),
 });
 
 function OrcamentosAgendaPage() {
+  const search = Route.useSearch();
   const [leftKey, setLeftKey] = useState(0);
   const [rightKey, setRightKey] = useState(0);
   const [leftPct, setLeftPct] = useState(45);
-  const [agendaSrc, setAgendaSrc] = useState("/app/agenda");
+  const [agendaSrc, setAgendaSrc] = useState(
+    search.orc ? `/app/agenda?orc=${search.orc}` : "/app/agenda"
+  );
   const draggingRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const agendaIframeRef = useRef<HTMLIFrameElement>(null);
