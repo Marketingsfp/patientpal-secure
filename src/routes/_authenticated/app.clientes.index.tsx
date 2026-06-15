@@ -94,12 +94,15 @@ function ClientesPage() {
       const dataIso = /^\d{2}\/\d{2}\/\d{4}$/.test(q)
         ? q.split("/").reverse().join("-")
         : null;
-      const ors = [`nome.ilike.${termoNorm}%`];
-      if (termoNorm.length >= 4) ors.push(`nome.ilike.% ${termoNorm}%`);
+      // Campos nome/codigo_prontuario são salvos em UPPERCASE (trigger),
+      // então usamos LIKE (case-sensitive) para o planner usar os índices
+      // btree text_pattern_ops e gin_trgm_ops corretamente.
+      const ors = [`nome.like.${termoNorm}%`];
+      if (termoNorm.length >= 4) ors.push(`nome.like.% ${termoNorm}%`);
       if (digits.length >= 3) {
-        ors.push(`cpf.ilike.${digits}%`);
-        ors.push(`telefone.ilike.%${digits}%`);
-        ors.push(`codigo_prontuario.ilike.${digits}%`);
+        ors.push(`cpf.like.${digits}%`);
+        ors.push(`telefone.like.%${digits}%`);
+        ors.push(`codigo_prontuario.like.${digits}%`);
       }
       if (q.includes("@") && q.length >= 5) ors.push(`email.ilike.%${q}%`);
       if (dataIso) ors.push(`data_nascimento.eq.${dataIso}`);
