@@ -282,8 +282,8 @@ export function AppShell() {
       const target = `${to}${hash ? `#${hash}` : ""}`;
       window.setTimeout(() => {
         const current = `${window.location.pathname}${window.location.hash}`;
-        if (current !== target) window.location.assign(target);
-      }, 80);
+        if (current !== target) window.location.href = `${target}${window.location.search}`;
+      }, 2500);
     }
   };
 
