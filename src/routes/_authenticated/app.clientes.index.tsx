@@ -28,6 +28,10 @@ function fmtNasc(d: string | null): string {
   return `${day}/${m}/${y}`;
 }
 
+function normalizarBusca(s: string): string {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+}
+
 function IdadeCell({ nascimento }: { nascimento: string | null }) {
   const idade = calcIdadeAnos(nascimento);
   if (idade === null || idade < 0) return <>—</>;
@@ -80,17 +84,24 @@ function ClientesPage() {
       .eq("clinica_id", clinicaAtual.clinica_id);
     const q = termo.trim();
     if (q) {
-      const like = `%${q}%`;
+      const digits = q.replace(/\D/g, "");
+      if (q.length < 3 && digits.length < 3) {
+        setItems([]);
+        setLoading(false);
+        return;
+      }
+      const termoNorm = normalizarBusca(q);
       const dataIso = /^\d{2}\/\d{2}\/\d{4}$/.test(q)
         ? q.split("/").reverse().join("-")
         : null;
-      const ors = [
-        `nome.ilike.${like}`,
-        `cpf.ilike.${like}`,
-        `telefone.ilike.${like}`,
-        `email.ilike.${like}`,
-        `codigo_prontuario.ilike.${like}`,
-      ];
+      const ors = [`nome.ilike.${termoNorm}%`];
+      if (termoNorm.length >= 4) ors.push(`nome.ilike.% ${termoNorm}%`);
+      if (digits.length >= 3) {
+        ors.push(`cpf.ilike.${digits}%`);
+        ors.push(`telefone.ilike.%${digits}%`);
+        ors.push(`codigo_prontuario.ilike.${digits}%`);
+      }
+      if (q.includes("@") && q.length >= 5) ors.push(`email.ilike.%${q}%`);
       if (dataIso) ors.push(`data_nascimento.eq.${dataIso}`);
       query = query.or(ors.join(","));
     }
