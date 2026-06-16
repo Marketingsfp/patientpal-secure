@@ -6984,7 +6984,7 @@ export type Database = {
           mesclados: number
         }[]
       }
-      _mj_apply_batch: { Args: { _limit?: number }; Returns: number }
+      _mj_apply_batch: { Args: { p_limit?: number }; Returns: number }
       _mj_null_all: { Args: never; Returns: number }
       _mj_set_batch: { Args: { _limit?: number }; Returns: number }
       _mj_tmp_batch: { Args: { _limit?: number }; Returns: number }
