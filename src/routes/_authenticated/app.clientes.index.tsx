@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Plus, Search, Pencil, Users, Download } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,10 +26,6 @@ function fmtNasc(d: string | null): string {
   const [y, m, day] = d.split("-");
   if (!y || !m || !day) return "—";
   return `${day}/${m}/${y}`;
-}
-
-function normalizarBusca(s: string): string {
-  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
 }
 
 function IdadeCell({ nascimento }: { nascimento: string | null }) {
@@ -72,11 +68,13 @@ function ClientesPage() {
   });
   const [loading, setLoading] = useState(false);
   const [openNovo, setOpenNovo] = useState(false);
+  const loadSeq = useRef(0);
 
   const [fotoSigned, setFotoSigned] = useState<Record<string, string>>({});
 
   const load = async (termo: string = "") => {
     if (!clinicaAtual) return;
+    const requestId = ++loadSeq.current;
     setLoading(true);
     const q = termo.trim();
     if (q && q.length < 3 && q.replace(/\D/g, "").length < 3) {
@@ -84,22 +82,29 @@ function ClientesPage() {
       setLoading(false);
       return;
     }
-    const dataRequest = supabase.rpc("buscar_pacientes", {
-      _clinica_id: clinicaAtual.clinica_id,
-      _termo: q,
-      _limit: q ? 80 : 120,
-    });
-    const countRequest = q
-      ? Promise.resolve({ count: totalPacientes, error: null })
-      : supabase
-        .from("pacientes")
-        .select("id", { count: "estimated", head: true })
-        .eq("clinica_id", clinicaAtual.clinica_id);
-    const [{ data, error }, { count, error: countError }] = await Promise.all([dataRequest, countRequest]);
-    setLoading(false);
-    if (error) { toast.error(error.message); return; }
-    if (countError) { toast.error(countError.message); } else { setTotalPacientes(count ?? 0); }
-    setItems((data ?? []) as any);
+    try {
+      const dataRequest = supabase.rpc("buscar_pacientes", {
+        _clinica_id: clinicaAtual.clinica_id,
+        _termo: q,
+        _limit: q ? 80 : 120,
+      });
+      const countRequest = q
+        ? Promise.resolve({ count: totalPacientes, error: null })
+        : supabase
+          .from("pacientes")
+          .select("id", { count: "estimated", head: true })
+          .eq("clinica_id", clinicaAtual.clinica_id);
+      const [{ data, error }, { count, error: countError }] = await Promise.all([dataRequest, countRequest]);
+      if (requestId !== loadSeq.current) return;
+      setLoading(false);
+      if (error) { toast.error("Não foi possível concluir esta busca. Tente novamente com mais letras do nome."); return; }
+      if (countError) { toast.error(countError.message); } else { setTotalPacientes(count ?? 0); }
+      setItems((data ?? []) as any);
+    } catch {
+      if (requestId !== loadSeq.current) return;
+      setLoading(false);
+      toast.error("Não foi possível concluir esta busca. Tente novamente com mais letras do nome.");
+    }
   };
 
   // Debounced server-side search
