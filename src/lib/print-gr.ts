@@ -822,6 +822,9 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     `;
   }).join("");
 
+  const nVias = numViasGR(pagamento);
+  const corpoVias = multiplicarVias(grsHtml, nVias);
+
   const html = `<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8" />
 <title>GR - ${esc(pacienteNome)}</title>
@@ -845,30 +848,13 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   .cut    { width: 76mm; padding: 4mm 2mm; text-align: center; }
   .cut-line { border-top: 2px dashed #000; margin: 2mm 0; }
   .cut-label { font-size: 8pt; letter-spacing: 1px; }
-  @media print { .noprint { display: none; } }
-  .noprint { position: fixed; top: 8px; right: 8px; }
-  .noprint button { padding: 6px 12px; font-size: 12px; cursor: pointer; }
+  ${VIA_CSS}
 </style></head>
 <body>
-  <div class="noprint">
-    <button onclick="window.print()">Imprimir</button>
-    <button onclick="window.close()">Fechar</button>
-  </div>
-  ${grsHtml}
-  <script>
-    window.addEventListener("load", function () {
-      setTimeout(function () { window.print(); }, 150);
-    });
-  </script>
+  ${corpoVias}
 </body></html>`;
 
-  const w = window.open("", "_blank", "width=420,height=720");
-  if (!w) {
-    throw new Error("O navegador bloqueou a janela de impressão. Permita pop-ups e tente novamente.");
-  }
-  w.document.open();
-  w.document.write(html);
-  w.document.close();
+  imprimirViaIframe(html);
 
   // Registra a impressão para cada agendamento (mantém limite de 2 vias por id).
   if (!reimpressao) {
