@@ -28,10 +28,6 @@ function fmtNasc(d: string | null): string {
   return `${day}/${m}/${y}`;
 }
 
-function normalizarBusca(s: string): string {
-  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
-}
-
 function IdadeCell({ nascimento }: { nascimento: string | null }) {
   const idade = calcIdadeAnos(nascimento);
   if (idade === null || idade < 0) return <>—</>;
