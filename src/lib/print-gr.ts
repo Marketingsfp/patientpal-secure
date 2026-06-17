@@ -976,35 +976,7 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
   const descricao = `MENSALIDADE ${m.numero_parcela}/${totalParcelas} — CONTRATO #${contrato.numero}${plano?.nome ? ` — ${plano.nome.toUpperCase()}` : ""}`;
   const tituloPac = paciente?.nome ?? contrato.paciente_nome;
 
-  const html = `<!doctype html>
-<html lang="pt-BR"><head><meta charset="utf-8" />
-<title>GR - ${esc(tituloPac)}</title>
-<style>
-  @page { size: 80mm auto; margin: 0; }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; background: #fff; color: #000; }
-  body { font-family: "Courier New", "Consolas", monospace; font-size: 11pt; line-height: 1.25; }
-  .ticket { width: 76mm; padding: 3mm 2mm 6mm; }
-  .center { text-align: center; }
-  .right  { text-align: right; }
-  .bold   { font-weight: 700; }
-  .sm     { font-size: 9pt; }
-  .lg     { font-size: 13pt; font-weight: 700; }
-  .sep    { border-top: 1px dashed #000; margin: 6px 0; }
-  .row    { display: flex; justify-content: space-between; gap: 6px; }
-  table   { width: 100%; border-collapse: collapse; }
-  td      { padding: 1px 0; vertical-align: top; }
-  .label  { color: #000; }
-  .v      { font-weight: 700; }
-  @media print { .noprint { display: none; } }
-  .noprint { position: fixed; top: 8px; right: 8px; }
-  .noprint button { padding: 6px 12px; font-size: 12px; cursor: pointer; }
-</style></head>
-<body>
-  <div class="noprint">
-    <button onclick="window.print()">Imprimir</button>
-    <button onclick="window.close()">Fechar</button>
-  </div>
+  const ticketHtml = `
   <div class="ticket">
     <div class="center bold">${esc(c?.nome ?? "")}</div>
     <div class="center sm">${endereco}</div>
@@ -1065,19 +1037,38 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
       <div>DATA IMPRESSÃO</div>
       <div>${fmtData(new Date().toISOString())}${viaNumero >= 2 ? ` — ${viaTexto}` : ""}</div>
     </div>
-  </div>
-  <script>
-    window.addEventListener("load", function () {
-      setTimeout(function () { window.print(); }, 150);
-    });
-  </script>
+  </div>`;
+
+  const nVias = numViasGR(pagamento);
+  const corpoVias = multiplicarVias(ticketHtml, nVias);
+
+  const html = `<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8" />
+<title>GR - ${esc(tituloPac)}</title>
+<style>
+  @page { size: 80mm auto; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #fff; color: #000; }
+  body { font-family: "Courier New", "Consolas", monospace; font-size: 11pt; line-height: 1.25; }
+  .ticket { width: 76mm; padding: 3mm 2mm 6mm; }
+  .center { text-align: center; }
+  .right  { text-align: right; }
+  .bold   { font-weight: 700; }
+  .sm     { font-size: 9pt; }
+  .lg     { font-size: 13pt; font-weight: 700; }
+  .sep    { border-top: 1px dashed #000; margin: 6px 0; }
+  .row    { display: flex; justify-content: space-between; gap: 6px; }
+  table   { width: 100%; border-collapse: collapse; }
+  td      { padding: 1px 0; vertical-align: top; }
+  .label  { color: #000; }
+  .v      { font-weight: 700; }
+  ${VIA_CSS}
+</style></head>
+<body>
+  ${corpoVias}
 </body></html>`;
 
-  const w = window.open("", "_blank", "width=420,height=720");
-  if (!w) throw new Error("O navegador bloqueou a janela de impressão. Permita pop-ups e tente novamente.");
-  w.document.open();
-  w.document.write(html);
-  w.document.close();
+  imprimirViaIframe(html);
 
   if (!reimpressao) {
     try {
