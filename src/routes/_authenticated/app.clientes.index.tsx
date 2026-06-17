@@ -110,10 +110,10 @@ function ClientesPage() {
       }
       if (q.includes("@") && q.length >= 5) ors.push(`email.ilike.*${q}*`);
       if (dataIso) ors.push(`data_nascimento.eq.${dataIso}`);
-      query = query.or(ors.join(","));
+      query = query.eq("ativo", true).or(ors.join(","));
     }
     const dataRequest = query
-      .order("codigo_prontuario", { ascending: true, nullsFirst: false })
+      .order(q ? "nome" : "codigo_prontuario", { ascending: true, nullsFirst: false })
       .limit(q ? 80 : 120);
     const countRequest = q
       ? Promise.resolve({ count: totalPacientes, error: null })
