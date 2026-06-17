@@ -94,13 +94,15 @@ function ClientesPage() {
       const dataIso = /^\d{2}\/\d{2}\/\d{4}$/.test(q)
         ? q.split("/").reverse().join("-")
         : null;
-      // Campos nome/codigo_prontuario são salvos em UPPERCASE (trigger),
-      // então usamos LIKE (case-sensitive) para o planner usar os índices
-      // btree text_pattern_ops e gin_trgm_ops corretamente.
+      // Campos nome/codigo_prontuario são salvos em UPPERCASE (trigger).
+      // Para busca com múltiplas palavras, montamos um pattern com curinga
+      // entre os tokens (ex: "michelle vieira" -> "*MICHELLE*VIEIRA*").
       // Em filtros .or() do PostgREST o curinga do LIKE é "*" (não "%").
-      const ors = [`nome.like.${termoNorm}*`];
-      if (termoNorm.length >= 4) ors.push(`nome.like.* ${termoNorm}*`);
-      if (termoNorm.length >= 4) ors.push(`nome.like.*${termoNorm}*`);
+      const tokens = termoNorm.split(/\s+/).filter(Boolean);
+      const nomePattern = tokens.length > 1
+        ? `*${tokens.join("*")}*`
+        : `*${termoNorm}*`;
+      const ors = [`nome.like.${nomePattern}`];
       if (digits.length >= 3) {
         ors.push(`cpf.like.${digits}*`);
         ors.push(`telefone.like.*${digits}*`);
