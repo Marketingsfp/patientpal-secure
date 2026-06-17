@@ -54,6 +54,93 @@ const FORMA_LABEL: Record<string, string> = {
   transferencia: "TRANSFERÊNCIA",
 };
 
+// Número de vias da GR conforme a forma de pagamento:
+// - dinheiro / boleto / convênio / transferência → 1 via
+// - cartão crédito / débito / pix → 2 vias (1ª médico, 2ª financeiro)
+// - misto → 2 vias se houver qualquer parcela em cartão/pix; senão 1
+function numViasGR(pag?: {
+  forma_pagamento: string | null;
+  detalhe?: Array<{ forma: string }>;
+} | null): number {
+  if (!pag) return 1;
+  const eletronico = (f: string | null | undefined) =>
+    f === "cartao_credito" || f === "cartao_debito" || f === "pix";
+  if (eletronico(pag.forma_pagamento)) return 2;
+  if (
+    pag.forma_pagamento === "misto" &&
+    (pag.detalhe ?? []).some((d) => eletronico(d.forma))
+  ) {
+    return 2;
+  }
+  return 1;
+}
+
+const VIA_LABELS = ["1ª VIA — MÉDICO", "2ª VIA — FINANCEIRO"];
+
+// Duplica o HTML de um ou mais tickets para emitir N vias com quebra de
+// página entre elas e um rótulo identificando a via.
+function multiplicarVias(ticketsHtml: string, nVias: number): string {
+  if (nVias <= 1) return ticketsHtml;
+  const parts: string[] = [];
+  for (let i = 0; i < nVias; i++) {
+    const label = VIA_LABELS[i] ?? `VIA ${i + 1}`;
+    const banner = `<div class="via-label">${label}</div>`;
+    // Injeta o banner logo após a abertura do primeiro ticket da via.
+    const bloco = ticketsHtml.replace(
+      '<div class="ticket">',
+      `<div class="ticket">${banner}`,
+    );
+    const wrapper = `<div class="via-wrap"${i < nVias - 1 ? ' style="page-break-after: always"' : ""}>${bloco}</div>`;
+    parts.push(wrapper);
+  }
+  return parts.join("");
+}
+
+// Estilos extras para vias (rótulo e quebra de página).
+const VIA_CSS = `
+  .via-label { text-align: center; font-weight: 700; border: 1px solid #000; padding: 2px 4px; margin: 0 2mm 4px; font-size: 9pt; letter-spacing: 1px; }
+  .via-wrap { width: 100%; }
+  @media print { .via-wrap { break-after: page; } .via-wrap:last-child { break-after: auto; } }
+`;
+
+// Imprime o HTML diretamente via iframe oculto — sem abrir nova janela.
+// O navegador ainda exibirá a caixa de diálogo de impressão padrão (não há
+// como suprimi-la sem modo quiosque), mas não há mais a tela intermediária.
+function imprimirViaIframe(html: string): void {
+  if (typeof document === "undefined") return;
+  const iframe = document.createElement("iframe");
+  iframe.setAttribute("aria-hidden", "true");
+  iframe.style.position = "fixed";
+  iframe.style.right = "0";
+  iframe.style.bottom = "0";
+  iframe.style.width = "0";
+  iframe.style.height = "0";
+  iframe.style.border = "0";
+  iframe.style.opacity = "0";
+  document.body.appendChild(iframe);
+  const cw = iframe.contentWindow;
+  if (!cw) {
+    try { document.body.removeChild(iframe); } catch { /* noop */ }
+    throw new Error("Não foi possível inicializar a impressão.");
+  }
+  const doc = cw.document;
+  doc.open();
+  doc.write(html);
+  doc.close();
+  const cleanup = () => { try { document.body.removeChild(iframe); } catch { /* noop */ } };
+  const dispararPrint = () => {
+    try {
+      cw.focus();
+      cw.print();
+    } catch { /* noop */ }
+    // Remove o iframe depois que o diálogo deve ter sido tratado.
+    setTimeout(cleanup, 4000);
+  };
+  iframe.onload = () => setTimeout(dispararPrint, 80);
+  // Fallback se onload não disparar (alguns navegadores com document.write).
+  setTimeout(() => { if (iframe.isConnected) dispararPrint(); }, 600);
+}
+
 export async function printGuiaAtendimento(input: PrintGRInput) {
   return printGuiaAtendimentoCore(input);
 }
