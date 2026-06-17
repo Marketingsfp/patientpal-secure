@@ -78,48 +78,22 @@ function ClientesPage() {
   const load = async (termo: string = "") => {
     if (!clinicaAtual) return;
     setLoading(true);
-    let query = supabase
-      .from("pacientes")
-      .select("id,nome,cpf,telefone,email,data_nascimento,ativo,cidade,estado,created_at,foto_url,codigo_prontuario")
-      .eq("clinica_id", clinicaAtual.clinica_id);
     const q = termo.trim();
-    if (q) {
-      const digits = q.replace(/\D/g, "");
-      if (q.length < 3 && digits.length < 3) {
-        setItems([]);
-        setLoading(false);
-        return;
-      }
-      const termoNorm = normalizarBusca(q);
-      const dataIso = /^\d{2}\/\d{2}\/\d{4}$/.test(q)
-        ? q.split("/").reverse().join("-")
-        : null;
-      // Campos nome/codigo_prontuario são salvos em UPPERCASE (trigger).
-      // Para busca com múltiplas palavras, montamos um pattern com curinga
-      // entre os tokens (ex: "michelle vieira" -> "*MICHELLE*VIEIRA*").
-      // Em filtros .or() do PostgREST o curinga do LIKE é "*" (não "%").
-      const tokens = termoNorm.split(/\s+/).filter(Boolean);
-      const nomePattern = tokens.length > 1
-        ? `*${tokens.join("*")}*`
-        : `*${termoNorm}*`;
-      const ors = [`nome.like.${nomePattern}`];
-      if (digits.length >= 3) {
-        ors.push(`cpf.like.${digits}*`);
-        ors.push(`telefone.like.*${digits}*`);
-        ors.push(`codigo_prontuario.like.${digits}*`);
-      }
-      if (q.includes("@") && q.length >= 5) ors.push(`email.ilike.*${q}*`);
-      if (dataIso) ors.push(`data_nascimento.eq.${dataIso}`);
-      query = query.eq("ativo", true).or(ors.join(","));
+    if (q && q.length < 3 && q.replace(/\D/g, "").length < 3) {
+      setItems([]);
+      setLoading(false);
+      return;
     }
-    const dataRequest = query
-      .order(q ? "nome" : "codigo_prontuario", { ascending: true, nullsFirst: false })
-      .limit(q ? 80 : 120);
+    const dataRequest = supabase.rpc("buscar_pacientes", {
+      _clinica_id: clinicaAtual.clinica_id,
+      _termo: q,
+      _limit: q ? 80 : 120,
+    });
     const countRequest = q
       ? Promise.resolve({ count: totalPacientes, error: null })
       : supabase
         .from("pacientes")
-        .select("id", { count: "planned", head: true })
+        .select("id", { count: "estimated", head: true })
         .eq("clinica_id", clinicaAtual.clinica_id);
     const [{ data, error }, { count, error: countError }] = await Promise.all([dataRequest, countRequest]);
     setLoading(false);
