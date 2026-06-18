@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -582,6 +582,9 @@ function AgendaPage() {
   const [pagamentoAgId, setPagamentoAgId] = useState<string | null>(null);
   const [pagamentoExtraIds, setPagamentoExtraIds] = useState<string[]>([]);
   const [pagamentoForma, setPagamentoForma] = useState<string>("");
+  // Sinaliza que após o pagamento+impressão devemos abrir a emissão da NFS-e.
+  const emitirNotaAposRef = useRef(false);
+  const navigate = useNavigate();
   // ── Desconto aplicado ANTES de "Salvar e Pagar" (com autorização da supervisão).
   type DescontoPendente = { tipo: "valor" | "percentual"; input: string; autorizadoPor: string; motivo: string };
   const [descontoPendente, setDescontoPendente] = useState<DescontoPendente | null>(null);
@@ -2980,17 +2983,27 @@ function AgendaPage() {
                     >
                       {descontoPendente
                         ? `Desconto: ${descontoPendente.tipo === "percentual" ? `${descontoPendente.input}%` : `R$ ${descontoPendente.input}`}`
-                        : "Aplicar desconto"}
+                        : "Desconto"}
                     </Button>
-                    <Button type="button" variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
                     <Button
                       type="button"
                       variant="outline"
                       disabled={saving}
-                      onClick={(e) => submit(e as unknown as FormEvent, true)}
+                      onClick={(e) => { emitirNotaAposRef.current = false; submit(e as unknown as FormEvent, true); }}
                       className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                      title="Salva, registra pagamento e imprime a GR em A4"
                     >
-                      Salvar e Pagar
+                      Pagar/Imprimir
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={saving}
+                      onClick={(e) => { emitirNotaAposRef.current = true; submit(e as unknown as FormEvent, true); }}
+                      className="border-sky-600 text-sky-700 hover:bg-sky-50 dark:hover:bg-sky-950/30"
+                      title="Salva, registra pagamento, imprime a GR e abre a emissão da NFS-e (a nota é salva ao imprimir o A4)"
+                    >
+                      Pagar/Imprimir/Nota
                     </Button>
                     <Button type="submit" data-primary disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
                   </>
@@ -3146,6 +3159,13 @@ function AgendaPage() {
           setPagamentoAgId(null);
           setPagamentoExtraIds([]);
           setDescontoPendente(null);
+          // Se o usuário escolheu "Pagar/Imprimir/Nota", abre a tela de
+          // atendimentos do financeiro com a linha pronta para emitir a NFS-e.
+          if (emitirNotaAposRef.current) {
+            emitirNotaAposRef.current = false;
+            toast.info("Emita a NFS-e clicando no botão ✉️ ao lado do atendimento.");
+            navigate({ to: "/app/financeiro/atendimentos" });
+          }
         }}
       />
 
