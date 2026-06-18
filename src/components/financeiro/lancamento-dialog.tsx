@@ -298,6 +298,110 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     setSaving(false);
     if (error) { toast.error(error.message); return; }
     toast.success(`${tipo === "receita" ? "Receita" : "Despesa"} registrada`);
+    // ----- Registra o split de repasse médico ----------------------------
+    // Antes esse cálculo só era feito em memória (na hora de imprimir a GR
+    // ou nos relatórios). Agora persistimos em `pagamento_splits` para que o
+    // histórico de repasses fique rastreável e somável por consulta direta.
+    try {
+      if (tipo === "receita" && lancInserido?.id && Number(valor) > 0) {
+        const splits: Array<{
+          clinica_id: string; pagamento_id: string;
+          beneficiario_tipo: "medico" | "prestador" | "clinica";
+          medico_id: string | null; prestador_id: string | null;
+          rotulo: string | null; percentual: number | null; valor: number;
+        }> = [];
+        // 1) Regras específicas do procedimento (se cadastradas)
+        let regrasAplicadas = false;
+        if (agendamentoId) {
+          const { data: ag } = await supabase
+            .from("agendamentos")
+            .select("procedimento")
+            .eq("id", agendamentoId).maybeSingle();
+          const procNome = (ag as { procedimento: string | null } | null)?.procedimento;
+          if (procNome) {
+            const { data: procRow } = await supabase
+              .from("procedimentos")
+              .select("id")
+              .eq("clinica_id", clinicaAtual.clinica_id)
+              .ilike("nome", procNome).limit(1).maybeSingle();
+            const procId = (procRow as { id: string } | null)?.id;
+            if (procId) {
+              const { data: regras } = await supabase
+                .from("procedimento_split_regras")
+                .select("beneficiario_tipo, medico_id, prestador_id, rotulo, percentual, valor")
+                .eq("clinica_id", clinicaAtual.clinica_id)
+                .eq("procedimento_id", procId);
+              const lista = (regras ?? []) as Array<{
+                beneficiario_tipo: "medico" | "prestador" | "clinica";
+                medico_id: string | null; prestador_id: string | null;
+                rotulo: string | null; percentual: number | null; valor: number | null;
+              }>;
+              for (const reg of lista) {
+                const v = reg.valor != null
+                  ? Number(reg.valor)
+                  : reg.percentual != null
+                    ? +(Number(valor) * Number(reg.percentual) / 100).toFixed(2)
+                    : 0;
+                splits.push({
+                  clinica_id: clinicaAtual.clinica_id,
+                  pagamento_id: lancInserido.id,
+                  beneficiario_tipo: reg.beneficiario_tipo,
+                  medico_id: reg.medico_id, prestador_id: reg.prestador_id,
+                  rotulo: reg.rotulo,
+                  percentual: reg.percentual != null ? Number(reg.percentual) : null,
+                  valor: v,
+                });
+              }
+              regrasAplicadas = lista.length > 0;
+            }
+          }
+        }
+        // 2) Fallback: usa o repasse padrão do médico vinculado
+        if (!regrasAplicadas && medicoId) {
+          const { data: med } = await supabase
+            .from("medicos")
+            .select("tipo_repasse, percentual_repasse_padrao, valor_repasse_padrao")
+            .eq("id", medicoId).maybeSingle();
+          const m = med as { tipo_repasse: string | null; percentual_repasse_padrao: number | null; valor_repasse_padrao: number | null } | null;
+          if (m) {
+            const vMed = m.tipo_repasse === "valor_fixo" && m.valor_repasse_padrao != null
+              ? Number(m.valor_repasse_padrao)
+              : +(Number(valor) * Number(m.percentual_repasse_padrao ?? 0) / 100).toFixed(2);
+            if (vMed > 0) {
+              splits.push({
+                clinica_id: clinicaAtual.clinica_id,
+                pagamento_id: lancInserido.id,
+                beneficiario_tipo: "medico",
+                medico_id: medicoId, prestador_id: null,
+                rotulo: "Repasse médico",
+                percentual: m.tipo_repasse === "valor_fixo" ? null : Number(m.percentual_repasse_padrao ?? 0),
+                valor: vMed,
+              });
+            }
+          }
+        }
+        // 3) Linha residual da clínica (diferença entre total e somatório)
+        const totalSplit = splits.reduce((s, x) => s + Number(x.valor || 0), 0);
+        const restoClinica = +(Number(valor) - totalSplit).toFixed(2);
+        if (restoClinica > 0) {
+          splits.push({
+            clinica_id: clinicaAtual.clinica_id,
+            pagamento_id: lancInserido.id,
+            beneficiario_tipo: "clinica",
+            medico_id: null, prestador_id: null,
+            rotulo: "Clínica",
+            percentual: null,
+            valor: restoClinica,
+          });
+        }
+        if (splits.length > 0) {
+          const { error: errSplit } = await supabase.from("pagamento_splits").insert(splits as never);
+          if (errSplit) console.error("Falha ao gravar splits:", errSplit);
+        }
+      }
+    } catch (e) {
+      console.error("Erro no cálculo de splits:", e);
+    }
     // Integração com Caixa: registra movimento na sessão aberta do usuário.
     // Se não houver sessão aberta, abre uma automaticamente com valor 0.
     try {
