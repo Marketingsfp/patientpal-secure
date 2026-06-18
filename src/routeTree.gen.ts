@@ -90,6 +90,7 @@ import { Route as AuthenticatedAppEquipeIndexRouteImport } from './routes/_authe
 import { Route as AuthenticatedAppClientesIndexRouteImport } from './routes/_authenticated/app.clientes.index'
 import { Route as AuthenticatedAppAtendimentoIaIndexRouteImport } from './routes/_authenticated/app.atendimento-ia.index'
 import { Route as ApiPublicWhatsappClinicaIdRouteImport } from './routes/api/public/whatsapp.$clinicaId'
+import { Route as ApiPublicFocusnfeWebhookRouteImport } from './routes/api/public/focusnfe.webhook'
 import { Route as AuthenticatedAppMedicoMedicoIdRouteImport } from './routes/_authenticated/app.medico.$medicoId'
 import { Route as AuthenticatedAppImprimirAgendamentoIdRouteImport } from './routes/_authenticated/app.imprimir.$agendamentoId'
 import { Route as AuthenticatedAppFuncionarioUserIdRouteImport } from './routes/_authenticated/app.funcionario.$userId'
@@ -106,6 +107,7 @@ import { Route as AuthenticatedAppFinanceiroBiRouteImport } from './routes/_auth
 import { Route as AuthenticatedAppFinanceiroAtendimentosRouteImport } from './routes/_authenticated/app.financeiro.atendimentos'
 import { Route as AuthenticatedAppFinanceiroAnaliticoRouteImport } from './routes/_authenticated/app.financeiro.analitico'
 import { Route as AuthenticatedAppFinanceiroAlertasRouteImport } from './routes/_authenticated/app.financeiro.alertas'
+import { Route as AuthenticatedAppConfiguracoesNfseRouteImport } from './routes/_authenticated/app.configuracoes.nfse'
 import { Route as AuthenticatedAppCartaoBeneficiosRelatoriosRouteImport } from './routes/_authenticated/app.cartao-beneficios.relatorios'
 import { Route as AuthenticatedAppCartaoBeneficiosModelosRouteImport } from './routes/_authenticated/app.cartao-beneficios.modelos'
 import { Route as AuthenticatedAppCartaoBeneficiosDependentesRouteImport } from './routes/_authenticated/app.cartao-beneficios.dependentes'
@@ -565,6 +567,12 @@ const ApiPublicWhatsappClinicaIdRoute =
     path: '/api/public/whatsapp/$clinicaId',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicFocusnfeWebhookRoute =
+  ApiPublicFocusnfeWebhookRouteImport.update({
+    id: '/api/public/focusnfe/webhook',
+    path: '/api/public/focusnfe/webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AuthenticatedAppMedicoMedicoIdRoute =
   AuthenticatedAppMedicoMedicoIdRouteImport.update({
     id: '/medico/$medicoId',
@@ -660,6 +668,12 @@ const AuthenticatedAppFinanceiroAlertasRoute =
     id: '/alertas',
     path: '/alertas',
     getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
+const AuthenticatedAppConfiguracoesNfseRoute =
+  AuthenticatedAppConfiguracoesNfseRouteImport.update({
+    id: '/configuracoes/nfse',
+    path: '/configuracoes/nfse',
+    getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppCartaoBeneficiosRelatoriosRoute =
   AuthenticatedAppCartaoBeneficiosRelatoriosRouteImport.update({
@@ -811,6 +825,7 @@ export interface FileRoutesByFullPath {
   '/app/cartao-beneficios/dependentes': typeof AuthenticatedAppCartaoBeneficiosDependentesRoute
   '/app/cartao-beneficios/modelos': typeof AuthenticatedAppCartaoBeneficiosModelosRoute
   '/app/cartao-beneficios/relatorios': typeof AuthenticatedAppCartaoBeneficiosRelatoriosRoute
+  '/app/configuracoes/nfse': typeof AuthenticatedAppConfiguracoesNfseRoute
   '/app/financeiro/alertas': typeof AuthenticatedAppFinanceiroAlertasRoute
   '/app/financeiro/analitico': typeof AuthenticatedAppFinanceiroAnaliticoRoute
   '/app/financeiro/atendimentos': typeof AuthenticatedAppFinanceiroAtendimentosRoute
@@ -827,6 +842,7 @@ export interface FileRoutesByFullPath {
   '/app/funcionario/$userId': typeof AuthenticatedAppFuncionarioUserIdRoute
   '/app/imprimir/$agendamentoId': typeof AuthenticatedAppImprimirAgendamentoIdRoute
   '/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
+  '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/app/atendimento-ia/': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/app/clientes/': typeof AuthenticatedAppClientesIndexRoute
@@ -916,6 +932,7 @@ export interface FileRoutesByTo {
   '/app/cartao-beneficios/dependentes': typeof AuthenticatedAppCartaoBeneficiosDependentesRoute
   '/app/cartao-beneficios/modelos': typeof AuthenticatedAppCartaoBeneficiosModelosRoute
   '/app/cartao-beneficios/relatorios': typeof AuthenticatedAppCartaoBeneficiosRelatoriosRoute
+  '/app/configuracoes/nfse': typeof AuthenticatedAppConfiguracoesNfseRoute
   '/app/financeiro/alertas': typeof AuthenticatedAppFinanceiroAlertasRoute
   '/app/financeiro/analitico': typeof AuthenticatedAppFinanceiroAnaliticoRoute
   '/app/financeiro/atendimentos': typeof AuthenticatedAppFinanceiroAtendimentosRoute
@@ -932,6 +949,7 @@ export interface FileRoutesByTo {
   '/app/funcionario/$userId': typeof AuthenticatedAppFuncionarioUserIdRoute
   '/app/imprimir/$agendamentoId': typeof AuthenticatedAppImprimirAgendamentoIdRoute
   '/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
+  '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/app/clientes': typeof AuthenticatedAppClientesIndexRoute
@@ -1027,6 +1045,7 @@ export interface FileRoutesById {
   '/_authenticated/app/cartao-beneficios/dependentes': typeof AuthenticatedAppCartaoBeneficiosDependentesRoute
   '/_authenticated/app/cartao-beneficios/modelos': typeof AuthenticatedAppCartaoBeneficiosModelosRoute
   '/_authenticated/app/cartao-beneficios/relatorios': typeof AuthenticatedAppCartaoBeneficiosRelatoriosRoute
+  '/_authenticated/app/configuracoes/nfse': typeof AuthenticatedAppConfiguracoesNfseRoute
   '/_authenticated/app/financeiro/alertas': typeof AuthenticatedAppFinanceiroAlertasRoute
   '/_authenticated/app/financeiro/analitico': typeof AuthenticatedAppFinanceiroAnaliticoRoute
   '/_authenticated/app/financeiro/atendimentos': typeof AuthenticatedAppFinanceiroAtendimentosRoute
@@ -1043,6 +1062,7 @@ export interface FileRoutesById {
   '/_authenticated/app/funcionario/$userId': typeof AuthenticatedAppFuncionarioUserIdRoute
   '/_authenticated/app/imprimir/$agendamentoId': typeof AuthenticatedAppImprimirAgendamentoIdRoute
   '/_authenticated/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
+  '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/_authenticated/app/atendimento-ia/': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/_authenticated/app/clientes/': typeof AuthenticatedAppClientesIndexRoute
@@ -1138,6 +1158,7 @@ export interface FileRouteTypes {
     | '/app/cartao-beneficios/dependentes'
     | '/app/cartao-beneficios/modelos'
     | '/app/cartao-beneficios/relatorios'
+    | '/app/configuracoes/nfse'
     | '/app/financeiro/alertas'
     | '/app/financeiro/analitico'
     | '/app/financeiro/atendimentos'
@@ -1154,6 +1175,7 @@ export interface FileRouteTypes {
     | '/app/funcionario/$userId'
     | '/app/imprimir/$agendamentoId'
     | '/app/medico/$medicoId'
+    | '/api/public/focusnfe/webhook'
     | '/api/public/whatsapp/$clinicaId'
     | '/app/atendimento-ia/'
     | '/app/clientes/'
@@ -1243,6 +1265,7 @@ export interface FileRouteTypes {
     | '/app/cartao-beneficios/dependentes'
     | '/app/cartao-beneficios/modelos'
     | '/app/cartao-beneficios/relatorios'
+    | '/app/configuracoes/nfse'
     | '/app/financeiro/alertas'
     | '/app/financeiro/analitico'
     | '/app/financeiro/atendimentos'
@@ -1259,6 +1282,7 @@ export interface FileRouteTypes {
     | '/app/funcionario/$userId'
     | '/app/imprimir/$agendamentoId'
     | '/app/medico/$medicoId'
+    | '/api/public/focusnfe/webhook'
     | '/api/public/whatsapp/$clinicaId'
     | '/app/atendimento-ia'
     | '/app/clientes'
@@ -1353,6 +1377,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/cartao-beneficios/dependentes'
     | '/_authenticated/app/cartao-beneficios/modelos'
     | '/_authenticated/app/cartao-beneficios/relatorios'
+    | '/_authenticated/app/configuracoes/nfse'
     | '/_authenticated/app/financeiro/alertas'
     | '/_authenticated/app/financeiro/analitico'
     | '/_authenticated/app/financeiro/atendimentos'
@@ -1369,6 +1394,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/funcionario/$userId'
     | '/_authenticated/app/imprimir/$agendamentoId'
     | '/_authenticated/app/medico/$medicoId'
+    | '/api/public/focusnfe/webhook'
     | '/api/public/whatsapp/$clinicaId'
     | '/_authenticated/app/atendimento-ia/'
     | '/_authenticated/app/clientes/'
@@ -1398,6 +1424,7 @@ export interface RootRouteChildren {
   VerificarCodigoRoute: typeof VerificarCodigoRoute
   PacienteIndexRoute: typeof PacienteIndexRoute
   PContratoTokenRoute: typeof PContratoTokenRoute
+  ApiPublicFocusnfeWebhookRoute: typeof ApiPublicFocusnfeWebhookRoute
   ApiPublicWhatsappClinicaIdRoute: typeof ApiPublicWhatsappClinicaIdRoute
 }
 
@@ -1970,6 +1997,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicWhatsappClinicaIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/focusnfe/webhook': {
+      id: '/api/public/focusnfe/webhook'
+      path: '/api/public/focusnfe/webhook'
+      fullPath: '/api/public/focusnfe/webhook'
+      preLoaderRoute: typeof ApiPublicFocusnfeWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/app/medico/$medicoId': {
       id: '/_authenticated/app/medico/$medicoId'
       path: '/medico/$medicoId'
@@ -2081,6 +2115,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/app/financeiro/alertas'
       preLoaderRoute: typeof AuthenticatedAppFinanceiroAlertasRouteImport
       parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
+    '/_authenticated/app/configuracoes/nfse': {
+      id: '/_authenticated/app/configuracoes/nfse'
+      path: '/configuracoes/nfse'
+      fullPath: '/app/configuracoes/nfse'
+      preLoaderRoute: typeof AuthenticatedAppConfiguracoesNfseRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/cartao-beneficios/relatorios': {
       id: '/_authenticated/app/cartao-beneficios/relatorios'
@@ -2343,6 +2384,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppTriagemEnfermagemRoute: typeof AuthenticatedAppTriagemEnfermagemRoute
   AuthenticatedAppUnidadesRoute: typeof AuthenticatedAppUnidadesRoute
   AuthenticatedAppIndexRoute: typeof AuthenticatedAppIndexRoute
+  AuthenticatedAppConfiguracoesNfseRoute: typeof AuthenticatedAppConfiguracoesNfseRoute
   AuthenticatedAppFuncionarioUserIdRoute: typeof AuthenticatedAppFuncionarioUserIdRoute
   AuthenticatedAppImprimirAgendamentoIdRoute: typeof AuthenticatedAppImprimirAgendamentoIdRoute
   AuthenticatedAppMedicoMedicoIdRoute: typeof AuthenticatedAppMedicoMedicoIdRoute
@@ -2417,6 +2459,8 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
     AuthenticatedAppTriagemEnfermagemRoute,
   AuthenticatedAppUnidadesRoute: AuthenticatedAppUnidadesRoute,
   AuthenticatedAppIndexRoute: AuthenticatedAppIndexRoute,
+  AuthenticatedAppConfiguracoesNfseRoute:
+    AuthenticatedAppConfiguracoesNfseRoute,
   AuthenticatedAppFuncionarioUserIdRoute:
     AuthenticatedAppFuncionarioUserIdRoute,
   AuthenticatedAppImprimirAgendamentoIdRoute:
@@ -2460,6 +2504,7 @@ const rootRouteChildren: RootRouteChildren = {
   VerificarCodigoRoute: VerificarCodigoRoute,
   PacienteIndexRoute: PacienteIndexRoute,
   PContratoTokenRoute: PContratoTokenRoute,
+  ApiPublicFocusnfeWebhookRoute: ApiPublicFocusnfeWebhookRoute,
   ApiPublicWhatsappClinicaIdRoute: ApiPublicWhatsappClinicaIdRoute,
 }
 export const routeTree = rootRouteImport
