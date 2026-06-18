@@ -55,6 +55,12 @@ interface Medico {
 interface Pac { id: string; nome: string }
 interface Convenio { medico_id: string; nome: string; tipo_repasse: string; percentual: number | null; valor: number | null }
 interface Conta { id: string; nome: string }
+interface Emitente { id: string; nome: string; codigo_municipio: string | null }
+interface PacFull {
+  id: string; nome: string; cpf: string | null; email: string | null;
+  cep: string | null; logradouro: string | null; numero: string | null;
+  bairro: string | null; cidade: string | null; estado: string | null;
+}
 
 const EMPTY = {
   data: new Date().toISOString().slice(0, 10), medico_id: "", paciente_id: "",
