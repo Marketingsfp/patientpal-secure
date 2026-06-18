@@ -35,6 +35,7 @@ interface Atend {
   status: string; forma_pagamento: string | null;
   medico_id: string | null; paciente_id: string | null;
   origem?: "manual" | "agenda";
+  agendamento_id?: string | null;
   repasse_pago?: boolean;
   repasse_pago_em?: string | null;
   repasse_forma_pagamento?: string | null;
