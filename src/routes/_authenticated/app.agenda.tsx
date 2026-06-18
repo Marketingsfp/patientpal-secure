@@ -1613,38 +1613,40 @@ function AgendaPage() {
 
     setReagLoteSalvando(true);
     const agora = new Date().toLocaleString("pt-BR");
-    let okCount = 0;
-    for (let i = 0; i < fontes.length; i++) {
-      const origem = fontes[i];
+    // H3 — Processa todos os pares (origem → alvo) em paralelo (cada par é
+    // independente). Reduz N×3 chamadas seriais a 3 ondas paralelas.
+    const resultados = await Promise.all(fontes.map(async (origem, i) => {
       const alvo = alvos[i];
       const trilha = `[Reagendado em lote em ${agora}] de ${new Date(origem.inicio).toLocaleString("pt-BR")} para ${new Date(alvo.inicio).toLocaleString("pt-BR")}`;
       const novasObs = origem.observacoes ? `${origem.observacoes}\n${trilha}` : trilha;
-      // 1) Libera a ficha de origem
-      const { error: e1 } = await supabase.from("agendamentos").update({
-        paciente_id: null,
-        paciente_nome: "DISPONÍVEL",
-        status: "agendado",
-        procedimento: null,
-        observacoes: null,
-        data_pagamento: null,
-      } as never).eq("id", origem.id);
-      if (e1) { toast.error(`Falha em ${origem.paciente_nome}: ${e1.message}`); continue; }
-      // 2) Coloca a paciente na ficha de destino (mantendo o horário do alvo)
-      const { error: e2 } = await supabase.from("agendamentos").update({
-        paciente_id: origem.paciente_id ?? null,
-        paciente_nome: origem.paciente_nome,
-        procedimento: origem.procedimento ?? null,
-        status: "agendado",
-        observacoes: novasObs,
-        data_pagamento: origem.data_pagamento ?? null,
-      } as never).eq("id", alvo.id);
-      if (e2) { toast.error(`Falha ao mover para destino: ${e2.message}`); continue; }
-      // 3) Transfere lançamentos financeiros (pagamento) da ficha de origem para a de destino
+      // 1+2) Libera origem e ocupa destino em paralelo
+      const [{ error: e1 }, { error: e2 }] = await Promise.all([
+        supabase.from("agendamentos").update({
+          paciente_id: null,
+          paciente_nome: "DISPONÍVEL",
+          status: "agendado",
+          procedimento: null,
+          observacoes: null,
+          data_pagamento: null,
+        } as never).eq("id", origem.id),
+        supabase.from("agendamentos").update({
+          paciente_id: origem.paciente_id ?? null,
+          paciente_nome: origem.paciente_nome,
+          procedimento: origem.procedimento ?? null,
+          status: "agendado",
+          observacoes: novasObs,
+          data_pagamento: origem.data_pagamento ?? null,
+        } as never).eq("id", alvo.id),
+      ]);
+      if (e1) { toast.error(`Falha em ${origem.paciente_nome}: ${e1.message}`); return false; }
+      if (e2) { toast.error(`Falha ao mover para destino: ${e2.message}`); return false; }
+      // 3) Transfere lançamentos financeiros
       await supabase.from("fin_lancamentos")
         .update({ agendamento_id: alvo.id } as never)
         .eq("agendamento_id", origem.id);
-      okCount++;
-    }
+      return true;
+    }));
+    const okCount = resultados.filter(Boolean).length;
     setReagLoteSalvando(false);
     setReagLoteIds(null);
     setSelecionados(new Set());
