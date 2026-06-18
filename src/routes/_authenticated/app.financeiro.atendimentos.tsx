@@ -164,11 +164,11 @@ function Page() {
           uf: p.estado ?? undefined,
         },
       } });
-      const nfseId = (res as { nfseId?: string })?.nfseId;
+      const nfseId = (res as { id?: string })?.id;
       toast.success("NFS-e enviada. Consultando status...");
       if (nfseId) {
         await new Promise((r) => setTimeout(r, 4000));
-        await consultarNfseFn({ data: { nfseId } });
+        await consultarNfseFn({ data: { id: nfseId } });
       }
       setNfseDialog({ open: false, atend: null });
     } catch (e) {

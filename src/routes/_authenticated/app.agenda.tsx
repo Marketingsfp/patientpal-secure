@@ -42,6 +42,7 @@ import { exportToExcel } from "@/lib/export-csv";
 import { useAuth } from "@/hooks/use-auth";
 import { useServerFn } from "@tanstack/react-start";
 import { listarEquipe } from "@/lib/equipe.functions";
+import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
 import { IdadeIcon } from "@/components/idade-icon";
 
 export const Route = createFileRoute("/_authenticated/app/agenda")({
@@ -677,6 +678,8 @@ function AgendaPage() {
   const [viewMode, setViewMode] = useState<"dia" | "medico">("dia");
 
   const fnListarEquipe = useServerFn(listarEquipe);
+  const emitirNfseFn = useServerFn(emitirNfse);
+  const consultarNfseFn = useServerFn(consultarNfse);
   const carregarEquipe = async () => {
     if (!clinicaAtual || equipeList.length > 0) return;
     try {
@@ -3163,8 +3166,61 @@ function AgendaPage() {
           // atendimentos do financeiro com a linha pronta para emitir a NFS-e.
           if (emitirNotaAposRef.current) {
             emitirNotaAposRef.current = false;
-            toast.info("Emita a NFS-e clicando no botão ✉️ ao lado do atendimento.");
-            navigate({ to: "/app/financeiro/atendimentos" });
+            // Emite a NFS-e automaticamente, sem o usuário precisar reabrir nada.
+            try {
+              const { data: emitente } = await supabase
+                .from("nfse_emitentes")
+                .select("id")
+                .eq("clinica_id", clinicaAtual.clinica_id)
+                .eq("ativo", true)
+                .maybeSingle();
+              if (!emitente?.id) {
+                toast.error("Nenhum emitente NFS-e configurado para esta clínica.");
+              } else {
+                const ag = items.find((x) => x.id === agId);
+                if (!ag?.paciente_id) {
+                  toast.error("Agendamento sem paciente vinculado — NFS-e não emitida.");
+                } else {
+                  const { data: pac } = await supabase.from("pacientes")
+                    .select("id, nome, cpf, email, cep, logradouro, numero, bairro, cidade, estado")
+                    .eq("id", ag.paciente_id).maybeSingle();
+                  if (!pac) {
+                    toast.error("Paciente não encontrado para emissão da NFS-e.");
+                  } else {
+                    const res = await emitirNfseFn({ data: {
+                      emitenteId: emitente.id,
+                      pacienteId: pac.id,
+                      agendamentoId: agId,
+                      valorServicos: Number(dados.valor) || 0,
+                      descricaoServicos: ag.procedimento || pagamentoDesc || "Serviços prestados",
+                      tomador: {
+                        nome: pac.nome,
+                        cpfCnpj: pac.cpf ?? undefined,
+                        email: pac.email ?? undefined,
+                        cep: pac.cep ?? undefined,
+                        logradouro: pac.logradouro ?? undefined,
+                        numero: pac.numero ?? undefined,
+                        bairro: pac.bairro ?? undefined,
+                        municipio: pac.cidade ?? undefined,
+                        uf: pac.estado ?? undefined,
+                      },
+                    } });
+                    const nfseId = (res as { id?: string })?.id;
+                    if (nfseId) {
+                      toast.success("NFS-e enviada. Consultando status...");
+                      await new Promise((r) => setTimeout(r, 4000));
+                      await consultarNfseFn({ data: { id: nfseId } });
+                      toast.success("NFS-e emitida com sucesso.");
+                    } else {
+                      toast.warning("NFS-e enviada — acompanhe o status em Financeiro › Atendimentos.");
+                    }
+                  }
+                }
+              }
+            } catch (err) {
+              toast.error("Falha ao emitir NFS-e: " + (err instanceof Error ? err.message : "erro"));
+              navigate({ to: "/app/financeiro/atendimentos" });
+            }
           }
         }}
       />
