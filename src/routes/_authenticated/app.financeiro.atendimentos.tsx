@@ -1,16 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Plus, Pencil, Trash2, Stethoscope, Download, Filter, Wallet, CheckCircle2, Clock, Undo2, Check, ChevronsUpDown, BellRing } from "lucide-react";
+import { Plus, Pencil, Trash2, Stethoscope, Download, Filter, Wallet, CheckCircle2, Clock, Undo2, Check, ChevronsUpDown, BellRing, Send, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useMedicoContext } from "@/hooks/use-medico-context";
+import { useServerFn } from "@tanstack/react-start";
+import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
 import { logAction } from "@/hooks/use-crud";
 import { exportToExcel } from "@/lib/export-csv";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -52,6 +55,12 @@ interface Medico {
 interface Pac { id: string; nome: string }
 interface Convenio { medico_id: string; nome: string; tipo_repasse: string; percentual: number | null; valor: number | null }
 interface Conta { id: string; nome: string }
+interface Emitente { id: string; nome: string; codigo_municipio: string | null }
+interface PacFull {
+  id: string; nome: string; cpf: string | null; email: string | null;
+  cep: string | null; logradouro: string | null; numero: string | null;
+  bairro: string | null; cidade: string | null; estado: string | null;
+}
 
 const EMPTY = {
   data: new Date().toISOString().slice(0, 10), medico_id: "", paciente_id: "",
@@ -96,6 +105,76 @@ function Page() {
   const [laudoTarget, setLaudoTarget] = useState<Atend | null>(null);
   const [laudoForm, setLaudoForm] = useState({ medico_laudador_id: "", valor_laudo: "" });
   const [laudoSaving, setLaudoSaving] = useState(false);
+
+  // NFS-e
+  const [emitentes, setEmitentes] = useState<Emitente[]>([]);
+  const [emitenteId, setEmitenteId] = useState("");
+  const [nfseDialog, setNfseDialog] = useState<{ open: boolean; atend: Atend | null }>({ open: false, atend: null });
+  const [nfseDesc, setNfseDesc] = useState("");
+  const [nfseEmitting, setNfseEmitting] = useState(false);
+  const emitirNfseFn = useServerFn(emitirNfse);
+  const consultarNfseFn = useServerFn(consultarNfse);
+
+  useEffect(() => {
+    if (!clinicaAtual) { setEmitentes([]); return; }
+    void supabase.from("nfse_emitentes")
+      .select("id, nome, codigo_municipio")
+      .eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome")
+      .then(({ data }) => {
+        const list = (data ?? []) as Emitente[];
+        setEmitentes(list);
+        if (list.length) setEmitenteId((prev) => prev || list[0].id);
+      });
+  }, [clinicaAtual?.clinica_id]);
+
+  const openEmitNfse = (a: Atend) => {
+    if (!emitentes.length) { toast.error("Cadastre um emitente em Configurações › NFS-e"); return; }
+    if (!a.paciente_id) { toast.error("Atendimento sem paciente vinculado"); return; }
+    const pacNome = pacMap.get(a.paciente_id) ?? a.paciente_nome_extra ?? "";
+    setNfseDesc(`${a.procedimento ?? "Serviços médicos prestados"}${pacNome ? ` — ${pacNome}` : ""}`.trim());
+    setNfseDialog({ open: true, atend: a });
+  };
+
+  const doEmitNfse = async () => {
+    const a = nfseDialog.atend;
+    if (!a || !emitenteId || !a.paciente_id) return;
+    setNfseEmitting(true);
+    try {
+      const { data: pac, error: pacErr } = await supabase.from("pacientes")
+        .select("id, nome, cpf, email, cep, logradouro, numero, bairro, cidade, estado")
+        .eq("id", a.paciente_id).maybeSingle();
+      if (pacErr || !pac) throw new Error("Paciente não encontrado");
+      const p = pac as PacFull;
+      const valor = Number(a.valor_total) || 0;
+      if (valor <= 0) throw new Error("Valor do atendimento é zero");
+      const res = await emitirNfseFn({ data: {
+        emitenteId,
+        pacienteId: p.id,
+        valorServicos: valor,
+        descricaoServicos: nfseDesc || "Serviços prestados",
+        tomador: {
+          nome: p.nome,
+          cpfCnpj: p.cpf ?? undefined,
+          email: p.email ?? undefined,
+          cep: p.cep ?? undefined,
+          logradouro: p.logradouro ?? undefined,
+          numero: p.numero ?? undefined,
+          bairro: p.bairro ?? undefined,
+          municipio: p.cidade ?? undefined,
+          uf: p.estado ?? undefined,
+        },
+      } });
+      const nfseId = (res as { nfseId?: string })?.nfseId;
+      toast.success("NFS-e enviada. Consultando status...");
+      if (nfseId) {
+        await new Promise((r) => setTimeout(r, 4000));
+        await consultarNfseFn({ data: { nfseId } });
+      }
+      setNfseDialog({ open: false, atend: null });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao emitir");
+    } finally { setNfseEmitting(false); }
+  };
 
   const openLaudo = (a: Atend) => {
     setLaudoTarget(a);
@@ -987,6 +1066,9 @@ function Page() {
                     {a.origem === "agenda" ? (
                       <div className="flex items-center justify-end gap-1">
                         <span className="text-[10px] text-muted-foreground uppercase">Agenda</span>
+                        <Button variant="ghost" size="icon" title="Emitir NFS-e" onClick={() => openEmitNfse(a)} disabled={!a.paciente_id}>
+                          <Send className="h-3.5 w-3.5" />
+                        </Button>
                         {podeEstornar && !a.repasse_pago && (
                           <Button
                             variant="ghost"
@@ -999,6 +1081,9 @@ function Page() {
                         )}
                       </div>
                     ) : (<>
+                      <Button variant="ghost" size="icon" title="Emitir NFS-e" onClick={() => openEmitNfse(a)} disabled={!a.paciente_id}>
+                        <Send className="h-3.5 w-3.5" />
+                      </Button>
                       <Button variant="ghost" size="icon" onClick={() => openEdit(a)}><Pencil className="h-3.5 w-3.5" /></Button>
                       <Button variant="ghost" size="icon" onClick={() => remove(a)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
                     </>)}
@@ -1085,6 +1170,37 @@ function Page() {
             <Button variant="outline" onClick={() => setLaudoOpen(false)}>Cancelar</Button>
             <Button onClick={emitirLaudo} disabled={laudoSaving}>
               {laudoSaving ? "Salvando..." : "Confirmar laudo emitido"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo: emitir NFS-e */}
+      <Dialog open={nfseDialog.open} onOpenChange={(o) => setNfseDialog({ open: o, atend: o ? nfseDialog.atend : null })}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Emitir NFS-e</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-2"><Label>Emitente *</Label>
+              <Select value={emitenteId} onValueChange={setEmitenteId}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{emitentes.map((e) => <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            {nfseDialog.atend && (
+              <div className="rounded-md border bg-muted/40 p-3 text-xs space-y-1">
+                <div><span className="text-muted-foreground">Paciente:</span> <b>{nfseDialog.atend.paciente_id ? pacMap.get(nfseDialog.atend.paciente_id) ?? "—" : nfseDialog.atend.paciente_nome_extra ?? "—"}</b></div>
+                <div><span className="text-muted-foreground">Serviço:</span> {nfseDialog.atend.procedimento ?? "—"}</div>
+                <div><span className="text-muted-foreground">Valor:</span> <b>{fmt(Number(nfseDialog.atend.valor_total))}</b></div>
+              </div>
+            )}
+            <div className="space-y-2"><Label>Descrição dos serviços *</Label>
+              <Textarea rows={3} value={nfseDesc} onChange={(e) => setNfseDesc(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNfseDialog({ open: false, atend: null })} disabled={nfseEmitting}>Cancelar</Button>
+            <Button onClick={doEmitNfse} disabled={nfseEmitting || !emitenteId}>
+              {nfseEmitting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Emitindo...</> : <><Send className="h-4 w-4 mr-2" />Emitir</>}
             </Button>
           </DialogFooter>
         </DialogContent>
