@@ -90,6 +90,7 @@ import { Route as AuthenticatedAppEquipeIndexRouteImport } from './routes/_authe
 import { Route as AuthenticatedAppClientesIndexRouteImport } from './routes/_authenticated/app.clientes.index'
 import { Route as AuthenticatedAppAtendimentoIaIndexRouteImport } from './routes/_authenticated/app.atendimento-ia.index'
 import { Route as ApiPublicWhatsappClinicaIdRouteImport } from './routes/api/public/whatsapp.$clinicaId'
+import { Route as ApiPublicFocusnfeWebhookRouteImport } from './routes/api/public/focusnfe.webhook'
 import { Route as AuthenticatedAppMedicoMedicoIdRouteImport } from './routes/_authenticated/app.medico.$medicoId'
 import { Route as AuthenticatedAppImprimirAgendamentoIdRouteImport } from './routes/_authenticated/app.imprimir.$agendamentoId'
 import { Route as AuthenticatedAppFuncionarioUserIdRouteImport } from './routes/_authenticated/app.funcionario.$userId'
@@ -566,6 +567,12 @@ const ApiPublicWhatsappClinicaIdRoute =
     path: '/api/public/whatsapp/$clinicaId',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicFocusnfeWebhookRoute =
+  ApiPublicFocusnfeWebhookRouteImport.update({
+    id: '/api/public/focusnfe/webhook',
+    path: '/api/public/focusnfe/webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AuthenticatedAppMedicoMedicoIdRoute =
   AuthenticatedAppMedicoMedicoIdRouteImport.update({
     id: '/medico/$medicoId',
@@ -835,6 +842,7 @@ export interface FileRoutesByFullPath {
   '/app/funcionario/$userId': typeof AuthenticatedAppFuncionarioUserIdRoute
   '/app/imprimir/$agendamentoId': typeof AuthenticatedAppImprimirAgendamentoIdRoute
   '/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
+  '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/app/atendimento-ia/': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/app/clientes/': typeof AuthenticatedAppClientesIndexRoute
@@ -941,6 +949,7 @@ export interface FileRoutesByTo {
   '/app/funcionario/$userId': typeof AuthenticatedAppFuncionarioUserIdRoute
   '/app/imprimir/$agendamentoId': typeof AuthenticatedAppImprimirAgendamentoIdRoute
   '/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
+  '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/app/clientes': typeof AuthenticatedAppClientesIndexRoute
@@ -1053,6 +1062,7 @@ export interface FileRoutesById {
   '/_authenticated/app/funcionario/$userId': typeof AuthenticatedAppFuncionarioUserIdRoute
   '/_authenticated/app/imprimir/$agendamentoId': typeof AuthenticatedAppImprimirAgendamentoIdRoute
   '/_authenticated/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
+  '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/_authenticated/app/atendimento-ia/': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/_authenticated/app/clientes/': typeof AuthenticatedAppClientesIndexRoute
@@ -1165,6 +1175,7 @@ export interface FileRouteTypes {
     | '/app/funcionario/$userId'
     | '/app/imprimir/$agendamentoId'
     | '/app/medico/$medicoId'
+    | '/api/public/focusnfe/webhook'
     | '/api/public/whatsapp/$clinicaId'
     | '/app/atendimento-ia/'
     | '/app/clientes/'
@@ -1271,6 +1282,7 @@ export interface FileRouteTypes {
     | '/app/funcionario/$userId'
     | '/app/imprimir/$agendamentoId'
     | '/app/medico/$medicoId'
+    | '/api/public/focusnfe/webhook'
     | '/api/public/whatsapp/$clinicaId'
     | '/app/atendimento-ia'
     | '/app/clientes'
@@ -1382,6 +1394,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/funcionario/$userId'
     | '/_authenticated/app/imprimir/$agendamentoId'
     | '/_authenticated/app/medico/$medicoId'
+    | '/api/public/focusnfe/webhook'
     | '/api/public/whatsapp/$clinicaId'
     | '/_authenticated/app/atendimento-ia/'
     | '/_authenticated/app/clientes/'
@@ -1411,6 +1424,7 @@ export interface RootRouteChildren {
   VerificarCodigoRoute: typeof VerificarCodigoRoute
   PacienteIndexRoute: typeof PacienteIndexRoute
   PContratoTokenRoute: typeof PContratoTokenRoute
+  ApiPublicFocusnfeWebhookRoute: typeof ApiPublicFocusnfeWebhookRoute
   ApiPublicWhatsappClinicaIdRoute: typeof ApiPublicWhatsappClinicaIdRoute
 }
 
@@ -1983,6 +1997,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicWhatsappClinicaIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/focusnfe/webhook': {
+      id: '/api/public/focusnfe/webhook'
+      path: '/api/public/focusnfe/webhook'
+      fullPath: '/api/public/focusnfe/webhook'
+      preLoaderRoute: typeof ApiPublicFocusnfeWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/app/medico/$medicoId': {
       id: '/_authenticated/app/medico/$medicoId'
       path: '/medico/$medicoId'
@@ -2483,6 +2504,7 @@ const rootRouteChildren: RootRouteChildren = {
   VerificarCodigoRoute: VerificarCodigoRoute,
   PacienteIndexRoute: PacienteIndexRoute,
   PContratoTokenRoute: PContratoTokenRoute,
+  ApiPublicFocusnfeWebhookRoute: ApiPublicFocusnfeWebhookRoute,
   ApiPublicWhatsappClinicaIdRoute: ApiPublicWhatsappClinicaIdRoute,
 }
 export const routeTree = rootRouteImport
