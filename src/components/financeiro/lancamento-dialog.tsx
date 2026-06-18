@@ -280,15 +280,9 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     // para que o repasse médico e os relatórios por paciente funcionem.
     let medicoId: string | null = null;
     let pacienteId: string | null = null;
-    if (agendamentoId) {
-      const { data: ag } = await supabase
-        .from("agendamentos")
-        .select("medico_id, paciente_id")
-        .eq("id", agendamentoId)
-        .maybeSingle();
-      const a = ag as { medico_id: string | null; paciente_id: string | null } | null;
-      medicoId = a?.medico_id ?? null;
-      pacienteId = a?.paciente_id ?? null;
+    if (agPrefetch) {
+      medicoId = agPrefetch.medico_id ?? null;
+      pacienteId = agPrefetch.paciente_id ?? null;
     }
     const { data: lancInserido, error } = await supabase.from("fin_lancamentos").insert({
       clinica_id: clinicaAtual.clinica_id,
