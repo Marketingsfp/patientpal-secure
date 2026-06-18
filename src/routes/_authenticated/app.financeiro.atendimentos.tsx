@@ -401,6 +401,7 @@ function Page() {
       const { total, repasse } = calcRepasseFull(medIdEff, pago, proc);
       return {
         id: r.id, data: r.data, procedimento: proc,
+        agendamento_id: r.agendamento_id ?? null,
         valor_total: total, valor_medico: repasse, valor_clinica: +(total - repasse).toFixed(2),
         status: "realizado", forma_pagamento: r.forma_pagamento,
         medico_id: medIdEff, paciente_id: pacIdEff,
