@@ -192,7 +192,8 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     // H2 — Roda jaPago + agendamento em paralelo. Antes eram duas queries
     // seriais (jaPago aqui, agendamento mais abaixo) e ainda uma 3ª query
     // duplicada para procedimento dentro do bloco de splits.
-    let agPrefetch: { medico_id: string | null; paciente_id: string | null; procedimento: string | null } | null = null;
+    type AgPrefetch = { medico_id: string | null; paciente_id: string | null; procedimento: string | null };
+    let agPrefetch: AgPrefetch | null = null;
     if (agendamentoId) {
       const [jaPagoRes, agRes] = await Promise.all([
         tipo === "receita"
@@ -216,7 +217,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         onOpenChange(false);
         return;
       }
-      agPrefetch = (agRes.data ?? null) as typeof agPrefetch;
+      agPrefetch = (agRes.data as AgPrefetch | null) ?? null;
     }
     const isCredito = formaPagamento === "cartao_credito";
     if (isCredito && !bandeiraCartao) {
