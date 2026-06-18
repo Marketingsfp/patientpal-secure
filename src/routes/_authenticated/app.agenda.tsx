@@ -487,36 +487,46 @@ function AgendaPage() {
   useEffect(() => {
     if (novoFromUrlConsumido.current) return;
     if (typeof window === "undefined") return;
-    if (pacientes.length === 0) return;
+    if (!clinicaAtual) return;
     const sp = new URLSearchParams(window.location.search);
     if (sp.get("novo") !== "1") return;
     novoFromUrlConsumido.current = true;
     const pacIdParam = sp.get("novoPacId") || "";
     const pacNomeParam = sp.get("novoPacNome") || "";
     const telParam = sp.get("novoTelefone") || "";
-    let pacienteId = "";
-    let pacienteNome = pacNomeParam;
-    if (pacIdParam && pacientes.some((p) => p.id === pacIdParam)) {
-      pacienteId = pacIdParam;
-      pacienteNome = pacientes.find((p) => p.id === pacIdParam)?.nome ?? pacNomeParam;
-    }
     const base = new Date(`${dataRef}T09:00:00`);
     const end = new Date(base.getTime() + 30 * 60000);
-    setEditing(null);
-    setForm({
-      ...EMPTY,
-      inicio: toLocalInput(base.toISOString()),
-      fim: toLocalInput(end.toISOString()),
-      paciente_id: pacienteId,
-      paciente_nome: pacienteNome,
-      observacoes: !pacienteId && telParam ? `Contato WhatsApp: ${telParam}` : "",
-    });
-    setOpen(true);
+    void (async () => {
+      let pacienteId = "";
+      let pacienteNome = pacNomeParam;
+      if (pacIdParam) {
+        const { data: pac } = await supabase
+          .from("pacientes")
+          .select("id,nome")
+          .eq("clinica_id", clinicaAtual.clinica_id)
+          .eq("id", pacIdParam)
+          .maybeSingle();
+        if (pac) {
+          pacienteId = pac.id;
+          pacienteNome = pac.nome ?? pacNomeParam;
+        }
+      }
+      setEditing(null);
+      setForm({
+        ...EMPTY,
+        inicio: toLocalInput(base.toISOString()),
+        fim: toLocalInput(end.toISOString()),
+        paciente_id: pacienteId,
+        paciente_nome: pacienteNome,
+        observacoes: !pacienteId && telParam ? `Contato WhatsApp: ${telParam}` : "",
+      });
+      setOpen(true);
+    })();
     // Limpa os params da URL para não reabrir ao recarregar.
     const url = new URL(window.location.href);
     ["novo", "novoPacId", "novoPacNome", "novoTelefone"].forEach((k) => url.searchParams.delete(k));
     window.history.replaceState({}, "", url.pathname + (url.search ? `?${url.searchParams}` : ""));
-  }, [pacientes, dataRef]);
+  }, [clinicaAtual?.clinica_id, dataRef]);
   // Reagendamento
   const [reagendandoAg, setReagendandoAg] = useState<Agendamento | null>(null);
   const [reagSalvando, setReagSalvando] = useState(false);
@@ -928,9 +938,8 @@ function AgendaPage() {
 
   const loadRef = async () => {
     if (!clinicaAtual) return;
-    const [m, p, e, me, pr, sr, mc, mp, er, erp] = await Promise.all([
+    const [m, e, me, pr, sr, mc, mp, er, erp] = await Promise.all([
       supabase.from("medicos").select("id,nome,sexo,usa_sistema,especialidade_id,procedimento_padrao_id,procedimento_padrao_em_branco").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
-      supabase.from("pacientes").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("especialidades").select("id,nome").order("nome"),
       supabase.from("medico_especialidades").select("medico_id,especialidade_id,medicos!inner(clinica_id)").eq("medicos.clinica_id", clinicaAtual.clinica_id),
       fetchProcedimentosAgenda(clinicaAtual.clinica_id),
@@ -1002,7 +1011,9 @@ function AgendaPage() {
     }));
     setRecursoIds(new Set(recursosArr.map((r) => r.id)));
     setMedicos([...medicosBase, ...recursosComoMedicos] as Medico[]);
-    setPacientes((p.data ?? []) as Paciente[]);
+    // Pacientes não são mais carregados em massa aqui: a seleção usa busca
+    // server-side em PatientSearchInput. Isso evita travar a agenda em bases grandes.
+    setPacientes([]);
     setEspecialidades((e.data ?? []) as Especialidade[]);
     {
       const ex = todos.filter((x) => x.tipo === "exame");
