@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
-import { Plus, FileText, Pencil, Trash2, ExternalLink } from "lucide-react";
+import { Plus, FileText, Pencil, Trash2, ExternalLink, Send, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { useServerFn } from "@tanstack/react-start";
+import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -26,6 +28,12 @@ interface Nota {
   paciente_id: string | null;
 }
 interface Pac { id: string; nome: string }
+interface PacFull {
+  id: string; nome: string; cpf: string | null; email: string | null;
+  cep: string | null; logradouro: string | null; numero: string | null;
+  bairro: string | null; cidade: string | null; estado: string | null;
+}
+interface Emitente { id: string; nome: string; codigo_municipio: string | null }
 const EMPTY = {
   numero: "", serie: "", data_emissao: new Date().toISOString().slice(0, 10), valor: "",
   status: "emitida", url_pdf: "", paciente_id: "", observacoes: "",
@@ -41,6 +49,13 @@ function Page() {
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<Nota | null>(null);
   const [form, setForm] = useState(EMPTY);
+  const [emitentes, setEmitentes] = useState<Emitente[]>([]);
+  const [emitDialog, setEmitDialog] = useState<{ open: boolean; nota: Nota | null }>({ open: false, nota: null });
+  const [emitenteId, setEmitenteId] = useState("");
+  const [descricao, setDescricao] = useState("");
+  const [emitting, setEmitting] = useState(false);
+  const emitirFn = useServerFn(emitirNfse);
+  const consultarFn = useServerFn(consultarNfse);
 
   const load = async () => {
     if (!clinicaAtual) { setItems([]); setLoading(false); return; }
@@ -57,7 +72,16 @@ function Page() {
       .eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome").limit(500);
     setPacientes((data ?? []) as Pac[]);
   };
-  useEffect(() => { void load(); void loadPac(); }, [clinicaAtual?.clinica_id]);
+  const loadEmit = async () => {
+    if (!clinicaAtual) return;
+    const { data } = await supabase.from("nfse_emitentes")
+      .select("id, nome, codigo_municipio")
+      .eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome");
+    const list = (data ?? []) as Emitente[];
+    setEmitentes(list);
+    if (list.length && !emitenteId) setEmitenteId(list[0].id);
+  };
+  useEffect(() => { void load(); void loadPac(); void loadEmit(); }, [clinicaAtual?.clinica_id]);
 
   const openNew = () => { setEditing(null); setForm(EMPTY); setOpen(true); };
   const openEdit = (n: Nota) => { setEditing(n); setForm({
@@ -87,6 +111,61 @@ function Page() {
     const { error } = await supabase.from("fin_notas_pacientes").delete().eq("id", n.id);
     if (error) toast.error(error.message); else { toast.success("Removida"); await load(); }
   };
+
+  const openEmit = async (n: Nota) => {
+    if (!emitentes.length) { toast.error("Cadastre um emitente em Configurações › NFS-e"); return; }
+    setDescricao(n.observacoes || `Serviços médicos prestados${n.paciente_id ? ` ao paciente ${pacMap.get(n.paciente_id) ?? ""}` : ""}`.trim());
+    setEmitDialog({ open: true, nota: n });
+  };
+
+  const doEmit = async () => {
+    const n = emitDialog.nota;
+    if (!n || !emitenteId) return;
+    if (!n.paciente_id) { toast.error("Vincule um paciente à nota antes de emitir."); return; }
+    setEmitting(true);
+    try {
+      const { data: pac, error: pacErr } = await supabase.from("pacientes")
+        .select("id, nome, cpf, email, cep, logradouro, numero, bairro, cidade, estado")
+        .eq("id", n.paciente_id).maybeSingle();
+      if (pacErr || !pac) throw new Error("Paciente não encontrado");
+      const p = pac as PacFull;
+      const res = await emitirFn({ data: {
+        emitenteId,
+        pacienteId: p.id,
+        valorServicos: Number(n.valor),
+        descricaoServicos: descricao || "Serviços prestados",
+        tomador: {
+          nome: p.nome,
+          cpfCnpj: p.cpf ?? undefined,
+          email: p.email ?? undefined,
+          cep: p.cep ?? undefined,
+          logradouro: p.logradouro ?? undefined,
+          numero: p.numero ?? undefined,
+          bairro: p.bairro ?? undefined,
+          municipio: p.cidade ?? undefined,
+          uf: p.estado ?? undefined,
+        },
+      } });
+      const nfseId = (res as { nfseId?: string })?.nfseId;
+      toast.success("NFS-e enviada. Consultando status...");
+      // Aguarda processamento e consulta
+      if (nfseId) {
+        await new Promise((r) => setTimeout(r, 4000));
+        const cons = await consultarFn({ data: { nfseId } }) as { focus?: { url_danfse?: string; status?: string } };
+        const url = cons?.focus?.url_danfse;
+        if (url) {
+          await supabase.from("fin_notas_pacientes").update({
+            url_pdf: url, status: "emitida",
+          }).eq("id", n.id);
+        }
+      }
+      setEmitDialog({ open: false, nota: null });
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao emitir");
+    } finally { setEmitting(false); }
+  };
+
   const pacMap = new Map(pacientes.map((p) => [p.id, p.nome]));
 
   return (
@@ -154,6 +233,9 @@ function Page() {
                 <TableCell><Badge variant={n.status === "emitida" ? "default" : "secondary"}>{n.status}</Badge></TableCell>
                 <TableCell className="text-right font-medium">{fmt(Number(n.valor))}</TableCell>
                 <TableCell className="text-right">
+                  <Button variant="ghost" size="icon" title="Emitir NFS-e" onClick={() => openEmit(n)} disabled={!n.paciente_id}>
+                    <Send className="h-3.5 w-3.5" />
+                  </Button>
                   {n.url_pdf && <a href={n.url_pdf} target="_blank" rel="noopener noreferrer"><Button variant="ghost" size="icon"><ExternalLink className="h-3.5 w-3.5" /></Button></a>}
                   <Button variant="ghost" size="icon" onClick={() => openEdit(n)}><Pencil className="h-3.5 w-3.5" /></Button>
                   <Button variant="ghost" size="icon" onClick={() => remove(n)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
@@ -162,6 +244,31 @@ function Page() {
             </TableBody>
           </Table>}
       </CardContent></Card>
+
+      <Dialog open={emitDialog.open} onOpenChange={(o) => setEmitDialog({ open: o, nota: o ? emitDialog.nota : null })}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Emitir NFS-e</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-2"><Label>Emitente *</Label>
+              <Select value={emitenteId} onValueChange={setEmitenteId}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{emitentes.map((e) => <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>)}</SelectContent>
+              </Select></div>
+            <div className="text-sm text-muted-foreground">
+              Tomador: <b>{emitDialog.nota?.paciente_id ? pacMap.get(emitDialog.nota.paciente_id) : "—"}</b><br />
+              Valor: <b>{emitDialog.nota ? fmt(Number(emitDialog.nota.valor)) : ""}</b>
+            </div>
+            <div className="space-y-2"><Label>Descrição dos serviços *</Label>
+              <Textarea rows={3} value={descricao} onChange={(e) => setDescricao(e.target.value)} /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEmitDialog({ open: false, nota: null })} disabled={emitting}>Cancelar</Button>
+            <Button onClick={doEmit} disabled={emitting || !emitenteId}>
+              {emitting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Emitindo...</> : <><Send className="h-4 w-4 mr-2" />Emitir</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
