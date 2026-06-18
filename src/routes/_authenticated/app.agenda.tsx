@@ -828,7 +828,10 @@ function AgendaPage() {
       if (!dataFim) {
         // Quando há busca por cliente, ampliamos a janela (o ILIKE no
         // servidor já reduz o volume). Sem filtro, mantemos 30 dias.
-        f.setDate(f.getDate() + (termoCli.length >= 2 ? 365 : 30));
+        // Janela padrão reduzida para 7 dias para abrir a agenda
+        // muito mais rápido. Quem precisa de janela maior pode
+        // selecionar uma data final no filtro.
+        f.setDate(f.getDate() + (termoCli.length >= 2 ? 365 : 7));
       } else {
         f.setHours(23, 59, 59);
       }
