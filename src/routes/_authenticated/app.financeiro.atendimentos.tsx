@@ -1174,6 +1174,37 @@ function Page() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Diálogo: emitir NFS-e */}
+      <Dialog open={nfseDialog.open} onOpenChange={(o) => setNfseDialog({ open: o, atend: o ? nfseDialog.atend : null })}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Emitir NFS-e</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-2"><Label>Emitente *</Label>
+              <Select value={emitenteId} onValueChange={setEmitenteId}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{emitentes.map((e) => <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            {nfseDialog.atend && (
+              <div className="rounded-md border bg-muted/40 p-3 text-xs space-y-1">
+                <div><span className="text-muted-foreground">Paciente:</span> <b>{nfseDialog.atend.paciente_id ? pacMap.get(nfseDialog.atend.paciente_id) ?? "—" : nfseDialog.atend.paciente_nome_extra ?? "—"}</b></div>
+                <div><span className="text-muted-foreground">Serviço:</span> {nfseDialog.atend.procedimento ?? "—"}</div>
+                <div><span className="text-muted-foreground">Valor:</span> <b>{fmt(Number(nfseDialog.atend.valor_total))}</b></div>
+              </div>
+            )}
+            <div className="space-y-2"><Label>Descrição dos serviços *</Label>
+              <Textarea rows={3} value={nfseDesc} onChange={(e) => setNfseDesc(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNfseDialog({ open: false, atend: null })} disabled={nfseEmitting}>Cancelar</Button>
+            <Button onClick={doEmitNfse} disabled={nfseEmitting || !emitenteId}>
+              {nfseEmitting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Emitindo...</> : <><Send className="h-4 w-4 mr-2" />Emitir</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
