@@ -106,6 +106,76 @@ function Page() {
   const [laudoForm, setLaudoForm] = useState({ medico_laudador_id: "", valor_laudo: "" });
   const [laudoSaving, setLaudoSaving] = useState(false);
 
+  // NFS-e
+  const [emitentes, setEmitentes] = useState<Emitente[]>([]);
+  const [emitenteId, setEmitenteId] = useState("");
+  const [nfseDialog, setNfseDialog] = useState<{ open: boolean; atend: Atend | null }>({ open: false, atend: null });
+  const [nfseDesc, setNfseDesc] = useState("");
+  const [nfseEmitting, setNfseEmitting] = useState(false);
+  const emitirNfseFn = useServerFn(emitirNfse);
+  const consultarNfseFn = useServerFn(consultarNfse);
+
+  useEffect(() => {
+    if (!clinicaAtual) { setEmitentes([]); return; }
+    void supabase.from("nfse_emitentes")
+      .select("id, nome, codigo_municipio")
+      .eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome")
+      .then(({ data }) => {
+        const list = (data ?? []) as Emitente[];
+        setEmitentes(list);
+        if (list.length) setEmitenteId((prev) => prev || list[0].id);
+      });
+  }, [clinicaAtual?.clinica_id]);
+
+  const openEmitNfse = (a: Atend) => {
+    if (!emitentes.length) { toast.error("Cadastre um emitente em Configurações › NFS-e"); return; }
+    if (!a.paciente_id) { toast.error("Atendimento sem paciente vinculado"); return; }
+    const pacNome = pacMap.get(a.paciente_id) ?? a.paciente_nome_extra ?? "";
+    setNfseDesc(`${a.procedimento ?? "Serviços médicos prestados"}${pacNome ? ` — ${pacNome}` : ""}`.trim());
+    setNfseDialog({ open: true, atend: a });
+  };
+
+  const doEmitNfse = async () => {
+    const a = nfseDialog.atend;
+    if (!a || !emitenteId || !a.paciente_id) return;
+    setNfseEmitting(true);
+    try {
+      const { data: pac, error: pacErr } = await supabase.from("pacientes")
+        .select("id, nome, cpf, email, cep, logradouro, numero, bairro, cidade, estado")
+        .eq("id", a.paciente_id).maybeSingle();
+      if (pacErr || !pac) throw new Error("Paciente não encontrado");
+      const p = pac as PacFull;
+      const valor = Number(a.valor_total) || 0;
+      if (valor <= 0) throw new Error("Valor do atendimento é zero");
+      const res = await emitirNfseFn({ data: {
+        emitenteId,
+        pacienteId: p.id,
+        valorServicos: valor,
+        descricaoServicos: nfseDesc || "Serviços prestados",
+        tomador: {
+          nome: p.nome,
+          cpfCnpj: p.cpf ?? undefined,
+          email: p.email ?? undefined,
+          cep: p.cep ?? undefined,
+          logradouro: p.logradouro ?? undefined,
+          numero: p.numero ?? undefined,
+          bairro: p.bairro ?? undefined,
+          municipio: p.cidade ?? undefined,
+          uf: p.estado ?? undefined,
+        },
+      } });
+      const nfseId = (res as { nfseId?: string })?.nfseId;
+      toast.success("NFS-e enviada. Consultando status...");
+      if (nfseId) {
+        await new Promise((r) => setTimeout(r, 4000));
+        await consultarNfseFn({ data: { nfseId } });
+      }
+      setNfseDialog({ open: false, atend: null });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao emitir");
+    } finally { setNfseEmitting(false); }
+  };
+
   const openLaudo = (a: Atend) => {
     setLaudoTarget(a);
     setLaudoForm({
