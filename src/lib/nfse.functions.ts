@@ -192,17 +192,7 @@ export const consultarNfse = createServerFn({ method: "POST" })
     });
     const body = await resp.json().catch(() => ({}));
 
-    const updates: {
-      focus_status: string | null;
-      payload_resposta: unknown;
-      status?: string;
-      numero?: string | null;
-      serie?: string | null;
-      codigo_verificacao?: string | null;
-      url_pdf?: string | null;
-      url_xml?: string | null;
-      erro_mensagem?: string | null;
-    } = {
+    const updates: Record<string, unknown> = {
       focus_status: body?.status ?? null,
       payload_resposta: body,
     };
@@ -220,7 +210,7 @@ export const consultarNfse = createServerFn({ method: "POST" })
       updates.erro_mensagem = body?.mensagem_sefaz ?? body?.mensagem ?? null;
     }
 
-    await supabase.from("nfse").update(updates).eq("id", nota.id);
+    await supabase.from("nfse").update(updates as never).eq("id", nota.id);
     return { ok: true, status: body?.status ?? null, body };
   });
 
