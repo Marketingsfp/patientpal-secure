@@ -1103,8 +1103,9 @@ function AgendaPage() {
     (async () => {
       // Usa RPC `procedimentos_popularidade` (GROUP BY no banco) em vez de
       // baixar até 20.000 agendamentos para contar no navegador.
-      const { data, error } = await supabase
-        .rpc("procedimentos_popularidade" as never, { p_clinica_id: clinicaAtual.clinica_id });
+      const { data, error } = await (supabase as unknown as {
+        rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
+      }).rpc("procedimentos_popularidade", { p_clinica_id: clinicaAtual.clinica_id });
       const counts = new Map<string, number>();
       if (!error && Array.isArray(data)) {
         for (const row of data as Array<{ procedimento: string | null; total: number | string }>) {
