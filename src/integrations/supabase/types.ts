@@ -7493,6 +7493,13 @@ export type Database = {
         }[]
       }
       pendencias_paciente: { Args: { _paciente_id: string }; Returns: Json }
+      procedimentos_popularidade: {
+        Args: { p_clinica_id: string }
+        Returns: {
+          procedimento: string
+          total: number
+        }[]
+      }
       salvar_anamnese_publica: {
         Args: { _modelo_id: string; _respostas: Json; _token: string }
         Returns: string
