@@ -132,6 +132,7 @@ function Page() {
       const res = await emitirFn({ data: {
         emitenteId,
         pacienteId: p.id,
+        pagamentoId: n.id ?? undefined,
         valorServicos: Number(n.valor),
         descricaoServicos: descricao || "Serviços prestados",
         tomador: {

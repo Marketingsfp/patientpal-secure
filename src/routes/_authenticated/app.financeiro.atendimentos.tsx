@@ -35,6 +35,7 @@ interface Atend {
   status: string; forma_pagamento: string | null;
   medico_id: string | null; paciente_id: string | null;
   origem?: "manual" | "agenda";
+  agendamento_id?: string | null;
   repasse_pago?: boolean;
   repasse_pago_em?: string | null;
   repasse_forma_pagamento?: string | null;
@@ -150,6 +151,8 @@ function Page() {
       const res = await emitirNfseFn({ data: {
         emitenteId,
         pacienteId: p.id,
+        agendamentoId: a.agendamento_id ?? undefined,
+        pagamentoId: a.id ?? undefined,
         valorServicos: valor,
         descricaoServicos: nfseDesc || "Serviços prestados",
         tomador: {
@@ -398,6 +401,7 @@ function Page() {
       const { total, repasse } = calcRepasseFull(medIdEff, pago, proc);
       return {
         id: r.id, data: r.data, procedimento: proc,
+        agendamento_id: r.agendamento_id ?? null,
         valor_total: total, valor_medico: repasse, valor_clinica: +(total - repasse).toFixed(2),
         status: "realizado", forma_pagamento: r.forma_pagamento,
         medico_id: medIdEff, paciente_id: pacIdEff,
