@@ -328,17 +328,18 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
             if (procId) {
               const { data: regras } = await supabase
                 .from("procedimento_split_regras")
-                .select("beneficiario_tipo, medico_id, prestador_id, rotulo, percentual, valor")
+                .select("beneficiario_tipo, medico_id, prestador_id, rotulo, percentual, valor_fixo")
                 .eq("clinica_id", clinicaAtual.clinica_id)
-                .eq("procedimento_id", procId);
+                .eq("procedimento_id", procId)
+                .eq("ativo", true);
               const lista = (regras ?? []) as Array<{
                 beneficiario_tipo: "medico" | "prestador" | "clinica";
                 medico_id: string | null; prestador_id: string | null;
-                rotulo: string | null; percentual: number | null; valor: number | null;
+                rotulo: string | null; percentual: number | null; valor_fixo: number | null;
               }>;
               for (const reg of lista) {
-                const v = reg.valor != null
-                  ? Number(reg.valor)
+                const v = reg.valor_fixo != null
+                  ? Number(reg.valor_fixo)
                   : reg.percentual != null
                     ? +(Number(valor) * Number(reg.percentual) / 100).toFixed(2)
                     : 0;
