@@ -828,7 +828,10 @@ function AgendaPage() {
       if (!dataFim) {
         // Quando há busca por cliente, ampliamos a janela (o ILIKE no
         // servidor já reduz o volume). Sem filtro, mantemos 30 dias.
-        f.setDate(f.getDate() + (termoCli.length >= 2 ? 365 : 30));
+        // Janela padrão reduzida para 7 dias para abrir a agenda
+        // muito mais rápido. Quem precisa de janela maior pode
+        // selecionar uma data final no filtro.
+        f.setDate(f.getDate() + (termoCli.length >= 2 ? 365 : 7));
       } else {
         f.setHours(23, 59, 59);
       }
@@ -938,7 +941,7 @@ function AgendaPage() {
 
   const loadRef = async () => {
     if (!clinicaAtual) return;
-    const [m, e, me, pr, sr, mc, mp, er, erp] = await Promise.all([
+    const [m, e, me, pr, sr, mc, mp, er, erp, agendasRes] = await Promise.all([
       supabase.from("medicos").select("id,nome,sexo,usa_sistema,especialidade_id,procedimento_padrao_id,procedimento_padrao_em_branco").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("especialidades").select("id,nome").order("nome"),
       supabase.from("medico_especialidades").select("medico_id,especialidade_id,medicos!inner(clinica_id)").eq("medicos.clinica_id", clinicaAtual.clinica_id),
@@ -948,15 +951,15 @@ function AgendaPage() {
       fetchMedicoProcedimentosAgenda(clinicaAtual.clinica_id),
       supabase.from("enfermagem_recursos").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("enfermagem_recurso_procedimentos").select("recurso_id,procedimento_id,enfermagem_recursos!inner(clinica_id)").eq("enfermagem_recursos.clinica_id", clinicaAtual.clinica_id),
+      supabase
+        .from("medico_agendas")
+        .select("id,nome,medico_id,ativo,ordem")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("ativo", true)
+        .order("ordem", { ascending: true })
+        .order("nome", { ascending: true }),
     ]);
-    // Carrega agendas nomeadas por médico (clínica atual)
-    const { data: agendasData } = await supabase
-      .from("medico_agendas")
-      .select("id,nome,medico_id,ativo,ordem")
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .eq("ativo", true)
-      .order("ordem", { ascending: true })
-      .order("nome", { ascending: true });
+    const agendasData = agendasRes.data;
     const ag = new Map<string, { id: string; nome: string }[]>();
     for (const a of (agendasData ?? []) as Array<{ id: string; nome: string; medico_id: string | null }>) {
       if (!a.medico_id) continue;
