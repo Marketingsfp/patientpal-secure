@@ -192,11 +192,20 @@ export const consultarNfse = createServerFn({ method: "POST" })
     });
     const body = await resp.json().catch(() => ({}));
 
-    type NfseUpdate = Parameters<ReturnType<typeof context.supabase.from<"nfse">>["update"]>[0];
-    const updates: NfseUpdate = {
+    const updates: {
+      focus_status: string | null;
+      payload_resposta: unknown;
+      status?: string;
+      numero?: string | null;
+      serie?: string | null;
+      codigo_verificacao?: string | null;
+      url_pdf?: string | null;
+      url_xml?: string | null;
+      erro_mensagem?: string | null;
+    } = {
       focus_status: body?.status ?? null,
       payload_resposta: body,
-    } as NfseUpdate;
+    };
     if (body?.status === "autorizado") {
       updates.status = "emitida";
       updates.numero = body?.numero ?? null;
