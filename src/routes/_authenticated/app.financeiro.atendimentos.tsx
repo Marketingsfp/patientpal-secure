@@ -1066,6 +1066,9 @@ function Page() {
                     {a.origem === "agenda" ? (
                       <div className="flex items-center justify-end gap-1">
                         <span className="text-[10px] text-muted-foreground uppercase">Agenda</span>
+                        <Button variant="ghost" size="icon" title="Emitir NFS-e" onClick={() => openEmitNfse(a)} disabled={!a.paciente_id}>
+                          <Send className="h-3.5 w-3.5" />
+                        </Button>
                         {podeEstornar && !a.repasse_pago && (
                           <Button
                             variant="ghost"
@@ -1078,6 +1081,9 @@ function Page() {
                         )}
                       </div>
                     ) : (<>
+                      <Button variant="ghost" size="icon" title="Emitir NFS-e" onClick={() => openEmitNfse(a)} disabled={!a.paciente_id}>
+                        <Send className="h-3.5 w-3.5" />
+                      </Button>
                       <Button variant="ghost" size="icon" onClick={() => openEdit(a)}><Pencil className="h-3.5 w-3.5" /></Button>
                       <Button variant="ghost" size="icon" onClick={() => remove(a)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
                     </>)}
