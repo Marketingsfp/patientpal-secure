@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useId, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 /**
@@ -13,15 +13,21 @@ export function useRealtimeRefresh(
   onChange: () => void,
   enabled = true,
 ) {
+  // Mantém a referência mais recente de onChange sem refazer a subscription
+  // a cada render — antes, qualquer re-render do componente pai derrubava e
+  // recriava o canal, deixando websockets zumbis pendurados.
+  const cbRef = useRef(onChange);
+  cbRef.current = onChange;
+  const stableId = useId();
   useEffect(() => {
     if (!enabled || tables.length === 0) return;
-    const channelName = `rt:${tables.join("+")}:${Math.random().toString(36).slice(2, 8)}`;
+    const channelName = `rt:${tables.join("+")}:${stableId}`;
     const ch = supabase.channel(channelName);
     for (const t of tables) {
       ch.on(
         "postgres_changes" as any,
         { event: "*", schema: "public", table: t },
-        () => onChange(),
+        () => cbRef.current(),
       );
     }
     ch.subscribe();
@@ -29,5 +35,5 @@ export function useRealtimeRefresh(
       supabase.removeChannel(ch);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, tables.join("|"), onChange]);
+  }, [enabled, tables.join("|"), stableId]);
 }

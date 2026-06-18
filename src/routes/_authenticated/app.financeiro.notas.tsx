@@ -146,12 +146,12 @@ function Page() {
           uf: p.estado ?? undefined,
         },
       } });
-      const nfseId = (res as { nfseId?: string })?.nfseId;
+      const nfseId = (res as { id?: string })?.id;
       toast.success("NFS-e enviada. Consultando status...");
       // Aguarda processamento e consulta
       if (nfseId) {
         await new Promise((r) => setTimeout(r, 4000));
-        const cons = await consultarFn({ data: { nfseId } }) as { focus?: { url_danfse?: string; status?: string } };
+        const cons = await consultarFn({ data: { id: nfseId } }) as { focus?: { url_danfse?: string; status?: string } };
         const url = cons?.focus?.url_danfse;
         if (url) {
           await supabase.from("fin_notas_pacientes").update({
