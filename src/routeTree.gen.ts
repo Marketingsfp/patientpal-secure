@@ -91,6 +91,7 @@ import { Route as AuthenticatedAppClientesIndexRouteImport } from './routes/_aut
 import { Route as AuthenticatedAppAtendimentoIaIndexRouteImport } from './routes/_authenticated/app.atendimento-ia.index'
 import { Route as ApiPublicWhatsappClinicaIdRouteImport } from './routes/api/public/whatsapp.$clinicaId'
 import { Route as ApiPublicFocusnfeWebhookRouteImport } from './routes/api/public/focusnfe.webhook'
+import { Route as AuthenticatedAppNfseTestarRouteImport } from './routes/_authenticated/app.nfse.testar'
 import { Route as AuthenticatedAppMedicoMedicoIdRouteImport } from './routes/_authenticated/app.medico.$medicoId'
 import { Route as AuthenticatedAppImprimirAgendamentoIdRouteImport } from './routes/_authenticated/app.imprimir.$agendamentoId'
 import { Route as AuthenticatedAppFuncionarioUserIdRouteImport } from './routes/_authenticated/app.funcionario.$userId'
@@ -573,6 +574,12 @@ const ApiPublicFocusnfeWebhookRoute =
     path: '/api/public/focusnfe/webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
+const AuthenticatedAppNfseTestarRoute =
+  AuthenticatedAppNfseTestarRouteImport.update({
+    id: '/testar',
+    path: '/testar',
+    getParentRoute: () => AuthenticatedAppNfseRoute,
+  } as any)
 const AuthenticatedAppMedicoMedicoIdRoute =
   AuthenticatedAppMedicoMedicoIdRouteImport.update({
     id: '/medico/$medicoId',
@@ -798,7 +805,7 @@ export interface FileRoutesByFullPath {
   '/app/mkt-leads': typeof AuthenticatedAppMktLeadsRoute
   '/app/mkt-segmentos': typeof AuthenticatedAppMktSegmentosRoute
   '/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
-  '/app/nfse': typeof AuthenticatedAppNfseRoute
+  '/app/nfse': typeof AuthenticatedAppNfseRouteWithChildren
   '/app/nina': typeof AuthenticatedAppNinaRoute
   '/app/odontologia': typeof AuthenticatedAppOdontologiaRoute
   '/app/orcamentos': typeof AuthenticatedAppOrcamentosRoute
@@ -842,6 +849,7 @@ export interface FileRoutesByFullPath {
   '/app/funcionario/$userId': typeof AuthenticatedAppFuncionarioUserIdRoute
   '/app/imprimir/$agendamentoId': typeof AuthenticatedAppImprimirAgendamentoIdRoute
   '/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
+  '/app/nfse/testar': typeof AuthenticatedAppNfseTestarRoute
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/app/atendimento-ia/': typeof AuthenticatedAppAtendimentoIaIndexRoute
@@ -905,7 +913,7 @@ export interface FileRoutesByTo {
   '/app/mkt-leads': typeof AuthenticatedAppMktLeadsRoute
   '/app/mkt-segmentos': typeof AuthenticatedAppMktSegmentosRoute
   '/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
-  '/app/nfse': typeof AuthenticatedAppNfseRoute
+  '/app/nfse': typeof AuthenticatedAppNfseRouteWithChildren
   '/app/nina': typeof AuthenticatedAppNinaRoute
   '/app/odontologia': typeof AuthenticatedAppOdontologiaRoute
   '/app/orcamentos': typeof AuthenticatedAppOrcamentosRoute
@@ -949,6 +957,7 @@ export interface FileRoutesByTo {
   '/app/funcionario/$userId': typeof AuthenticatedAppFuncionarioUserIdRoute
   '/app/imprimir/$agendamentoId': typeof AuthenticatedAppImprimirAgendamentoIdRoute
   '/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
+  '/app/nfse/testar': typeof AuthenticatedAppNfseTestarRoute
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaIndexRoute
@@ -1018,7 +1027,7 @@ export interface FileRoutesById {
   '/_authenticated/app/mkt-leads': typeof AuthenticatedAppMktLeadsRoute
   '/_authenticated/app/mkt-segmentos': typeof AuthenticatedAppMktSegmentosRoute
   '/_authenticated/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
-  '/_authenticated/app/nfse': typeof AuthenticatedAppNfseRoute
+  '/_authenticated/app/nfse': typeof AuthenticatedAppNfseRouteWithChildren
   '/_authenticated/app/nina': typeof AuthenticatedAppNinaRoute
   '/_authenticated/app/odontologia': typeof AuthenticatedAppOdontologiaRoute
   '/_authenticated/app/orcamentos': typeof AuthenticatedAppOrcamentosRoute
@@ -1062,6 +1071,7 @@ export interface FileRoutesById {
   '/_authenticated/app/funcionario/$userId': typeof AuthenticatedAppFuncionarioUserIdRoute
   '/_authenticated/app/imprimir/$agendamentoId': typeof AuthenticatedAppImprimirAgendamentoIdRoute
   '/_authenticated/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
+  '/_authenticated/app/nfse/testar': typeof AuthenticatedAppNfseTestarRoute
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/_authenticated/app/atendimento-ia/': typeof AuthenticatedAppAtendimentoIaIndexRoute
@@ -1175,6 +1185,7 @@ export interface FileRouteTypes {
     | '/app/funcionario/$userId'
     | '/app/imprimir/$agendamentoId'
     | '/app/medico/$medicoId'
+    | '/app/nfse/testar'
     | '/api/public/focusnfe/webhook'
     | '/api/public/whatsapp/$clinicaId'
     | '/app/atendimento-ia/'
@@ -1282,6 +1293,7 @@ export interface FileRouteTypes {
     | '/app/funcionario/$userId'
     | '/app/imprimir/$agendamentoId'
     | '/app/medico/$medicoId'
+    | '/app/nfse/testar'
     | '/api/public/focusnfe/webhook'
     | '/api/public/whatsapp/$clinicaId'
     | '/app/atendimento-ia'
@@ -1394,6 +1406,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/funcionario/$userId'
     | '/_authenticated/app/imprimir/$agendamentoId'
     | '/_authenticated/app/medico/$medicoId'
+    | '/_authenticated/app/nfse/testar'
     | '/api/public/focusnfe/webhook'
     | '/api/public/whatsapp/$clinicaId'
     | '/_authenticated/app/atendimento-ia/'
@@ -2004,6 +2017,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicFocusnfeWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/app/nfse/testar': {
+      id: '/_authenticated/app/nfse/testar'
+      path: '/testar'
+      fullPath: '/app/nfse/testar'
+      preLoaderRoute: typeof AuthenticatedAppNfseTestarRouteImport
+      parentRoute: typeof AuthenticatedAppNfseRoute
+    }
     '/_authenticated/app/medico/$medicoId': {
       id: '/_authenticated/app/medico/$medicoId'
       path: '/medico/$medicoId'
@@ -2325,6 +2345,17 @@ const AuthenticatedAppFinanceiroRouteWithChildren =
     AuthenticatedAppFinanceiroRouteChildren,
   )
 
+interface AuthenticatedAppNfseRouteChildren {
+  AuthenticatedAppNfseTestarRoute: typeof AuthenticatedAppNfseTestarRoute
+}
+
+const AuthenticatedAppNfseRouteChildren: AuthenticatedAppNfseRouteChildren = {
+  AuthenticatedAppNfseTestarRoute: AuthenticatedAppNfseTestarRoute,
+}
+
+const AuthenticatedAppNfseRouteWithChildren =
+  AuthenticatedAppNfseRoute._addFileChildren(AuthenticatedAppNfseRouteChildren)
+
 interface AuthenticatedAppRouteChildren {
   AuthenticatedAppAgendaRoute: typeof AuthenticatedAppAgendaRoute
   AuthenticatedAppAlertasEnfermagemRoute: typeof AuthenticatedAppAlertasEnfermagemRoute
@@ -2365,7 +2396,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppMktLeadsRoute: typeof AuthenticatedAppMktLeadsRoute
   AuthenticatedAppMktSegmentosRoute: typeof AuthenticatedAppMktSegmentosRoute
   AuthenticatedAppModelosDocumentosRoute: typeof AuthenticatedAppModelosDocumentosRoute
-  AuthenticatedAppNfseRoute: typeof AuthenticatedAppNfseRoute
+  AuthenticatedAppNfseRoute: typeof AuthenticatedAppNfseRouteWithChildren
   AuthenticatedAppNinaRoute: typeof AuthenticatedAppNinaRoute
   AuthenticatedAppOdontologiaRoute: typeof AuthenticatedAppOdontologiaRoute
   AuthenticatedAppOrcamentosRoute: typeof AuthenticatedAppOrcamentosRoute
@@ -2438,7 +2469,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppMktSegmentosRoute: AuthenticatedAppMktSegmentosRoute,
   AuthenticatedAppModelosDocumentosRoute:
     AuthenticatedAppModelosDocumentosRoute,
-  AuthenticatedAppNfseRoute: AuthenticatedAppNfseRoute,
+  AuthenticatedAppNfseRoute: AuthenticatedAppNfseRouteWithChildren,
   AuthenticatedAppNinaRoute: AuthenticatedAppNinaRoute,
   AuthenticatedAppOdontologiaRoute: AuthenticatedAppOdontologiaRoute,
   AuthenticatedAppOrcamentosRoute: AuthenticatedAppOrcamentosRoute,
