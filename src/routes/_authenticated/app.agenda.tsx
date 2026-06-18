@@ -1101,30 +1101,16 @@ function AgendaPage() {
     if (!clinicaAtual?.clinica_id) return;
     let cancelled = false;
     (async () => {
-      const desde = new Date();
-      desde.setDate(desde.getDate() - 365);
-      const desdeIso = desde.toISOString().slice(0, 10);
+      // Usa RPC `procedimentos_popularidade` (GROUP BY no banco) em vez de
+      // baixar até 20.000 agendamentos para contar no navegador.
+      const { data, error } = await supabase
+        .rpc("procedimentos_popularidade" as never, { p_clinica_id: clinicaAtual.clinica_id });
       const counts = new Map<string, number>();
-      // Paginar para evitar limite de 1000 linhas do PostgREST
-      const PAGE = 1000;
-      let from = 0;
-      // Limita a 20k linhas (~55 agendamentos/dia) — suficiente para popularidade
-      for (let i = 0; i < 20; i++) {
-        const { data, error } = await supabase
-          .from("agendamentos")
-          .select("procedimento")
-          .eq("clinica_id", clinicaAtual.clinica_id)
-          .gte("data", desdeIso)
-          .not("procedimento", "is", null)
-          .range(from, from + PAGE - 1);
-        if (error || !data || data.length === 0) break;
-        for (const row of data as Array<{ procedimento: string | null }>) {
+      if (!error && Array.isArray(data)) {
+        for (const row of data as Array<{ procedimento: string | null; total: number | string }>) {
           if (!row.procedimento) continue;
-          const k = normalizar(row.procedimento);
-          counts.set(k, (counts.get(k) ?? 0) + 1);
+          counts.set(normalizar(row.procedimento), Number(row.total) || 0);
         }
-        if (data.length < PAGE) break;
-        from += PAGE;
       }
       if (!cancelled) setProcedimentoUsoMap(counts);
     })();
