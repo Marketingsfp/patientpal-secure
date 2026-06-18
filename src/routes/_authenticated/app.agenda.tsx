@@ -42,6 +42,7 @@ import { exportToExcel } from "@/lib/export-csv";
 import { useAuth } from "@/hooks/use-auth";
 import { useServerFn } from "@tanstack/react-start";
 import { listarEquipe } from "@/lib/equipe.functions";
+import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
 import { IdadeIcon } from "@/components/idade-icon";
 
 export const Route = createFileRoute("/_authenticated/app/agenda")({
