@@ -150,6 +150,8 @@ function Page() {
       const res = await emitirNfseFn({ data: {
         emitenteId,
         pacienteId: p.id,
+        agendamentoId: a.agendamento_id ?? undefined,
+        pagamentoId: a.id ?? undefined,
         valorServicos: valor,
         descricaoServicos: nfseDesc || "Serviços prestados",
         tomador: {
