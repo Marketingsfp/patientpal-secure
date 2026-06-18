@@ -189,20 +189,34 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         setSaving(false); return;
       }
     }
-    if (agendamentoId && tipo === "receita") {
-      const { data: jaPago } = await supabase
-        .from("fin_lancamentos")
-        .select("id")
-        .eq("agendamento_id", agendamentoId)
-        .eq("tipo", "receita")
-        .limit(1)
-        .maybeSingle();
-      if (jaPago) {
+    // H2 — Roda jaPago + agendamento em paralelo. Antes eram duas queries
+    // seriais (jaPago aqui, agendamento mais abaixo) e ainda uma 3ª query
+    // duplicada para procedimento dentro do bloco de splits.
+    let agPrefetch: { medico_id: string | null; paciente_id: string | null; procedimento: string | null } | null = null;
+    if (agendamentoId) {
+      const [jaPagoRes, agRes] = await Promise.all([
+        tipo === "receita"
+          ? supabase
+              .from("fin_lancamentos")
+              .select("id")
+              .eq("agendamento_id", agendamentoId)
+              .eq("tipo", "receita")
+              .limit(1)
+              .maybeSingle()
+          : Promise.resolve({ data: null }),
+        supabase
+          .from("agendamentos")
+          .select("medico_id, paciente_id, procedimento")
+          .eq("id", agendamentoId)
+          .maybeSingle(),
+      ]);
+      if (tipo === "receita" && jaPagoRes.data) {
         toast.error("Este agendamento já possui um pagamento registrado.");
         setSaving(false);
         onOpenChange(false);
         return;
       }
+      agPrefetch = (agRes.data ?? null) as typeof agPrefetch;
     }
     const isCredito = formaPagamento === "cartao_credito";
     if (isCredito && !bandeiraCartao) {
