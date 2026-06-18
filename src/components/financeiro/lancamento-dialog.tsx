@@ -322,11 +322,8 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         // 1) Regras específicas do procedimento (se cadastradas)
         let regrasAplicadas = false;
         if (agendamentoId) {
-          const { data: ag } = await supabase
-            .from("agendamentos")
-            .select("procedimento")
-            .eq("id", agendamentoId).maybeSingle();
-          const procNome = (ag as { procedimento: string | null } | null)?.procedimento;
+          // Reusa o prefetch feito antes do insert (H2) — evita 1 query duplicada.
+          const procNome = agPrefetch?.procedimento ?? null;
           if (procNome) {
             const { data: procRow } = await supabase
               .from("procedimentos")
