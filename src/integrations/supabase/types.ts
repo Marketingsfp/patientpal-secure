@@ -5198,60 +5198,273 @@ export type Database = {
       }
       nfse: {
         Row: {
+          agendamento_id: string | null
+          aliquota_iss: number | null
+          cancelada_em: string | null
+          cancelada_motivo: string | null
           clinica_id: string
+          codigo_verificacao: string | null
           created_at: string
           data_emissao: string
           descricao_servicos: string | null
+          emitente_id: string | null
+          emitida_por: string | null
+          erro_mensagem: string | null
+          focus_ref: string | null
+          focus_status: string | null
           id: string
           medico_id: string | null
           numero: string | null
           observacoes: string | null
           paciente_id: string | null
+          pagamento_id: string | null
+          payload_envio: Json | null
+          payload_resposta: Json | null
+          rps_numero: number | null
+          rps_serie: string | null
           serie: string | null
           status: string
+          tomador_documento: string | null
+          tomador_email: string | null
+          tomador_endereco: Json | null
+          tomador_nome: string | null
           updated_at: string
           url_pdf: string | null
           url_xml: string | null
           valor_iss: number
+          valor_liquido: number | null
           valor_servicos: number
         }
         Insert: {
+          agendamento_id?: string | null
+          aliquota_iss?: number | null
+          cancelada_em?: string | null
+          cancelada_motivo?: string | null
           clinica_id: string
+          codigo_verificacao?: string | null
           created_at?: string
           data_emissao?: string
           descricao_servicos?: string | null
+          emitente_id?: string | null
+          emitida_por?: string | null
+          erro_mensagem?: string | null
+          focus_ref?: string | null
+          focus_status?: string | null
           id?: string
           medico_id?: string | null
           numero?: string | null
           observacoes?: string | null
           paciente_id?: string | null
+          pagamento_id?: string | null
+          payload_envio?: Json | null
+          payload_resposta?: Json | null
+          rps_numero?: number | null
+          rps_serie?: string | null
           serie?: string | null
           status?: string
+          tomador_documento?: string | null
+          tomador_email?: string | null
+          tomador_endereco?: Json | null
+          tomador_nome?: string | null
           updated_at?: string
           url_pdf?: string | null
           url_xml?: string | null
           valor_iss?: number
+          valor_liquido?: number | null
           valor_servicos?: number
         }
         Update: {
+          agendamento_id?: string | null
+          aliquota_iss?: number | null
+          cancelada_em?: string | null
+          cancelada_motivo?: string | null
           clinica_id?: string
+          codigo_verificacao?: string | null
           created_at?: string
           data_emissao?: string
           descricao_servicos?: string | null
+          emitente_id?: string | null
+          emitida_por?: string | null
+          erro_mensagem?: string | null
+          focus_ref?: string | null
+          focus_status?: string | null
           id?: string
           medico_id?: string | null
           numero?: string | null
           observacoes?: string | null
           paciente_id?: string | null
+          pagamento_id?: string | null
+          payload_envio?: Json | null
+          payload_resposta?: Json | null
+          rps_numero?: number | null
+          rps_serie?: string | null
           serie?: string | null
           status?: string
+          tomador_documento?: string | null
+          tomador_email?: string | null
+          tomador_endereco?: Json | null
+          tomador_nome?: string | null
           updated_at?: string
           url_pdf?: string | null
           url_xml?: string | null
           valor_iss?: number
+          valor_liquido?: number | null
           valor_servicos?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "nfse_agendamento_id_fkey"
+            columns: ["agendamento_id"]
+            isOneToOne: false
+            referencedRelation: "agendamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nfse_emitente_id_fkey"
+            columns: ["emitente_id"]
+            isOneToOne: false
+            referencedRelation: "nfse_emitentes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nfse_pagamento_id_fkey"
+            columns: ["pagamento_id"]
+            isOneToOne: false
+            referencedRelation: "pagamentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nfse_emitentes: {
+        Row: {
+          aliquota_iss: number
+          ativo: boolean
+          bairro: string
+          cep: string
+          certificado_pfx_base64: string | null
+          certificado_senha: string | null
+          certificado_validade: string | null
+          clinica_id: string
+          cnpj: string
+          codigo_cnae: string | null
+          codigo_municipio: string
+          codigo_tributario_municipio: string | null
+          complemento: string | null
+          created_at: string
+          descricao_servico_padrao: string | null
+          email: string | null
+          focus_ambiente: string
+          focus_token_homologacao: string | null
+          focus_token_producao: string | null
+          id: string
+          incentivador_cultural: boolean
+          inscricao_estadual: string | null
+          inscricao_municipal: string
+          item_lista_servico: string
+          logradouro: string
+          municipio: string
+          nome: string
+          nome_fantasia: string | null
+          numero: string
+          optante_simples: boolean
+          padrao: boolean
+          razao_social: string
+          regime_tributario: string
+          rps_proximo_numero: number
+          rps_serie: string
+          telefone: string | null
+          uf: string
+          updated_at: string
+        }
+        Insert: {
+          aliquota_iss?: number
+          ativo?: boolean
+          bairro: string
+          cep: string
+          certificado_pfx_base64?: string | null
+          certificado_senha?: string | null
+          certificado_validade?: string | null
+          clinica_id: string
+          cnpj: string
+          codigo_cnae?: string | null
+          codigo_municipio: string
+          codigo_tributario_municipio?: string | null
+          complemento?: string | null
+          created_at?: string
+          descricao_servico_padrao?: string | null
+          email?: string | null
+          focus_ambiente?: string
+          focus_token_homologacao?: string | null
+          focus_token_producao?: string | null
+          id?: string
+          incentivador_cultural?: boolean
+          inscricao_estadual?: string | null
+          inscricao_municipal: string
+          item_lista_servico?: string
+          logradouro: string
+          municipio: string
+          nome: string
+          nome_fantasia?: string | null
+          numero: string
+          optante_simples?: boolean
+          padrao?: boolean
+          razao_social: string
+          regime_tributario?: string
+          rps_proximo_numero?: number
+          rps_serie?: string
+          telefone?: string | null
+          uf: string
+          updated_at?: string
+        }
+        Update: {
+          aliquota_iss?: number
+          ativo?: boolean
+          bairro?: string
+          cep?: string
+          certificado_pfx_base64?: string | null
+          certificado_senha?: string | null
+          certificado_validade?: string | null
+          clinica_id?: string
+          cnpj?: string
+          codigo_cnae?: string | null
+          codigo_municipio?: string
+          codigo_tributario_municipio?: string | null
+          complemento?: string | null
+          created_at?: string
+          descricao_servico_padrao?: string | null
+          email?: string | null
+          focus_ambiente?: string
+          focus_token_homologacao?: string | null
+          focus_token_producao?: string | null
+          id?: string
+          incentivador_cultural?: boolean
+          inscricao_estadual?: string | null
+          inscricao_municipal?: string
+          item_lista_servico?: string
+          logradouro?: string
+          municipio?: string
+          nome?: string
+          nome_fantasia?: string | null
+          numero?: string
+          optante_simples?: boolean
+          padrao?: boolean
+          razao_social?: string
+          regime_tributario?: string
+          rps_proximo_numero?: number
+          rps_serie?: string
+          telefone?: string | null
+          uf?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nfse_emitentes_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       odonto_dentes: {
         Row: {
