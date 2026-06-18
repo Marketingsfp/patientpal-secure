@@ -3159,6 +3159,13 @@ function AgendaPage() {
           setPagamentoAgId(null);
           setPagamentoExtraIds([]);
           setDescontoPendente(null);
+          // Se o usuário escolheu "Pagar/Imprimir/Nota", abre a tela de
+          // atendimentos do financeiro com a linha pronta para emitir a NFS-e.
+          if (emitirNotaAposRef.current) {
+            emitirNotaAposRef.current = false;
+            toast.info("Emita a NFS-e clicando no botão ✉️ ao lado do atendimento.");
+            navigate({ to: "/app/financeiro/atendimentos" });
+          }
         }}
       />
 
