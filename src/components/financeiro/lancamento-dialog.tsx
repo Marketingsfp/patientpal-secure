@@ -189,20 +189,35 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         setSaving(false); return;
       }
     }
-    if (agendamentoId && tipo === "receita") {
-      const { data: jaPago } = await supabase
-        .from("fin_lancamentos")
-        .select("id")
-        .eq("agendamento_id", agendamentoId)
-        .eq("tipo", "receita")
-        .limit(1)
-        .maybeSingle();
-      if (jaPago) {
+    // H2 — Roda jaPago + agendamento em paralelo. Antes eram duas queries
+    // seriais (jaPago aqui, agendamento mais abaixo) e ainda uma 3ª query
+    // duplicada para procedimento dentro do bloco de splits.
+    type AgPrefetch = { medico_id: string | null; paciente_id: string | null; procedimento: string | null };
+    let agPrefetch: AgPrefetch | null = null;
+    if (agendamentoId) {
+      const [jaPagoRes, agRes] = await Promise.all([
+        tipo === "receita"
+          ? supabase
+              .from("fin_lancamentos")
+              .select("id")
+              .eq("agendamento_id", agendamentoId)
+              .eq("tipo", "receita")
+              .limit(1)
+              .maybeSingle()
+          : Promise.resolve({ data: null }),
+        supabase
+          .from("agendamentos")
+          .select("medico_id, paciente_id, procedimento")
+          .eq("id", agendamentoId)
+          .maybeSingle(),
+      ]);
+      if (tipo === "receita" && jaPagoRes.data) {
         toast.error("Este agendamento já possui um pagamento registrado.");
         setSaving(false);
         onOpenChange(false);
         return;
       }
+      agPrefetch = (agRes.data as AgPrefetch | null) ?? null;
     }
     const isCredito = formaPagamento === "cartao_credito";
     if (isCredito && !bandeiraCartao) {
@@ -266,15 +281,9 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     // para que o repasse médico e os relatórios por paciente funcionem.
     let medicoId: string | null = null;
     let pacienteId: string | null = null;
-    if (agendamentoId) {
-      const { data: ag } = await supabase
-        .from("agendamentos")
-        .select("medico_id, paciente_id")
-        .eq("id", agendamentoId)
-        .maybeSingle();
-      const a = ag as { medico_id: string | null; paciente_id: string | null } | null;
-      medicoId = a?.medico_id ?? null;
-      pacienteId = a?.paciente_id ?? null;
+    if (agPrefetch) {
+      medicoId = agPrefetch.medico_id ?? null;
+      pacienteId = agPrefetch.paciente_id ?? null;
     }
     const { data: lancInserido, error } = await supabase.from("fin_lancamentos").insert({
       clinica_id: clinicaAtual.clinica_id,
@@ -313,11 +322,8 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         // 1) Regras específicas do procedimento (se cadastradas)
         let regrasAplicadas = false;
         if (agendamentoId) {
-          const { data: ag } = await supabase
-            .from("agendamentos")
-            .select("procedimento")
-            .eq("id", agendamentoId).maybeSingle();
-          const procNome = (ag as { procedimento: string | null } | null)?.procedimento;
+          // Reusa o prefetch feito antes do insert (H2) — evita 1 query duplicada.
+          const procNome = agPrefetch?.procedimento ?? null;
           if (procNome) {
             const { data: procRow } = await supabase
               .from("procedimentos")
