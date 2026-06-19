@@ -47,12 +47,34 @@ export const emitirNfse = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
-    const { data: emitente, error: errEmit } = await supabase
+    let { data: emitente, error: errEmit } = await supabase
       .from("nfse_emitentes")
       .select("*")
       .eq("id", data.emitenteId)
       .single();
     if (errEmit || !emitente) throw new Error("Emitente não encontrado");
+
+    // Regra de negócio: toda NFS-e de CONSULTA deve ser emitida no CNPJ
+    // 31.919.483/0003-18 (CASA DE SAUDE E MATERNIDADE), independente do
+    // emitente escolhido pelo usuário. Detecta "consulta" na descrição.
+    const CONSULTA_CNPJ = "31919483000318";
+    const ehConsulta = /consulta/i.test(data.descricaoServicos ?? "");
+    if (ehConsulta && only(emitente.cnpj) !== CONSULTA_CNPJ) {
+      const { data: emitConsulta } = await supabase
+        .from("nfse_emitentes")
+        .select("*")
+        .eq("clinica_id", emitente.clinica_id)
+        .eq("ativo", true)
+        .eq("cnpj", "31.919.483/0003-18")
+        .maybeSingle();
+      if (emitConsulta) {
+        emitente = emitConsulta;
+      } else {
+        throw new Error(
+          "Emitente CNPJ 31.919.483/0003-18 não cadastrado/ativo — necessário para NFS-e de consulta.",
+        );
+      }
+    }
 
     const token =
       emitente.focus_ambiente === "producao"
