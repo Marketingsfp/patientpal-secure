@@ -95,8 +95,17 @@ export const emitirNfse = createServerFn({ method: "POST" })
     const valorIss = +(data.valorServicos * aliquota).toFixed(2);
     const ref = `nfse-${emitente.id.slice(0, 8)}-${Date.now()}`;
 
+    // Focus/Ambiente Nacional NFS-e interpreta o horário no fuso local.
+    // Se enviarmos UTC (...Z) a nota fica ~3h no "futuro" e é rejeitada
+    // com "data de emissão posterior à data de processamento".
+    // Geramos a data já em horário de Brasília (UTC-3) com offset.
+    const dataEmissaoBR = (() => {
+      const now = new Date(Date.now() - 3 * 60 * 60 * 1000);
+      return now.toISOString().replace(/\.\d{3}Z$/, "-03:00");
+    })();
+
     const payload = {
-      data_emissao: new Date().toISOString(),
+      data_emissao: dataEmissaoBR,
       prestador: {
         cnpj: only(emitente.cnpj),
         inscricao_municipal: emitente.inscricao_municipal,
