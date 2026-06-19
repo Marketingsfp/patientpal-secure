@@ -59,19 +59,28 @@ export const emitirNfse = createServerFn({ method: "POST" })
     // emitente escolhido pelo usuário. Detecta "consulta" na descrição.
     const CONSULTA_CNPJ = "31919483000318";
     const ehConsulta = /consulta/i.test(data.descricaoServicos ?? "");
-    if (ehConsulta && only(emitente.cnpj) !== CONSULTA_CNPJ) {
+    // Exames vão para MA IMAGENS (CNPJ 57.786.061/0001-43).
+    const EXAME_CNPJ = "57786061000143";
+    const desc = (data.descricaoServicos ?? "").toLowerCase();
+    const ehExame = /\bexam|ultrassom|ultra-?som|raio.?x|raio x|radiograf|tomograf|ressonan|mamograf|densitometr|ecocardio|eletrocardio|\becg\b|\beeg\b|holter|endoscop|colonoscop|doppler|ecograf/i.test(desc);
+
+    const alvoCnpj = ehExame ? EXAME_CNPJ : ehConsulta ? CONSULTA_CNPJ : null;
+    const alvoCnpjFormatado = ehExame ? "57.786.061/0001-43" : "31.919.483/0003-18";
+    const alvoNome = ehExame ? "MA IMAGENS" : "CASA DE SAUDE E MATERNIDADE";
+
+    if (alvoCnpj && only(emitente.cnpj) !== alvoCnpj) {
       const { data: emitConsulta } = await supabase
         .from("nfse_emitentes")
         .select("*")
         .eq("clinica_id", emitente.clinica_id)
         .eq("ativo", true)
-        .eq("cnpj", "31.919.483/0003-18")
+        .eq("cnpj", alvoCnpjFormatado)
         .maybeSingle();
       if (emitConsulta) {
         emitente = emitConsulta;
       } else {
         throw new Error(
-          "Emitente CNPJ 31.919.483/0003-18 não cadastrado/ativo — necessário para NFS-e de consulta.",
+          `Emitente ${alvoNome} (CNPJ ${alvoCnpjFormatado}) não cadastrado/ativo — necessário para esta NFS-e.`,
         );
       }
     }
