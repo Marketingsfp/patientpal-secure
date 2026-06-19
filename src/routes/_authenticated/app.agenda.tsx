@@ -3280,14 +3280,9 @@ function AgendaPage() {
             emitirNotaAposRef.current = false;
             // Emite a NFS-e automaticamente, sem o usuário precisar reabrir nada.
             try {
-              const { data: emitente } = await supabase
-                .from("nfse_emitentes")
-                .select("id")
-                .eq("clinica_id", clinicaAtual.clinica_id)
-                .eq("ativo", true)
-                .maybeSingle();
-              if (!emitente?.id) {
-                toast.error("Nenhum emitente NFS-e configurado para esta clínica.");
+              const emitenteIdEscolhido = await pickEmitenteNfse();
+              if (!emitenteIdEscolhido) {
+                toast.error("Selecione a empresa emitente para emitir a NFS-e.");
               } else {
                 const ag = items.find((x) => x.id === agId);
                 if (!ag?.paciente_id) {
@@ -3300,7 +3295,7 @@ function AgendaPage() {
                     toast.error("Paciente não encontrado para emissão da NFS-e.");
                   } else {
                     const res = await emitirNfseFn({ data: {
-                      emitenteId: emitente.id,
+                      emitenteId: emitenteIdEscolhido,
                       pacienteId: pac.id,
                       agendamentoId: agId,
                       valorServicos: Number(dados.valor) || 0,
