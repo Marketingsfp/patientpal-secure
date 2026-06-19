@@ -287,6 +287,27 @@ function Page() {
   const norm = (s: string) =>
     s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 
+  // Gera variantes para casar o nome do procedimento com o cadastro de convênio.
+  // O procedimento na agenda costuma vir com sufixo de especialidade entre
+  // parênteses (ex.: "ECOCARDIOGRAMA (ADULTO) (CARDIOLOGIA)"), enquanto no
+  // cadastro de convênio o nome é só "ECOCARDIOGRAMA (ADULTO)".
+  const procVariants = (nome: string): string[] => {
+    const base = norm(nome);
+    const out = new Set<string>([base]);
+    // remove um sufixo " (xxx)" de cada vez
+    let cur = base;
+    for (let i = 0; i < 3; i++) {
+      const m = cur.match(/^(.*)\s*\([^()]*\)\s*$/);
+      if (!m) break;
+      cur = m[1].trim();
+      if (cur) out.add(cur);
+    }
+    // também remove todos os parênteses (último recurso)
+    const semParens = base.replace(/\s*\([^()]*\)\s*/g, " ").replace(/\s+/g, " ").trim();
+    if (semParens) out.add(semParens);
+    return Array.from(out).filter(Boolean);
+  };
+
   // Calcula repasse e também o "total" efetivo (valor do convênio quando o paciente
   // não paga em dinheiro, ex.: ANGIOLOGIA por convênio). Retorna { total, repasse }.
   const calcRepasseFull = (
@@ -298,11 +319,21 @@ function Page() {
     const med = medicos.find((m) => m.id === medicoId);
     // 1) Procura convênio cadastrado pelo nome do procedimento (independente de ter pagamento)
     if (procNome) {
-      const alvo = norm(procNome);
-      let c = convenios.find((cv) => cv.medico_id === medicoId && norm(cv.nome) === alvo);
+      const variants = procVariants(procNome);
+      let c: Convenio | undefined;
+      for (const alvo of variants) {
+        c = convenios.find(
+          (cv) => cv.medico_id === medicoId && norm(cv.nome) === alvo,
+        );
+        if (c) break;
+      }
       // Fallback: repasse por categoria (__CAT__:<TIPO>) usando o tipo do procedimento
       if (!c) {
-        const tipo = procTipos.get(alvo);
+        let tipo: string | undefined;
+        for (const alvo of variants) {
+          tipo = procTipos.get(alvo);
+          if (tipo) break;
+        }
         if (tipo) {
           const sentinel = `__CAT__:${String(tipo).toUpperCase()}`;
           c = convenios.find((cv) => cv.medico_id === medicoId && cv.nome === sentinel);
