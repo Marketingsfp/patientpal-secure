@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Plus, Pencil, Trash2, Stethoscope, Download, Filter, Wallet, CheckCircle2, Clock, Undo2, Check, ChevronsUpDown, BellRing, Send, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Stethoscope, Download, Filter, Wallet, CheckCircle2, Clock, Undo2, Check, ChevronsUpDown, BellRing, Send, Loader2, Banknote, CreditCard, QrCode, HelpCircle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -68,6 +68,16 @@ const EMPTY = {
   procedimento: "", valor_total: "", forma_pagamento: "", status: "realizado",
 };
 const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+// Ícone da forma de pagamento
+function FormaPagamentoIcon({ forma }: { forma: string | null | undefined }) {
+  const f = (forma ?? "").toLowerCase();
+  if (!f) return <span className="text-muted-foreground text-xs">—</span>;
+  if (f.includes("pix")) return <QrCode className="h-4 w-4 text-emerald-600" aria-label="PIX" />;
+  if (f.includes("dinhe") || f.includes("especie") || f.includes("espécie")) return <Banknote className="h-4 w-4 text-green-700" aria-label="Dinheiro" />;
+  if (f.includes("cart") || f.includes("credi") || f.includes("debi") || f.includes("débi")) return <CreditCard className="h-4 w-4 text-blue-600" aria-label="Cartão" />;
+  return <HelpCircle className="h-4 w-4 text-muted-foreground" aria-label={forma ?? ""} />;
+}
 
 function Page() {
   const { clinicaAtual } = useClinica();
@@ -1104,6 +1114,7 @@ function Page() {
               <TableHead className="text-right">{isMedicoOnly ? "Repasse" : "Médico"}</TableHead>
               {!isMedicoOnly && <TableHead className="text-right">Clínica</TableHead>}
               <TableHead className="text-center">Status</TableHead>
+              <TableHead className="text-center">Pgto</TableHead>
               <TableHead className="text-center">Laudo</TableHead>
               {!isMedicoOnly && <TableHead className="w-24"></TableHead>}
             </TableRow></TableHeader>
@@ -1138,6 +1149,11 @@ function Page() {
                       <Clock className="h-3 w-3 mr-1" />A receber
                     </Badge>
                   )}
+                </TableCell>
+                <TableCell className="text-center">
+                  <div className="flex justify-center" title={a.forma_pagamento ?? "Sem forma de pagamento"}>
+                    <FormaPagamentoIcon forma={a.forma_pagamento} />
+                  </div>
                 </TableCell>
                 <TableCell className="text-center">
                   {(() => {
