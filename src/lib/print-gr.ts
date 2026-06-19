@@ -673,8 +673,22 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     if (a.medico_id) {
       const med = medById.get(a.medico_id);
       const convs = convsByMedico.get(a.medico_id) ?? [];
-      const alvo = normalizar(procNomeBase);
-      let conv = convs.find((cv) => normalizar(cv.nome) === alvo);
+      const baseNorm = normalizar(procNomeBase);
+      const variants = new Set<string>([baseNorm]);
+      let cur = baseNorm;
+      for (let i = 0; i < 3; i++) {
+        const m = cur.match(/^(.*)\s*\([^()]*\)\s*$/);
+        if (!m) break;
+        cur = m[1].trim();
+        if (cur) variants.add(cur);
+      }
+      const semParens = baseNorm.replace(/\s*\([^()]*\)\s*/g, " ").replace(/\s+/g, " ").trim();
+      if (semParens) variants.add(semParens);
+      let conv: typeof convs[number] | undefined;
+      for (const alvo of variants) {
+        conv = convs.find((cv) => normalizar(cv.nome) === alvo);
+        if (conv) break;
+      }
       if (!conv && proc?.tipo) {
         const sentinel = `__CAT__:${String(proc.tipo).toUpperCase()}`;
         conv = convs.find((cv) => cv.nome === sentinel);
