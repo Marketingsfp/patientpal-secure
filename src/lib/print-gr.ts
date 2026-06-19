@@ -251,6 +251,19 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   // (fin_lancamentos confirmado) — garante que reimpressões usem o mesmo
   // valor base de cálculo da 1ª via, mantendo o repasse do médico correto.
   let valor: number;
+  let isCartaoConsulta = false;
+  const detectCartaoConsulta = (desc: string | null | undefined): boolean => {
+    if (!desc) return false;
+    const d = desc.toUpperCase();
+    if (d.includes("ADESAO") || d.includes("ADESÃO")) return false;
+    if (d.includes("+ SEGUROS")) return false;
+    return (
+      d.includes("CARTAO CONSULTA") ||
+      d.includes("CARTÃO CONSULTA") ||
+      d.includes("CONSULTA CARTAO") ||
+      d.includes("CONSULTA CARTÃO")
+    );
+  };
   if (pagamento) {
     valor = Number(pagamento.valor);
   } else {
@@ -258,15 +271,30 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     try {
       const { data: lancs } = await supabase
         .from("fin_lancamentos")
-        .select("valor")
+        .select("valor, descricao")
         .eq("agendamento_id", agendamentoId)
         .eq("tipo", "receita")
         .eq("status", "confirmado");
-      for (const l of ((lancs ?? []) as Array<{ valor: number | string }>)) {
+      for (const l of ((lancs ?? []) as Array<{ valor: number | string; descricao: string | null }>)) {
         valorPago += Number(l.valor);
+        if (detectCartaoConsulta(l.descricao)) isCartaoConsulta = true;
       }
     } catch { /* segue para fallback */ }
     valor = valorPago > 0 ? valorPago : Number(procData?.valor_dinheiro_pix ?? 0);
+  }
+  // Quando o pagamento já vem informado pelo caller, ainda consultamos os
+  // lançamentos para descobrir se é Cartão Consulta (não há flag no payload).
+  if (pagamento && !isCartaoConsulta) {
+    try {
+      const { data: lancs } = await supabase
+        .from("fin_lancamentos")
+        .select("descricao")
+        .eq("agendamento_id", agendamentoId)
+        .eq("tipo", "receita");
+      for (const l of ((lancs ?? []) as Array<{ descricao: string | null }>)) {
+        if (detectCartaoConsulta(l.descricao)) { isCartaoConsulta = true; break; }
+      }
+    } catch { /* noop */ }
   }
   const procNomeBase = (a.procedimento || procData?.nome || "CONSULTA").toUpperCase();
   const procNome = espNome && !procNomeBase.includes(espNome) ? `${espNome} - ${procNomeBase}` : procNomeBase;
