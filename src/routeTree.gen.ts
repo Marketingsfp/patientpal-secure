@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TotemRouteImport } from './routes/totem'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as PainelRouteImport } from './routes/painel'
 import { Route as LoginRouteImport } from './routes/login'
@@ -124,6 +125,11 @@ import { Route as AuthenticatedAppEquipeEnfermeiroUserIdEditarRouteImport } from
 const TotemRoute = TotemRouteImport.update({
   id: '/totem',
   path: '/totem',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SignupRoute = SignupRouteImport.update({
@@ -755,6 +761,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/painel': typeof PainelRoute
   '/signup': typeof SignupRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/totem': typeof TotemRoute
   '/app': typeof AuthenticatedAppRouteWithChildren
   '/checkin/$token': typeof CheckinTokenRoute
@@ -867,6 +874,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/painel': typeof PainelRoute
   '/signup': typeof SignupRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/totem': typeof TotemRoute
   '/checkin/$token': typeof CheckinTokenRoute
   '/lp/$slug': typeof LpSlugRoute
@@ -977,6 +985,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/painel': typeof PainelRoute
   '/signup': typeof SignupRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/totem': typeof TotemRoute
   '/_authenticated/app': typeof AuthenticatedAppRouteWithChildren
   '/checkin/$token': typeof CheckinTokenRoute
@@ -1091,6 +1100,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/painel'
     | '/signup'
+    | '/sitemap.xml'
     | '/totem'
     | '/app'
     | '/checkin/$token'
@@ -1203,6 +1213,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/painel'
     | '/signup'
+    | '/sitemap.xml'
     | '/totem'
     | '/checkin/$token'
     | '/lp/$slug'
@@ -1312,6 +1323,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/painel'
     | '/signup'
+    | '/sitemap.xml'
     | '/totem'
     | '/_authenticated/app'
     | '/checkin/$token'
@@ -1426,6 +1438,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   PainelRoute: typeof PainelRoute
   SignupRoute: typeof SignupRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TotemRoute: typeof TotemRoute
   CheckinTokenRoute: typeof CheckinTokenRoute
   LpSlugRoute: typeof LpSlugRoute
@@ -1448,6 +1461,13 @@ declare module '@tanstack/react-router' {
       path: '/totem'
       fullPath: '/totem'
       preLoaderRoute: typeof TotemRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/signup': {
@@ -2524,6 +2544,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   PainelRoute: PainelRoute,
   SignupRoute: SignupRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
   TotemRoute: TotemRoute,
   CheckinTokenRoute: CheckinTokenRoute,
   LpSlugRoute: LpSlugRoute,

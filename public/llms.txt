@@ -1,0 +1,11 @@
+# ClinicaOS
+
+> Sistema completo de gestão para clínicas multi-especialidades: agenda online, prontuário eletrônico, financeiro com rateio, telemedicina, totem de senhas e IA para atendimento.
+
+ClinicaOS unifica recepção, agenda, prontuário e financeiro de clínicas e consultórios em um único produto SaaS em português. Inclui telemedicina embarcada, emissão de NFS-e, cartões de benefícios, marketing/CRM e portal do paciente.
+
+## Pages
+
+- [Página inicial](/): visão geral da plataforma.
+- [Entrar](/login): acesso para usuários cadastrados.
+- [Criar conta](/signup): cadastro de novas clínicas.
