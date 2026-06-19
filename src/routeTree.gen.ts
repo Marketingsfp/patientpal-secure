@@ -46,7 +46,6 @@ import { Route as AuthenticatedAppOrcamentosAgendaRouteImport } from './routes/_
 import { Route as AuthenticatedAppOrcamentosRouteImport } from './routes/_authenticated/app.orcamentos'
 import { Route as AuthenticatedAppOdontologiaRouteImport } from './routes/_authenticated/app.odontologia'
 import { Route as AuthenticatedAppNinaRouteImport } from './routes/_authenticated/app.nina'
-import { Route as AuthenticatedAppNfseRouteImport } from './routes/_authenticated/app.nfse'
 import { Route as AuthenticatedAppModelosDocumentosRouteImport } from './routes/_authenticated/app.modelos-documentos'
 import { Route as AuthenticatedAppMktSegmentosRouteImport } from './routes/_authenticated/app.mkt-segmentos'
 import { Route as AuthenticatedAppMktLeadsRouteImport } from './routes/_authenticated/app.mkt-leads'
@@ -86,6 +85,7 @@ import { Route as AuthenticatedAppAtendimentoIaRouteImport } from './routes/_aut
 import { Route as AuthenticatedAppAnamnesesRouteImport } from './routes/_authenticated/app.anamneses'
 import { Route as AuthenticatedAppAlertasEnfermagemRouteImport } from './routes/_authenticated/app.alertas-enfermagem'
 import { Route as AuthenticatedAppAgendaRouteImport } from './routes/_authenticated/app.agenda'
+import { Route as AuthenticatedAppNfseIndexRouteImport } from './routes/_authenticated/app.nfse.index'
 import { Route as AuthenticatedAppFinanceiroIndexRouteImport } from './routes/_authenticated/app.financeiro.index'
 import { Route as AuthenticatedAppEquipeIndexRouteImport } from './routes/_authenticated/app.equipe.index'
 import { Route as AuthenticatedAppClientesIndexRouteImport } from './routes/_authenticated/app.clientes.index'
@@ -318,11 +318,6 @@ const AuthenticatedAppNinaRoute = AuthenticatedAppNinaRouteImport.update({
   path: '/nina',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
-const AuthenticatedAppNfseRoute = AuthenticatedAppNfseRouteImport.update({
-  id: '/nfse',
-  path: '/nfse',
-  getParentRoute: () => AuthenticatedAppRoute,
-} as any)
 const AuthenticatedAppModelosDocumentosRoute =
   AuthenticatedAppModelosDocumentosRouteImport.update({
     id: '/modelos-documentos',
@@ -544,6 +539,12 @@ const AuthenticatedAppAgendaRoute = AuthenticatedAppAgendaRouteImport.update({
   path: '/agenda',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
+const AuthenticatedAppNfseIndexRoute =
+  AuthenticatedAppNfseIndexRouteImport.update({
+    id: '/nfse/',
+    path: '/nfse/',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppFinanceiroIndexRoute =
   AuthenticatedAppFinanceiroIndexRouteImport.update({
     id: '/',
@@ -582,9 +583,9 @@ const ApiPublicFocusnfeWebhookRoute =
   } as any)
 const AuthenticatedAppNfseTestarRoute =
   AuthenticatedAppNfseTestarRouteImport.update({
-    id: '/testar',
-    path: '/testar',
-    getParentRoute: () => AuthenticatedAppNfseRoute,
+    id: '/nfse/testar',
+    path: '/nfse/testar',
+    getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppMedicoMedicoIdRoute =
   AuthenticatedAppMedicoMedicoIdRouteImport.update({
@@ -812,7 +813,6 @@ export interface FileRoutesByFullPath {
   '/app/mkt-leads': typeof AuthenticatedAppMktLeadsRoute
   '/app/mkt-segmentos': typeof AuthenticatedAppMktSegmentosRoute
   '/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
-  '/app/nfse': typeof AuthenticatedAppNfseRouteWithChildren
   '/app/nina': typeof AuthenticatedAppNinaRoute
   '/app/odontologia': typeof AuthenticatedAppOdontologiaRoute
   '/app/orcamentos': typeof AuthenticatedAppOrcamentosRoute
@@ -863,6 +863,7 @@ export interface FileRoutesByFullPath {
   '/app/clientes/': typeof AuthenticatedAppClientesIndexRoute
   '/app/equipe/': typeof AuthenticatedAppEquipeIndexRoute
   '/app/financeiro/': typeof AuthenticatedAppFinanceiroIndexRoute
+  '/app/nfse/': typeof AuthenticatedAppNfseIndexRoute
   '/app/clientes/$pacienteId/editar': typeof AuthenticatedAppClientesPacienteIdEditarRoute
   '/app/equipe/enfermeiro/$userId/editar': typeof AuthenticatedAppEquipeEnfermeiroUserIdEditarRoute
   '/app/equipe/funcionario/$userId/editar': typeof AuthenticatedAppEquipeFuncionarioUserIdEditarRoute
@@ -921,7 +922,6 @@ export interface FileRoutesByTo {
   '/app/mkt-leads': typeof AuthenticatedAppMktLeadsRoute
   '/app/mkt-segmentos': typeof AuthenticatedAppMktSegmentosRoute
   '/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
-  '/app/nfse': typeof AuthenticatedAppNfseRouteWithChildren
   '/app/nina': typeof AuthenticatedAppNinaRoute
   '/app/odontologia': typeof AuthenticatedAppOdontologiaRoute
   '/app/orcamentos': typeof AuthenticatedAppOrcamentosRoute
@@ -972,6 +972,7 @@ export interface FileRoutesByTo {
   '/app/clientes': typeof AuthenticatedAppClientesIndexRoute
   '/app/equipe': typeof AuthenticatedAppEquipeIndexRoute
   '/app/financeiro': typeof AuthenticatedAppFinanceiroIndexRoute
+  '/app/nfse': typeof AuthenticatedAppNfseIndexRoute
   '/app/clientes/$pacienteId/editar': typeof AuthenticatedAppClientesPacienteIdEditarRoute
   '/app/equipe/enfermeiro/$userId/editar': typeof AuthenticatedAppEquipeEnfermeiroUserIdEditarRoute
   '/app/equipe/funcionario/$userId/editar': typeof AuthenticatedAppEquipeFuncionarioUserIdEditarRoute
@@ -1036,7 +1037,6 @@ export interface FileRoutesById {
   '/_authenticated/app/mkt-leads': typeof AuthenticatedAppMktLeadsRoute
   '/_authenticated/app/mkt-segmentos': typeof AuthenticatedAppMktSegmentosRoute
   '/_authenticated/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
-  '/_authenticated/app/nfse': typeof AuthenticatedAppNfseRouteWithChildren
   '/_authenticated/app/nina': typeof AuthenticatedAppNinaRoute
   '/_authenticated/app/odontologia': typeof AuthenticatedAppOdontologiaRoute
   '/_authenticated/app/orcamentos': typeof AuthenticatedAppOrcamentosRoute
@@ -1087,6 +1087,7 @@ export interface FileRoutesById {
   '/_authenticated/app/clientes/': typeof AuthenticatedAppClientesIndexRoute
   '/_authenticated/app/equipe/': typeof AuthenticatedAppEquipeIndexRoute
   '/_authenticated/app/financeiro/': typeof AuthenticatedAppFinanceiroIndexRoute
+  '/_authenticated/app/nfse/': typeof AuthenticatedAppNfseIndexRoute
   '/_authenticated/app/clientes/$pacienteId/editar': typeof AuthenticatedAppClientesPacienteIdEditarRoute
   '/_authenticated/app/equipe/enfermeiro/$userId/editar': typeof AuthenticatedAppEquipeEnfermeiroUserIdEditarRoute
   '/_authenticated/app/equipe/funcionario/$userId/editar': typeof AuthenticatedAppEquipeFuncionarioUserIdEditarRoute
@@ -1151,7 +1152,6 @@ export interface FileRouteTypes {
     | '/app/mkt-leads'
     | '/app/mkt-segmentos'
     | '/app/modelos-documentos'
-    | '/app/nfse'
     | '/app/nina'
     | '/app/odontologia'
     | '/app/orcamentos'
@@ -1202,6 +1202,7 @@ export interface FileRouteTypes {
     | '/app/clientes/'
     | '/app/equipe/'
     | '/app/financeiro/'
+    | '/app/nfse/'
     | '/app/clientes/$pacienteId/editar'
     | '/app/equipe/enfermeiro/$userId/editar'
     | '/app/equipe/funcionario/$userId/editar'
@@ -1260,7 +1261,6 @@ export interface FileRouteTypes {
     | '/app/mkt-leads'
     | '/app/mkt-segmentos'
     | '/app/modelos-documentos'
-    | '/app/nfse'
     | '/app/nina'
     | '/app/odontologia'
     | '/app/orcamentos'
@@ -1311,6 +1311,7 @@ export interface FileRouteTypes {
     | '/app/clientes'
     | '/app/equipe'
     | '/app/financeiro'
+    | '/app/nfse'
     | '/app/clientes/$pacienteId/editar'
     | '/app/equipe/enfermeiro/$userId/editar'
     | '/app/equipe/funcionario/$userId/editar'
@@ -1374,7 +1375,6 @@ export interface FileRouteTypes {
     | '/_authenticated/app/mkt-leads'
     | '/_authenticated/app/mkt-segmentos'
     | '/_authenticated/app/modelos-documentos'
-    | '/_authenticated/app/nfse'
     | '/_authenticated/app/nina'
     | '/_authenticated/app/odontologia'
     | '/_authenticated/app/orcamentos'
@@ -1425,6 +1425,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/clientes/'
     | '/_authenticated/app/equipe/'
     | '/_authenticated/app/financeiro/'
+    | '/_authenticated/app/nfse/'
     | '/_authenticated/app/clientes/$pacienteId/editar'
     | '/_authenticated/app/equipe/enfermeiro/$userId/editar'
     | '/_authenticated/app/equipe/funcionario/$userId/editar'
@@ -1715,13 +1716,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppNinaRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
-    '/_authenticated/app/nfse': {
-      id: '/_authenticated/app/nfse'
-      path: '/nfse'
-      fullPath: '/app/nfse'
-      preLoaderRoute: typeof AuthenticatedAppNfseRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
     '/_authenticated/app/modelos-documentos': {
       id: '/_authenticated/app/modelos-documentos'
       path: '/modelos-documentos'
@@ -1995,6 +1989,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppAgendaRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/app/nfse/': {
+      id: '/_authenticated/app/nfse/'
+      path: '/nfse'
+      fullPath: '/app/nfse/'
+      preLoaderRoute: typeof AuthenticatedAppNfseIndexRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/app/financeiro/': {
       id: '/_authenticated/app/financeiro/'
       path: '/'
@@ -2039,10 +2040,10 @@ declare module '@tanstack/react-router' {
     }
     '/_authenticated/app/nfse/testar': {
       id: '/_authenticated/app/nfse/testar'
-      path: '/testar'
+      path: '/nfse/testar'
       fullPath: '/app/nfse/testar'
       preLoaderRoute: typeof AuthenticatedAppNfseTestarRouteImport
-      parentRoute: typeof AuthenticatedAppNfseRoute
+      parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/medico/$medicoId': {
       id: '/_authenticated/app/medico/$medicoId'
@@ -2365,17 +2366,6 @@ const AuthenticatedAppFinanceiroRouteWithChildren =
     AuthenticatedAppFinanceiroRouteChildren,
   )
 
-interface AuthenticatedAppNfseRouteChildren {
-  AuthenticatedAppNfseTestarRoute: typeof AuthenticatedAppNfseTestarRoute
-}
-
-const AuthenticatedAppNfseRouteChildren: AuthenticatedAppNfseRouteChildren = {
-  AuthenticatedAppNfseTestarRoute: AuthenticatedAppNfseTestarRoute,
-}
-
-const AuthenticatedAppNfseRouteWithChildren =
-  AuthenticatedAppNfseRoute._addFileChildren(AuthenticatedAppNfseRouteChildren)
-
 interface AuthenticatedAppRouteChildren {
   AuthenticatedAppAgendaRoute: typeof AuthenticatedAppAgendaRoute
   AuthenticatedAppAlertasEnfermagemRoute: typeof AuthenticatedAppAlertasEnfermagemRoute
@@ -2416,7 +2406,6 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppMktLeadsRoute: typeof AuthenticatedAppMktLeadsRoute
   AuthenticatedAppMktSegmentosRoute: typeof AuthenticatedAppMktSegmentosRoute
   AuthenticatedAppModelosDocumentosRoute: typeof AuthenticatedAppModelosDocumentosRoute
-  AuthenticatedAppNfseRoute: typeof AuthenticatedAppNfseRouteWithChildren
   AuthenticatedAppNinaRoute: typeof AuthenticatedAppNinaRoute
   AuthenticatedAppOdontologiaRoute: typeof AuthenticatedAppOdontologiaRoute
   AuthenticatedAppOrcamentosRoute: typeof AuthenticatedAppOrcamentosRoute
@@ -2439,7 +2428,9 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppFuncionarioUserIdRoute: typeof AuthenticatedAppFuncionarioUserIdRoute
   AuthenticatedAppImprimirAgendamentoIdRoute: typeof AuthenticatedAppImprimirAgendamentoIdRoute
   AuthenticatedAppMedicoMedicoIdRoute: typeof AuthenticatedAppMedicoMedicoIdRoute
+  AuthenticatedAppNfseTestarRoute: typeof AuthenticatedAppNfseTestarRoute
   AuthenticatedAppClientesIndexRoute: typeof AuthenticatedAppClientesIndexRoute
+  AuthenticatedAppNfseIndexRoute: typeof AuthenticatedAppNfseIndexRoute
   AuthenticatedAppClientesPacienteIdEditarRoute: typeof AuthenticatedAppClientesPacienteIdEditarRoute
 }
 
@@ -2489,7 +2480,6 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppMktSegmentosRoute: AuthenticatedAppMktSegmentosRoute,
   AuthenticatedAppModelosDocumentosRoute:
     AuthenticatedAppModelosDocumentosRoute,
-  AuthenticatedAppNfseRoute: AuthenticatedAppNfseRouteWithChildren,
   AuthenticatedAppNinaRoute: AuthenticatedAppNinaRoute,
   AuthenticatedAppOdontologiaRoute: AuthenticatedAppOdontologiaRoute,
   AuthenticatedAppOrcamentosRoute: AuthenticatedAppOrcamentosRoute,
@@ -2517,7 +2507,9 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppImprimirAgendamentoIdRoute:
     AuthenticatedAppImprimirAgendamentoIdRoute,
   AuthenticatedAppMedicoMedicoIdRoute: AuthenticatedAppMedicoMedicoIdRoute,
+  AuthenticatedAppNfseTestarRoute: AuthenticatedAppNfseTestarRoute,
   AuthenticatedAppClientesIndexRoute: AuthenticatedAppClientesIndexRoute,
+  AuthenticatedAppNfseIndexRoute: AuthenticatedAppNfseIndexRoute,
   AuthenticatedAppClientesPacienteIdEditarRoute:
     AuthenticatedAppClientesPacienteIdEditarRoute,
 }
