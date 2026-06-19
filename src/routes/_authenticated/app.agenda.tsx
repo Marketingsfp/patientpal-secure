@@ -429,6 +429,7 @@ function AgendaPage() {
   })();
   const bordaClinica = { borderColor: corClinica, borderWidth: 2 } as const;
   const { user } = useAuth();
+  const { pick: pickEmitenteNfse, dialog: emitenteNfseDialog } = usePickEmitente();
   const [dataRef, setDataRef] = useState(() => {
     const d = new Date();
     // se hoje for sáb/dom, avança para o próximo dia útil (funcionamento)
