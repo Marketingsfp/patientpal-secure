@@ -1,0 +1,2 @@
+update public.nfse set status='erro', focus_status='erro_autorizacao', erro_mensagem='A data de emissão da DPS não pode ser posterior à data do seu processamento. (ajustado +2min de buffer — tente reemitir)' where id='1fd3b5ee-fe4d-4c4c-8f30-482878ebbfdc';
+update public.nfse set erro_mensagem='O código de tributação nacional informado não existe na lista nacional NFS-e. Verifique o cadastro do emitente (codigo_tributario_municipio / item_lista_servico).' where id='5613f9c3-709d-4b9c-b8e8-20e4347282b8';
