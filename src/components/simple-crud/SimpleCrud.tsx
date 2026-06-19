@@ -34,6 +34,11 @@ export interface SimpleCrudProps<T extends { id: string }, F> {
   toPayload: (form: F) => Record<string, unknown>;
   /** Form fields rendered inside the dialog. */
   renderForm: (form: F, setForm: (f: F) => void) => ReactNode;
+  /**
+   * Optional pre-submit validation. Return a string with the error message
+   * to block submission and show a toast; return null to allow saving.
+   */
+  validate?: (form: F) => string | null;
   /** Optional search filter. */
   searchFields?: (keyof T)[];
   /** Optional sort column. Defaults to created_at desc. */
@@ -42,7 +47,7 @@ export interface SimpleCrudProps<T extends { id: string }, F> {
 
 export function SimpleCrud<T extends { id: string }, F>({
   table, selectColumns, title, subtitle, icon, columns,
-  emptyForm, toForm, toPayload, renderForm, searchFields, orderBy,
+  emptyForm, toForm, toPayload, renderForm, validate, searchFields, orderBy,
 }: SimpleCrudProps<T, F>) {
   const { clinicaAtual } = useClinica();
   const [items, setItems] = useState<T[]>([]);
@@ -82,15 +87,27 @@ export function SimpleCrud<T extends { id: string }, F>({
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!clinicaAtual) return;
+    if (validate) {
+      const msg = validate(form);
+      if (msg) { toast.error(msg); return; }
+    }
     setSaving(true);
     const payload = { ...toPayload(form), clinica_id: clinicaAtual.clinica_id };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const q = supabase.from(table as any) as any;
-    const { error } = editing
-      ? await q.update(payload).eq("id", editing.id)
-      : await q.insert(payload);
+    const { data: ret, error } = editing
+      ? await q.update(payload).eq("id", editing.id).select("id")
+      : await q.insert(payload).select("id");
     setSaving(false);
     if (error) { toast.error(error.message); return; }
+    if (!ret || (Array.isArray(ret) && ret.length === 0)) {
+      toast.error(
+        editing
+          ? "Sem permissão para alterar este registro. Verifique se você é admin/gestor desta clínica."
+          : "Cadastro não foi salvo. Verifique se você tem permissão de admin/gestor nesta clínica."
+      );
+      return;
+    }
     toast.success(editing ? "Atualizado." : "Cadastrado.");
     setOpen(false);
     void load();
