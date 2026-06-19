@@ -460,7 +460,7 @@ function Page() {
       const pacIdEff = r.paciente_id ?? ag?.paciente_id ?? null;
       const medIdEff = r.medico_id ?? ag?.medico_id ?? null;
       const pago = Number(r.valor);
-      const { total, repasse } = calcRepasseFull(medIdEff, pago, proc);
+      const { total, repasse } = calcRepasseFull(medIdEff, pago, proc, r.descricao ?? null);
       return {
         id: r.id, data: r.data, procedimento: proc,
         agendamento_id: r.agendamento_id ?? null,
