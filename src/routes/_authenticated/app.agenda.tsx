@@ -39,6 +39,7 @@ import {
 import { printGuiaAtendimento, printGuiaAtendimentoAgrupada } from "@/lib/print-gr";
 import { VoiceInput } from "@/components/voice-input";
 import { exportToExcel } from "@/lib/export-csv";
+import { usePickEmitente } from "@/components/nfse/use-pick-emitente";
 import { useAuth } from "@/hooks/use-auth";
 import { useServerFn } from "@tanstack/react-start";
 import { listarEquipe } from "@/lib/equipe.functions";
