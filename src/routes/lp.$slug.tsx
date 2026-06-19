@@ -20,16 +20,42 @@ export const Route = createFileRoute("/lp/$slug")({
     if (error || !data) throw notFound();
     return { page: data };
   },
-  head: ({ loaderData }) => ({
-    meta: loaderData
-      ? [
-          { title: loaderData.page.titulo },
-          { name: "description", content: loaderData.page.subtitulo ?? loaderData.page.titulo },
-          { property: "og:title", content: loaderData.page.titulo },
-          { property: "og:description", content: loaderData.page.subtitulo ?? loaderData.page.titulo },
-        ]
-      : [{ title: "Página não encontrada" }],
-  }),
+  head: ({ params, loaderData }) => {
+    if (!loaderData) {
+      return { meta: [{ title: "Página não encontrada" }] };
+    }
+    const url = `https://patientpal-secure.lovable.app/lp/${params.slug}`;
+    const desc = loaderData.page.subtitulo ?? loaderData.page.titulo;
+    const meta: Array<Record<string, string>> = [
+      { title: loaderData.page.titulo },
+      { name: "description", content: desc },
+      { property: "og:title", content: loaderData.page.titulo },
+      { property: "og:description", content: desc },
+      { property: "og:url", content: url },
+      { property: "og:type", content: "website" },
+    ];
+    if (loaderData.page.hero_imagem_url) {
+      meta.push({ property: "og:image", content: loaderData.page.hero_imagem_url });
+      meta.push({ name: "twitter:image", content: loaderData.page.hero_imagem_url });
+    }
+    return {
+      meta,
+      links: [{ rel: "canonical", href: url }],
+      scripts: [
+        {
+          type: "application/ld+json",
+          children: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            name: loaderData.page.titulo,
+            description: desc,
+            url,
+            ...(loaderData.page.hero_imagem_url ? { image: loaderData.page.hero_imagem_url } : {}),
+          }),
+        },
+      ],
+    };
+  },
   notFoundComponent: () => (
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="text-center space-y-2">
