@@ -935,9 +935,32 @@ function AgendaPage() {
       }
       setPagosSet(new Set(pagosIds.filter((x) => idsComPaciente.has(x))));
       setPagoInfoMap(infoMap);
+      // Carrega NFS-e existentes para os agendamentos do dia (uma por agendamento, a mais recente).
+      try {
+        const nMap = new Map<string, { id: string; status: string | null; url_pdf: string | null; numero: string | null }>();
+        for (let i = 0; i < idsParaPagamento.length; i += CHUNK) {
+          const slice = idsParaPagamento.slice(i, i + CHUNK);
+          const { data: ns } = await supabase
+            .from("nfse")
+            .select("id, agendamento_id, status, url_pdf, numero, created_at")
+            .eq("clinica_id", clinicaAtual.clinica_id)
+            .in("agendamento_id", slice)
+            .order("created_at", { ascending: false });
+          ((ns ?? []) as Array<{ id: string; agendamento_id: string | null; status: string | null; url_pdf: string | null; numero: string | null }>).forEach((r) => {
+            if (!r.agendamento_id) return;
+            if (!nMap.has(r.agendamento_id)) {
+              nMap.set(r.agendamento_id, { id: r.id, status: r.status, url_pdf: r.url_pdf, numero: r.numero });
+            }
+          });
+        }
+        setNfseMap(nMap);
+      } catch {
+        setNfseMap(new Map());
+      }
     } else {
       setPagosSet(new Set());
       setPagoInfoMap(new Map());
+      setNfseMap(new Map());
     }
   };
 
