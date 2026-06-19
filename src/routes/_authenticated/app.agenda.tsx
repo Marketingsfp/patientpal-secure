@@ -451,6 +451,8 @@ function AgendaPage() {
   const [items, setItems] = useState<Agendamento[]>([]);
   const [pagosSet, setPagosSet] = useState<Set<string>>(new Set());
   const [pagoInfoMap, setPagoInfoMap] = useState<Map<string, { valor: number; forma: string | null }>>(new Map());
+  // Mapa agendamento_id → NFS-e mais recente (id/status/url_pdf).
+  const [nfseMap, setNfseMap] = useState<Map<string, { id: string; status: string | null; url_pdf: string | null; numero: string | null }>>(new Map());
   const [nascMap, setNascMap] = useState<Map<string, string | null>>(new Map());
   const [convenioMap, setConvenioMap] = useState<Map<string, string>>(new Map());
   const [etapaMap, setEtapaMap] = useState<Map<string, string>>(new Map());
