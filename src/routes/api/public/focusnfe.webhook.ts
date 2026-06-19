@@ -1,4 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { timingSafeEqual } from "crypto";
+
+function validBasicAuth(authHeader: string | null, token: string): boolean {
+  if (!authHeader || !authHeader.startsWith("Basic ")) return false;
+  const expected = "Basic " + Buffer.from(`${token}:`).toString("base64");
+  const a = Buffer.from(authHeader);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  try {
+    return timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Webhook do Focus NFe. Recebe notificações de mudança de status
@@ -9,7 +23,16 @@ export const Route = createFileRoute("/api/public/focusnfe/webhook")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const body = await request.json().catch(() => null) as
+        const token = process.env.FOCUS_WEBHOOK_TOKEN;
+        if (!token) {
+          // Refuse to process if the webhook secret is not configured.
+          return new Response("Webhook not configured", { status: 503 });
+        }
+        if (!validBasicAuth(request.headers.get("authorization"), token)) {
+          return new Response("Unauthorized", { status: 401 });
+        }
+
+        const body = (await request.json().catch(() => null)) as
           | { ref?: string; status?: string; numero?: string; serie?: string; codigo_verificacao?: string; caminho_xml_nota_fiscal?: string; caminho_danfse?: string; mensagem_sefaz?: string }
           | null;
         if (!body?.ref) return new Response("missing ref", { status: 400 });
