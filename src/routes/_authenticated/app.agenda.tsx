@@ -599,6 +599,7 @@ function AgendaPage() {
   const [pagamentoForma, setPagamentoForma] = useState<string>("");
   // Sinaliza que após o pagamento+impressão devemos abrir a emissão da NFS-e.
   const emitirNotaAposRef = useRef(false);
+  const emitenteNotaAposRef = useRef<string | null>(null);
   const navigate = useNavigate();
   // ── Desconto aplicado ANTES de "Salvar e Pagar" (com autorização da supervisão).
   type DescontoPendente = { tipo: "valor" | "percentual"; input: string; autorizadoPor: string; motivo: string };
@@ -3115,7 +3116,17 @@ function AgendaPage() {
                       type="button"
                       variant="outline"
                       disabled={saving}
-                      onClick={(e) => { emitirNotaAposRef.current = true; submit(e as unknown as FormEvent, true); }}
+                      onClick={async (e) => {
+                        e.preventDefault();
+                        const escolhido = await pickEmitenteNfse();
+                        if (!escolhido) {
+                          toast.error("Selecione a empresa emitente para emitir a NFS-e.");
+                          return;
+                        }
+                        emitenteNotaAposRef.current = escolhido;
+                        emitirNotaAposRef.current = true;
+                        submit(e as unknown as FormEvent, true);
+                      }}
                       className="border-sky-600 text-sky-700 hover:bg-sky-50 dark:hover:bg-sky-950/30"
                       title="Salva, registra pagamento, imprime a GR e abre a emissão da NFS-e (a nota é salva ao imprimir o A4)"
                     >
@@ -3281,7 +3292,8 @@ function AgendaPage() {
             emitirNotaAposRef.current = false;
             // Emite a NFS-e automaticamente, sem o usuário precisar reabrir nada.
             try {
-              const emitenteIdEscolhido = await pickEmitenteNfse();
+              const emitenteIdEscolhido = emitenteNotaAposRef.current ?? (await pickEmitenteNfse());
+              emitenteNotaAposRef.current = null;
               if (!emitenteIdEscolhido) {
                 toast.error("Selecione a empresa emitente para emitir a NFS-e.");
               } else {
