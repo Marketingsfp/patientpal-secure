@@ -599,6 +599,7 @@ function AgendaPage() {
   const [pagamentoForma, setPagamentoForma] = useState<string>("");
   // Sinaliza que após o pagamento+impressão devemos abrir a emissão da NFS-e.
   const emitirNotaAposRef = useRef(false);
+  const emitenteNotaAposRef = useRef<string | null>(null);
   const navigate = useNavigate();
   // ── Desconto aplicado ANTES de "Salvar e Pagar" (com autorização da supervisão).
   type DescontoPendente = { tipo: "valor" | "percentual"; input: string; autorizadoPor: string; motivo: string };
