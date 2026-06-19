@@ -100,7 +100,8 @@ export const emitirNfse = createServerFn({ method: "POST" })
     // com "data de emissão posterior à data de processamento".
     // Geramos a data já em horário de Brasília (UTC-3) com offset.
     const dataEmissaoBR = (() => {
-      const now = new Date(Date.now() - 3 * 60 * 60 * 1000);
+      // -3h fuso de Brasília + 2 min de buffer (clock skew vs Focus/SEFAZ)
+      const now = new Date(Date.now() - 3 * 60 * 60 * 1000 - 2 * 60 * 1000);
       return now.toISOString().replace(/\.\d{3}Z$/, "-03:00");
     })();
 
