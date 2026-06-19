@@ -451,6 +451,8 @@ function AgendaPage() {
   const [items, setItems] = useState<Agendamento[]>([]);
   const [pagosSet, setPagosSet] = useState<Set<string>>(new Set());
   const [pagoInfoMap, setPagoInfoMap] = useState<Map<string, { valor: number; forma: string | null }>>(new Map());
+  // Mapa agendamento_id → NFS-e mais recente (id/status/url_pdf).
+  const [nfseMap, setNfseMap] = useState<Map<string, { id: string; status: string | null; url_pdf: string | null; numero: string | null }>>(new Map());
   const [nascMap, setNascMap] = useState<Map<string, string | null>>(new Map());
   const [convenioMap, setConvenioMap] = useState<Map<string, string>>(new Map());
   const [etapaMap, setEtapaMap] = useState<Map<string, string>>(new Map());
@@ -933,9 +935,32 @@ function AgendaPage() {
       }
       setPagosSet(new Set(pagosIds.filter((x) => idsComPaciente.has(x))));
       setPagoInfoMap(infoMap);
+      // Carrega NFS-e existentes para os agendamentos do dia (uma por agendamento, a mais recente).
+      try {
+        const nMap = new Map<string, { id: string; status: string | null; url_pdf: string | null; numero: string | null }>();
+        for (let i = 0; i < idsParaPagamento.length; i += CHUNK) {
+          const slice = idsParaPagamento.slice(i, i + CHUNK);
+          const { data: ns } = await supabase
+            .from("nfse")
+            .select("id, agendamento_id, status, url_pdf, numero, created_at")
+            .eq("clinica_id", clinicaAtual.clinica_id)
+            .in("agendamento_id", slice)
+            .order("created_at", { ascending: false });
+          ((ns ?? []) as Array<{ id: string; agendamento_id: string | null; status: string | null; url_pdf: string | null; numero: string | null }>).forEach((r) => {
+            if (!r.agendamento_id) return;
+            if (!nMap.has(r.agendamento_id)) {
+              nMap.set(r.agendamento_id, { id: r.id, status: r.status, url_pdf: r.url_pdf, numero: r.numero });
+            }
+          });
+        }
+        setNfseMap(nMap);
+      } catch {
+        setNfseMap(new Map());
+      }
     } else {
       setPagosSet(new Set());
       setPagoInfoMap(new Map());
+      setNfseMap(new Map());
     }
   };
 
@@ -2415,6 +2440,93 @@ function AgendaPage() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  // Abre a NFS-e emitida (PDF) ou, se ainda não existir, emite uma nova
+  // para o agendamento (exige pagamento confirmado).
+  const verOuEmitirNota = async (a: Agendamento) => {
+    if (!clinicaAtual) return;
+    const ex = nfseMap.get(a.id);
+    if (ex) {
+      if (ex.url_pdf) {
+        window.open(ex.url_pdf, "_blank", "noopener,noreferrer");
+      } else {
+        toast.info(`NFS-e ${ex.numero ?? ""} — status: ${ex.status ?? "—"}. PDF ainda não disponível.`);
+        navigate({ to: "/app/nfse" });
+      }
+      return;
+    }
+    if (!pagosSet.has(a.id)) {
+      toast.error("Registre o pagamento antes de emitir a NFS-e.");
+      return;
+    }
+    if (isSlotLivre(a.paciente_nome) || !a.paciente_id) {
+      toast.error("Agendamento sem paciente vinculado — NFS-e não emitida.");
+      return;
+    }
+    try {
+      const { data: emitente } = await supabase
+        .from("nfse_emitentes")
+        .select("id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("ativo", true)
+        .maybeSingle();
+      if (!emitente?.id) {
+        toast.error("Nenhum emitente NFS-e configurado para esta clínica.");
+        return;
+      }
+      const { data: pac } = await supabase.from("pacientes")
+        .select("id, nome, cpf, email, cep, logradouro, numero, bairro, cidade, estado")
+        .eq("id", a.paciente_id).maybeSingle();
+      if (!pac) {
+        toast.error("Paciente não encontrado para emissão da NFS-e.");
+        return;
+      }
+      const valor = pagoInfoMap.get(a.id)?.valor ?? 0;
+      const res = await emitirNfseFn({ data: {
+        emitenteId: emitente.id,
+        pacienteId: pac.id,
+        agendamentoId: a.id,
+        valorServicos: Number(valor) || 0,
+        descricaoServicos: a.procedimento || "Serviços prestados",
+        tomador: {
+          nome: pac.nome,
+          cpfCnpj: pac.cpf ?? undefined,
+          email: pac.email ?? undefined,
+          cep: pac.cep ?? undefined,
+          logradouro: pac.logradouro ?? undefined,
+          numero: pac.numero ?? undefined,
+          bairro: pac.bairro ?? undefined,
+          municipio: pac.cidade ?? undefined,
+          uf: pac.estado ?? undefined,
+        },
+      } });
+      const nfseId = (res as { id?: string })?.id;
+      if (nfseId) {
+        toast.success("NFS-e enviada. Consultando status...");
+        await new Promise((r) => setTimeout(r, 4000));
+        await consultarNfseFn({ data: { id: nfseId } });
+        toast.success("NFS-e emitida com sucesso.");
+        // Atualiza o mapa para refletir a NFS-e recém-emitida.
+        const { data: nv } = await supabase
+          .from("nfse")
+          .select("id, status, url_pdf, numero")
+          .eq("id", nfseId)
+          .maybeSingle();
+        if (nv) {
+          setNfseMap((prev) => {
+            const n = new Map(prev);
+            n.set(a.id, { id: nv.id, status: nv.status, url_pdf: nv.url_pdf, numero: nv.numero });
+            return n;
+          });
+          if (nv.url_pdf) window.open(nv.url_pdf, "_blank", "noopener,noreferrer");
+        }
+      } else {
+        toast.warning("NFS-e enviada — acompanhe o status em Financeiro › NFS-e.");
+      }
+    } catch (err) {
+      toast.error("Falha ao emitir NFS-e: " + (err instanceof Error ? err.message : "erro"));
+    }
+  };
 
   const imprimirGR = async (a: Agendamento) => {
     if (!clinicaAtual) return;
@@ -3903,6 +4015,29 @@ function AgendaPage() {
                         <DollarSign className="h-4 w-4" strokeWidth={pagosSet.has(a.id) ? 3 : 2.5} />
                       </Button>
                       {(() => {
+                        if (isSlotLivre(a.paciente_nome)) return null;
+                        const nf = nfseMap.get(a.id);
+                        const emitida = !!nf;
+                        const podeEmitir = pagosSet.has(a.id);
+                        if (!emitida && !podeEmitir) return null;
+                        const title = emitida
+                          ? `NFS-e ${nf?.numero ?? ""} • ${nf?.status ?? "—"} — clique para ver`
+                          : "Emitir nota fiscal (NFS-e)";
+                        return (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title={title}
+                            onClick={() => verOuEmitirNota(a)}
+                            className={`h-7 w-7 border-2 rounded-md shadow-sm ${emitida
+                              ? "bg-sky-600 text-white border-sky-700 hover:bg-sky-700 hover:text-white"
+                              : "text-sky-700 border-sky-600 hover:bg-sky-50"}`}
+                          >
+                            <FileText className="h-4 w-4" strokeWidth={emitida ? 3 : 2.5} />
+                          </Button>
+                        );
+                      })()}
+                      {(() => {
                         const m = medicos.find((x) => x.id === a.medico_id);
                         const manual = m && m.usa_sistema === false && !recursoIds.has(m.id);
                         if (!manual) return null;
@@ -3967,26 +4102,15 @@ function AgendaPage() {
                         }}>
                           <Video className="h-4 w-4 mr-2" /> Copiar link do paciente
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={async () => {
-                          const { data, error } = await supabase
-                            .from("nfse")
-                            .select("id, url_pdf, status, numero")
-                            .eq("agendamento_id", a.id)
-                            .order("created_at", { ascending: false })
-                            .limit(1)
-                            .maybeSingle();
-                          if (error || !data) {
-                            toast.error("Nenhuma NFS-e encontrada para este agendamento.");
-                            return;
-                          }
-                          if (data.url_pdf) {
-                            window.open(data.url_pdf, "_blank", "noopener,noreferrer");
-                          } else {
-                            toast.info(`NFS-e ${data.numero ?? ""} — status: ${data.status}. PDF ainda não disponível.`);
-                            window.open("/app/nfse", "_blank", "noopener,noreferrer");
-                          }
-                        }}>
-                          <FileText className="h-4 w-4 mr-2" /> Ver nota emitida
+                        <DropdownMenuItem
+                          onClick={() => verOuEmitirNota(a)}
+                          disabled={!nfseMap.has(a.id) && !pagosSet.has(a.id)}
+                        >
+                          <FileText className="h-4 w-4 mr-2" />
+                          {nfseMap.has(a.id) ? "Ver nota emitida" : "Emitir nota fiscal"}
+                          {!nfseMap.has(a.id) && !pagosSet.has(a.id) && (
+                            <span className="ml-2 text-xs text-muted-foreground">(pagar primeiro)</span>
+                          )}
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => abrirAuditoria(a)}>
                           <ShieldCheck className="h-4 w-4 mr-2" /> Auditoria
