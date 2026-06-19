@@ -97,6 +97,7 @@ function Page() {
   const [fOrdem, setFOrdem] = useState<"data_desc" | "data_asc" | "gr" | "paciente_az" | "paciente_za">("data_desc");
   const [contas, setContas] = useState<Conta[]>([]);
   const [sel, setSel] = useState<Set<string>>(new Set());
+  const [optsReady, setOptsReady] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
   const [payForm, setPayForm] = useState({ data: hoje, conta_id: "", forma_pagamento: "" });
   const [payingNow, setPayingNow] = useState(false);
