@@ -232,12 +232,38 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
       medicoData = { tipo_repasse: s.tipo_repasse ?? null, percentual_repasse_padrao: s.percentual_repasse_padrao ?? null, valor_repasse_padrao: s.valor_repasse_padrao ?? null };
     } catch { medicoData = null; }
   }
+  // Dados do Cartão de Benefícios do médico (não vêm em medico_dados_sensiveis)
+  let medicoCb: { aceita: boolean; tipo: string | null; valor: number | null; percentual: number | null } | null = null;
+  if (a.medico_id) {
+    try {
+      const { data: mcb } = await supabase
+        .from("medicos")
+        .select("aceita_cartao_beneficios, cb_tipo_repasse, cb_valor_repasse, cb_percentual_repasse")
+        .eq("id", a.medico_id)
+        .maybeSingle();
+      const m = (mcb as any) ?? null;
+      if (m) medicoCb = { aceita: !!m.aceita_cartao_beneficios, tipo: m.cb_tipo_repasse ?? null, valor: m.cb_valor_repasse ?? null, percentual: m.cb_percentual_repasse ?? null };
+    } catch { medicoCb = null; }
+  }
   const procData = proc.data as { nome: string; valor_dinheiro_pix: number | null; valor_cartao: number | null; tipo: string | null } | null;
 
   // Se já temos pagamento informado, usa ele; senão busca valor REALMENTE pago
   // (fin_lancamentos confirmado) — garante que reimpressões usem o mesmo
   // valor base de cálculo da 1ª via, mantendo o repasse do médico correto.
   let valor: number;
+  let isCartaoConsulta = false;
+  const detectCartaoConsulta = (desc: string | null | undefined): boolean => {
+    if (!desc) return false;
+    const d = desc.toUpperCase();
+    if (d.includes("ADESAO") || d.includes("ADESÃO")) return false;
+    if (d.includes("+ SEGUROS")) return false;
+    return (
+      d.includes("CARTAO CONSULTA") ||
+      d.includes("CARTÃO CONSULTA") ||
+      d.includes("CONSULTA CARTAO") ||
+      d.includes("CONSULTA CARTÃO")
+    );
+  };
   if (pagamento) {
     valor = Number(pagamento.valor);
   } else {
@@ -245,15 +271,30 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     try {
       const { data: lancs } = await supabase
         .from("fin_lancamentos")
-        .select("valor")
+        .select("valor, descricao")
         .eq("agendamento_id", agendamentoId)
         .eq("tipo", "receita")
         .eq("status", "confirmado");
-      for (const l of ((lancs ?? []) as Array<{ valor: number | string }>)) {
+      for (const l of ((lancs ?? []) as Array<{ valor: number | string; descricao: string | null }>)) {
         valorPago += Number(l.valor);
+        if (detectCartaoConsulta(l.descricao)) isCartaoConsulta = true;
       }
     } catch { /* segue para fallback */ }
     valor = valorPago > 0 ? valorPago : Number(procData?.valor_dinheiro_pix ?? 0);
+  }
+  // Quando o pagamento já vem informado pelo caller, ainda consultamos os
+  // lançamentos para descobrir se é Cartão Consulta (não há flag no payload).
+  if (pagamento && !isCartaoConsulta) {
+    try {
+      const { data: lancs } = await supabase
+        .from("fin_lancamentos")
+        .select("descricao")
+        .eq("agendamento_id", agendamentoId)
+        .eq("tipo", "receita");
+      for (const l of ((lancs ?? []) as Array<{ descricao: string | null }>)) {
+        if (detectCartaoConsulta(l.descricao)) { isCartaoConsulta = true; break; }
+      }
+    } catch { /* noop */ }
   }
   const procNomeBase = (a.procedimento || procData?.nome || "CONSULTA").toUpperCase();
   const procNome = espNome && !procNomeBase.includes(espNome) ? `${espNome} - ${procNomeBase}` : procNomeBase;
@@ -316,7 +357,15 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
 
   let prestador = 0;
   let repasseFixoConvenio = false;
-  if (a.medico_id) {
+  // Cartão Consulta tem prioridade: usa o cb_*_repasse do médico.
+  if (a.medico_id && isCartaoConsulta && medicoCb?.aceita) {
+    if (medicoCb.tipo === "valor" && medicoCb.valor != null) {
+      prestador = Number(medicoCb.valor);
+      repasseFixoConvenio = true; // não rebaixa pelo valor pago (R$ 9,99 etc.)
+    } else if (medicoCb.tipo === "percentual" && medicoCb.percentual != null) {
+      prestador = +(valor * Number(medicoCb.percentual) / 100).toFixed(2);
+    }
+  } else if (a.medico_id) {
     const { data: convs } = await supabase
       .from("medico_convenios")
       .select("nome, tipo_repasse, percentual, valor, ativo")
