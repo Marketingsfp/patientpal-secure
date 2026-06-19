@@ -37,16 +37,29 @@ export function usePickEmitente() {
       .then(({ data }) => setEmitentes((data ?? []) as Emitente[]));
   }, [clinicaAtual?.clinica_id]);
 
-  const pick = useCallback((): Promise<string | null> => {
-    return new Promise((resolve) => {
-      if (!emitentes.length) { resolve(null); return; }
-      if (emitentes.length === 1) { resolve(emitentes[0].id); return; }
-      const padrao = emitentes.find((e) => (e as Emitente & { padrao?: boolean }).padrao)?.id ?? emitentes[0].id;
+  const pick = useCallback(async (): Promise<string | null> => {
+    let list = emitentes;
+    if (!list.length && clinicaAtual?.clinica_id) {
+      // Busca ao vivo caso o useEffect ainda não tenha populado o estado.
+      const { data } = await supabase
+        .from("nfse_emitentes")
+        .select("id, nome, cnpj, razao_social, padrao")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("ativo", true)
+        .order("padrao", { ascending: false })
+        .order("nome", { ascending: true });
+      list = (data ?? []) as Emitente[];
+      setEmitentes(list);
+    }
+    if (!list.length) return null;
+    if (list.length === 1) return list[0].id;
+    return new Promise<string | null>((resolve) => {
+      const padrao = list.find((e) => (e as Emitente & { padrao?: boolean }).padrao)?.id ?? list[0].id;
       setSelected(padrao);
       resolverRef.current = resolve;
       setOpen(true);
     });
-  }, [emitentes]);
+  }, [emitentes, clinicaAtual?.clinica_id]);
 
   const confirm = () => {
     const r = resolverRef.current; resolverRef.current = null;
