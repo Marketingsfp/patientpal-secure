@@ -31,7 +31,16 @@ export const Route = createFileRoute("/")({
         content:
           "Sistema completo para clínicas multi-especialidades: agenda online, prontuário eletrônico, financeiro com rateio, totem, telemedicina e IA.",
       },
+      { property: "og:title", content: "ClinicaOS — Sistema para clínicas multi-especialidades" },
+      {
+        property: "og:description",
+        content:
+          "Agenda, prontuário, financeiro, telemedicina e IA: tudo o que sua clínica precisa em uma só plataforma.",
+      },
+      { property: "og:url", content: "https://patientpal-secure.lovable.app/" },
+      { property: "og:type", content: "website" },
     ],
+    links: [{ rel: "canonical", href: "https://patientpal-secure.lovable.app/" }],
   }),
 });
 
