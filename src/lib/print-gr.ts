@@ -232,6 +232,19 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
       medicoData = { tipo_repasse: s.tipo_repasse ?? null, percentual_repasse_padrao: s.percentual_repasse_padrao ?? null, valor_repasse_padrao: s.valor_repasse_padrao ?? null };
     } catch { medicoData = null; }
   }
+  // Dados do Cartão de Benefícios do médico (não vêm em medico_dados_sensiveis)
+  let medicoCb: { aceita: boolean; tipo: string | null; valor: number | null; percentual: number | null } | null = null;
+  if (a.medico_id) {
+    try {
+      const { data: mcb } = await supabase
+        .from("medicos")
+        .select("aceita_cartao_beneficios, cb_tipo_repasse, cb_valor_repasse, cb_percentual_repasse")
+        .eq("id", a.medico_id)
+        .maybeSingle();
+      const m = (mcb as any) ?? null;
+      if (m) medicoCb = { aceita: !!m.aceita_cartao_beneficios, tipo: m.cb_tipo_repasse ?? null, valor: m.cb_valor_repasse ?? null, percentual: m.cb_percentual_repasse ?? null };
+    } catch { medicoCb = null; }
+  }
   const procData = proc.data as { nome: string; valor_dinheiro_pix: number | null; valor_cartao: number | null; tipo: string | null } | null;
 
   // Se já temos pagamento informado, usa ele; senão busca valor REALMENTE pago
