@@ -989,7 +989,7 @@ function Page() {
       {/* Filtros */}
       <Card>
         <CardContent className="p-2">
-          <div className="grid grid-cols-1 md:grid-cols-7 gap-2 items-end">
+          <div className="grid grid-cols-1 md:grid-cols-8 gap-2 items-end">
             <div className="space-y-1">
               <Label className="text-[10px] flex items-center gap-1"><Filter className="h-3 w-3" />Médico</Label>
               <MedicoCombobox
@@ -1023,6 +1023,17 @@ function Page() {
                   <SelectItem value="aberto">A receber</SelectItem>
                   <SelectItem value="pago">Pagos</SelectItem>
                   <SelectItem value="todos">Todos</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[10px]">Tipo</Label>
+              <Select value={fTipo} onValueChange={(v) => setFTipo(v as "todos" | "medico" | "clinica")}>
+                <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="medico">Apenas médico (com repasse)</SelectItem>
+                  <SelectItem value="clinica">Apenas clínica (sem repasse)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
