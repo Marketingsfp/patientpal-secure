@@ -539,7 +539,7 @@ export function AppShell() {
                         {subOpen && item.children.map((child) => {
                           const active = leafIsActive(child.to, child.hash);
                           const linkKey = `${child.to}#${child.hash ?? ""}`;
-                          const openInNewTab = child.to === "/app/nina";
+                          const openInNewTab = false;
                           const href = `${child.to}${child.hash ? `#${child.hash}` : ""}`;
                           if (openInNewTab) {
                             return (
