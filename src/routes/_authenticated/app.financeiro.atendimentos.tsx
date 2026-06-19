@@ -668,10 +668,15 @@ function Page() {
           const nome = (a.paciente_id ? pacMap.get(a.paciente_id) : null) ?? a.paciente_nome_extra ?? "";
           return norm(nome).includes(q);
         });
+    const baseTipo = fTipo === "todos"
+      ? base
+      : fTipo === "medico"
+        ? base.filter((a) => (Number(a.valor_medico) || 0) > 0)
+        : base.filter((a) => (Number(a.valor_medico) || 0) === 0);
     const nomeDe = (a: Atend) =>
       norm(((a.paciente_id ? pacMap.get(a.paciente_id) : null) ?? a.paciente_nome_extra ?? "").trim());
     const grDe = (a: Atend) => a.agendamento_inicio ?? a.data ?? "";
-    const arr = [...base];
+    const arr = [...baseTipo];
     switch (fOrdem) {
       case "data_asc":
         arr.sort((a, b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : 0));
@@ -697,7 +702,7 @@ function Page() {
     }
     return arr;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, fPaciente, pacientes.length, fOrdem]);
+  }, [items, fPaciente, pacientes.length, fOrdem, fTipo]);
   const totais = useMemo(() => filteredItems.reduce(
     (acc, a) => {
       acc.total += Number(a.valor_total) || 0;
