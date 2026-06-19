@@ -97,6 +97,7 @@ function Page() {
   const [fOrdem, setFOrdem] = useState<"data_desc" | "data_asc" | "gr" | "paciente_az" | "paciente_za">("data_desc");
   const [contas, setContas] = useState<Conta[]>([]);
   const [sel, setSel] = useState<Set<string>>(new Set());
+  const [optsReady, setOptsReady] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
   const [payForm, setPayForm] = useState({ data: hoje, conta_id: "", forma_pagamento: "" });
   const [payingNow, setPayingNow] = useState(false);
@@ -415,6 +416,10 @@ function Page() {
   const load = async () => {
     if (!clinicaAtual) { setItems([]); setLoading(false); return; }
     if (!fIni || !fFim) { setLoading(false); return; }
+    // Aguarda médicos/convênios/procedimentos carregarem para não calcular o
+    // repasse com base vazia (cairia no padrão do médico em vez do convênio
+    // cadastrado por procedimento — ex.: PREVENTIVO R$ 10,40).
+    if (!optsReady) { setLoading(true); return; }
     setLoading(true);
     // Une atendimentos manuais (fin_atendimentos) com pagamentos da agenda (fin_lancamentos receita).
     let qManual = supabase
@@ -542,11 +547,12 @@ function Page() {
         .eq("ativo", true);
       setConvenios((cv ?? []) as Convenio[]);
     }
+    setOptsReady(true);
   };
-  useEffect(() => { void loadOpts(); }, [clinicaAtual?.clinica_id]);
+  useEffect(() => { setOptsReady(false); void loadOpts(); }, [clinicaAtual?.clinica_id]);
   useEffect(() => { void load(); /* refaz ao mudar filtros ou opções de repasse */ },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [clinicaAtual?.clinica_id, fMedico, fIni, fFim, fStatus, medicos.length, convenios.length, procValores.size]);
+    [clinicaAtual?.clinica_id, fMedico, fIni, fFim, fStatus, optsReady, medicos.length, convenios.length, procValores.size]);
 
   const calc = useMemo(() => {
     const total = Number(form.valor_total || 0);
