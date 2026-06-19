@@ -325,7 +325,6 @@ function Page() {
     if (!desc) return false;
     const d = desc.toUpperCase();
     if (d.includes("ADESAO") || d.includes("ADESÃO")) return false;
-    if (d.includes("+ SEGUROS")) return false;
     return (
       d.includes("CARTAO CONSULTA") ||
       d.includes("CARTÃO CONSULTA") ||
