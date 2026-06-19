@@ -3120,7 +3120,7 @@ function AgendaPage() {
                         e.preventDefault();
                         const escolhido = await pickEmitenteNfse();
                         if (!escolhido) {
-                          toast.error("Selecione a empresa emitente para emitir a NFS-e.");
+                          toast.error("Nenhum emitente NFS-e ativo. Cadastre em Configurações › NFS-e antes de emitir notas.");
                           return;
                         }
                         emitenteNotaAposRef.current = escolhido;
