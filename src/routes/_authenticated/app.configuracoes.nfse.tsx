@@ -146,6 +146,20 @@ function NfseConfigPage() {
         ativo: f.ativo,
         padrao: f.padrao,
       })}
+      validate={(f) => {
+        if (!f.nome.trim()) return "Informe o apelido do emitente.";
+        if (!f.cnpj.trim()) return "Informe o CNPJ.";
+        if (!f.razao_social.trim()) return "Informe a razão social.";
+        if (!f.inscricao_municipal.trim()) return "Informe a inscrição municipal.";
+        if (!f.municipio.trim()) return "Informe o município.";
+        if (!f.uf.trim()) return "Informe a UF.";
+        if (!f.codigo_municipio.trim()) return "Informe o código IBGE do município (7 dígitos).";
+        if (!f.cep.trim()) return "Informe o CEP do emitente.";
+        if (!f.logradouro.trim()) return "Informe o logradouro.";
+        if (!f.numero.trim()) return "Informe o número do endereço.";
+        if (!f.bairro.trim()) return "Informe o bairro.";
+        return null;
+      }}
       renderForm={(f, set) => (
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
