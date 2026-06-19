@@ -357,7 +357,15 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
 
   let prestador = 0;
   let repasseFixoConvenio = false;
-  if (a.medico_id) {
+  // Cartão Consulta tem prioridade: usa o cb_*_repasse do médico.
+  if (a.medico_id && isCartaoConsulta && medicoCb?.aceita) {
+    if (medicoCb.tipo === "valor" && medicoCb.valor != null) {
+      prestador = Number(medicoCb.valor);
+      repasseFixoConvenio = true; // não rebaixa pelo valor pago (R$ 9,99 etc.)
+    } else if (medicoCb.tipo === "percentual" && medicoCb.percentual != null) {
+      prestador = +(valor * Number(medicoCb.percentual) / 100).toFixed(2);
+    }
+  } else if (a.medico_id) {
     const { data: convs } = await supabase
       .from("medico_convenios")
       .select("nome, tipo_repasse, percentual, valor, ativo")
