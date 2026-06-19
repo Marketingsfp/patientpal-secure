@@ -7,7 +7,13 @@ import { Check, Eraser } from "lucide-react";
 
 export const Route = createFileRoute("/p/contrato/$token")({
   component: AssinarContrato,
-  head: () => ({ meta: [{ title: "Assinar contrato" }] }),
+  head: () => ({
+    meta: [
+      { title: "Assinar contrato — ClinicaOS" },
+      { name: "description", content: "Leia e assine seu contrato digital de forma segura." },
+      { name: "robots", content: "noindex, nofollow" },
+    ],
+  }),
 });
 
 function AssinarContrato() {
@@ -95,7 +101,7 @@ function AssinarContrato() {
           <div className="rounded-md border-2 border-green-500 bg-green-50 p-4 text-center">
             <Check className="h-8 w-8 text-green-600 mx-auto"/>
             <div className="font-semibold text-green-800">Contrato assinado em {new Date(c.assinado_em).toLocaleString("pt-BR")}</div>
-            {c.assinatura_svg ? <img src={c.assinatura_svg} alt="assinatura" className="h-20 mx-auto mt-2"/> : null}
+            {c.assinatura_svg ? <img src={c.assinatura_svg} alt="Assinatura digital do contratante" className="h-20 mx-auto mt-2"/> : null}
           </div>
         ) : (
           <div className="space-y-2">
