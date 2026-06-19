@@ -315,6 +315,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   };
 
   let prestador = 0;
+  let repasseFixoConvenio = false;
   if (a.medico_id) {
     const { data: convs } = await supabase
       .from("medico_convenios")
@@ -334,6 +335,9 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     if (conv) {
       if (conv.tipo_repasse === "valor" && conv.valor != null) {
         prestador = Number(conv.valor);
+        // repasse fixo do convênio: pago mesmo que o paciente tenha pago R$ 0
+        // no caixa (convênio cobre direto com a clínica).
+        repasseFixoConvenio = true;
       } else if (conv.tipo_repasse === "percentual" && conv.percentual != null) {
         prestador = +(valor * Number(conv.percentual) / 100).toFixed(2);
       } else if (medicoData) {
@@ -352,8 +356,11 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
       }
     }
   }
-  prestador = Math.min(prestador, valor);
-  const clinica = +(valor - prestador).toFixed(2);
+  // Só limita o repasse pelo valor pago quando NÃO é repasse fixo de convênio.
+  if (!repasseFixoConvenio) {
+    prestador = Math.min(prestador, valor);
+  }
+  const clinica = +(Math.max(0, valor - prestador)).toFixed(2);
 
   const formaLbl = pagamento?.forma_pagamento ? (FORMA_LABEL[pagamento.forma_pagamento] ?? pagamento.forma_pagamento.toUpperCase()) : "DINHEIRO";
   const parcelasTxt = pagamento && pagamento.forma_pagamento === "cartao_credito" && pagamento.parcelas && pagamento.parcelas > 1

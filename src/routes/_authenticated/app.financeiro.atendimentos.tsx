@@ -344,7 +344,9 @@ function Page() {
         // financeiro for lançado). Com pagamento, usa o valor pago como base.
         const base = totalPago;
         if (c.tipo_repasse === "valor" && c.valor != null) {
-          return { total: base, repasse: Math.min(Number(c.valor), base) };
+          // Repasse fixo do convênio é pago integralmente, mesmo que o paciente
+          // tenha pago R$ 0 no caixa (convênio cobre direto com a clínica).
+          return { total: Math.max(base, Number(c.valor)), repasse: Number(c.valor) };
         }
         if (c.tipo_repasse === "percentual" && c.percentual != null) {
           return { total: base, repasse: +(base * Number(c.percentual) / 100).toFixed(2) };
