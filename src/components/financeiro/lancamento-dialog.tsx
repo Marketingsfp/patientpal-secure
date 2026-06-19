@@ -99,13 +99,45 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       setCategorias(lista);
       const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
       const particular = lista.find((c) => norm(c.nome) === "particular");
-      if (particular) setCategoriaId((cur) => cur || particular.id);
+      // Default: paciente comum (sem convênio ativo) → PARTICULAR.
+      // Se o agendamento estiver vinculado a um paciente com contrato de
+      // convênio ativo, tenta casar a categoria com o nome do convênio.
+      let categoriaEscolhidaId: string | null = particular?.id ?? null;
+      if (agendamentoId) {
+        try {
+          const { data: ag } = await supabase
+            .from("agendamentos")
+            .select("paciente_id")
+            .eq("id", agendamentoId)
+            .maybeSingle();
+          const pid = ag?.paciente_id ?? null;
+          if (pid) {
+            const { data: contrato } = await supabase
+              .from("contratos_assinatura")
+              .select("convenio_id, cb_convenios:convenio_id(nome)")
+              .eq("paciente_id", pid)
+              .eq("status", "ativo")
+              .is("cancelado_em", null)
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            const convNome = (contrato as { cb_convenios?: { nome?: string } } | null)?.cb_convenios?.nome;
+            if (convNome) {
+              const match = lista.find((c) => norm(c.nome) === norm(convNome));
+              if (match) categoriaEscolhidaId = match.id;
+            }
+          }
+        } catch {
+          // silencioso: mantém PARTICULAR como padrão
+        }
+      }
+      if (categoriaEscolhidaId) setCategoriaId((cur) => cur || categoriaEscolhidaId!);
       const listaContas = cs ?? [];
       setContas(listaContas);
       const caixa = listaContas.find((c) => norm(c.nome) === "caixa");
       if (caixa) setContaId((cur) => cur || caixa.id);
     })();
-  }, [open, clinicaAtual, tipo]);
+  }, [open, clinicaAtual, tipo, agendamentoId]);
 
   const formatBRL = (n: number) =>
     n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
