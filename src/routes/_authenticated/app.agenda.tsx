@@ -2441,6 +2441,93 @@ function AgendaPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // Abre a NFS-e emitida (PDF) ou, se ainda não existir, emite uma nova
+  // para o agendamento (exige pagamento confirmado).
+  const verOuEmitirNota = async (a: Agendamento) => {
+    if (!clinicaAtual) return;
+    const ex = nfseMap.get(a.id);
+    if (ex) {
+      if (ex.url_pdf) {
+        window.open(ex.url_pdf, "_blank", "noopener,noreferrer");
+      } else {
+        toast.info(`NFS-e ${ex.numero ?? ""} — status: ${ex.status ?? "—"}. PDF ainda não disponível.`);
+        navigate({ to: "/app/nfse" });
+      }
+      return;
+    }
+    if (!pagosSet.has(a.id)) {
+      toast.error("Registre o pagamento antes de emitir a NFS-e.");
+      return;
+    }
+    if (isSlotLivre(a.paciente_nome) || !a.paciente_id) {
+      toast.error("Agendamento sem paciente vinculado — NFS-e não emitida.");
+      return;
+    }
+    try {
+      const { data: emitente } = await supabase
+        .from("nfse_emitentes")
+        .select("id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("ativo", true)
+        .maybeSingle();
+      if (!emitente?.id) {
+        toast.error("Nenhum emitente NFS-e configurado para esta clínica.");
+        return;
+      }
+      const { data: pac } = await supabase.from("pacientes")
+        .select("id, nome, cpf, email, cep, logradouro, numero, bairro, cidade, estado")
+        .eq("id", a.paciente_id).maybeSingle();
+      if (!pac) {
+        toast.error("Paciente não encontrado para emissão da NFS-e.");
+        return;
+      }
+      const valor = pagoInfoMap.get(a.id)?.valor ?? 0;
+      const res = await emitirNfseFn({ data: {
+        emitenteId: emitente.id,
+        pacienteId: pac.id,
+        agendamentoId: a.id,
+        valorServicos: Number(valor) || 0,
+        descricaoServicos: a.procedimento || "Serviços prestados",
+        tomador: {
+          nome: pac.nome,
+          cpfCnpj: pac.cpf ?? undefined,
+          email: pac.email ?? undefined,
+          cep: pac.cep ?? undefined,
+          logradouro: pac.logradouro ?? undefined,
+          numero: pac.numero ?? undefined,
+          bairro: pac.bairro ?? undefined,
+          municipio: pac.cidade ?? undefined,
+          uf: pac.estado ?? undefined,
+        },
+      } });
+      const nfseId = (res as { id?: string })?.id;
+      if (nfseId) {
+        toast.success("NFS-e enviada. Consultando status...");
+        await new Promise((r) => setTimeout(r, 4000));
+        await consultarNfseFn({ data: { id: nfseId } });
+        toast.success("NFS-e emitida com sucesso.");
+        // Atualiza o mapa para refletir a NFS-e recém-emitida.
+        const { data: nv } = await supabase
+          .from("nfse")
+          .select("id, status, url_pdf, numero")
+          .eq("id", nfseId)
+          .maybeSingle();
+        if (nv) {
+          setNfseMap((prev) => {
+            const n = new Map(prev);
+            n.set(a.id, { id: nv.id, status: nv.status, url_pdf: nv.url_pdf, numero: nv.numero });
+            return n;
+          });
+          if (nv.url_pdf) window.open(nv.url_pdf, "_blank", "noopener,noreferrer");
+        }
+      } else {
+        toast.warning("NFS-e enviada — acompanhe o status em Financeiro › NFS-e.");
+      }
+    } catch (err) {
+      toast.error("Falha ao emitir NFS-e: " + (err instanceof Error ? err.message : "erro"));
+    }
+  };
+
   const imprimirGR = async (a: Agendamento) => {
     if (!clinicaAtual) return;
     if (!pagosSet.has(a.id)) {
