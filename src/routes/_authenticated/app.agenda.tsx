@@ -3292,7 +3292,8 @@ function AgendaPage() {
             emitirNotaAposRef.current = false;
             // Emite a NFS-e automaticamente, sem o usuário precisar reabrir nada.
             try {
-              const emitenteIdEscolhido = await pickEmitenteNfse();
+              const emitenteIdEscolhido = emitenteNotaAposRef.current ?? (await pickEmitenteNfse());
+              emitenteNotaAposRef.current = null;
               if (!emitenteIdEscolhido) {
                 toast.error("Selecione a empresa emitente para emitir a NFS-e.");
               } else {
