@@ -4015,6 +4015,29 @@ function AgendaPage() {
                         <DollarSign className="h-4 w-4" strokeWidth={pagosSet.has(a.id) ? 3 : 2.5} />
                       </Button>
                       {(() => {
+                        if (isSlotLivre(a.paciente_nome)) return null;
+                        const nf = nfseMap.get(a.id);
+                        const emitida = !!nf;
+                        const podeEmitir = pagosSet.has(a.id);
+                        if (!emitida && !podeEmitir) return null;
+                        const title = emitida
+                          ? `NFS-e ${nf?.numero ?? ""} • ${nf?.status ?? "—"} — clique para ver`
+                          : "Emitir nota fiscal (NFS-e)";
+                        return (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title={title}
+                            onClick={() => verOuEmitirNota(a)}
+                            className={`h-7 w-7 border-2 rounded-md shadow-sm ${emitida
+                              ? "bg-sky-600 text-white border-sky-700 hover:bg-sky-700 hover:text-white"
+                              : "text-sky-700 border-sky-600 hover:bg-sky-50"}`}
+                          >
+                            <FileText className="h-4 w-4" strokeWidth={emitida ? 3 : 2.5} />
+                          </Button>
+                        );
+                      })()}
+                      {(() => {
                         const m = medicos.find((x) => x.id === a.medico_id);
                         const manual = m && m.usa_sistema === false && !recursoIds.has(m.id);
                         if (!manual) return null;
