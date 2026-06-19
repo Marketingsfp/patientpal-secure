@@ -3967,6 +3967,27 @@ function AgendaPage() {
                         }}>
                           <Video className="h-4 w-4 mr-2" /> Copiar link do paciente
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={async () => {
+                          const { data, error } = await supabase
+                            .from("nfse")
+                            .select("id, url_pdf, status, numero")
+                            .eq("agendamento_id", a.id)
+                            .order("created_at", { ascending: false })
+                            .limit(1)
+                            .maybeSingle();
+                          if (error || !data) {
+                            toast.error("Nenhuma NFS-e encontrada para este agendamento.");
+                            return;
+                          }
+                          if (data.url_pdf) {
+                            window.open(data.url_pdf, "_blank", "noopener,noreferrer");
+                          } else {
+                            toast.info(`NFS-e ${data.numero ?? ""} — status: ${data.status}. PDF ainda não disponível.`);
+                            window.open("/app/nfse", "_blank", "noopener,noreferrer");
+                          }
+                        }}>
+                          <FileText className="h-4 w-4 mr-2" /> Ver nota emitida
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => abrirAuditoria(a)}>
                           <ShieldCheck className="h-4 w-4 mr-2" /> Auditoria
                         </DropdownMenuItem>
