@@ -95,6 +95,7 @@ function Page() {
   const [fStatus, setFStatus] = useState<"todos" | "aberto" | "pago">("aberto");
   const [fPaciente, setFPaciente] = useState<string>("");
   const [fOrdem, setFOrdem] = useState<"data_desc" | "data_asc" | "gr" | "paciente_az" | "paciente_za">("data_desc");
+  const [fTipo, setFTipo] = useState<"todos" | "medico" | "clinica">("todos");
   const [contas, setContas] = useState<Conta[]>([]);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [optsReady, setOptsReady] = useState(false);
@@ -667,10 +668,15 @@ function Page() {
           const nome = (a.paciente_id ? pacMap.get(a.paciente_id) : null) ?? a.paciente_nome_extra ?? "";
           return norm(nome).includes(q);
         });
+    const baseTipo = fTipo === "todos"
+      ? base
+      : fTipo === "medico"
+        ? base.filter((a) => (Number(a.valor_medico) || 0) > 0)
+        : base.filter((a) => (Number(a.valor_medico) || 0) === 0);
     const nomeDe = (a: Atend) =>
       norm(((a.paciente_id ? pacMap.get(a.paciente_id) : null) ?? a.paciente_nome_extra ?? "").trim());
     const grDe = (a: Atend) => a.agendamento_inicio ?? a.data ?? "";
-    const arr = [...base];
+    const arr = [...baseTipo];
     switch (fOrdem) {
       case "data_asc":
         arr.sort((a, b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : 0));
@@ -696,7 +702,7 @@ function Page() {
     }
     return arr;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, fPaciente, pacientes.length, fOrdem]);
+  }, [items, fPaciente, pacientes.length, fOrdem, fTipo]);
   const totais = useMemo(() => filteredItems.reduce(
     (acc, a) => {
       acc.total += Number(a.valor_total) || 0;
@@ -983,7 +989,7 @@ function Page() {
       {/* Filtros */}
       <Card>
         <CardContent className="p-2">
-          <div className="grid grid-cols-1 md:grid-cols-7 gap-2 items-end">
+          <div className="grid grid-cols-1 md:grid-cols-8 gap-2 items-end">
             <div className="space-y-1">
               <Label className="text-[10px] flex items-center gap-1"><Filter className="h-3 w-3" />Médico</Label>
               <MedicoCombobox
@@ -1017,6 +1023,17 @@ function Page() {
                   <SelectItem value="aberto">A receber</SelectItem>
                   <SelectItem value="pago">Pagos</SelectItem>
                   <SelectItem value="todos">Todos</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[10px]">Tipo</Label>
+              <Select value={fTipo} onValueChange={(v) => setFTipo(v as "todos" | "medico" | "clinica")}>
+                <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="medico">Apenas médico (com repasse)</SelectItem>
+                  <SelectItem value="clinica">Apenas clínica (sem repasse)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
