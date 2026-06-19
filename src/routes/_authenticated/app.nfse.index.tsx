@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-export const Route = createFileRoute("/_authenticated/app/nfse")({
+export const Route = createFileRoute("/_authenticated/app/nfse/")({
   component: NfsePage,
   head: () => ({ meta: [{ title: "Notas Fiscais — ClinicaOS" }] }),
 });
