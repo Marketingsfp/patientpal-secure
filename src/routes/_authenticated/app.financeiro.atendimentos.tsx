@@ -547,11 +547,12 @@ function Page() {
         .eq("ativo", true);
       setConvenios((cv ?? []) as Convenio[]);
     }
+    setOptsReady(true);
   };
-  useEffect(() => { void loadOpts(); }, [clinicaAtual?.clinica_id]);
+  useEffect(() => { setOptsReady(false); void loadOpts(); }, [clinicaAtual?.clinica_id]);
   useEffect(() => { void load(); /* refaz ao mudar filtros ou opções de repasse */ },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [clinicaAtual?.clinica_id, fMedico, fIni, fFim, fStatus, medicos.length, convenios.length, procValores.size]);
+    [clinicaAtual?.clinica_id, fMedico, fIni, fFim, fStatus, optsReady, medicos.length, convenios.length, procValores.size]);
 
   const calc = useMemo(() => {
     const total = Number(form.valor_total || 0);
