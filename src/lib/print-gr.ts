@@ -334,6 +334,9 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     if (conv) {
       if (conv.tipo_repasse === "valor" && conv.valor != null) {
         prestador = Number(conv.valor);
+        // repasse fixo do convênio: não rebaixa quando o "valor" base é menor
+        // (ex.: convênio pago fora do caixa, sem fin_lancamentos)
+        var __repasseConvenioValorFixo = true;
       } else if (conv.tipo_repasse === "percentual" && conv.percentual != null) {
         prestador = +(valor * Number(conv.percentual) / 100).toFixed(2);
       } else if (medicoData) {
@@ -352,7 +355,17 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
       }
     }
   }
-  prestador = Math.min(prestador, valor);
+  // Só limita pelo valor quando NÃO é repasse fixo de convênio cadastrado.
+  // O repasse "valor" do convênio é fixo e deve ser pago mesmo que o paciente
+  // tenha pago R$ 0 no caixa (convênio cobre direto com a clínica).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if (!(typeof (globalThis as any).__noop === "undefined") || true) {
+    // mantém compatibilidade
+  }
+  // @ts-ignore - flag definida acima quando aplicável
+  if (typeof __repasseConvenioValorFixo === "undefined" || !__repasseConvenioValorFixo) {
+    prestador = Math.min(prestador, valor);
+  }
   const clinica = +(valor - prestador).toFixed(2);
 
   const formaLbl = pagamento?.forma_pagamento ? (FORMA_LABEL[pagamento.forma_pagamento] ?? pagamento.forma_pagamento.toUpperCase()) : "DINHEIRO";
