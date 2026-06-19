@@ -446,16 +446,27 @@ function Page() {
     const [mr, ar] = await Promise.all([qManual.order("data", { ascending: false }), qAgenda.order("data", { ascending: false })]);
     if (mr.error) { toast.error(mr.error.message); setLoading(false); return; }
     if (ar.error) { toast.error(ar.error.message); setLoading(false); return; }
-    const manuais: Atend[] = (mr.data ?? []).map((r) => ({
-      id: r.id, data: r.data, procedimento: r.procedimento,
-      valor_total: Number(r.valor_total), valor_medico: Number(r.valor_medico), valor_clinica: Number(r.valor_clinica),
-      status: r.status, forma_pagamento: r.forma_pagamento, medico_id: r.medico_id, paciente_id: r.paciente_id,
-      origem: "manual",
-      repasse_pago: !!r.repasse_pago, repasse_pago_em: r.repasse_pago_em, repasse_forma_pagamento: r.repasse_forma_pagamento,
-      laudo_status: (r as any).laudo_status ?? null,
-      medico_laudador_id: (r as any).medico_laudador_id ?? null,
-      valor_laudo: Number((r as any).valor_laudo ?? 0),
-    }));
+    const manuais: Atend[] = (mr.data ?? []).map((r) => {
+      const pago = Number(r.valor_total);
+      // Recalcula repasse usando convênio cadastrado por procedimento
+      // (ex.: PREVENTIVO R$ 10,40). Mantém o valor armazenado apenas como
+      // fallback caso o cálculo retorne 0 e o banco já tenha um valor manual.
+      const { total, repasse } = calcRepasseFull(r.medico_id, pago, r.procedimento, null);
+      const valorMedico = repasse > 0 ? repasse : Number(r.valor_medico);
+      const valorTotal = total > 0 ? total : pago;
+      return {
+        id: r.id, data: r.data, procedimento: r.procedimento,
+        valor_total: valorTotal,
+        valor_medico: valorMedico,
+        valor_clinica: +(valorTotal - valorMedico).toFixed(2),
+        status: r.status, forma_pagamento: r.forma_pagamento, medico_id: r.medico_id, paciente_id: r.paciente_id,
+        origem: "manual",
+        repasse_pago: !!r.repasse_pago, repasse_pago_em: r.repasse_pago_em, repasse_forma_pagamento: r.repasse_forma_pagamento,
+        laudo_status: (r as any).laudo_status ?? null,
+        medico_laudador_id: (r as any).medico_laudador_id ?? null,
+        valor_laudo: Number((r as any).valor_laudo ?? 0),
+      };
+    });
     const agend: Atend[] = (ar.data ?? []).map((r): Atend => {
       const ag = (r as any).agendamento as { procedimento: string | null; paciente_nome: string | null; paciente_id: string | null; medico_id: string | null; inicio: string | null; status: string | null } | null;
       // Procedimento: só usamos o do agendamento. Quando não há agendamento
