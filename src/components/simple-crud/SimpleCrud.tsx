@@ -43,11 +43,13 @@ export interface SimpleCrudProps<T extends { id: string }, F> {
   searchFields?: (keyof T)[];
   /** Optional sort column. Defaults to created_at desc. */
   orderBy?: { column: string; ascending?: boolean };
+  /** Optional max-width class for the dialog (default: max-w-2xl). */
+  dialogClassName?: string;
 }
 
 export function SimpleCrud<T extends { id: string }, F>({
   table, selectColumns, title, subtitle, icon, columns,
-  emptyForm, toForm, toPayload, renderForm, validate, searchFields, orderBy,
+  emptyForm, toForm, toPayload, renderForm, validate, searchFields, orderBy, dialogClassName,
 }: SimpleCrudProps<T, F>) {
   const { clinicaAtual } = useClinica();
   const [items, setItems] = useState<T[]>([]);
@@ -170,7 +172,7 @@ export function SimpleCrud<T extends { id: string }, F>({
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className={`${dialogClassName ?? "max-w-2xl"} max-h-[90vh] overflow-y-auto`}>
           <DialogHeader>
             <DialogTitle>{editing ? `Editar ${title.toLowerCase()}` : `Novo ${title.toLowerCase().replace(/s$/, "")}`}</DialogTitle>
           </DialogHeader>
