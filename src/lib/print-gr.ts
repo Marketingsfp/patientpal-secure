@@ -297,6 +297,23 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
       .toLowerCase()
       .trim();
 
+  // Variantes para casar o nome do procedimento com cadastro de convênio
+  // (a agenda costuma anexar a especialidade entre parênteses).
+  const variantsOf = (nome: string): string[] => {
+    const base = norm(nome);
+    const out = new Set<string>([base]);
+    let cur = base;
+    for (let i = 0; i < 3; i++) {
+      const m = cur.match(/^(.*)\s*\([^()]*\)\s*$/);
+      if (!m) break;
+      cur = m[1].trim();
+      if (cur) out.add(cur);
+    }
+    const semParens = base.replace(/\s*\([^()]*\)\s*/g, " ").replace(/\s+/g, " ").trim();
+    if (semParens) out.add(semParens);
+    return Array.from(out).filter(Boolean);
+  };
+
   let prestador = 0;
   if (a.medico_id) {
     const { data: convs } = await supabase
@@ -304,11 +321,15 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
       .select("nome, tipo_repasse, percentual, valor, ativo")
       .eq("medico_id", a.medico_id)
       .eq("ativo", true);
-    const alvo = norm(procNomeBase);
-    let conv = (convs ?? []).find((c) => norm(c.nome) === alvo);
+    const variants = variantsOf(procNomeBase);
+    let conv: { nome: string; tipo_repasse: string | null; percentual: number | null; valor: number | null } | undefined;
+    for (const alvo of variants) {
+      conv = (convs ?? []).find((c) => norm(c.nome) === alvo) as typeof conv;
+      if (conv) break;
+    }
     if (!conv && procData?.tipo) {
       const sentinel = `__CAT__:${String(procData.tipo).toUpperCase()}`;
-      conv = (convs ?? []).find((c) => c.nome === sentinel);
+      conv = (convs ?? []).find((c) => c.nome === sentinel) as typeof conv;
     }
     if (conv) {
       if (conv.tipo_repasse === "valor" && conv.valor != null) {
