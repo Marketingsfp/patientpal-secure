@@ -416,6 +416,10 @@ function Page() {
   const load = async () => {
     if (!clinicaAtual) { setItems([]); setLoading(false); return; }
     if (!fIni || !fFim) { setLoading(false); return; }
+    // Aguarda médicos/convênios/procedimentos carregarem para não calcular o
+    // repasse com base vazia (cairia no padrão do médico em vez do convênio
+    // cadastrado por procedimento — ex.: PREVENTIVO R$ 10,40).
+    if (!optsReady) { setLoading(true); return; }
     setLoading(true);
     // Une atendimentos manuais (fin_atendimentos) com pagamentos da agenda (fin_lancamentos receita).
     let qManual = supabase
