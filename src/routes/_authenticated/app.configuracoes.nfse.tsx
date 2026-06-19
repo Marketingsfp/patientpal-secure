@@ -73,6 +73,7 @@ function NfseConfigPage() {
       subtitle="CNPJs cadastrados para emissão de notas fiscais via Focus NFe."
       icon={<Building2 className="h-6 w-6 text-primary" />}
       orderBy={{ column: "created_at", ascending: false }}
+      dialogClassName="max-w-5xl w-[95vw]"
       columns={[
         { key: "nome", header: "Nome", render: (r) => <span className="font-medium">{r.nome}</span> },
         { key: "cnpj", header: "CNPJ", className: "w-44", render: (r) => r.cnpj },
