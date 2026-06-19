@@ -13,7 +13,25 @@ export const Route = createFileRoute("/signup")({
     const { data } = await supabase.auth.getSession();
     if (data.session) throw redirect({ to: "/app" });
   },
-  head: () => ({ meta: [{ title: "Criar conta — ClinicaOS" }] }),
+  head: () => ({
+    meta: [
+      { title: "Criar conta — ClinicaOS" },
+      {
+        name: "description",
+        content:
+          "Crie sua conta ClinicaOS em minutos e configure agenda, pacientes e financeiro da sua clínica.",
+      },
+      { property: "og:title", content: "Criar conta — ClinicaOS" },
+      {
+        property: "og:description",
+        content:
+          "Cadastre sua clínica e comece a usar agenda, prontuário e financeiro hoje mesmo.",
+      },
+      { property: "og:url", content: "https://patientpal-secure.lovable.app/signup" },
+      { property: "og:type", content: "website" },
+    ],
+    links: [{ rel: "canonical", href: "https://patientpal-secure.lovable.app/signup" }],
+  }),
 });
 
 function SignupPage() {
