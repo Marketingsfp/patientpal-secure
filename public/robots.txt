@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /
+
+Disallow: /app/
+Disallow: /paciente/
+Disallow: /painel
+Disallow: /totem
+Disallow: /p/
+Disallow: /checkin/
+Disallow: /verificar/
+Disallow: /diagnostico
+Disallow: /api/
+
+Sitemap: https://patientpal-secure.lovable.app/sitemap.xml

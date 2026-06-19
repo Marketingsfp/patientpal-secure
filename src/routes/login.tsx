@@ -10,7 +10,24 @@ import { Label } from "@/components/ui/label";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
-  head: () => ({ meta: [{ title: "Entrar — ClinicaOS" }] }),
+  head: () => ({
+    meta: [
+      { title: "Entrar — ClinicaOS" },
+      {
+        name: "description",
+        content:
+          "Acesse sua conta ClinicaOS para gerenciar agenda, prontuários e financeiro da sua clínica.",
+      },
+      { property: "og:title", content: "Entrar — ClinicaOS" },
+      {
+        property: "og:description",
+        content: "Faça login para acessar agenda, prontuário e financeiro da sua clínica.",
+      },
+      { property: "og:url", content: "https://patientpal-secure.lovable.app/login" },
+      { property: "og:type", content: "website" },
+    ],
+    links: [{ rel: "canonical", href: "https://patientpal-secure.lovable.app/login" }],
+  }),
 });
 
 function LoginPage() {

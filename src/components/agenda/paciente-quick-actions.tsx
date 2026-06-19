@@ -365,7 +365,7 @@ function FotoDialog({
         </div>
         {atualUrl && !preview && (
           <div className="text-xs text-muted-foreground flex items-center gap-2">
-            <img src={atualUrl} alt="atual" className="h-8 w-8 rounded-full object-cover border"/>
+            <img src={atualUrl} alt="Foto atual do paciente" className="h-8 w-8 rounded-full object-cover border"/>
             Foto atual
           </div>
         )}

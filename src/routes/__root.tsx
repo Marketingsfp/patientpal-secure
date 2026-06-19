@@ -74,19 +74,49 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "ClinicaOS — Sistema de gestão para clínicas" },
+      {
+        name: "description",
+        content:
+          "Plataforma SaaS para clínicas multi-especialidades: agenda online, prontuário eletrônico, financeiro com rateio, telemedicina, totem de senhas e IA.",
+      },
+      { name: "author", content: "ClinicaOS" },
+      { property: "og:site_name", content: "ClinicaOS" },
+      { property: "og:title", content: "ClinicaOS — Sistema de gestão para clínicas" },
+      {
+        property: "og:description",
+        content:
+          "Agenda, prontuário, financeiro, telemedicina e IA em um único sistema pensado para o dia a dia da sua clínica.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
     ],
     links: [
       {
         rel: "stylesheet",
         href: appCss,
+      },
+    ],
+    scripts: [
+      {
+        type: "application/ld+json",
+        children: JSON.stringify({
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "Organization",
+              name: "ClinicaOS",
+              url: "https://patientpal-secure.lovable.app",
+              description:
+                "Plataforma SaaS para clínicas multi-especialidades com agenda, prontuário, financeiro, telemedicina e IA.",
+            },
+            {
+              "@type": "WebSite",
+              name: "ClinicaOS",
+              url: "https://patientpal-secure.lovable.app",
+            },
+          ],
+        }),
       },
     ],
   }),
@@ -98,7 +128,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="pt-BR">
       <head>
         <HeadContent />
       </head>
