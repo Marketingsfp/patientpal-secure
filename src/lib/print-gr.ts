@@ -361,11 +361,11 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   if (a.medico_id && isCartaoConsulta && medicoCb?.aceita) {
     if (medicoCb.tipo === "valor" && medicoCb.valor != null) {
       prestador = Number(medicoCb.valor);
-      // Só tratamos como repasse fixo (sem limitar pelo valor pago) quando
-      // o paciente NÃO pagou nada no caixa — cenário típico de convênio
-      // que cobre direto com a clínica. Em pagamentos normais, o repasse
-      // deve ser limitado ao valor recebido.
-      if (valor <= 0) repasseFixoConvenio = true;
+      // Cartão Consulta: repasse SEMPRE fixo. O paciente paga uma taxa
+      // simbólica no caixa (ex.: R$ 9,99) e o médico recebe o valor cheio
+      // cadastrado em "Repasse cartões benefícios" (ex.: R$ 35,00). Nunca
+      // limitar pelo valor pago.
+      repasseFixoConvenio = true;
     } else if (medicoCb.tipo === "percentual" && medicoCb.percentual != null) {
       prestador = +(valor * Number(medicoCb.percentual) / 100).toFixed(2);
     }
