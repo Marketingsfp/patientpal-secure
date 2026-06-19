@@ -2466,14 +2466,9 @@ function AgendaPage() {
       return;
     }
     try {
-      const { data: emitente } = await supabase
-        .from("nfse_emitentes")
-        .select("id")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("ativo", true)
-        .maybeSingle();
-      if (!emitente?.id) {
-        toast.error("Nenhum emitente NFS-e configurado para esta clínica.");
+      const emitenteIdEscolhido = await pickEmitenteNfse();
+      if (!emitenteIdEscolhido) {
+        toast.error("Selecione a empresa emitente para emitir a NFS-e.");
         return;
       }
       const { data: pac } = await supabase.from("pacientes")
@@ -2485,7 +2480,7 @@ function AgendaPage() {
       }
       const valor = pagoInfoMap.get(a.id)?.valor ?? 0;
       const res = await emitirNfseFn({ data: {
-        emitenteId: emitente.id,
+        emitenteId: emitenteIdEscolhido,
         pacienteId: pac.id,
         agendamentoId: a.id,
         valorServicos: Number(valor) || 0,
