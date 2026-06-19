@@ -308,15 +308,44 @@ function Page() {
     return Array.from(out).filter(Boolean);
   };
 
+  // Detecta lançamentos de "Cartão Consulta" pela descrição.
+  const isCartaoConsultaDesc = (desc: string | null | undefined): boolean => {
+    if (!desc) return false;
+    const d = desc.toUpperCase();
+    if (d.includes("ADESAO") || d.includes("ADESÃO")) return false;
+    if (d.includes("+ SEGUROS")) return false;
+    return (
+      d.includes("CARTAO CONSULTA") ||
+      d.includes("CARTÃO CONSULTA") ||
+      d.includes("CONSULTA CARTAO") ||
+      d.includes("CONSULTA CARTÃO")
+    );
+  };
+
   // Calcula repasse e também o "total" efetivo (valor do convênio quando o paciente
   // não paga em dinheiro, ex.: ANGIOLOGIA por convênio). Retorna { total, repasse }.
   const calcRepasseFull = (
     medicoId: string | null,
     totalPago: number,
     procNome: string | null,
+    descricao?: string | null,
   ): { total: number; repasse: number } => {
     if (!medicoId) return { total: totalPago, repasse: 0 };
     const med = medicos.find((m) => m.id === medicoId);
+    // Cartão Consulta: o paciente paga um valor reduzido (ex.: R$ 9,99) e o
+    // repasse ao médico é o cb_valor_repasse cadastrado (não o valor do
+    // convênio particular). Detecta pela descrição do lançamento.
+    if (isCartaoConsultaDesc(descricao) && med?.aceita_cartao_beneficios) {
+      if (med.cb_tipo_repasse === "valor" && med.cb_valor_repasse != null) {
+        return { total: totalPago, repasse: Number(med.cb_valor_repasse) };
+      }
+      if (med.cb_tipo_repasse === "percentual" && med.cb_percentual_repasse != null) {
+        return {
+          total: totalPago,
+          repasse: +(totalPago * Number(med.cb_percentual_repasse) / 100).toFixed(2),
+        };
+      }
+    }
     // 1) Procura convênio cadastrado pelo nome do procedimento (independente de ter pagamento)
     if (procNome) {
       const variants = procVariants(procNome);
