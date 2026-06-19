@@ -39,6 +39,7 @@ import {
 import { printGuiaAtendimento, printGuiaAtendimentoAgrupada } from "@/lib/print-gr";
 import { VoiceInput } from "@/components/voice-input";
 import { exportToExcel } from "@/lib/export-csv";
+import { usePickEmitente } from "@/components/nfse/use-pick-emitente";
 import { useAuth } from "@/hooks/use-auth";
 import { useServerFn } from "@tanstack/react-start";
 import { listarEquipe } from "@/lib/equipe.functions";
@@ -428,6 +429,7 @@ function AgendaPage() {
   })();
   const bordaClinica = { borderColor: corClinica, borderWidth: 2 } as const;
   const { user } = useAuth();
+  const { pick: pickEmitenteNfse, dialog: emitenteNfseDialog } = usePickEmitente();
   const [dataRef, setDataRef] = useState(() => {
     const d = new Date();
     // se hoje for sáb/dom, avança para o próximo dia útil (funcionamento)
@@ -2464,14 +2466,9 @@ function AgendaPage() {
       return;
     }
     try {
-      const { data: emitente } = await supabase
-        .from("nfse_emitentes")
-        .select("id")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("ativo", true)
-        .maybeSingle();
-      if (!emitente?.id) {
-        toast.error("Nenhum emitente NFS-e configurado para esta clínica.");
+      const emitenteIdEscolhido = await pickEmitenteNfse();
+      if (!emitenteIdEscolhido) {
+        toast.error("Selecione a empresa emitente para emitir a NFS-e.");
         return;
       }
       const { data: pac } = await supabase.from("pacientes")
@@ -2483,7 +2480,7 @@ function AgendaPage() {
       }
       const valor = pagoInfoMap.get(a.id)?.valor ?? 0;
       const res = await emitirNfseFn({ data: {
-        emitenteId: emitente.id,
+        emitenteId: emitenteIdEscolhido,
         pacienteId: pac.id,
         agendamentoId: a.id,
         valorServicos: Number(valor) || 0,
@@ -2596,6 +2593,7 @@ function AgendaPage() {
 
   return (
     <div className="space-y-3">
+      {emitenteNfseDialog}
       {reagendandoAg && (
         <div className="sticky top-0 z-30 -mx-4 px-4 py-2 border-b bg-primary text-primary-foreground shadow-sm">
           <div className="flex flex-wrap items-center gap-3 text-sm">
@@ -3283,14 +3281,9 @@ function AgendaPage() {
             emitirNotaAposRef.current = false;
             // Emite a NFS-e automaticamente, sem o usuário precisar reabrir nada.
             try {
-              const { data: emitente } = await supabase
-                .from("nfse_emitentes")
-                .select("id")
-                .eq("clinica_id", clinicaAtual.clinica_id)
-                .eq("ativo", true)
-                .maybeSingle();
-              if (!emitente?.id) {
-                toast.error("Nenhum emitente NFS-e configurado para esta clínica.");
+              const emitenteIdEscolhido = await pickEmitenteNfse();
+              if (!emitenteIdEscolhido) {
+                toast.error("Selecione a empresa emitente para emitir a NFS-e.");
               } else {
                 const ag = items.find((x) => x.id === agId);
                 if (!ag?.paciente_id) {
@@ -3303,7 +3296,7 @@ function AgendaPage() {
                     toast.error("Paciente não encontrado para emissão da NFS-e.");
                   } else {
                     const res = await emitirNfseFn({ data: {
-                      emitenteId: emitente.id,
+                      emitenteId: emitenteIdEscolhido,
                       pacienteId: pac.id,
                       agendamentoId: agId,
                       valorServicos: Number(dados.valor) || 0,
