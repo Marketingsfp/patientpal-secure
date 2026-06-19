@@ -511,8 +511,19 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
     };
     let medicoId = editId;
     if (editId) {
-      const { error } = await supabase.from("medicos").update(payload).eq("id", editId);
+      const { data: upd, error } = await supabase
+        .from("medicos")
+        .update(payload)
+        .eq("id", editId)
+        .select("id");
       if (error) { setSaving(false); toast.error(error.message); return; }
+      if (!upd || upd.length === 0) {
+        setSaving(false);
+        toast.error(
+          "Sem permissão para alterar este médico. Apenas gestores/administradores da clínica podem salvar essas alterações.",
+        );
+        return;
+      }
       const { error: delEsp } = await supabase.from("medico_especialidades").delete().eq("medico_id", editId);
       if (delEsp) { setSaving(false); toast.error(`Erro ao limpar especialidades: ${delEsp.message}`); return; }
       const { error: delProc } = await supabase.from("medico_procedimentos").delete().eq("medico_id", editId);
