@@ -14,6 +14,7 @@ export const Route = createFileRoute("/p/$token")({
       { title: "Minha consulta — ClinicaOS" },
       { name: "description", content: "Acesse sua consulta, preencha a anamnese e entre na sala de telemedicina." },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { name: "robots", content: "noindex, nofollow" },
     ],
   }),
 });
@@ -88,8 +89,8 @@ function PacientePublicoPage() {
 
       <main className="mx-auto max-w-2xl px-4 py-4 pb-24">
         <Card className="p-4">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Sua consulta</p>
-          <h1 className="mt-1 text-xl font-bold capitalize">{dataFmt}</h1>
+          <h1 className="text-xl font-bold">Minha consulta</h1>
+          <p className="mt-1 text-sm capitalize text-muted-foreground">{dataFmt}</p>
           <p className="text-2xl font-bold text-primary mt-1">{horaFmt}</p>
           {ag.medico_nome && (
             <p className="mt-3 text-sm">
