@@ -361,7 +361,11 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   if (a.medico_id && isCartaoConsulta && medicoCb?.aceita) {
     if (medicoCb.tipo === "valor" && medicoCb.valor != null) {
       prestador = Number(medicoCb.valor);
-      repasseFixoConvenio = true; // não rebaixa pelo valor pago (R$ 9,99 etc.)
+      // Só tratamos como repasse fixo (sem limitar pelo valor pago) quando
+      // o paciente NÃO pagou nada no caixa — cenário típico de convênio
+      // que cobre direto com a clínica. Em pagamentos normais, o repasse
+      // deve ser limitado ao valor recebido.
+      if (valor <= 0) repasseFixoConvenio = true;
     } else if (medicoCb.tipo === "percentual" && medicoCb.percentual != null) {
       prestador = +(valor * Number(medicoCb.percentual) / 100).toFixed(2);
     }
@@ -384,9 +388,10 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     if (conv) {
       if (conv.tipo_repasse === "valor" && conv.valor != null) {
         prestador = Number(conv.valor);
-        // repasse fixo do convênio: pago mesmo que o paciente tenha pago R$ 0
-        // no caixa (convênio cobre direto com a clínica).
-        repasseFixoConvenio = true;
+        // Repasse fixo de convênio só se aplica quando o paciente não pagou
+        // nada no caixa (convênio cobre direto com a clínica). Quando há
+        // pagamento normal, segue para o Math.min abaixo e limita ao recebido.
+        if (valor <= 0) repasseFixoConvenio = true;
       } else if (conv.tipo_repasse === "percentual" && conv.percentual != null) {
         prestador = +(valor * Number(conv.percentual) / 100).toFixed(2);
       } else if (medicoData) {
