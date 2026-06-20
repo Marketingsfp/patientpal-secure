@@ -19,16 +19,30 @@ function safeEq(a: string, b: string): boolean {
  * o painel seja reconfigurado.
  */
 function validFocusAuth(request: Request, token: string): boolean {
-  // 1) Header customizado: nome === valor === token
-  const direct = request.headers.get(token);
-  if (direct && safeEq(direct, token)) return true;
-
-  // 2) Authorization: Basic base64(token:)
+  // 1) Authorization: Basic base64(token:)
   const auth = request.headers.get("authorization");
   if (auth && auth.startsWith("Basic ")) {
     const expected = "Basic " + Buffer.from(`${token}:`).toString("base64");
     if (safeEq(auth, expected)) return true;
   }
+
+  // 2) Focus envia header customizado no formato `<Chave>: <Chave>`.
+  //    Como o nome do header pode conter caracteres exóticos (que a infra
+  //    descarta) ou ser case-insensitive, aceitamos QUALQUER header cujo
+  //    valor seja exatamente o token. Seguro porque o token tem alta entropia.
+  let matched = false;
+  request.headers.forEach((value) => {
+    if (!matched && safeEq(value, token)) matched = true;
+  });
+  if (matched) return true;
+
+  // 3) Query string: ?token=...  (fallback de último recurso)
+  try {
+    const url = new URL(request.url);
+    const qp = url.searchParams.get("token");
+    if (qp && safeEq(qp, token)) return true;
+  } catch {}
+
   return false;
 }
 
