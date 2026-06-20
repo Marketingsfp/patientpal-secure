@@ -16,13 +16,28 @@ interface Row {
   nome: string;
   cnpj: string;
   razao_social: string;
+  nome_fantasia: string | null;
   inscricao_municipal: string;
+  cep: string | null;
+  logradouro: string | null;
+  numero: string | null;
+  complemento: string | null;
+  bairro: string | null;
   municipio: string;
   uf: string;
   codigo_municipio: string;
+  telefone: string | null;
+  email: string | null;
+  regime_tributario: string | null;
+  optante_simples: boolean | null;
   item_lista_servico: string;
+  codigo_tributario_municipio: string | null;
+  codigo_cnae: string | null;
   aliquota_iss: number;
+  descricao_servico_padrao: string | null;
   focus_ambiente: string;
+  rps_serie: string | null;
+  rps_proximo_numero: number | null;
   ativo: boolean;
   padrao: boolean;
 }
@@ -68,7 +83,7 @@ function NfseConfigPage() {
   return (
     <SimpleCrud<Row, Form>
       table="nfse_emitentes"
-      selectColumns="id, nome, cnpj, razao_social, inscricao_municipal, municipio, uf, codigo_municipio, item_lista_servico, aliquota_iss, focus_ambiente, ativo, padrao"
+      selectColumns="id, nome, cnpj, razao_social, nome_fantasia, inscricao_municipal, cep, logradouro, numero, complemento, bairro, municipio, uf, codigo_municipio, telefone, email, regime_tributario, optante_simples, item_lista_servico, codigo_tributario_municipio, codigo_cnae, aliquota_iss, descricao_servico_padrao, focus_ambiente, rps_serie, rps_proximo_numero, ativo, padrao"
       title="Emitentes NFS-e"
       subtitle="CNPJs cadastrados para emissão de notas fiscais via Focus NFe."
       icon={<Building2 className="h-6 w-6 text-primary" />}
@@ -107,15 +122,24 @@ function NfseConfigPage() {
         ativo: true, padrao: false,
       }}
       toForm={(r) => ({
-        nome: r.nome, cnpj: r.cnpj, razao_social: r.razao_social, nome_fantasia: "",
-        inscricao_municipal: r.inscricao_municipal, cep: "", logradouro: "", numero: "",
-        complemento: "", bairro: "", municipio: r.municipio, uf: r.uf,
-        codigo_municipio: r.codigo_municipio, telefone: "", email: "",
-        regime_tributario: "simples_nacional", optante_simples: true,
-        item_lista_servico: r.item_lista_servico, codigo_tributario_municipio: "",
-        codigo_cnae: "", aliquota_iss: String(r.aliquota_iss),
-        descricao_servico_padrao: "", focus_ambiente: r.focus_ambiente,
-        rps_serie: "1", rps_proximo_numero: "1",
+        nome: r.nome, cnpj: r.cnpj, razao_social: r.razao_social,
+        nome_fantasia: r.nome_fantasia ?? "",
+        inscricao_municipal: r.inscricao_municipal,
+        cep: r.cep ?? "", logradouro: r.logradouro ?? "", numero: r.numero ?? "",
+        complemento: r.complemento ?? "", bairro: r.bairro ?? "",
+        municipio: r.municipio, uf: r.uf,
+        codigo_municipio: r.codigo_municipio,
+        telefone: r.telefone ?? "", email: r.email ?? "",
+        regime_tributario: r.regime_tributario ?? "simples_nacional",
+        optante_simples: r.optante_simples ?? true,
+        item_lista_servico: r.item_lista_servico,
+        codigo_tributario_municipio: r.codigo_tributario_municipio ?? "",
+        codigo_cnae: r.codigo_cnae ?? "",
+        aliquota_iss: String(r.aliquota_iss),
+        descricao_servico_padrao: r.descricao_servico_padrao ?? "",
+        focus_ambiente: r.focus_ambiente,
+        rps_serie: r.rps_serie ?? "1",
+        rps_proximo_numero: String(r.rps_proximo_numero ?? 1),
         ativo: r.ativo, padrao: r.padrao,
       })}
       toPayload={(f) => ({
