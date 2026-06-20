@@ -92,6 +92,7 @@ import { Route as AuthenticatedAppClientesIndexRouteImport } from './routes/_aut
 import { Route as AuthenticatedAppAtendimentoIaIndexRouteImport } from './routes/_authenticated/app.atendimento-ia.index'
 import { Route as ApiPublicWhatsappClinicaIdRouteImport } from './routes/api/public/whatsapp.$clinicaId'
 import { Route as ApiPublicFocusnfeWebhookRouteImport } from './routes/api/public/focusnfe.webhook'
+import { Route as ApiPublicFocusnfeDebugRouteImport } from './routes/api/public/focusnfe.debug'
 import { Route as AuthenticatedAppNfseTestarRouteImport } from './routes/_authenticated/app.nfse.testar'
 import { Route as AuthenticatedAppMedicoMedicoIdRouteImport } from './routes/_authenticated/app.medico.$medicoId'
 import { Route as AuthenticatedAppImprimirAgendamentoIdRouteImport } from './routes/_authenticated/app.imprimir.$agendamentoId'
@@ -581,6 +582,11 @@ const ApiPublicFocusnfeWebhookRoute =
     path: '/api/public/focusnfe/webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicFocusnfeDebugRoute = ApiPublicFocusnfeDebugRouteImport.update({
+  id: '/api/public/focusnfe/debug',
+  path: '/api/public/focusnfe/debug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedAppNfseTestarRoute =
   AuthenticatedAppNfseTestarRouteImport.update({
     id: '/nfse/testar',
@@ -857,6 +863,7 @@ export interface FileRoutesByFullPath {
   '/app/imprimir/$agendamentoId': typeof AuthenticatedAppImprimirAgendamentoIdRoute
   '/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
   '/app/nfse/testar': typeof AuthenticatedAppNfseTestarRoute
+  '/api/public/focusnfe/debug': typeof ApiPublicFocusnfeDebugRoute
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/app/atendimento-ia/': typeof AuthenticatedAppAtendimentoIaIndexRoute
@@ -966,6 +973,7 @@ export interface FileRoutesByTo {
   '/app/imprimir/$agendamentoId': typeof AuthenticatedAppImprimirAgendamentoIdRoute
   '/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
   '/app/nfse/testar': typeof AuthenticatedAppNfseTestarRoute
+  '/api/public/focusnfe/debug': typeof ApiPublicFocusnfeDebugRoute
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaIndexRoute
@@ -1081,6 +1089,7 @@ export interface FileRoutesById {
   '/_authenticated/app/imprimir/$agendamentoId': typeof AuthenticatedAppImprimirAgendamentoIdRoute
   '/_authenticated/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
   '/_authenticated/app/nfse/testar': typeof AuthenticatedAppNfseTestarRoute
+  '/api/public/focusnfe/debug': typeof ApiPublicFocusnfeDebugRoute
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/_authenticated/app/atendimento-ia/': typeof AuthenticatedAppAtendimentoIaIndexRoute
@@ -1196,6 +1205,7 @@ export interface FileRouteTypes {
     | '/app/imprimir/$agendamentoId'
     | '/app/medico/$medicoId'
     | '/app/nfse/testar'
+    | '/api/public/focusnfe/debug'
     | '/api/public/focusnfe/webhook'
     | '/api/public/whatsapp/$clinicaId'
     | '/app/atendimento-ia/'
@@ -1305,6 +1315,7 @@ export interface FileRouteTypes {
     | '/app/imprimir/$agendamentoId'
     | '/app/medico/$medicoId'
     | '/app/nfse/testar'
+    | '/api/public/focusnfe/debug'
     | '/api/public/focusnfe/webhook'
     | '/api/public/whatsapp/$clinicaId'
     | '/app/atendimento-ia'
@@ -1419,6 +1430,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/imprimir/$agendamentoId'
     | '/_authenticated/app/medico/$medicoId'
     | '/_authenticated/app/nfse/testar'
+    | '/api/public/focusnfe/debug'
     | '/api/public/focusnfe/webhook'
     | '/api/public/whatsapp/$clinicaId'
     | '/_authenticated/app/atendimento-ia/'
@@ -1451,6 +1463,7 @@ export interface RootRouteChildren {
   VerificarCodigoRoute: typeof VerificarCodigoRoute
   PacienteIndexRoute: typeof PacienteIndexRoute
   PContratoTokenRoute: typeof PContratoTokenRoute
+  ApiPublicFocusnfeDebugRoute: typeof ApiPublicFocusnfeDebugRoute
   ApiPublicFocusnfeWebhookRoute: typeof ApiPublicFocusnfeWebhookRoute
   ApiPublicWhatsappClinicaIdRoute: typeof ApiPublicWhatsappClinicaIdRoute
 }
@@ -2038,6 +2051,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicFocusnfeWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/focusnfe/debug': {
+      id: '/api/public/focusnfe/debug'
+      path: '/api/public/focusnfe/debug'
+      fullPath: '/api/public/focusnfe/debug'
+      preLoaderRoute: typeof ApiPublicFocusnfeDebugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/app/nfse/testar': {
       id: '/_authenticated/app/nfse/testar'
       path: '/nfse/testar'
@@ -2548,19 +2568,10 @@ const rootRouteChildren: RootRouteChildren = {
   VerificarCodigoRoute: VerificarCodigoRoute,
   PacienteIndexRoute: PacienteIndexRoute,
   PContratoTokenRoute: PContratoTokenRoute,
+  ApiPublicFocusnfeDebugRoute: ApiPublicFocusnfeDebugRoute,
   ApiPublicFocusnfeWebhookRoute: ApiPublicFocusnfeWebhookRoute,
   ApiPublicWhatsappClinicaIdRoute: ApiPublicWhatsappClinicaIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
