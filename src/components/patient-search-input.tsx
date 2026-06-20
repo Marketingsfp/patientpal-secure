@@ -97,7 +97,7 @@ export function PatientSearchInput({
     if (!open || scope.length === 0) return;
     const term = query.trim();
     const digits = term.replace(/\D/g, "");
-    if (term.length < 3 && digits.length < 3) {
+    if (term.length < 2 && digits.length < 2) {
       setOptions([]);
       return;
     }
@@ -160,7 +160,7 @@ export function PatientSearchInput({
       cacheRef.current.set(cacheKey, rows);
       setOptions(rows);
       setLoading(false);
-    }, 350);
+    }, 150);
     return () => clearTimeout(handle);
   }, [query, open, scope]);
 
