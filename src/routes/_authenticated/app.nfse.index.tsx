@@ -1,11 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Receipt, ExternalLink, FilePlus2 } from "lucide-react";
+import { Receipt, ExternalLink, FilePlus2, RefreshCw, Send } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
-import { consultarNfse } from "@/lib/nfse.functions";
+import { consultarNfse, reenviarNfse } from "@/lib/nfse.functions";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -31,6 +31,8 @@ interface Row {
 function NfsePage() {
   const { clinicaAtual } = useClinica();
   const consulta = useServerFn(consultarNfse);
+  const reenviar = useServerFn(reenviarNfse);
+  const [reenviando, setReenviando] = useState<string | null>(null);
   const [emitentes, setEmitentes] = useState<Emitente[]>([]);
   const [filtroEmitente, setFiltroEmitente] = useState<string>("todos");
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
@@ -88,6 +90,29 @@ function NfsePage() {
     if (filtroStatus !== "todos" && r.status !== filtroStatus) return false;
     return true;
   }), [rows, filtroEmitente, filtroStatus]);
+
+  const onReenviar = async (id: string) => {
+    setReenviando(id);
+    try {
+      const r = await reenviar({ data: { id } });
+      if (r.ok) toast.success("Nota reenviada. Aguarde autorização.");
+      else toast.error(r.error ?? "Falha ao reenviar");
+      await load();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setReenviando(null);
+    }
+  };
+
+  const onConsultar = async (id: string) => {
+    try {
+      await consulta({ data: { id } });
+      await load();
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
 
   const totais = useMemo(() => {
     const porEmitente = new Map<string, { nome: string; qtd: number; valor: number }>();
@@ -160,7 +185,7 @@ function NfsePage() {
               <TableHead>Tomador</TableHead>
               <TableHead className="w-32 text-right">Valor</TableHead>
               <TableHead className="w-28">Status</TableHead>
-              <TableHead className="w-20 text-right">PDF</TableHead>
+              <TableHead className="w-40 text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -191,9 +216,30 @@ function NfsePage() {
                   }`}>{r.status}</span>
                 </TableCell>
                 <TableCell className="text-right">
-                  {r.url_pdf ? (
-                    <a href={r.url_pdf} target="_blank" rel="noreferrer" className="text-primary inline-flex items-center gap-1"><ExternalLink className="h-3.5 w-3.5" /></a>
-                  ) : "—"}
+                  <div className="flex items-center justify-end gap-1">
+                    {r.url_pdf && (
+                      <a href={r.url_pdf} target="_blank" rel="noreferrer" title="Abrir PDF" className="text-primary inline-flex items-center px-2 py-1 rounded hover:bg-accent">
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </a>
+                    )}
+                    {(r.status === "processando" || r.status === "erro") && (
+                      <Button size="sm" variant="ghost" title="Consultar status" onClick={() => void onConsultar(r.id)}>
+                        <RefreshCw className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                    {r.status === "erro" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        title="Reenviar nota"
+                        disabled={reenviando === r.id}
+                        onClick={() => void onReenviar(r.id)}
+                      >
+                        <Send className="h-3.5 w-3.5 mr-1" />
+                        {reenviando === r.id ? "Reenviando…" : "Reenviar"}
+                      </Button>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
