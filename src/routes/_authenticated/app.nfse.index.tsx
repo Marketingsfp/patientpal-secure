@@ -2,8 +2,10 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Receipt, ExternalLink, FilePlus2 } from "lucide-react";
 import { toast } from "sonner";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { consultarNfse } from "@/lib/nfse.functions";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -28,6 +30,7 @@ interface Row {
 
 function NfsePage() {
   const { clinicaAtual } = useClinica();
+  const consulta = useServerFn(consultarNfse);
   const [emitentes, setEmitentes] = useState<Emitente[]>([]);
   const [filtroEmitente, setFiltroEmitente] = useState<string>("todos");
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
@@ -60,6 +63,25 @@ function NfsePage() {
     setRows((data ?? []) as unknown as Row[]);
   };
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, [clinicaAtual?.clinica_id]);
+
+  // Auto-polling: a cada 15s consulta o Focus para notas em "processando"
+  // (webhook do Focus pode falhar/não estar configurado).
+  useEffect(() => {
+    const pendentes = rows.filter((r) => r.status === "processando").map((r) => r.id);
+    if (pendentes.length === 0) return;
+    let cancelled = false;
+    const tick = async () => {
+      for (const id of pendentes) {
+        if (cancelled) return;
+        try { await consulta({ data: { id } }); } catch { /* ignore */ }
+      }
+      if (!cancelled) await load();
+    };
+    const t = setInterval(() => void tick(), 15000);
+    void tick();
+    return () => { cancelled = true; clearInterval(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows.map((r) => `${r.id}:${r.status}`).join("|")]);
 
   const filtrados = useMemo(() => rows.filter((r) => {
     if (filtroEmitente !== "todos" && r.emitente_id !== filtroEmitente) return false;

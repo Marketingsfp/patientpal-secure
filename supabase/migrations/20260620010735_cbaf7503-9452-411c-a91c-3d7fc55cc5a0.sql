@@ -1,0 +1,1 @@
+UPDATE public.nfse SET status='erro', focus_status='erro_autorizacao', erro_mensagem='Nota travou em processamento no Ambiente Nacional (sem retorno do webhook). Pode reemitir.' WHERE id='2bba0794-89b2-4bfb-aa94-fbdc9880d997';
