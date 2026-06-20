@@ -314,3 +314,127 @@ export const cancelarNfse = createServerFn({ method: "POST" })
       .eq("id", data.id);
     return { ok: true };
   });
+
+/**
+ * Reenvia uma NFS-e a partir de um registro existente (status=erro).
+ * Reusa emitente/tomador/valor/descrição da nota original.
+ */
+export const reenviarNfse = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { data: nota, error } = await supabase
+      .from("nfse")
+      .select("*")
+      .eq("id", data.id)
+      .single();
+    if (error || !nota) throw new Error("Nota não encontrada");
+
+    const tomadorEndereco = (nota.tomador_endereco ?? {}) as Record<string, unknown>;
+    const emitenteRow = await supabase
+      .from("nfse_emitentes")
+      .select("*")
+      .eq("id", nota.emitente_id!)
+      .single();
+    const emitente = emitenteRow.data;
+    if (!emitente) throw new Error("Emitente não encontrado");
+
+    const token =
+      emitente.focus_ambiente === "producao"
+        ? process.env.FOCUS_NFE_TOKEN_PROD
+        : process.env.FOCUS_NFE_TOKEN_HML ?? process.env.FOCUS_NFE_TOKEN_PROD;
+    if (!token) throw new Error("Token Focus NFe não configurado");
+
+    const aliquota = Number(nota.aliquota_iss ?? emitente.aliquota_iss ?? 0.02);
+    const valorServicos = Number(nota.valor_servicos);
+    const valorIss = +(valorServicos * aliquota).toFixed(2);
+    const ref = `nfse-${emitente.id.slice(0, 8)}-${Date.now()}`;
+
+    const dataEmissaoBR = (() => {
+      const now = new Date(Date.now() - 3 * 60 * 60 * 1000 - 2 * 60 * 1000);
+      return now.toISOString().replace(/\.\d{3}Z$/, "-03:00");
+    })();
+
+    const itemListaServico = only(emitente.item_lista_servico);
+    if (!itemListaServico) throw new Error("Informe o código nacional do serviço no emitente.");
+    const codigoTributarioMunicipio = normalizeCodigoTributarioMunicipio(emitente.codigo_tributario_municipio);
+
+    const cpfCnpj = only(nota.tomador_documento ?? "");
+    const payload = {
+      data_emissao: dataEmissaoBR,
+      prestador: {
+        cnpj: only(emitente.cnpj),
+        inscricao_municipal: emitente.inscricao_municipal,
+        codigo_municipio: emitente.codigo_municipio,
+      },
+      tomador: {
+        cpf: cpfCnpj.length === 11 ? cpfCnpj : undefined,
+        cnpj: cpfCnpj.length === 14 ? cpfCnpj : undefined,
+        razao_social: nota.tomador_nome,
+        email: nota.tomador_email ?? undefined,
+        endereco: tomadorEndereco?.logradouro
+          ? {
+              logradouro: String(tomadorEndereco.logradouro),
+              numero: String(tomadorEndereco.numero ?? "S/N"),
+              bairro: String(tomadorEndereco.bairro ?? "Centro"),
+              codigo_municipio: String(tomadorEndereco.codigoMunicipio ?? emitente.codigo_municipio),
+              uf: String(tomadorEndereco.uf ?? emitente.uf),
+              cep: only(String(tomadorEndereco.cep ?? "")),
+            }
+          : undefined,
+      },
+      servico: {
+        aliquota: aliquota * 100,
+        discriminacao: nota.descricao_servicos,
+        iss_retido: false,
+        item_lista_servico: itemListaServico,
+        codigo_tributario_municipio: codigoTributarioMunicipio,
+        codigo_cnae: only(emitente.codigo_cnae) || undefined,
+        valor_servicos: valorServicos,
+        valor_iss: valorIss,
+      },
+    };
+
+    await supabase
+      .from("nfse")
+      .update({
+        focus_ref: ref,
+        focus_status: "enviando",
+        status: "processando",
+        erro_mensagem: null,
+        payload_envio: payload,
+      })
+      .eq("id", nota.id);
+
+    const url = `${FOCUS_API}/nfse?ref=${encodeURIComponent(ref)}`;
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: authHeader(token) },
+      body: JSON.stringify(payload),
+    });
+    const body = await resp.json().catch(() => ({}));
+
+    if (!resp.ok) {
+      await supabase
+        .from("nfse")
+        .update({
+          status: "erro",
+          focus_status: body?.status ?? "erro",
+          erro_mensagem: body?.mensagem ?? body?.erros?.[0]?.mensagem ?? `HTTP ${resp.status}`,
+          payload_resposta: body,
+        })
+        .eq("id", nota.id);
+      return { ok: false, id: nota.id, error: body?.mensagem ?? `HTTP ${resp.status}`, body };
+    }
+
+    await supabase
+      .from("nfse")
+      .update({
+        focus_status: body?.status ?? "processando_autorizacao",
+        payload_resposta: body,
+      })
+      .eq("id", nota.id);
+
+    return { ok: true, id: nota.id, ref, focus: body };
+  });
