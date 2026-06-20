@@ -1,17 +1,35 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { timingSafeEqual } from "crypto";
 
-function validBasicAuth(authHeader: string | null, token: string): boolean {
-  if (!authHeader || !authHeader.startsWith("Basic ")) return false;
-  const expected = "Basic " + Buffer.from(`${token}:`).toString("base64");
-  const a = Buffer.from(authHeader);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length) return false;
+function safeEq(a: string, b: string): boolean {
+  const ba = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ba.length !== bb.length) return false;
   try {
-    return timingSafeEqual(a, b);
+    return timingSafeEqual(ba, bb);
   } catch {
     return false;
   }
+}
+
+/**
+ * Focus NFe envia o webhook com um header customizado no formato
+ * `<Chave>: <Chave>` (a chave configurada no painel é o NOME do header
+ * e também o VALOR). Também aceitamos Basic Auth como fallback caso
+ * o painel seja reconfigurado.
+ */
+function validFocusAuth(request: Request, token: string): boolean {
+  // 1) Header customizado: nome === valor === token
+  const direct = request.headers.get(token);
+  if (direct && safeEq(direct, token)) return true;
+
+  // 2) Authorization: Basic base64(token:)
+  const auth = request.headers.get("authorization");
+  if (auth && auth.startsWith("Basic ")) {
+    const expected = "Basic " + Buffer.from(`${token}:`).toString("base64");
+    if (safeEq(auth, expected)) return true;
+  }
+  return false;
 }
 
 /**
@@ -28,7 +46,7 @@ export const Route = createFileRoute("/api/public/focusnfe/webhook")({
           // Refuse to process if the webhook secret is not configured.
           return new Response("Webhook not configured", { status: 503 });
         }
-        if (!validBasicAuth(request.headers.get("authorization"), token)) {
+        if (!validFocusAuth(request, token)) {
           return new Response("Unauthorized", { status: 401 });
         }
 
