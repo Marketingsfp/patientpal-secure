@@ -155,14 +155,14 @@ function NfseConfigPage() {
         bairro: f.bairro,
         municipio: f.municipio,
         uf: f.uf.toUpperCase(),
-        codigo_municipio: f.codigo_municipio,
+        codigo_municipio: f.codigo_municipio.replace(/\D/g, ""),
         telefone: f.telefone || null,
         email: f.email || null,
         regime_tributario: f.regime_tributario,
         optante_simples: f.optante_simples,
-        item_lista_servico: f.item_lista_servico,
-        codigo_tributario_municipio: f.codigo_tributario_municipio || null,
-        codigo_cnae: f.codigo_cnae || null,
+        item_lista_servico: f.item_lista_servico.replace(/\D/g, ""),
+        codigo_tributario_municipio: f.codigo_tributario_municipio.replace(/\D/g, "") || null,
+        codigo_cnae: f.codigo_cnae.replace(/\D/g, "") || null,
         aliquota_iss: Number(f.aliquota_iss) || 0.02,
         descricao_servico_padrao: f.descricao_servico_padrao || null,
         focus_ambiente: f.focus_ambiente,
@@ -179,10 +179,15 @@ function NfseConfigPage() {
         if (!f.municipio.trim()) return "Informe o município.";
         if (!f.uf.trim()) return "Informe a UF.";
         if (!f.codigo_municipio.trim()) return "Informe o código IBGE do município (7 dígitos).";
+        if (!/^\d{7}$/.test(f.codigo_municipio.replace(/\D/g, ""))) return "O código IBGE do município deve ter 7 dígitos.";
         if (!f.cep.trim()) return "Informe o CEP do emitente.";
         if (!f.logradouro.trim()) return "Informe o logradouro.";
         if (!f.numero.trim()) return "Informe o número do endereço.";
         if (!f.bairro.trim()) return "Informe o bairro.";
+        if (!f.item_lista_servico.trim()) return "Informe o código nacional do serviço.";
+        if (f.codigo_tributario_municipio.trim() && !/^\d{3}$/.test(f.codigo_tributario_municipio.replace(/\D/g, ""))) {
+          return "O Cód. Tributário Município deve ter 3 dígitos; código IBGE fica no campo Cód. IBGE Município.";
+        }
         return null;
       }}
       renderForm={(f, set) => (
@@ -225,11 +230,11 @@ function NfseConfigPage() {
                   <SelectContent>{REGIMES.map((r) => <SelectItem key={r.v} value={r.v}>{r.l}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1"><Label>Item LC 116</Label><Input value={f.item_lista_servico} onChange={(e) => set({ ...f, item_lista_servico: e.target.value })} placeholder="0401" /></div>
+              <div className="space-y-1"><Label>Cód. nacional serviço</Label><Input value={f.item_lista_servico} onChange={(e) => set({ ...f, item_lista_servico: e.target.value })} placeholder="Ex: código nacional NFS-e" /></div>
               <div className="space-y-1"><Label>Alíquota ISS (0–1)</Label><Input value={f.aliquota_iss} onChange={(e) => set({ ...f, aliquota_iss: e.target.value })} placeholder="0.02" /></div>
             </div>
             <div className="grid grid-cols-2 gap-3 mt-3">
-              <div className="space-y-1"><Label>Cód. Tributário Município</Label><Input value={f.codigo_tributario_municipio} onChange={(e) => set({ ...f, codigo_tributario_municipio: e.target.value })} /></div>
+              <div className="space-y-1"><Label>Cód. Tributário Município</Label><Input value={f.codigo_tributario_municipio} onChange={(e) => set({ ...f, codigo_tributario_municipio: e.target.value })} placeholder="3 dígitos, não IBGE" /></div>
               <div className="space-y-1"><Label>CNAE</Label><Input value={f.codigo_cnae} onChange={(e) => set({ ...f, codigo_cnae: e.target.value })} /></div>
             </div>
             <div className="space-y-1 mt-3"><Label>Descrição padrão do serviço</Label><Input value={f.descricao_servico_padrao} onChange={(e) => set({ ...f, descricao_servico_padrao: e.target.value })} placeholder="Serviços médicos prestados conforme LC 116/03" /></div>

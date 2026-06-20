@@ -14,6 +14,17 @@ function only(s: string | null | undefined) {
   return (s ?? "").replace(/\D/g, "");
 }
 
+function normalizeCodigoTributarioMunicipio(value: string | null | undefined) {
+  const digits = only(value);
+  if (!digits) return undefined;
+  if (!/^\d{3}$/.test(digits)) {
+    throw new Error(
+      `Cód. Tributário Município inválido (${digits}). Informe o código municipal do serviço com 3 dígitos; não use o código IBGE do município nesse campo.`,
+    );
+  }
+  return digits;
+}
+
 /**
  * Emite uma NFS-e via Focus NFe.
  * Cria um registro local em `nfse` e dispara o envio assíncrono ao Focus.
@@ -105,6 +116,10 @@ export const emitirNfse = createServerFn({ method: "POST" })
       return now.toISOString().replace(/\.\d{3}Z$/, "-03:00");
     })();
 
+    const itemListaServico = only(data.itemListaOverride ?? emitente.item_lista_servico);
+    if (!itemListaServico) throw new Error("Informe o código nacional do serviço para emissão da NFS-e.");
+    const codigoTributarioMunicipio = normalizeCodigoTributarioMunicipio(emitente.codigo_tributario_municipio);
+
     const payload = {
       data_emissao: dataEmissaoBR,
       prestador: {
@@ -132,9 +147,9 @@ export const emitirNfse = createServerFn({ method: "POST" })
         aliquota: aliquota * 100, // Focus espera percentual (ex: 2.00 = 2%)
         discriminacao: data.descricaoServicos,
         iss_retido: false,
-        item_lista_servico: data.itemListaOverride ?? emitente.item_lista_servico,
-        codigo_tributario_municipio: emitente.codigo_tributario_municipio ?? undefined,
-        codigo_cnae: emitente.codigo_cnae ?? undefined,
+        item_lista_servico: itemListaServico,
+        codigo_tributario_municipio: codigoTributarioMunicipio,
+        codigo_cnae: only(emitente.codigo_cnae) || undefined,
         valor_servicos: data.valorServicos,
         valor_iss: valorIss,
       },
