@@ -545,11 +545,26 @@ export const reenviarNfse = createServerFn({ method: "POST" })
       regime_especial_tributacao: 0,
       ...(cpfCnpj.length === 14 ? { cnpj_tomador: cpfCnpj } : {}),
       ...(cpfCnpj.length === 11 ? { cpf_tomador: cpfCnpj } : {}),
+      razao_social_tomador: nota.tomador_nome,
       codigo_municipio_prestacao: Number(tomadorCodMun),
       codigo_tributacao_nacional_iss: itemListaServico,
       descricao_servico: nota.descricao_servicos,
       valor_servico: valorServicos,
       tributacao_iss: 1,
+      tipo_retencao_iss: 1,
+      situacao_tributaria_pis_cofins: "08",
+      ...(codigoOpcaoSimplesNacional !== 1
+        ? {
+            indicador_total_tributacao: 1,
+            percentual_total_tributos_simples_nacional: +(aliquota * 100).toFixed(2),
+          }
+        : {
+            indicador_total_tributacao: 1,
+            valor_total_tributos_federais: 0,
+            valor_total_tributos_estaduais: 0,
+            valor_total_tributos_municipais: 0,
+          }),
+      ...(codigoOpcaoSimplesNacional === 3 ? { regime_tributario_simples_nacional: 1 } : {}),
     };
 
     const payload = emitente.usar_ambiente_nacional ? payloadNacional : payloadMunicipal;
