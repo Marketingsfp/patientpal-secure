@@ -26,6 +26,21 @@ function normalizeCodigoTributarioMunicipio(value: string | null | undefined) {
   return digits;
 }
 
+async function buscarCodigoMunicipioPorCep(cep: string | null | undefined) {
+  const digits = only(cep);
+  if (!/^\d{8}$/.test(digits)) return undefined;
+
+  try {
+    const resp = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
+    if (!resp.ok) return undefined;
+    const body = (await resp.json().catch(() => null)) as { erro?: boolean; ibge?: string } | null;
+    const ibge = only(body?.ibge);
+    return body?.erro || !/^\d{7}$/.test(ibge) ? undefined : ibge;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * Emite uma NFS-e via Focus NFe.
  * Cria um registro local em `nfse` e dispara o envio assíncrono ao Focus.
@@ -124,6 +139,9 @@ export const emitirNfse = createServerFn({ method: "POST" })
     const imRaw = only(emitente.inscricao_municipal ?? "");
     const imLower = (emitente.inscricao_municipal ?? "").trim().toLowerCase();
     const inscricaoMunicipal = imRaw && imLower !== "isento" && imLower !== "insento" ? imRaw : undefined;
+    const tomadorCodigoMunicipio = data.tomador.logradouro
+      ? (await buscarCodigoMunicipioPorCep(data.tomador.cep)) ?? data.tomador.codigoMunicipio ?? emitente.codigo_municipio
+      : undefined;
 
     const payload = {
       data_emissao: dataEmissaoBR,
@@ -142,7 +160,7 @@ export const emitirNfse = createServerFn({ method: "POST" })
               logradouro: data.tomador.logradouro,
               numero: data.tomador.numero ?? "S/N",
               bairro: data.tomador.bairro ?? "Centro",
-              codigo_municipio: data.tomador.codigoMunicipio ?? emitente.codigo_municipio,
+              codigo_municipio: tomadorCodigoMunicipio,
               uf: data.tomador.uf ?? emitente.uf,
               cep: only(data.tomador.cep),
             }
@@ -268,7 +286,7 @@ export const consultarNfse = createServerFn({ method: "POST" })
       updates.status = "cancelada";
     } else if (body?.status === "erro_autorizacao" || body?.status === "erro") {
       updates.status = "erro";
-      updates.erro_mensagem = body?.mensagem_sefaz ?? body?.mensagem ?? null;
+      updates.erro_mensagem = body?.mensagem_sefaz ?? body?.mensagem ?? body?.erros?.[0]?.mensagem ?? null;
     }
 
     await supabase.from("nfse").update(updates as never).eq("id", nota.id);
@@ -369,6 +387,10 @@ export const reenviarNfse = createServerFn({ method: "POST" })
     const imRaw2 = only(emitente.inscricao_municipal ?? "");
     const imLower2 = (emitente.inscricao_municipal ?? "").trim().toLowerCase();
     const inscricaoMunicipal2 = imRaw2 && imLower2 !== "isento" && imLower2 !== "insento" ? imRaw2 : undefined;
+    const tomadorCep = only(String(tomadorEndereco.cep ?? ""));
+    const tomadorCodigoMunicipio = tomadorEndereco?.logradouro
+      ? (await buscarCodigoMunicipioPorCep(tomadorCep)) ?? String(tomadorEndereco.codigoMunicipio ?? emitente.codigo_municipio)
+      : undefined;
     const payload = {
       data_emissao: dataEmissaoBR,
       prestador: {
@@ -386,9 +408,9 @@ export const reenviarNfse = createServerFn({ method: "POST" })
               logradouro: String(tomadorEndereco.logradouro),
               numero: String(tomadorEndereco.numero ?? "S/N"),
               bairro: String(tomadorEndereco.bairro ?? "Centro"),
-              codigo_municipio: String(tomadorEndereco.codigoMunicipio ?? emitente.codigo_municipio),
+              codigo_municipio: tomadorCodigoMunicipio,
               uf: String(tomadorEndereco.uf ?? emitente.uf),
-              cep: only(String(tomadorEndereco.cep ?? "")),
+              cep: tomadorCep,
             }
           : undefined,
       },
