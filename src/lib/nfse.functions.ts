@@ -545,17 +545,7 @@ export const reenviarNfse = createServerFn({ method: "POST" })
       tributacao_iss: 1,
       tipo_retencao_iss: 1,
       situacao_tributaria_pis_cofins: "08",
-      ...(codigoOpcaoSimplesNacional !== 1
-        ? {
-            indicador_total_tributacao: 1,
-            percentual_total_tributos_simples_nacional: +(aliquota * 100).toFixed(2),
-          }
-        : {
-            indicador_total_tributacao: 1,
-            valor_total_tributos_federais: 0,
-            valor_total_tributos_estaduais: 0,
-            valor_total_tributos_municipais: 0,
-          }),
+      indicador_total_tributacao: 0,
       ...(codigoOpcaoSimplesNacional === 3 ? { regime_tributario_simples_nacional: 1 } : {}),
     };
 
