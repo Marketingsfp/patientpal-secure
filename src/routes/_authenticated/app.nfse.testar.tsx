@@ -63,6 +63,10 @@ function TestarNfse() {
   const onEmitir = async () => {
     if (!emitenteId) return toast.error("Selecione um emitente");
     if (!nome.trim()) return toast.error("Informe o nome do tomador");
+    const cpfLimpo = (cpf || "").replace(/\D/g, "");
+    if (cpfLimpo.length !== 11 && cpfLimpo.length !== 14) {
+      return toast.error("CPF/CNPJ do tomador é obrigatório (11 ou 14 dígitos).");
+    }
     const valorNum = Number(valor);
     if (!valorNum || valorNum <= 0) return toast.error("Valor inválido");
 
@@ -75,7 +79,7 @@ function TestarNfse() {
           emitenteId,
           valorServicos: valorNum,
           descricaoServicos: descricao,
-          tomador: { nome, cpfCnpj: cpf || undefined, email: email || undefined },
+          tomador: { nome, cpfCnpj: cpfLimpo, email: email || undefined },
         },
       });
       setResultado(r);
@@ -154,14 +158,20 @@ function TestarNfse() {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1"><Label>CPF/CNPJ (opcional)</Label><Input value={cpf} onChange={(e) => setCpf(e.target.value)} placeholder="só números" /></div>
+            <div className="space-y-1"><Label>CPF/CNPJ *</Label><Input value={cpf} onChange={(e) => setCpf(e.target.value)} placeholder="só números (11 ou 14 dígitos)" required /></div>
             <div className="space-y-1"><Label>E-mail (opcional)</Label><Input value={email} onChange={(e) => setEmail(e.target.value)} /></div>
           </div>
 
           <div className="space-y-1"><Label>Descrição dos serviços</Label><Textarea rows={3} value={descricao} onChange={(e) => setDescricao(e.target.value)} /></div>
 
           <div className="flex gap-2">
-            <Button onClick={onEmitir} disabled={loading}>
+            <Button
+              onClick={onEmitir}
+              disabled={
+                loading ||
+                !((cpf || "").replace(/\D/g, "").length === 11 || (cpf || "").replace(/\D/g, "").length === 14)
+              }
+            >
               {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Enviando…</> : "Emitir NFS-e"}
             </Button>
             {notaId && (
