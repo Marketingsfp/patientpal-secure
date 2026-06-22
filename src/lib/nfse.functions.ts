@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const FOCUS_API = "https://api.focusnfe.com.br/v2";
+const AI_GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
 function authHeader(token: string) {
   // Focus NFe usa Basic Auth: base64(token + ":")
