@@ -233,6 +233,14 @@ export const emitirNfse = createServerFn({ method: "POST" })
 
     const payload = emitente.usar_ambiente_nacional ? payloadNacional : payloadMunicipal;
 
+    // Reserva o próximo número de DPS/RPS antes do envio (evita duplicidade).
+    if (emitente.usar_ambiente_nacional) {
+      await supabase
+        .from("nfse_emitentes")
+        .update({ rps_proximo_numero: (emitente.rps_proximo_numero ?? 1) + 1 })
+        .eq("id", emitente.id);
+    }
+
     // Cria registro local antes do envio (para rastreio mesmo se Focus falhar)
     const { data: nota, error: errIns } = await supabase
       .from("nfse")
