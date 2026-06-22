@@ -265,9 +265,14 @@ function NfsePage() {
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-1">
                     {r.url_pdf && (
-                      <a href={r.url_pdf} target="_blank" rel="noreferrer" title="Abrir PDF" className="text-primary inline-flex items-center px-2 py-1 rounded hover:bg-accent">
-                        <ExternalLink className="h-3.5 w-3.5" />
-                      </a>
+                      <>
+                        <Button size="sm" variant="ghost" title="Visualizar DANFSE" onClick={() => setPdfVisualizando(r)}>
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
+                        <a href={r.url_pdf} target="_blank" rel="noreferrer" title="Abrir em nova aba" className="text-primary inline-flex items-center px-2 py-1 rounded hover:bg-accent">
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
+                      </>
                     )}
                     {(r.status === "processando" || r.status === "erro") && (
                       <Button size="sm" variant="ghost" title="Consultar status" onClick={() => void onConsultar(r.id)}>
