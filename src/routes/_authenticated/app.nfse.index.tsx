@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Receipt, ExternalLink, FilePlus2, RefreshCw, Send, ScanLine, Check, X, Loader2, AlertCircle } from "lucide-react";
+import { Receipt, ExternalLink, FilePlus2, RefreshCw, Send, ScanLine, Check, X, Loader2, AlertCircle, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -47,6 +47,7 @@ function NfsePage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
   const [erroDetalhe, setErroDetalhe] = useState<Row | null>(null);
+  const [pdfVisualizando, setPdfVisualizando] = useState<Row | null>(null);
 
   useEffect(() => {
     if (!clinicaAtual) return;
@@ -162,6 +163,11 @@ function NfsePage() {
     return Array.from(porEmitente.values());
   }, [filtrados]);
 
+  const emitidasComPdf = useMemo(
+    () => filtrados.filter((r) => r.status === "emitida" && !!r.url_pdf).slice(0, 4),
+    [filtrados],
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
@@ -216,6 +222,36 @@ function NfsePage() {
         )}
       </div>
 
+      {emitidasComPdf.length > 0 && (
+        <div className="rounded-lg border bg-card p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="text-sm font-medium">DANFSE — últimas emitidas ({emitidasComPdf.length})</div>
+            <div className="text-xs text-muted-foreground">Pré-visualização dos PDFs</div>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            {emitidasComPdf.map((r) => (
+              <div key={r.id} className="border rounded-md overflow-hidden bg-muted/20 flex flex-col">
+                <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/40 text-xs">
+                  <div className="truncate">
+                    <span className="font-medium">Nº {r.numero ?? "—"}</span>
+                    <span className="text-muted-foreground"> · {r.tomador_nome ?? "—"} · {Number(r.valor_servicos).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</span>
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    <Button size="sm" variant="ghost" className="h-6 px-2" onClick={() => setPdfVisualizando(r)} title="Ampliar">
+                      <Eye className="h-3.5 w-3.5" />
+                    </Button>
+                    <a href={r.url_pdf!} target="_blank" rel="noreferrer" title="Abrir em nova aba" className="inline-flex items-center px-2 rounded hover:bg-accent text-primary">
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  </div>
+                </div>
+                <iframe src={r.url_pdf!} title={`DANFSE ${r.numero ?? r.id}`} className="w-full h-[480px] bg-white" />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="rounded-lg border bg-card overflow-hidden">
         <Table>
           <TableHeader>
@@ -259,9 +295,14 @@ function NfsePage() {
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-1">
                     {r.url_pdf && (
-                      <a href={r.url_pdf} target="_blank" rel="noreferrer" title="Abrir PDF" className="text-primary inline-flex items-center px-2 py-1 rounded hover:bg-accent">
-                        <ExternalLink className="h-3.5 w-3.5" />
-                      </a>
+                      <>
+                        <Button size="sm" variant="ghost" title="Visualizar DANFSE" onClick={() => setPdfVisualizando(r)}>
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
+                        <a href={r.url_pdf} target="_blank" rel="noreferrer" title="Abrir em nova aba" className="text-primary inline-flex items-center px-2 py-1 rounded hover:bg-accent">
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
+                      </>
                     )}
                     {(r.status === "processando" || r.status === "erro") && (
                       <Button size="sm" variant="ghost" title="Consultar status" onClick={() => void onConsultar(r.id)}>
@@ -436,6 +477,28 @@ function NfsePage() {
               >Copiar JSON</Button>
             )}
             <Button variant="ghost" onClick={() => setErroDetalhe(null)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!pdfVisualizando} onOpenChange={(o) => !o && setPdfVisualizando(null)}>
+        <DialogContent className="max-w-5xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="h-4 w-4" /> DANFSE Nº {pdfVisualizando?.numero ?? "—"}
+              {pdfVisualizando?.tomador_nome && <span className="text-sm font-normal text-muted-foreground">· {pdfVisualizando.tomador_nome}</span>}
+            </DialogTitle>
+          </DialogHeader>
+          {pdfVisualizando?.url_pdf && (
+            <iframe src={pdfVisualizando.url_pdf} title={`DANFSE ${pdfVisualizando.numero ?? ""}`} className="w-full h-[75vh] bg-white border rounded" />
+          )}
+          <DialogFooter>
+            {pdfVisualizando?.url_pdf && (
+              <a href={pdfVisualizando.url_pdf} target="_blank" rel="noreferrer">
+                <Button variant="outline"><ExternalLink className="h-3.5 w-3.5 mr-2" /> Abrir em nova aba</Button>
+              </a>
+            )}
+            <Button variant="ghost" onClick={() => setPdfVisualizando(null)}>Fechar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
