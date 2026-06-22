@@ -374,6 +374,71 @@ function NfsePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!erroDetalhe} onOpenChange={(o) => !o && setErroDetalhe(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-700">
+              <AlertCircle className="h-4 w-4" /> Detalhes do erro
+            </DialogTitle>
+          </DialogHeader>
+          {erroDetalhe && (() => {
+            const body = erroDetalhe.payload_resposta as
+              | { status?: string; codigo?: string; mensagem?: string; mensagem_sefaz?: string; erros?: Array<{ codigo?: string; mensagem?: string; correcao?: string; campo?: string }> }
+              | null
+              | undefined;
+            const erros = Array.isArray(body?.erros) ? body!.erros! : [];
+            return (
+              <div className="space-y-3 text-sm max-h-[60vh] overflow-auto">
+                {erroDetalhe.erro_mensagem && (
+                  <div className="rounded-md border border-red-200 bg-red-50 p-3 text-red-900">
+                    <div className="text-xs font-medium uppercase tracking-wide text-red-700">Mensagem</div>
+                    <div className="mt-1 whitespace-pre-wrap break-words">{erroDetalhe.erro_mensagem}</div>
+                  </div>
+                )}
+                {(body?.status || body?.codigo) && (
+                  <div className="grid grid-cols-[120px_1fr] gap-2">
+                    {body?.status && (<><div className="text-xs text-muted-foreground">Status</div><div>{body.status}</div></>)}
+                    {body?.codigo && (<><div className="text-xs text-muted-foreground">Código</div><div>{body.codigo}</div></>)}
+                    {body?.mensagem_sefaz && (<><div className="text-xs text-muted-foreground">SEFAZ/Prefeitura</div><div className="whitespace-pre-wrap break-words">{body.mensagem_sefaz}</div></>)}
+                  </div>
+                )}
+                {erros.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Erros retornados</div>
+                    {erros.map((er, i) => (
+                      <div key={i} className="rounded-md border bg-muted/40 p-3 space-y-1">
+                        <div className="flex items-center gap-2 text-xs">
+                          {er.codigo && <span className="rounded bg-red-100 text-red-800 px-1.5 py-0.5 font-mono">{er.codigo}</span>}
+                          {er.campo && <span className="rounded bg-amber-100 text-amber-800 px-1.5 py-0.5">campo: {er.campo}</span>}
+                        </div>
+                        {er.mensagem && <div className="whitespace-pre-wrap break-words">{er.mensagem}</div>}
+                        {er.correcao && <div className="text-xs text-muted-foreground"><span className="font-medium">Correção:</span> {er.correcao}</div>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <details className="rounded-md border bg-muted/30 p-2">
+                  <summary className="cursor-pointer text-xs text-muted-foreground">Retorno completo (JSON)</summary>
+                  <pre className="mt-2 text-xs overflow-auto whitespace-pre-wrap break-words">{JSON.stringify(body ?? { erro_mensagem: erroDetalhe.erro_mensagem }, null, 2)}</pre>
+                </details>
+              </div>
+            );
+          })()}
+          <DialogFooter>
+            {erroDetalhe && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const txt = JSON.stringify(erroDetalhe.payload_resposta ?? erroDetalhe.erro_mensagem, null, 2);
+                  void navigator.clipboard.writeText(txt).then(() => toast.success("Copiado"));
+                }}
+              >Copiar JSON</Button>
+            )}
+            <Button variant="ghost" onClick={() => setErroDetalhe(null)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
