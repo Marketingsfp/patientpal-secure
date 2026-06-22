@@ -1,14 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Receipt, ExternalLink, FilePlus2, RefreshCw, Send } from "lucide-react";
+import { Receipt, ExternalLink, FilePlus2, RefreshCw, Send, ScanLine, Check, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
-import { consultarNfse, reenviarNfse } from "@/lib/nfse.functions";
+import { consultarNfse, reenviarNfse, extrairNfseDeImagem } from "@/lib/nfse.functions";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/_authenticated/app/nfse/")({
   component: NfsePage,
@@ -32,7 +33,12 @@ function NfsePage() {
   const { clinicaAtual } = useClinica();
   const consulta = useServerFn(consultarNfse);
   const reenviar = useServerFn(reenviarNfse);
+  const extrair = useServerFn(extrairNfseDeImagem);
   const [reenviando, setReenviando] = useState<string | null>(null);
+  const [conferirOpen, setConferirOpen] = useState(false);
+  const [conferirLoading, setConferirLoading] = useState(false);
+  const [conferirPreview, setConferirPreview] = useState<string | null>(null);
+  const [conferirExtraido, setConferirExtraido] = useState<Awaited<ReturnType<typeof extrair>> | null>(null);
   const [emitentes, setEmitentes] = useState<Emitente[]>([]);
   const [filtroEmitente, setFiltroEmitente] = useState<string>("todos");
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
@@ -114,6 +120,33 @@ function NfsePage() {
     }
   };
 
+  const onConferirArquivo = async (file: File) => {
+    setConferirLoading(true);
+    setConferirExtraido(null);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error("Falha ao ler arquivo"));
+        reader.readAsDataURL(file);
+      });
+      setConferirPreview(file.type.startsWith("image/") ? dataUrl : null);
+      const base64 = dataUrl.split(",")[1] ?? "";
+      const r = await extrair({ data: { arquivo_base64: base64, mime: file.type || "image/jpeg" } });
+      setConferirExtraido(r);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setConferirLoading(false);
+    }
+  };
+
+  const notaMatch = useMemo(() => {
+    if (!conferirExtraido?.numero) return null;
+    const numTxt = String(conferirExtraido.numero).replace(/\D/g, "");
+    return rows.find((r) => (r.numero ?? "").replace(/\D/g, "") === numTxt) ?? null;
+  }, [conferirExtraido, rows]);
+
   const totais = useMemo(() => {
     const porEmitente = new Map<string, { nome: string; qtd: number; valor: number }>();
     for (const r of filtrados) {
@@ -133,7 +166,12 @@ function NfsePage() {
           <h1 className="text-2xl font-semibold flex items-center gap-2"><Receipt className="h-6 w-6 text-primary" /> Notas Fiscais (NFS-e)</h1>
           <p className="text-sm text-muted-foreground">Emissão e controle de notas fiscais de serviço.</p>
         </div>
-        <Button asChild><Link to="/app/nfse/testar"><FilePlus2 className="h-4 w-4 mr-2" /> Emitir NFS-e</Link></Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => { setConferirOpen(true); setConferirExtraido(null); setConferirPreview(null); }}>
+            <ScanLine className="h-4 w-4 mr-2" /> Conferir por imagem
+          </Button>
+          <Button asChild><Link to="/app/nfse/testar"><FilePlus2 className="h-4 w-4 mr-2" /> Emitir NFS-e</Link></Button>
+        </div>
       </div>
 
       <div className="rounded-lg border bg-card p-4 flex flex-wrap gap-3 items-end">
@@ -246,6 +284,83 @@ function NfsePage() {
           </TableBody>
         </Table>
       </div>
+
+      <Dialog open={conferirOpen} onOpenChange={setConferirOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><ScanLine className="h-4 w-4" /> Conferir NFS-e por imagem</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <input
+                type="file"
+                accept="image/*,application/pdf"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) void onConferirArquivo(f); }}
+                className="text-sm"
+              />
+              {conferirLoading && <span className="text-xs text-muted-foreground flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Extraindo dados…</span>}
+            </div>
+
+            {conferirExtraido && (
+              <div className="grid md:grid-cols-2 gap-4">
+                {conferirPreview && (
+                  <div className="border rounded-md overflow-hidden bg-muted/30 max-h-[400px] flex items-center justify-center">
+                    <img src={conferirPreview} alt="NFS-e" className="max-h-[400px] object-contain" />
+                  </div>
+                )}
+                <div className="space-y-2 text-sm">
+                  <div className="font-medium">Dados extraídos</div>
+                  {(() => {
+                    const fields: Array<[string, unknown, unknown]> = [
+                      ["Número", conferirExtraido.numero, notaMatch?.numero],
+                      ["Data emissão", conferirExtraido.data_emissao, notaMatch ? new Date(notaMatch.data_emissao).toISOString().slice(0, 10) : null],
+                      ["Valor", conferirExtraido.valor_servicos != null ? Number(conferirExtraido.valor_servicos).toFixed(2) : null, notaMatch ? Number(notaMatch.valor_servicos).toFixed(2) : null],
+                      ["Descrição", conferirExtraido.descricao_servicos, null],
+                      ["Emitente CNPJ", conferirExtraido.emitente_cnpj, notaMatch?.emitente?.cnpj?.replace(/\D/g, "") ?? null],
+                      ["Emitente", conferirExtraido.emitente_nome, notaMatch?.emitente?.nome ?? null],
+                      ["Tomador CPF/CNPJ", conferirExtraido.tomador_cpf_cnpj, null],
+                      ["Tomador", conferirExtraido.tomador_nome, notaMatch?.tomador_nome ?? null],
+                    ];
+                    return fields.map(([label, extr, sys]) => {
+                      const e = extr == null || extr === "" ? "—" : String(extr);
+                      const s = sys == null || sys === "" ? null : String(sys);
+                      const match = s != null && String(extr ?? "").replace(/\D/g, "").length > 0
+                        ? String(extr).replace(/\D/g, "") === s.replace(/\D/g, "") || String(extr).toLowerCase().includes(s.toLowerCase()) || s.toLowerCase().includes(String(extr).toLowerCase())
+                        : null;
+                      return (
+                        <div key={label} className="grid grid-cols-[140px_1fr_auto] gap-2 items-start py-1 border-b last:border-0">
+                          <div className="text-xs text-muted-foreground pt-0.5">{label}</div>
+                          <div>
+                            <div className="break-words">{e}</div>
+                            {s != null && s !== e && (
+                              <div className="text-xs text-muted-foreground">Sistema: {s}</div>
+                            )}
+                          </div>
+                          {match != null && (
+                            match
+                              ? <Check className="h-4 w-4 text-green-600" />
+                              : <X className="h-4 w-4 text-red-600" />
+                          )}
+                        </div>
+                      );
+                    });
+                  })()}
+                  <div className="pt-2 text-xs">
+                    {notaMatch ? (
+                      <span className="text-green-700">✓ Nota nº {notaMatch.numero} encontrada no sistema.</span>
+                    ) : (
+                      <span className="text-amber-700">Nenhuma nota com esse número foi encontrada no sistema.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setConferirOpen(false)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
