@@ -452,6 +452,8 @@ export const reenviarNfse = createServerFn({ method: "POST" })
       optante_simples_nacional: !!emitente.optante_simples,
       codigo_opcao_simples_nacional: emitente.optante_simples ? "1" : "3", // evita E0160
       regime_especial_tributacao: "0",
+      // E0166: para optante SN ME/EPP, regime de apuração é obrigatório (1 = Competência).
+      ...(emitente.optante_simples ? { regime_apuracao_tributos_sn: 1 } : {}),
       // Bloco <trib> exige tribFed OU totTrib (evita erro_validacao_schema).
       ...(emitente.optante_simples
         ? { percentual_total_tributos_simples_nacional: +(aliquota * 100).toFixed(2) }
