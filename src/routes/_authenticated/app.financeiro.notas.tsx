@@ -118,6 +118,8 @@ function Page() {
     setEmitDialog({ open: true, nota: n });
   };
 
+  const [tomadorCpf, setTomadorCpf] = useState("");
+
   const doEmit = async () => {
     const n = emitDialog.nota;
     if (!n || !emitenteId) return;
@@ -129,6 +131,10 @@ function Page() {
         .eq("id", n.paciente_id).maybeSingle();
       if (pacErr || !pac) throw new Error("Paciente não encontrado");
       const p = pac as PacFull;
+      const cpfLimpo = (tomadorCpf || p.cpf || "").replace(/\D/g, "");
+      if (cpfLimpo.length !== 11 && cpfLimpo.length !== 14) {
+        throw new Error("CPF/CNPJ do tomador é obrigatório (11 ou 14 dígitos).");
+      }
       const res = await emitirFn({ data: {
         emitenteId,
         pacienteId: p.id,
@@ -137,7 +143,7 @@ function Page() {
         descricaoServicos: descricao || "Serviços prestados",
         tomador: {
           nome: p.nome,
-          cpfCnpj: p.cpf ?? undefined,
+          cpfCnpj: cpfLimpo,
           email: p.email ?? undefined,
           cep: p.cep ?? undefined,
           logradouro: p.logradouro ?? undefined,
