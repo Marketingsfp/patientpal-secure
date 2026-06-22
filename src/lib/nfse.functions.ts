@@ -426,6 +426,8 @@ export const reenviarNfse = createServerFn({ method: "POST" })
         valor_servicos: valorServicos,
         valor_iss: valorIss,
       },
+      optante_simples_nacional: !!emitente.optante_simples,
+      regime_especial_tributacao: emitente.optante_simples ? 1 : undefined,
     };
 
     await supabase
