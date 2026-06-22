@@ -186,6 +186,9 @@ export const emitirNfse = createServerFn({ method: "POST" })
       // 3 = não optante. Sem este campo dá E0160 (incompatível com cadastro Simples).
       codigo_opcao_simples_nacional: emitente.optante_simples ? "1" : "3",
       regime_especial_tributacao: "0",
+      // E0166: para optante SN ME/EPP é obrigatório o regime de apuração dos tributos do SN.
+      // 1 = Competência. Sem isso a NFS-e Nacional rejeita.
+      ...(emitente.optante_simples ? { regime_apuracao_tributos_sn: 1 } : {}),
       // Bloco <trib> exige tribFed OU totTrib. Sem isto: erro_validacao_schema
       // "Element 'trib': Missing child element(s). Expected is one of (tribFed, totTrib)".
       ...(emitente.optante_simples
