@@ -151,7 +151,7 @@ export const emitirNfse = createServerFn({ method: "POST" })
     const regimeTributario = (emitente.regime_tributario ?? "").toLowerCase();
     const codigoOpcaoSimplesNacional = emitente.optante_simples ? (regimeTributario === "mei" ? 2 : 3) : 1;
 
-    const payload = {
+    const payloadMunicipal = {
       data_emissao: dataEmissaoBR,
       prestador: {
         cnpj: only(emitente.cnpj),
@@ -206,6 +206,40 @@ export const emitirNfse = createServerFn({ method: "POST" })
             valor_total_tributos_municipais: 0,
           }),
     };
+
+    // NFS-e Nacional (endpoint /v2/nfsen) usa um payload FLAT diferente,
+    // baseado no schema da DPS. Sem isto: "Parâmetro obrigatório
+    // cnpj_prestador ou cpf_prestador não informado" (requisicao_invalida).
+    const cpfCnpjTomador = only(data.tomador.cpfCnpj);
+    const tomadorCodMun = tomadorCodigoMunicipio ?? emitente.codigo_municipio;
+    const payloadNacional = {
+      data_emissao: dataEmissaoBR,
+      serie_dps: Number(emitente.rps_serie ?? 1) || 1,
+      numero_dps: emitente.rps_proximo_numero ?? 1,
+      data_competencia: new Date().toISOString().slice(0, 10),
+      emitente_dps: 1, // 1 = prestador
+      codigo_municipio_emissora: Number(emitente.codigo_municipio),
+      cnpj_prestador: only(emitente.cnpj),
+      codigo_opcao_simples_nacional: codigoOpcaoSimplesNacional,
+      regime_especial_tributacao: 0,
+      ...(cpfCnpjTomador.length === 14 ? { cnpj_tomador: cpfCnpjTomador } : {}),
+      ...(cpfCnpjTomador.length === 11 ? { cpf_tomador: cpfCnpjTomador } : {}),
+      codigo_municipio_prestacao: Number(tomadorCodMun),
+      codigo_tributacao_nacional_iss: itemListaServico,
+      descricao_servico: data.descricaoServicos,
+      valor_servico: data.valorServicos,
+      tributacao_iss: 1,
+    };
+
+    const payload = emitente.usar_ambiente_nacional ? payloadNacional : payloadMunicipal;
+
+    // Reserva o próximo número de DPS/RPS antes do envio (evita duplicidade).
+    if (emitente.usar_ambiente_nacional) {
+      await supabase
+        .from("nfse_emitentes")
+        .update({ rps_proximo_numero: (emitente.rps_proximo_numero ?? 1) + 1 })
+        .eq("id", emitente.id);
+    }
 
     // Cria registro local antes do envio (para rastreio mesmo se Focus falhar)
     const { data: nota, error: errIns } = await supabase
