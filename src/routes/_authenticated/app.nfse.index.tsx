@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Receipt, ExternalLink, FilePlus2, RefreshCw, Send, ScanLine, Check, X, Loader2, AlertCircle } from "lucide-react";
+import { Receipt, ExternalLink, FilePlus2, RefreshCw, Send, ScanLine, Check, X, Loader2, AlertCircle, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -47,6 +47,7 @@ function NfsePage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
   const [erroDetalhe, setErroDetalhe] = useState<Row | null>(null);
+  const [pdfVisualizando, setPdfVisualizando] = useState<Row | null>(null);
 
   useEffect(() => {
     if (!clinicaAtual) return;
@@ -161,6 +162,11 @@ function NfsePage() {
     }
     return Array.from(porEmitente.values());
   }, [filtrados]);
+
+  const emitidasComPdf = useMemo(
+    () => filtrados.filter((r) => r.status === "emitida" && !!r.url_pdf).slice(0, 4),
+    [filtrados],
+  );
 
   return (
     <div className="space-y-6">
