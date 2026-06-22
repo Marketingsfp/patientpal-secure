@@ -414,6 +414,8 @@ export const reenviarNfse = createServerFn({ method: "POST" })
     const tomadorCodigoMunicipio = tomadorEndereco?.logradouro
       ? (await buscarCodigoMunicipioPorCep(tomadorCep)) ?? String(tomadorEndereco.codigoMunicipio ?? emitente.codigo_municipio)
       : undefined;
+    const regimeTributario = (emitente.regime_tributario ?? "").toLowerCase();
+    const codigoOpcaoSimplesNacional = emitente.optante_simples ? (regimeTributario === "mei" ? 2 : 3) : 1;
     const payload = {
       data_emissao: dataEmissaoBR,
       prestador: {
@@ -450,13 +452,13 @@ export const reenviarNfse = createServerFn({ method: "POST" })
         municipio_incidencia: emitente.codigo_municipio,
         tributacao_iss: 1, // NFS-e Nacional: 1 = Operação tributável (evita E0539)
       },
-      optante_simples_nacional: !!emitente.optante_simples,
-      codigo_opcao_simples_nacional: emitente.optante_simples ? "1" : "3", // evita E0160
+      optante_simples_nacional: codigoOpcaoSimplesNacional !== 1,
+      codigo_opcao_simples_nacional: codigoOpcaoSimplesNacional, // 1 = não optante; 2 = MEI; 3 = ME/EPP
       regime_especial_tributacao: "0",
       // E0166: para optante SN ME/EPP, regime de apuração é obrigatório (1 = Competência).
-      ...(emitente.optante_simples ? { regime_apuracao_tributos_sn: 1 } : {}),
+      ...(codigoOpcaoSimplesNacional === 3 ? { regime_apuracao_tributos_sn: 1 } : {}),
       // Bloco <trib> exige tribFed OU totTrib (evita erro_validacao_schema).
-      ...(emitente.optante_simples
+      ...(codigoOpcaoSimplesNacional !== 1
         ? { percentual_total_tributos_simples_nacional: +(aliquota * 100).toFixed(2) }
         : {
             valor_total_tributos_federais: 0,
