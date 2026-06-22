@@ -271,6 +271,16 @@ function NfsePage() {
                     {r.status === "erro" && (
                       <Button
                         size="sm"
+                        variant="ghost"
+                        title="Ver detalhes do erro"
+                        onClick={() => setErroDetalhe(r)}
+                      >
+                        <AlertCircle className="h-3.5 w-3.5 text-red-600" />
+                      </Button>
+                    )}
+                    {r.status === "erro" && (
+                      <Button
+                        size="sm"
                         variant="outline"
                         title="Reenviar nota"
                         disabled={reenviando === r.id}
