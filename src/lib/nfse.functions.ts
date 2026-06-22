@@ -5,6 +5,12 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 const FOCUS_API = "https://api.focusnfe.com.br/v2";
 const AI_GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
+function focusNfseBase(emitente: { usar_ambiente_nacional?: boolean | null } | null | undefined) {
+  // Ambiente Nacional NFS-e usa o endpoint /v2/nfsen. Municípios que não
+  // aderiram ainda usam o endpoint municipal /v2/nfse.
+  return emitente?.usar_ambiente_nacional ? `${FOCUS_API}/nfsen` : `${FOCUS_API}/nfse`;
+}
+
 function authHeader(token: string) {
   // Focus NFe usa Basic Auth: base64(token + ":")
   const b64 = Buffer.from(`${token}:`).toString("base64");
