@@ -175,10 +175,10 @@ export const emitirNfse = createServerFn({ method: "POST" })
         codigo_cnae: only(emitente.codigo_cnae) || undefined,
         valor_servicos: data.valorServicos,
         valor_iss: valorIss,
+        exigibilidade_iss: 1,
+        municipio_incidencia: emitente.codigo_municipio,
       },
       optante_simples_nacional: !!emitente.optante_simples,
-      exigibilidade_iss: 1,
-      natureza_operacao: 1,
     };
 
     // Cria registro local antes do envio (para rastreio mesmo se Focus falhar)
@@ -426,10 +426,10 @@ export const reenviarNfse = createServerFn({ method: "POST" })
         codigo_cnae: only(emitente.codigo_cnae) || undefined,
         valor_servicos: valorServicos,
         valor_iss: valorIss,
+        exigibilidade_iss: 1,
+        municipio_incidencia: emitente.codigo_municipio,
       },
       optante_simples_nacional: !!emitente.optante_simples,
-      exigibilidade_iss: 1,
-      natureza_operacao: 1,
     };
 
     await supabase
