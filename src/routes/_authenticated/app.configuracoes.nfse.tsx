@@ -41,6 +41,7 @@ interface Row {
   rps_proximo_numero: number | null;
   ativo: boolean;
   padrao: boolean;
+  usar_ambiente_nacional: boolean | null;
 }
 
 interface Form {
@@ -71,6 +72,7 @@ interface Form {
   rps_proximo_numero: string;
   ativo: boolean;
   padrao: boolean;
+  usar_ambiente_nacional: boolean;
 }
 
 const REGIMES = [
@@ -84,7 +86,7 @@ function NfseConfigPage() {
   return (
     <SimpleCrud<Row, Form>
       table="nfse_emitentes"
-      selectColumns="id, nome, cnpj, razao_social, nome_fantasia, inscricao_municipal, cep, logradouro, numero, complemento, bairro, municipio, uf, codigo_municipio, telefone, email, regime_tributario, optante_simples, item_lista_servico, codigo_tributario_municipio, codigo_cnae, aliquota_iss, descricao_servico_padrao, focus_ambiente, rps_serie, rps_proximo_numero, ativo, padrao"
+      selectColumns="id, nome, cnpj, razao_social, nome_fantasia, inscricao_municipal, cep, logradouro, numero, complemento, bairro, municipio, uf, codigo_municipio, telefone, email, regime_tributario, optante_simples, item_lista_servico, codigo_tributario_municipio, codigo_cnae, aliquota_iss, descricao_servico_padrao, focus_ambiente, rps_serie, rps_proximo_numero, ativo, padrao, usar_ambiente_nacional"
       title="Emitentes NFS-e"
       subtitle="CNPJs cadastrados para emissão de notas fiscais via Focus NFe."
       icon={<Building2 className="h-6 w-6 text-primary" />}
@@ -120,7 +122,7 @@ function NfseConfigPage() {
         item_lista_servico: "0401", codigo_tributario_municipio: "",
         codigo_cnae: "", aliquota_iss: "0.02", descricao_servico_padrao: "",
         focus_ambiente: "producao", rps_serie: "1", rps_proximo_numero: "1",
-        ativo: true, padrao: false,
+        ativo: true, padrao: false, usar_ambiente_nacional: false,
       }}
       toForm={(r) => ({
         nome: r.nome, cnpj: r.cnpj, razao_social: r.razao_social,
@@ -142,6 +144,7 @@ function NfseConfigPage() {
         rps_serie: r.rps_serie ?? "1",
         rps_proximo_numero: String(r.rps_proximo_numero ?? 1),
         ativo: r.ativo, padrao: r.padrao,
+        usar_ambiente_nacional: r.usar_ambiente_nacional ?? false,
       })}
       toPayload={(f) => ({
         nome: f.nome,
@@ -171,6 +174,7 @@ function NfseConfigPage() {
         rps_proximo_numero: Number(f.rps_proximo_numero) || 1,
         ativo: f.ativo,
         padrao: f.padrao,
+        usar_ambiente_nacional: f.usar_ambiente_nacional,
       })}
       validate={(f) => {
         if (!f.nome.trim()) return "Informe o apelido do emitente.";
@@ -263,6 +267,18 @@ function NfseConfigPage() {
               <div className="space-y-1"><Label>Série RPS</Label><Input value={f.rps_serie} onChange={(e) => set({ ...f, rps_serie: e.target.value })} /></div>
               <div className="space-y-1"><Label>Próx. nº RPS</Label><Input value={f.rps_proximo_numero} onChange={(e) => set({ ...f, rps_proximo_numero: e.target.value })} /></div>
             </div>
+            <label className="flex items-start gap-2 text-sm mt-3">
+              <Switch
+                checked={f.usar_ambiente_nacional}
+                onCheckedChange={(v) => set({ ...f, usar_ambiente_nacional: v })}
+              />
+              <span>
+                Usar <strong>Ambiente Nacional NFS-e</strong> (endpoint <code>/v2/nfsen</code>)
+                <span className="block text-xs text-muted-foreground">
+                  Ative para municípios que aderiram ao padrão nacional (ex.: São João de Meriti/RJ). Caso contrário, será usado o endpoint municipal padrão do Focus.
+                </span>
+              </span>
+            </label>
             <p className="text-xs text-muted-foreground mt-2">
               O certificado A1 (.pfx) já está cadastrado no Focus NFe. O token de produção fica salvo como segredo do servidor.
             </p>
