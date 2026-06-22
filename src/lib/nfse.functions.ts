@@ -186,6 +186,15 @@ export const emitirNfse = createServerFn({ method: "POST" })
       // 3 = não optante. Sem este campo dá E0160 (incompatível com cadastro Simples).
       codigo_opcao_simples_nacional: emitente.optante_simples ? "1" : "3",
       regime_especial_tributacao: "0",
+      // Bloco <trib> exige tribFed OU totTrib. Sem isto: erro_validacao_schema
+      // "Element 'trib': Missing child element(s). Expected is one of (tribFed, totTrib)".
+      ...(emitente.optante_simples
+        ? { percentual_total_tributos_simples_nacional: +(aliquota * 100).toFixed(2) }
+        : {
+            valor_total_tributos_federais: 0,
+            valor_total_tributos_estaduais: 0,
+            valor_total_tributos_municipais: 0,
+          }),
     };
 
     // Cria registro local antes do envio (para rastreio mesmo se Focus falhar)
@@ -440,6 +449,14 @@ export const reenviarNfse = createServerFn({ method: "POST" })
       optante_simples_nacional: !!emitente.optante_simples,
       codigo_opcao_simples_nacional: emitente.optante_simples ? "1" : "3", // evita E0160
       regime_especial_tributacao: "0",
+      // Bloco <trib> exige tribFed OU totTrib (evita erro_validacao_schema).
+      ...(emitente.optante_simples
+        ? { percentual_total_tributos_simples_nacional: +(aliquota * 100).toFixed(2) }
+        : {
+            valor_total_tributos_federais: 0,
+            valor_total_tributos_estaduais: 0,
+            valor_total_tributos_municipais: 0,
+          }),
     };
 
     await supabase
