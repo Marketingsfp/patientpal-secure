@@ -1,14 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Receipt, ExternalLink, FilePlus2, RefreshCw, Send } from "lucide-react";
+import { Receipt, ExternalLink, FilePlus2, RefreshCw, Send, ScanLine, Check, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
-import { consultarNfse, reenviarNfse } from "@/lib/nfse.functions";
+import { consultarNfse, reenviarNfse, extrairNfseDeImagem } from "@/lib/nfse.functions";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/_authenticated/app/nfse/")({
   component: NfsePage,
@@ -32,7 +33,12 @@ function NfsePage() {
   const { clinicaAtual } = useClinica();
   const consulta = useServerFn(consultarNfse);
   const reenviar = useServerFn(reenviarNfse);
+  const extrair = useServerFn(extrairNfseDeImagem);
   const [reenviando, setReenviando] = useState<string | null>(null);
+  const [conferirOpen, setConferirOpen] = useState(false);
+  const [conferirLoading, setConferirLoading] = useState(false);
+  const [conferirPreview, setConferirPreview] = useState<string | null>(null);
+  const [conferirExtraido, setConferirExtraido] = useState<Awaited<ReturnType<typeof extrair>> | null>(null);
   const [emitentes, setEmitentes] = useState<Emitente[]>([]);
   const [filtroEmitente, setFiltroEmitente] = useState<string>("todos");
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
@@ -114,6 +120,33 @@ function NfsePage() {
     }
   };
 
+  const onConferirArquivo = async (file: File) => {
+    setConferirLoading(true);
+    setConferirExtraido(null);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error("Falha ao ler arquivo"));
+        reader.readAsDataURL(file);
+      });
+      setConferirPreview(file.type.startsWith("image/") ? dataUrl : null);
+      const base64 = dataUrl.split(",")[1] ?? "";
+      const r = await extrair({ data: { arquivo_base64: base64, mime: file.type || "image/jpeg" } });
+      setConferirExtraido(r);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setConferirLoading(false);
+    }
+  };
+
+  const notaMatch = useMemo(() => {
+    if (!conferirExtraido?.numero) return null;
+    const numTxt = String(conferirExtraido.numero).replace(/\D/g, "");
+    return rows.find((r) => (r.numero ?? "").replace(/\D/g, "") === numTxt) ?? null;
+  }, [conferirExtraido, rows]);
+
   const totais = useMemo(() => {
     const porEmitente = new Map<string, { nome: string; qtd: number; valor: number }>();
     for (const r of filtrados) {
@@ -133,7 +166,12 @@ function NfsePage() {
           <h1 className="text-2xl font-semibold flex items-center gap-2"><Receipt className="h-6 w-6 text-primary" /> Notas Fiscais (NFS-e)</h1>
           <p className="text-sm text-muted-foreground">Emissão e controle de notas fiscais de serviço.</p>
         </div>
-        <Button asChild><Link to="/app/nfse/testar"><FilePlus2 className="h-4 w-4 mr-2" /> Emitir NFS-e</Link></Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => { setConferirOpen(true); setConferirExtraido(null); setConferirPreview(null); }}>
+            <ScanLine className="h-4 w-4 mr-2" /> Conferir por imagem
+          </Button>
+          <Button asChild><Link to="/app/nfse/testar"><FilePlus2 className="h-4 w-4 mr-2" /> Emitir NFS-e</Link></Button>
+        </div>
       </div>
 
       <div className="rounded-lg border bg-card p-4 flex flex-wrap gap-3 items-end">
