@@ -189,7 +189,7 @@ export const emitirNfse = createServerFn({ method: "POST" })
       regime_especial_tributacao: "0",
       // E0166: para optante SN ME/EPP é obrigatório o regime de apuração dos tributos do SN.
       // 1 = Competência. Sem isso a NFS-e Nacional rejeita.
-      ...(codigoOpcaoSimplesNacional === 3 ? { regime_apuracao_tributos_sn: 1 } : {}),
+      ...(codigoOpcaoSimplesNacional === 3 ? { regime_tributario_simples_nacional: 1 } : {}),
       // Bloco <trib> exige tribFed OU totTrib. Sem isto: erro_validacao_schema
       // "Element 'trib': Missing child element(s). Expected is one of (tribFed, totTrib)".
       ...(codigoOpcaoSimplesNacional !== 1
@@ -456,7 +456,7 @@ export const reenviarNfse = createServerFn({ method: "POST" })
       codigo_opcao_simples_nacional: codigoOpcaoSimplesNacional, // 1 = não optante; 2 = MEI; 3 = ME/EPP
       regime_especial_tributacao: "0",
       // E0166: para optante SN ME/EPP, regime de apuração é obrigatório (1 = Competência).
-      ...(codigoOpcaoSimplesNacional === 3 ? { regime_apuracao_tributos_sn: 1 } : {}),
+      ...(codigoOpcaoSimplesNacional === 3 ? { regime_tributario_simples_nacional: 1 } : {}),
       // Bloco <trib> exige tribFed OU totTrib (evita erro_validacao_schema).
       ...(codigoOpcaoSimplesNacional !== 1
         ? { percentual_total_tributos_simples_nacional: +(aliquota * 100).toFixed(2) }
