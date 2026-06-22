@@ -361,8 +361,13 @@ export const consultarNfse = createServerFn({ method: "POST" })
       updates.numero = body?.numero ?? null;
       updates.serie = body?.serie ?? null;
       updates.codigo_verificacao = body?.codigo_verificacao ?? null;
-      updates.url_pdf = body?.url_danfse ?? body?.caminho_danfse ? `https://api.focusnfe.com.br${body?.caminho_danfse}` : null;
-      updates.url_xml = body?.caminho_xml_nota_fiscal ? `https://api.focusnfe.com.br${body?.caminho_xml_nota_fiscal}` : null;
+      // url_danfse já vem absoluta (S3). caminho_* é relativo ao host do Focus.
+      updates.url_pdf =
+        body?.url_danfse ??
+        (body?.caminho_danfse ? `https://api.focusnfe.com.br${body?.caminho_danfse}` : null);
+      updates.url_xml =
+        body?.url_xml_nota_fiscal ??
+        (body?.caminho_xml_nota_fiscal ? `https://api.focusnfe.com.br${body?.caminho_xml_nota_fiscal}` : null);
     } else if (body?.status === "cancelado") {
       updates.status = "cancelada";
     } else if (body?.status === "erro_autorizacao" || body?.status === "erro") {
