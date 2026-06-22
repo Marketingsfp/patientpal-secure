@@ -284,6 +284,83 @@ function NfsePage() {
           </TableBody>
         </Table>
       </div>
+
+      <Dialog open={conferirOpen} onOpenChange={setConferirOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><ScanLine className="h-4 w-4" /> Conferir NFS-e por imagem</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <input
+                type="file"
+                accept="image/*,application/pdf"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) void onConferirArquivo(f); }}
+                className="text-sm"
+              />
+              {conferirLoading && <span className="text-xs text-muted-foreground flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Extraindo dados…</span>}
+            </div>
+
+            {conferirExtraido && (
+              <div className="grid md:grid-cols-2 gap-4">
+                {conferirPreview && (
+                  <div className="border rounded-md overflow-hidden bg-muted/30 max-h-[400px] flex items-center justify-center">
+                    <img src={conferirPreview} alt="NFS-e" className="max-h-[400px] object-contain" />
+                  </div>
+                )}
+                <div className="space-y-2 text-sm">
+                  <div className="font-medium">Dados extraídos</div>
+                  {(() => {
+                    const fields: Array<[string, unknown, unknown]> = [
+                      ["Número", conferirExtraido.numero, notaMatch?.numero],
+                      ["Data emissão", conferirExtraido.data_emissao, notaMatch ? new Date(notaMatch.data_emissao).toISOString().slice(0, 10) : null],
+                      ["Valor", conferirExtraido.valor_servicos != null ? Number(conferirExtraido.valor_servicos).toFixed(2) : null, notaMatch ? Number(notaMatch.valor_servicos).toFixed(2) : null],
+                      ["Descrição", conferirExtraido.descricao_servicos, null],
+                      ["Emitente CNPJ", conferirExtraido.emitente_cnpj, notaMatch?.emitente?.cnpj?.replace(/\D/g, "") ?? null],
+                      ["Emitente", conferirExtraido.emitente_nome, notaMatch?.emitente?.nome ?? null],
+                      ["Tomador CPF/CNPJ", conferirExtraido.tomador_cpf_cnpj, null],
+                      ["Tomador", conferirExtraido.tomador_nome, notaMatch?.tomador_nome ?? null],
+                    ];
+                    return fields.map(([label, extr, sys]) => {
+                      const e = extr == null || extr === "" ? "—" : String(extr);
+                      const s = sys == null || sys === "" ? null : String(sys);
+                      const match = s != null && String(extr ?? "").replace(/\D/g, "").length > 0
+                        ? String(extr).replace(/\D/g, "") === s.replace(/\D/g, "") || String(extr).toLowerCase().includes(s.toLowerCase()) || s.toLowerCase().includes(String(extr).toLowerCase())
+                        : null;
+                      return (
+                        <div key={label} className="grid grid-cols-[140px_1fr_auto] gap-2 items-start py-1 border-b last:border-0">
+                          <div className="text-xs text-muted-foreground pt-0.5">{label}</div>
+                          <div>
+                            <div className="break-words">{e}</div>
+                            {s != null && s !== e && (
+                              <div className="text-xs text-muted-foreground">Sistema: {s}</div>
+                            )}
+                          </div>
+                          {match != null && (
+                            match
+                              ? <Check className="h-4 w-4 text-green-600" />
+                              : <X className="h-4 w-4 text-red-600" />
+                          )}
+                        </div>
+                      );
+                    });
+                  })()}
+                  <div className="pt-2 text-xs">
+                    {notaMatch ? (
+                      <span className="text-green-700">✓ Nota nº {notaMatch.numero} encontrada no sistema.</span>
+                    ) : (
+                      <span className="text-amber-700">Nenhuma nota com esse número foi encontrada no sistema.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setConferirOpen(false)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
