@@ -177,8 +177,15 @@ export const emitirNfse = createServerFn({ method: "POST" })
         valor_iss: valorIss,
         exigibilidade_iss: 1,
         municipio_incidencia: emitente.codigo_municipio,
+        // NFS-e Nacional (ambiente nacional) — evita E0539 ("ISSQN = 4 Não Incidência"),
+        // que ocorre quando este campo não é enviado e assume o default 4.
+        tributacao_iss: 1, // 1 = Operação tributável
       },
       optante_simples_nacional: !!emitente.optante_simples,
+      // NFS-e Nacional usa código (não booleano). 1 = ME/EPP optante;
+      // 3 = não optante. Sem este campo dá E0160 (incompatível com cadastro Simples).
+      codigo_opcao_simples_nacional: emitente.optante_simples ? "1" : "3",
+      regime_especial_tributacao: "0",
     };
 
     // Cria registro local antes do envio (para rastreio mesmo se Focus falhar)
@@ -428,8 +435,11 @@ export const reenviarNfse = createServerFn({ method: "POST" })
         valor_iss: valorIss,
         exigibilidade_iss: 1,
         municipio_incidencia: emitente.codigo_municipio,
+        tributacao_iss: 1, // NFS-e Nacional: 1 = Operação tributável (evita E0539)
       },
       optante_simples_nacional: !!emitente.optante_simples,
+      codigo_opcao_simples_nacional: emitente.optante_simples ? "1" : "3", // evita E0160
+      regime_especial_tributacao: "0",
     };
 
     await supabase
