@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SimpleCrud } from "@/components/simple-crud/SimpleCrud";
+import { ItemServicoPicker } from "@/components/nfse/item-servico-picker";
 
 export const Route = createFileRoute("/_authenticated/app/configuracoes/nfse")({
   component: NfseConfigPage,
@@ -230,7 +231,13 @@ function NfseConfigPage() {
                   <SelectContent>{REGIMES.map((r) => <SelectItem key={r.v} value={r.v}>{r.l}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1"><Label>Cód. nacional serviço</Label><Input value={f.item_lista_servico} onChange={(e) => set({ ...f, item_lista_servico: e.target.value })} placeholder="Ex: código nacional NFS-e" /></div>
+              <div className="space-y-1 col-span-2">
+                <Label>Cód. nacional serviço (Lista Nacional NFS-e)</Label>
+                <ItemServicoPicker
+                  value={f.item_lista_servico}
+                  onChange={(codigo) => set({ ...f, item_lista_servico: codigo })}
+                />
+              </div>
               <div className="space-y-1"><Label>Alíquota ISS (0–1)</Label><Input value={f.aliquota_iss} onChange={(e) => set({ ...f, aliquota_iss: e.target.value })} placeholder="0.02" /></div>
             </div>
             <div className="grid grid-cols-2 gap-3 mt-3">
