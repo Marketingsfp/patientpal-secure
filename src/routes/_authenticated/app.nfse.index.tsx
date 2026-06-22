@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Receipt, ExternalLink, FilePlus2, RefreshCw, Send, ScanLine, Check, X, Loader2 } from "lucide-react";
+import { Receipt, ExternalLink, FilePlus2, RefreshCw, Send, ScanLine, Check, X, Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,6 +27,8 @@ interface Row {
   tomador_nome: string | null;
   emitente_id: string | null;
   emitente: { nome: string; cnpj: string } | null;
+  erro_mensagem: string | null;
+  payload_resposta: unknown;
 }
 
 function NfsePage() {
@@ -44,6 +46,7 @@ function NfsePage() {
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
+  const [erroDetalhe, setErroDetalhe] = useState<Row | null>(null);
 
   useEffect(() => {
     if (!clinicaAtual) return;
@@ -62,7 +65,7 @@ function NfsePage() {
     setLoading(true);
     const { data, error } = await supabase
       .from("nfse")
-      .select("id, numero, data_emissao, valor_servicos, status, url_pdf, tomador_nome, emitente_id, emitente:nfse_emitentes(nome, cnpj)")
+      .select("id, numero, data_emissao, valor_servicos, status, url_pdf, tomador_nome, emitente_id, erro_mensagem, payload_resposta, emitente:nfse_emitentes(nome, cnpj)")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("data_emissao", { ascending: false })
       .limit(500);
