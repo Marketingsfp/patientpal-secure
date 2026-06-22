@@ -5,6 +5,12 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 const FOCUS_API = "https://api.focusnfe.com.br/v2";
 const AI_GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
+function focusNfseBase(emitente: { usar_ambiente_nacional?: boolean | null } | null | undefined) {
+  // Ambiente Nacional NFS-e usa o endpoint /v2/nfsen. Municípios que não
+  // aderiram ainda usam o endpoint municipal /v2/nfse.
+  return emitente?.usar_ambiente_nacional ? `${FOCUS_API}/nfsen` : `${FOCUS_API}/nfse`;
+}
+
 function authHeader(token: string) {
   // Focus NFe usa Basic Auth: base64(token + ":")
   const b64 = Buffer.from(`${token}:`).toString("base64");
@@ -230,7 +236,7 @@ export const emitirNfse = createServerFn({ method: "POST" })
     if (errIns) throw errIns;
 
     // Envia para o Focus
-    const url = `${FOCUS_API}/nfse?ref=${encodeURIComponent(ref)}`;
+    const url = `${focusNfseBase(emitente)}?ref=${encodeURIComponent(ref)}`;
     const resp = await fetch(url, {
       method: "POST",
       headers: {
@@ -280,7 +286,7 @@ export const consultarNfse = createServerFn({ method: "POST" })
 
     const { data: emitente } = await supabase
       .from("nfse_emitentes")
-      .select("focus_ambiente")
+      .select("focus_ambiente, usar_ambiente_nacional")
       .eq("id", nota.emitente_id!)
       .single();
     const token =
@@ -289,7 +295,7 @@ export const consultarNfse = createServerFn({ method: "POST" })
         : process.env.FOCUS_NFE_TOKEN_HML ?? process.env.FOCUS_NFE_TOKEN_PROD;
     if (!token) throw new Error("Token Focus NFe não configurado");
 
-    const resp = await fetch(`${FOCUS_API}/nfse/${nota.focus_ref}`, {
+    const resp = await fetch(`${focusNfseBase(emitente)}/${nota.focus_ref}`, {
       headers: { Authorization: authHeader(token) },
     });
     const body = await resp.json().catch(() => ({}));
@@ -332,7 +338,7 @@ export const cancelarNfse = createServerFn({ method: "POST" })
     if (!nota?.focus_ref) throw new Error("Nota sem referência Focus");
     const { data: emitente } = await supabase
       .from("nfse_emitentes")
-      .select("focus_ambiente")
+      .select("focus_ambiente, usar_ambiente_nacional")
       .eq("id", nota.emitente_id!)
       .single();
     const token =
@@ -341,7 +347,7 @@ export const cancelarNfse = createServerFn({ method: "POST" })
         : process.env.FOCUS_NFE_TOKEN_HML ?? process.env.FOCUS_NFE_TOKEN_PROD;
     if (!token) throw new Error("Token Focus NFe não configurado");
 
-    const resp = await fetch(`${FOCUS_API}/nfse/${nota.focus_ref}`, {
+    const resp = await fetch(`${focusNfseBase(emitente)}/${nota.focus_ref}`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json", Authorization: authHeader(token) },
       body: JSON.stringify({ justificativa: data.justificativa }),
@@ -478,7 +484,7 @@ export const reenviarNfse = createServerFn({ method: "POST" })
       })
       .eq("id", nota.id);
 
-    const url = `${FOCUS_API}/nfse?ref=${encodeURIComponent(ref)}`;
+    const url = `${focusNfseBase(emitente)}?ref=${encodeURIComponent(ref)}`;
     const resp = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: authHeader(token) },

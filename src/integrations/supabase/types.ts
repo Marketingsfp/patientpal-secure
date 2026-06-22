@@ -5375,6 +5375,7 @@ export type Database = {
           telefone: string | null
           uf: string
           updated_at: string
+          usar_ambiente_nacional: boolean
         }
         Insert: {
           aliquota_iss?: number
@@ -5415,6 +5416,7 @@ export type Database = {
           telefone?: string | null
           uf: string
           updated_at?: string
+          usar_ambiente_nacional?: boolean
         }
         Update: {
           aliquota_iss?: number
@@ -5455,6 +5457,7 @@ export type Database = {
           telefone?: string | null
           uf?: string
           updated_at?: string
+          usar_ambiente_nacional?: boolean
         }
         Relationships: [
           {
