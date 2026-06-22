@@ -176,6 +176,8 @@ export const emitirNfse = createServerFn({ method: "POST" })
         valor_servicos: data.valorServicos,
         valor_iss: valorIss,
       },
+      optante_simples_nacional: !!emitente.optante_simples,
+      regime_especial_tributacao: emitente.optante_simples ? 1 : undefined,
     };
 
     // Cria registro local antes do envio (para rastreio mesmo se Focus falhar)
@@ -424,6 +426,8 @@ export const reenviarNfse = createServerFn({ method: "POST" })
         valor_servicos: valorServicos,
         valor_iss: valorIss,
       },
+      optante_simples_nacional: !!emitente.optante_simples,
+      regime_especial_tributacao: emitente.optante_simples ? 1 : undefined,
     };
 
     await supabase
