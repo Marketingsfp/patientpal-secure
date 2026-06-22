@@ -1,0 +1,2 @@
+ALTER TABLE public.nfse_emitentes ADD COLUMN IF NOT EXISTS usar_ambiente_nacional boolean NOT NULL DEFAULT false;
+COMMENT ON COLUMN public.nfse_emitentes.usar_ambiente_nacional IS 'Quando true, envia ao Focus NFe via endpoint /v2/nfsen (Ambiente Nacional NFS-e). Necessário para municípios que aderiram ao padrão nacional (ex: São João de Meriti/RJ).';
