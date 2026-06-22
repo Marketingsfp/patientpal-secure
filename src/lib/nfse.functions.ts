@@ -142,6 +142,8 @@ export const emitirNfse = createServerFn({ method: "POST" })
     const tomadorCodigoMunicipio = data.tomador.logradouro
       ? (await buscarCodigoMunicipioPorCep(data.tomador.cep)) ?? data.tomador.codigoMunicipio ?? emitente.codigo_municipio
       : undefined;
+    const regimeTributario = (emitente.regime_tributario ?? "").toLowerCase();
+    const codigoOpcaoSimplesNacional = emitente.optante_simples ? (regimeTributario === "mei" ? 2 : 3) : 1;
 
     const payload = {
       data_emissao: dataEmissaoBR,
@@ -181,17 +183,16 @@ export const emitirNfse = createServerFn({ method: "POST" })
         // que ocorre quando este campo não é enviado e assume o default 4.
         tributacao_iss: 1, // 1 = Operação tributável
       },
-      optante_simples_nacional: !!emitente.optante_simples,
-      // NFS-e Nacional usa código (não booleano). 1 = ME/EPP optante;
-      // 3 = não optante. Sem este campo dá E0160 (incompatível com cadastro Simples).
-      codigo_opcao_simples_nacional: emitente.optante_simples ? "1" : "3",
+      optante_simples_nacional: codigoOpcaoSimplesNacional !== 1,
+      // NFS-e Nacional: 1 = Não optante; 2 = MEI; 3 = ME/EPP optante.
+      codigo_opcao_simples_nacional: codigoOpcaoSimplesNacional,
       regime_especial_tributacao: "0",
       // E0166: para optante SN ME/EPP é obrigatório o regime de apuração dos tributos do SN.
       // 1 = Competência. Sem isso a NFS-e Nacional rejeita.
-      ...(emitente.optante_simples ? { regime_apuracao_tributos_sn: 1 } : {}),
+      ...(codigoOpcaoSimplesNacional === 3 ? { regime_apuracao_tributos_sn: 1 } : {}),
       // Bloco <trib> exige tribFed OU totTrib. Sem isto: erro_validacao_schema
       // "Element 'trib': Missing child element(s). Expected is one of (tribFed, totTrib)".
-      ...(emitente.optante_simples
+      ...(codigoOpcaoSimplesNacional !== 1
         ? { percentual_total_tributos_simples_nacional: +(aliquota * 100).toFixed(2) }
         : {
             valor_total_tributos_federais: 0,
