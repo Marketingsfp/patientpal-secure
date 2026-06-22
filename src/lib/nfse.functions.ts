@@ -439,3 +439,86 @@ export const reenviarNfse = createServerFn({ method: "POST" })
 
     return { ok: true, id: nota.id, ref, focus: body };
   });
+/**
+ * Extrai dados de uma NFS-e a partir de imagem/PDF (DANFSe).
+ * Usa Lovable AI (Gemini vision) para fazer OCR estruturado.
+ */
+export const extrairNfseDeImagem = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({
+      arquivo_base64: z.string().min(20).max(15_000_000),
+      mime: z.string().min(3).max(100),
+    }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const key = process.env.LOVABLE_API_KEY;
+    if (!key) throw new Error("LOVABLE_API_KEY ausente");
+
+    const dataUrl = data.arquivo_base64.startsWith("data:")
+      ? data.arquivo_base64
+      : `data:${data.mime};base64,${data.arquivo_base64}`;
+    const isPdf = data.mime.includes("pdf");
+
+    const sys = `Você extrai dados estruturados de uma NFS-e (Nota Fiscal de Serviço eletrônica) brasileira.
+Devolva APENAS JSON com este formato exato (use null quando o campo não aparecer):
+{
+  "numero": "string ou null",
+  "data_emissao": "YYYY-MM-DD ou null",
+  "valor_servicos": number ou null,
+  "descricao_servicos": "string ou null",
+  "emitente_cnpj": "apenas dígitos ou null",
+  "emitente_nome": "string ou null",
+  "tomador_cpf_cnpj": "apenas dígitos ou null",
+  "tomador_nome": "string ou null"
+}
+Não invente. Datas devem virar YYYY-MM-DD. Valor em número (ex: 60.00).`;
+
+    const userContent: Array<Record<string, unknown>> = [
+      { type: "text", text: "Extraia os dados da NFS-e nesta imagem/PDF." },
+      isPdf
+        ? { type: "file", file: { filename: "nfse.pdf", file_data: dataUrl } }
+        : { type: "image_url", image_url: { url: dataUrl } },
+    ];
+
+    const res = await fetch(AI_GATEWAY, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: sys },
+          { role: "user", content: userContent },
+        ],
+        response_format: { type: "json_object" },
+      }),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      if (res.status === 429) throw new Error("Limite de uso da IA atingido. Tente em instantes.");
+      if (res.status === 402) throw new Error("Créditos de IA esgotados.");
+      throw new Error(`Falha IA (${res.status}): ${text.slice(0, 200)}`);
+    }
+    const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+    const content = json.choices?.[0]?.message?.content ?? "{}";
+    const cleaned = content.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "").trim();
+    const start = cleaned.indexOf("{");
+    const end = cleaned.lastIndexOf("}");
+    if (start < 0 || end < 0) throw new Error("IA não devolveu JSON válido");
+    const parsed = JSON.parse(cleaned.slice(start, end + 1)) as Record<string, unknown>;
+
+    const num = (v: unknown) => (typeof v === "number" ? v : typeof v === "string" ? Number(v.replace(/[^\d.,-]/g, "").replace(/\.(?=\d{3})/g, "").replace(",", ".")) : null);
+    const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+    const digits = (v: unknown) => { const s = str(v); return s ? s.replace(/\D/g, "") : null; };
+
+    return {
+      numero: str(parsed.numero),
+      data_emissao: str(parsed.data_emissao),
+      valor_servicos: num(parsed.valor_servicos),
+      descricao_servicos: str(parsed.descricao_servicos),
+      emitente_cnpj: digits(parsed.emitente_cnpj),
+      emitente_nome: str(parsed.emitente_nome),
+      tomador_cpf_cnpj: digits(parsed.tomador_cpf_cnpj),
+      tomador_nome: str(parsed.tomador_nome),
+    };
+  });
