@@ -240,18 +240,10 @@ export const emitirNfse = createServerFn({ method: "POST" })
       // <tribFed> exige PIS/COFINS. Para Simples Nacional usamos CST=08
       // (Operação sem Incidência).
       situacao_tributaria_pis_cofins: "08",
-      // <totTrib> exige indTotTrib. Para SN: indTotTrib=1 + pTotTribSN.
-      ...(codigoOpcaoSimplesNacional !== 1
-        ? {
-            indicador_total_tributacao: 1,
-            percentual_total_tributos_simples_nacional: +(aliquota * 100).toFixed(2),
-          }
-        : {
-            indicador_total_tributacao: 1,
-            valor_total_tributos_federais: 0,
-            valor_total_tributos_estaduais: 0,
-            valor_total_tributos_municipais: 0,
-          }),
+      // <totTrib>: o schema atual só aceita indTotTrib=0 (opção por não informar
+      // valor estimado de tributos — Lei 12.741 / Dec. 8.264/2014). Quando 0,
+      // não enviar pTotTribSN nem vTotTrib* (pTotTribSN: "This element is not expected").
+      indicador_total_tributacao: 0,
       // E0166: para optante SN ME/EPP é obrigatório o regime de apuração SN.
       ...(codigoOpcaoSimplesNacional === 3 ? { regime_tributario_simples_nacional: 1 } : {}),
     };
@@ -553,17 +545,7 @@ export const reenviarNfse = createServerFn({ method: "POST" })
       tributacao_iss: 1,
       tipo_retencao_iss: 1,
       situacao_tributaria_pis_cofins: "08",
-      ...(codigoOpcaoSimplesNacional !== 1
-        ? {
-            indicador_total_tributacao: 1,
-            percentual_total_tributos_simples_nacional: +(aliquota * 100).toFixed(2),
-          }
-        : {
-            indicador_total_tributacao: 1,
-            valor_total_tributos_federais: 0,
-            valor_total_tributos_estaduais: 0,
-            valor_total_tributos_municipais: 0,
-          }),
+      indicador_total_tributacao: 0,
       ...(codigoOpcaoSimplesNacional === 3 ? { regime_tributario_simples_nacional: 1 } : {}),
     };
 
