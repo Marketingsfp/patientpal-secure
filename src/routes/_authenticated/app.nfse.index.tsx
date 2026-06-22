@@ -480,6 +480,28 @@ function NfsePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!pdfVisualizando} onOpenChange={(o) => !o && setPdfVisualizando(null)}>
+        <DialogContent className="max-w-5xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="h-4 w-4" /> DANFSE Nº {pdfVisualizando?.numero ?? "—"}
+              {pdfVisualizando?.tomador_nome && <span className="text-sm font-normal text-muted-foreground">· {pdfVisualizando.tomador_nome}</span>}
+            </DialogTitle>
+          </DialogHeader>
+          {pdfVisualizando?.url_pdf && (
+            <iframe src={pdfVisualizando.url_pdf} title={`DANFSE ${pdfVisualizando.numero ?? ""}`} className="w-full h-[75vh] bg-white border rounded" />
+          )}
+          <DialogFooter>
+            {pdfVisualizando?.url_pdf && (
+              <a href={pdfVisualizando.url_pdf} target="_blank" rel="noreferrer">
+                <Button variant="outline"><ExternalLink className="h-3.5 w-3.5 mr-2" /> Abrir em nova aba</Button>
+              </a>
+            )}
+            <Button variant="ghost" onClick={() => setPdfVisualizando(null)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
