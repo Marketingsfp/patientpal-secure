@@ -115,8 +115,15 @@ function Page() {
   const openEmit = async (n: Nota) => {
     if (!emitentes.length) { toast.error("Cadastre um emitente em Configurações › NFS-e"); return; }
     setDescricao(n.observacoes || `Serviços médicos prestados${n.paciente_id ? ` ao paciente ${pacMap.get(n.paciente_id) ?? ""}` : ""}`.trim());
+    setTomadorCpf("");
+    if (n.paciente_id) {
+      const { data: pac } = await supabase.from("pacientes").select("cpf").eq("id", n.paciente_id).maybeSingle();
+      setTomadorCpf((pac?.cpf ?? "").toString());
+    }
     setEmitDialog({ open: true, nota: n });
   };
+
+  const [tomadorCpf, setTomadorCpf] = useState("");
 
   const doEmit = async () => {
     const n = emitDialog.nota;
@@ -129,6 +136,10 @@ function Page() {
         .eq("id", n.paciente_id).maybeSingle();
       if (pacErr || !pac) throw new Error("Paciente não encontrado");
       const p = pac as PacFull;
+      const cpfLimpo = (tomadorCpf || p.cpf || "").replace(/\D/g, "");
+      if (cpfLimpo.length !== 11 && cpfLimpo.length !== 14) {
+        throw new Error("CPF/CNPJ do tomador é obrigatório (11 ou 14 dígitos).");
+      }
       const res = await emitirFn({ data: {
         emitenteId,
         pacienteId: p.id,
@@ -137,7 +148,7 @@ function Page() {
         descricaoServicos: descricao || "Serviços prestados",
         tomador: {
           nome: p.nome,
-          cpfCnpj: p.cpf ?? undefined,
+          cpfCnpj: cpfLimpo,
           email: p.email ?? undefined,
           cep: p.cep ?? undefined,
           logradouro: p.logradouro ?? undefined,
@@ -259,12 +270,28 @@ function Page() {
               Tomador: <b>{emitDialog.nota?.paciente_id ? pacMap.get(emitDialog.nota.paciente_id) : "—"}</b><br />
               Valor: <b>{emitDialog.nota ? fmt(Number(emitDialog.nota.valor)) : ""}</b>
             </div>
+            <div className="space-y-2"><Label>CPF/CNPJ do tomador *</Label>
+              <Input
+                value={tomadorCpf}
+                onChange={(e) => setTomadorCpf(e.target.value)}
+                placeholder="Somente números (11 ou 14 dígitos)"
+                required
+              />
+              <p className="text-xs text-muted-foreground">Obrigatório para emissão da NFS-e.</p>
+            </div>
             <div className="space-y-2"><Label>Descrição dos serviços *</Label>
               <Textarea rows={3} value={descricao} onChange={(e) => setDescricao(e.target.value)} /></div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEmitDialog({ open: false, nota: null })} disabled={emitting}>Cancelar</Button>
-            <Button onClick={doEmit} disabled={emitting || !emitenteId}>
+            <Button
+              onClick={doEmit}
+              disabled={
+                emitting ||
+                !emitenteId ||
+                !((tomadorCpf || "").replace(/\D/g, "").length === 11 || (tomadorCpf || "").replace(/\D/g, "").length === 14)
+              }
+            >
               {emitting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Emitindo...</> : <><Send className="h-4 w-4 mr-2" />Emitir</>}
             </Button>
           </DialogFooter>
