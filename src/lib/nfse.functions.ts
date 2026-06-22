@@ -121,11 +121,15 @@ export const emitirNfse = createServerFn({ method: "POST" })
     if (!itemListaServico) throw new Error("Informe o código nacional do serviço para emissão da NFS-e.");
     const codigoTributarioMunicipio = normalizeCodigoTributarioMunicipio(emitente.codigo_tributario_municipio);
 
+    const imRaw = only(emitente.inscricao_municipal ?? "");
+    const imLower = (emitente.inscricao_municipal ?? "").trim().toLowerCase();
+    const inscricaoMunicipal = imRaw && imLower !== "isento" && imLower !== "insento" ? imRaw : undefined;
+
     const payload = {
       data_emissao: dataEmissaoBR,
       prestador: {
         cnpj: only(emitente.cnpj),
-        inscricao_municipal: emitente.inscricao_municipal,
+        ...(inscricaoMunicipal ? { inscricao_municipal: inscricaoMunicipal } : {}),
         codigo_municipio: emitente.codigo_municipio,
       },
       tomador: {
