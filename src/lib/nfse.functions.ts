@@ -224,11 +224,36 @@ export const emitirNfse = createServerFn({ method: "POST" })
       regime_especial_tributacao: 0,
       ...(cpfCnpjTomador.length === 14 ? { cnpj_tomador: cpfCnpjTomador } : {}),
       ...(cpfCnpjTomador.length === 11 ? { cpf_tomador: cpfCnpjTomador } : {}),
+      // <toma> exige um identificador além do CNPJ/CPF — sem xNome (razão social
+      // do tomador) o schema rejeita: "Element 'toma': Missing child element(s).
+      // Expected is one of (CAEPF, IM, xNome)".
+      razao_social_tomador: data.tomador.nome,
       codigo_municipio_prestacao: Number(tomadorCodMun),
       codigo_tributacao_nacional_iss: itemListaServico,
       descricao_servico: data.descricaoServicos,
       valor_servico: data.valorServicos,
       tributacao_iss: 1,
+      // <tribMun> exige um dos elementos do choice (tpRetISSQN, tpImunidade,
+      // tpSusp, BM, cPaisResult). Como tribISSQN=1 (tributável), enviamos
+      // tipo_retencao_iss=1 (Não Retido).
+      tipo_retencao_iss: 1,
+      // <tribFed> exige PIS/COFINS. Para Simples Nacional usamos CST=08
+      // (Operação sem Incidência).
+      situacao_tributaria_pis_cofins: "08",
+      // <totTrib> exige indTotTrib. Para SN: indTotTrib=1 + pTotTribSN.
+      ...(codigoOpcaoSimplesNacional !== 1
+        ? {
+            indicador_total_tributacao: 1,
+            percentual_total_tributos_simples_nacional: +(aliquota * 100).toFixed(2),
+          }
+        : {
+            indicador_total_tributacao: 1,
+            valor_total_tributos_federais: 0,
+            valor_total_tributos_estaduais: 0,
+            valor_total_tributos_municipais: 0,
+          }),
+      // E0166: para optante SN ME/EPP é obrigatório o regime de apuração SN.
+      ...(codigoOpcaoSimplesNacional === 3 ? { regime_tributario_simples_nacional: 1 } : {}),
     };
 
     const payload = emitente.usar_ambiente_nacional ? payloadNacional : payloadMunicipal;
