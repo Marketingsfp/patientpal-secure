@@ -366,11 +366,14 @@ export const reenviarNfse = createServerFn({ method: "POST" })
     const codigoTributarioMunicipio = normalizeCodigoTributarioMunicipio(emitente.codigo_tributario_municipio);
 
     const cpfCnpj = only(nota.tomador_documento ?? "");
+    const imRaw2 = only(emitente.inscricao_municipal ?? "");
+    const imLower2 = (emitente.inscricao_municipal ?? "").trim().toLowerCase();
+    const inscricaoMunicipal2 = imRaw2 && imLower2 !== "isento" && imLower2 !== "insento" ? imRaw2 : undefined;
     const payload = {
       data_emissao: dataEmissaoBR,
       prestador: {
         cnpj: only(emitente.cnpj),
-        inscricao_municipal: emitente.inscricao_municipal,
+        ...(inscricaoMunicipal2 ? { inscricao_municipal: inscricaoMunicipal2 } : {}),
         codigo_municipio: emitente.codigo_municipio,
       },
       tomador: {
