@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
-import { consultarNfse, reenviarNfse, extrairNfseDeImagem } from "@/lib/nfse.functions";
+import { consultarNfse, reenviarNfse, extrairNfseDeImagem, baixarNfseArquivo } from "@/lib/nfse.functions";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -48,6 +48,7 @@ function NfsePage() {
   const [loading, setLoading] = useState(false);
   const [erroDetalhe, setErroDetalhe] = useState<Row | null>(null);
   const [pdfVisualizando, setPdfVisualizando] = useState<Row | null>(null);
+  const baixarArquivo = useServerFn(baixarNfseArquivo);
 
   useEffect(() => {
     if (!clinicaAtual) return;
@@ -245,7 +246,7 @@ function NfsePage() {
                     </a>
                   </div>
                 </div>
-                <iframe src={r.url_pdf!} title={`DANFSE ${r.numero ?? r.id}`} className="w-full h-[480px] bg-white" />
+                <PdfPreview nfseId={r.id} baixar={baixarArquivo} className="w-full h-[480px] bg-white" title={`DANFSE ${r.numero ?? r.id}`} />
               </div>
             ))}
           </div>
@@ -490,7 +491,7 @@ function NfsePage() {
             </DialogTitle>
           </DialogHeader>
           {pdfVisualizando?.url_pdf && (
-            <iframe src={pdfVisualizando.url_pdf} title={`DANFSE ${pdfVisualizando.numero ?? ""}`} className="w-full h-[75vh] bg-white border rounded" />
+            <PdfPreview nfseId={pdfVisualizando.id} baixar={baixarArquivo} className="w-full h-[75vh] bg-white border rounded" title={`DANFSE ${pdfVisualizando.numero ?? ""}`} />
           )}
           <DialogFooter>
             {pdfVisualizando?.url_pdf && (
@@ -504,4 +505,46 @@ function NfsePage() {
       </Dialog>
     </div>
   );
+}
+
+function PdfPreview({
+  nfseId,
+  baixar,
+  className,
+  title,
+}: {
+  nfseId: string;
+  baixar: (args: { data: { nfseId: string; tipo: "pdf" | "xml" } }) => Promise<{ base64: string; mime: string }>;
+  className?: string;
+  title?: string;
+}) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelado = false;
+    let criada: string | null = null;
+    setUrl(null);
+    setErro(null);
+    void (async () => {
+      try {
+        const r = await baixar({ data: { nfseId, tipo: "pdf" } });
+        if (cancelado) return;
+        const bin = atob(r.base64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        const blob = new Blob([bytes], { type: r.mime });
+        criada = URL.createObjectURL(blob);
+        setUrl(criada);
+      } catch (e) {
+        if (!cancelado) setErro(e instanceof Error ? e.message : "Falha ao carregar PDF");
+      }
+    })();
+    return () => {
+      cancelado = true;
+      if (criada) URL.revokeObjectURL(criada);
+    };
+  }, [nfseId, baixar]);
+  if (erro) return <div className={`${className ?? ""} flex items-center justify-center text-xs text-destructive p-4`}>{erro}</div>;
+  if (!url) return <div className={`${className ?? ""} flex items-center justify-center text-xs text-muted-foreground`}><Loader2 className="h-4 w-4 animate-spin mr-2" /> Carregando PDF…</div>;
+  return <iframe src={url} title={title} className={className} />;
 }
