@@ -200,11 +200,7 @@ export const emitirNfse = createServerFn({ method: "POST" })
       // "Element 'trib': Missing child element(s). Expected is one of (tribFed, totTrib)".
       ...(codigoOpcaoSimplesNacional !== 1
         ? { percentual_total_tributos_simples_nacional: +(aliquota * 100).toFixed(2) }
-        : {
-            valor_total_tributos_federais: 0,
-            valor_total_tributos_estaduais: 0,
-            valor_total_tributos_municipais: 0,
-          }),
+        : {}),
     };
 
     // NFS-e Nacional (endpoint /v2/nfsen) usa um payload FLAT diferente,
@@ -570,11 +566,7 @@ export const reenviarNfse = createServerFn({ method: "POST" })
       // Bloco <trib> exige tribFed OU totTrib (evita erro_validacao_schema).
       ...(codigoOpcaoSimplesNacional !== 1
         ? { percentual_total_tributos_simples_nacional: +(aliquota * 100).toFixed(2) }
-        : {
-            valor_total_tributos_federais: 0,
-            valor_total_tributos_estaduais: 0,
-            valor_total_tributos_municipais: 0,
-          }),
+        : {}),
     };
 
     const tomadorCodMun = tomadorCodigoMunicipio ?? emitente.codigo_municipio;
