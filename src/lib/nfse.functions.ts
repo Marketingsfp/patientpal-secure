@@ -617,36 +617,69 @@ export const reenviarNfse = createServerFn({ method: "POST" })
       })
       .eq("id", nota.id);
 
-    const url = `${focusNfseBase(emitente)}?ref=${encodeURIComponent(ref)}`;
-    const resp = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: authHeader(token) },
-      body: JSON.stringify(payload),
-    });
-    const body = await resp.json().catch(() => ({}));
+    // E0014 (DPS já existente) — incrementa numero_dps e tenta de novo.
+    const baseUrl = focusNfseBase(emitente);
+    const isNacional = !!emitente.usar_ambiente_nacional;
+    const MAX_RPS_RETRIES = 200;
+    let currentRef = ref;
+    let currentNumero = (payloadNacional as { numero_dps?: number }).numero_dps ?? (emitente.rps_proximo_numero ?? 1);
+    let resp: Response;
+    let body: { status?: string; erros?: Array<{ codigo?: string; mensagem?: string }>; mensagem?: string } = {};
+    let attempts = 0;
+    let bumpedTo = currentNumero;
 
-    if (!resp.ok) {
+    while (true) {
+      attempts++;
+      resp = await fetch(`${baseUrl}?ref=${encodeURIComponent(currentRef)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: authHeader(token) },
+        body: JSON.stringify(payload),
+      });
+      body = (await resp.json().catch(() => ({}))) as typeof body;
+      const erros = Array.isArray(body?.erros) ? body!.erros! : [];
+      const e0014 = erros.some((e) => (e?.codigo ?? "").toUpperCase() === "E0014");
+      if (!isNacional || !e0014 || attempts >= MAX_RPS_RETRIES) break;
+      currentNumero += 1;
+      bumpedTo = currentNumero;
+      (payloadNacional as { numero_dps: number }).numero_dps = currentNumero;
+      currentRef = `${ref}-r${currentNumero}`;
+    }
+
+    if (isNacional && bumpedTo !== (emitente.rps_proximo_numero ?? 1)) {
+      await supabase
+        .from("nfse_emitentes")
+        .update({ rps_proximo_numero: bumpedTo + 1 })
+        .eq("id", emitente.id);
+    }
+
+    const errosFinal = Array.isArray(body?.erros) ? body.erros! : [];
+    const e0014Final = errosFinal.some((e) => (e?.codigo ?? "").toUpperCase() === "E0014");
+    if (!resp.ok || (body?.status === "erro_autorizacao" && e0014Final)) {
       await supabase
         .from("nfse")
         .update({
           status: "erro",
+          focus_ref: currentRef,
           focus_status: body?.status ?? "erro",
-          erro_mensagem: body?.mensagem ?? body?.erros?.[0]?.mensagem ?? `HTTP ${resp.status}`,
+          erro_mensagem: e0014Final
+            ? `Após ${attempts} tentativas a prefeitura ainda recusou (E0014 — DPS já existente). Ajuste manualmente o "Próx. nº RPS" do emitente.`
+            : body?.mensagem ?? body?.erros?.[0]?.mensagem ?? `HTTP ${resp.status}`,
           payload_resposta: body,
         })
         .eq("id", nota.id);
-      return { ok: false, id: nota.id, error: body?.mensagem ?? `HTTP ${resp.status}`, body };
+      return { ok: false, id: nota.id, error: body?.mensagem ?? `HTTP ${resp.status}`, body, tentativas: attempts };
     }
 
     await supabase
       .from("nfse")
       .update({
+        focus_ref: currentRef,
         focus_status: body?.status ?? "processando_autorizacao",
         payload_resposta: body,
       })
       .eq("id", nota.id);
 
-    return { ok: true, id: nota.id, ref, focus: body };
+    return { ok: true, id: nota.id, ref: currentRef, focus: body, tentativas: attempts };
   });
 /**
  * Extrai dados de uma NFS-e a partir de imagem/PDF (DANFSe).
