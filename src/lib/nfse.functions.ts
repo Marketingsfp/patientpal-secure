@@ -691,3 +691,37 @@ Não invente. Datas devem virar YYYY-MM-DD. Valor em número (ex: 60.00).`;
       tomador_nome: str(parsed.tomador_nome),
     };
   });
+
+/**
+ * Faz proxy do PDF/XML da NFS-e para evitar bloqueios de iframe cross-origin
+ * (CSP/X-Frame-Options) ao exibir DANFSE inline no app.
+ */
+export const baixarNfseArquivo = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({
+      nfseId: z.string().uuid(),
+      tipo: z.enum(["pdf", "xml"]).default("pdf"),
+    }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { data: nota, error } = await supabase
+      .from("nfse")
+      .select("url_pdf, url_xml")
+      .eq("id", data.nfseId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!nota) throw new Error("NFS-e não encontrada");
+    const url = data.tipo === "pdf" ? nota.url_pdf : nota.url_xml;
+    if (!url) throw new Error("Arquivo indisponível");
+
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Falha ao baixar arquivo (${res.status})`);
+    const buf = await res.arrayBuffer();
+    const b64 = Buffer.from(buf).toString("base64");
+    return {
+      base64: b64,
+      mime: data.tipo === "pdf" ? "application/pdf" : "application/xml",
+    };
+  });
