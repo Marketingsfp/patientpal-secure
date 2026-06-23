@@ -669,6 +669,14 @@ export const reenviarNfse = createServerFn({ method: "POST" })
         body: JSON.stringify(payload),
       });
       body = (await resp.json().catch(() => ({}))) as typeof body;
+      // /v2/nfsen é assíncrono: precisamos consultar o ref para descobrir
+      // se a prefeitura recusou com E0014.
+      if (
+        isNacional &&
+        (body?.status === "processando_autorizacao" || body?.status === "processando")
+      ) {
+        body = (await pollFocusTerminal(baseUrl, currentRef, token)) as typeof body;
+      }
       const erros = Array.isArray(body?.erros) ? body!.erros! : [];
       const e0014 = erros.some((e) => (e?.codigo ?? "").toUpperCase() === "E0014");
       if (!isNacional || !e0014 || attempts >= MAX_RPS_RETRIES) break;
