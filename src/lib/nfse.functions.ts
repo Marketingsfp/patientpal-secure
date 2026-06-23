@@ -323,7 +323,7 @@ export const emitirNfse = createServerFn({ method: "POST" })
     // incrementamos numero_dps e reenviamos até achar um número livre.
     const baseUrl = focusNfseBase(emitente);
     const isNacional = !!emitente.usar_ambiente_nacional;
-    const MAX_RPS_RETRIES = 200;
+    const MAX_RPS_RETRIES = 10;
 
     let currentRef = ref;
     let currentNumero = (payloadNacional as { numero_dps?: number }).numero_dps ?? (emitente.rps_proximo_numero ?? 1);
@@ -653,7 +653,7 @@ export const reenviarNfse = createServerFn({ method: "POST" })
     // E0014 (DPS já existente) — incrementa numero_dps e tenta de novo.
     const baseUrl = focusNfseBase(emitente);
     const isNacional = !!emitente.usar_ambiente_nacional;
-    const MAX_RPS_RETRIES = 200;
+    const MAX_RPS_RETRIES = 10;
     let currentRef = ref;
     let currentNumero = (payloadNacional as { numero_dps?: number }).numero_dps ?? (emitente.rps_proximo_numero ?? 1);
     let resp: Response;
