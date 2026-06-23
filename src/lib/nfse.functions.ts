@@ -26,7 +26,7 @@ function normalizeCodigoTributarioMunicipio(value: string | null | undefined) {
   if (!digits) return undefined;
   if (!/^\d{3}$/.test(digits)) {
     throw new Error(
-      `Cód. Tributário Município inválido (${digits}). Informe o código municipal do serviço com 3 dígitos; não use o código IBGE do município nesse campo.`,
+      `Cód. Tributário Município inválido (${digits}). Informe o código municipal do serviço com 3 dígitos (cTribMun); não use o código IBGE do município (7 dígitos) nesse campo.`,
     );
   }
   return digits;
