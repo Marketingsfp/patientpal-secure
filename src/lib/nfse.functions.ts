@@ -271,11 +271,16 @@ export const emitirNfse = createServerFn({ method: "POST" })
       // (Operação sem Incidência).
       situacao_tributaria_pis_cofins: "08",
       // <totTrib>: ME/EPP optante do SN -> usar pTotTribSN (E0712 proíbe indTotTrib).
-      // Para Não Optante (cod=1) NÃO enviar indTotTrib nem pTotTribSN
-      // (E0713 rejeita ambos quando regime não é Simples Nacional).
+      // Para Não Optante (cod=1) o schema exige o bloco vTotTrib com os
+      // valores federais/estaduais/municipais (E0713 rejeita indTotTrib e
+      // pTotTribSN). Enviamos zeros quando não há cálculo IBPT disponível.
       ...(codigoOpcaoSimplesNacional !== 1
         ? { percentual_total_tributos_simples_nacional: +(aliquota * 100).toFixed(2) }
-        : {}),
+        : {
+            valor_total_tributos_federais: 0,
+            valor_total_tributos_estaduais: 0,
+            valor_total_tributos_municipais: 0,
+          }),
       // E0166: para optante SN ME/EPP é obrigatório o regime de apuração SN.
       ...(codigoOpcaoSimplesNacional === 3 ? { regime_tributario_simples_nacional: 1 } : {}),
     };
@@ -633,7 +638,11 @@ export const reenviarNfse = createServerFn({ method: "POST" })
       situacao_tributaria_pis_cofins: "08",
       ...(codigoOpcaoSimplesNacional !== 1
         ? { percentual_total_tributos_simples_nacional: +(aliquota * 100).toFixed(2) }
-        : {}),
+        : {
+            valor_total_tributos_federais: 0,
+            valor_total_tributos_estaduais: 0,
+            valor_total_tributos_municipais: 0,
+          }),
       ...(codigoOpcaoSimplesNacional === 3 ? { regime_tributario_simples_nacional: 1 } : {}),
     };
 
