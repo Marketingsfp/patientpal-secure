@@ -287,40 +287,77 @@ export const emitirNfse = createServerFn({ method: "POST" })
       .single();
     if (errIns) throw errIns;
 
-    // Envia para o Focus
-    const url = `${focusNfseBase(emitente)}?ref=${encodeURIComponent(ref)}`;
-    const resp = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: authHeader(token),
-      },
-      body: JSON.stringify(payload),
-    });
-    const body = await resp.json().catch(() => ({}));
+    // Envia para o Focus. Para ambiente nacional, se a prefeitura recusar com
+    // E0014 (DPS já existente), o contador local está atrás da realidade —
+    // incrementamos numero_dps e reenviamos até achar um número livre.
+    const baseUrl = focusNfseBase(emitente);
+    const isNacional = !!emitente.usar_ambiente_nacional;
+    const MAX_RPS_RETRIES = 200;
+
+    let currentRef = ref;
+    let currentNumero = (payloadNacional as { numero_dps?: number }).numero_dps ?? (emitente.rps_proximo_numero ?? 1);
+    let resp: Response;
+    let body: { status?: string; erros?: Array<{ codigo?: string; mensagem?: string }>; mensagem?: string } = {};
+    let attempts = 0;
+    let bumpedTo = currentNumero;
+
+    while (true) {
+      attempts++;
+      resp = await fetch(`${baseUrl}?ref=${encodeURIComponent(currentRef)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: authHeader(token) },
+        body: JSON.stringify(payload),
+      });
+      body = (await resp.json().catch(() => ({}))) as typeof body;
+
+      // Detecta E0014 — "DPS já existe" — vindo tanto em HTTP 4xx quanto em
+      // resposta 2xx com status=erro_autorizacao.
+      const erros = Array.isArray(body?.erros) ? body!.erros! : [];
+      const e0014 = erros.some((e) => (e?.codigo ?? "").toUpperCase() === "E0014");
+
+      if (!isNacional || !e0014 || attempts >= MAX_RPS_RETRIES) break;
+
+      currentNumero += 1;
+      bumpedTo = currentNumero;
+      (payloadNacional as { numero_dps: number }).numero_dps = currentNumero;
+      currentRef = `${ref}-r${currentNumero}`;
+    }
+
+    // Persiste o avanço do contador (mesmo em caso de falha final, para não
+    // tentar de novo os mesmos números na próxima emissão).
+    if (isNacional && bumpedTo !== (emitente.rps_proximo_numero ?? 1)) {
+      await supabase
+        .from("nfse_emitentes")
+        .update({ rps_proximo_numero: bumpedTo + 1 })
+        .eq("id", emitente.id);
+    }
 
     if (!resp.ok) {
       await supabase
         .from("nfse")
         .update({
           status: "erro",
+          focus_ref: currentRef,
           focus_status: body?.status ?? "erro",
           erro_mensagem: body?.mensagem ?? body?.erros?.[0]?.mensagem ?? `HTTP ${resp.status}`,
+          payload_envio: payload,
           payload_resposta: body,
         })
         .eq("id", nota.id);
-      return { ok: false, id: nota.id, error: body?.mensagem ?? `HTTP ${resp.status}`, body };
+      return { ok: false, id: nota.id, error: body?.mensagem ?? `HTTP ${resp.status}`, body, tentativas: attempts };
     }
 
     await supabase
       .from("nfse")
       .update({
+        focus_ref: currentRef,
         focus_status: body?.status ?? "processando_autorizacao",
+        payload_envio: payload,
         payload_resposta: body,
       })
       .eq("id", nota.id);
 
-    return { ok: true, id: nota.id, ref, focus: body };
+    return { ok: true, id: nota.id, ref: currentRef, focus: body, tentativas: attempts };
   });
 
 /** Consulta o status atual da nota no Focus NFe e atualiza o registro local. */
