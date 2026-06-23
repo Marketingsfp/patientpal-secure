@@ -599,13 +599,6 @@ export const reenviarNfse = createServerFn({ method: "POST" })
 
     const payload = emitente.usar_ambiente_nacional ? payloadNacional : payloadMunicipal;
 
-    if (emitente.usar_ambiente_nacional) {
-      await supabase
-        .from("nfse_emitentes")
-        .update({ rps_proximo_numero: (emitente.rps_proximo_numero ?? 1) + 1 })
-        .eq("id", emitente.id);
-    }
-
     await supabase
       .from("nfse")
       .update({
