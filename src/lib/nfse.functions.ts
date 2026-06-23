@@ -17,6 +17,36 @@ function authHeader(token: string) {
   return `Basic ${b64}`;
 }
 
+/**
+ * O Ambiente Nacional /v2/nfsen é assíncrono: o POST responde
+ * `processando_autorizacao` e o resultado real (autorizado / erro_autorizacao
+ * com códigos como E0014) só aparece via GET segundos depois. Esta função
+ * faz polling até obter status terminal ou timeout.
+ */
+async function pollFocusTerminal(
+  baseUrl: string,
+  ref: string,
+  token: string,
+  maxAttempts = 8,
+  intervalMs = 1500,
+): Promise<{ status?: string; erros?: Array<{ codigo?: string; mensagem?: string }>; mensagem?: string } & Record<string, unknown>> {
+  let last: Record<string, unknown> = {};
+  for (let i = 0; i < maxAttempts; i++) {
+    await new Promise((r) => setTimeout(r, intervalMs));
+    try {
+      const r = await fetch(`${baseUrl}/${encodeURIComponent(ref)}`, {
+        headers: { Authorization: authHeader(token) },
+      });
+      last = (await r.json().catch(() => ({}))) as Record<string, unknown>;
+      const s = (last as { status?: string }).status;
+      if (s && s !== "processando_autorizacao" && s !== "processando") return last as never;
+    } catch {
+      // ignora — tenta de novo
+    }
+  }
+  return last as never;
+}
+
 function only(s: string | null | undefined) {
   return (s ?? "").replace(/\D/g, "");
 }
