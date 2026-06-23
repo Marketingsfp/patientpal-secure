@@ -341,6 +341,16 @@ export const emitirNfse = createServerFn({ method: "POST" })
       });
       body = (await resp.json().catch(() => ({}))) as typeof body;
 
+      // Endpoint Nacional é assíncrono — o POST retorna `processando_autorizacao`
+      // e o E0014 só aparece depois via GET. Sem polling aqui o retry nunca
+      // dispararia e a nota ficaria parada num número de DPS já usado.
+      if (
+        isNacional &&
+        (body?.status === "processando_autorizacao" || body?.status === "processando")
+      ) {
+        body = (await pollFocusTerminal(baseUrl, currentRef, token)) as typeof body;
+      }
+
       // Detecta E0014 — "DPS já existe" — vindo tanto em HTTP 4xx quanto em
       // resposta 2xx com status=erro_autorizacao.
       const erros = Array.isArray(body?.erros) ? body!.erros! : [];
