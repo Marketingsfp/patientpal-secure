@@ -332,14 +332,19 @@ export const emitirNfse = createServerFn({ method: "POST" })
         .eq("id", emitente.id);
     }
 
-    if (!resp.ok) {
+    const errosFinal = Array.isArray(body?.erros) ? body.erros! : [];
+    const e0014Final = errosFinal.some((e) => (e?.codigo ?? "").toUpperCase() === "E0014");
+    if (!resp.ok || (body?.status === "erro_autorizacao" && e0014Final)) {
       await supabase
         .from("nfse")
         .update({
           status: "erro",
           focus_ref: currentRef,
           focus_status: body?.status ?? "erro",
-          erro_mensagem: body?.mensagem ?? body?.erros?.[0]?.mensagem ?? `HTTP ${resp.status}`,
+          erro_mensagem:
+            (e0014Final
+              ? `Após ${attempts} tentativas a prefeitura ainda recusou (E0014 — DPS já existente). Ajuste manualmente o "Próx. nº RPS" do emitente.`
+              : body?.mensagem ?? body?.erros?.[0]?.mensagem ?? `HTTP ${resp.status}`),
           payload_envio: payload,
           payload_resposta: body,
         })
