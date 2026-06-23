@@ -142,6 +142,12 @@ export const emitirNfse = createServerFn({ method: "POST" })
     if (!itemListaServico) throw new Error("Informe o código nacional do serviço para emissão da NFS-e.");
     const codigoTributarioMunicipio = normalizeCodigoTributarioMunicipio(emitente.codigo_tributario_municipio);
 
+    if (!emitente.usar_ambiente_nacional && !codigoTributarioMunicipio) {
+      throw new Error(
+        "Cód. Tributário Município (cTribMun) não cadastrado no emitente. Informe o código municipal do serviço com 3 dígitos em Configurações › NFS-e (não é o código IBGE da cidade).",
+      );
+    }
+
     const imRaw = only(emitente.inscricao_municipal ?? "");
     const imLower = (emitente.inscricao_municipal ?? "").trim().toLowerCase();
     const inscricaoMunicipal = imRaw && imLower !== "isento" && imLower !== "insento" ? imRaw : undefined;
