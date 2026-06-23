@@ -142,12 +142,6 @@ export const emitirNfse = createServerFn({ method: "POST" })
     if (!itemListaServico) throw new Error("Informe o código nacional do serviço para emissão da NFS-e.");
     const codigoTributarioMunicipio = normalizeCodigoTributarioMunicipio(emitente.codigo_tributario_municipio);
 
-    if (!codigoTributarioMunicipio) {
-      throw new Error(
-        "Cód. Tributário Município (cTribMun) não cadastrado no emitente. Informe o código municipal do serviço com 3 dígitos em Configurações › NFS-e (não é o código IBGE da cidade).",
-      );
-    }
-
     const imRaw = only(emitente.inscricao_municipal ?? "");
     const imLower = (emitente.inscricao_municipal ?? "").trim().toLowerCase();
     const inscricaoMunicipal = imRaw && imLower !== "isento" && imLower !== "insento" ? imRaw : undefined;
@@ -239,7 +233,7 @@ export const emitirNfse = createServerFn({ method: "POST" })
       razao_social_tomador: data.tomador.nome,
       codigo_municipio_prestacao: Number(tomadorCodMun),
       codigo_tributacao_nacional_iss: itemListaServico,
-      codigo_tributacao_municipio: codigoTributarioMunicipio,
+      ...(codigoTributarioMunicipio ? { codigo_tributacao_municipio: codigoTributarioMunicipio } : {}),
       descricao_servico: data.descricaoServicos,
       valor_servico: data.valorServicos,
       tributacao_iss: 1,
@@ -521,11 +515,6 @@ export const reenviarNfse = createServerFn({ method: "POST" })
     const itemListaServico = only(emitente.item_lista_servico);
     if (!itemListaServico) throw new Error("Informe o código nacional do serviço no emitente.");
     const codigoTributarioMunicipio = normalizeCodigoTributarioMunicipio(emitente.codigo_tributario_municipio);
-    if (!codigoTributarioMunicipio) {
-      throw new Error(
-        "Cód. Tributário Município (cTribMun) não cadastrado no emitente. Informe o código municipal do serviço com 3 dígitos em Configurações › NFS-e (não é o código IBGE da cidade).",
-      );
-    }
 
     const cpfCnpj = only(nota.tomador_documento ?? "");
     const imRaw2 = only(emitente.inscricao_municipal ?? "");
@@ -604,7 +593,7 @@ export const reenviarNfse = createServerFn({ method: "POST" })
       razao_social_tomador: nota.tomador_nome,
       codigo_municipio_prestacao: Number(tomadorCodMun),
       codigo_tributacao_nacional_iss: itemListaServico,
-      codigo_tributacao_municipio: codigoTributarioMunicipio,
+      ...(codigoTributarioMunicipio ? { codigo_tributacao_municipio: codigoTributarioMunicipio } : {}),
       descricao_servico: nota.descricao_servicos,
       valor_servico: valorServicos,
       tributacao_iss: 1,
