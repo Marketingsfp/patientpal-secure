@@ -216,7 +216,10 @@ export const emitirNfse = createServerFn({ method: "POST" })
       data_emissao: dataEmissaoBR,
       serie_dps: Number(emitente.rps_serie ?? 1) || 1,
       numero_dps: emitente.rps_proximo_numero ?? 1,
-      data_competencia: new Date().toISOString().slice(0, 10),
+      // data_competencia tem que ser <= data_emissao. Usamos a data já em
+      // horário de Brasília (mesmo fuso de dataEmissaoBR) para evitar que
+      // o UTC "vire o dia" antes do horário local.
+      data_competencia: dataEmissaoBR.slice(0, 10),
       emitente_dps: 1, // 1 = prestador
       codigo_municipio_emissora: Number(emitente.codigo_municipio),
       cnpj_prestador: only(emitente.cnpj),
