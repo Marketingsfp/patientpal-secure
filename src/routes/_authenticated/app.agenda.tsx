@@ -2377,7 +2377,11 @@ function AgendaPage() {
       { forma: "cartao_credito", label: "Cartão de Crédito", valor: vCredito },
     ];
     let descSuffix = "";
-    if (info) {
+    if (opcoesOrc) {
+      // Valores do orçamento já consideram desconto/convênio definidos na hora
+      // de gerar o orçamento — não aplicamos nada por cima.
+      opcoes = opcoesOrc;
+    } else if (info) {
       if (!info.emDia) {
         toast.error(`Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.`);
         descSuffix = ` — ${info.convenioNome} EM ATRASO`;
