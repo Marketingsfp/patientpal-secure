@@ -2157,7 +2157,10 @@ function AgendaPage() {
         { forma: "cartao_credito", label: "Cartão de Crédito", valor: vCredito },
       ];
       let descSuffix = "";
-      if (info) {
+      const opcoesOrc = payload.orcamento_id ? await opcoesPagamentoDeOrcamento(payload.orcamento_id) : null;
+      if (opcoesOrc) {
+        opcoes = opcoesOrc;
+      } else if (info) {
         if (!info.emDia) {
           toast.error(`Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.`);
           descSuffix = ` — ${info.convenioNome} EM ATRASO`;
@@ -2302,12 +2305,40 @@ function AgendaPage() {
     await load();
   };
 
+  // Lê os valores fechados de um orçamento e devolve as 4 opções de pagamento.
+  // Quando o orçamento tem `valores_pagamento` por forma, usa cada um;
+  // caso contrário aplica o (valor_total - desconto) em todas as formas.
+  const opcoesPagamentoDeOrcamento = async (orcamentoId: string): Promise<FormaOpcao[] | null> => {
+    const { data, error } = await supabase
+      .from("orcamentos")
+      .select("valor_total, desconto, valores_pagamento")
+      .eq("id", orcamentoId)
+      .maybeSingle();
+    if (error || !data) return null;
+    const totalLiquido = Math.max(0, Number(data.valor_total ?? 0) - Number(data.desconto ?? 0));
+    const vals = (data.valores_pagamento ?? {}) as Record<string, number> | null;
+    const pegar = (label: string) => {
+      const v = vals ? Number(vals[label] ?? 0) : 0;
+      return v > 0 ? v : totalLiquido;
+    };
+    return [
+      { forma: "dinheiro", label: "Dinheiro", valor: pegar("Dinheiro") },
+      { forma: "pix", label: "Pix", valor: pegar("Pix") },
+      { forma: "cartao_debito", label: "Cartão de Débito", valor: pegar("Cartão de Débito") },
+      { forma: "cartao_credito", label: "Cartão de Crédito", valor: pegar("Cartão de Crédito") },
+    ];
+  };
+
   const cobrarAgendamento = async (a: Agendamento) => {
     if (!clinicaAtual) return;
     if (pagosSet.has(a.id)) {
       toast.info("Este agendamento já foi pago.");
       return;
     }
+    // Se o agendamento veio de um orçamento, usa SEMPRE os valores do orçamento
+    // (o procedimento pode ser texto livre tipo "LABORATÓRIO (4 EXAMES): ..."
+    // que não bate com a tabela de procedimentos e zeraria as opções).
+    const opcoesOrc = a.orcamento_id ? await opcoesPagamentoDeOrcamento(a.orcamento_id) : null;
     // Verificação fresca no banco: impede faturar duas vezes mesmo se o cache
     // local estiver desatualizado (ex.: outro usuário pagou em outra aba, ou
     // o pagamento foi transferido de uma ficha reagendada).
@@ -2349,7 +2380,11 @@ function AgendaPage() {
       { forma: "cartao_credito", label: "Cartão de Crédito", valor: vCredito },
     ];
     let descSuffix = "";
-    if (info) {
+    if (opcoesOrc) {
+      // Valores do orçamento já consideram desconto/convênio definidos na hora
+      // de gerar o orçamento — não aplicamos nada por cima.
+      opcoes = opcoesOrc;
+    } else if (info) {
       if (!info.emDia) {
         toast.error(`Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.`);
         descSuffix = ` — ${info.convenioNome} EM ATRASO`;
