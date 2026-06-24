@@ -925,3 +925,12 @@ function Clock() {
   if (!now) return <span>--:--</span>;
   return <span>{now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>;
 }
+
+function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-muted-foreground text-sm">{label}</span>
+      <span className={strong ? "text-2xl font-bold text-primary" : "text-lg"}>{value}</span>
+    </div>
+  );
+}
