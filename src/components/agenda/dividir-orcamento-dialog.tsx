@@ -59,8 +59,15 @@ const addMin = (localInput: string, min: number) => {
 function agruparItens(itens: DividirItem[]): GrupoForm[] {
   const map = new Map<string, GrupoForm>();
   for (const it of itens) {
-    const g = norm(it.grupo) || norm(it.tipo) || "OUTROS";
-    const label = (it.grupo ?? it.tipo ?? "Outros").toUpperCase();
+    // Regra: só separa em blocos diferentes se for LABORATÓRIO.
+    // Todos os demais itens (independente da especialidade) ficam num único
+    // bloco no nome do médico solicitante.
+    const ehLab =
+      norm(it.grupo) === "LABORATORIO" ||
+      (norm(it.tipo) === "EXAME" && norm(it.grupo) === "LABORATORIO") ||
+      norm(it.tipo) === "LABORATORIO";
+    const g = ehLab ? "LABORATORIO" : "GERAL";
+    const label = ehLab ? "LABORATÓRIO" : "CONSULTAS / EXAMES";
     if (!map.has(g)) {
       map.set(g, {
         key: g,
@@ -74,7 +81,14 @@ function agruparItens(itens: DividirItem[]): GrupoForm[] {
     }
     map.get(g)!.itens.push(it);
   }
-  return Array.from(map.values());
+  // Garante que o bloco "GERAL" venha primeiro (médico solicitante),
+  // e laboratório por último.
+  return Array.from(map.values()).sort((a, b) => {
+    if (a.key === b.key) return 0;
+    if (a.key === "LABORATORIO") return 1;
+    if (b.key === "LABORATORIO") return -1;
+    return 0;
+  });
 }
 
 function montarDescricao(g: GrupoForm): string {
