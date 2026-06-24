@@ -3105,7 +3105,7 @@ function AgendaPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      disabled={saving}
+                      disabled={saving || !form.paciente_id}
                       onClick={(e) => { emitirNotaAposRef.current = false; submit(e as unknown as FormEvent, true); }}
                       className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
                       title="Salva, registra pagamento e imprime a GR em A4"
@@ -3115,7 +3115,7 @@ function AgendaPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      disabled={saving}
+                      disabled={saving || !form.paciente_id}
                       onClick={async (e) => {
                         e.preventDefault();
                         const escolhido = await pickEmitenteNfse();
@@ -3132,7 +3132,7 @@ function AgendaPage() {
                     >
                       Pagar/Imprimir/Nota
                     </Button>
-                    <Button type="submit" data-primary disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
+                    <Button type="submit" data-primary disabled={saving || !form.paciente_id} title={!form.paciente_id ? "Selecione um paciente cadastrado antes de salvar" : undefined}>{saving ? "Salvando…" : "Salvar"}</Button>
                   </>
                 )}
               </DialogFooter>
