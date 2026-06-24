@@ -279,22 +279,187 @@ function AutoatendimentoPage() {
     setEspecialidades(filtradas);
   }
 
-  async function solicitarAgendamento(paciente: { id: string; nome: string } | null) {
+  // -------- Vagas disponíveis hoje --------
+  async function carregarVagasHoje(especialidadeId: string) {
     if (!clinicaAtual) return;
     setBusy(true);
-    const { data, error } = await supabase.rpc("emitir_senha", {
+    try {
+      // 1) Médicos da especialidade
+      const { data: meRows } = await supabase
+        .from("medico_especialidades")
+        .select("medico_id")
+        .eq("especialidade_id", especialidadeId);
+      const medicoIdsEsp = (meRows ?? []).map((r: any) => r.medico_id);
+      const { data: medsBase } = await supabase
+        .from("medicos")
+        .select("id, nome, duracao_consulta_min, especialidade_id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("ativo", true);
+      const meds = (medsBase ?? []).filter(
+        (m: any) => medicoIdsEsp.includes(m.id) || m.especialidade_id === especialidadeId,
+      );
+      if (meds.length === 0) {
+        setVagas([]);
+        setStep("vagas");
+        return;
+      }
+      const medicoIds = meds.map((m: any) => m.id);
+
+      // 2) Disponibilidades de hoje
+      const hoje = new Date();
+      const diaSemana = hoje.getDay();
+      const yyyy = hoje.getFullYear();
+      const mm = String(hoje.getMonth() + 1).padStart(2, "0");
+      const dd = String(hoje.getDate()).padStart(2, "0");
+      const hojeStr = `${yyyy}-${mm}-${dd}`;
+      const inicioDia = new Date();
+      inicioDia.setHours(0, 0, 0, 0);
+      const fimDia = new Date();
+      fimDia.setHours(23, 59, 59, 999);
+
+      const { data: disps } = await supabase
+        .from("medico_disponibilidades")
+        .select("medico_id, dia_semana, hora_inicio, hora_fim, intervalo_min, ativo, agenda_id, vigencia_inicio, vigencia_fim")
+        .in("medico_id", medicoIds)
+        .eq("dia_semana", diaSemana)
+        .eq("ativo", true);
+
+      const dispsValidas = (disps ?? []).filter((d: any) => {
+        if (d.vigencia_inicio && d.vigencia_inicio > hojeStr) return false;
+        if (d.vigencia_fim && d.vigencia_fim < hojeStr) return false;
+        return true;
+      });
+
+      // 3) Agendamentos já existentes hoje
+      const { data: ags } = await supabase
+        .from("agendamentos")
+        .select("medico_id, inicio, status")
+        .in("medico_id", medicoIds)
+        .gte("inicio", inicioDia.toISOString())
+        .lte("inicio", fimDia.toISOString())
+        .neq("status", "cancelado");
+      const ocupados = new Set(
+        (ags ?? []).map((a: any) => `${a.medico_id}|${new Date(a.inicio).getTime()}`),
+      );
+
+      // 4) Gera slots futuros
+      const agora = new Date();
+      const lista: Vaga[] = [];
+      for (const d of dispsValidas) {
+        const med = meds.find((m: any) => m.id === d.medico_id);
+        if (!med) continue;
+        const dur = d.intervalo_min || med.duracao_consulta_min || 30;
+        const [h1, m1] = d.hora_inicio.split(":").map(Number);
+        const [h2, m2] = d.hora_fim.split(":").map(Number);
+        const t0 = new Date();
+        t0.setHours(h1, m1, 0, 0);
+        const tEnd = new Date();
+        tEnd.setHours(h2, m2, 0, 0);
+        for (let t = new Date(t0); t < tEnd; t = new Date(t.getTime() + dur * 60000)) {
+          if (t < agora) continue;
+          const fim = new Date(t.getTime() + dur * 60000);
+          if (ocupados.has(`${d.medico_id}|${t.getTime()}`)) continue;
+          lista.push({
+            medico_id: d.medico_id,
+            medico_nome: med.nome,
+            agenda_id: d.agenda_id ?? null,
+            inicio: t.toISOString(),
+            fim: fim.toISOString(),
+            hora_label: t.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+          });
+        }
+      }
+      lista.sort((a, b) => a.inicio.localeCompare(b.inicio));
+      setVagas(lista.slice(0, 24));
+      setStep("vagas");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function carregarProcedimento(especialidadeId: string) {
+    if (!clinicaAtual) return null;
+    const esp = especialidades.find((e) => e.id === especialidadeId);
+    const nomeEsp = esp?.nome ?? "";
+    // Procura procedimento por nome da especialidade ou "consulta"
+    const { data } = await supabase
+      .from("procedimentos")
+      .select(
+        "id, nome, valor_padrao, valor_dinheiro, valor_pix, valor_cartao_credito, valor_cartao_debito, duracao_minutos",
+      )
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("ativo", true)
+      .or(`nome.ilike.%${nomeEsp}%,nome.ilike.%consulta%`)
+      .order("nome")
+      .limit(20);
+    const list = data ?? [];
+    // Prioriza match por nome exato da especialidade
+    const exato = list.find((p: any) =>
+      (p.nome || "").toLowerCase().includes(nomeEsp.toLowerCase()),
+    );
+    const escolhido = exato ?? list[0] ?? null;
+    setProcInfo(escolhido as any);
+    return escolhido as any;
+  }
+
+  function valorPorForma(p: ProcInfo | null, f: FormaPagto): number {
+    if (!p) return 0;
+    const map: Record<FormaPagto, number | null | undefined> = {
+      dinheiro: p.valor_dinheiro,
+      pix: p.valor_pix,
+      cartao_credito: p.valor_cartao_credito,
+      cartao_debito: p.valor_cartao_debito,
+    };
+    const v = map[f];
+    return v ?? p.valor_padrao ?? 0;
+  }
+
+  async function confirmarAgendamentoECaixa(paciente: { id: string; nome: string } | null) {
+    if (!clinicaAtual || !paciente || !vagaSel || !procInfo || !formaPagto) return;
+    setBusy(true);
+    const valor = valorPorForma(procInfo, formaPagto);
+    const formaLabel = FORMA_LABEL[formaPagto];
+    const obs = `[Totem] Forma de pagamento: ${formaLabel} — R$ ${valor
+      .toFixed(2)
+      .replace(".", ",")}`;
+    const { error: errAg } = await supabase.from("agendamentos").insert({
+      clinica_id: clinicaAtual.clinica_id,
+      paciente_id: paciente.id,
+      paciente_nome: paciente.nome,
+      medico_id: vagaSel.medico_id,
+      inicio: vagaSel.inicio,
+      fim: vagaSel.fim,
+      procedimento: procInfo.nome,
+      status: "agendado",
+      fluxo_etapa: "caixa",
+      agenda_id: vagaSel.agenda_id,
+      observacoes: obs,
+    });
+    if (errAg) {
+      setBusy(false);
+      toast.error(errAg.message);
+      return;
+    }
+    const { data: senhaData, error: errSenha } = await supabase.rpc("emitir_senha", {
       _clinica_id: clinicaAtual.clinica_id,
       _tipo: "N",
-      _paciente_id: paciente?.id,
+      _paciente_id: paciente.id,
       _identificado_facial: identMode === "facial",
     });
     setBusy(false);
-    if (error || !data) {
-      toast.error(error?.message ?? "Erro ao emitir senha");
+    if (errSenha || !senhaData) {
+      toast.error(errSenha?.message ?? "Erro ao emitir senha");
       return;
     }
-    const row = Array.isArray(data) ? data[0] : data;
+    const row = Array.isArray(senhaData) ? senhaData[0] : senhaData;
     setSenhaEmitida(row.codigo);
+    setValorFinal(valor);
+    setCheckoutInfo({
+      medico: vagaSel.medico_nome,
+      hora: vagaSel.hora_label,
+      forma: formaLabel,
+      valor,
+    });
     setStep("ok-agendar");
   }
 
