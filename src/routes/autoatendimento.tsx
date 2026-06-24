@@ -34,8 +34,44 @@ function AutoatendimentoRoute() {
   );
 }
 
-type Hub = "home" | "checkin" | "agendar" | "ok-checkin" | "ok-agendar";
+type Hub =
+  | "home"
+  | "checkin"
+  | "agendar"
+  | "vagas"
+  | "pagamento"
+  | "ok-checkin"
+  | "ok-agendar";
 type IdentMode = "cpf" | "facial" | null;
+
+type Vaga = {
+  medico_id: string;
+  medico_nome: string;
+  agenda_id: string | null;
+  inicio: string; // ISO
+  fim: string;
+  hora_label: string;
+};
+
+type FormaPagto = "dinheiro" | "pix" | "cartao_credito" | "cartao_debito";
+
+const FORMA_LABEL: Record<FormaPagto, string> = {
+  dinheiro: "Dinheiro",
+  pix: "PIX",
+  cartao_credito: "Cartão de crédito",
+  cartao_debito: "Cartão de débito",
+};
+
+type ProcInfo = {
+  id: string;
+  nome: string;
+  valor_dinheiro: number | null;
+  valor_pix: number | null;
+  valor_cartao_credito: number | null;
+  valor_cartao_debito: number | null;
+  valor_padrao: number | null;
+  duracao_minutos: number | null;
+};
 
 function AutoatendimentoPage() {
   const navigate = useNavigate();
@@ -56,6 +92,17 @@ function AutoatendimentoPage() {
   const [senhaEmitida, setSenhaEmitida] = useState<string | null>(null);
   const [especialidades, setEspecialidades] = useState<{ id: string; nome: string }[]>([]);
   const [especialidadeSel, setEspecialidadeSel] = useState<string | null>(null);
+  const [vagas, setVagas] = useState<Vaga[]>([]);
+  const [vagaSel, setVagaSel] = useState<Vaga | null>(null);
+  const [procInfo, setProcInfo] = useState<ProcInfo | null>(null);
+  const [formaPagto, setFormaPagto] = useState<FormaPagto | null>(null);
+  const [valorFinal, setValorFinal] = useState<number | null>(null);
+  const [checkoutInfo, setCheckoutInfo] = useState<{
+    medico: string;
+    hora: string;
+    forma: string;
+    valor: number;
+  } | null>(null);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -85,6 +132,12 @@ function AutoatendimentoPage() {
     setAgendamentoCheckin(null);
     setSenhaEmitida(null);
     setEspecialidadeSel(null);
+    setVagas([]);
+    setVagaSel(null);
+    setProcInfo(null);
+    setFormaPagto(null);
+    setValorFinal(null);
+    setCheckoutInfo(null);
   }
 
   // -------- Identificação --------
@@ -233,22 +286,187 @@ function AutoatendimentoPage() {
     setEspecialidades(filtradas);
   }
 
-  async function solicitarAgendamento(paciente: { id: string; nome: string } | null) {
+  // -------- Vagas disponíveis hoje --------
+  async function carregarVagasHoje(especialidadeId: string) {
     if (!clinicaAtual) return;
     setBusy(true);
-    const { data, error } = await supabase.rpc("emitir_senha", {
+    try {
+      // 1) Médicos da especialidade
+      const { data: meRows } = await supabase
+        .from("medico_especialidades")
+        .select("medico_id")
+        .eq("especialidade_id", especialidadeId);
+      const medicoIdsEsp = (meRows ?? []).map((r: any) => r.medico_id);
+      const { data: medsBase } = await supabase
+        .from("medicos")
+        .select("id, nome, duracao_consulta_min, especialidade_id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("ativo", true);
+      const meds = (medsBase ?? []).filter(
+        (m: any) => medicoIdsEsp.includes(m.id) || m.especialidade_id === especialidadeId,
+      );
+      if (meds.length === 0) {
+        setVagas([]);
+        setStep("vagas");
+        return;
+      }
+      const medicoIds = meds.map((m: any) => m.id);
+
+      // 2) Disponibilidades de hoje
+      const hoje = new Date();
+      const diaSemana = hoje.getDay();
+      const yyyy = hoje.getFullYear();
+      const mm = String(hoje.getMonth() + 1).padStart(2, "0");
+      const dd = String(hoje.getDate()).padStart(2, "0");
+      const hojeStr = `${yyyy}-${mm}-${dd}`;
+      const inicioDia = new Date();
+      inicioDia.setHours(0, 0, 0, 0);
+      const fimDia = new Date();
+      fimDia.setHours(23, 59, 59, 999);
+
+      const { data: disps } = await supabase
+        .from("medico_disponibilidades")
+        .select("medico_id, dia_semana, hora_inicio, hora_fim, intervalo_min, ativo, agenda_id, vigencia_inicio, vigencia_fim")
+        .in("medico_id", medicoIds)
+        .eq("dia_semana", diaSemana)
+        .eq("ativo", true);
+
+      const dispsValidas = (disps ?? []).filter((d: any) => {
+        if (d.vigencia_inicio && d.vigencia_inicio > hojeStr) return false;
+        if (d.vigencia_fim && d.vigencia_fim < hojeStr) return false;
+        return true;
+      });
+
+      // 3) Agendamentos já existentes hoje
+      const { data: ags } = await supabase
+        .from("agendamentos")
+        .select("medico_id, inicio, status")
+        .in("medico_id", medicoIds)
+        .gte("inicio", inicioDia.toISOString())
+        .lte("inicio", fimDia.toISOString())
+        .neq("status", "cancelado");
+      const ocupados = new Set(
+        (ags ?? []).map((a: any) => `${a.medico_id}|${new Date(a.inicio).getTime()}`),
+      );
+
+      // 4) Gera slots futuros
+      const agora = new Date();
+      const lista: Vaga[] = [];
+      for (const d of dispsValidas) {
+        const med = meds.find((m: any) => m.id === d.medico_id);
+        if (!med) continue;
+        const dur = d.intervalo_min || med.duracao_consulta_min || 30;
+        const [h1, m1] = d.hora_inicio.split(":").map(Number);
+        const [h2, m2] = d.hora_fim.split(":").map(Number);
+        const t0 = new Date();
+        t0.setHours(h1, m1, 0, 0);
+        const tEnd = new Date();
+        tEnd.setHours(h2, m2, 0, 0);
+        for (let t = new Date(t0); t < tEnd; t = new Date(t.getTime() + dur * 60000)) {
+          if (t < agora) continue;
+          const fim = new Date(t.getTime() + dur * 60000);
+          if (ocupados.has(`${d.medico_id}|${t.getTime()}`)) continue;
+          lista.push({
+            medico_id: d.medico_id,
+            medico_nome: med.nome,
+            agenda_id: d.agenda_id ?? null,
+            inicio: t.toISOString(),
+            fim: fim.toISOString(),
+            hora_label: t.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+          });
+        }
+      }
+      lista.sort((a, b) => a.inicio.localeCompare(b.inicio));
+      setVagas(lista.slice(0, 24));
+      setStep("vagas");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function carregarProcedimento(especialidadeId: string) {
+    if (!clinicaAtual) return null;
+    const esp = especialidades.find((e) => e.id === especialidadeId);
+    const nomeEsp = esp?.nome ?? "";
+    // Procura procedimento por nome da especialidade ou "consulta"
+    const { data } = await supabase
+      .from("procedimentos")
+      .select(
+        "id, nome, valor_padrao, valor_dinheiro, valor_pix, valor_cartao_credito, valor_cartao_debito, duracao_minutos",
+      )
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("ativo", true)
+      .or(`nome.ilike.%${nomeEsp}%,nome.ilike.%consulta%`)
+      .order("nome")
+      .limit(20);
+    const list = data ?? [];
+    // Prioriza match por nome exato da especialidade
+    const exato = list.find((p: any) =>
+      (p.nome || "").toLowerCase().includes(nomeEsp.toLowerCase()),
+    );
+    const escolhido = exato ?? list[0] ?? null;
+    setProcInfo(escolhido as any);
+    return escolhido as any;
+  }
+
+  function valorPorForma(p: ProcInfo | null, f: FormaPagto): number {
+    if (!p) return 0;
+    const map: Record<FormaPagto, number | null | undefined> = {
+      dinheiro: p.valor_dinheiro,
+      pix: p.valor_pix,
+      cartao_credito: p.valor_cartao_credito,
+      cartao_debito: p.valor_cartao_debito,
+    };
+    const v = map[f];
+    return v ?? p.valor_padrao ?? 0;
+  }
+
+  async function confirmarAgendamentoECaixa(paciente: { id: string; nome: string } | null) {
+    if (!clinicaAtual || !paciente || !vagaSel || !procInfo || !formaPagto) return;
+    setBusy(true);
+    const valor = valorPorForma(procInfo, formaPagto);
+    const formaLabel = FORMA_LABEL[formaPagto];
+    const obs = `[Totem] Forma de pagamento: ${formaLabel} — R$ ${valor
+      .toFixed(2)
+      .replace(".", ",")}`;
+    const { error: errAg } = await supabase.from("agendamentos").insert({
+      clinica_id: clinicaAtual.clinica_id,
+      paciente_id: paciente.id,
+      paciente_nome: paciente.nome,
+      medico_id: vagaSel.medico_id,
+      inicio: vagaSel.inicio,
+      fim: vagaSel.fim,
+      procedimento: procInfo.nome,
+      status: "agendado",
+      fluxo_etapa: "caixa",
+      agenda_id: vagaSel.agenda_id,
+      observacoes: obs,
+    });
+    if (errAg) {
+      setBusy(false);
+      toast.error(errAg.message);
+      return;
+    }
+    const { data: senhaData, error: errSenha } = await supabase.rpc("emitir_senha", {
       _clinica_id: clinicaAtual.clinica_id,
       _tipo: "N",
-      _paciente_id: paciente?.id,
+      _paciente_id: paciente.id,
       _identificado_facial: identMode === "facial",
     });
     setBusy(false);
-    if (error || !data) {
-      toast.error(error?.message ?? "Erro ao emitir senha");
+    if (errSenha || !senhaData) {
+      toast.error(errSenha?.message ?? "Erro ao emitir senha");
       return;
     }
-    const row = Array.isArray(data) ? data[0] : data;
+    const row = Array.isArray(senhaData) ? senhaData[0] : senhaData;
     setSenhaEmitida(row.codigo);
+    setValorFinal(valor);
+    setCheckoutInfo({
+      medico: vagaSel.medico_nome,
+      hora: vagaSel.hora_label,
+      forma: formaLabel,
+      valor,
+    });
     setStep("ok-agendar");
   }
 
@@ -466,10 +684,14 @@ function AutoatendimentoPage() {
                   size="lg"
                   className="w-full h-14"
                   disabled={busy || !especialidadeSel}
-                  onClick={() => solicitarAgendamento(pacienteAtual)}
+                  onClick={async () => {
+                    if (!especialidadeSel) return;
+                    await carregarProcedimento(especialidadeSel);
+                    await carregarVagasHoje(especialidadeSel);
+                  }}
                 >
                   {busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Confirmar e pegar senha
+                  Ver horários disponíveis
                 </Button>
               </div>
             )}
@@ -511,13 +733,141 @@ function AutoatendimentoPage() {
           </div>
         )}
 
+        {step === "vagas" && (
+          <div className="w-full max-w-4xl bg-card border rounded-3xl p-10 shadow-xl relative">
+            <button
+              onClick={reset}
+              className="absolute top-6 left-6 text-muted-foreground hover:text-foreground flex items-center gap-1"
+            >
+              <ArrowLeft className="h-5 w-5" /> Início
+            </button>
+            <div className="text-center space-y-2 mb-6">
+              <h2 className="text-3xl font-bold">Escolha um horário</h2>
+              <p className="text-muted-foreground">Vagas disponíveis para hoje</p>
+            </div>
+            {vagas.length === 0 ? (
+              <div className="text-center py-12 space-y-4">
+                <p className="text-xl text-muted-foreground">
+                  Não há vagas disponíveis para hoje nesta especialidade.
+                </p>
+                <Button size="lg" variant="outline" onClick={() => setStep("agendar")}>
+                  Voltar
+                </Button>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[420px] overflow-auto pr-1">
+                  {vagas.map((v) => (
+                    <button
+                      key={`${v.medico_id}-${v.inicio}`}
+                      onClick={() => {
+                        setVagaSel(v);
+                        setFormaPagto(null);
+                        setStep("pagamento");
+                      }}
+                      className="flex items-center justify-between p-4 rounded-xl border-2 hover:border-primary hover:bg-primary/5 transition text-left"
+                    >
+                      <div>
+                        <div className="text-sm text-muted-foreground">Dr(a).</div>
+                        <div className="text-lg font-semibold">{v.medico_nome}</div>
+                      </div>
+                      <div className="text-2xl font-mono font-bold text-primary">
+                        {v.hora_label}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-6 text-center">
+                  <Button variant="outline" size="lg" onClick={() => setStep("agendar")}>
+                    Voltar
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {step === "pagamento" && vagaSel && (
+          <div className="w-full max-w-3xl bg-card border rounded-3xl p-10 shadow-xl relative">
+            <button
+              onClick={() => setStep("vagas")}
+              className="absolute top-6 left-6 text-muted-foreground hover:text-foreground flex items-center gap-1"
+            >
+              <ArrowLeft className="h-5 w-5" /> Voltar
+            </button>
+            <div className="text-center space-y-1 mb-6">
+              <h2 className="text-3xl font-bold">Forma de pagamento</h2>
+              <p className="text-muted-foreground">
+                {vagaSel.medico_nome} · {vagaSel.hora_label}
+              </p>
+              {procInfo && (
+                <p className="text-sm text-muted-foreground">{procInfo.nome}</p>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {(["dinheiro", "pix", "cartao_credito", "cartao_debito"] as FormaPagto[]).map((f) => {
+                const v = valorPorForma(procInfo, f);
+                const ativa = formaPagto === f;
+                return (
+                  <button
+                    key={f}
+                    onClick={() => setFormaPagto(f)}
+                    className={`p-5 rounded-2xl border-2 text-left transition ${
+                      ativa ? "border-primary bg-primary/10" : "hover:border-primary/50"
+                    }`}
+                  >
+                    <div className="text-lg font-semibold">{FORMA_LABEL[f]}</div>
+                    <div className="text-3xl font-bold text-primary mt-2 tabular-nums">
+                      {v > 0
+                        ? v.toLocaleString("pt-BR", {
+                            style: "currency",
+                            currency: "BRL",
+                          })
+                        : "—"}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            {!procInfo && (
+              <p className="text-center text-sm text-amber-600 mt-4">
+                Procedimento de consulta não cadastrado — valor poderá ser confirmado no caixa.
+              </p>
+            )}
+            <Button
+              size="lg"
+              className="w-full h-16 mt-6 text-lg"
+              disabled={busy || !formaPagto}
+              onClick={() => confirmarAgendamentoECaixa(pacienteAtual)}
+            >
+              {busy && <Loader2 className="h-5 w-5 mr-2 animate-spin" />}
+              Confirmar e ir para o caixa
+            </Button>
+          </div>
+        )}
+
         {step === "ok-agendar" && senhaEmitida && (
-          <div className="text-center space-y-4">
+          <div className="text-center space-y-4 max-w-xl">
             <div className="text-muted-foreground uppercase tracking-widest text-sm">Sua senha</div>
-            <div className="text-[10rem] leading-none font-black text-primary tabular-nums">
+            <div className="text-[8rem] leading-none font-black text-primary tabular-nums">
               {senhaEmitida}
             </div>
-            <p className="text-xl">A recepção irá chamar você para confirmar o horário.</p>
+            {checkoutInfo ? (
+              <div className="bg-card border rounded-2xl p-6 text-left space-y-2">
+                <Row label="Profissional" value={checkoutInfo.medico} />
+                <Row label="Horário" value={checkoutInfo.hora} />
+                <Row label="Pagamento" value={checkoutInfo.forma} />
+                <Row
+                  label="Valor"
+                  value={checkoutInfo.valor.toLocaleString("pt-BR", {
+                    style: "currency",
+                    currency: "BRL",
+                  })}
+                  strong
+                />
+              </div>
+            ) : null}
+            <p className="text-xl font-semibold">Dirija-se ao caixa para efetuar o pagamento.</p>
             <Button size="lg" onClick={reset}>
               Concluir
             </Button>
@@ -574,4 +924,13 @@ function Clock() {
   }, []);
   if (!now) return <span>--:--</span>;
   return <span>{now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>;
+}
+
+function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-muted-foreground text-sm">{label}</span>
+      <span className={strong ? "text-2xl font-bold text-primary" : "text-lg"}>{value}</span>
+    </div>
+  );
 }
