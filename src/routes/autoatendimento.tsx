@@ -756,26 +756,46 @@ function AutoatendimentoPage() {
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[420px] overflow-auto pr-1">
-                  {vagas.map((v) => (
-                    <button
-                      key={`${v.medico_id}-${v.inicio}`}
-                      onClick={() => {
-                        setVagaSel(v);
-                        setFormaPagto(null);
-                        setStep("pagamento");
-                      }}
-                      className="flex items-center justify-between p-4 rounded-xl border-2 hover:border-primary hover:bg-primary/5 transition text-left"
-                    >
-                      <div>
-                        <div className="text-sm text-muted-foreground">Dr(a).</div>
-                        <div className="text-lg font-semibold">{v.medico_nome}</div>
+                <div className="space-y-4 max-h-[460px] overflow-auto pr-1">
+                  {Object.values(
+                    vagas.reduce<Record<string, { medico_id: string; medico_nome: string; horarios: Vaga[] }>>(
+                      (acc, v) => {
+                        if (!acc[v.medico_id]) {
+                          acc[v.medico_id] = { medico_id: v.medico_id, medico_nome: v.medico_nome, horarios: [] };
+                        }
+                        acc[v.medico_id].horarios.push(v);
+                        return acc;
+                      },
+                      {},
+                    ),
+                  )
+                    .sort((a, b) => a.medico_nome.localeCompare(b.medico_nome))
+                    .map((grupo) => (
+                      <div
+                        key={grupo.medico_id}
+                        className="rounded-2xl border-2 p-4 bg-card/50"
+                      >
+                        <div className="mb-3">
+                          <div className="text-sm text-muted-foreground">Dr(a).</div>
+                          <div className="text-lg font-semibold">{grupo.medico_nome}</div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {grupo.horarios.map((v) => (
+                            <button
+                              key={v.inicio}
+                              onClick={() => {
+                                setVagaSel(v);
+                                setFormaPagto(null);
+                                setStep("pagamento");
+                              }}
+                              className="px-4 py-2 rounded-lg border-2 text-base font-mono font-semibold hover:border-primary hover:bg-primary/10 hover:text-primary transition"
+                            >
+                              {v.hora_label}
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                      <div className="text-2xl font-mono font-bold text-primary">
-                        {v.hora_label}
-                      </div>
-                    </button>
-                  ))}
+                    ))}
                 </div>
                 <div className="mt-6 text-center">
                   <Button variant="outline" size="lg" onClick={() => setStep("agendar")}>
