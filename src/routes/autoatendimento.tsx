@@ -24,7 +24,6 @@ import {
 
 export const Route = createFileRoute("/autoatendimento")({
   component: AutoatendimentoRoute,
-  ssr: false,
 });
 
 function AutoatendimentoRoute() {
