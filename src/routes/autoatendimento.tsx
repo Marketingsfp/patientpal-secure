@@ -733,13 +733,141 @@ function AutoatendimentoPage() {
           </div>
         )}
 
+        {step === "vagas" && (
+          <div className="w-full max-w-4xl bg-card border rounded-3xl p-10 shadow-xl relative">
+            <button
+              onClick={reset}
+              className="absolute top-6 left-6 text-muted-foreground hover:text-foreground flex items-center gap-1"
+            >
+              <ArrowLeft className="h-5 w-5" /> Início
+            </button>
+            <div className="text-center space-y-2 mb-6">
+              <h2 className="text-3xl font-bold">Escolha um horário</h2>
+              <p className="text-muted-foreground">Vagas disponíveis para hoje</p>
+            </div>
+            {vagas.length === 0 ? (
+              <div className="text-center py-12 space-y-4">
+                <p className="text-xl text-muted-foreground">
+                  Não há vagas disponíveis para hoje nesta especialidade.
+                </p>
+                <Button size="lg" variant="outline" onClick={() => setStep("agendar")}>
+                  Voltar
+                </Button>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[420px] overflow-auto pr-1">
+                  {vagas.map((v) => (
+                    <button
+                      key={`${v.medico_id}-${v.inicio}`}
+                      onClick={() => {
+                        setVagaSel(v);
+                        setFormaPagto(null);
+                        setStep("pagamento");
+                      }}
+                      className="flex items-center justify-between p-4 rounded-xl border-2 hover:border-primary hover:bg-primary/5 transition text-left"
+                    >
+                      <div>
+                        <div className="text-sm text-muted-foreground">Dr(a).</div>
+                        <div className="text-lg font-semibold">{v.medico_nome}</div>
+                      </div>
+                      <div className="text-2xl font-mono font-bold text-primary">
+                        {v.hora_label}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-6 text-center">
+                  <Button variant="outline" size="lg" onClick={() => setStep("agendar")}>
+                    Voltar
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {step === "pagamento" && vagaSel && (
+          <div className="w-full max-w-3xl bg-card border rounded-3xl p-10 shadow-xl relative">
+            <button
+              onClick={() => setStep("vagas")}
+              className="absolute top-6 left-6 text-muted-foreground hover:text-foreground flex items-center gap-1"
+            >
+              <ArrowLeft className="h-5 w-5" /> Voltar
+            </button>
+            <div className="text-center space-y-1 mb-6">
+              <h2 className="text-3xl font-bold">Forma de pagamento</h2>
+              <p className="text-muted-foreground">
+                {vagaSel.medico_nome} · {vagaSel.hora_label}
+              </p>
+              {procInfo && (
+                <p className="text-sm text-muted-foreground">{procInfo.nome}</p>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {(["dinheiro", "pix", "cartao_credito", "cartao_debito"] as FormaPagto[]).map((f) => {
+                const v = valorPorForma(procInfo, f);
+                const ativa = formaPagto === f;
+                return (
+                  <button
+                    key={f}
+                    onClick={() => setFormaPagto(f)}
+                    className={`p-5 rounded-2xl border-2 text-left transition ${
+                      ativa ? "border-primary bg-primary/10" : "hover:border-primary/50"
+                    }`}
+                  >
+                    <div className="text-lg font-semibold">{FORMA_LABEL[f]}</div>
+                    <div className="text-3xl font-bold text-primary mt-2 tabular-nums">
+                      {v > 0
+                        ? v.toLocaleString("pt-BR", {
+                            style: "currency",
+                            currency: "BRL",
+                          })
+                        : "—"}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            {!procInfo && (
+              <p className="text-center text-sm text-amber-600 mt-4">
+                Procedimento de consulta não cadastrado — valor poderá ser confirmado no caixa.
+              </p>
+            )}
+            <Button
+              size="lg"
+              className="w-full h-16 mt-6 text-lg"
+              disabled={busy || !formaPagto}
+              onClick={() => confirmarAgendamentoECaixa(pacienteAtual)}
+            >
+              {busy && <Loader2 className="h-5 w-5 mr-2 animate-spin" />}
+              Confirmar e ir para o caixa
+            </Button>
+          </div>
+        )}
+
         {step === "ok-agendar" && senhaEmitida && (
-          <div className="text-center space-y-4">
+          <div className="text-center space-y-4 max-w-xl">
             <div className="text-muted-foreground uppercase tracking-widest text-sm">Sua senha</div>
-            <div className="text-[10rem] leading-none font-black text-primary tabular-nums">
+            <div className="text-[8rem] leading-none font-black text-primary tabular-nums">
               {senhaEmitida}
             </div>
-            <p className="text-xl">A recepção irá chamar você para confirmar o horário.</p>
+            {checkoutInfo ? (
+              <div className="bg-card border rounded-2xl p-6 text-left space-y-2">
+                <Row label="Profissional" value={checkoutInfo.medico} />
+                <Row label="Horário" value={checkoutInfo.hora} />
+                <Row label="Pagamento" value={checkoutInfo.forma} />
+                <Row
+                  label="Valor"
+                  value={checkoutInfo.valor.toLocaleString("pt-BR", {
+                    style: "currency",
+                    currency: "BRL",
+                  })}
+                  strong
+                />
+              </div>
+            ) : null}
+            <p className="text-xl font-semibold">Dirija-se ao caixa para efetuar o pagamento.</p>
             <Button size="lg" onClick={reset}>
               Concluir
             </Button>
