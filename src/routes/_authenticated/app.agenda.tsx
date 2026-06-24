@@ -1971,9 +1971,38 @@ function AgendaPage() {
         .order("ordem");
       itensOrc = ((its ?? []) as { descricao: string }[]).map((x) => x.descricao);
     }
+    // Se o agendamento veio sem paciente_id (ex.: criado a partir de um
+    // orçamento que também não tinha o vínculo), tenta resolver pelo nome
+    // dentro da clínica atual e backfilla o cadastro tanto no agendamento
+    // quanto no orçamento, evitando o aviso "Paciente não cadastrado".
+    let resolvedPacId: string = a.paciente_id ?? "";
+    let resolvedPacNome: string = a.paciente_nome;
+    if (!resolvedPacId && a.paciente_nome && clinicaAtual) {
+      const nomeBusca = a.paciente_nome.trim();
+      const { data: cands } = await supabase
+        .from("pacientes")
+        .select("id, nome")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("ativo", true)
+        .ilike("nome", nomeBusca)
+        .limit(5);
+      const lista = (cands ?? []) as { id: string; nome: string }[];
+      const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim().replace(/\s+/g, " ");
+      const alvo = norm(nomeBusca);
+      const exato = lista.find((p) => norm(p.nome) === alvo) ?? (lista.length === 1 ? lista[0] : null);
+      if (exato) {
+        resolvedPacId = exato.id;
+        resolvedPacNome = exato.nome;
+        // Backfill silencioso (não bloqueia a abertura do diálogo se falhar)
+        void supabase.from("agendamentos").update({ paciente_id: exato.id }).eq("id", a.id);
+        if (a.orcamento_id) {
+          void supabase.from("orcamentos").update({ paciente_id: exato.id }).eq("id", a.orcamento_id).is("paciente_id", null);
+        }
+      }
+    }
     setForm({
-      paciente_nome: a.paciente_nome,
-      paciente_id: a.paciente_id ?? "",
+      paciente_nome: resolvedPacNome,
+      paciente_id: resolvedPacId,
       medico_id: a.medico_id ?? "",
       inicio: toLocalInput(a.inicio), fim: toLocalInput(a.fim),
       procedimento: procedimentoEfetivo(a.medico_id, a.procedimento),
