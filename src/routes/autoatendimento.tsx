@@ -55,6 +55,13 @@ type Vaga = {
 
 type FormaPagto = "dinheiro" | "pix" | "cartao_credito" | "cartao_debito";
 
+const FORMA_LABEL: Record<FormaPagto, string> = {
+  dinheiro: "Dinheiro",
+  pix: "PIX",
+  cartao_credito: "Cartão de crédito",
+  cartao_debito: "Cartão de débito",
+};
+
 type ProcInfo = {
   id: string;
   nome: string;
@@ -677,10 +684,14 @@ function AutoatendimentoPage() {
                   size="lg"
                   className="w-full h-14"
                   disabled={busy || !especialidadeSel}
-                  onClick={() => solicitarAgendamento(pacienteAtual)}
+                  onClick={async () => {
+                    if (!especialidadeSel) return;
+                    await carregarProcedimento(especialidadeSel);
+                    await carregarVagasHoje(especialidadeSel);
+                  }}
                 >
                   {busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Confirmar e pegar senha
+                  Ver horários disponíveis
                 </Button>
               </div>
             )}
