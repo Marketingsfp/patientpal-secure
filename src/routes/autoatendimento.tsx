@@ -226,7 +226,6 @@ function AutoatendimentoPage() {
     const { data } = await supabase
       .from("especialidades")
       .select("id, nome")
-      .eq("clinica_id", clinicaAtual.clinica_id)
       .order("nome");
     setEspecialidades(data ?? []);
   }

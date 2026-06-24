@@ -15,6 +15,7 @@ import { Route as SignupRouteImport } from './routes/signup'
 import { Route as PainelRouteImport } from './routes/painel'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DiagnosticoRouteImport } from './routes/diagnostico'
+import { Route as AutoatendimentoRouteImport } from './routes/autoatendimento'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PacienteIndexRouteImport } from './routes/paciente.index'
@@ -150,6 +151,11 @@ const LoginRoute = LoginRouteImport.update({
 const DiagnosticoRoute = DiagnosticoRouteImport.update({
   id: '/diagnostico',
   path: '/diagnostico',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AutoatendimentoRoute = AutoatendimentoRouteImport.update({
+  id: '/autoatendimento',
+  path: '/autoatendimento',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
@@ -758,6 +764,7 @@ const AuthenticatedAppEquipeEnfermeiroUserIdEditarRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/autoatendimento': typeof AutoatendimentoRoute
   '/diagnostico': typeof DiagnosticoRoute
   '/login': typeof LoginRoute
   '/painel': typeof PainelRoute
@@ -871,6 +878,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/autoatendimento': typeof AutoatendimentoRoute
   '/diagnostico': typeof DiagnosticoRoute
   '/login': typeof LoginRoute
   '/painel': typeof PainelRoute
@@ -982,6 +990,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
+  '/autoatendimento': typeof AutoatendimentoRoute
   '/diagnostico': typeof DiagnosticoRoute
   '/login': typeof LoginRoute
   '/painel': typeof PainelRoute
@@ -1097,6 +1106,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/autoatendimento'
     | '/diagnostico'
     | '/login'
     | '/painel'
@@ -1210,6 +1220,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/autoatendimento'
     | '/diagnostico'
     | '/login'
     | '/painel'
@@ -1320,6 +1331,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_authenticated'
+    | '/autoatendimento'
     | '/diagnostico'
     | '/login'
     | '/painel'
@@ -1435,6 +1447,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
+  AutoatendimentoRoute: typeof AutoatendimentoRoute
   DiagnosticoRoute: typeof DiagnosticoRoute
   LoginRoute: typeof LoginRoute
   PainelRoute: typeof PainelRoute
@@ -1497,6 +1510,13 @@ declare module '@tanstack/react-router' {
       path: '/diagnostico'
       fullPath: '/diagnostico'
       preLoaderRoute: typeof DiagnosticoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/autoatendimento': {
+      id: '/autoatendimento'
+      path: '/autoatendimento'
+      fullPath: '/autoatendimento'
+      preLoaderRoute: typeof AutoatendimentoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -2532,6 +2552,7 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
+  AutoatendimentoRoute: AutoatendimentoRoute,
   DiagnosticoRoute: DiagnosticoRoute,
   LoginRoute: LoginRoute,
   PainelRoute: PainelRoute,
@@ -2554,13 +2575,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
