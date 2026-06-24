@@ -34,8 +34,37 @@ function AutoatendimentoRoute() {
   );
 }
 
-type Hub = "home" | "checkin" | "agendar" | "ok-checkin" | "ok-agendar";
+type Hub =
+  | "home"
+  | "checkin"
+  | "agendar"
+  | "vagas"
+  | "pagamento"
+  | "ok-checkin"
+  | "ok-agendar";
 type IdentMode = "cpf" | "facial" | null;
+
+type Vaga = {
+  medico_id: string;
+  medico_nome: string;
+  agenda_id: string | null;
+  inicio: string; // ISO
+  fim: string;
+  hora_label: string;
+};
+
+type FormaPagto = "dinheiro" | "pix" | "cartao_credito" | "cartao_debito";
+
+type ProcInfo = {
+  id: string;
+  nome: string;
+  valor_dinheiro: number | null;
+  valor_pix: number | null;
+  valor_cartao_credito: number | null;
+  valor_cartao_debito: number | null;
+  valor_padrao: number | null;
+  duracao_minutos: number | null;
+};
 
 function AutoatendimentoPage() {
   const navigate = useNavigate();
@@ -56,6 +85,17 @@ function AutoatendimentoPage() {
   const [senhaEmitida, setSenhaEmitida] = useState<string | null>(null);
   const [especialidades, setEspecialidades] = useState<{ id: string; nome: string }[]>([]);
   const [especialidadeSel, setEspecialidadeSel] = useState<string | null>(null);
+  const [vagas, setVagas] = useState<Vaga[]>([]);
+  const [vagaSel, setVagaSel] = useState<Vaga | null>(null);
+  const [procInfo, setProcInfo] = useState<ProcInfo | null>(null);
+  const [formaPagto, setFormaPagto] = useState<FormaPagto | null>(null);
+  const [valorFinal, setValorFinal] = useState<number | null>(null);
+  const [checkoutInfo, setCheckoutInfo] = useState<{
+    medico: string;
+    hora: string;
+    forma: string;
+    valor: number;
+  } | null>(null);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -85,6 +125,12 @@ function AutoatendimentoPage() {
     setAgendamentoCheckin(null);
     setSenhaEmitida(null);
     setEspecialidadeSel(null);
+    setVagas([]);
+    setVagaSel(null);
+    setProcInfo(null);
+    setFormaPagto(null);
+    setValorFinal(null);
+    setCheckoutInfo(null);
   }
 
   // -------- Identificação --------
