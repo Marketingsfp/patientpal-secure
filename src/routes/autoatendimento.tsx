@@ -377,7 +377,7 @@ function AutoatendimentoPage() {
         }
       }
       lista.sort((a, b) => a.inicio.localeCompare(b.inicio));
-      setVagas(lista.slice(0, 24));
+      setVagas(lista);
       setStep("vagas");
     } finally {
       setBusy(false);
