@@ -2308,6 +2308,10 @@ function AgendaPage() {
       toast.info("Este agendamento já foi pago.");
       return;
     }
+    // Se o agendamento veio de um orçamento, usa SEMPRE os valores do orçamento
+    // (o procedimento pode ser texto livre tipo "LABORATÓRIO (4 EXAMES): ..."
+    // que não bate com a tabela de procedimentos e zeraria as opções).
+    const opcoesOrc = a.orcamento_id ? await opcoesPagamentoDeOrcamento(a.orcamento_id) : null;
     // Verificação fresca no banco: impede faturar duas vezes mesmo se o cache
     // local estiver desatualizado (ex.: outro usuário pagou em outra aba, ou
     // o pagamento foi transferido de uma ficha reagendada).
