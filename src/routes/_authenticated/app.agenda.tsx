@@ -2157,7 +2157,10 @@ function AgendaPage() {
         { forma: "cartao_credito", label: "Cartão de Crédito", valor: vCredito },
       ];
       let descSuffix = "";
-      if (info) {
+      const opcoesOrc = payload.orcamento_id ? await opcoesPagamentoDeOrcamento(payload.orcamento_id) : null;
+      if (opcoesOrc) {
+        opcoes = opcoesOrc;
+      } else if (info) {
         if (!info.emDia) {
           toast.error(`Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.`);
           descSuffix = ` — ${info.convenioNome} EM ATRASO`;
