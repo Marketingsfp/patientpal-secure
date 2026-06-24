@@ -226,7 +226,11 @@ function AutoatendimentoPage() {
       .from("especialidades")
       .select("id, nome")
       .order("nome");
-    setEspecialidades(data ?? []);
+    const filtradas = (data ?? []).filter((e) => {
+      const n = (e.nome || "").toUpperCase();
+      return !n.includes("CARTAO") && !n.includes("CARTÃO") && !n.includes("SEGURO");
+    });
+    setEspecialidades(filtradas);
   }
 
   async function solicitarAgendamento(paciente: { id: string; nome: string } | null) {
