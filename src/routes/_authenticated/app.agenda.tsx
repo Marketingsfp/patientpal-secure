@@ -2401,6 +2401,7 @@ function AgendaPage() {
       toast.info("Este agendamento já foi pago.");
       return;
     }
+    try {
     // Se o agendamento veio de um orçamento, usa SEMPRE os valores do orçamento
     // (o procedimento pode ser texto livre tipo "LABORATÓRIO (4 EXAMES): ..."
     // que não bate com a tabela de procedimentos e zeraria as opções).
@@ -2480,6 +2481,10 @@ function AgendaPage() {
       especialidade: medicos.find((m) => m.id === a.medico_id)?.especialidade_nome ?? undefined,
     });
     setFormaPagOpen(true);
+    } catch (e: any) {
+      console.error("[cobrarAgendamento]", e);
+      toast.error(e?.message ?? "Falha ao preparar a cobrança. Tente novamente.");
+    }
   };
 
   const confirmarPresenca = async (a: Agendamento) => {
