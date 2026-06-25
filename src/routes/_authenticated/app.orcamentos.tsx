@@ -318,17 +318,29 @@ function OrcamentosPage() {
                 <td className="px-3 py-2 font-mono">
                   <div className="flex items-center gap-1.5">
                     <span>#{String(o.numero).padStart(5, "0")}</span>
-                    {(o.agendamentos_total ?? 0) > 0 && (
-                      <span
-                        title={`Realizado · ${o.agendamentos_total} agendamento(s)${(o.agendamentos_realizados ?? 0) > 0 ? `, ${o.agendamentos_realizados} realizado(s)` : ""}`}
-                        className="inline-flex items-center gap-0.5 text-emerald-600"
-                      >
-                        <CheckCircle2 className="h-4 w-4" />
-                        {(o.agendamentos_total ?? 0) > 1 && (
-                          <span className="text-[10px] font-semibold">{o.agendamentos_total}</span>
-                        )}
-                      </span>
-                    )}
+                     {(o.agendamentos_total ?? 0) > 0 && (() => {
+                       const total = o.itens_total ?? 0;
+                       const usados = o.itens_consumidos ?? 0;
+                       const parcial = total > 0 && usados > 0 && usados < total;
+                       const titulo = total > 0
+                         ? (parcial
+                             ? `Uso parcial · ${usados} de ${total} itens agendados`
+                             : `Totalmente agendado · ${usados}/${total} itens`)
+                         : `${o.agendamentos_total} agendamento(s)`;
+                       return (
+                         <span
+                           title={titulo}
+                           className={`inline-flex items-center gap-0.5 ${parcial ? "text-amber-600" : "text-emerald-600"}`}
+                         >
+                           {parcial
+                             ? <CircleDashed className="h-4 w-4" />
+                             : <CheckCircle2 className="h-4 w-4" />}
+                           {total > 0 && (
+                             <span className="text-[10px] font-semibold">{usados}/{total}</span>
+                           )}
+                         </span>
+                       );
+                     })()}
                   </div>
                 </td>
                 <td className="px-3 py-2">{new Date(o.created_at).toLocaleDateString("pt-BR")}</td>
