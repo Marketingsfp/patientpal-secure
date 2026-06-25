@@ -1327,11 +1327,9 @@ function AgendaPage() {
     const med = medicos.find((m) => m.id === medicoId);
     if (!med) return "";
     if (med.procedimento_padrao_em_branco) return "";
-    return (med.procedimento_padrao_id
-      ? med.procedimento_padrao_nome
-        ?? procedimentosList.find((p) => p.id === med.procedimento_padrao_id)?.nome
-      : null)
-      ?? med.especialidade_nome
+    if (!med.procedimento_padrao_id) return "";
+    return med.procedimento_padrao_nome
+      ?? procedimentosList.find((p) => p.id === med.procedimento_padrao_id)?.nome
       ?? "";
   };
 
@@ -1340,6 +1338,13 @@ function AgendaPage() {
     const med = medicoId ? medicos.find((m) => m.id === medicoId) : null;
     const padrao = procedimentoPadraoDoMedico(medicoId);
     if (padrao && (!atual || normalizar(atual) === normalizar(med?.especialidade_nome ?? ""))) return padrao;
+    return atual;
+  };
+
+  const procedimentoFormulario = (medicoId: string | null | undefined, procedimento: string | null | undefined) => {
+    const atual = procedimentoEfetivo(medicoId, procedimento);
+    const med = medicoId ? medicos.find((m) => m.id === medicoId) : null;
+    if (atual && med?.especialidade_nome && normalizar(atual) === normalizar(med.especialidade_nome)) return "";
     return atual;
   };
 
@@ -1809,10 +1814,8 @@ function AgendaPage() {
       : toLocalInput(end.toISOString());
     let procedimento = "";
     if (medicoFiltro) {
-      const med = medicos.find((m) => m.id === medicoFiltro);
       const padrao = procedimentoPadraoDoMedico(medicoFiltro);
       if (padrao) procedimento = padrao;
-      else if (med?.especialidade_nome) procedimento = med.especialidade_nome;
     }
     setForm({
       ...EMPTY,
@@ -2011,7 +2014,7 @@ function AgendaPage() {
       paciente_id: pacienteCopia?.id ?? "",
       medico_id: a.medico_id ?? "",
       inicio: toLocalInput(a.inicio), fim: toLocalInput(a.fim),
-      procedimento: procedimentoEfetivo(a.medico_id, a.procedimento) || "CONSULTA",
+      procedimento: procedimentoFormulario(a.medico_id, a.procedimento),
       status: "agendado",
       observacoes: a.observacoes ?? "",
       data_pagamento: a.data_pagamento ?? "",
@@ -2071,7 +2074,7 @@ function AgendaPage() {
       paciente_id: resolvedPacId,
       medico_id: a.medico_id ?? "",
       inicio: toLocalInput(a.inicio), fim: toLocalInput(a.fim),
-      procedimento: procedimentoEfetivo(a.medico_id, a.procedimento),
+      procedimento: procedimentoFormulario(a.medico_id, a.procedimento),
       status: a.status,
       observacoes: a.observacoes ?? "",
       data_pagamento: a.data_pagamento ?? "",
@@ -2183,7 +2186,7 @@ function AgendaPage() {
       enfermagem_recurso_id: ehRecurso ? form.medico_id : null,
       inicio: new Date(form.inicio).toISOString(),
       fim: new Date(form.fim).toISOString(),
-      procedimento: procedimentoEfetivo(form.medico_id, form.procedimento) || null,
+      procedimento: procedimentoFormulario(form.medico_id, form.procedimento) || null,
       status: form.status,
       observacoes: form.observacoes.trim() || null,
       data_pagamento: form.data_pagamento ? form.data_pagamento : null,
@@ -3085,8 +3088,12 @@ function AgendaPage() {
                       opts.unshift({ value: padrao, label: `${padrao} (principal)` });
                     }
                     // Se o valor atual não estiver na lista (ex.: procedimento legado), inclui também.
+                    // Exceção: não recria a especialidade do médico como se fosse serviço real
+                    // (ex.: agenda ENFERMAGEM gerando opção "ENFERMAGEM" sem existir no cadastro de serviços).
                     const atual = (form.procedimento ?? "").trim();
-                    if (atual && !opts.some((o) => normalizar(o.value) === normalizar(atual))) {
+                    const especialidadeMedico = medicos.find((m) => m.id === form.medico_id)?.especialidade_nome ?? "";
+                    const atualEhEspecialidadeSintetica = especialidadeMedico && normalizar(atual) === normalizar(especialidadeMedico);
+                    if (atual && !atualEhEspecialidadeSintetica && !opts.some((o) => normalizar(o.value) === normalizar(atual))) {
                       opts.push({ value: atual, label: atual });
                     }
                     // ── Top 10 por modalidade (USG/RX/TC/RM) com base no
