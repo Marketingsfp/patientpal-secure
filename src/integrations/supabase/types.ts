@@ -260,6 +260,62 @@ export type Database = {
         }
         Relationships: []
       }
+      agendamento_orcamento_itens: {
+        Row: {
+          agendamento_id: string
+          clinica_id: string
+          created_at: string
+          id: string
+          orcamento_id: string
+          orcamento_item_id: string
+        }
+        Insert: {
+          agendamento_id: string
+          clinica_id: string
+          created_at?: string
+          id?: string
+          orcamento_id: string
+          orcamento_item_id: string
+        }
+        Update: {
+          agendamento_id?: string
+          clinica_id?: string
+          created_at?: string
+          id?: string
+          orcamento_id?: string
+          orcamento_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agendamento_orcamento_itens_agendamento_id_fkey"
+            columns: ["agendamento_id"]
+            isOneToOne: false
+            referencedRelation: "agendamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agendamento_orcamento_itens_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agendamento_orcamento_itens_orcamento_id_fkey"
+            columns: ["orcamento_id"]
+            isOneToOne: false
+            referencedRelation: "orcamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agendamento_orcamento_itens_orcamento_item_id_fkey"
+            columns: ["orcamento_item_id"]
+            isOneToOne: false
+            referencedRelation: "orcamento_itens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agendamentos: {
         Row: {
           agenda_id: string | null
