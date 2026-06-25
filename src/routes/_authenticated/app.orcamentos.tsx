@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { FileText, Plus, Printer, Trash2, Search, AlertTriangle, Calendar, Columns2, CheckCircle2, Download } from "lucide-react";
+import { FileText, Plus, Printer, Trash2, Search, AlertTriangle, Calendar, Columns2, CheckCircle2, CircleDashed, Download } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -35,6 +35,8 @@ type Orc = {
   categoria: "laboratorio" | "demais" | null;
   agendamentos_total?: number;
   agendamentos_realizados?: number;
+  itens_total?: number;
+  itens_consumidos?: number;
 };
 
 type Procedimento = {
