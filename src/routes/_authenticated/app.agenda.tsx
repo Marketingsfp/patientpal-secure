@@ -1245,7 +1245,12 @@ function AgendaPage() {
       for (const p of procedimentosList) {
         if (idsAgenda.has(p.id)) nomesAgenda.add(normalizar(p.nome));
       }
-      return lista.filter((p) => idsAgenda.has(p.id) || nomesAgenda.has(normalizar(p.nome)));
+      const filtrada = lista.filter((p) => idsAgenda.has(p.id) || nomesAgenda.has(normalizar(p.nome)));
+      // Fallback: se o filtro por agenda zerar a lista (ex.: vínculos da
+      // agenda não casam com o cadastro do médico, ou o slot herdou um
+      // agenda_id de outra agenda do mesmo médico), preserva a lista
+      // completa em vez de esconder todos os serviços cadastrados.
+      return filtrada.length > 0 ? filtrada : lista;
     };
     if (opcoesCadastradas && opcoesCadastradas.length > 0) {
       // Preserva a ordem do cadastro (created_at asc) — Top 10 aparecem primeiro.

@@ -1,66 +1,36 @@
-# Painel de divisão de orçamento na agenda
+## Problema
 
-## Objetivo
-Quando a recepção busca um orçamento com itens de tipos diferentes (ex: ultra + laboratório + ECG), abrir um painel onde ela define **quem faz, em qual sala e em qual horário** cada grupo de itens. O sistema cria **N agendamentos vinculados** ao mesmo orçamento, e a partir daí tratamos esse conjunto como um "pacote".
+Na clínica, o "médico" **ENFERMAGEM** (id `2da8714a…`) tem **22 procedimentos** cadastrados em `medico_procedimentos` (e 16 vinculados à agenda ENFERMAGEM em `medico_agenda_procedimentos`). Mesmo assim, ao abrir o diálogo de agendamento, o campo **Serviço** só lista uma opção (a especialidade "ENFERMAGEM"), em vez dos serviços configurados.
 
----
+## Causa
 
-## Fluxo na tela da agenda
+Em `src/routes/_authenticated/app.agenda.tsx`, a função `opcoesProcedimentoMedico(medicoId, agendaId)` aplica um filtro extra (`filtrarPorAgenda`) usando o `agenda_id` do slot/filtro ativo. Quando o `agenda_id` do slot clicado **não** é o da agenda ENFERMAGEM (ex.: clique em um slot que herdou `agenda_id` de outra agenda do mesmo médico — ITB, EEG, HOLTER…) ou quando há divergência entre os IDs de procedimento entre `medico_procedimentos` e `medico_agenda_procedimentos`, o filtro **zera** a lista de serviços e o select fica só com o "padrão" da especialidade.
 
-1. Recepção digita o nº do orçamento no campo atual.
-2. Em vez de criar 1 agendamento direto, abre um **modal "Dividir orçamento"** mostrando:
-   - Cabeçalho: paciente, nº do orçamento, valor total.
-   - Lista de itens **pré-agrupados por tipo de procedimento** (Laboratório, Ultrassonografia, ECG, Consulta, Procedimento, etc.).
-   - Cada grupo vira um "card de agendamento" editável:
-     - Profissional (dropdown filtrado por quem atende aquele tipo)
-     - Sala/recurso (quando aplicável — ex: ECG precisa de sala de enfermagem)
-     - Data + hora início + duração
-     - Observações
-   - Botão "+ separar item" pra tirar um item específico do grupo e virar agendamento próprio (caso raro: 2 ultras com médicos diferentes).
-   - Botão "juntar com outro grupo" se a recepção quiser fundir.
-3. Botão **"Criar N agendamentos"** no rodapé — valida que todos os grupos têm profissional + horário, então cria tudo numa transação.
+A lista de 22 serviços do médico nunca deveria ficar oculta por causa do filtro por agenda — esse filtro é apenas uma sugestão de priorização, não uma restrição rígida.
 
-## Vínculo (pacote)
+## Correção (frontend, escopo mínimo)
 
-Cada agendamento gerado guarda referência ao orçamento de origem **e** a um id de pacote compartilhado. Com isso:
+Arquivo único: `src/routes/_authenticated/app.agenda.tsx`, função `opcoesProcedimentoMedico`.
 
-- **Pagamento único**: o pagamento é feito no orçamento (já é assim hoje); os N agendamentos só "consomem" o mesmo orçamento. Não cobra duas vezes.
-- **Check-in inteligente**: ao fazer check-in de um agendamento do pacote, mostra aviso "Este paciente tem mais 2 procedimentos hoje: Ultra 14h, ECG 14h30" e oferece check-in conjunto.
-- **Cancelamento**: ao cancelar um agendamento do pacote, pergunta "Cancelar só este ou todos os 3 do orçamento?".
-- **Indicador visual** no card da agenda: badge "📦 1/3" mostrando que faz parte de um pacote, com tooltip listando os outros.
-- **Busca por orçamento já agendado**: se a recepção buscar o mesmo orçamento de novo, sistema avisa "Este orçamento já tem 3 agendamentos ativos" e mostra a lista, em vez de duplicar.
+1. Aplicar `filtrarPorAgenda` de forma **não destrutiva**: se o resultado filtrado for vazio (ou menor que 1), retornar a lista completa do médico em vez de uma lista vazia.
+2. Garantir que o ramo `opcoesCadastradas` (que vem de `medico_procedimentos`, fonte oficial do cadastro do médico) também caia nesse fallback.
 
----
+Pseudocódigo do ajuste:
 
-## Detalhes técnicos
+```text
+const filtrarPorAgenda = (lista) => {
+  if (!agendaId) return lista;
+  const idsAgenda = procIdsPorAgenda.get(agendaId);
+  if (!idsAgenda || idsAgenda.size === 0) return lista;
+  const filtrada = lista.filter(p => idsAgenda.has(p.id) || nomesAgenda.has(normalizar(p.nome)));
+  return filtrada.length > 0 ? filtrada : lista;   // ← fallback novo
+};
+```
 
-### Banco
-Migration nova:
-- Adicionar coluna `pacote_id uuid` em `agendamentos` (nullable; agendamentos avulsos ficam null).
-- Índice em `(orcamento_id)` e `(pacote_id)` pra busca rápida.
-- Não precisa de tabela nova — `pacote_id` agrupa, `orcamento_id` já existe.
+## Verificação
 
-### Frontend
-- Novo componente `src/components/agenda/dividir-orcamento-dialog.tsx` com o painel descrito.
-- Em `src/routes/_authenticated/app.agenda.tsx`:
-  - `buscarOrcamento` muda: em vez de criar agendamento direto, carrega itens do orçamento, agrupa por `procedimentos.tipo` e abre o novo dialog.
-  - Verifica antes se já existem agendamentos ativos pra esse orçamento (avisa em vez de duplicar).
-  - Submit do dialog: gera `pacote_id = crypto.randomUUID()` e insere N linhas em `agendamentos` em uma única chamada.
-- Card do agendamento na agenda: badge "📦 X/Y" quando `pacote_id` não é null.
-- Modal de cancelamento: detecta `pacote_id` e oferece "cancelar pacote inteiro".
-- Check-in: ao confirmar presença, busca outros agendamentos do mesmo `pacote_id` no dia e oferece check-in em lote.
+- Abrir a agenda ENFERMAGEM, clicar em um slot e confirmar que o select **Serviço** lista os 22 procedimentos cadastrados (SORO + 3 MEDICAMENTOS, CURATIVO (G/M/P), MEDICACAO, NEBULIZACAO, ECG, MAPA 24H, HOLTER, etc.) além do padrão "ENFERMAGEM".
+- Em uma agenda de médico com vínculos válidos em `medico_agenda_procedimentos` (ex.: cardiologista com 3 serviços), confirmar que o filtro por agenda continua priorizando esses 3.
+- Reproduzir via Playwright contra `localhost:8080`, abrir o diálogo de novo agendamento no slot ENFERMAGEM e capturar print do dropdown aberto antes/depois.
 
-### Agrupamento padrão
-Os itens são agrupados pelo campo `procedimentos.tipo` (laboratorio, ultrassonografia, ecg, consulta, procedimento, odontologia, etc.). Itens sem tipo definido vão pra um grupo "Outros" que a recepção precisa atribuir manualmente.
-
----
-
-## O que NÃO está nesse plano (pra próximas etapas)
-- Sugestão automática de horário (ex: encaixar os 3 procedimentos em janelas livres consecutivas). Por ora a recepção escolhe na mão.
-- Recurso de "fila do paciente" (esperar entre um exame e outro). Tratamos como agendamentos independentes no mesmo dia.
-- Reagendamento em lote (mudar dia do pacote inteiro). Fica pra v2.
-
----
-
-## Próximo passo
-Se aprovar, começo pela migration do `pacote_id` + ajuste do `buscarOrcamento` pra abrir o dialog, e depois construo o componente de divisão.
+Sem mudanças de schema, RLS ou backend.
