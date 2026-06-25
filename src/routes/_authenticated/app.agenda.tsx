@@ -2226,6 +2226,30 @@ function AgendaPage() {
       if (error || !novo) { setSaving(false); toast.error(error?.message ?? "Erro ao salvar"); return; }
       novoId = novo.id;
     }
+    // Grava vínculos com itens do orçamento (consome itens individualmente
+    // para permitir agendamentos parciais futuros).
+    if (payload.orcamento_id && novoId && pendingOrcItemIds.length > 0) {
+      const vinculos = pendingOrcItemIds.map((itemId) => ({
+        clinica_id: clinicaAtual.clinica_id,
+        agendamento_id: novoId!,
+        orcamento_id: payload.orcamento_id!,
+        orcamento_item_id: itemId,
+      }));
+      // Em update, primeiro limpa vínculos antigos do agendamento.
+      if (editing) {
+        await supabase
+          .from("agendamento_orcamento_itens")
+          .delete()
+          .eq("agendamento_id", editing.id);
+      }
+      const { error: vErr } = await supabase
+        .from("agendamento_orcamento_itens")
+        .insert(vinculos as never);
+      if (vErr) {
+        toast.error(`Agendamento salvo, mas vínculo com itens do orçamento falhou: ${vErr.message}`);
+      }
+    }
+    setPendingOrcItemIds([]);
     setSaving(false);
     toast.success("Salvo"); setOpen(false); await load();
     if (irParaPagamento && novoId) {
