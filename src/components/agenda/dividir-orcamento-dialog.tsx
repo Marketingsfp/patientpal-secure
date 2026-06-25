@@ -381,12 +381,63 @@ export function DividirOrcamentoDialog({
                   )}
                 </div>
                 <div>
-                  <Label className="text-xs">Início</Label>
+                  <Label className="text-xs">Data</Label>
                   <Input
-                    type="datetime-local"
-                    value={g.inicio}
-                    onChange={(e) => updateGrupo(idx, { inicio: e.target.value })}
+                    type="date"
+                    value={g.data}
+                    onChange={(e) => updateGrupo(idx, { data: e.target.value, hora: "" })}
                   />
+                </div>
+                <div>
+                  <Label className="text-xs">Horário disponível</Label>
+                  {(() => {
+                    if (!g.medico_id || !g.data) {
+                      return <Input value="" disabled placeholder="Escolha profissional e data" />;
+                    }
+                    const key = slotKey(g.medico_id, g.data, g.duracao);
+                    const slots = slotsCache.get(key);
+                    const loading = loadingSlotsKey === key || (slots === undefined);
+                    if (loading) {
+                      return <Input value="" disabled placeholder="Carregando horários…" />;
+                    }
+                    // slots === null → sem agenda configurada → fallback livre
+                    if (slots === null) {
+                      return (
+                        <>
+                          <Input
+                            type="time"
+                            value={g.hora}
+                            onChange={(e) => updateGrupo(idx, { hora: e.target.value })}
+                          />
+                          <div className="mt-1 flex items-start gap-1 text-xs text-amber-600">
+                            <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
+                            <span>Sem agenda configurada — horário livre.</span>
+                          </div>
+                        </>
+                      );
+                    }
+                    if (slots.length === 0) {
+                      return (
+                        <>
+                          <Input value="" disabled placeholder="Sem horários nessa data" />
+                          <div className="mt-1 flex items-start gap-1 text-xs text-amber-600">
+                            <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
+                            <span>Nenhum horário livre nessa data. Escolha outro dia.</span>
+                          </div>
+                        </>
+                      );
+                    }
+                    return (
+                      <Select value={g.hora} onValueChange={(v) => updateGrupo(idx, { hora: v })}>
+                        <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
+                        <SelectContent className="max-h-64">
+                          {slots.map((h) => (
+                            <SelectItem key={h} value={h}>{h}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    );
+                  })()}
                 </div>
                 <div>
                   <Label className="text-xs">Duração (min)</Label>
