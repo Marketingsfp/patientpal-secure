@@ -113,6 +113,24 @@ function OrcamentosPage() {
         o.agendamentos_total = tot.get(o.id) ?? 0;
         o.agendamentos_realizados = real.get(o.id) ?? 0;
       }
+      // Itens totais e consumidos (uso parcial vs total)
+      const [{ data: itens }, { data: links }] = await Promise.all([
+        supabase.from("orcamento_itens").select("orcamento_id, quantidade").in("orcamento_id", ids),
+        supabase.from("agendamento_orcamento_itens").select("orcamento_id, orcamento_item_id").in("orcamento_id", ids),
+      ]);
+      const totItens = new Map<string, number>();
+      for (const it of (itens ?? []) as { orcamento_id: string; quantidade: number }[]) {
+        totItens.set(it.orcamento_id, (totItens.get(it.orcamento_id) ?? 0) + Number(it.quantidade || 1));
+      }
+      const consumidos = new Map<string, Set<string>>();
+      for (const l of (links ?? []) as { orcamento_id: string; orcamento_item_id: string }[]) {
+        if (!consumidos.has(l.orcamento_id)) consumidos.set(l.orcamento_id, new Set());
+        consumidos.get(l.orcamento_id)!.add(l.orcamento_item_id);
+      }
+      for (const o of orcs) {
+        o.itens_total = totItens.get(o.id) ?? 0;
+        o.itens_consumidos = consumidos.get(o.id)?.size ?? 0;
+      }
     }
     setList(orcs);
     setLoading(false);
