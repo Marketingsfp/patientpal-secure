@@ -414,7 +414,6 @@ const EMPTY = {
   orcamento_id: "",
   orcamento_numero: "",
   orcamento_itens: [] as string[],
-  orcamento_item_ids: [] as string[],
 };
 
 function AgendaPage() {
