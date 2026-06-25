@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, ExternalLink, FileText, CalendarDays, GripVertical } from "lucide-react";
+import { RefreshCw, ExternalLink, FileText, CalendarDays, GripVertical, X, PanelRightOpen } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/orcamentos-agenda")({
   component: OrcamentosAgendaPage,
@@ -15,6 +15,7 @@ function OrcamentosAgendaPage() {
   const [leftKey, setLeftKey] = useState(0);
   const [rightKey, setRightKey] = useState(0);
   const [leftPct, setLeftPct] = useState(45);
+  const [agendaAberta, setAgendaAberta] = useState(true);
   const [agendaSrc, setAgendaSrc] = useState(
     search.orc ? `/app/agenda?embed=1&orc=${search.orc}` : "/app/agenda?embed=1"
   );
@@ -47,6 +48,7 @@ function OrcamentosAgendaPage() {
       const d = ev.data;
       if (!d || typeof d !== "object") return;
       if (d.type === "agendar-orcamento" && typeof d.numero === "number") {
+        setAgendaAberta(true);
         const win = agendaIframeRef.current?.contentWindow;
         if (win) {
           win.postMessage({ type: "agendar-orcamento", numero: d.numero }, "*");
@@ -73,7 +75,7 @@ function OrcamentosAgendaPage() {
       </div>
 
       <div ref={containerRef} className="flex-1 flex min-h-0 w-full">
-        <div style={{ width: `${leftPct}%` }} className="min-w-0 h-full">
+        <div style={{ width: agendaAberta ? `${leftPct}%` : "100%" }} className="min-w-0 h-full">
           <div className="h-full flex flex-col">
             <div className="flex items-center justify-between gap-2 px-3 py-1.5 border-b bg-muted/30">
               <div className="flex items-center gap-2 text-sm font-medium">
@@ -81,6 +83,11 @@ function OrcamentosAgendaPage() {
                 Orçamentos
               </div>
               <div className="flex items-center gap-1">
+                {!agendaAberta && (
+                  <Button size="sm" variant="ghost" onClick={() => setAgendaAberta(true)} title="Abrir agenda">
+                    <PanelRightOpen className="h-3.5 w-3.5" />
+                  </Button>
+                )}
                 <Button size="sm" variant="ghost" onClick={() => setLeftKey((k) => k + 1)} title="Recarregar">
                   <RefreshCw className="h-3.5 w-3.5" />
                 </Button>
@@ -103,6 +110,8 @@ function OrcamentosAgendaPage() {
           </div>
         </div>
 
+        {agendaAberta && (
+        <>
         <div
           onMouseDown={onMouseDown}
           className="w-1.5 shrink-0 bg-border hover:bg-primary/40 cursor-col-resize flex items-center justify-center relative group"
@@ -132,6 +141,14 @@ function OrcamentosAgendaPage() {
                 >
                   <ExternalLink className="h-3.5 w-3.5" />
                 </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setAgendaAberta(false)}
+                  title="Fechar agenda"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
               </div>
             </div>
             <iframe
@@ -143,6 +160,8 @@ function OrcamentosAgendaPage() {
             />
           </div>
         </div>
+        </>
+        )}
       </div>
     </div>
   );
