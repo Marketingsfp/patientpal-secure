@@ -108,6 +108,81 @@ function montarDescricao(g: GrupoForm): string {
   return `${g.label} (${nomes.length} ITENS): ${nomes.join(", ")}`;
 }
 
+// Calcula slots livres para um profissional/recurso numa data, com base nas
+// disponibilidades semanais e nos agendamentos já existentes. Retorna null
+// quando o profissional não tem agenda configurada (fallback para horário livre).
+async function computarSlots(
+  profId: string,
+  dataStr: string,
+  duracaoMin: number,
+  ehRecurso: boolean,
+): Promise<string[] | null> {
+  const dia = new Date(`${dataStr}T00:00:00`);
+  const dow = dia.getDay(); // 0..6
+
+  let dispos: DispoRow[] = [];
+  if (ehRecurso) {
+    const { data } = await supabase
+      .from("enfermagem_recurso_disponibilidades")
+      .select("dia_semana, hora_inicio, hora_fim, intervalo_min")
+      .eq("recurso_id", profId)
+      .eq("dia_semana", dow)
+      .eq("ativo", true);
+    dispos = (data ?? []) as DispoRow[];
+  } else {
+    const { data } = await supabase
+      .from("medico_disponibilidades")
+      .select("dia_semana, hora_inicio, hora_fim, intervalo_min, vigencia_inicio, vigencia_fim")
+      .eq("medico_id", profId)
+      .eq("dia_semana", dow)
+      .eq("ativo", true);
+    dispos = ((data ?? []) as DispoRow[]).filter((d) => {
+      if (d.vigencia_inicio && dataStr < d.vigencia_inicio) return false;
+      if (d.vigencia_fim && dataStr > d.vigencia_fim) return false;
+      return true;
+    });
+  }
+
+  if (dispos.length === 0) return null;
+
+  // Carrega agendamentos do dia para este profissional.
+  const inicioDia = new Date(`${dataStr}T00:00:00`).toISOString();
+  const fimDia = new Date(`${dataStr}T23:59:59`).toISOString();
+  const ags = ehRecurso
+    ? await supabase
+        .from("agendamentos")
+        .select("inicio, fim, status")
+        .eq("enfermagem_recurso_id", profId)
+        .gte("inicio", inicioDia)
+        .lte("inicio", fimDia)
+    : await supabase
+        .from("agendamentos")
+        .select("inicio, fim, status")
+        .eq("medico_id", profId)
+        .gte("inicio", inicioDia)
+        .lte("inicio", fimDia);
+
+  const ocupados = ((ags.data ?? []) as { inicio: string; fim: string; status: string | null }[])
+    .filter((a) => a.status !== "cancelado")
+    .map((a) => ({ ini: new Date(a.inicio).getTime(), fim: new Date(a.fim).getTime() }));
+
+  const out: string[] = [];
+  for (const d of dispos) {
+    const step = d.intervalo_min && d.intervalo_min > 0 ? d.intervalo_min : duracaoMin;
+    const startMin = hmToMin(d.hora_inicio.slice(0, 5));
+    const endMin = hmToMin(d.hora_fim.slice(0, 5));
+    for (let m = startMin; m + duracaoMin <= endMin; m += step) {
+      const hm = minToHm(m);
+      const slotIni = combineLocal(dataStr, hm).getTime();
+      const slotFim = slotIni + duracaoMin * 60_000;
+      const conflita = ocupados.some((o) => slotIni < o.fim && slotFim > o.ini);
+      if (!conflita && !out.includes(hm)) out.push(hm);
+    }
+  }
+  out.sort();
+  return out;
+}
+
 export function DividirOrcamentoDialog({
   open, onOpenChange, clinicaId, orcamento, itens, medicos, inicioPadrao, onCreated,
 }: Props) {
