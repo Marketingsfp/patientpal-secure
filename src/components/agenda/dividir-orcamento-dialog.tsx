@@ -30,7 +30,8 @@ type GrupoForm = {
   label: string;
   itens: DividirItem[];
   medico_id: string;
-  inicio: string;
+  data: string;        // YYYY-MM-DD
+  hora: string;        // HH:MM (slot escolhido)
   duracao: number; // minutos
   observacoes: string;
 };
@@ -56,6 +57,26 @@ const addMin = (localInput: string, min: number) => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const toDateStr = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const toHmStr = (d: Date) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+const combineLocal = (data: string, hora: string) => new Date(`${data}T${hora}:00`);
+
+type DispoRow = {
+  dia_semana: number;
+  hora_inicio: string; // HH:MM:SS
+  hora_fim: string;
+  intervalo_min: number | null;
+  vigencia_inicio?: string | null;
+  vigencia_fim?: string | null;
+};
+
+const hmToMin = (s: string) => {
+  const [h, m] = s.split(":").map(Number);
+  return h * 60 + (m || 0);
+};
+const minToHm = (n: number) => `${pad2(Math.floor(n / 60))}:${pad2(n % 60)}`;
+
 function agruparItens(itens: DividirItem[]): GrupoForm[] {
   const map = new Map<string, GrupoForm>();
   for (const it of itens) {
@@ -67,7 +88,8 @@ function agruparItens(itens: DividirItem[]): GrupoForm[] {
         label,
         itens: [],
         medico_id: "",
-        inicio: "",
+        data: "",
+        hora: "",
         duracao: 30,
         observacoes: "",
       });
