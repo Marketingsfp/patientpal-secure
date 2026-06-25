@@ -1,45 +1,34 @@
 ## Problema
 
-Hoje o sistema bloqueia qualquer novo agendamento a partir de um orçamento assim que existe **um** agendamento ativo vinculado a ele (`src/routes/_authenticated/app.agenda.tsx`, linha ~1885). Isso impede o uso parcelado do orçamento — exatamente o caso do #202600013, onde só a eletroneuromiografia foi agendada e a audiometria + teste do olhinho ficaram travadas.
+A agenda do "ELETROCARDIOGRAMA" no dia 25/06 foi criada pelo botão **"Criar/gerar horários"**, que pré-gera 36 linhas vazias na tabela `agendamentos` (com `paciente_nome = 'DISPONIVEL'` e `paciente_id = null`).
 
-## Solução proposta
+Ele **não** preenche `medico_disponibilidades`. Como o cálculo de slots (no formulário da agenda e no diálogo "Dividir orçamento") só lê `medico_disponibilidades` / `enfermagem_recurso_disponibilidades`, o sistema acha que não há agenda e cai no fallback "Sem agenda configurada — horário livre". Por isso o seletor mostra só `09:00` em vez dos 36 horários reais.
 
-Permitir **agendamentos parciais** do orçamento, controlando quais itens já foram usados em vez de bloquear o orçamento inteiro.
+## Correção
 
-### 1. Banco — vincular agendamento ↔ item de orçamento
-- Nova tabela `agendamento_orcamento_itens` (relação N:N entre `agendamentos` e `orcamento_itens`) com `clinica_id`, `agendamento_id`, `orcamento_item_id`, `quantidade` (default 1) e timestamps. RLS por clínica, com grants completos.
-- Permite saber exatamente quais itens (e quantidade) de cada orçamento já foram consumidos, mesmo quando o orçamento foi dividido em vários agendamentos.
+Tratar slots pré-gerados como fonte oficial de horários quando não houver disponibilidade semanal configurada.
 
-### 2. Lógica de abertura do orçamento (app.agenda.tsx)
-- Remover o `toast.error("Este orçamento já está vinculado…")`.
-- Ao abrir um orçamento, buscar os itens já consumidos via `agendamento_orcamento_itens` (excluindo agendamentos cancelados).
-- Calcular a lista de **itens restantes** (quantidade pedida − quantidade já agendada).
-- Se não sobrar nenhum item → aviso amigável "Todos os itens deste orçamento já foram agendados" + botão para ver os agendamentos existentes.
-- Se sobrar 1 item → fluxo direto (igual hoje), só com os itens restantes.
-- Se sobrar mais de um grupo → abrir o `DividirOrcamentoDialog` apenas com os itens restantes.
+### 1. `src/routes/_authenticated/app.agenda.tsx` (fluxo single — foto 1)
 
-### 3. DividirOrcamentoDialog
-- Receber a lista de itens restantes (já filtrada) e exibir um cabeçalho informativo: "Restam X de Y itens deste orçamento".
-- Ao salvar os agendamentos, inserir também as linhas em `agendamento_orcamento_itens` (um insert por item incluído em cada grupo).
+- Na função que calcula horários disponíveis, depois de consultar `medico_disponibilidades` (ou `enfermagem_recurso_disponibilidades`) e antes do fallback "horário livre", buscar em `agendamentos` no dia selecionado as linhas com `paciente_id IS NULL` **ou** `paciente_nome = 'DISPONIVEL'` (status ≠ cancelado) para o profissional/recurso.
+- Se houver placeholders: usá-los como universo de slots, com `inicio` virando o horário disponível e excluindo-os do conjunto de "ocupados" (senão entrariam em conflito consigo mesmos).
+- Guardar em estado um mapa `horario → placeholder_id`. Ao salvar o agendamento, se o slot escolhido tem placeholder, fazer `UPDATE` na linha pré-gerada (preenchendo paciente, procedimento, status, orcamento_id, etc.) em vez de `INSERT`. Isso evita duplicar slot e mantém a numeração de Ficha.
+- Só cair no fallback "Sem agenda configurada" quando não houver nem disponibilidade semanal nem placeholders.
 
-### 4. Backfill
-- Migração de dados única: para cada agendamento existente com `orcamento_id`, marcar **todos** os itens do orçamento como consumidos por aquele agendamento (comportamento atual). Assim orçamentos legados continuam consistentes.
+### 2. `src/components/agenda/dividir-orcamento-dialog.tsx`
 
-### 5. UI extra (pequenos ajustes)
-- Na listagem de orçamentos (`/app/orcamentos-agenda`), mostrar contador `Realizados (n/total)` por orçamento, considerando itens (não mais "tudo ou nada").
-- No DANFSE / impressão do orçamento: nada muda.
+- Mesma alteração na função `computarSlots`: se não há disponibilidades, retornar a lista de placeholders do dia em vez de `null`.
+- No `handleSalvar`, quando o slot escolhido corresponde a um placeholder, atualizar a linha existente em vez de inserir. Para grupos com placeholder, manter o vínculo com `agendamento_orcamento_itens` usando o `id` da linha atualizada.
 
-## Arquivos afetados
+### 3. Bloqueio quando não houver mais slots
 
-- **Migração nova**: tabela `agendamento_orcamento_itens` + RLS + grants + backfill.
-- `src/routes/_authenticated/app.agenda.tsx` — remover bloqueio, calcular itens restantes, passar para o dialog.
-- `src/components/agenda/dividir-orcamento-dialog.tsx` — receber itens restantes, gravar vínculo na nova tabela após criar os agendamentos.
-- `src/routes/_authenticated/app.orcamentos-agenda.tsx` — atualizar badge "Realizados" para refletir itens (opcional, mas recomendado).
+- Se todos os placeholders já estão tomados e não há disponibilidade semanal, mostrar "Nenhum horário livre nessa data" (igual ao caminho atual de disponibilidades), em vez de "horário livre".
 
-## Pergunta para confirmar antes de implementar
+## Não muda
 
-Quando um item tem **quantidade > 1** (ex.: "4 x ELETRONEUROMIOGRAFIA"), você quer:
-- **(A)** Tratar como **1 item consumido = orçamento item inteiro** (mais simples: agendou eletroneuromiografia → as 4 saem do saldo); ou
-- **(B)** Permitir agendar **parcial por quantidade** (agenda 1 das 4 hoje, sobram 3 para depois)?
+- Comportamento para profissionais com `medico_disponibilidades` configurada continua igual.
+- Layout da tela, regras de orçamento parcial e demais validações permanecem intactos.
 
-A opção **A** é mais simples e cobre 95% dos casos; a **B** dá flexibilidade máxima mas exige um seletor de quantidade no dialog.
+## Resultado esperado
+
+Ao abrir o formulário para "ELETROCARDIOGRAMA" em 25/06, o select "Horário disponível" listará todos os 36 horários (08:00, 08:15, … ) gerados pela agenda, e o agendamento ocupará a linha pré-existente em vez de criar outra paralela.

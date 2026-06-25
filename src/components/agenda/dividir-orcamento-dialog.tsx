@@ -104,13 +104,16 @@ function montarDescricao(g: GrupoForm): string {
 
 // Calcula slots livres para um profissional/recurso numa data, com base nas
 // disponibilidades semanais e nos agendamentos já existentes. Retorna null
-// quando o profissional não tem agenda configurada (fallback para horário livre).
+// quando o profissional não tem agenda configurada nem slots pré-gerados
+// (fallback para horário livre). Quando há slots pré-gerados ("DISPONIVEL"),
+// usa-os como universo de horários. O segundo elemento do retorno mapeia
+// HH:MM → id do placeholder a ser reutilizado no save.
 async function computarSlots(
   profId: string,
   dataStr: string,
   duracaoMin: number,
   ehRecurso: boolean,
-): Promise<string[] | null> {
+): Promise<{ slots: string[] | null; placeholders: Record<string, string> }> {
   const dia = new Date(`${dataStr}T00:00:00`);
   const dow = dia.getDay(); // 0..6
 
@@ -137,28 +140,49 @@ async function computarSlots(
     });
   }
 
-  if (dispos.length === 0) return null;
-
   // Carrega agendamentos do dia para este profissional.
   const inicioDia = new Date(`${dataStr}T00:00:00`).toISOString();
   const fimDia = new Date(`${dataStr}T23:59:59`).toISOString();
   const ags = ehRecurso
     ? await supabase
         .from("agendamentos")
-        .select("inicio, fim, status")
+        .select("id, inicio, fim, status, paciente_id, paciente_nome")
         .eq("enfermagem_recurso_id", profId)
         .gte("inicio", inicioDia)
         .lte("inicio", fimDia)
     : await supabase
         .from("agendamentos")
-        .select("inicio, fim, status")
+        .select("id, inicio, fim, status, paciente_id, paciente_nome")
         .eq("medico_id", profId)
         .gte("inicio", inicioDia)
         .lte("inicio", fimDia);
 
-  const ocupados = ((ags.data ?? []) as { inicio: string; fim: string; status: string | null }[])
-    .filter((a) => a.status !== "cancelado")
+  type Ag = { id: string; inicio: string; fim: string; status: string | null; paciente_id: string | null; paciente_nome: string | null };
+  const todos = ((ags.data ?? []) as Ag[]).filter((a) => a.status !== "cancelado");
+  const placeholdersAg = todos.filter(
+    (a) => !a.paciente_id && (a.paciente_nome === null || a.paciente_nome === "" || a.paciente_nome === "DISPONIVEL"),
+  );
+  const ocupados = todos
+    .filter((a) => !placeholdersAg.some((p) => p.id === a.id))
     .map((a) => ({ ini: new Date(a.inicio).getTime(), fim: new Date(a.fim).getTime() }));
+
+  // Sem disponibilidade semanal: se há slots pré-gerados ("Criar/gerar horários"),
+  // usá-los como universo de horários.
+  if (dispos.length === 0) {
+    if (placeholdersAg.length === 0) return { slots: null, placeholders: {} };
+    const map: Record<string, string> = {};
+    const out: string[] = [];
+    for (const p of placeholdersAg) {
+      const d = new Date(p.inicio);
+      const hm = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+      if (!map[hm]) {
+        map[hm] = p.id;
+        out.push(hm);
+      }
+    }
+    out.sort();
+    return { slots: out, placeholders: map };
+  }
 
   const out: string[] = [];
   for (const d of dispos) {
@@ -174,7 +198,7 @@ async function computarSlots(
     }
   }
   out.sort();
-  return out;
+  return { slots: out, placeholders: {} };
 }
 
 export function DividirOrcamentoDialog({
@@ -305,8 +329,10 @@ export function DividirOrcamentoDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vincMedicos, vincRecursos]);
 
-  // Cache de slots: chave `${profId}|${data}|${duracao}` → array de HH:MM disponíveis (ou null = sem agenda configurada).
-  const [slotsCache, setSlotsCache] = useState<Map<string, string[] | null>>(new Map());
+  // Cache de slots: chave `${profId}|${data}|${duracao}` → { slots, placeholders }.
+  // slots === null significa sem agenda configurada nem placeholders (fallback livre).
+  type SlotsEntry = { slots: string[] | null; placeholders: Record<string, string> };
+  const [slotsCache, setSlotsCache] = useState<Map<string, SlotsEntry>>(new Map());
   const [loadingSlotsKey, setLoadingSlotsKey] = useState<string | null>(null);
 
   const slotKey = (profId: string, data: string, dur: number) => `${profId}|${data}|${dur}`;
@@ -327,11 +353,11 @@ export function DividirOrcamentoDialog({
         if (cancel) return;
         const key = slotKey(p.profId, p.data, p.dur);
         setLoadingSlotsKey(key);
-        const slots = await computarSlots(p.profId, p.data, p.dur, recursoSet.has(p.profId));
+        const res = await computarSlots(p.profId, p.data, p.dur, recursoSet.has(p.profId));
         if (cancel) return;
         setSlotsCache((prev) => {
           const next = new Map(prev);
-          next.set(key, slots);
+          next.set(key, res);
           return next;
         });
       }
@@ -364,13 +390,15 @@ export function DividirOrcamentoDialog({
     setSaving(true);
     try {
       const pacote_id = crypto.randomUUID();
-      const payloads = grupos.map((g) => {
+      const insertPayloads: Array<{ payload: Record<string, unknown>; itens: DividirItem[] }> = [];
+      const updates: Array<{ id: string; payload: Record<string, unknown>; itens: DividirItem[] }> = [];
+      for (const g of grupos) {
         const inicioDate = combineLocal(g.data, g.hora);
         const fimDate = new Date(inicioDate.getTime() + g.duracao * 60_000);
         const inicioIso = inicioDate.toISOString();
         const fimIso = fimDate.toISOString();
         const ehRecurso = recursoSet.has(g.medico_id);
-        return {
+        const payload = {
           clinica_id: clinicaId,
           paciente_nome: orcamento.paciente_nome ?? "",
           paciente_id: orcamento.paciente_id ?? null,
@@ -384,39 +412,58 @@ export function DividirOrcamentoDialog({
           orcamento_id: orcamento.id,
           pacote_id,
         };
-      });
-      const { data: inseridos, error } = await supabase
-        .from("agendamentos")
-        .insert(payloads as never)
-        .select("id");
-      if (error) { toast.error(error.message); return; }
-      // Grava vínculo agendamento ↔ itens do orçamento (1 linha por item).
-      const novos = (inseridos ?? []) as { id: string }[];
-      if (novos.length === grupos.length) {
-        const vinculos: Array<{
-          clinica_id: string; agendamento_id: string; orcamento_id: string; orcamento_item_id: string;
-        }> = [];
-        grupos.forEach((g, i) => {
-          const agId = novos[i]?.id;
-          if (!agId) return;
-          g.itens.forEach((it) => {
-            if (!it.id) return;
-            vinculos.push({
-              clinica_id: clinicaId,
-              agendamento_id: agId,
-              orcamento_id: orcamento.id,
-              orcamento_item_id: it.id,
-            });
-          });
-        });
-        if (vinculos.length > 0) {
-          const { error: vErr } = await supabase
-            .from("agendamento_orcamento_itens")
-            .insert(vinculos as never);
-          if (vErr) toast.error(`Agendamentos criados, mas vínculo com itens falhou: ${vErr.message}`);
+        // Se o slot escolhido é um placeholder pré-gerado, atualiza a linha existente.
+        const entry = slotsCache.get(slotKey(g.medico_id, g.data, g.duracao));
+        const placeholderId = entry?.placeholders[g.hora];
+        if (placeholderId) {
+          updates.push({ id: placeholderId, payload, itens: g.itens });
+        } else {
+          insertPayloads.push({ payload, itens: g.itens });
         }
       }
-      toast.success(`${payloads.length} agendamentos criados (pacote do orçamento #${String(orcamento.numero).padStart(5, "0")}).`);
+
+      const agendamentoIds: Array<{ id: string; itens: DividirItem[] }> = [];
+      if (insertPayloads.length > 0) {
+        const { data: inseridos, error } = await supabase
+          .from("agendamentos")
+          .insert(insertPayloads.map((x) => x.payload) as never)
+          .select("id");
+        if (error) { toast.error(error.message); return; }
+        (inseridos ?? []).forEach((r: { id: string }, i: number) => {
+          agendamentoIds.push({ id: r.id, itens: insertPayloads[i].itens });
+        });
+      }
+      for (const u of updates) {
+        const { error } = await supabase
+          .from("agendamentos")
+          .update(u.payload as never)
+          .eq("id", u.id);
+        if (error) { toast.error(error.message); return; }
+        agendamentoIds.push({ id: u.id, itens: u.itens });
+      }
+
+      // Grava vínculo agendamento ↔ itens do orçamento (1 linha por item).
+      const vinculos: Array<{
+        clinica_id: string; agendamento_id: string; orcamento_id: string; orcamento_item_id: string;
+      }> = [];
+      for (const a of agendamentoIds) {
+        for (const it of a.itens) {
+          if (!it.id) continue;
+          vinculos.push({
+            clinica_id: clinicaId,
+            agendamento_id: a.id,
+            orcamento_id: orcamento.id,
+            orcamento_item_id: it.id,
+          });
+        }
+      }
+      if (vinculos.length > 0) {
+        const { error: vErr } = await supabase
+          .from("agendamento_orcamento_itens")
+          .insert(vinculos as never);
+        if (vErr) toast.error(`Agendamentos criados, mas vínculo com itens falhou: ${vErr.message}`);
+      }
+      toast.success(`${grupos.length} agendamentos criados (pacote do orçamento #${String(orcamento.numero).padStart(5, "0")}).`);
       onOpenChange(false);
       onCreated();
     } finally {
@@ -493,11 +540,12 @@ export function DividirOrcamentoDialog({
                       return <Input value="" disabled placeholder="Escolha profissional e data" />;
                     }
                     const key = slotKey(g.medico_id, g.data, g.duracao);
-                    const slots = slotsCache.get(key);
-                    const loading = loadingSlotsKey === key || (slots === undefined);
+                    const entry = slotsCache.get(key);
+                    const loading = loadingSlotsKey === key || (entry === undefined);
                     if (loading) {
                       return <Input value="" disabled placeholder="Carregando horários…" />;
                     }
+                    const slots = entry!.slots;
                     // slots === null → sem agenda configurada → fallback livre
                     if (slots === null) {
                       return (
