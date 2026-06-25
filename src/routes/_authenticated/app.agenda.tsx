@@ -485,6 +485,9 @@ function AgendaPage() {
     itens: DividirItem[];
     inicioPadrao: string;
   } | null>(null);
+  // IDs dos itens do orçamento que serão consumidos pelo agendamento atual
+  // (fluxo de 1 grupo). Gravados em `agendamento_orcamento_itens` após o save.
+  const [pendingOrcItemIds, setPendingOrcItemIds] = useState<string[]>([]);
   // Abre o diálogo "Novo agendamento" pré-preenchido a partir de querystring
   // (usado pelo botão "Agendar" da conversa do WhatsApp).
   const novoFromUrlConsumido = useRef(false);
