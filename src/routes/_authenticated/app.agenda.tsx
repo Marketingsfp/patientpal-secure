@@ -1239,13 +1239,19 @@ function AgendaPage() {
     const opcoesCadastradas = procOpcoesPorMedico.get(medicoId);
     const filtrarPorAgenda = (lista: { id: string; nome: string }[]) => {
       if (!agendaId) return lista;
+      // Só aplica o filtro de agenda quando a agenda pertence ao médico selecionado.
+      const agendasDoMedico = agendasPorMedico.get(medicoId) ?? [];
+      if (!agendasDoMedico.some((a) => a.id === agendaId)) return lista;
       const idsAgenda = procIdsPorAgenda.get(agendaId);
       if (!idsAgenda || idsAgenda.size === 0) return lista;
       const nomesAgenda = new Set<string>();
       for (const p of procedimentosList) {
         if (idsAgenda.has(p.id)) nomesAgenda.add(normalizar(p.nome));
       }
-      return lista.filter((p) => idsAgenda.has(p.id) || nomesAgenda.has(normalizar(p.nome)));
+      const filtrada = lista.filter((p) => idsAgenda.has(p.id) || nomesAgenda.has(normalizar(p.nome)));
+      // Fallback: se o filtro zerar a lista mas o médico tem serviços
+      // cadastrados, mostra todos eles para não bloquear o agendamento.
+      return filtrada.length > 0 ? filtrada : lista;
     };
     if (opcoesCadastradas && opcoesCadastradas.length > 0) {
       // Preserva a ordem do cadastro (created_at asc) — Top 10 aparecem primeiro.
