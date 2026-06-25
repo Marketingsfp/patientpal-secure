@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { SearchableSelect } from "@/components/ui/searchable-select";
-import { Package, Trash2 } from "lucide-react";
+import { AlertTriangle, Package, Trash2 } from "lucide-react";
 
 export type DividirItem = {
   descricao: string;
@@ -90,6 +90,10 @@ export function DividirOrcamentoDialog({
 }: Props) {
   const [grupos, setGrupos] = useState<GrupoForm[]>([]);
   const [saving, setSaving] = useState(false);
+  // Mapas procedimento_id -> Set(medico_id | recurso_id) que executam aquele procedimento.
+  const [vincMedicos, setVincMedicos] = useState<Map<string, Set<string>>>(new Map());
+  const [vincRecursos, setVincRecursos] = useState<Map<string, Set<string>>>(new Map());
+  const [loadingVinc, setLoadingVinc] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -101,6 +105,53 @@ export function DividirOrcamentoDialog({
     }
   }, [open, itens, inicioPadrao]);
 
+  // Carrega vínculos profissionais x procedimentos do orçamento.
+  useEffect(() => {
+    if (!open) return;
+    const procIds = Array.from(
+      new Set(itens.map((i) => i.procedimento_id).filter((x): x is string => !!x)),
+    );
+    if (procIds.length === 0) {
+      setVincMedicos(new Map());
+      setVincRecursos(new Map());
+      return;
+    }
+    let cancel = false;
+    (async () => {
+      setLoadingVinc(true);
+      try {
+        const [{ data: mp }, { data: rp }] = await Promise.all([
+          supabase
+            .from("medico_procedimentos")
+            .select("medico_id, procedimento_id")
+            .in("procedimento_id", procIds),
+          supabase
+            .from("enfermagem_recurso_procedimentos")
+            .select("recurso_id, procedimento_id")
+            .in("procedimento_id", procIds),
+        ]);
+        if (cancel) return;
+        const m = new Map<string, Set<string>>();
+        for (const r of mp ?? []) {
+          if (!r.procedimento_id || !r.medico_id) continue;
+          if (!m.has(r.procedimento_id)) m.set(r.procedimento_id, new Set());
+          m.get(r.procedimento_id)!.add(r.medico_id);
+        }
+        const re = new Map<string, Set<string>>();
+        for (const r of rp ?? []) {
+          if (!r.procedimento_id || !r.recurso_id) continue;
+          if (!re.has(r.procedimento_id)) re.set(r.procedimento_id, new Set());
+          re.get(r.procedimento_id)!.add(r.recurso_id);
+        }
+        setVincMedicos(m);
+        setVincRecursos(re);
+      } finally {
+        if (!cancel) setLoadingVinc(false);
+      }
+    })();
+    return () => { cancel = true; };
+  }, [open, itens]);
+
   const updateGrupo = (idx: number, patch: Partial<GrupoForm>) => {
     setGrupos((prev) => prev.map((g, i) => (i === idx ? { ...g, ...patch } : g)));
   };
@@ -109,15 +160,49 @@ export function DividirOrcamentoDialog({
     setGrupos((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  const medicoOpts = useMemo(
-    () => medicos.map((m) => ({
+  const recursoSet = useMemo(() => new Set(medicos.filter((m) => m.isRecurso).map((m) => m.id)), [medicos]);
+
+  // Retorna o set de profissionais permitidos para um grupo (interseção entre todos
+  // os procedimentos com procedimento_id). Itens sem procedimento_id são ignorados.
+  // Retorna null quando nenhum item do grupo tem procedimento_id → sem restrição.
+  const permitidosDoGrupo = (g: GrupoForm): Set<string> | null => {
+    const procIds = Array.from(
+      new Set(g.itens.map((i) => i.procedimento_id).filter((x): x is string => !!x)),
+    );
+    if (procIds.length === 0) return null;
+    let inter: Set<string> | null = null;
+    for (const pid of procIds) {
+      const allowed = new Set<string>([
+        ...(vincMedicos.get(pid) ?? []),
+        ...(vincRecursos.get(pid) ?? []),
+      ]);
+      inter = inter ? new Set([...inter].filter((x) => allowed.has(x))) : allowed;
+      if (inter.size === 0) break;
+    }
+    return inter;
+  };
+
+  const opcoesPorGrupo = (g: GrupoForm) => {
+    const permitidos = permitidosDoGrupo(g);
+    const filtrados = permitidos ? medicos.filter((m) => permitidos.has(m.id)) : medicos;
+    return filtrados.map((m) => ({
       value: m.id,
       label: `${m.isRecurso ? "🏥 " : "👤 "}${m.nome}`,
-    })),
-    [medicos],
-  );
+    }));
+  };
 
-  const recursoSet = useMemo(() => new Set(medicos.filter((m) => m.isRecurso).map((m) => m.id)), [medicos]);
+  // Limpa profissional selecionado quando ele deixar de pertencer ao set permitido
+  // (ex.: após carregar vínculos, ou alteração de itens do grupo).
+  useEffect(() => {
+    setGrupos((prev) => prev.map((g) => {
+      if (!g.medico_id) return g;
+      const permitidos = permitidosDoGrupo(g);
+      if (!permitidos) return g;
+      if (permitidos.has(g.medico_id)) return g;
+      return { ...g, medico_id: "" };
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vincMedicos, vincRecursos]);
 
   const podeSalvar = grupos.length > 0 && grupos.every((g) => g.medico_id && g.inicio && g.duracao > 0);
 
@@ -125,6 +210,15 @@ export function DividirOrcamentoDialog({
     if (!podeSalvar) {
       toast.error("Preencha profissional e horário em todos os grupos.");
       return;
+    }
+    // Revalida: profissional escolhido precisa executar todos os procedimentos do grupo.
+    for (const g of grupos) {
+      const permitidos = permitidosDoGrupo(g);
+      if (permitidos && !permitidos.has(g.medico_id)) {
+        const med = medicos.find((m) => m.id === g.medico_id);
+        toast.error(`${med?.nome ?? "Profissional"} não realiza ${g.label}. Selecione outro profissional ou cadastre o serviço no perfil dele.`);
+        return;
+      }
     }
     if (!orcamento.paciente_id && !orcamento.paciente_nome) {
       toast.error("Orçamento sem paciente.");
@@ -178,7 +272,11 @@ export function DividirOrcamentoDialog({
         </div>
 
         <div className="space-y-4">
-          {grupos.map((g, idx) => (
+          {grupos.map((g, idx) => {
+            const opts = opcoesPorGrupo(g);
+            const permitidos = permitidosDoGrupo(g);
+            const vazio = permitidos !== null && opts.length === 0;
+            return (
             <div key={g.key} className="border rounded-lg p-4 bg-card">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
@@ -202,9 +300,15 @@ export function DividirOrcamentoDialog({
                   <SearchableSelect
                     value={g.medico_id}
                     onChange={(v) => updateGrupo(idx, { medico_id: v })}
-                    options={medicoOpts}
-                    placeholder="Selecione…"
+                    options={opts}
+                    placeholder={loadingVinc ? "Carregando…" : (vazio ? "Nenhum profissional cadastrado para este serviço" : "Selecione…")}
                   />
+                  {vazio && (
+                    <div className="mt-1 flex items-start gap-1 text-xs text-amber-600">
+                      <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
+                      <span>Nenhum profissional cadastrado para este serviço. Vincule em Equipe → Médico → Serviços.</span>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <Label className="text-xs">Início</Label>
@@ -234,12 +338,13 @@ export function DividirOrcamentoDialog({
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
-          <Button onClick={handleSalvar} disabled={!podeSalvar || saving}>
+          <Button onClick={handleSalvar} disabled={!podeSalvar || saving || loadingVinc}>
             {saving ? "Criando…" : `Criar ${grupos.length} agendamentos`}
           </Button>
         </DialogFooter>
