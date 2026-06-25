@@ -385,8 +385,37 @@ export function DividirOrcamentoDialog({
           pacote_id,
         };
       });
-      const { error } = await supabase.from("agendamentos").insert(payloads as never);
+      const { data: inseridos, error } = await supabase
+        .from("agendamentos")
+        .insert(payloads as never)
+        .select("id");
       if (error) { toast.error(error.message); return; }
+      // Grava vínculo agendamento ↔ itens do orçamento (1 linha por item).
+      const novos = (inseridos ?? []) as { id: string }[];
+      if (novos.length === grupos.length) {
+        const vinculos: Array<{
+          clinica_id: string; agendamento_id: string; orcamento_id: string; orcamento_item_id: string;
+        }> = [];
+        grupos.forEach((g, i) => {
+          const agId = novos[i]?.id;
+          if (!agId) return;
+          g.itens.forEach((it) => {
+            if (!it.id) return;
+            vinculos.push({
+              clinica_id: clinicaId,
+              agendamento_id: agId,
+              orcamento_id: orcamento.id,
+              orcamento_item_id: it.id,
+            });
+          });
+        });
+        if (vinculos.length > 0) {
+          const { error: vErr } = await supabase
+            .from("agendamento_orcamento_itens")
+            .insert(vinculos as never);
+          if (vErr) toast.error(`Agendamentos criados, mas vínculo com itens falhou: ${vErr.message}`);
+        }
+      }
       toast.success(`${payloads.length} agendamentos criados (pacote do orçamento #${String(orcamento.numero).padStart(5, "0")}).`);
       onOpenChange(false);
       onCreated();
