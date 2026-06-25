@@ -1807,10 +1807,8 @@ function AgendaPage() {
       : toLocalInput(end.toISOString());
     let procedimento = "";
     if (medicoFiltro) {
-      const med = medicos.find((m) => m.id === medicoFiltro);
       const padrao = procedimentoPadraoDoMedico(medicoFiltro);
       if (padrao) procedimento = padrao;
-      else if (med?.especialidade_nome) procedimento = med.especialidade_nome;
     }
     setForm({
       ...EMPTY,
