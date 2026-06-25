@@ -1327,11 +1327,9 @@ function AgendaPage() {
     const med = medicos.find((m) => m.id === medicoId);
     if (!med) return "";
     if (med.procedimento_padrao_em_branco) return "";
-    return (med.procedimento_padrao_id
-      ? med.procedimento_padrao_nome
-        ?? procedimentosList.find((p) => p.id === med.procedimento_padrao_id)?.nome
-      : null)
-      ?? med.especialidade_nome
+    if (!med.procedimento_padrao_id) return "";
+    return med.procedimento_padrao_nome
+      ?? procedimentosList.find((p) => p.id === med.procedimento_padrao_id)?.nome
       ?? "";
   };
 
@@ -3085,8 +3083,12 @@ function AgendaPage() {
                       opts.unshift({ value: padrao, label: `${padrao} (principal)` });
                     }
                     // Se o valor atual não estiver na lista (ex.: procedimento legado), inclui também.
+                    // Exceção: não recria a especialidade do médico como se fosse serviço real
+                    // (ex.: agenda ENFERMAGEM gerando opção "ENFERMAGEM" sem existir no cadastro de serviços).
                     const atual = (form.procedimento ?? "").trim();
-                    if (atual && !opts.some((o) => normalizar(o.value) === normalizar(atual))) {
+                    const especialidadeMedico = medicos.find((m) => m.id === form.medico_id)?.especialidade_nome ?? "";
+                    const atualEhEspecialidadeSintetica = especialidadeMedico && normalizar(atual) === normalizar(especialidadeMedico);
+                    if (atual && !atualEhEspecialidadeSintetica && !opts.some((o) => normalizar(o.value) === normalizar(atual))) {
                       opts.push({ value: atual, label: atual });
                     }
                     // ── Top 10 por modalidade (USG/RX/TC/RM) com base no
