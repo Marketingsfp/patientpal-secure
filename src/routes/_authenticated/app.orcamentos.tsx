@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { FileText, Plus, Printer, Trash2, Search, AlertTriangle, Calendar, Columns2, CheckCircle2, Download } from "lucide-react";
+import { FileText, Plus, Printer, Trash2, Search, AlertTriangle, Calendar, Columns2, CheckCircle2, CircleDashed, Download } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -35,6 +35,8 @@ type Orc = {
   categoria: "laboratorio" | "demais" | null;
   agendamentos_total?: number;
   agendamentos_realizados?: number;
+  itens_total?: number;
+  itens_consumidos?: number;
 };
 
 type Procedimento = {
@@ -110,6 +112,24 @@ function OrcamentosPage() {
       for (const o of orcs) {
         o.agendamentos_total = tot.get(o.id) ?? 0;
         o.agendamentos_realizados = real.get(o.id) ?? 0;
+      }
+      // Itens totais e consumidos (uso parcial vs total)
+      const [{ data: itens }, { data: links }] = await Promise.all([
+        supabase.from("orcamento_itens").select("orcamento_id, quantidade").in("orcamento_id", ids),
+        supabase.from("agendamento_orcamento_itens").select("orcamento_id, orcamento_item_id").in("orcamento_id", ids),
+      ]);
+      const totItens = new Map<string, number>();
+      for (const it of (itens ?? []) as { orcamento_id: string; quantidade: number }[]) {
+        totItens.set(it.orcamento_id, (totItens.get(it.orcamento_id) ?? 0) + Number(it.quantidade || 1));
+      }
+      const consumidos = new Map<string, Set<string>>();
+      for (const l of (links ?? []) as { orcamento_id: string; orcamento_item_id: string }[]) {
+        if (!consumidos.has(l.orcamento_id)) consumidos.set(l.orcamento_id, new Set());
+        consumidos.get(l.orcamento_id)!.add(l.orcamento_item_id);
+      }
+      for (const o of orcs) {
+        o.itens_total = totItens.get(o.id) ?? 0;
+        o.itens_consumidos = consumidos.get(o.id)?.size ?? 0;
       }
     }
     setList(orcs);
@@ -298,17 +318,29 @@ function OrcamentosPage() {
                 <td className="px-3 py-2 font-mono">
                   <div className="flex items-center gap-1.5">
                     <span>#{String(o.numero).padStart(5, "0")}</span>
-                    {(o.agendamentos_total ?? 0) > 0 && (
-                      <span
-                        title={`Realizado · ${o.agendamentos_total} agendamento(s)${(o.agendamentos_realizados ?? 0) > 0 ? `, ${o.agendamentos_realizados} realizado(s)` : ""}`}
-                        className="inline-flex items-center gap-0.5 text-emerald-600"
-                      >
-                        <CheckCircle2 className="h-4 w-4" />
-                        {(o.agendamentos_total ?? 0) > 1 && (
-                          <span className="text-[10px] font-semibold">{o.agendamentos_total}</span>
-                        )}
-                      </span>
-                    )}
+                     {(o.agendamentos_total ?? 0) > 0 && (() => {
+                       const total = o.itens_total ?? 0;
+                       const usados = o.itens_consumidos ?? 0;
+                       const parcial = total > 0 && usados > 0 && usados < total;
+                       const titulo = total > 0
+                         ? (parcial
+                             ? `Uso parcial · ${usados} de ${total} itens agendados`
+                             : `Totalmente agendado · ${usados}/${total} itens`)
+                         : `${o.agendamentos_total} agendamento(s)`;
+                       return (
+                         <span
+                           title={titulo}
+                           className={`inline-flex items-center gap-0.5 ${parcial ? "text-amber-600" : "text-emerald-600"}`}
+                         >
+                           {parcial
+                             ? <CircleDashed className="h-4 w-4" />
+                             : <CheckCircle2 className="h-4 w-4" />}
+                           {total > 0 && (
+                             <span className="text-[10px] font-semibold">{usados}/{total}</span>
+                           )}
+                         </span>
+                       );
+                     })()}
                   </div>
                 </td>
                 <td className="px-3 py-2">{new Date(o.created_at).toLocaleDateString("pt-BR")}</td>
