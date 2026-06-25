@@ -51,13 +51,6 @@ type Props = {
 const norm = (s: string | null | undefined) =>
   (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
 
-const addMin = (localInput: string, min: number) => {
-  const d = new Date(localInput);
-  d.setMinutes(d.getMinutes() + min);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-};
-
 const pad2 = (n: number) => String(n).padStart(2, "0");
 const toDateStr = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 const toHmStr = (d: Date) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
