@@ -1246,11 +1246,13 @@ function AgendaPage() {
         if (idsAgenda.has(p.id)) nomesAgenda.add(normalizar(p.nome));
       }
       const filtrada = lista.filter((p) => idsAgenda.has(p.id) || nomesAgenda.has(normalizar(p.nome)));
-      // Fallback: se o filtro por agenda zerar a lista (ex.: vínculos da
-      // agenda não casam com o cadastro do médico, ou o slot herdou um
-      // agenda_id de outra agenda do mesmo médico), preserva a lista
-      // completa em vez de esconder todos os serviços cadastrados.
-      return filtrada.length > 0 ? filtrada : lista;
+      if (filtrada.length === 0) return lista;
+      // O vínculo da agenda deve só priorizar os serviços daquela agenda,
+      // nunca esconder os demais serviços do médico. Isso é essencial para
+      // médicos como "ENFERMAGEM", que possuem várias agendas no mesmo cadastro.
+      const filtrados = new Set(filtrada.map((p) => p.id || normalizar(p.nome)));
+      const restantes = lista.filter((p) => !filtrados.has(p.id || normalizar(p.nome)));
+      return [...filtrada, ...restantes];
     };
     if (opcoesCadastradas && opcoesCadastradas.length > 0) {
       // Preserva a ordem do cadastro (created_at asc) — Top 10 aparecem primeiro.
@@ -2987,7 +2989,7 @@ function AgendaPage() {
                 <Label>Serviço</Label>
                 {form.medico_id ? (
                   (procOpcoesPorMedico.get(form.medico_id)?.length || procPorMedico.get(form.medico_id)?.size || procNomesPorMedico.get(form.medico_id)?.size) ? (
-                    <p className="text-xs text-muted-foreground">Mostrando apenas serviços configurados para este médico.</p>
+                    <p className="text-xs text-muted-foreground">Mostrando os serviços configurados para este médico.</p>
                   ) : procedimentoPadraoDoMedico(form.medico_id) ? (
                     <p className="text-xs text-muted-foreground">
                       Mostrando o serviço principal do médico. Cadastre mais serviços no cadastro do médico, se necessário.
