@@ -1137,6 +1137,61 @@ function AgendaPage() {
 
   useEffect(() => { loadRef(); }, [clinicaAtual?.clinica_id]);
 
+  // Fallback definitivo: se ao selecionar um médico a lista local de
+  // serviços vier vazia (por qualquer motivo — cache defasado, RLS,
+  // race com loadRef), busca direto no banco e popula o mapa.
+  useEffect(() => {
+    const medicoId = form.medico_id;
+    if (!medicoId || !clinicaAtual?.clinica_id) return;
+    const jaTem = (procOpcoesPorMedico.get(medicoId)?.length ?? 0) > 0;
+    if (jaTem) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("medico_procedimentos")
+        .select("procedimento_id, especialidade_id, procedimentos!inner(id,nome,grupo,ativo)")
+        .eq("medico_id", medicoId);
+      if (error || cancelled || !Array.isArray(data)) return;
+      const opcoes: { id: string; nome: string }[] = [];
+      const vistos = new Set<string>();
+      const ids = new Set<string>();
+      for (const r of data as Array<{ procedimento_id: string; procedimentos: { id: string; nome: string; grupo: string | null; ativo: boolean | null } | null }>) {
+        const p = r.procedimentos;
+        if (!p || p.ativo === false) continue;
+        const k = normalizar(p.nome);
+        if (vistos.has(k)) continue;
+        vistos.add(k);
+        ids.add(p.id);
+        opcoes.push({ id: p.id, nome: p.nome });
+      }
+      if (opcoes.length === 0) return;
+      setProcOpcoesPorMedico((prev) => {
+        if ((prev.get(medicoId)?.length ?? 0) > 0) return prev;
+        const next = new Map(prev);
+        next.set(medicoId, opcoes);
+        return next;
+      });
+      setProcPorMedico((prev) => {
+        const cur = prev.get(medicoId);
+        if (cur && cur.size >= ids.size) return prev;
+        const next = new Map(prev);
+        const merged = new Set(cur ?? []);
+        for (const id of ids) merged.add(id);
+        next.set(medicoId, merged);
+        return next;
+      });
+      // garante que os procedimentos apareçam em procedimentosList para
+      // o caminho `procedimentosList.filter(...)` (linha 1264) funcionar.
+      setProcedimentosList((prev) => {
+        const known = new Set(prev.map((p) => p.id));
+        const adicionar = opcoes.filter((o) => !known.has(o.id));
+        if (adicionar.length === 0) return prev;
+        return [...prev, ...adicionar];
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [form.medico_id, clinicaAtual?.clinica_id, procOpcoesPorMedico]);
+
   // Carrega contagem histórica de procedimentos (últimos 365 dias) para
   // ordenar as opções por popularidade no momento do agendamento.
   useEffect(() => {
