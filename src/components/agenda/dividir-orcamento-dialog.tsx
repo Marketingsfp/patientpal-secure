@@ -104,13 +104,16 @@ function montarDescricao(g: GrupoForm): string {
 
 // Calcula slots livres para um profissional/recurso numa data, com base nas
 // disponibilidades semanais e nos agendamentos já existentes. Retorna null
-// quando o profissional não tem agenda configurada (fallback para horário livre).
+// quando o profissional não tem agenda configurada nem slots pré-gerados
+// (fallback para horário livre). Quando há slots pré-gerados ("DISPONIVEL"),
+// usa-os como universo de horários. O segundo elemento do retorno mapeia
+// HH:MM → id do placeholder a ser reutilizado no save.
 async function computarSlots(
   profId: string,
   dataStr: string,
   duracaoMin: number,
   ehRecurso: boolean,
-): Promise<string[] | null> {
+): Promise<{ slots: string[] | null; placeholders: Record<string, string> }> {
   const dia = new Date(`${dataStr}T00:00:00`);
   const dow = dia.getDay(); // 0..6
 
@@ -137,28 +140,49 @@ async function computarSlots(
     });
   }
 
-  if (dispos.length === 0) return null;
-
   // Carrega agendamentos do dia para este profissional.
   const inicioDia = new Date(`${dataStr}T00:00:00`).toISOString();
   const fimDia = new Date(`${dataStr}T23:59:59`).toISOString();
   const ags = ehRecurso
     ? await supabase
         .from("agendamentos")
-        .select("inicio, fim, status")
+        .select("id, inicio, fim, status, paciente_id, paciente_nome")
         .eq("enfermagem_recurso_id", profId)
         .gte("inicio", inicioDia)
         .lte("inicio", fimDia)
     : await supabase
         .from("agendamentos")
-        .select("inicio, fim, status")
+        .select("id, inicio, fim, status, paciente_id, paciente_nome")
         .eq("medico_id", profId)
         .gte("inicio", inicioDia)
         .lte("inicio", fimDia);
 
-  const ocupados = ((ags.data ?? []) as { inicio: string; fim: string; status: string | null }[])
-    .filter((a) => a.status !== "cancelado")
+  type Ag = { id: string; inicio: string; fim: string; status: string | null; paciente_id: string | null; paciente_nome: string | null };
+  const todos = ((ags.data ?? []) as Ag[]).filter((a) => a.status !== "cancelado");
+  const placeholdersAg = todos.filter(
+    (a) => !a.paciente_id && (a.paciente_nome === null || a.paciente_nome === "" || a.paciente_nome === "DISPONIVEL"),
+  );
+  const ocupados = todos
+    .filter((a) => !placeholdersAg.some((p) => p.id === a.id))
     .map((a) => ({ ini: new Date(a.inicio).getTime(), fim: new Date(a.fim).getTime() }));
+
+  // Sem disponibilidade semanal: se há slots pré-gerados ("Criar/gerar horários"),
+  // usá-los como universo de horários.
+  if (dispos.length === 0) {
+    if (placeholdersAg.length === 0) return { slots: null, placeholders: {} };
+    const map: Record<string, string> = {};
+    const out: string[] = [];
+    for (const p of placeholdersAg) {
+      const d = new Date(p.inicio);
+      const hm = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+      if (!map[hm]) {
+        map[hm] = p.id;
+        out.push(hm);
+      }
+    }
+    out.sort();
+    return { slots: out, placeholders: map };
+  }
 
   const out: string[] = [];
   for (const d of dispos) {
@@ -174,7 +198,7 @@ async function computarSlots(
     }
   }
   out.sort();
-  return out;
+  return { slots: out, placeholders: {} };
 }
 
 export function DividirOrcamentoDialog({
