@@ -1849,12 +1849,39 @@ function AgendaPage() {
       if (orc.status === "cancelado") { toast.error("Orçamento cancelado."); return; }
       const { data: itens, error: e2 } = await supabase
         .from("orcamento_itens")
-        .select("descricao, procedimento_id")
+        .select("id, descricao, procedimento_id")
         .eq("orcamento_id", orc.id)
         .order("ordem");
       if (e2) { toast.error(e2.message); return; }
-      const its = (itens ?? []) as { descricao: string; procedimento_id: string | null }[];
-      if (its.length === 0) { toast.error("Orçamento sem itens."); return; }
+      const itsAll = (itens ?? []) as { id: string; descricao: string; procedimento_id: string | null }[];
+      if (itsAll.length === 0) { toast.error("Orçamento sem itens."); return; }
+      // Filtra itens já consumidos por agendamentos ativos. Permite agendar
+      // o restante quando o orçamento foi aproveitado em partes.
+      const { data: consumidosRows } = await supabase
+        .from("agendamento_orcamento_itens")
+        .select("orcamento_item_id, agendamento_id, agendamentos!inner(status)")
+        .eq("orcamento_id", orc.id);
+      const consumidos = new Set<string>(
+        ((consumidosRows ?? []) as Array<{ orcamento_item_id: string; agendamentos: { status: string } | null }>)
+          .filter((r) => r.agendamentos?.status !== "cancelado")
+          .map((r) => r.orcamento_item_id),
+      );
+      const editingItemIdsLiberar = editing?.id
+        ? new Set<string>(
+            ((consumidosRows ?? []) as Array<{ orcamento_item_id: string; agendamento_id: string }>)
+              .filter((r) => r.agendamento_id === editing.id)
+              .map((r) => r.orcamento_item_id),
+          )
+        : new Set<string>();
+      const its = itsAll.filter((i) => !consumidos.has(i.id) || editingItemIdsLiberar.has(i.id));
+      if (its.length === 0) {
+        toast.error(`Todos os ${itsAll.length} itens deste orçamento já foram agendados.`);
+        return;
+      }
+      const totalConsumidos = itsAll.length - its.length;
+      if (totalConsumidos > 0) {
+        toast.info(`${totalConsumidos} de ${itsAll.length} itens já agendados. Restam ${its.length} para agendar.`);
+      }
       const procIds = Array.from(new Set(its.map(i => i.procedimento_id).filter((x): x is string => !!x)));
       let procs: { id: string; grupo: string | null; tipo: string | null }[] = [];
       if (procIds.length) {
@@ -1877,18 +1904,8 @@ function AgendaPage() {
         return g === "LABORATORIO" || t === "EXAME" || t === "LABORATORIO";
       };
       const todosLab = its.every(i => isLab(i.procedimento_id));
-      // Verifica se já existe agendamento ativo vinculado (mesma clínica)
-      const { data: jaAg } = await supabase
-        .from("agendamentos")
-        .select("id")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("orcamento_id", orc.id)
-        .neq("status", "cancelado")
-        .limit(1);
-      if (jaAg && jaAg.length > 0 && (!editing || editing.id !== jaAg[0].id)) {
-        toast.error("Este orçamento já está vinculado a outro agendamento.");
-        return;
-      }
+      // (Bloqueio antigo removido: agora permitimos agendamentos parciais,
+      // controlados via `agendamento_orcamento_itens`.)
       const nomes = its.map(i => i.descricao);
       const procStr = todosLab
         ? `LABORATÓRIO (${nomes.length} EXAMES): ${nomes.join(", ")}`
@@ -1926,6 +1943,7 @@ function AgendaPage() {
         const itensRicos: DividirItem[] = its.map(i => {
           const p = i.procedimento_id ? procPorId.get(i.procedimento_id) : null;
           return {
+            id: i.id,
             descricao: i.descricao,
             procedimento_id: i.procedimento_id,
             grupo: p?.grupo ?? null,
@@ -1947,6 +1965,9 @@ function AgendaPage() {
         setDividirOpen(true);
         return;
       }
+      // Fluxo de 1 grupo: registra os IDs restantes para gravar o vínculo
+      // após o save do agendamento.
+      setPendingOrcItemIds(its.map((i) => i.id));
       setForm(f => ({
         ...f,
         orcamento_id: orc.id,
