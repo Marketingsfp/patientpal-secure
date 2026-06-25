@@ -1,37 +1,40 @@
 ## Problema
 
-No diálogo **Dividir orçamento** (`src/components/agenda/dividir-orcamento-dialog.tsx`) o campo "Profissional / Recurso" lista **todos** os médicos/recursos da clínica, sem checar se aquele profissional realmente executa o serviço do bloco. Resultado: dá para mandar Ecocardiograma para o Dr. Milton (Dermato) ou Consulta Diferenciada para a Conceição.
+No diálogo **Dividir orçamento** (`src/components/agenda/dividir-orcamento-dialog.tsx`), o campo **Início** é um `<input type="datetime-local">` livre. Isso permite agendar em qualquer dia/hora, mesmo fora da grade real do profissional/recurso (folga, horário de almoço, slot já ocupado, fora do expediente).
 
-A relação correta já existe no banco:
-- `medico_procedimentos (medico_id, procedimento_id)` — médicos
-- `enfermagem_recurso_procedimentos (recurso_id, procedimento_id)` — recursos
+## Solução proposta
 
-## Correção
+Trocar o campo livre por um **seletor de slots disponíveis** baseado na agenda real do profissional/recurso selecionado, igual ao usado no formulário de novo agendamento (`app.agenda.tsx`).
 
-1. **Carregar vínculos** ao abrir o diálogo:
-   - `SELECT medico_id, procedimento_id FROM medico_procedimentos WHERE procedimento_id IN (ids do orçamento)`
-   - `SELECT recurso_id, procedimento_id FROM enfermagem_recurso_procedimentos WHERE procedimento_id IN (...)`
-   - Montar dois `Map<procedimento_id, Set<profissional_id>>`.
+### Fluxo
 
-2. **Filtrar opções por bloco** em `dividir-orcamento-dialog.tsx`:
-   - Para cada grupo, juntar os `procedimento_id` dos itens (ignorar itens sem `procedimento_id` — descrição livre).
-   - Opção habilitada = profissional/recurso que executa **todos** os `procedimento_id` do grupo (interseção).
-   - Se nenhum item do grupo tiver `procedimento_id`, mantém a lista completa (fallback para texto livre).
-   - A `SearchableSelect` passa a receber `medicoOpts` calculado por grupo, não global.
+1. Usuário escolhe o **profissional/recurso** do bloco (já filtrado por serviço, como corrigido na rodada anterior).
+2. Aparece um campo **Data** (date picker — só dias com agenda ativa).
+3. Aparece um `Select` **Horário disponível** que lista apenas os slots livres daquele profissional/recurso naquela data, respeitando:
+   - dias e horários da agenda configurada (`medico_agendas` / `enfermagem_horarios`),
+   - duração do serviço,
+   - agendamentos já existentes (sem conflito),
+   - intervalos/folgas.
+4. Se ninguém tem slot na data, mostra aviso "Sem horários disponíveis nessa data — escolha outro dia".
+5. A duração passa a vir do cadastro do serviço (somando blocos), mas continua editável.
 
-3. **Feedback visual**:
-   - Se a lista filtrada ficar vazia, mostrar aviso no bloco: "Nenhum profissional cadastrado para este serviço. Vincule em Equipe → Médico → Serviços."
-   - Se o usuário já tinha selecionado um profissional e ele não está mais na lista (mudou serviço), limpar `medico_id` do grupo.
+### Detalhes técnicos
 
-4. **Trava no salvar** (`handleSalvar`): revalidar que cada `medico_id` escolhido pertence ao set permitido do grupo; caso contrário, `toast.error` e bloqueia o insert.
+- Reaproveitar a função/RPC que a agenda principal já usa para calcular slots livres (verificar `app.agenda.tsx` — existe lógica de `slots disponíveis` / `proximos horarios`). Se houver RPC tipo `buscar_slots_disponiveis`, chamar com `(medico_id|recurso_id, data, duracao)`.
+- Carregar slots sob demanda quando `medico_id` + `data` + `duracao` estiverem definidos no bloco.
+- Cache local por chave `${profissional}-${data}-${duracao}` para evitar recalcular ao trocar entre blocos.
+- Manter a sequência automática dos blocos: ao escolher o slot do bloco 1, sugerir o próximo slot livre para o bloco 2, e assim por diante (mas usuário pode trocar manualmente).
+- Revalidação no `handleSalvar`: além da checagem profissional×serviço, conferir que o horário ainda está livre no momento do insert (refetch rápido) para evitar corrida.
 
-5. **Mesma regra na agenda comum** (`app.agenda.tsx`, formulário de novo agendamento): já existe `opcoesProcedimentoMedico` filtrando serviço por médico; verificar e, se necessário, aplicar o filtro inverso (médico por serviço) quando o usuário escolher o serviço primeiro — para evitar o mesmo bug em agendamento avulso.
+### Fallback
 
-## Arquivos a editar
+Se o profissional/recurso não tiver agenda configurada no sistema, manter o campo `datetime-local` livre como hoje, com aviso "Sem agenda configurada — horário livre".
 
-- `src/components/agenda/dividir-orcamento-dialog.tsx` — receber maps de vínculos, filtrar `medicoOpts` por grupo, validar no salvar, exibir aviso quando vazio.
-- `src/routes/_authenticated/app.agenda.tsx` (linhas ~4380-4392) — buscar os vínculos antes de abrir o diálogo (ou na própria abertura) e passar como prop nova `vinculos={{ medicos: Map, recursos: Map }}`.
+## Arquivos
 
-## Sem alterações de schema
+- `src/components/agenda/dividir-orcamento-dialog.tsx` — substituir campo Início, adicionar campo Data + Select de horário, lógica de carregamento de slots, revalidação no salvar.
+- Sem mudanças de schema. Reuso da RPC/lógica já existente em `app.agenda.tsx`.
 
-Tabelas e dados já existem; só uso das relações.
+## Confirmação
+
+Antes de implementar: confirma que quer **bloquear** horários fora da agenda (não dá pra salvar), ou prefere **apenas avisar** e ainda permitir forçar (override)?

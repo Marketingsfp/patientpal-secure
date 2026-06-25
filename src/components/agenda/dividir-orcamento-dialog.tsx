@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { AlertTriangle, Package, Trash2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export type DividirItem = {
   descricao: string;
@@ -30,7 +31,8 @@ type GrupoForm = {
   label: string;
   itens: DividirItem[];
   medico_id: string;
-  inicio: string;
+  data: string;        // YYYY-MM-DD
+  hora: string;        // HH:MM (slot escolhido)
   duracao: number; // minutos
   observacoes: string;
 };
@@ -49,12 +51,25 @@ type Props = {
 const norm = (s: string | null | undefined) =>
   (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
 
-const addMin = (localInput: string, min: number) => {
-  const d = new Date(localInput);
-  d.setMinutes(d.getMinutes() + min);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const toDateStr = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const toHmStr = (d: Date) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+const combineLocal = (data: string, hora: string) => new Date(`${data}T${hora}:00`);
+
+type DispoRow = {
+  dia_semana: number;
+  hora_inicio: string; // HH:MM:SS
+  hora_fim: string;
+  intervalo_min: number | null;
+  vigencia_inicio?: string | null;
+  vigencia_fim?: string | null;
 };
+
+const hmToMin = (s: string) => {
+  const [h, m] = s.split(":").map(Number);
+  return h * 60 + (m || 0);
+};
+const minToHm = (n: number) => `${pad2(Math.floor(n / 60))}:${pad2(n % 60)}`;
 
 function agruparItens(itens: DividirItem[]): GrupoForm[] {
   const map = new Map<string, GrupoForm>();
@@ -67,7 +82,8 @@ function agruparItens(itens: DividirItem[]): GrupoForm[] {
         label,
         itens: [],
         medico_id: "",
-        inicio: "",
+        data: "",
+        hora: "",
         duracao: 30,
         observacoes: "",
       });
@@ -85,6 +101,81 @@ function montarDescricao(g: GrupoForm): string {
   return `${g.label} (${nomes.length} ITENS): ${nomes.join(", ")}`;
 }
 
+// Calcula slots livres para um profissional/recurso numa data, com base nas
+// disponibilidades semanais e nos agendamentos já existentes. Retorna null
+// quando o profissional não tem agenda configurada (fallback para horário livre).
+async function computarSlots(
+  profId: string,
+  dataStr: string,
+  duracaoMin: number,
+  ehRecurso: boolean,
+): Promise<string[] | null> {
+  const dia = new Date(`${dataStr}T00:00:00`);
+  const dow = dia.getDay(); // 0..6
+
+  let dispos: DispoRow[] = [];
+  if (ehRecurso) {
+    const { data } = await supabase
+      .from("enfermagem_recurso_disponibilidades")
+      .select("dia_semana, hora_inicio, hora_fim, intervalo_min")
+      .eq("recurso_id", profId)
+      .eq("dia_semana", dow)
+      .eq("ativo", true);
+    dispos = (data ?? []) as DispoRow[];
+  } else {
+    const { data } = await supabase
+      .from("medico_disponibilidades")
+      .select("dia_semana, hora_inicio, hora_fim, intervalo_min, vigencia_inicio, vigencia_fim")
+      .eq("medico_id", profId)
+      .eq("dia_semana", dow)
+      .eq("ativo", true);
+    dispos = ((data ?? []) as DispoRow[]).filter((d) => {
+      if (d.vigencia_inicio && dataStr < d.vigencia_inicio) return false;
+      if (d.vigencia_fim && dataStr > d.vigencia_fim) return false;
+      return true;
+    });
+  }
+
+  if (dispos.length === 0) return null;
+
+  // Carrega agendamentos do dia para este profissional.
+  const inicioDia = new Date(`${dataStr}T00:00:00`).toISOString();
+  const fimDia = new Date(`${dataStr}T23:59:59`).toISOString();
+  const ags = ehRecurso
+    ? await supabase
+        .from("agendamentos")
+        .select("inicio, fim, status")
+        .eq("enfermagem_recurso_id", profId)
+        .gte("inicio", inicioDia)
+        .lte("inicio", fimDia)
+    : await supabase
+        .from("agendamentos")
+        .select("inicio, fim, status")
+        .eq("medico_id", profId)
+        .gte("inicio", inicioDia)
+        .lte("inicio", fimDia);
+
+  const ocupados = ((ags.data ?? []) as { inicio: string; fim: string; status: string | null }[])
+    .filter((a) => a.status !== "cancelado")
+    .map((a) => ({ ini: new Date(a.inicio).getTime(), fim: new Date(a.fim).getTime() }));
+
+  const out: string[] = [];
+  for (const d of dispos) {
+    const step = d.intervalo_min && d.intervalo_min > 0 ? d.intervalo_min : duracaoMin;
+    const startMin = hmToMin(d.hora_inicio.slice(0, 5));
+    const endMin = hmToMin(d.hora_fim.slice(0, 5));
+    for (let m = startMin; m + duracaoMin <= endMin; m += step) {
+      const hm = minToHm(m);
+      const slotIni = combineLocal(dataStr, hm).getTime();
+      const slotFim = slotIni + duracaoMin * 60_000;
+      const conflita = ocupados.some((o) => slotIni < o.fim && slotFim > o.ini);
+      if (!conflita && !out.includes(hm)) out.push(hm);
+    }
+  }
+  out.sort();
+  return out;
+}
+
 export function DividirOrcamentoDialog({
   open, onOpenChange, clinicaId, orcamento, itens, medicos, inicioPadrao, onCreated,
 }: Props) {
@@ -97,10 +188,13 @@ export function DividirOrcamentoDialog({
 
   useEffect(() => {
     if (open) {
-      const gs = agruparItens(itens).map((g, i) => ({
-        ...g,
-        inicio: i === 0 ? inicioPadrao : addMin(inicioPadrao, i * 30),
-      }));
+      // Quebra o datetime padrão em data + hora; cada bloco subsequente recebe sugestão +30min.
+      const base = new Date(inicioPadrao);
+      const gs = agruparItens(itens).map((g, i) => {
+        const d = new Date(base);
+        d.setMinutes(d.getMinutes() + i * 30);
+        return { ...g, data: toDateStr(d), hora: toHmStr(d) };
+      });
       setGrupos(gs);
     }
   }, [open, itens, inicioPadrao]);
@@ -210,7 +304,43 @@ export function DividirOrcamentoDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vincMedicos, vincRecursos]);
 
-  const podeSalvar = grupos.length > 0 && grupos.every((g) => g.medico_id && g.inicio && g.duracao > 0);
+  // Cache de slots: chave `${profId}|${data}|${duracao}` → array de HH:MM disponíveis (ou null = sem agenda configurada).
+  const [slotsCache, setSlotsCache] = useState<Map<string, string[] | null>>(new Map());
+  const [loadingSlotsKey, setLoadingSlotsKey] = useState<string | null>(null);
+
+  const slotKey = (profId: string, data: string, dur: number) => `${profId}|${data}|${dur}`;
+
+  // Carrega slots disponíveis para os grupos que já têm profissional + data + duração.
+  useEffect(() => {
+    if (!open) return;
+    const pendentes = grupos
+      .filter((g) => g.medico_id && g.data && g.duracao > 0)
+      .map((g) => ({ profId: g.medico_id, data: g.data, dur: g.duracao }))
+      .filter((x) => !slotsCache.has(slotKey(x.profId, x.data, x.dur)));
+    if (pendentes.length === 0) return;
+    // Deduplica
+    const unicos = Array.from(new Map(pendentes.map((p) => [slotKey(p.profId, p.data, p.dur), p])).values());
+    let cancel = false;
+    (async () => {
+      for (const p of unicos) {
+        if (cancel) return;
+        const key = slotKey(p.profId, p.data, p.dur);
+        setLoadingSlotsKey(key);
+        const slots = await computarSlots(p.profId, p.data, p.dur, recursoSet.has(p.profId));
+        if (cancel) return;
+        setSlotsCache((prev) => {
+          const next = new Map(prev);
+          next.set(key, slots);
+          return next;
+        });
+      }
+      if (!cancel) setLoadingSlotsKey(null);
+    })();
+    return () => { cancel = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, grupos, recursoSet]);
+
+  const podeSalvar = grupos.length > 0 && grupos.every((g) => g.medico_id && g.data && g.hora && g.duracao > 0);
 
   const handleSalvar = async () => {
     if (!podeSalvar) {
@@ -234,8 +364,10 @@ export function DividirOrcamentoDialog({
     try {
       const pacote_id = crypto.randomUUID();
       const payloads = grupos.map((g) => {
-        const inicioIso = new Date(g.inicio).toISOString();
-        const fimIso = new Date(addMin(g.inicio, g.duracao)).toISOString();
+        const inicioDate = combineLocal(g.data, g.hora);
+        const fimDate = new Date(inicioDate.getTime() + g.duracao * 60_000);
+        const inicioIso = inicioDate.toISOString();
+        const fimIso = fimDate.toISOString();
         const ehRecurso = recursoSet.has(g.medico_id);
         return {
           clinica_id: clinicaId,
@@ -317,12 +449,63 @@ export function DividirOrcamentoDialog({
                   )}
                 </div>
                 <div>
-                  <Label className="text-xs">Início</Label>
+                  <Label className="text-xs">Data</Label>
                   <Input
-                    type="datetime-local"
-                    value={g.inicio}
-                    onChange={(e) => updateGrupo(idx, { inicio: e.target.value })}
+                    type="date"
+                    value={g.data}
+                    onChange={(e) => updateGrupo(idx, { data: e.target.value, hora: "" })}
                   />
+                </div>
+                <div>
+                  <Label className="text-xs">Horário disponível</Label>
+                  {(() => {
+                    if (!g.medico_id || !g.data) {
+                      return <Input value="" disabled placeholder="Escolha profissional e data" />;
+                    }
+                    const key = slotKey(g.medico_id, g.data, g.duracao);
+                    const slots = slotsCache.get(key);
+                    const loading = loadingSlotsKey === key || (slots === undefined);
+                    if (loading) {
+                      return <Input value="" disabled placeholder="Carregando horários…" />;
+                    }
+                    // slots === null → sem agenda configurada → fallback livre
+                    if (slots === null) {
+                      return (
+                        <>
+                          <Input
+                            type="time"
+                            value={g.hora}
+                            onChange={(e) => updateGrupo(idx, { hora: e.target.value })}
+                          />
+                          <div className="mt-1 flex items-start gap-1 text-xs text-amber-600">
+                            <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
+                            <span>Sem agenda configurada — horário livre.</span>
+                          </div>
+                        </>
+                      );
+                    }
+                    if (slots.length === 0) {
+                      return (
+                        <>
+                          <Input value="" disabled placeholder="Sem horários nessa data" />
+                          <div className="mt-1 flex items-start gap-1 text-xs text-amber-600">
+                            <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
+                            <span>Nenhum horário livre nessa data. Escolha outro dia.</span>
+                          </div>
+                        </>
+                      );
+                    }
+                    return (
+                      <Select value={g.hora} onValueChange={(v) => updateGrupo(idx, { hora: v })}>
+                        <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
+                        <SelectContent className="max-h-64">
+                          {slots.map((h) => (
+                            <SelectItem key={h} value={h}>{h}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    );
+                  })()}
                 </div>
                 <div>
                   <Label className="text-xs">Duração (min)</Label>
