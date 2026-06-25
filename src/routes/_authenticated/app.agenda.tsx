@@ -1459,6 +1459,7 @@ function AgendaPage() {
       toast.info("Há atendimentos já pagos na seleção. Desmarque-os antes de cobrar.");
       return;
     }
+    try {
     // Verificação fresca + carga de procedimentos em PARALELO (cache 60s)
     const [{ data: jaPagosLote }, procs] = await Promise.all([
       supabase
@@ -1514,6 +1515,10 @@ function AgendaPage() {
       })(),
     });
     setFormaPagOpen(true);
+    } catch (e: any) {
+      console.error("[cobrarSelecionados]", e);
+      toast.error(e?.message ?? "Falha ao preparar a cobrança. Tente novamente.");
+    }
   };
 
   const isManager = clinicaAtual?.role === "admin" || clinicaAtual?.role === "gestor";
