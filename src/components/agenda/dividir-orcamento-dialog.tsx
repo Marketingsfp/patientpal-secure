@@ -176,7 +176,13 @@ export function DividirOrcamentoDialog({
         ...(vincMedicos.get(pid) ?? []),
         ...(vincRecursos.get(pid) ?? []),
       ]);
-      inter = inter ? new Set([...inter].filter((x) => allowed.has(x))) : allowed;
+      if (inter === null) {
+        inter = allowed;
+      } else {
+        const next = new Set<string>();
+        inter.forEach((x) => { if (allowed.has(x)) next.add(x); });
+        inter = next;
+      }
       if (inter.size === 0) break;
     }
     return inter;
