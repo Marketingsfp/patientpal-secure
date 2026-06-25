@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { AlertTriangle, Package, Trash2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export type DividirItem = {
   descricao: string;
@@ -119,10 +120,13 @@ export function DividirOrcamentoDialog({
 
   useEffect(() => {
     if (open) {
-      const gs = agruparItens(itens).map((g, i) => ({
-        ...g,
-        inicio: i === 0 ? inicioPadrao : addMin(inicioPadrao, i * 30),
-      }));
+      // Quebra o datetime padrão em data + hora; cada bloco subsequente recebe sugestão +30min.
+      const base = new Date(inicioPadrao);
+      const gs = agruparItens(itens).map((g, i) => {
+        const d = new Date(base);
+        d.setMinutes(d.getMinutes() + i * 30);
+        return { ...g, data: toDateStr(d), hora: toHmStr(d) };
+      });
       setGrupos(gs);
     }
   }, [open, itens, inicioPadrao]);
@@ -232,7 +236,43 @@ export function DividirOrcamentoDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vincMedicos, vincRecursos]);
 
-  const podeSalvar = grupos.length > 0 && grupos.every((g) => g.medico_id && g.inicio && g.duracao > 0);
+  // Cache de slots: chave `${profId}|${data}|${duracao}` → array de HH:MM disponíveis (ou null = sem agenda configurada).
+  const [slotsCache, setSlotsCache] = useState<Map<string, string[] | null>>(new Map());
+  const [loadingSlotsKey, setLoadingSlotsKey] = useState<string | null>(null);
+
+  const slotKey = (profId: string, data: string, dur: number) => `${profId}|${data}|${dur}`;
+
+  // Carrega slots disponíveis para os grupos que já têm profissional + data + duração.
+  useEffect(() => {
+    if (!open) return;
+    const pendentes = grupos
+      .filter((g) => g.medico_id && g.data && g.duracao > 0)
+      .map((g) => ({ profId: g.medico_id, data: g.data, dur: g.duracao }))
+      .filter((x) => !slotsCache.has(slotKey(x.profId, x.data, x.dur)));
+    if (pendentes.length === 0) return;
+    // Deduplica
+    const unicos = Array.from(new Map(pendentes.map((p) => [slotKey(p.profId, p.data, p.dur), p])).values());
+    let cancel = false;
+    (async () => {
+      for (const p of unicos) {
+        if (cancel) return;
+        const key = slotKey(p.profId, p.data, p.dur);
+        setLoadingSlotsKey(key);
+        const slots = await computarSlots(p.profId, p.data, p.dur, recursoSet.has(p.profId));
+        if (cancel) return;
+        setSlotsCache((prev) => {
+          const next = new Map(prev);
+          next.set(key, slots);
+          return next;
+        });
+      }
+      if (!cancel) setLoadingSlotsKey(null);
+    })();
+    return () => { cancel = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, grupos, recursoSet]);
+
+  const podeSalvar = grupos.length > 0 && grupos.every((g) => g.medico_id && g.data && g.hora && g.duracao > 0);
 
   const handleSalvar = async () => {
     if (!podeSalvar) {
@@ -256,8 +296,10 @@ export function DividirOrcamentoDialog({
     try {
       const pacote_id = crypto.randomUUID();
       const payloads = grupos.map((g) => {
-        const inicioIso = new Date(g.inicio).toISOString();
-        const fimIso = new Date(addMin(g.inicio, g.duracao)).toISOString();
+        const inicioDate = combineLocal(g.data, g.hora);
+        const fimDate = new Date(inicioDate.getTime() + g.duracao * 60_000);
+        const inicioIso = inicioDate.toISOString();
+        const fimIso = fimDate.toISOString();
         const ehRecurso = recursoSet.has(g.medico_id);
         return {
           clinica_id: clinicaId,
