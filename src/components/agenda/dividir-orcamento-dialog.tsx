@@ -14,6 +14,7 @@ import { AlertTriangle, Package, Trash2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export type DividirItem = {
+  id: string;
   descricao: string;
   procedimento_id: string | null;
   grupo: string | null;
