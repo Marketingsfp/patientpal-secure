@@ -1341,6 +1341,13 @@ function AgendaPage() {
     return atual;
   };
 
+  const procedimentoFormulario = (medicoId: string | null | undefined, procedimento: string | null | undefined) => {
+    const atual = procedimentoEfetivo(medicoId, procedimento);
+    const med = medicoId ? medicos.find((m) => m.id === medicoId) : null;
+    if (atual && med?.especialidade_nome && normalizar(atual) === normalizar(med.especialidade_nome)) return "";
+    return atual;
+  };
+
   // Atualiza inline o procedimento de um agendamento (do badge na coluna Serviço)
   const atualizarProcedimento = async (ag: Agendamento, novoNome: string) => {
     const nomeFinal = novoNome.trim();
@@ -2007,7 +2014,7 @@ function AgendaPage() {
       paciente_id: pacienteCopia?.id ?? "",
       medico_id: a.medico_id ?? "",
       inicio: toLocalInput(a.inicio), fim: toLocalInput(a.fim),
-      procedimento: procedimentoEfetivo(a.medico_id, a.procedimento) || "CONSULTA",
+      procedimento: procedimentoFormulario(a.medico_id, a.procedimento),
       status: "agendado",
       observacoes: a.observacoes ?? "",
       data_pagamento: a.data_pagamento ?? "",
@@ -2067,7 +2074,7 @@ function AgendaPage() {
       paciente_id: resolvedPacId,
       medico_id: a.medico_id ?? "",
       inicio: toLocalInput(a.inicio), fim: toLocalInput(a.fim),
-      procedimento: procedimentoEfetivo(a.medico_id, a.procedimento),
+      procedimento: procedimentoFormulario(a.medico_id, a.procedimento),
       status: a.status,
       observacoes: a.observacoes ?? "",
       data_pagamento: a.data_pagamento ?? "",
@@ -2179,7 +2186,7 @@ function AgendaPage() {
       enfermagem_recurso_id: ehRecurso ? form.medico_id : null,
       inicio: new Date(form.inicio).toISOString(),
       fim: new Date(form.fim).toISOString(),
-      procedimento: procedimentoEfetivo(form.medico_id, form.procedimento) || null,
+      procedimento: procedimentoFormulario(form.medico_id, form.procedimento) || null,
       status: form.status,
       observacoes: form.observacoes.trim() || null,
       data_pagamento: form.data_pagamento ? form.data_pagamento : null,
