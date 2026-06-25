@@ -1985,6 +1985,7 @@ function AgendaPage() {
 
   const limparOrcamento = () => {
     setForm(f => ({ ...f, orcamento_id: "", orcamento_numero: "", orcamento_itens: [] }));
+    setPendingOrcItemIds([]);
   };
 
   // Abre o diálogo de novo agendamento já com o nº de orçamento preenchido
