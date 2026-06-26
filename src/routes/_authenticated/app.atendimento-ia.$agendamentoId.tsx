@@ -645,7 +645,12 @@ function AtendimentoEditorPage() {
         <Button variant="outline" size="lg" onClick={() => imprimirDocumento("Prescrição")} disabled={!soap.prescricao.trim()}>
           <Printer className="h-4 w-4" /> Imprimir prescrição
         </Button>
-        <Button size="lg" onClick={handleSalvar} disabled={loading === "salvar" || !pacienteId}>
+        <Button
+          size="lg"
+          onClick={handleSalvar}
+          disabled={loading === "salvar" || !pacienteId || (pagamento ? !pagamento.pago : false)}
+          title={pagamento && !pagamento.pago ? "Pagamento pendente" : undefined}
+        >
           {loading === "salvar" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           Salvar prontuário
         </Button>
