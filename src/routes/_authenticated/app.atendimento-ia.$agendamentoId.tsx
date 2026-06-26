@@ -18,6 +18,7 @@ import {
   sugerirCondutaClinica,
   resumirHistoricoPaciente,
 } from "@/lib/atendimento-ai.functions";
+import { agendamentoStatusPagamento, type StatusPagamento } from "@/lib/pagamento-status";
 
 export const Route = createFileRoute("/_authenticated/app/atendimento-ia/$agendamentoId")({
   component: AtendimentoEditorPage,
@@ -79,6 +80,7 @@ function AtendimentoEditorPage() {
   const [medico, setMedico] = useState<Medico | null>(null);
   const [modelo, setModelo] = useState<Modelo | null>(null);
   const [triagem, setTriagem] = useState<Triagem | null>(null);
+  const [pagamento, setPagamento] = useState<StatusPagamento | null>(null);
 
   const [transcricao, setTranscricao] = useState("");
   const [soap, setSoap] = useState<Soap>(EMPTY);
@@ -102,6 +104,11 @@ function AtendimentoEditorPage() {
       if (error || !ag) { toast.error("Agendamento não encontrado"); navigate({ to: "/app/atendimento-ia" }); return; }
       setAgendamento(ag as never);
 
+      // Pagamento ANTES da consulta — bloqueia avanço enquanto pendente.
+      const status = await agendamentoStatusPagamento(ag.id);
+      if (cancel) return;
+      setPagamento(status);
+
       if (ag.medico_id) {
         const { data: med } = await supabase
           .from("medicos")
@@ -118,8 +125,8 @@ function AtendimentoEditorPage() {
         }
       }
 
-      // move para "atendimento" se ainda não estiver
-      if (ag.fluxo_etapa !== "atendimento") {
+      // move para "atendimento" se ainda não estiver (apenas se já estiver pago)
+      if (status.pago && ag.fluxo_etapa !== "atendimento") {
         void supabase.from("agendamentos")
           .update({ fluxo_etapa: "atendimento", fluxo_atualizado_em: new Date().toISOString() } as never)
           .eq("id", ag.id);
