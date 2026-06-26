@@ -71,6 +71,8 @@ type Dep = {
   parentesco: string | null;
   tipo: string;
   cpf?: string | null;
+  data_nascimento?: string | null;
+  telefone?: string | null;
   incluido_em: string | null;
   excluido_em: string | null;
   ativo: boolean;
@@ -799,7 +801,7 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
       supabase.from("contrato_mensalidades").select("*").eq("contrato_id", contrato.id).order("numero_parcela"),
       supabase
         .from("contrato_dependentes")
-        .select("id, paciente_id, paciente_nome, parentesco, tipo, incluido_em, excluido_em, ativo")
+        .select("id, paciente_id, paciente_nome, parentesco, tipo, telefone, incluido_em, excluido_em, ativo")
         .eq("contrato_id", contrato.id),
       contrato.convenio_id
         ? supabase
@@ -833,13 +835,13 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     }
     const rows = (d.data ?? []) as any[];
     const pids = Array.from(new Set(rows.map((r) => r.paciente_id).filter(Boolean)));
-    let cpfMap: Record<string, string | null> = {};
+    let pacMap: Record<string, { cpf: string | null; data_nascimento: string | null; telefone: string | null }> = {};
     if (pids.length) {
       const { data: pacs } = await supabase
         .from("pacientes")
-        .select("id, cpf")
+        .select("id, cpf, data_nascimento, telefone")
         .in("id", pids);
-      cpfMap = Object.fromEntries((pacs ?? []).map((p: any) => [p.id, p.cpf]));
+      pacMap = Object.fromEntries((pacs ?? []).map((p: any) => [p.id, { cpf: p.cpf, data_nascimento: p.data_nascimento, telefone: p.telefone }]));
     }
     const depsRows = rows.map((r) => ({
       id: r.id,
@@ -847,7 +849,9 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
       paciente_nome: r.paciente_nome,
       parentesco: r.parentesco,
       tipo: r.tipo,
-      cpf: cpfMap[r.paciente_id] ?? null,
+      cpf: pacMap[r.paciente_id]?.cpf ?? null,
+      data_nascimento: pacMap[r.paciente_id]?.data_nascimento ?? null,
+      telefone: pacMap[r.paciente_id]?.telefone ?? r.telefone ?? null,
       incluido_em: r.incluido_em ?? null,
       excluido_em: r.excluido_em ?? null,
       ativo: !!r.ativo,
