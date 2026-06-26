@@ -18,6 +18,7 @@ import {
   sugerirCondutaClinica,
   resumirHistoricoPaciente,
 } from "@/lib/atendimento-ai.functions";
+import { agendamentoStatusPagamento, type StatusPagamento } from "@/lib/pagamento-status";
 
 export const Route = createFileRoute("/_authenticated/app/atendimento-ia/$agendamentoId")({
   component: AtendimentoEditorPage,
@@ -79,6 +80,7 @@ function AtendimentoEditorPage() {
   const [medico, setMedico] = useState<Medico | null>(null);
   const [modelo, setModelo] = useState<Modelo | null>(null);
   const [triagem, setTriagem] = useState<Triagem | null>(null);
+  const [pagamento, setPagamento] = useState<StatusPagamento | null>(null);
 
   const [transcricao, setTranscricao] = useState("");
   const [soap, setSoap] = useState<Soap>(EMPTY);
@@ -102,6 +104,11 @@ function AtendimentoEditorPage() {
       if (error || !ag) { toast.error("Agendamento não encontrado"); navigate({ to: "/app/atendimento-ia" }); return; }
       setAgendamento(ag as never);
 
+      // Pagamento ANTES da consulta — bloqueia avanço enquanto pendente.
+      const status = await agendamentoStatusPagamento(ag.id);
+      if (cancel) return;
+      setPagamento(status);
+
       if (ag.medico_id) {
         const { data: med } = await supabase
           .from("medicos")
@@ -118,8 +125,8 @@ function AtendimentoEditorPage() {
         }
       }
 
-      // move para "atendimento" se ainda não estiver
-      if (ag.fluxo_etapa !== "atendimento") {
+      // move para "atendimento" se ainda não estiver (apenas se já estiver pago)
+      if (status.pago && ag.fluxo_etapa !== "atendimento") {
         void supabase.from("agendamentos")
           .update({ fluxo_etapa: "atendimento", fluxo_atualizado_em: new Date().toISOString() } as never)
           .eq("id", ag.id);
@@ -248,6 +255,10 @@ function AtendimentoEditorPage() {
 
   async function handleSalvar() {
     if (!clinicaAtual || !pacienteId) { toast.error("Paciente não identificado"); return; }
+    if (pagamento && !pagamento.pago) {
+      toast.error("Pagamento pendente — finalize no caixa antes de salvar o prontuário.");
+      return;
+    }
     setLoading("salvar");
     try {
       const cid = clinicaAtual.clinica_id;
@@ -393,6 +404,30 @@ function AtendimentoEditorPage() {
 
   return (
     <div className="space-y-4 p-1">
+      {pagamento && !pagamento.pago && (
+        <Card className="p-4 border-amber-400 bg-amber-50/60 dark:bg-amber-950/20">
+          <div className="flex items-start gap-3">
+            <HeartPulse className="h-5 w-5 text-amber-600 mt-0.5" />
+            <div className="flex-1">
+              <div className="font-semibold text-amber-900 dark:text-amber-200">
+                Pagamento pendente — consulta requer pagamento antecipado
+              </div>
+              <p className="text-sm text-amber-800/80 dark:text-amber-200/80">
+                Envie o paciente ao caixa antes de iniciar o atendimento.
+                O prontuário fica disponível somente após a confirmação do pagamento.
+              </p>
+              <div className="mt-2 flex gap-2">
+                <Button size="sm" asChild>
+                  <Link to="/app/caixa">Abrir caixa</Link>
+                </Button>
+                <Button size="sm" variant="outline" asChild>
+                  <Link to="/app/atendimento-ia">Voltar para fila</Link>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
           <Brain className="h-6 w-6 text-primary" />
@@ -610,7 +645,12 @@ function AtendimentoEditorPage() {
         <Button variant="outline" size="lg" onClick={() => imprimirDocumento("Prescrição")} disabled={!soap.prescricao.trim()}>
           <Printer className="h-4 w-4" /> Imprimir prescrição
         </Button>
-        <Button size="lg" onClick={handleSalvar} disabled={loading === "salvar" || !pacienteId}>
+        <Button
+          size="lg"
+          onClick={handleSalvar}
+          disabled={loading === "salvar" || !pacienteId || (pagamento ? !pagamento.pago : false)}
+          title={pagamento && !pagamento.pago ? "Pagamento pendente" : undefined}
+        >
           {loading === "salvar" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           Salvar prontuário
         </Button>

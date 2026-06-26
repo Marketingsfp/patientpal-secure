@@ -14,7 +14,9 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { HeartPulse, Bell, ChevronRight, AlertTriangle, Stethoscope } from "lucide-react";
+import { HeartPulse, Bell, ChevronRight, AlertTriangle, Stethoscope, Wallet } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { agendamentosStatusPagamento } from "@/lib/pagamento-status";
 
 export const Route = createFileRoute("/_authenticated/app/triagem-enfermagem")({
   component: TriagemEnfermagemPage,
@@ -100,6 +102,7 @@ function TriagemEnfermagemPage() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [ags, setAgs] = useState<Ag[]>([]);
+  const [pagosSet, setPagosSet] = useState<Set<string>>(new Set());
   const [aberto, setAberto] = useState<Grupo | null>(null);
   const [form, setForm] = useState<Form>(formVazio);
   const [salvando, setSalvando] = useState(false);
@@ -123,7 +126,12 @@ function TriagemEnfermagemPage() {
       .order("inicio");
     setLoading(false);
     if (error) { toast.error(error.message); return; }
-    setAgs((data ?? []) as unknown as Ag[]);
+    const lista = (data ?? []) as unknown as Ag[];
+    setAgs(lista);
+    const status = await agendamentosStatusPagamento(lista.map((a) => a.id));
+    const pagos = new Set<string>();
+    status.forEach((s, id) => { if (s.pago) pagos.add(id); });
+    setPagosSet(pagos);
   }, [clinicaAtual]);
 
   useEffect(() => { void carregar(); }, [carregar]);
@@ -149,6 +157,9 @@ function TriagemEnfermagemPage() {
   }, [form.peso, form.altura]);
 
   const grupos = useMemo(() => agruparPorPaciente(ags), [ags]);
+  function grupoPago(g: Grupo) {
+    return g.agendamentos.every((a) => pagosSet.has(a.id));
+  }
 
   function abrir(g: Grupo) {
     setAberto(g); setForm(formVazio);
@@ -160,6 +171,10 @@ function TriagemEnfermagemPage() {
 
   async function chamarPaciente(g: Grupo) {
     if (!clinicaAtual) return;
+    if (!grupoPago(g)) {
+      toast.error("Pagamento pendente — envie o paciente ao caixa antes de chamar para a triagem.");
+      return;
+    }
     if (!consultorio.trim()) { toast.error("Informe o consultório/sala da enfermagem no topo."); return; }
     const hoje = new Date().toISOString().slice(0, 10);
     const { data: ult } = await supabase
@@ -270,8 +285,10 @@ function TriagemEnfermagemPage() {
         </Card>
       ) : (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {grupos.map((g) => (
-            <Card key={g.chave} className="p-3 space-y-2">
+          {grupos.map((g) => {
+            const pago = grupoPago(g);
+            return (
+            <Card key={g.chave} className={`p-3 space-y-2 ${pago ? "" : "border-amber-400/70 bg-amber-50/40 dark:bg-amber-950/10"}`}>
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="font-semibold truncate">{g.paciente_nome}</div>
@@ -281,12 +298,19 @@ function TriagemEnfermagemPage() {
                     </div>
                   )}
                 </div>
-                {g.prioridade !== "normal" && (
-                  <Badge className={`border-0 text-[10px] gap-1 ${g.prioridade === "urgente" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}`}>
-                    <AlertTriangle className="h-3 w-3" />
-                    {g.prioridade === "urgente" ? "URGENTE" : "PRIORITÁRIO"}
-                  </Badge>
-                )}
+                <div className="flex flex-col items-end gap-1">
+                  {!pago && (
+                    <Badge className="border-0 text-[10px] gap-1 bg-amber-500 text-white">
+                      <Wallet className="h-3 w-3" /> PAGAMENTO PENDENTE
+                    </Badge>
+                  )}
+                  {g.prioridade !== "normal" && (
+                    <Badge className={`border-0 text-[10px] gap-1 ${g.prioridade === "urgente" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}`}>
+                      <AlertTriangle className="h-3 w-3" />
+                      {g.prioridade === "urgente" ? "URGENTE" : "PRIORITÁRIO"}
+                    </Badge>
+                  )}
+                </div>
               </div>
               <ul className="text-xs text-muted-foreground space-y-0.5">
                 {g.agendamentos.map((a) => {
@@ -299,15 +323,33 @@ function TriagemEnfermagemPage() {
                 })}
               </ul>
               <div className="flex items-center gap-2 pt-1">
-                <Button size="sm" className="flex-1" onClick={() => chamarPaciente(g)}>
+                <Button
+                  size="sm" className="flex-1"
+                  onClick={() => chamarPaciente(g)}
+                  disabled={!pago}
+                  title={!pago ? "Pagamento pendente" : undefined}
+                >
                   <Bell className="h-4 w-4 mr-1" /> Chamar
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => abrir(g)}>
+                <Button
+                  size="sm" variant="outline"
+                  onClick={() => abrir(g)}
+                  disabled={!pago}
+                  title={!pago ? "Pagamento pendente" : undefined}
+                >
                   <Stethoscope className="h-4 w-4 mr-1" /> Atender
                 </Button>
+                {!pago && (
+                  <Button size="sm" variant="secondary" asChild>
+                    <Link to="/app/caixa">
+                      <Wallet className="h-4 w-4 mr-1" /> Caixa
+                    </Link>
+                  </Button>
+                )}
               </div>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
 
