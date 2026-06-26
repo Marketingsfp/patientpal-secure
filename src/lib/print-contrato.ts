@@ -59,7 +59,7 @@ export async function printContrato(contratoId: string) {
 
   const { data: deps } = await supabase
     .from("contrato_dependentes")
-    .select("*, pacientes:paciente_id(cpf)")
+    .select("*, pacientes:paciente_id(cpf, data_nascimento, telefone)")
     .eq("contrato_id", contratoId)
     .eq("ativo", true);
 
@@ -72,7 +72,7 @@ export async function printContrato(contratoId: string) {
 
   const enderecoPaciente = [_pa.logradouro, _pa.numero, _pa.bairro, _pa.cidade && _pa.estado ? `${_pa.cidade}-${_pa.estado}` : _pa.cidade].filter(Boolean).join(", ");
 
-  const maxSlots = Math.max(Number(_pl.max_dependentes ?? 0) || 0, (deps ?? []).length);
+  const maxSlots = (deps ?? []).length;
   const depSlotVars: Record<string, string> = {};
   for (let i = 0; i < maxSlots; i++) {
     const d: any = (deps ?? [])[i];
@@ -80,6 +80,8 @@ export async function printContrato(contratoId: string) {
     depSlotVars[`DEPENDENTE_${idx}`] = d?.paciente_nome ?? "";
     depSlotVars[`DEPENDENTE_${idx}_PARENTESCO`] = d?.parentesco ?? "";
     depSlotVars[`DEPENDENTE_${idx}_CPF`] = d?.pacientes?.cpf ?? "";
+    depSlotVars[`DEPENDENTE_${idx}_NASCIMENTO`] = fmtData(d?.pacientes?.data_nascimento) === "—" ? "" : fmtData(d?.pacientes?.data_nascimento);
+    depSlotVars[`DEPENDENTE_${idx}_TELEFONE`] = d?.pacientes?.telefone ?? d?.telefone ?? "";
   }
 
   const corpo = applyTemplate(_pl.template_contrato || "", {

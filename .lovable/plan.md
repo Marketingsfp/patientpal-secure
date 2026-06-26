@@ -1,30 +1,46 @@
-## Objetivo
-Permitir cadastrar/editar o e-mail (e telefone) do titular sem sair da tela de "Novo contrato" do Cartão Benefício, preservando tudo que já foi preenchido (faixa, tipo de cobrança, dependentes, observações).
+## Problema
 
-## Como vai funcionar
+No contrato impresso aparecem slots vazios "2, 3, 4, 5" mesmo quando o titular tem só 1 dependente, e os campos Nascimento/Telefone dos dependentes vêm em branco mesmo quando existem no cadastro do paciente.
 
-1. Ao lado do nome do titular selecionado em `src/components/pages/contratos-page.tsx`, adiciono um ícone de lápis (✏️ "Editar dados do titular").
-2. O alerta vermelho "Titular precisa ter e-mail..." ganha um botão **"Cadastrar e-mail agora"** que abre o mesmo modal — atalho direto a partir da mensagem de erro.
-3. O clique abre um **Dialog modal** (sobreposto, sem trocar de rota) com os campos essenciais:
-   - Nome (somente leitura, para confirmação)
-   - **E-mail** (foco automático quando o motivo de abrir foi o alerta)
-   - Telefone / WhatsApp
-   - CPF e Data de nascimento (somente leitura)
-   - Botões: **Voltar** (fecha sem salvar) e **Salvar e continuar**
-4. Ao salvar:
-   - `UPDATE` em `pacientes` apenas dos campos alterados (email / telefone).
-   - Atualizo o paciente carregado no estado local (`titular`) com os novos valores — **nada do formulário de contrato é resetado**.
-   - Modal fecha e o alerta de e-mail some automaticamente, liberando o botão "Salvar e imprimir".
-5. Se o usuário clicar em **Voltar**, volta exatamente para a tela de venda como estava.
+Isso acontece em `src/lib/print-contrato.ts`:
+- O loop usa `Math.max(plano.max_dependentes, deps.length)` — por isso renderiza 5 slots no template mesmo com 1 dependente.
+- A query de dependentes só puxa `cpf` do paciente vinculado. `data_nascimento`, `telefone` e `parentesco` do paciente nunca são buscados, então `DEPENDENTE_N_NASCIMENTO` e `DEPENDENTE_N_TELEFONE` ficam vazios.
 
-O mesmo ícone também fica disponível em cada dependente da lista, para o caso de querer corrigir um dado do dependente sem recomeçar.
+## Correções
 
-## Detalhes técnicos
-- Componente novo: `src/components/contratos/editar-paciente-rapido-dialog.tsx` (usa shadcn `Dialog`, `Input`, `Button`).
-- Validação de e-mail com Zod (mesmo padrão já usado no projeto).
-- Atualização via `supabase.from('pacientes').update(...)` respeitando RLS atual.
-- Sem mudança de rota, sem `navigate`, sem recarregar — o estado do contrato (`faixa`, `tipoCobranca`, `dependentes`, `observacoes`) permanece intacto porque o modal é renderizado por cima do mesmo componente.
-- Não altero regras de venda, cálculo de mensalidade nem geração de carnê/boleto.
+**Arquivo único:** `src/lib/print-contrato.ts`
 
-## Fora do escopo
-- Edição completa do cadastro do paciente (endereço, documentos, foto facial, etc.) — para isso continua existindo a tela `/app/pacientes`. Aqui é só o conjunto mínimo que destrava a venda.
+1. **Iterar somente sobre dependentes existentes**
+   - Trocar `maxSlots = Math.max(max_dependentes, deps.length)` por `maxSlots = deps.length`.
+   - Resultado: blocos `{{#DEPENDENTE_2}}...{{/DEPENDENTE_2}}` ficam vazios e o motor de template já remove (lógica condicional `{{#KEY}}` já existe). Sem alteração no template do plano.
+
+2. **Buscar dados completos do paciente dependente**
+   - Ampliar o `select` do join para `pacientes:paciente_id(cpf, data_nascimento, telefone)`.
+   - Para cada dependente preencher novas variáveis:
+     - `DEPENDENTE_{n}_NASCIMENTO` — formatado `dd/mm/aaaa` (usa `fmtData` já existente).
+     - `DEPENDENTE_{n}_TELEFONE` — vindo do paciente (fallback para `contrato_dependentes.telefone` se existir).
+     - `DEPENDENTE_{n}_PARENTESCO` — já existe, mantido.
+     - `DEPENDENTE_{n}_CPF` — já existe, mantido.
+   - `DEPENDENTE_{n}` (nome) já existe.
+
+3. **Fallback de parentesco**
+   - Se `contrato_dependentes.parentesco` for nulo, deixar string vazia (o bloco condicional `{{#DEPENDENTE_N_PARENTESCO}}` esconde a linha "Parentesco:" no template do plano, quando ele usar bloco condicional).
+
+## Observação sobre o template do plano
+
+O template (`planos_assinatura.template_contrato`) precisa usar blocos condicionais para que slots sem dependente sumam:
+
+```
+{{#DEPENDENTE_1}}
+1. Nome: {{DEPENDENTE_1}}
+   Nascimento: {{DEPENDENTE_1_NASCIMENTO}}   Parentesco: {{DEPENDENTE_1_PARENTESCO}}
+   Telefone: {{DEPENDENTE_1_TELEFONE}}
+{{/DEPENDENTE_1}}
+{{#DEPENDENTE_2}}
+2. ...
+{{/DEPENDENTE_2}}
+```
+
+Como o motor `applyTemplate` já apaga blocos `{{#KEY}}...{{/KEY}}` quando a variável está vazia, basta a correção no `print-contrato.ts` (passo 1) para que os números 2–5 sumam — desde que o template do plano use os blocos condicionais. Vou deixar **registrado na resposta** que, se o template ainda renderiza linhas fixas "2. Nome:" sem usar `{{#DEPENDENTE_2}}`, é preciso reeditar o template do plano em `/app/planos` para envolver cada dependente no bloco condicional.
+
+Sem mudança de schema, sem migration, sem mexer no resto do fluxo de venda.
