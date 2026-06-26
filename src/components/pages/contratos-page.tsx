@@ -20,8 +20,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import DOMPurify from "dompurify";
 import { ChevronsUpDown } from "lucide-react";
-import { printContrato } from "@/lib/print-contrato";
-import { fmtDataExtenso } from "@/lib/print-contrato";
+import { printContrato, fmtDataExtenso, applyTemplate } from "@/lib/print-contrato";
 import { printCartoes } from "@/lib/print-cartao";
 import { printGuiaMensalidade } from "@/lib/print-gr";
 import { gerarCarnePDF } from "@/lib/print-carne";
@@ -1182,14 +1181,18 @@ h1, h2, h3 { margin: 0 0 6mm; }
       ? deps.map((d, i) => `${i + 1}. ${d.paciente_nome} — ${d.parentesco ?? "—"} (${d.tipo})`).join("\n")
       : "(nenhum)";
     const enderecoPaciente = [_pa.logradouro, _pa.numero, _pa.bairro, _pa.cidade && _pa.estado ? `${_pa.cidade}-${_pa.estado}` : _pa.cidade].filter(Boolean).join(", ");
-    const maxSlots = Math.max(Number(convenio?.max_dependentes ?? 0) || 0, deps.length);
+    const depsAtivos = deps.filter((x) => x.ativo);
+    const maxSlots = depsAtivos.length;
     const depSlotVars: Record<string, string> = {};
     for (let i = 0; i < maxSlots; i++) {
-      const d = deps[i];
+      const d = depsAtivos[i];
       const idx = i + 1;
       depSlotVars[`DEPENDENTE_${idx}`] = d?.paciente_nome ?? "";
       depSlotVars[`DEPENDENTE_${idx}_PARENTESCO`] = d?.parentesco ?? "";
       depSlotVars[`DEPENDENTE_${idx}_CPF`] = d?.cpf ?? "";
+      const nasc = d?.data_nascimento ? fmtD(d.data_nascimento) : "";
+      depSlotVars[`DEPENDENTE_${idx}_NASCIMENTO`] = nasc === "—" ? "" : nasc;
+      depSlotVars[`DEPENDENTE_${idx}_TELEFONE`] = d?.telefone ?? "";
     }
     const vars: Record<string, string> = {
       CLINICA_NOME: _cl.nome ?? "",
@@ -1211,7 +1214,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
       DEPENDENTES: dependentesTxt,
       ...depSlotVars,
     };
-    return tpl.replace(/\{\{(\w+)\}\}/g, (_m: string, k: string) => vars[k] ?? "");
+    return applyTemplate(tpl, vars);
   }, [convenio, clinica, pacienteFull, deps, mens.length, contrato]);
 
   return (
