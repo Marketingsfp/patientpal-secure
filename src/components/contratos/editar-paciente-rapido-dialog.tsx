@@ -72,7 +72,7 @@ export function EditarPacienteRapidoDialog({
     }
     setSaving(true);
     try {
-      const patch: Record<string, string | null> = {};
+      const patch: { email?: string | null; telefone?: string | null } = {};
       const novoEmail = email.trim() || null;
       const novoTel = telefone.trim() || null;
       if (novoEmail !== paciente!.email) patch.email = novoEmail;
