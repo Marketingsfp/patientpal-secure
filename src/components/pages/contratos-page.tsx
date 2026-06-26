@@ -400,19 +400,38 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
           ) : null}
           <div className="col-span-2"><Label>Paciente titular</Label>
             {titular ? (
+              <div className="space-y-1">
               <div className="flex items-center justify-between rounded-md border p-2 bg-muted/30">
                 <span className="font-medium flex items-center gap-2">
                   {titular.nome} {titular.cpf ? `— ${titular.cpf}` : ""}
                   {titular.face_descriptor && titular.face_descriptor.length > 0
                     ? <Badge variant="default" className="gap-1"><Check className="h-3 w-3"/>Foto</Badge>
                     : <Badge variant="outline" className="gap-1 text-amber-600 border-amber-400">Sem foto</Badge>}
+                  {!titular.email
+                    ? <Badge variant="outline" className="gap-1 text-amber-600 border-amber-400"><Mail className="h-3 w-3"/>Sem e-mail</Badge>
+                    : null}
                 </span>
                 <div className="flex gap-1">
+                  <Button size="sm" variant="outline" onClick={() => setEditarPaciente({ alvo: "titular" })} title="Editar e-mail e telefone">
+                    <Pencil className="h-3 w-3 mr-1"/>Editar
+                  </Button>
                   <Button size="sm" variant="outline" onClick={() => setFaceOpen("titular")}>
                     <Camera className="h-3 w-3 mr-1"/>{titular.face_descriptor?.length ? "Refazer foto" : "Tirar foto"}
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => setTitular(null)}>Trocar</Button>
                 </div>
+              </div>
+              {!titular.email ? (
+                <div className="flex items-center justify-between gap-2 rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+                  <span className="flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 shrink-0"/>
+                    Titular precisa ter e-mail para acessar o app.
+                  </span>
+                  <Button size="sm" variant="outline" className="h-7" onClick={() => setEditarPaciente({ alvo: "titular", focus: "email" })}>
+                    <Mail className="h-3 w-3 mr-1"/>Cadastrar e-mail agora
+                  </Button>
+                </div>
+              ) : null}
               </div>
             ) : (
               <PatientSearchInput
