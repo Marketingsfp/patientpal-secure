@@ -400,6 +400,30 @@ function AtendimentoEditorPage() {
 
   return (
     <div className="space-y-4 p-1">
+      {pagamento && !pagamento.pago && (
+        <Card className="p-4 border-amber-400 bg-amber-50/60 dark:bg-amber-950/20">
+          <div className="flex items-start gap-3">
+            <HeartPulse className="h-5 w-5 text-amber-600 mt-0.5" />
+            <div className="flex-1">
+              <div className="font-semibold text-amber-900 dark:text-amber-200">
+                Pagamento pendente — consulta requer pagamento antecipado
+              </div>
+              <p className="text-sm text-amber-800/80 dark:text-amber-200/80">
+                Envie o paciente ao caixa antes de iniciar o atendimento.
+                O prontuário fica disponível somente após a confirmação do pagamento.
+              </p>
+              <div className="mt-2 flex gap-2">
+                <Button size="sm" asChild>
+                  <Link to="/app/caixa">Abrir caixa</Link>
+                </Button>
+                <Button size="sm" variant="outline" asChild>
+                  <Link to="/app/atendimento-ia">Voltar para fila</Link>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
           <Brain className="h-6 w-6 text-primary" />
