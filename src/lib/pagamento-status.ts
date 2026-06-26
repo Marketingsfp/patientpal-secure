@@ -1,17 +1,17 @@
 import { supabase } from "@/integrations/supabase/client";
 
-export type MotivoPago = "caixa" | "orcamento" | "convenio" | "cartao_beneficios" | null;
+export type MotivoPago = "caixa" | "orcamento" | null;
 export type StatusPagamento = { pago: boolean; motivo: MotivoPago };
 
 /**
  * Considera-se PAGO quando houver pelo menos um destes vínculos:
  * 1. fin_lancamentos (receita) vinculado ao agendamento     → motivo: "caixa"
  * 2. agendamento_orcamento_itens com orçamento pago         → motivo: "orcamento"
- * 3. agendamentos.convenio_id preenchido                    → motivo: "convenio"
- * 4. agendamentos.contrato_id (cartão benefícios ativo)     → motivo: "cartao_beneficios"
  *
  * O paciente paga ANTES da consulta. Telas downstream (triagem, atendimento)
  * usam este helper para bloquear o avanço enquanto não houver pagamento.
+ * Convênio / Cartão Benefícios geram um fin_lancamentos quitado (mesmo que
+ * R$ 0 do paciente), portanto também são detectados pela regra (1).
  */
 export async function agendamentosStatusPagamento(
   ids: string[],
@@ -42,19 +42,6 @@ export async function agendamentosStatusPagamento(
     });
   }
 
-  // 3 + 4) convênio / cartão benefícios direto no agendamento
-  const ainda = ids.filter((id) => !out.get(id)?.pago);
-  if (ainda.length) {
-    const { data: ags } = await supabase
-      .from("agendamentos")
-      .select("id, convenio_id, contrato_id")
-      .in("id", ainda);
-    ((ags ?? []) as Array<{ id: string; convenio_id: string | null; contrato_id: string | null }>).forEach((a) => {
-      if (a.convenio_id) out.set(a.id, { pago: true, motivo: "convenio" });
-      else if (a.contrato_id) out.set(a.id, { pago: true, motivo: "cartao_beneficios" });
-    });
-  }
-
   return out;
 }
 
@@ -67,8 +54,6 @@ export function rotuloMotivoPago(m: MotivoPago): string {
   switch (m) {
     case "caixa": return "Pago no caixa";
     case "orcamento": return "Orçamento pago";
-    case "convenio": return "Convênio";
-    case "cartao_beneficios": return "Cartão benefícios";
     default: return "Pendente";
   }
 }
