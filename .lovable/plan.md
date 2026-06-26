@@ -1,46 +1,47 @@
 ## Problema
 
-No contrato impresso aparecem slots vazios "2, 3, 4, 5" mesmo quando o titular tem só 1 dependente, e os campos Nascimento/Telefone dos dependentes vêm em branco mesmo quando existem no cadastro do paciente.
+Na aba **Contrato** (que já é renderizada só depois da venda salva, dentro do `DetalheContrato`), o preview usa o `modelo_contrato` do convênio (`cb_convenios.modelo_contrato`) — diferente do template de planos usado em `print-contrato.ts`. O renderizador atual em `src/components/pages/contratos-page.tsx` (linhas 1172-1211) tem dois bugs:
 
-Isso acontece em `src/lib/print-contrato.ts`:
-- O loop usa `Math.max(plano.max_dependentes, deps.length)` — por isso renderiza 5 slots no template mesmo com 1 dependente.
-- A query de dependentes só puxa `cpf` do paciente vinculado. `data_nascimento`, `telefone` e `parentesco` do paciente nunca são buscados, então `DEPENDENTE_N_NASCIMENTO` e `DEPENDENTE_N_TELEFONE` ficam vazios.
+1. **`maxSlots = Math.max(max_dependentes, deps.length)`** — sempre cria N variáveis vazias (`DEPENDENTE_2..5`) mesmo quando há 0 ou 1 dependente, então qualquer linha/linha de tabela no template para "Dependente 2..5" continua aparecendo em branco.
+2. **`tpl.replace(/\{\{(\w+)\}\}/g, ...)`** — substituição simples, sem suporte aos blocos condicionais `{{#KEY}}...{{/KEY}}` que o `print-contrato.ts` já entende. Sem esses blocos, é impossível esconder uma linha de tabela inteira quando o dependente não existe.
+3. Não busca `data_nascimento` nem `telefone` dos dependentes — então mesmo quando o dependente existe, esses campos vêm vazios na tabela do contrato.
 
 ## Correções
 
-**Arquivo único:** `src/lib/print-contrato.ts`
+**Arquivo único:** `src/components/pages/contratos-page.tsx` (preview da aba Contrato em `DetalheContrato`).
 
-1. **Iterar somente sobre dependentes existentes**
+1. **Reutilizar o mesmo motor de template do PDF**
+   - Importar (ou duplicar como helper local) o `applyTemplate` de `src/lib/print-contrato.ts`, que já trata:
+     - `{{#KEY}}...{{/KEY}}` — renderiza só se `vars[KEY]` tiver valor.
+     - `{{^KEY}}...{{/KEY}}` — renderiza só se estiver vazio.
+     - `{{KEY}}` — substituição simples com escape.
+   - Trocar o `tpl.replace(...)` do `useMemo` por `applyTemplate(tpl, vars)`.
+
+2. **Iterar somente sobre dependentes existentes**
    - Trocar `maxSlots = Math.max(max_dependentes, deps.length)` por `maxSlots = deps.length`.
-   - Resultado: blocos `{{#DEPENDENTE_2}}...{{/DEPENDENTE_2}}` ficam vazios e o motor de template já remove (lógica condicional `{{#KEY}}` já existe). Sem alteração no template do plano.
+   - Resultado: `DEPENDENTE_2..5` deixam de existir quando não há dependente, então blocos `{{#DEPENDENTE_2}}...{{/DEPENDENTE_2}}` somem do preview e do PDF.
 
-2. **Buscar dados completos do paciente dependente**
-   - Ampliar o `select` do join para `pacientes:paciente_id(cpf, data_nascimento, telefone)`.
-   - Para cada dependente preencher novas variáveis:
-     - `DEPENDENTE_{n}_NASCIMENTO` — formatado `dd/mm/aaaa` (usa `fmtData` já existente).
-     - `DEPENDENTE_{n}_TELEFONE` — vindo do paciente (fallback para `contrato_dependentes.telefone` se existir).
-     - `DEPENDENTE_{n}_PARENTESCO` — já existe, mantido.
-     - `DEPENDENTE_{n}_CPF` — já existe, mantido.
-   - `DEPENDENTE_{n}` (nome) já existe.
+3. **Trazer Nascimento e Telefone dos dependentes**
+   - Na consulta de dependentes do `DetalheContrato` (já existente, ~linha 801–803), ampliar o select para `*, pacientes:paciente_id(cpf, data_nascimento, telefone)`.
+   - Mapear para o `deps` local incluindo `data_nascimento` e `telefone` (fallback no `contrato_dependentes.telefone` se existir).
+   - Preencher novas variáveis no `depSlotVars`:
+     - `DEPENDENTE_{n}_NASCIMENTO` — `dd/mm/aaaa` (usar `fmtD` já existente).
+     - `DEPENDENTE_{n}_TELEFONE`.
+   - Mantidos: `DEPENDENTE_{n}` (nome), `DEPENDENTE_{n}_PARENTESCO`, `DEPENDENTE_{n}_CPF`.
 
-3. **Fallback de parentesco**
-   - Se `contrato_dependentes.parentesco` for nulo, deixar string vazia (o bloco condicional `{{#DEPENDENTE_N_PARENTESCO}}` esconde a linha "Parentesco:" no template do plano, quando ele usar bloco condicional).
+Sem mudança de schema, sem migração. O PDF (`print-contrato.ts`) já está correto desde a última iteração — esta correção alinha o **preview da aba Contrato** ao mesmo comportamento.
 
-## Observação sobre o template do plano
+## Observação importante sobre o `modelo_contrato` do convênio
 
-O template (`planos_assinatura.template_contrato`) precisa usar blocos condicionais para que slots sem dependente sumam:
+O `modelo_contrato` salvo em `cb_convenios` (editado em **Cartão Benefícios → Convênios → Modelo do contrato**) precisa envolver **cada linha da tabela de dependentes** em bloco condicional, senão o HTML/markup da linha continua sendo renderizado vazio. Ex.:
 
 ```
 {{#DEPENDENTE_1}}
-1. Nome: {{DEPENDENTE_1}}
-   Nascimento: {{DEPENDENTE_1_NASCIMENTO}}   Parentesco: {{DEPENDENTE_1_PARENTESCO}}
-   Telefone: {{DEPENDENTE_1_TELEFONE}}
+1) {{DEPENDENTE_1}} — Nasc.: {{DEPENDENTE_1_NASCIMENTO}} — Parentesco: {{DEPENDENTE_1_PARENTESCO}} — Tel.: {{DEPENDENTE_1_TELEFONE}} — CPF: {{DEPENDENTE_1_CPF}}
 {{/DEPENDENTE_1}}
 {{#DEPENDENTE_2}}
-2. ...
+2) ...
 {{/DEPENDENTE_2}}
 ```
 
-Como o motor `applyTemplate` já apaga blocos `{{#KEY}}...{{/KEY}}` quando a variável está vazia, basta a correção no `print-contrato.ts` (passo 1) para que os números 2–5 sumam — desde que o template do plano use os blocos condicionais. Vou deixar **registrado na resposta** que, se o template ainda renderiza linhas fixas "2. Nome:" sem usar `{{#DEPENDENTE_2}}`, é preciso reeditar o template do plano em `/app/planos` para envolver cada dependente no bloco condicional.
-
-Sem mudança de schema, sem migration, sem mexer no resto do fluxo de venda.
+Se o template do convênio hoje tem texto fixo `2. Nome: _____` sem envolver em `{{#DEPENDENTE_2}}`, esse texto continuará aparecendo. Posso, num próximo passo (após você aprovar este), abrir o modelo dos convênios e ajustar o markup para usar os blocos condicionais — só me confirme se quer que eu já faça isso e em quais convênios.
