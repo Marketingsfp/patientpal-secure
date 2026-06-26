@@ -255,6 +255,10 @@ function AtendimentoEditorPage() {
 
   async function handleSalvar() {
     if (!clinicaAtual || !pacienteId) { toast.error("Paciente não identificado"); return; }
+    if (pagamento && !pagamento.pago) {
+      toast.error("Pagamento pendente — finalize no caixa antes de salvar o prontuário.");
+      return;
+    }
     setLoading("salvar");
     try {
       const cid = clinicaAtual.clinica_id;
