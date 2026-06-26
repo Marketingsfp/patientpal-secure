@@ -285,8 +285,10 @@ function TriagemEnfermagemPage() {
         </Card>
       ) : (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {grupos.map((g) => (
-            <Card key={g.chave} className="p-3 space-y-2">
+          {grupos.map((g) => {
+            const pago = grupoPago(g);
+            return (
+            <Card key={g.chave} className={`p-3 space-y-2 ${pago ? "" : "border-amber-400/70 bg-amber-50/40 dark:bg-amber-950/10"}`}>
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="font-semibold truncate">{g.paciente_nome}</div>
@@ -296,12 +298,19 @@ function TriagemEnfermagemPage() {
                     </div>
                   )}
                 </div>
-                {g.prioridade !== "normal" && (
-                  <Badge className={`border-0 text-[10px] gap-1 ${g.prioridade === "urgente" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}`}>
-                    <AlertTriangle className="h-3 w-3" />
-                    {g.prioridade === "urgente" ? "URGENTE" : "PRIORITÁRIO"}
-                  </Badge>
-                )}
+                <div className="flex flex-col items-end gap-1">
+                  {!pago && (
+                    <Badge className="border-0 text-[10px] gap-1 bg-amber-500 text-white">
+                      <Wallet className="h-3 w-3" /> PAGAMENTO PENDENTE
+                    </Badge>
+                  )}
+                  {g.prioridade !== "normal" && (
+                    <Badge className={`border-0 text-[10px] gap-1 ${g.prioridade === "urgente" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}`}>
+                      <AlertTriangle className="h-3 w-3" />
+                      {g.prioridade === "urgente" ? "URGENTE" : "PRIORITÁRIO"}
+                    </Badge>
+                  )}
+                </div>
               </div>
               <ul className="text-xs text-muted-foreground space-y-0.5">
                 {g.agendamentos.map((a) => {
@@ -314,15 +323,33 @@ function TriagemEnfermagemPage() {
                 })}
               </ul>
               <div className="flex items-center gap-2 pt-1">
-                <Button size="sm" className="flex-1" onClick={() => chamarPaciente(g)}>
+                <Button
+                  size="sm" className="flex-1"
+                  onClick={() => chamarPaciente(g)}
+                  disabled={!pago}
+                  title={!pago ? "Pagamento pendente" : undefined}
+                >
                   <Bell className="h-4 w-4 mr-1" /> Chamar
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => abrir(g)}>
+                <Button
+                  size="sm" variant="outline"
+                  onClick={() => abrir(g)}
+                  disabled={!pago}
+                  title={!pago ? "Pagamento pendente" : undefined}
+                >
                   <Stethoscope className="h-4 w-4 mr-1" /> Atender
                 </Button>
+                {!pago && (
+                  <Button size="sm" variant="secondary" asChild>
+                    <Link to="/app/caixa">
+                      <Wallet className="h-4 w-4 mr-1" /> Caixa
+                    </Link>
+                  </Button>
+                )}
               </div>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
 
