@@ -218,6 +218,9 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
   const [deps, setDeps] = useState<Array<Paciente & { parentesco: string; tipo: string }>>([]);
   const [saving, setSaving] = useState(false);
   const [faceOpen, setFaceOpen] = useState<null | "titular" | number>(null);
+  const [editarPaciente, setEditarPaciente] = useState<
+    null | { alvo: "titular" | number; focus?: "email" | "telefone" }
+  >(null);
   const gerarBoletosFn = useServerFn(gerarBoletosContrato);
 
   useEffect(() => {
