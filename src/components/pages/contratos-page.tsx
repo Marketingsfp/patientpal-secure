@@ -29,7 +29,7 @@ import { gerarBoletosContrato } from "@/lib/boleto.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { Barcode, FileText } from "lucide-react";
 import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
-import type { PatientOption } from "@/components/patient-search-input";
+import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 
 const BRL = (v: number) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtD = (s?: string | null) => (s ? new Date(s + (s.length === 10 ? "T00:00:00" : "")).toLocaleDateString("pt-BR") : "—");
@@ -223,15 +223,17 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
     if (convenio) { setValor(Number(convenio.valor_mensal)); setTaxa(Number(convenio.taxa_adesao)); }
   }, [convenioId]);
 
-  // Carrega todos os clientes (pacientes) ativos da clínica
-  useEffect(() => {
-    (async () => {
-      const { data } = await supabase.from("pacientes")
-        .select("id, nome, cpf, telefone, email, face_descriptor")
-        .eq("clinica_id", clinicaId).eq("ativo", true).order("nome");
-      setClientes((data ?? []) as Paciente[]);
-    })();
-  }, [clinicaId]);
+  // A busca de pacientes é feita sob demanda via RPC (PatientSearchInput),
+  // suportando nome, CPF, prontuário, nº de pasta e data de nascimento.
+  // Após selecionar, buscamos email + face_descriptor que não vêm na RPC.
+  async function carregarPacienteCompleto(p: PatientOption): Promise<Paciente> {
+    const { data } = await supabase.from("pacientes")
+      .select("id, nome, cpf, telefone, email, face_descriptor")
+      .eq("id", p.id).maybeSingle();
+    return (data as Paciente | null) ?? {
+      id: p.id, nome: p.nome, cpf: p.cpf, telefone: p.telefone, email: null, face_descriptor: null,
+    };
+  }
 
   // Carrega faixas (por vidas) e benefícios do convênio selecionado
   useEffect(() => {
@@ -409,29 +411,19 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
                 </div>
               </div>
             ) : (
-              <Popover open={titularOpen} onOpenChange={setTitularOpen}>
-                <PopoverTrigger asChild>
-                  <Button type="button" variant="outline" role="combobox" className="w-full justify-between font-normal">
-                    <span className="text-muted-foreground">Selecionar cliente…</span>
-                    <ChevronsUpDown className="h-4 w-4 opacity-50"/>
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
-                  <Command>
-                    <CommandInput placeholder="Buscar cliente por nome ou CPF…"/>
-                    <CommandList>
-                      <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
-                      <CommandGroup>
-                        {clientes.map((p) => (
-                          <CommandItem key={p.id} value={`${p.nome} ${p.cpf ?? ""}`} onSelect={() => { setTitular(p); setTitularOpen(false); }}>
-                            {p.nome} {p.cpf ? `— ${p.cpf}` : ""}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+              <PatientSearchInput
+                clinicaIdsOverride={[clinicaId]}
+                placeholder="Buscar por nome, CPF, prontuário, pasta ou nascimento…"
+                onSelect={async (p) => {
+                  if (!p) return;
+                  if (deps.find((d) => d.id === p.id)) {
+                    toast.error("Esse paciente já está como dependente.");
+                    return;
+                  }
+                  const full = await carregarPacienteCompleto(p);
+                  setTitular(full);
+                }}
+              />
             )}
           </div>
           <div><Label>Data início</Label><Input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)}/></div>
