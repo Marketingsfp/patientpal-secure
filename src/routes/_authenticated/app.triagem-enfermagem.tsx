@@ -14,7 +14,9 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { HeartPulse, Bell, ChevronRight, AlertTriangle, Stethoscope } from "lucide-react";
+import { HeartPulse, Bell, ChevronRight, AlertTriangle, Stethoscope, Wallet } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { agendamentosStatusPagamento } from "@/lib/pagamento-status";
 
 export const Route = createFileRoute("/_authenticated/app/triagem-enfermagem")({
   component: TriagemEnfermagemPage,
@@ -100,6 +102,7 @@ function TriagemEnfermagemPage() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [ags, setAgs] = useState<Ag[]>([]);
+  const [pagosSet, setPagosSet] = useState<Set<string>>(new Set());
   const [aberto, setAberto] = useState<Grupo | null>(null);
   const [form, setForm] = useState<Form>(formVazio);
   const [salvando, setSalvando] = useState(false);
@@ -123,7 +126,12 @@ function TriagemEnfermagemPage() {
       .order("inicio");
     setLoading(false);
     if (error) { toast.error(error.message); return; }
-    setAgs((data ?? []) as unknown as Ag[]);
+    const lista = (data ?? []) as unknown as Ag[];
+    setAgs(lista);
+    const status = await agendamentosStatusPagamento(lista.map((a) => a.id));
+    const pagos = new Set<string>();
+    status.forEach((s, id) => { if (s.pago) pagos.add(id); });
+    setPagosSet(pagos);
   }, [clinicaAtual]);
 
   useEffect(() => { void carregar(); }, [carregar]);
@@ -149,6 +157,9 @@ function TriagemEnfermagemPage() {
   }, [form.peso, form.altura]);
 
   const grupos = useMemo(() => agruparPorPaciente(ags), [ags]);
+  function grupoPago(g: Grupo) {
+    return g.agendamentos.every((a) => pagosSet.has(a.id));
+  }
 
   function abrir(g: Grupo) {
     setAberto(g); setForm(formVazio);
@@ -160,6 +171,10 @@ function TriagemEnfermagemPage() {
 
   async function chamarPaciente(g: Grupo) {
     if (!clinicaAtual) return;
+    if (!grupoPago(g)) {
+      toast.error("Pagamento pendente — envie o paciente ao caixa antes de chamar para a triagem.");
+      return;
+    }
     if (!consultorio.trim()) { toast.error("Informe o consultório/sala da enfermagem no topo."); return; }
     const hoje = new Date().toISOString().slice(0, 10);
     const { data: ult } = await supabase
