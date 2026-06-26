@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { FileSignature, Plus, Printer, Search, Trash2, Link2, Check, ChevronRight, CreditCard, Camera, ArrowLeft, Ban, XCircle, RefreshCw } from "lucide-react";
+import { FileSignature, Plus, Printer, Search, Trash2, Link2, Check, ChevronRight, CreditCard, Camera, ArrowLeft, Ban, XCircle, RefreshCw, Pencil, Mail, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -30,6 +30,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Barcode, FileText } from "lucide-react";
 import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
+import { EditarPacienteRapidoDialog } from "@/components/contratos/editar-paciente-rapido-dialog";
 
 const BRL = (v: number) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtD = (s?: string | null) => (s ? new Date(s + (s.length === 10 ? "T00:00:00" : "")).toLocaleDateString("pt-BR") : "—");
@@ -217,6 +218,9 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
   const [deps, setDeps] = useState<Array<Paciente & { parentesco: string; tipo: string }>>([]);
   const [saving, setSaving] = useState(false);
   const [faceOpen, setFaceOpen] = useState<null | "titular" | number>(null);
+  const [editarPaciente, setEditarPaciente] = useState<
+    null | { alvo: "titular" | number; focus?: "email" | "telefone" }
+  >(null);
   const gerarBoletosFn = useServerFn(gerarBoletosContrato);
 
   useEffect(() => {
@@ -396,19 +400,38 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
           ) : null}
           <div className="col-span-2"><Label>Paciente titular</Label>
             {titular ? (
+              <div className="space-y-1">
               <div className="flex items-center justify-between rounded-md border p-2 bg-muted/30">
                 <span className="font-medium flex items-center gap-2">
                   {titular.nome} {titular.cpf ? `— ${titular.cpf}` : ""}
                   {titular.face_descriptor && titular.face_descriptor.length > 0
                     ? <Badge variant="default" className="gap-1"><Check className="h-3 w-3"/>Foto</Badge>
                     : <Badge variant="outline" className="gap-1 text-amber-600 border-amber-400">Sem foto</Badge>}
+                  {!titular.email
+                    ? <Badge variant="outline" className="gap-1 text-amber-600 border-amber-400"><Mail className="h-3 w-3"/>Sem e-mail</Badge>
+                    : null}
                 </span>
                 <div className="flex gap-1">
+                  <Button size="sm" variant="outline" onClick={() => setEditarPaciente({ alvo: "titular" })} title="Editar e-mail e telefone">
+                    <Pencil className="h-3 w-3 mr-1"/>Editar
+                  </Button>
                   <Button size="sm" variant="outline" onClick={() => setFaceOpen("titular")}>
                     <Camera className="h-3 w-3 mr-1"/>{titular.face_descriptor?.length ? "Refazer foto" : "Tirar foto"}
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => setTitular(null)}>Trocar</Button>
                 </div>
+              </div>
+              {!titular.email ? (
+                <div className="flex items-center justify-between gap-2 rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+                  <span className="flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 shrink-0"/>
+                    Titular precisa ter e-mail para acessar o app.
+                  </span>
+                  <Button size="sm" variant="outline" className="h-7" onClick={() => setEditarPaciente({ alvo: "titular", focus: "email" })}>
+                    <Mail className="h-3 w-3 mr-1"/>Cadastrar e-mail agora
+                  </Button>
+                </div>
+              ) : null}
               </div>
             ) : (
               <PatientSearchInput
@@ -554,8 +577,11 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
                       </SelectContent>
                     </Select>
                     <div className="col-span-2 text-xs text-muted-foreground self-center">Dependente</div>
-                    <Button size="sm" variant="outline" className="col-span-3 h-8" onClick={() => setFaceOpen(i)}>
+                    <Button size="sm" variant="outline" className="col-span-2 h-8" onClick={() => setFaceOpen(i)}>
                       <Camera className="h-3 w-3 mr-1"/>{d.face_descriptor?.length ? "Refazer" : "Foto"}
+                    </Button>
+                    <Button size="sm" variant="outline" className="col-span-1 h-8 px-0" onClick={() => setEditarPaciente({ alvo: i })} title="Editar e-mail e telefone">
+                      <Pencil className="h-3 w-3"/>
                     </Button>
                     <Button size="sm" variant="ghost" className="col-span-1" onClick={() => setDeps(deps.filter((_, j) => j !== i))}><Trash2 className="h-3 w-3 text-destructive"/></Button>
                   </div>
@@ -593,6 +619,27 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
             }}
           />
         ) : null}
+        <EditarPacienteRapidoDialog
+          open={editarPaciente !== null}
+          onOpenChange={(v) => { if (!v) setEditarPaciente(null); }}
+          paciente={
+            editarPaciente === null
+              ? null
+              : editarPaciente.alvo === "titular"
+                ? titular
+                : deps[editarPaciente.alvo] ?? null
+          }
+          focus={editarPaciente?.focus}
+          onSaved={(atualizado) => {
+            if (!editarPaciente) return;
+            if (editarPaciente.alvo === "titular") {
+              setTitular((prev) => prev ? { ...prev, email: atualizado.email, telefone: atualizado.telefone } : prev);
+            } else {
+              const idx = editarPaciente.alvo;
+              setDeps((prev) => prev.map((x, j) => j === idx ? { ...x, email: atualizado.email, telefone: atualizado.telefone } : x));
+            }
+          }}
+        />
         </CardContent>
       </Card>
     </div>
