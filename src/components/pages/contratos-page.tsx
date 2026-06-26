@@ -577,8 +577,11 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
                       </SelectContent>
                     </Select>
                     <div className="col-span-2 text-xs text-muted-foreground self-center">Dependente</div>
-                    <Button size="sm" variant="outline" className="col-span-3 h-8" onClick={() => setFaceOpen(i)}>
+                    <Button size="sm" variant="outline" className="col-span-2 h-8" onClick={() => setFaceOpen(i)}>
                       <Camera className="h-3 w-3 mr-1"/>{d.face_descriptor?.length ? "Refazer" : "Foto"}
+                    </Button>
+                    <Button size="sm" variant="outline" className="col-span-1 h-8 px-0" onClick={() => setEditarPaciente({ alvo: i })} title="Editar e-mail e telefone">
+                      <Pencil className="h-3 w-3"/>
                     </Button>
                     <Button size="sm" variant="ghost" className="col-span-1" onClick={() => setDeps(deps.filter((_, j) => j !== i))}><Trash2 className="h-3 w-3 text-destructive"/></Button>
                   </div>
@@ -616,6 +619,27 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
             }}
           />
         ) : null}
+        <EditarPacienteRapidoDialog
+          open={editarPaciente !== null}
+          onOpenChange={(v) => { if (!v) setEditarPaciente(null); }}
+          paciente={
+            editarPaciente === null
+              ? null
+              : editarPaciente.alvo === "titular"
+                ? titular
+                : deps[editarPaciente.alvo] ?? null
+          }
+          focus={editarPaciente?.focus}
+          onSaved={(atualizado) => {
+            if (!editarPaciente) return;
+            if (editarPaciente.alvo === "titular") {
+              setTitular((prev) => prev ? { ...prev, email: atualizado.email, telefone: atualizado.telefone } : prev);
+            } else {
+              const idx = editarPaciente.alvo;
+              setDeps((prev) => prev.map((x, j) => j === idx ? { ...x, email: atualizado.email, telefone: atualizado.telefone } : x));
+            }
+          }}
+        />
         </CardContent>
       </Card>
     </div>
