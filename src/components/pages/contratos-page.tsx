@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { FileSignature, Plus, Printer, Search, Trash2, Link2, Check, ChevronRight, CreditCard, Camera, ArrowLeft, Ban, XCircle, RefreshCw } from "lucide-react";
+import { FileSignature, Plus, Printer, Search, Trash2, Link2, Check, ChevronRight, CreditCard, Camera, ArrowLeft, Ban, XCircle, RefreshCw, Pencil, Mail, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -30,6 +30,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Barcode, FileText } from "lucide-react";
 import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
+import { EditarPacienteRapidoDialog } from "@/components/contratos/editar-paciente-rapido-dialog";
 
 const BRL = (v: number) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtD = (s?: string | null) => (s ? new Date(s + (s.length === 10 ? "T00:00:00" : "")).toLocaleDateString("pt-BR") : "—");
