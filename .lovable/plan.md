@@ -1,53 +1,53 @@
-# Fluxo completo e detalhado do ClinicaOS
+## Objetivo
 
-Já existem 8 arquivos em `/mnt/documents/fluxo-sistema/` (índice + 7 módulos), mas em nível de visão geral. Vou **reescrever e expandir** cada um para conter o fluxo ponta-a-ponta com: telas, ações do usuário, tabelas tocadas, RPCs/server functions, regras de negócio, integrações externas e diagramas Mermaid por subfluxo.
+Tornar o **pagamento antecipado** uma regra obrigatória em todo o fluxo clínico. Hoje a tela de **Check-in** já só lista quem pagou, mas **Triagem**, **Atendimento** e a **Agenda** ainda deixam o paciente avançar sem pagamento. Vamos fechar essas brechas, mantendo exceções legítimas (convênio e cartão benefícios cobrem a consulta).
 
-## Estrutura final (em `/mnt/documents/fluxo-sistema/`)
+## Regra de negócio
 
-```text
-00-indice.md                      Índice navegável + diagrama macro do sistema
-01-visao-geral.md                 Stack, multi-clínica, RLS, auth, layout autenticado
-02-cadastros.md                   Pacientes, médicos, enfermagem, procedimentos, splits
-03-agenda-atendimento.md          Disponibilidade, agendamento, check-in, triagem, IA
-04-orcamentos-cartao.md           Orçamentos, consumo parcial, Cartão Benefícios, contratos
-05-financeiro-nfse.md             Caixa, pagamentos, splits, boletos, NFS-e (DPS Nacional)
-06-enfermagem-odonto-extras.md    Recursos enfermagem, odontograma, CRM, Nina IA, estoque
-07-rh-marketing-portais.md        RH/Ponto, LMS, Marketing, Portal Paciente, Totem, Face
-08-integracoes-webhooks.md        Focus NFe, WhatsApp, ViaCEP, Gemini, Whisper, pg_cron
-09-seguranca-rls.md               user_roles, has_role, políticas RLS, GRANTs, auditoria
-```
+Considera-se **pago** quando existe pelo menos um destes para o agendamento:
+1. `fin_lancamentos` tipo `receita` vinculado ao `agendamento_id` (pagamento no caixa).
+2. `agendamento_orcamento_itens` quitado (orçamento já pago).
+3. Atendimento por **convênio** (`agendamentos.convenio_id` preenchido) ou **Cartão Benefícios** ativo do paciente cobrindo o procedimento — nesses casos a "cobrança" do paciente é a taxa simbólica e o repasse é tratado pela regra do CB.
 
-(2 arquivos novos: `08-integracoes-webhooks.md` e `09-seguranca-rls.md`.)
+Bloqueio aplica-se a: avançar para **Triagem**, **Atendimento (sala/IA)** e **Caixa de saída**. Não bloqueia agendar nem reagendar.
 
-## O que cada arquivo passa a conter
+## Mudanças
 
-Para cada módulo, na ordem:
+### 1. Helper único de status de pagamento
+- Criar `src/lib/pagamento-status.ts` com `agendamentoEstaPago(agendamentoId)` e versão batch `agendamentosPagosMap(ids[])`, retornando `{ pago, motivo: 'caixa' | 'orcamento' | 'convenio' | 'cartao_beneficios' | null }`.
+- Centralizar a lógica que hoje está duplicada em `app.checkin.tsx`, `app.recepcao.tsx` e `app.agenda.tsx`.
 
-1. **Mapa de telas** — rotas em `src/routes/_authenticated/app.*` com finalidade.
-2. **Fluxo do usuário passo a passo** — clique a clique, do início ao fim.
-3. **Diagrama Mermaid** do fluxo principal + sub-diagramas para ramificações.
-4. **Camada de dados** — tabelas Supabase tocadas (insert/update/delete), RPCs e server functions (`*.functions.ts`) chamadas em cada passo.
-5. **Regras de negócio** — validações, cálculos, hierarquias (ex.: regra de preço CB, splits, consumo parcial de orçamento, código tributário 3 dígitos).
-6. **Integrações** — quando o passo dispara chamada externa (Focus NFe, ViaCEP, Gemini Vision, Whisper, WhatsApp).
-7. **Erros conhecidos e tratamento** — ex.: E0014/E0160/E0712 da NFS-e, auto-sync de RPS, fallback de paciente órfão no agendamento por orçamento.
-8. **Permissões** — quais roles/permissions liberam cada ação (`permissoes-presets.ts`, `has_role`).
+### 2. Triagem (`src/routes/_authenticated/app.triagem-enfermagem.tsx`)
+- Carregar status de pagamento dos agendamentos do dia.
+- Badge **PAGAMENTO PENDENTE** ao lado do nome.
+- Botão "Iniciar triagem" desabilitado quando `!pago`, com tooltip "Pagamento pendente — envie ao caixa".
+- Atalho rápido "Ir para o caixa" que navega para `/app/caixa?agendamento_id=...`.
 
-## Diagramas-chave
+### 3. Atendimento (`src/routes/_authenticated/app.atendimento-ia.$agendamentoId.tsx` e `app.recepcao.tsx`)
+- No `loader`/efeito inicial verificar pagamento.
+- Se não pago: renderizar tela bloqueada com aviso amarelo "Consulta requer pagamento antecipado" + botão **Abrir caixa**.
+- Permitir override apenas para usuários com permissão `caixa.supervisor` (reaproveitar `SupervisorAuthDialog`), gerando log em `audit_log` (`acao = 'atendimento_sem_pagamento'`).
 
-- **Macro** (00): autenticação → escolha de subsistema → módulos clínicos/financeiros/RH.
-- **Cadastro/busca de paciente** (02): `buscar_pacientes_agenda` RPC, índice de prefixo, autocomplete.
-- **Agendamento completo** (03): disponibilidade → slot → check-in → triagem → atendimento IA → prontuário.
-- **Orçamento → Agenda** (04): criação, divisão por item, consumo parcial, status verde/âmbar.
-- **Cartão Benefícios** (04): venda, dependentes, faixas de preço, mensalidades, repasse de cartão consulta.
-- **Pagamento + NFS-e** (05): caixa → split → boleto/PIX → emissão DPS Nacional → polling Focus → webhook → DANFSE.
-- **Webhooks** (08): Focus NFe (auth header), WhatsApp por clínica, callbacks públicos sob `/api/public/*`.
+### 4. Agenda (`src/routes/_authenticated/app.agenda.tsx`)
+- Já existe `pago` no card; reforçar visual: linha com borda âmbar quando pendente.
+- Ação "Iniciar atendimento" desabilitada quando pendente (mesma regra do item 3).
 
-## Entrega
+### 5. Check-in (`src/routes/_authenticated/app.checkin.tsx`)
+- Manter comportamento atual; trocar lógica inline pelo helper novo para não divergir.
 
-Substituo os 8 arquivos existentes pelos 10 novos arquivos detalhados em uma única rodada (em paralelo). O índice (`00-indice.md`) ganha uma tabela com link, finalidade, principais tabelas e principais rotas de cada módulo.
+### 6. Configuração (opcional, mesma migração)
+- Adicionar flag `clinicas.exige_pagamento_antecipado boolean default true`.
+- Quando `false`, helper retorna sempre `pago = true` (mantendo apenas o badge informativo). Permite clínicas que aceitam pagar depois.
+- Toggle em `/app/clinicas` (edição da clínica): "Exigir pagamento antes da consulta".
 
-## Confirmações antes de executar
+## Detalhes técnicos
 
-1. **Tamanho**: cada módulo deve ficar em ~400–700 linhas (denso, mas legível). Posso reduzir se preferir resumido.
-2. **Formato adicional**: quer também um **PDF consolidado** ou um único Markdown gigante além dos arquivos por módulo?
-3. **Diagramas**: mantenho tudo em Mermaid embutido nos `.md`, ou gero também arquivos `.mmd` separados em `/mnt/documents/fluxo-sistema/diagramas/` para você abrir no draw.io?
+- Bloqueio é **client-side de UX**; a integridade financeira continua garantida pelas regras de caixa existentes.
+- Override usa o fluxo já implementado de `SupervisorAuthDialog` + `audit_log` (tabela já existe).
+- Nenhuma migração destrutiva. Apenas `ALTER TABLE clinicas ADD COLUMN exige_pagamento_antecipado boolean NOT NULL DEFAULT true;` + `GRANT` já cobertos pela política existente.
+- Helper consulta em uma única query batch para não regredir performance da agenda (`in('agendamento_id', ids)` em `fin_lancamentos` + join leve em `agendamento_orcamento_itens`).
+
+## Fora do escopo
+
+- Cobrança automática por link PIX (pode virar próxima feature).
+- Mudanças na lógica de repasse / cartão consulta (já documentadas em memória).
