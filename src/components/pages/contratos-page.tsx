@@ -20,7 +20,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import DOMPurify from "dompurify";
 import { ChevronsUpDown } from "lucide-react";
-import { printContrato, fmtDataExtenso, applyTemplate } from "@/lib/print-contrato";
+import { printContrato } from "@/lib/print-contrato";
+import { fmtDataExtenso } from "@/lib/print-contrato";
 import { printCartoes } from "@/lib/print-cartao";
 import { printGuiaMensalidade } from "@/lib/print-gr";
 import { gerarCarnePDF } from "@/lib/print-carne";
@@ -70,8 +71,6 @@ type Dep = {
   parentesco: string | null;
   tipo: string;
   cpf?: string | null;
-  data_nascimento?: string | null;
-  telefone?: string | null;
   incluido_em: string | null;
   excluido_em: string | null;
   ativo: boolean;
@@ -800,7 +799,7 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
       supabase.from("contrato_mensalidades").select("*").eq("contrato_id", contrato.id).order("numero_parcela"),
       supabase
         .from("contrato_dependentes")
-        .select("id, paciente_id, paciente_nome, parentesco, tipo, telefone, incluido_em, excluido_em, ativo")
+        .select("id, paciente_id, paciente_nome, parentesco, tipo, incluido_em, excluido_em, ativo")
         .eq("contrato_id", contrato.id),
       contrato.convenio_id
         ? supabase
@@ -834,13 +833,13 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     }
     const rows = (d.data ?? []) as any[];
     const pids = Array.from(new Set(rows.map((r) => r.paciente_id).filter(Boolean)));
-    let pacMap: Record<string, { cpf: string | null; data_nascimento: string | null; telefone: string | null }> = {};
+    let cpfMap: Record<string, string | null> = {};
     if (pids.length) {
       const { data: pacs } = await supabase
         .from("pacientes")
-        .select("id, cpf, data_nascimento, telefone")
+        .select("id, cpf")
         .in("id", pids);
-      pacMap = Object.fromEntries((pacs ?? []).map((p: any) => [p.id, { cpf: p.cpf, data_nascimento: p.data_nascimento, telefone: p.telefone }]));
+      cpfMap = Object.fromEntries((pacs ?? []).map((p: any) => [p.id, p.cpf]));
     }
     const depsRows = rows.map((r) => ({
       id: r.id,
@@ -848,9 +847,7 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
       paciente_nome: r.paciente_nome,
       parentesco: r.parentesco,
       tipo: r.tipo,
-      cpf: pacMap[r.paciente_id]?.cpf ?? null,
-      data_nascimento: pacMap[r.paciente_id]?.data_nascimento ?? null,
-      telefone: pacMap[r.paciente_id]?.telefone ?? r.telefone ?? null,
+      cpf: cpfMap[r.paciente_id] ?? null,
       incluido_em: r.incluido_em ?? null,
       excluido_em: r.excluido_em ?? null,
       ativo: !!r.ativo,
@@ -1181,18 +1178,14 @@ h1, h2, h3 { margin: 0 0 6mm; }
       ? deps.map((d, i) => `${i + 1}. ${d.paciente_nome} — ${d.parentesco ?? "—"} (${d.tipo})`).join("\n")
       : "(nenhum)";
     const enderecoPaciente = [_pa.logradouro, _pa.numero, _pa.bairro, _pa.cidade && _pa.estado ? `${_pa.cidade}-${_pa.estado}` : _pa.cidade].filter(Boolean).join(", ");
-    const depsAtivos = deps.filter((x) => x.ativo);
-    const maxSlots = depsAtivos.length;
+    const maxSlots = Math.max(Number(convenio?.max_dependentes ?? 0) || 0, deps.length);
     const depSlotVars: Record<string, string> = {};
     for (let i = 0; i < maxSlots; i++) {
-      const d = depsAtivos[i];
+      const d = deps[i];
       const idx = i + 1;
       depSlotVars[`DEPENDENTE_${idx}`] = d?.paciente_nome ?? "";
       depSlotVars[`DEPENDENTE_${idx}_PARENTESCO`] = d?.parentesco ?? "";
       depSlotVars[`DEPENDENTE_${idx}_CPF`] = d?.cpf ?? "";
-      const nasc = d?.data_nascimento ? fmtD(d.data_nascimento) : "";
-      depSlotVars[`DEPENDENTE_${idx}_NASCIMENTO`] = nasc === "—" ? "" : nasc;
-      depSlotVars[`DEPENDENTE_${idx}_TELEFONE`] = d?.telefone ?? "";
     }
     const vars: Record<string, string> = {
       CLINICA_NOME: _cl.nome ?? "",
@@ -1214,7 +1207,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
       DEPENDENTES: dependentesTxt,
       ...depSlotVars,
     };
-    return applyTemplate(tpl, vars);
+    return tpl.replace(/\{\{(\w+)\}\}/g, (_m: string, k: string) => vars[k] ?? "");
   }, [convenio, clinica, pacienteFull, deps, mens.length, contrato]);
 
   return (

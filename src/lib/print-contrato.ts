@@ -25,7 +25,7 @@ export const fmtDataExtenso = (iso?: string | null) => {
 const esc = (s: string | null | undefined) =>
   (s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!);
 
-export function applyTemplate(tpl: string, vars: Record<string, string>): string {
+function applyTemplate(tpl: string, vars: Record<string, string>): string {
   // Blocos condicionais: {{#KEY}}...{{/KEY}} (renderiza apenas se vars[KEY] tiver valor)
   // e {{^KEY}}...{{/KEY}} (renderiza apenas se vars[KEY] estiver vazio)
   let out = tpl.replace(/\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (_, key, body) =>
