@@ -507,43 +507,33 @@ function NovoContratoForm({ onBack, convenios, clinicaId, userId, onCreated }: {
             <Label>
               Dependentes {convenio ? `(${deps.length}/${convenio.max_dependentes ?? 0})` : ""}
             </Label>
-            <Popover open={depOpen} onOpenChange={setDepOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  role="combobox"
-                  className="w-full justify-between font-normal mt-1"
-                  disabled={!convenio || deps.length >= (Number(convenio?.max_dependentes ?? 0) || 0)}
-                >
-                  <span className="text-muted-foreground">
-                    {convenio && deps.length >= (Number(convenio.max_dependentes ?? 0) || 0)
-                      ? (convenio.max_dependentes ?? 0) === 0
-                        ? "Convênio sem dependentes"
-                        : `Limite atingido (${deps.length}/${convenio.max_dependentes})`
-                      : "Adicionar cliente como dependente…"}
-                  </span>
-                  <ChevronsUpDown className="h-4 w-4 opacity-50"/>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
-                <Command>
-                  <CommandInput placeholder="Buscar cliente por nome ou CPF…"/>
-                  <CommandList>
-                    <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
-                    <CommandGroup>
-                      {clientes
-                        .filter((p) => p.id !== titular?.id && !deps.find((d) => d.id === p.id))
-                        .map((p) => (
-                          <CommandItem key={p.id} value={`${p.nome} ${p.cpf ?? ""}`} onSelect={() => addDep(p)}>
-                            + {p.nome} {p.cpf ? `— ${p.cpf}` : ""}
-                          </CommandItem>
-                        ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
+            {convenio && deps.length >= (Number(convenio?.max_dependentes ?? 0) || 0) ? (
+              <div className="w-full mt-1 rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+                {(convenio.max_dependentes ?? 0) === 0
+                  ? "Convênio sem dependentes"
+                  : `Limite atingido (${deps.length}/${convenio.max_dependentes})`}
+              </div>
+            ) : (
+              <div className="mt-1">
+                <PatientSearchInput
+                  clinicaIdsOverride={[clinicaId]}
+                  placeholder="Adicionar dependente — busque por nome, CPF, prontuário…"
+                  onSelect={async (p) => {
+                    if (!p) return;
+                    if (p.id === titular?.id) {
+                      toast.error("Esse paciente já é o titular.");
+                      return;
+                    }
+                    if (deps.find((d) => d.id === p.id)) {
+                      toast.error("Dependente já adicionado.");
+                      return;
+                    }
+                    const full = await carregarPacienteCompleto(p);
+                    addDep(full);
+                  }}
+                />
+              </div>
+            )}
             {deps.length > 0 ? (
               <div className="mt-2 space-y-1">
                 {deps.map((d, i) => (
