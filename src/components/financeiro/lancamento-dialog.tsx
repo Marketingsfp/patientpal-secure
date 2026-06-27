@@ -35,9 +35,11 @@ interface Props {
   initialValor?: string;
   agendamentoId?: string | null;
   initialFormaPagamento?: string;
+  /** Nome exato da categoria a fixar (ex.: "MENSALIDADE CARTAO CONSULTA"). Quando setado, o select fica desabilitado. */
+  categoriaFixaNome?: string;
 }
 
-export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWithData, initialDescricao, initialValor, agendamentoId, initialFormaPagamento }: Props) {
+export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWithData, initialDescricao, initialValor, agendamentoId, initialFormaPagamento, categoriaFixaNome }: Props) {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
   const role = clinicaAtual?.role ?? null;
@@ -98,6 +100,16 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       const lista = cats ?? [];
       setCategorias(lista);
       const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+      const listaContas = cs ?? [];
+      setContas(listaContas);
+      const caixa = listaContas.find((c) => norm(c.nome) === "caixa");
+      if (caixa) setContaId((cur) => cur || caixa.id);
+      // Categoria fixa tem prioridade absoluta (ex.: pagamento de mensalidade)
+      if (categoriaFixaNome) {
+        const fixa = lista.find((c) => norm(c.nome) === norm(categoriaFixaNome));
+        if (fixa) setCategoriaId(fixa.id);
+        return;
+      }
       const particular = lista.find((c) => norm(c.nome) === "particular");
       // Default: paciente comum (sem convênio ativo) → PARTICULAR.
       // Se o agendamento estiver vinculado a um paciente com contrato de
@@ -132,12 +144,8 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         }
       }
       if (categoriaEscolhidaId) setCategoriaId((cur) => cur || categoriaEscolhidaId!);
-      const listaContas = cs ?? [];
-      setContas(listaContas);
-      const caixa = listaContas.find((c) => norm(c.nome) === "caixa");
-      if (caixa) setContaId((cur) => cur || caixa.id);
     })();
-  }, [open, clinicaAtual, tipo, agendamentoId]);
+  }, [open, clinicaAtual, tipo, agendamentoId, categoriaFixaNome]);
 
   const formatBRL = (n: number) =>
     n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -639,12 +647,17 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
           )}
           <div className="space-y-1.5">
             <Label>Categoria</Label>
-            <Select value={categoriaId} onValueChange={setCategoriaId}>
+            <Select value={categoriaId} onValueChange={setCategoriaId} disabled={!!categoriaFixaNome}>
               <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
               <SelectContent>
                 {categorias.map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
               </SelectContent>
             </Select>
+            {categoriaFixaNome && !categorias.some((c) => c.id === categoriaId) && (
+              <p className="text-xs text-amber-600">
+                Categoria fixa "{categoriaFixaNome}" não encontrada — cadastre em Financeiro › Categorias.
+              </p>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
