@@ -52,6 +52,10 @@ function buildContratoVariaveis(maxDeps: number): { label: string; token: string
     base.push({ label: `Dependente ${i} — nome`, token: `DEPENDENTE_${i}` });
     base.push({ label: `Dependente ${i} — parentesco`, token: `DEPENDENTE_${i}_PARENTESCO` });
     base.push({ label: `Dependente ${i} — CPF`, token: `DEPENDENTE_${i}_CPF` });
+    base.push({ label: `Dependente ${i} — nascimento`, token: `DEPENDENTE_${i}_NASCIMENTO` });
+    base.push({ label: `Dependente ${i} — telefone`, token: `DEPENDENTE_${i}_TELEFONE` });
+    base.push({ label: `Dependente ${i} — INÍCIO do bloco condicional`, token: `#DEPENDENTE_${i}` });
+    base.push({ label: `Dependente ${i} — FIM do bloco condicional`, token: `/DEPENDENTE_${i}` });
   }
   return base;
 }
