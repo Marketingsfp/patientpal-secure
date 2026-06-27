@@ -647,12 +647,17 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
           )}
           <div className="space-y-1.5">
             <Label>Categoria</Label>
-            <Select value={categoriaId} onValueChange={setCategoriaId}>
+            <Select value={categoriaId} onValueChange={setCategoriaId} disabled={!!categoriaFixaNome}>
               <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
               <SelectContent>
                 {categorias.map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
               </SelectContent>
             </Select>
+            {categoriaFixaNome && !categorias.some((c) => c.id === categoriaId) && (
+              <p className="text-xs text-amber-600">
+                Categoria fixa "{categoriaFixaNome}" não encontrada — cadastre em Financeiro › Categorias.
+              </p>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
