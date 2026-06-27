@@ -1,30 +1,19 @@
 ## Problema
-A tela de Vendas permite criar mais de um contrato com status `ativo` para o mesmo titular (paciente). Exemplo: QUEDIMA SUELEN com contratos 20261879 e 20261880, ambos ativos.
+Ao pagar uma mensalidade do contrato (botão **Pagar** na lista de mensalidades), abre o diálogo "Nova Receita" com a categoria editável e padrão `PARTICULAR`. O correto é fixar a categoria como **MENSALIDADE CARTAO CONSULTA**, sem permitir alteração.
 
-## Causa
-Em `src/components/pages/contratos-page.tsx` (função `salvar`, linha ~463), o insert em `contratos_assinatura` não verifica se o titular já possui um contrato ativo na clínica.
+## Plano
 
-## Correção
+1. **`src/components/financeiro/lancamento-dialog.tsx`**
+   - Adicionar duas novas props opcionais:
+     - `categoriaFixaNome?: string` — nome exato da categoria a usar (ex.: `"MENSALIDADE CARTAO CONSULTA"`).
+     - quando definida, após carregar `categorias`, localizar pelo nome normalizado e setar `categoriaId`, ignorando a lógica de PARTICULAR/convênio.
+   - No bloco da Categoria (linhas 640–648), quando `categoriaFixaNome` estiver setado, renderizar o `Select` com `disabled` (mantém o visual atual mas bloqueado).
+   - Se a categoria não existir no banco, mostrar o nome em um Input read-only como fallback informativo (sem quebrar o submit — `categoria_id` fica null nesse caso, mas isso é raríssimo).
 
-### 1. Bloqueio no frontend (UX imediata)
-Em `src/components/pages/contratos-page.tsx`, antes do insert:
-- Consultar `contratos_assinatura` por `clinica_id` + `paciente_id` (titular) + `status = 'ativo'`.
-- Se existir, mostrar toast de erro: "Este titular já possui um contrato ativo (#<numero>). Cancele o contrato anterior antes de criar um novo." e abortar.
-- Também alertar ao selecionar o titular no formulário (badge/aviso visual) para evitar preencher tudo em vão.
+2. **`src/components/pages/contratos-page.tsx`** (no `<LancamentoDialog>` da linha 2061)
+   - Passar `categoriaFixaNome="MENSALIDADE CARTAO CONSULTA"` quando o diálogo é aberto para pagamento de mensalidade (sempre que `pagMens` estiver definido — que é o único caso desse `LancamentoDialog` no arquivo).
 
-### 2. Garantia no banco (proteção real contra duplicidade)
-Migration criando índice único parcial em `public.contratos_assinatura`:
-```sql
-CREATE UNIQUE INDEX IF NOT EXISTS uniq_contrato_ativo_por_titular
-  ON public.contratos_assinatura (clinica_id, paciente_id)
-  WHERE status = 'ativo';
-```
-Isso impede definitivamente dois contratos ativos para o mesmo titular na mesma clínica, mesmo em race conditions ou inserts feitos por outras rotas.
-
-### 3. Limpeza dos dois duplicados existentes
-Cancelar o contrato 20261880 (mais recente) da QUEDIMA SUELEN para não bloquear a criação do índice único. Confirmar com você antes qual dos dois manter ativo.
-
-## O que NÃO muda
-- Continua sendo permitido renovar: basta cancelar o contrato anterior.
-- Dependentes e mensalidades não são afetados.
-- Demais validações (e-mail, foto facial, limite de dependentes) permanecem.
+## Observações
+- Não altero a lógica de outros lançamentos (financeiro, agenda, etc.).
+- Mantém compatibilidade total: prop é opcional.
+- Caso a categoria "MENSALIDADE CARTAO CONSULTA" não exista naquela clínica, mantemos o select desabilitado vazio — o usuário precisa cadastrar a categoria no financeiro. Posso opcionalmente criar a categoria automaticamente na primeira vez, se você preferir — me avise.

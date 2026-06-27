@@ -35,9 +35,11 @@ interface Props {
   initialValor?: string;
   agendamentoId?: string | null;
   initialFormaPagamento?: string;
+  /** Nome exato da categoria a fixar (ex.: "MENSALIDADE CARTAO CONSULTA"). Quando setado, o select fica desabilitado. */
+  categoriaFixaNome?: string;
 }
 
-export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWithData, initialDescricao, initialValor, agendamentoId, initialFormaPagamento }: Props) {
+export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWithData, initialDescricao, initialValor, agendamentoId, initialFormaPagamento, categoriaFixaNome }: Props) {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
   const role = clinicaAtual?.role ?? null;
@@ -98,6 +100,12 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       const lista = cats ?? [];
       setCategorias(lista);
       const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+      // Categoria fixa tem prioridade absoluta (ex.: pagamento de mensalidade)
+      if (categoriaFixaNome) {
+        const fixa = lista.find((c) => norm(c.nome) === norm(categoriaFixaNome));
+        if (fixa) setCategoriaId(fixa.id);
+        return;
+      }
       const particular = lista.find((c) => norm(c.nome) === "particular");
       // Default: paciente comum (sem convênio ativo) → PARTICULAR.
       // Se o agendamento estiver vinculado a um paciente com contrato de
@@ -137,7 +145,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       const caixa = listaContas.find((c) => norm(c.nome) === "caixa");
       if (caixa) setContaId((cur) => cur || caixa.id);
     })();
-  }, [open, clinicaAtual, tipo, agendamentoId]);
+  }, [open, clinicaAtual, tipo, agendamentoId, categoriaFixaNome]);
 
   const formatBRL = (n: number) =>
     n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
