@@ -1,40 +1,36 @@
-Objetivo: permitir que, no modelo do contrato do "CARTÃO CONSULTA + SEGUROS", os slots de dependentes 2 a 5 (ou qualquer slot sem dado) deixem de aparecer no PDF impresso, sem precisar manter modelos diferentes por número de dependentes.
+## Diagnóstico
 
-Como o motor de template já funciona
-- `src/lib/print-contrato.ts` já suporta blocos condicionais `{{#CHAVE}}...{{/CHAVE}}` (renderiza só se a variável tiver valor) e `{{^CHAVE}}...{{/CHAVE}}` (só se estiver vazia).
-- Ele já popula `DEPENDENTE_N`, `DEPENDENTE_N_NASCIMENTO`, `DEPENDENTE_N_PARENTESCO`, `DEPENDENTE_N_TELEFONE`, `DEPENDENTE_N_CPF` como string vazia quando o slot não existe.
-- Portanto, basta o modelo envolver cada bloco de dependente nos marcadores condicionais — nenhuma alteração na lógica de impressão é necessária.
+Quando você gera o contrato pelo **Cartão Benefícios → Convênios**, o sistema salva em `contratos_assinatura` com `convenio_id` preenchido e `plano_id = null`. Porém, `src/lib/print-contrato.ts` só busca o texto do modelo na tabela `planos_assinatura` (via `plano_id`). Resultado: o corpo do contrato sai vazio na impressão — por isso só aparece o cabeçalho da clínica e a linha de assinatura (1 folha só, igual à foto).
 
-Mudanças de código (mínimas, só no editor de convênios)
-Arquivo: `src/routes/_authenticated/app.cartao-beneficios.convenios.tsx`
-1. Em `buildContratoVariaveis(maxDeps)`, para cada `i` de 1 até `maxDeps`, adicionar dois novos itens à lista que alimenta o seletor "Inserir variável":
-   - label "Dependente i — início do bloco", token `#DEPENDENTE_i`
-   - label "Dependente i — fim do bloco",   token `/DEPENDENTE_i`
-   Esses tokens, ao serem inseridos pelo botão, produzem `{{#DEPENDENTE_i}}` e `{{/DEPENDENTE_i}}` no editor.
-2. Ajustar o texto de ajuda acima do editor (linhas ~622–628) para mencionar:
-   "Para esconder um slot de dependente quando não estiver preenchido, envolva o trecho com `{{#DEPENDENTE_2}}` ... `{{/DEPENDENTE_2}}` (idem para 3, 4 e 5). Use o seletor Inserir variável > Dependente N — início/fim do bloco."
+Além disso, o modelo salvo no convênio é **HTML** (vem do editor rich-text), mas a impressão atual envolve o conteúdo em `<pre>` e faz `escape` de tudo — então mesmo se o template fosse carregado, as tags HTML apareceriam como texto literal.
 
-Nenhuma alteração em:
-- `src/lib/print-contrato.ts` (já suporta os blocos)
-- `src/components/pages/contratos-page.tsx`
-- Banco de dados
+## Mudanças
 
-Como a usuária aplica no modelo já cadastrado
-1. Abrir Convênios > CARTÃO CONSULTA + SEGUROS > Modelo do Contrato.
-2. Para cada bloco numerado de 2 a 5, na seção "ASSOCIADOS DEPENDENTES":
-   a. Posicionar o cursor logo antes do número "2" (ou da linha "Nome: {{DEPENDENTE_2}}").
-   b. No menu "Inserir variável", escolher "Dependente 2 — início do bloco" (insere `{{#DEPENDENTE_2}}`).
-   c. Posicionar o cursor logo depois de `{{DEPENDENTE_2_TELEFONE}}` (fim da linha de Telefone do mesmo bloco).
-   d. Inserir "Dependente 2 — fim do bloco" (`{{/DEPENDENTE_2}}`).
-   e. Repetir os mesmos quatro passos para os blocos 3, 4 e 5.
-3. Salvar o modelo.
+Arquivo único: `src/lib/print-contrato.ts`
 
-Resultado
-- Contrato com 1 dependente: imprime só o bloco 1; blocos 2 a 5 somem.
-- Contrato com 3 dependentes: imprime 1, 2 e 3; 4 e 5 somem.
-- Contrato com 5 dependentes: imprime todos.
-- Modelo continua único; o motor decide o que mostrar a partir dos dados do contrato.
+1. **Carregar o modelo do convênio quando `plano_id` não existir**
+   - Manter o `select` em `planos_assinatura` quando houver `plano_id`.
+   - Adicionar um `select` em `cb_convenios` (colunas `modelo_contrato`, `num_parcelas`, `vigencia_meses`, `fidelidade_meses` se existirem) quando o contrato tiver `convenio_id`.
+   - Usar `_pl.template_contrato` se vier do plano; senão, usar `_conv.modelo_contrato`.
 
-Validação
-- `tsgo` no arquivo alterado.
-- Teste manual: gerar contrato com 1 dependente preenchido e confirmar que blocos 2–5 não aparecem mais no PDF.
+2. **Renderizar HTML quando o modelo for HTML (caso do convênio)**
+   - Detectar HTML pela presença de tags (`/<[a-z][\s\S]*>/i`) ou simplesmente assumir HTML quando vier do convênio.
+   - No HTML de impressão, trocar `<pre class="body">${esc(corpo)}</pre>` por `<div class="body">${corpo}</div>` quando o conteúdo for HTML; manter `<pre>` + escape quando for texto puro (planos legados).
+   - Atualizar o CSS: `.body { font-size: 11pt; line-height: 1.45; } .body p { margin: 0 0 6pt; }` para impressão consistente.
+
+3. **Garantir que `applyTemplate` continue funcionando com HTML**
+   - A função já está correta: blocos condicionais `{{#KEY}}...{{/KEY}}` e substituição `{{KEY}}` operam sobre a string bruta. Os valores das variáveis continuam escapados via `esc()`, evitando XSS quando vêm do banco.
+   - Nenhuma mudança em `applyTemplate`.
+
+4. **Fallback de campos do plano**
+   - `VIGENCIA_MESES` e `FIDELIDADE_MESES`: usar `_pl?.vigencia_meses ?? _conv?.vigencia_meses ?? 12` (mesma ideia para fidelidade).
+
+## Validação manual
+
+- Reimprimir o contrato Nº 20261878 (NICOLY KIDMAN, "CARTÃO CONSULTA + SEGUROS"): o corpo agora deve ocupar várias páginas e os blocos `{{#DEPENDENTE_2}}...{{/DEPENDENTE_2}}` etc. devem sumir quando não houver dependente.
+- Reimprimir um contrato antigo que ainda usa `plano_id` (planos legados em texto puro): deve continuar imprimindo igual a antes.
+
+## Fora de escopo
+
+- Não mexer em `applyTemplate`, no editor de convênios, no banco, nem nos modelos salvos.
+- Não alterar a tela de venda nem o fluxo de assinatura pública (`/p/contrato/:token`) — o problema relatado é só na impressão A4 a partir do app.
