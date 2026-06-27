@@ -100,6 +100,10 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       const lista = cats ?? [];
       setCategorias(lista);
       const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+      const listaContas = cs ?? [];
+      setContas(listaContas);
+      const caixa = listaContas.find((c) => norm(c.nome) === "caixa");
+      if (caixa) setContaId((cur) => cur || caixa.id);
       // Categoria fixa tem prioridade absoluta (ex.: pagamento de mensalidade)
       if (categoriaFixaNome) {
         const fixa = lista.find((c) => norm(c.nome) === norm(categoriaFixaNome));
@@ -140,10 +144,6 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         }
       }
       if (categoriaEscolhidaId) setCategoriaId((cur) => cur || categoriaEscolhidaId!);
-      const listaContas = cs ?? [];
-      setContas(listaContas);
-      const caixa = listaContas.find((c) => norm(c.nome) === "caixa");
-      if (caixa) setContaId((cur) => cur || caixa.id);
     })();
   }, [open, clinicaAtual, tipo, agendamentoId, categoriaFixaNome]);
 
