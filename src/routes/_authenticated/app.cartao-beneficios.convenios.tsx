@@ -631,6 +631,13 @@ function ConveniosPage() {
                   (<code>{"{{DEPENDENTE_1}}"}</code>… até o máximo de dependentes do convênio)
                   para um slot por dependente; slots não preenchidos ficam vazios.
                 </p>
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-medium">Esconder slots vazios:</span> envolva o trecho de cada
+                  dependente entre <code>{"{{#DEPENDENTE_2}}"}</code> e <code>{"{{/DEPENDENTE_2}}"}</code>{" "}
+                  (idem para 3, 4 e 5). Use no seletor <em>Inserir variável</em> as opções
+                  "Dependente N — INÍCIO/FIM do bloco condicional". O bloco só será impresso se o
+                  dependente N existir no contrato.
+                </p>
                 <div id="convenio-contrato-print">
                   <RichEditor
                     value={modeloContrato}
