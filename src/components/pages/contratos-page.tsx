@@ -488,6 +488,21 @@ function NovoContratoForm({
     )
       return;
     setSaving(true);
+    // Bloquear duplicidade: 1 contrato ativo por titular/clínica
+    const { data: jaAtivo } = await supabase
+      .from("contratos_assinatura")
+      .select("id, numero")
+      .eq("clinica_id", clinicaId)
+      .eq("paciente_id", titular.id)
+      .eq("status", "ativo")
+      .limit(1)
+      .maybeSingle();
+    if (jaAtivo) {
+      setSaving(false);
+      return toast.error(
+        `Este titular já possui um contrato ativo (#${(jaAtivo as { numero: number }).numero}). Cancele o contrato anterior antes de criar um novo.`,
+      );
+    }
     const { data: contrato, error } = await supabase
       .from("contratos_assinatura")
       .insert({
