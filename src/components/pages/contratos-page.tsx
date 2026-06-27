@@ -2075,6 +2075,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
         }
         initialValor={pagMens ? pagValorFinal.toFixed(2) : ""}
         initialFormaPagamento={pagInitialForma}
+        categoriaFixaNome="MENSALIDADE CARTAO CONSULTA"
         onSavedWithData={async (dados) => {
           if (!pagMens || !clinicaAtual) return;
           const mensId = pagMens.id;
