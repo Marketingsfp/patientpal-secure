@@ -52,6 +52,10 @@ function buildContratoVariaveis(maxDeps: number): { label: string; token: string
     base.push({ label: `Dependente ${i} — nome`, token: `DEPENDENTE_${i}` });
     base.push({ label: `Dependente ${i} — parentesco`, token: `DEPENDENTE_${i}_PARENTESCO` });
     base.push({ label: `Dependente ${i} — CPF`, token: `DEPENDENTE_${i}_CPF` });
+    base.push({ label: `Dependente ${i} — nascimento`, token: `DEPENDENTE_${i}_NASCIMENTO` });
+    base.push({ label: `Dependente ${i} — telefone`, token: `DEPENDENTE_${i}_TELEFONE` });
+    base.push({ label: `Dependente ${i} — INÍCIO do bloco condicional`, token: `#DEPENDENTE_${i}` });
+    base.push({ label: `Dependente ${i} — FIM do bloco condicional`, token: `/DEPENDENTE_${i}` });
   }
   return base;
 }
@@ -626,6 +630,13 @@ function ConveniosPage() {
                   <code>{"{{CLINICA_NOME}}"}</code>. Use as variáveis numeradas
                   (<code>{"{{DEPENDENTE_1}}"}</code>… até o máximo de dependentes do convênio)
                   para um slot por dependente; slots não preenchidos ficam vazios.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-medium">Esconder slots vazios:</span> envolva o trecho de cada
+                  dependente entre <code>{"{{#DEPENDENTE_2}}"}</code> e <code>{"{{/DEPENDENTE_2}}"}</code>{" "}
+                  (idem para 3, 4 e 5). Use no seletor <em>Inserir variável</em> as opções
+                  "Dependente N — INÍCIO/FIM do bloco condicional". O bloco só será impresso se o
+                  dependente N existir no contrato.
                 </p>
                 <div id="convenio-contrato-print">
                   <RichEditor

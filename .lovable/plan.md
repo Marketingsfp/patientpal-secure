@@ -1,53 +1,40 @@
-## Objetivo
+Objetivo: permitir que, no modelo do contrato do "CARTÃO CONSULTA + SEGUROS", os slots de dependentes 2 a 5 (ou qualquer slot sem dado) deixem de aparecer no PDF impresso, sem precisar manter modelos diferentes por número de dependentes.
 
-Tornar o **pagamento antecipado** uma regra obrigatória em todo o fluxo clínico. Hoje a tela de **Check-in** já só lista quem pagou, mas **Triagem**, **Atendimento** e a **Agenda** ainda deixam o paciente avançar sem pagamento. Vamos fechar essas brechas, mantendo exceções legítimas (convênio e cartão benefícios cobrem a consulta).
+Como o motor de template já funciona
+- `src/lib/print-contrato.ts` já suporta blocos condicionais `{{#CHAVE}}...{{/CHAVE}}` (renderiza só se a variável tiver valor) e `{{^CHAVE}}...{{/CHAVE}}` (só se estiver vazia).
+- Ele já popula `DEPENDENTE_N`, `DEPENDENTE_N_NASCIMENTO`, `DEPENDENTE_N_PARENTESCO`, `DEPENDENTE_N_TELEFONE`, `DEPENDENTE_N_CPF` como string vazia quando o slot não existe.
+- Portanto, basta o modelo envolver cada bloco de dependente nos marcadores condicionais — nenhuma alteração na lógica de impressão é necessária.
 
-## Regra de negócio
+Mudanças de código (mínimas, só no editor de convênios)
+Arquivo: `src/routes/_authenticated/app.cartao-beneficios.convenios.tsx`
+1. Em `buildContratoVariaveis(maxDeps)`, para cada `i` de 1 até `maxDeps`, adicionar dois novos itens à lista que alimenta o seletor "Inserir variável":
+   - label "Dependente i — início do bloco", token `#DEPENDENTE_i`
+   - label "Dependente i — fim do bloco",   token `/DEPENDENTE_i`
+   Esses tokens, ao serem inseridos pelo botão, produzem `{{#DEPENDENTE_i}}` e `{{/DEPENDENTE_i}}` no editor.
+2. Ajustar o texto de ajuda acima do editor (linhas ~622–628) para mencionar:
+   "Para esconder um slot de dependente quando não estiver preenchido, envolva o trecho com `{{#DEPENDENTE_2}}` ... `{{/DEPENDENTE_2}}` (idem para 3, 4 e 5). Use o seletor Inserir variável > Dependente N — início/fim do bloco."
 
-Considera-se **pago** quando existe pelo menos um destes para o agendamento:
-1. `fin_lancamentos` tipo `receita` vinculado ao `agendamento_id` (pagamento no caixa).
-2. `agendamento_orcamento_itens` quitado (orçamento já pago).
-3. Atendimento por **convênio** (`agendamentos.convenio_id` preenchido) ou **Cartão Benefícios** ativo do paciente cobrindo o procedimento — nesses casos a "cobrança" do paciente é a taxa simbólica e o repasse é tratado pela regra do CB.
+Nenhuma alteração em:
+- `src/lib/print-contrato.ts` (já suporta os blocos)
+- `src/components/pages/contratos-page.tsx`
+- Banco de dados
 
-Bloqueio aplica-se a: avançar para **Triagem**, **Atendimento (sala/IA)** e **Caixa de saída**. Não bloqueia agendar nem reagendar.
+Como a usuária aplica no modelo já cadastrado
+1. Abrir Convênios > CARTÃO CONSULTA + SEGUROS > Modelo do Contrato.
+2. Para cada bloco numerado de 2 a 5, na seção "ASSOCIADOS DEPENDENTES":
+   a. Posicionar o cursor logo antes do número "2" (ou da linha "Nome: {{DEPENDENTE_2}}").
+   b. No menu "Inserir variável", escolher "Dependente 2 — início do bloco" (insere `{{#DEPENDENTE_2}}`).
+   c. Posicionar o cursor logo depois de `{{DEPENDENTE_2_TELEFONE}}` (fim da linha de Telefone do mesmo bloco).
+   d. Inserir "Dependente 2 — fim do bloco" (`{{/DEPENDENTE_2}}`).
+   e. Repetir os mesmos quatro passos para os blocos 3, 4 e 5.
+3. Salvar o modelo.
 
-## Mudanças
+Resultado
+- Contrato com 1 dependente: imprime só o bloco 1; blocos 2 a 5 somem.
+- Contrato com 3 dependentes: imprime 1, 2 e 3; 4 e 5 somem.
+- Contrato com 5 dependentes: imprime todos.
+- Modelo continua único; o motor decide o que mostrar a partir dos dados do contrato.
 
-### 1. Helper único de status de pagamento
-- Criar `src/lib/pagamento-status.ts` com `agendamentoEstaPago(agendamentoId)` e versão batch `agendamentosPagosMap(ids[])`, retornando `{ pago, motivo: 'caixa' | 'orcamento' | 'convenio' | 'cartao_beneficios' | null }`.
-- Centralizar a lógica que hoje está duplicada em `app.checkin.tsx`, `app.recepcao.tsx` e `app.agenda.tsx`.
-
-### 2. Triagem (`src/routes/_authenticated/app.triagem-enfermagem.tsx`)
-- Carregar status de pagamento dos agendamentos do dia.
-- Badge **PAGAMENTO PENDENTE** ao lado do nome.
-- Botão "Iniciar triagem" desabilitado quando `!pago`, com tooltip "Pagamento pendente — envie ao caixa".
-- Atalho rápido "Ir para o caixa" que navega para `/app/caixa?agendamento_id=...`.
-
-### 3. Atendimento (`src/routes/_authenticated/app.atendimento-ia.$agendamentoId.tsx` e `app.recepcao.tsx`)
-- No `loader`/efeito inicial verificar pagamento.
-- Se não pago: renderizar tela bloqueada com aviso amarelo "Consulta requer pagamento antecipado" + botão **Abrir caixa**.
-- Permitir override apenas para usuários com permissão `caixa.supervisor` (reaproveitar `SupervisorAuthDialog`), gerando log em `audit_log` (`acao = 'atendimento_sem_pagamento'`).
-
-### 4. Agenda (`src/routes/_authenticated/app.agenda.tsx`)
-- Já existe `pago` no card; reforçar visual: linha com borda âmbar quando pendente.
-- Ação "Iniciar atendimento" desabilitada quando pendente (mesma regra do item 3).
-
-### 5. Check-in (`src/routes/_authenticated/app.checkin.tsx`)
-- Manter comportamento atual; trocar lógica inline pelo helper novo para não divergir.
-
-### 6. Configuração (opcional, mesma migração)
-- Adicionar flag `clinicas.exige_pagamento_antecipado boolean default true`.
-- Quando `false`, helper retorna sempre `pago = true` (mantendo apenas o badge informativo). Permite clínicas que aceitam pagar depois.
-- Toggle em `/app/clinicas` (edição da clínica): "Exigir pagamento antes da consulta".
-
-## Detalhes técnicos
-
-- Bloqueio é **client-side de UX**; a integridade financeira continua garantida pelas regras de caixa existentes.
-- Override usa o fluxo já implementado de `SupervisorAuthDialog` + `audit_log` (tabela já existe).
-- Nenhuma migração destrutiva. Apenas `ALTER TABLE clinicas ADD COLUMN exige_pagamento_antecipado boolean NOT NULL DEFAULT true;` + `GRANT` já cobertos pela política existente.
-- Helper consulta em uma única query batch para não regredir performance da agenda (`in('agendamento_id', ids)` em `fin_lancamentos` + join leve em `agendamento_orcamento_itens`).
-
-## Fora do escopo
-
-- Cobrança automática por link PIX (pode virar próxima feature).
-- Mudanças na lógica de repasse / cartão consulta (já documentadas em memória).
+Validação
+- `tsgo` no arquivo alterado.
+- Teste manual: gerar contrato com 1 dependente preenchido e confirmar que blocos 2–5 não aparecem mais no PDF.
