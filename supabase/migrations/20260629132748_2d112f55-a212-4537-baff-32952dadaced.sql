@@ -1,0 +1,1 @@
+UPDATE public.clinica_memberships SET role='admin' WHERE user_id='c1a7adb9-2065-4e23-9fff-99d3bc31b63c';
