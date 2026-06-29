@@ -575,6 +575,23 @@ function ProcedimentosPage() {
   const grupoSelecionadoKey = form.grupo ? especialidadeKey(form.grupo) : "__none__";
   const grupoExisteNasEspecialidades = especialidades.some(e => especialidadeKey(e.nome) === grupoSelecionadoKey);
 
+  const getConvValorExibicao = (p: Procedimento, c: CbConvenio): ConvValor => {
+    const salvo = convValores.get(`${p.id}::${c.id}`);
+    if (salvo && (salvo.valor_dinheiro > 0 || salvo.valor_outros > 0)) return salvo;
+
+    const espId = p.grupo
+      ? (especialidades.find(e => especialidadeKey(e.nome) === especialidadeKey(p.grupo))?.id ?? null)
+      : null;
+    const regra = findRegra(regras.filter(r => r.convenio_id === c.id), espId, p.tipo);
+    const calculado = computeValor(
+      regra,
+      Number(p.valor_dinheiro ?? p.valor_dinheiro_pix ?? p.valor_padrao ?? 0),
+      Number(p.valor_pix ?? p.valor_cartao_credito ?? p.valor_cartao_debito ?? p.valor_cartao ?? 0),
+    );
+    if (calculado) return { valor_dinheiro: calculado.dinheiro, valor_outros: calculado.outros };
+    return salvo ?? { valor_dinheiro: 0, valor_outros: 0 };
+  };
+
   // Reset de página quando filtros aplicados ou ordenação mudam
   useEffect(() => { setPagina(1); }, [buscaAplicada, tipoAplicado, grupoAplicado, situacaoAplicada, sort]);
 
@@ -1022,15 +1039,15 @@ function ProcedimentosPage() {
                     <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_dinheiro ?? p.valor_dinheiro_pix))}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_pix ?? p.valor_cartao_credito ?? p.valor_cartao_debito ?? p.valor_cartao))}</TableCell>
                     {convenios.map(c => {
-                      const v = convValores.get(`${p.id}::${c.id}`);
+                      const v = getConvValorExibicao(p, c);
                       return (
                         <TableCell key={c.id} className="text-right tabular-nums">
                           <div className="leading-tight">
-                            <div title={`Dinheiro: ${fmtBRL(v?.valor_dinheiro ?? 0)}`}>
-                              <span className="text-muted-foreground mr-1">D</span>{fmtBRL(v?.valor_dinheiro ?? 0)}
+                            <div title={`Dinheiro: ${fmtBRL(v.valor_dinheiro)}`}>
+                              <span className="text-muted-foreground mr-1">D</span>{fmtBRL(v.valor_dinheiro)}
                             </div>
-                            <div className="text-[10px] text-muted-foreground" title={`Pix / Débito / Crédito: ${fmtBRL(v?.valor_outros ?? 0)}`}>
-                              <span className="mr-1">C</span>{fmtBRL(v?.valor_outros ?? 0)}
+                            <div className="text-[10px] text-muted-foreground" title={`Pix / Débito / Crédito: ${fmtBRL(v.valor_outros)}`}>
+                              <span className="mr-1">C</span>{fmtBRL(v.valor_outros)}
                             </div>
                           </div>
                         </TableCell>
