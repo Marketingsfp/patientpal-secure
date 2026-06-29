@@ -45,7 +45,7 @@ function ChatPage() {
   const [autores, setAutores] = useState<Record<string, string>>({});
   const [nomesDiretos, setNomesDiretos] = useState<Record<string, string>>({});
   const [texto, setTexto] = useState("");
-  const [openNovo, setOpenNovo] = useState(true);
+  const [openNovo, setOpenNovo] = useState(false);
   const [novoNome, setNovoNome] = useState("");
   const [equipe, setEquipe] = useState<Membro[]>([]);
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
