@@ -450,18 +450,24 @@ function ProcedimentosPage() {
 
   const loadConvValores = async () => {
     if (!clinicaAtual) return;
-    const { data, error } = await (supabase as any)
-      .from("procedimento_cb_convenio_valores")
-      .select("procedimento_id,convenio_id,valor_dinheiro,valor_outros")
-      .eq("clinica_id", clinicaAtual.clinica_id);
-    if (error) { toast.error(error.message); return; }
     const m = new Map<string, ConvValor>();
-    (data ?? []).forEach((r: any) => {
-      m.set(`${r.procedimento_id}::${r.convenio_id}`, {
-        valor_dinheiro: Number(r.valor_dinheiro) || 0,
-        valor_outros: Number(r.valor_outros) || 0,
+    const PAGE = 1000;
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await (supabase as any)
+        .from("procedimento_cb_convenio_valores")
+        .select("procedimento_id,convenio_id,valor_dinheiro,valor_outros")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .range(from, from + PAGE - 1);
+      if (error) { toast.error(error.message); return; }
+      const rows = (data ?? []) as any[];
+      rows.forEach((r) => {
+        m.set(`${r.procedimento_id}::${r.convenio_id}`, {
+          valor_dinheiro: Number(r.valor_dinheiro) || 0,
+          valor_outros: Number(r.valor_outros) || 0,
+        });
       });
-    });
+      if (rows.length < PAGE) break;
+    }
     setConvValores(m);
   };
 
