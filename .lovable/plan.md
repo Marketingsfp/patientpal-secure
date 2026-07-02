@@ -1,31 +1,30 @@
 ## Objetivo
-Povoar a aba **Fluxo do paciente** (`/app/fluxo`) com dados variados para teste visual e funcional das 7 etapas.
+Executar um teste funcional automatizado (Playwright headless) na página `/app/fluxo`, acionando **uma vez cada** um dos botões principais e reportando o resultado.
 
-## Passos
+## Botões a testar
+1. **Voltar etapa** (ícone `‹` — em qualquer card fora de "Aguardando").
+2. **Prioridade** (ícone `CircleDot` / alerta — cicla normal → prioritário → urgente).
+3. **Chamar** (coluna Triagem — cria senha no painel + move para Atendimento).
+4. **Avançar** (coluna intermediária — move para próxima etapa).
+5. **Finalizar** (coluna Atendimento — move para Finalizado).
+6. **Rechamar** (coluna Atendimento — cria nova senha sem mudar etapa).
 
-1. **Identificar a clínica ativa** do usuário (via `clinica_memberships` do usuário logado ou clínica mais recentemente usada) para escopar as alterações.
+## Execução
+- Usar Playwright via shell (`/tmp/browser/fluxo-test/`) autenticando com a sessão Supabase injetada.
+- Antes de cada clique: capturar o estado inicial do card-alvo (nome, etapa, prioridade) via query no banco.
+- Após cada clique: aguardar 1-2s, capturar screenshot e reconsultar o banco para validar a mudança esperada.
+- Marcar cada teste como **PASSOU** / **FALHOU** com evidência (screenshot + valores antes/depois).
+- Escolher cards distintos (para não interferir uns nos outros) dentre os 140 seeds criados.
 
-2. **Limpar o fluxo do dia**
-   - Nos agendamentos de **hoje** da clínica, remover os pacientes reais colocando `paciente_id = NULL`, `paciente_nome = 'DISPONÍVEL'` e `fluxo_etapa = 'aguardando_recepcao'`.
-   - Isso "esvazia" o quadro sem apagar horários históricos.
+## Validações por botão
+| Botão | Verificação |
+|---|---|
+| Prioridade | `prioridade` no DB muda para o próximo valor + toast "Prioridade: …" |
+| Voltar | `fluxo_etapa` recua uma coluna |
+| Avançar | `fluxo_etapa` avança uma coluna |
+| Chamar (Triagem) | Nova linha em `senhas` (tipo N, status chamada) + etapa vai para atendimento + toast "Chamando …" |
+| Rechamar (Atendimento) | Nova linha em `senhas`, etapa permanece "atendimento" |
+| Finalizar | Etapa vai para `finalizado` |
 
-3. **Selecionar 140 pacientes reais** já cadastrados na clínica (variados por nome). Se houver menos que 140, reciclar os disponíveis distribuindo entre as etapas.
-
-4. **Criar 140 agendamentos novos** para hoje, 20 em cada uma das 7 etapas:
-   - `aguardando_recepcao`, `recepcao`, `caixa`, `triagem`, `atendimento`, `exame`, `finalizado`
-   - Horários espaçados ao longo do dia (07:00 → 19:00) para não sobrepor.
-   - Variação de:
-     - **Procedimento**: consulta clínica, cardiologia, pediatria, exame (raio-X, USG, tomografia — força coluna "exame"), curativo, etc.
-     - **Prioridade**: mistura de `normal`, `prioritario` e `urgente` (aprox. 70/20/10%).
-     - **Médico**: distribuir entre os médicos ativos da clínica.
-
-5. **Verificar** com `read_query` a contagem final por `fluxo_etapa` para confirmar 20 em cada.
-
-## Detalhes técnicos
-- Usar `supabase--insert` (INSERT/UPDATE em tabela existente `agendamentos`), sem migration.
-- Campos preenchidos: `clinica_id`, `paciente_id`, `paciente_nome`, `procedimento`, `medico_id`, `inicio`, `fim`, `fluxo_etapa`, `prioridade`, `status = 'confirmado'`.
-- Não mexer em `pagamentos`, `triagens`, `senhas` etc. — apenas o quadro de fluxo.
-- Reversível: os agendamentos criados ficam marcados com uma observação `[SEED FLUXO TESTE]` para permitir limpeza futura fácil.
-
-## Resultado esperado
-Ao abrir `/app/fluxo` com a data de hoje, cada uma das 7 colunas exibe exatamente 20 cards de pacientes variados, com prioridades e procedimentos misturados.
+## Relatório final
+Tabela resumo com paciente-alvo, ação, esperado, obtido, status (✅/❌), erros de console/rede se houver, e prints em `/tmp/browser/fluxo-test/screenshots/`.
