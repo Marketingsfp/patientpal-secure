@@ -1,25 +1,33 @@
-## Verificação visual dos 5 pacientes no Check-in
+## Objetivo
+Simular o fluxo real de estorno de ponta a ponta usando um dos pagamentos criados na simulação anterior, aprovar como financeiro pela UI e confirmar que a solicitação some do sino/caixa.
 
-### Status no banco (já confirmado por SQL)
-Todos os 5 agendamentos existem com `fluxo_etapa = aguardando_recepcao`, `status = agendado` e `fin_lancamentos` receita associado (=> aparecerão com badge **PAGO**):
+## Alvo escolhido
+Pagamento **JOAO PEDRO NEVES CANTARELA – CONSULTA – R$ 150,00** (lançamento `653c5041…`, agendamento `fee8e982…` de hoje 09:00). É o mais recente da POLICLINICA MENINO JESUS, ideal para o teste sem afetar dados reais antigos.
 
-| Paciente | Data/Hora BRT |
-|---|---|
-| JOAO PEDRO NEVES CANTARELA | 02/07 09:00 |
-| QA CODEX PACIENTE 01072026 | 02/07 14:30 |
-| NICOLY KIDMAN | 03/07 10:15 |
-| ASTOLFO ARNALDO | 04/07 16:00 |
-| DANIELE CRISTINA DA SILVA SOARES | 09/07 08:45 |
+## Etapa 1 — Criar a solicitação (via banco)
+Inserir 1 linha em `estorno_solicitacoes` como se a recepção tivesse pedido, apontando para o lançamento e agendamento acima:
+- `status = 'pendente'`
+- `tipo = 'erro_caixa'`
+- `motivo = 'SIMULAÇÃO QA — cobrança em duplicidade, favor estornar'`
+- `valor = 150.00`, `paciente_nome = 'JOAO PEDRO NEVES CANTARELA'`
+- `solicitado_por` = qualquer usuário membro da clínica (uso o próprio Jean para representar a recepção)
 
-### O que vou fazer
-Abrir `/app/checkin` no Playwright (autenticado com sua sessão, clínica POLICLINICA MENINO JESUS) e trocar o seletor de data 4 vezes, tirando um screenshot em cada:
+Isso dispara o realtime que já existe: o sino no header (`EstornosBell`) e o painel em `/app/financeiro/atendimentos` recebem a solicitação em tempo real.
 
-1. **02/07/2026** → esperar ver Joao Pedro + QA Codex (contador "2 aguardando").
-2. **03/07/2026** → esperar ver Nicoly Kidman (contador "1 aguardando").
-3. **04/07/2026** → esperar ver Astolfo Arnaldo (contador "1 aguardando").
-4. **09/07/2026** → esperar ver Daniele Cristina (contador "1 aguardando").
+## Etapa 2 — Aprovar como financeiro (via UI/Playwright)
+Abrir `http://localhost:8080/app/financeiro/atendimentos` autenticado, capturar screenshot mostrando o card "1 solicitação(ões) de estorno pendente(s)" com JOAO PEDRO, e clicar em **Aprovar**. Isso executa `aprovarSolicitacao()` que:
+1. localiza o lançamento correspondente em `items`;
+2. chama `estornar(alvo)` — gera um lançamento de despesa compensatória (estorno) na mesma conta/categoria;
+3. marca a solicitação como `status = 'aprovado'` com `resolvido_por/resolvido_em`.
 
-Para cada data, extraio o texto da lista e comparo com o nome esperado.
+Screenshot pós-clique confirmando o toast "Solicitação aprovada" e o desaparecimento do card.
 
-### Entrega
-Uma tabela com: data testada, quem apareceu, badge PAGO presente (sim/não), e os 4 screenshots anexados. Sem alterações no código nem no banco — só leitura/navegação.
+## Etapa 3 — Verificar no caixa e no sino
+1. Navegar para `/app/caixa` e tirar screenshot mostrando os dois movimentos casados (receita R$ 150 + despesa/estorno R$ 150) para o JOAO PEDRO — saldo neutro.
+2. Abrir o sino de notificações no header e confirmar que **não há mais solicitação pendente** (`estorno_solicitacoes.status = 'pendente'` zerado para essa clínica).
+3. Query final no banco:
+   - `SELECT status, resolvido_em, resposta FROM estorno_solicitacoes WHERE id = <novo>` → aprovado.
+   - `SELECT tipo, valor, descricao FROM fin_lancamentos WHERE agendamento_id = 'fee8e982…' ORDER BY created_at` → mostra receita original + despesa de estorno.
+
+## Entrega
+Tabela resumo + 3 screenshots (solicitação pendente na tela do financeiro, tela após aprovação, caixa mostrando o estorno registrado) e a evidência SQL de que o `status` virou `aprovado` e a despesa compensatória foi criada. Nenhum arquivo de código do projeto é alterado.
