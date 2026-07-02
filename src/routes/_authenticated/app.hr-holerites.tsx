@@ -50,7 +50,7 @@ function HoleritesPage() {
       supabase.from("hr_holerites").select("*").eq("clinica_id", clinicaAtual.clinica_id).order("competencia", { ascending: false }),
       supabase.from("hr_contratos").select("id,funcionario_nome,salario").eq("clinica_id", clinicaAtual.clinica_id).eq("status", "ativo").order("funcionario_nome"),
     ]);
-    if (h.error) toast.error(h.error.message);
+    if (h.error) mostrarErro(h.error);
     setRows((h.data ?? []) as unknown as Holerite[]);
     setContratos((c.data ?? []) as Contrato[]);
     setLoading(false);

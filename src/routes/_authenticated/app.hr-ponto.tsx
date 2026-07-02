@@ -62,7 +62,7 @@ function PontoPage() {
       supabase.from("unidades").select("id,nome,latitude,longitude,raio_metros")
         .eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true),
     ]);
-    if (p.error) toast.error(p.error.message);
+    if (p.error) mostrarErro(p.error);
     setPontos((p.data ?? []) as Ponto[]);
     setUnidades((u.data ?? []) as Unidade[]);
     setLoading(false);

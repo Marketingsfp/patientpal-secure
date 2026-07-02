@@ -169,7 +169,7 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
         .eq("ativo", true)
         .order("nome"),
     ]);
-    if (cs.error) toast.error(cs.error.message);
+    if (cs.error) mostrarErro(cs.error);
     setList((cs.data ?? []) as Contrato[]);
     setConvenios((cv.data ?? []) as Convenio[]);
     setLoading(false);

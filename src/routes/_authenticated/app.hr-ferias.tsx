@@ -48,7 +48,7 @@ function FeriasPage() {
       supabase.from("hr_ferias").select("*").eq("clinica_id", clinicaAtual.clinica_id).order("created_at", { ascending: false }),
       supabase.from("hr_contratos").select("id,funcionario_nome,data_admissao").eq("clinica_id", clinicaAtual.clinica_id).eq("status", "ativo").order("funcionario_nome"),
     ]);
-    if (f.error) toast.error(f.error.message);
+    if (f.error) mostrarErro(f.error);
     setRows((f.data ?? []) as Ferias[]);
     setContratos((c.data ?? []) as Contrato[]);
     setLoading(false);

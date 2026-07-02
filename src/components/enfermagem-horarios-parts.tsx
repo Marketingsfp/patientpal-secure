@@ -130,7 +130,7 @@ export function EnfermagemGerarAgendaCard() {
       }
       toast.success(`${rows.length} horários criados`);
     } catch (e: any) {
-      toast.error(e.message ?? "Erro ao gerar agenda");
+      mostrarErro(e);
     } finally { setGerando(false); }
   };
 

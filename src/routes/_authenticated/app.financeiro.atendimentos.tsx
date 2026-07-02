@@ -454,8 +454,8 @@ function Page() {
       // logo após o mapeamento abaixo.
     }
     const [mr, ar] = await Promise.all([qManual.order("data", { ascending: false }), qAgenda.order("data", { ascending: false })]);
-    if (mr.error) { toast.error(mr.error.message); setLoading(false); return; }
-    if (ar.error) { toast.error(ar.error.message); setLoading(false); return; }
+    if (mr.error) { mostrarErro(mr.error); setLoading(false); return; }
+    if (ar.error) { mostrarErro(ar.error); setLoading(false); return; }
     const manuais: Atend[] = (mr.data ?? []).map((r) => {
       const pago = Number(r.valor_total);
       // Recalcula repasse usando convênio cadastrado por procedimento
@@ -843,7 +843,7 @@ function Page() {
       await load();
     } catch (e) {
       const err = e as { message?: string };
-      toast.error(err.message ?? "Falha ao registrar pagamento");
+      mostrarErro(err);
     } finally {
       setPayingNow(false);
     }

@@ -43,7 +43,7 @@ function Page() {
         .eq("clinica_id", clinicaAtual.clinica_id).order("prioridade", { ascending: false }),
       supabase.from("fin_categorias").select("id, nome, tipo").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
     ]);
-    if (r.error) toast.error(r.error.message); else setItems((r.data ?? []) as Regra[]);
+    if (r.error) mostrarErro(r.error); else setItems((r.data ?? []) as Regra[]);
     setCats((c.data ?? []) as Cat[]);
     setLoading(false);
   };

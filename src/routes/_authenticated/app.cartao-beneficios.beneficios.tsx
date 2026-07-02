@@ -89,8 +89,8 @@ function BeneficiosPage() {
       allProcs.push(...page);
       if (page.length < PAGE) break;
     }
-    if (cs.error) toast.error(cs.error.message);
-    if (bs.error) toast.error(bs.error.message);
+    if (cs.error) mostrarErro(cs.error);
+    if (bs.error) mostrarErro(bs.error);
     setConvenios((cs.data ?? []) as Convenio[]);
     setRows((bs.data ?? []) as Beneficio[]);
     setProcedimentos(allProcs);

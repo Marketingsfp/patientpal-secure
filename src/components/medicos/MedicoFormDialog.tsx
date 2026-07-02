@@ -653,7 +653,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         });
         toast.success("Usuário do sistema criado e vinculado à equipe!");
       } catch (err: any) {
-        toast.error(`Médico salvo, mas erro ao criar usuário: ${err?.message ?? err}`);
+        mostrarErro(err, "médico salvo, mas erro ao criar usuário");
       }
     } else if (form.criarUsuario) {
       toast.warning("Informe e-mail e senha (mín. 6 caracteres) para criar o usuário.");

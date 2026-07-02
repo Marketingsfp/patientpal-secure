@@ -2710,7 +2710,7 @@ function AgendaPage() {
         toast.warning("NFS-e enviada — acompanhe o status em Financeiro › NFS-e.");
       }
     } catch (err) {
-      toast.error("Falha ao emitir NFS-e: " + (err instanceof Error ? err.message : "erro"));
+      mostrarErro(err, "falha ao emitir NFS-e");
     }
   };
 
@@ -3530,7 +3530,7 @@ function AgendaPage() {
                 }
               }
             } catch (err) {
-              toast.error("Falha ao emitir NFS-e: " + (err instanceof Error ? err.message : "erro"));
+              mostrarErro(err, "falha ao emitir NFS-e");
               navigate({ to: "/app/financeiro/atendimentos" });
             }
           }

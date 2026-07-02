@@ -75,7 +75,7 @@ function ContratosPage() {
       supabase.from("cargos").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("setores").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
     ]);
-    if (c.error) toast.error(c.error.message);
+    if (c.error) mostrarErro(c.error);
     setRows((c.data ?? []) as Contrato[]);
     setCargos((cg.data ?? []) as Ref[]);
     setSetores((st.data ?? []) as Ref[]);
