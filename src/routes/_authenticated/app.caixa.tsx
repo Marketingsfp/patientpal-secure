@@ -770,13 +770,15 @@ function Page() {
   const imprimirDetalhe = () => {
     if (!openDetalhe) return;
     const s = openDetalhe;
+    const esc = (v: unknown) =>
+      String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
     const linhas = detalheMovs.map((m) => `
       <tr>
         <td>${new Date(m.created_at).toLocaleDateString("pt-BR")}</td>
         <td>${new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</td>
         <td>${TIPO_LABEL[m.tipo]}</td>
-        <td>${(m.descricao ?? "").replace(/</g, "&lt;")}</td>
-        <td>${m.forma_pagamento ?? "—"}</td>
+        <td>${esc(m.descricao ?? "")}</td>
+        <td>${esc(m.forma_pagamento ?? "—")}</td>
         <td style="text-align:right;">${TIPO_SINAL[m.tipo] < 0 ? "-" : ""}${fmt(m.valor)}</td>
       </tr>`).join("");
     const html = `<!doctype html><html><head><meta charset="utf-8"/>
@@ -792,7 +794,7 @@ function Page() {
         th{background:#f1f5f9;}
       </style></head><body>
       <h1>Sessão de caixa</h1>
-      <div class="meta">${s.user_nome ?? "—"} · ${fmtDT(s.aberto_em)} → ${fmtDT(s.fechado_em)}</div>
+      <div class="meta">${esc(s.user_nome ?? "—")} · ${fmtDT(s.aberto_em)} → ${fmtDT(s.fechado_em)}</div>
       <div class="grid">
         <div><b>Abertura</b><br/>${fmt(s.valor_abertura)}</div>
         <div><b>Calculado</b><br/>${fmt(s.valor_fechamento_calculado)}</div>
