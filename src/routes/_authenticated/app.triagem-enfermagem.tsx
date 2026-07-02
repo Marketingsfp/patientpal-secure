@@ -196,6 +196,26 @@ function TriagemEnfermagemPage() {
 
   async function salvarEAvancar(avancar: boolean) {
     if (!clinicaAtual || !aberto) return;
+    // Validação de faixas plausíveis (só valida se preenchido)
+    const range = (v: string, min: number, max: number, label: string) => {
+      if (!v.trim()) return true;
+      const n = parseFloat(v.replace(",", "."));
+      if (!isFinite(n) || n < min || n > max) {
+        toast.error(`${label} fora da faixa esperada (${min}–${max})`);
+        return false;
+      }
+      return true;
+    };
+    if (
+      !range(form.pa_sis, 50, 260, "PA sistólica") ||
+      !range(form.pa_dia, 30, 180, "PA diastólica") ||
+      !range(form.fc, 20, 250, "Frequência cardíaca") ||
+      !range(form.temp, 30, 45, "Temperatura") ||
+      !range(form.sat, 40, 100, "Saturação O₂") ||
+      !range(form.glicemia, 20, 800, "Glicemia") ||
+      !range(form.peso, 1, 400, "Peso") ||
+      !range(form.altura, 30, 260, "Altura")
+    ) return;
     setSalvando(true);
     const num = (v: string) => {
       const n = parseFloat(v.replace(",", "."));
