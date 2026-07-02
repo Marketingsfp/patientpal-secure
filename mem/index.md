@@ -1,8 +1,9 @@
 # Project Memory
 
 ## Core
-Médicos: serviços (medico_procedimentos) e aba "Repasse" (medico_convenios) devem ficar sincronizados. Ao adicionar/remover um serviço, criar/remover automaticamente o item correspondente em Repasse. Itens manuais (nomes que não correspondem a procedimentos) são preservados.
-Cartão Consulta: repasse do médico é SEMPRE fixo (`medicos.cb_valor_repasse`, ex.: R$ 35,00), mesmo que o paciente pague uma taxa simbólica (R$ 9,99). Nunca limitar pelo valor pago.
+Sistema clínico multi-clínica (agenda, prontuário, NFS-e, financeiro, cartão convênio). PT-BR em toda UI.
+CPF é único por clínica em pacientes (índice parcial idx_pacientes_clinica_cpf_unique — CPFs em branco permitidos).
+Validações do cadastro de cliente: nome exige letra + máx 120, data de nascimento entre 1900 e hoje, e-mail regex JS (sem tooltip HTML5).
 
 ## Memories
-- [Repasse cartão consulta](mem://features/repasse-cartao-consulta) — Regra de cálculo do prestador em atendimentos de cartão consulta vs. convênio comum
+- [Testes pendentes de clientes](mem://tests/clientes-pendentes) — Cenários do formulário /app/clientes que ficaram sem cobertura por timeout do Playwright
