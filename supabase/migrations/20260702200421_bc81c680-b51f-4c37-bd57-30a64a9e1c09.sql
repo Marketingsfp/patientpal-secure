@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pacientes_clinica_cpf_unique ON public.pacientes (clinica_id, cpf) WHERE cpf IS NOT NULL AND cpf <> '';
