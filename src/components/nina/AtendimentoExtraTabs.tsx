@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -109,7 +110,7 @@ export function AtendInbox() {
       await travarFilaFn({ data: { clinicaId, travada: !abrir } });
       setFilaAberta(abrir);
       toast.success(abrir ? "Fila aberta" : "Fila fechada");
-    } catch (e: any) { toast.error(e?.message); }
+    } catch (e: any) { mostrarErro(e); }
   };
 
   const definirStatus = async (status: "online" | "pausa" | "offline") => {
@@ -130,7 +131,7 @@ export function AtendInbox() {
         setPausaReasonSel(pauseReasons[0].id);
         setPausaDialogOpen(true);
       }
-    } catch (e: any) { toast.error(e?.message); }
+    } catch (e: any) { mostrarErro(e); }
   };
 
   const confirmarPausa = async () => {
@@ -140,7 +141,7 @@ export function AtendInbox() {
       setPausaDialogOpen(false);
       await carregarStatusAgente();
       toast.success("Em pausa");
-    } catch (e: any) { toast.error(e?.message); }
+    } catch (e: any) { mostrarErro(e); }
   };
 
   const carregarConvs = useCallback(async () => {
@@ -149,7 +150,7 @@ export function AtendInbox() {
       const rows = await listarConvs({ data: { clinicaId, status: filtroStatus, busca: busca || undefined, canal: "todos", limit: 200 } });
       setConvs(rows);
       if (!sel && rows[0]) setSel(rows[0]);
-    } catch (e: any) { toast.error(e?.message); }
+    } catch (e: any) { mostrarErro(e); }
   }, [clinicaId, filtroStatus, busca, listarConvs, sel]);
 
   const carregarConversa = useCallback(async () => {
@@ -161,7 +162,7 @@ export function AtendInbox() {
         listarNotasFn({ data: { clinicaId, conversaId: sel.id } }),
       ]);
       setMsgs(m); setContato(c); setNotas(n);
-    } catch (e: any) { toast.error(e?.message); }
+    } catch (e: any) { mostrarErro(e); }
   }, [clinicaId, sel?.id, listarMsgs, obterContato, listarNotasFn]);
 
   useEffect(() => { carregarConvs(); }, [carregarConvs]);
@@ -207,7 +208,7 @@ export function AtendInbox() {
       await enviarMsg({ data: { clinicaId, conversaId: sel.id, text: t } });
       setDraft("");
       await carregarConversa();
-    } catch (e: any) { toast.error(e?.message); }
+    } catch (e: any) { mostrarErro(e); }
     finally { setEnviando(false); }
   };
 
@@ -218,7 +219,7 @@ export function AtendInbox() {
       await criarNotaFn({ data: { clinicaId, conversaId: sel.id, conteudo: t } });
       setNovaNota("");
       await carregarConversa();
-    } catch (e: any) { toast.error(e?.message); }
+    } catch (e: any) { mostrarErro(e); }
   };
 
   const transferir = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -233,7 +234,7 @@ export function AtendInbox() {
       toast.success("Conversa transferida");
       setTransferOpen(false);
       await carregarConvs(); await carregarConversa();
-    } catch (e: any) { toast.error(e?.message); }
+    } catch (e: any) { mostrarErro(e); }
   };
 
   const fechar = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -249,7 +250,7 @@ export function AtendInbox() {
       toast.success("Conversa encerrada");
       setFecharOpen(false);
       await carregarConvs(); await carregarConversa();
-    } catch (e: any) { toast.error(e?.message); }
+    } catch (e: any) { mostrarErro(e); }
   };
 
   const statusBadge = (s: string) => {
@@ -617,7 +618,7 @@ export function AtendSupervisor() {
     if (!clinicaId) return;
     setLoading(true);
     try { setRows(await liveFn({ data: { clinicaId } })); }
-    catch (e: any) { toast.error(e?.message); }
+    catch (e: any) { mostrarErro(e); }
     finally { setLoading(false); }
   }, [clinicaId, liveFn]);
   useEffect(() => { carregar(); const t = setInterval(carregar, 10000); return () => clearInterval(t); }, [carregar]);
@@ -740,7 +741,7 @@ export function AtendRelatorios() {
     try {
       const r = await relFn({ data: { clinicaId, de: `${de}T00:00:00Z`, ate: `${ate}T23:59:59Z` } });
       setData(r);
-    } catch (e: any) { toast.error(e?.message); }
+    } catch (e: any) { mostrarErro(e); }
     finally { setLoading(false); }
   }, [clinicaId, de, ate, relFn]);
   useEffect(() => { carregar(); }, [carregar]);
@@ -856,7 +857,7 @@ export function AtendRoteamento() {
         listarDeptosFn({ data: { clinicaId } }),
       ]);
       setRows(r); setDeptos(d);
-    } catch (e: any) { toast.error(e?.message); }
+    } catch (e: any) { mostrarErro(e); }
   }, [clinicaId, listar, listarDeptosFn]);
   useEffect(() => { carregar(); }, [carregar]);
   useRealtimeRefresh(["atend_routing_rules"], carregar, !!clinicaId);
@@ -896,7 +897,7 @@ export function AtendRoteamento() {
       toast.success("Regra salva");
       setOpen(false); setEdit(null);
       await carregar();
-    } catch (e: any) { toast.error(e?.message); }
+    } catch (e: any) { mostrarErro(e); }
   };
 
   const toggleDia = (d: number) =>
@@ -938,7 +939,7 @@ export function AtendRoteamento() {
               <Button size="icon" variant="ghost" onClick={async () => {
                 if (!confirm("Excluir regra?")) return;
                 try { await excluir({ data: { clinicaId: clinicaId!, id: r.id } }); await carregar(); toast.success("Excluída"); }
-                catch (e: any) { toast.error(e?.message); }
+                catch (e: any) { mostrarErro(e); }
               }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
             </div>
           </div>

@@ -13,6 +13,7 @@ import { MiniPieChart } from "@/components/charts/MiniPieChart";
 import { MiniLineChart } from "@/components/charts/MiniLineChart";
 import { exportToExcel } from "@/lib/export-csv";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { Download, Save, Trash2, BarChart3, PieChart, LineChart, Table as TableIcon, ChevronRight, ChevronDown, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 
 // ============================================================
@@ -555,7 +556,7 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
       : cube.load({ clinicaId, ini: effIni, fim: effFim });
     loadRows
       .then((rows) => { if (!cancel) setRawRows(rows); })
-      .catch((e) => toast.error(e?.message ?? "Erro ao carregar cubo"))
+      .catch((e) => mostrarErro(e))
       .finally(() => { if (!cancel) setLoading(false); });
     return () => { cancel = true; };
   }, [clinicaId, effIni, effFim, cube, financeLoadKey]);

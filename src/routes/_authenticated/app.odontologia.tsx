@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Smile, Save } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
@@ -74,7 +75,7 @@ function OdontologiaPage() {
       procedimento: procNovo || null,
       observacoes: obsNovo || null,
     });
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success(`Dente ${selecionado} atualizado`);
     setProcNovo(""); setObsNovo("");
     void carregar();
@@ -86,7 +87,7 @@ function OdontologiaPage() {
     const patch: Partial<Record<CampoProntuario, string>> = { [campo]: valor };
     if (prontuario) {
       const { error } = await supabase.from("odonto_prontuarios").update(patch).eq("id", prontuario.id);
-      if (error) { toast.error(error.message); return; }
+      if (error) { mostrarErro(error); return; }
       setProntuario({ ...prontuario, [campo]: valor });
     } else {
       const { data, error } = await supabase.from("odonto_prontuarios").insert({
@@ -94,7 +95,7 @@ function OdontologiaPage() {
         paciente_id: pacienteId,
         ...patch,
       }).select("id,queixa_principal,historia_dental,plano_tratamento,observacoes").maybeSingle();
-      if (error) { toast.error(error.message); return; }
+      if (error) { mostrarErro(error); return; }
       setProntuario(data as ProntuarioOdonto);
     }
     toast.success("Prontuário salvo");

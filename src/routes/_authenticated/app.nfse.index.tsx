@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Receipt, ExternalLink, FilePlus2, RefreshCw, Send, ScanLine, Check, X, Loader2, AlertCircle, Eye } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -72,7 +73,7 @@ function NfsePage() {
       .order("data_emissao", { ascending: false })
       .limit(500);
     setLoading(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     setRows((data ?? []) as unknown as Row[]);
   };
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, [clinicaAtual?.clinica_id]);

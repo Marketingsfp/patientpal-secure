@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { ChevronLeft, ChevronRight, CheckCircle2, Workflow, Bell, Settings2, AlertTriangle, Siren, CircleDot } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -111,7 +112,7 @@ function FluxoPage() {
       .lte("inicio", fim)
       .order("inicio");
     setLoading(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     const rows = (data ?? []) as unknown as Ag[];
     const reais = rows.filter((a) => !!a.paciente_id && (a.paciente_nome ?? "").trim().toUpperCase() !== "DISPONÍVEL");
     setAgs(reais);
@@ -159,7 +160,7 @@ function FluxoPage() {
       .from("agendamentos")
       .update({ fluxo_etapa: etapa, fluxo_atualizado_em: new Date().toISOString() } as never)
       .eq("id", id);
-    if (error) toast.error(error.message);
+    if (error) mostrarErro(error);
   }
 
   async function ciclarPrioridade(a: Ag) {
@@ -169,7 +170,7 @@ function FluxoPage() {
       .from("agendamentos")
       .update({ prioridade: prox } as never)
       .eq("id", a.id);
-    if (error) toast.error(error.message);
+    if (error) mostrarErro(error);
     else toast.success(`Prioridade: ${prox}`);
   }
 
@@ -207,7 +208,7 @@ function FluxoPage() {
       guiche: guicheStr,
       chamada_em: now,
     } as never);
-    if (insErr) { toast.error(insErr.message); return; }
+    if (insErr) { mostrarErro(insErr); return; }
     await setEtapa(a.id, "atendimento");
     toast.success(`Chamando ${nomeCurto} · ${guicheStr}`);
   }

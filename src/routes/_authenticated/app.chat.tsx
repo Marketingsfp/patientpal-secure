@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { Plus, Send, Hash, User as UserIcon, Users, Trash2 } from "lucide-react";
 import { formatDateTime } from "@/lib/date-utils";
 
@@ -186,7 +187,7 @@ function ChatPage() {
       texto: texto.trim(),
     });
     if (error) {
-      toast.error(error.message);
+      mostrarErro(error);
       return;
     }
     setTexto("");
@@ -206,7 +207,7 @@ function ChatPage() {
       .select("id, tipo, nome, clinica_id")
       .single();
     if (error || !canal) {
-      toast.error(error?.message ?? "Falha ao criar canal");
+      mostrarErro(error);
       return;
     }
     const membros = [user.id, ...Array.from(selecionados)].map((uid) => ({
@@ -215,7 +216,7 @@ function ChatPage() {
     }));
     const { error: e2 } = await supabase.from("chat_membros").insert(membros);
     if (e2) {
-      toast.error(e2.message);
+      mostrarErro(e2);
       return;
     }
 
@@ -239,7 +240,7 @@ function ChatPage() {
     if (!confirm("Tem certeza que deseja apagar esta conversa para todos?")) return;
     const { error } = await supabase.from("chat_canais").delete().eq("id", id);
     if (error) {
-      toast.error("Erro ao excluir: " + error.message);
+      mostrarErro(error, "erro ao excluir");
       return;
     }
     toast.success("Conversa excluída");

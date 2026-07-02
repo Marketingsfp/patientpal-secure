@@ -17,6 +17,7 @@ import {
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -573,7 +574,7 @@ function AgendaPage() {
       observacoes: null,
       data_pagamento: null,
     } as never).eq("id", origem.id);
-    if (e1) { setReagSalvando(false); toast.error(e1.message); return; }
+    if (e1) { setReagSalvando(false); mostrarErro(e1); return; }
     // 2) Coloca a paciente na ficha de destino (slot escolhido), preservando o horário do slot
     const { error: e2 } = await supabase.from("agendamentos").update({
       paciente_id: origem.paciente_id ?? null,
@@ -583,7 +584,7 @@ function AgendaPage() {
       observacoes: novasObs,
       data_pagamento: origem.data_pagamento ?? null,
     } as never).eq("id", slot.id);
-    if (e2) { setReagSalvando(false); toast.error(e2.message); return; }
+    if (e2) { setReagSalvando(false); mostrarErro(e2); return; }
     // 3) Transfere lançamentos financeiros (pagamento) da ficha de origem para a de destino,
     //    para que o ícone de "pago" continue aparecendo na nova ficha.
     await supabase.from("fin_lancamentos")
@@ -718,7 +719,7 @@ function AgendaPage() {
       .eq("record_id", a.id)
       .order("created_at", { ascending: false })
       .limit(200);
-    if (error) { setAuditLoading(false); toast.error(error.message); return; }
+    if (error) { setAuditLoading(false); mostrarErro(error); return; }
     // 2) lançamentos financeiros vinculados ao agendamento (para status do repasse médico)
     const { data: lancs } = await supabase
       .from("fin_lancamentos")
@@ -765,7 +766,7 @@ function AgendaPage() {
       .select("id,nome")
       .single();
     setSavingPac(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     setPacientes(prev => [...prev, { id: data.id, nome: data.nome }].sort((a, b) => a.nome.localeCompare(b.nome)));
     setForm(f => ({ ...f, paciente_nome: data.nome, paciente_id: data.id }));
     setNovoPac({ nome: "", cpf: "", telefone: "", data_nascimento: "", email: "" });
@@ -850,7 +851,7 @@ function AgendaPage() {
     }
     const { data, error } = await q;
     setLoading(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     // Recursos de enfermagem aparecem como "médicos virtuais": mapeamos o
     // enfermagem_recurso_id no campo medico_id para reuso de toda a UI.
     const mapped = (((data ?? []) as unknown) as Array<Agendamento & { enfermagem_recurso_id?: string | null; medico?: { nome: string | null; sexo: string | null } | null; orcamento?: { numero: number | null } | null }>).map((a) => ({
@@ -1525,7 +1526,7 @@ function AgendaPage() {
     setFormaPagOpen(true);
     } catch (e: any) {
       console.error("[cobrarSelecionados]", e);
-      toast.error(e?.message ?? "Falha ao preparar a cobrança. Tente novamente.");
+      mostrarErro(e);
     }
   };
 
@@ -1565,7 +1566,7 @@ function AgendaPage() {
         executado_em: nowIso,
       } as never)
       .in("id", validos.map(v => v.id));
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success(`${validos.length} atendimento(s) baixado(s) como Realizado.`);
     setSelecionados(new Set());
     await load();
@@ -1615,7 +1616,7 @@ function AgendaPage() {
       toast.success(temRepassePago ? "Atendimento reaberto e repasse estornado." : "Atendimento reaberto.");
       await load();
     } catch (err: any) {
-      toast.error(err?.message ?? "Falha ao reabrir atendimento.");
+      mostrarErro(err);
     }
   };
 
@@ -1632,7 +1633,7 @@ function AgendaPage() {
     }
     if (!confirm(`Excluir ${ids.length} horário(s)? Esta ação não pode ser desfeita.`)) return;
     const { error } = await supabase.from("agendamentos").delete().in("id", ids);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success(`${ids.length} horário(s) excluído(s).`);
     setSelecionados(new Set());
     await load();
@@ -1685,7 +1686,7 @@ function AgendaPage() {
       .select("id,paciente_id,paciente_nome,inicio,fim,medico_id,status,procedimento,observacoes,data_pagamento")
       .in("id", ids)
       .limit(1000);
-    if (eFontes) { toast.error(eFontes.message); return; }
+    if (eFontes) { mostrarErro(eFontes); return; }
     const fontes = ((fontesRaw ?? []) as Array<Agendamento>)
       .filter(a => a.status !== "realizado" && !isSlotLivre(a.paciente_nome))
       .sort((a, b) => new Date(a.inicio).getTime() - new Date(b.inicio).getTime());
@@ -1704,7 +1705,7 @@ function AgendaPage() {
       .lte("inicio", df.toISOString())
       .order("inicio", { ascending: true })
       .limit(1000);
-    if (eDest) { toast.error(eDest.message); return; }
+    if (eDest) { mostrarErro(eDest); return; }
     const destino = (destinoRaw ?? []) as Array<{
       id: string; paciente_id: string | null; paciente_nome: string;
       inicio: string; fim: string; medico_id: string | null; status: string;
@@ -1755,7 +1756,7 @@ function AgendaPage() {
         } as never).eq("id", alvo.id),
       ]);
       if (e1) { toast.error(`Falha em ${origem.paciente_nome}: ${e1.message}`); return false; }
-      if (e2) { toast.error(`Falha ao mover para destino: ${e2.message}`); return false; }
+      if (e2) { mostrarErro(e2, "falha ao mover para destino"); return false; }
       // 3) Transfere lançamentos financeiros
       await supabase.from("fin_lancamentos")
         .update({ agendamento_id: alvo.id } as never)
@@ -1844,7 +1845,7 @@ function AgendaPage() {
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("numero", num)
         .maybeSingle();
-      if (error) { toast.error(error.message); return; }
+      if (error) { mostrarErro(error); return; }
       if (!orc) { toast.error(`Orçamento nº ${num} não encontrado.`); return; }
       if (orc.status === "cancelado") { toast.error("Orçamento cancelado."); return; }
       const { data: itens, error: e2 } = await supabase
@@ -1852,7 +1853,7 @@ function AgendaPage() {
         .select("id, descricao, procedimento_id")
         .eq("orcamento_id", orc.id)
         .order("ordem");
-      if (e2) { toast.error(e2.message); return; }
+      if (e2) { mostrarErro(e2); return; }
       const itsAll = (itens ?? []) as { id: string; descricao: string; procedimento_id: string | null }[];
       if (itsAll.length === 0) { toast.error("Orçamento sem itens."); return; }
       // Filtra itens já consumidos por agendamentos ativos. Permite agendar
@@ -1889,7 +1890,7 @@ function AgendaPage() {
           .from("procedimentos")
           .select("id, grupo, tipo")
           .in("id", procIds);
-        if (e3) { toast.error(e3.message); return; }
+        if (e3) { mostrarErro(e3); return; }
         procs = (pdata ?? []) as { id: string; grupo: string | null; tipo: string | null }[];
       }
       const norm = (g: string | null | undefined) =>
@@ -2220,10 +2221,10 @@ function AgendaPage() {
     let novoId: string | null = editing?.id ?? null;
     if (editing) {
       const { error } = await supabase.from("agendamentos").update(payload).eq("id", editing.id);
-      if (error) { setSaving(false); toast.error(error.message); return; }
+      if (error) { setSaving(false); mostrarErro(error); return; }
     } else {
       const { data: novo, error } = await supabase.from("agendamentos").insert(payload).select("id").single();
-      if (error || !novo) { setSaving(false); toast.error(error?.message ?? "Erro ao salvar"); return; }
+      if (error || !novo) { setSaving(false); mostrarErro(error); return; }
       novoId = novo.id;
     }
     // Grava vínculos com itens do orçamento (consome itens individualmente
@@ -2246,7 +2247,7 @@ function AgendaPage() {
         .from("agendamento_orcamento_itens")
         .insert(vinculos as never);
       if (vErr) {
-        toast.error(`Agendamento salvo, mas vínculo com itens do orçamento falhou: ${vErr.message}`);
+        mostrarErro(vErr, "agendamento salvo, mas vínculo com itens do orçamento falhou");
       }
     }
     setPendingOrcItemIds([]);
@@ -2332,7 +2333,7 @@ function AgendaPage() {
         orcamento_id: null,
       } as never)
       .eq("id", a.id);
-    if (error) toast.error(error.message);
+    if (error) mostrarErro(error);
     else { toast.success("Horário liberado."); await load(); }
   };
 
@@ -2381,7 +2382,7 @@ function AgendaPage() {
       }
     }
     const { error } = await supabase.from("agendamentos").update(payload).in("id", idsParaAtualizar);
-    if (error) toast.error(error.message); else {
+    if (error) mostrarErro(error); else {
       if (idsParaAtualizar.length > 1) toast.success(`${idsParaAtualizar.length} agendamentos do pacote cancelados.`);
       await load();
     }
@@ -2398,7 +2399,7 @@ function AgendaPage() {
         executado_em: new Date().toISOString(),
       } as never)
       .eq("id", a.id);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Atendimento iniciado e registrado");
     await load();
   };
@@ -2418,7 +2419,7 @@ function AgendaPage() {
         executado_em: new Date().toISOString(),
       } as never)
       .eq("id", a.id);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Atendimento concluído");
     await load();
   };
@@ -2535,7 +2536,7 @@ function AgendaPage() {
     setFormaPagOpen(true);
     } catch (e: any) {
       console.error("[cobrarAgendamento]", e);
-      toast.error(e?.message ?? "Falha ao preparar a cobrança. Tente novamente.");
+      mostrarErro(e);
     }
   };
 
@@ -2544,7 +2545,7 @@ function AgendaPage() {
       .from("agendamentos")
       .update({ fluxo_etapa: "triagem", fluxo_atualizado_em: new Date().toISOString() } as never)
       .eq("id", a.id);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Presença confirmada — paciente liberado para a triagem");
     setEtapaMap((m) => { const n = new Map(m); n.set(a.id, "triagem"); return n; });
   };
@@ -2727,7 +2728,7 @@ function AgendaPage() {
         usuarioId: user?.id ?? null,
       });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha ao imprimir GR");
+      mostrarErro(err);
     }
   };
 
@@ -3413,7 +3414,7 @@ function AgendaPage() {
             }));
             const { error: errSombras } = await supabase.from("fin_lancamentos").insert(sombras);
             if (errSombras) {
-              toast.error("Pagamento salvo, mas falhou ao vincular itens extras: " + errSombras.message);
+              mostrarErro(errSombras, "pagamento salvo, mas falhou ao vincular itens extras");
             }
           }
           setPagosSet((prev) => {
@@ -3440,7 +3441,7 @@ function AgendaPage() {
                 .update({ fluxo_etapa: "triagem", fluxo_atualizado_em: new Date().toISOString() } as never)
                 .in("id", mesmoDia);
               if (errFluxo) {
-                toast.error("Pagamento salvo, mas falhou ao avançar o fluxo: " + errFluxo.message);
+                mostrarErro(errFluxo, "pagamento salvo, mas falhou ao avançar o fluxo");
               } else {
                 setEtapaMap((m) => {
                   const n = new Map(m);
@@ -3450,7 +3451,7 @@ function AgendaPage() {
               }
             }
           } catch (err) {
-            toast.error(err instanceof Error ? err.message : "Falha ao avançar o fluxo");
+            mostrarErro(err);
           }
           // limpa seleção após cobrança agrupada
           if (pagamentoExtraIds.length > 0) {
@@ -3472,7 +3473,7 @@ function AgendaPage() {
             });
             toast.success("Pagamento registrado e GR enviado para impressão.");
           } catch (err) {
-            toast.error(err instanceof Error ? err.message : "Falha ao imprimir GR");
+            mostrarErro(err);
           }
           setPagamentoAgId(null);
           setPagamentoExtraIds([]);

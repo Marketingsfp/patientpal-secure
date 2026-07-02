@@ -6,6 +6,7 @@ import {
   Unlock, Eye, FileDown, Users, Receipt, ChevronRight, Trash2, Plus, HandCoins, ArrowRight, Undo2, Printer,
 } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
@@ -528,7 +529,7 @@ function Page() {
       setCobrancaLinhas([linhaVazia()]);
       void load(); void loadFilaCaixa();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha na cobrança");
+      mostrarErro(err);
     } finally { setSaving(false); }
   };
 
@@ -641,7 +642,7 @@ function Page() {
       .single();
     if (error || !sess) {
       setSaving(false);
-      toast.error(error?.message || "Erro ao abrir caixa");
+      mostrarErro(error);
       return;
     }
     // movimento abertura
@@ -682,7 +683,7 @@ function Page() {
       forma_pagamento: ehPagto ? movForma : null,
     });
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     setOpenMov(null);
     setMovValor(""); setMovDesc(""); setMovForma("dinheiro");
     setMovBandeira(""); setMovParcelas("1");
@@ -720,7 +721,7 @@ function Page() {
       });
     }
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     setOpenFechar(false);
     setValorInformado(""); setObsFechamento("");
     toast.success("Caixa fechado");

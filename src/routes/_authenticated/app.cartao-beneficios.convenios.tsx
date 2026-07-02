@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Plus, Pencil, Trash2, ShieldCheck, Layers, Lightbulb, ArrowLeft, FileText, Info, Printer, Gift, FileSignature, Stethoscope, Scale } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Card, CardContent } from "@/components/ui/card";
@@ -148,7 +149,7 @@ function ConveniosPage() {
       .select("id, nome, descricao, ativo, escopo, procedimento_id, especialidade_id, tipo_desconto, valor_desconto, inicio_a_partir, limite_uso, periodicidade, pessoa, prioridade, procedimento_ids")
       .eq("convenio_id", convenioId)
       .order("nome");
-    if (error) toast.error(error.message);
+    if (error) mostrarErro(error);
     setBeneficios(((data ?? []) as any[]).map((b) => ({
       id: b.id,
       nome: b.nome,
@@ -226,7 +227,7 @@ function ConveniosPage() {
       .select("*")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("nome");
-    if (error) toast.error(error.message);
+    if (error) mostrarErro(error);
     const list = (data ?? []) as Convenio[];
     setRows(list);
     if (list.length) {
@@ -334,10 +335,10 @@ function ConveniosPage() {
     let convenioId = editing?.id;
     if (editing) {
       const { error } = await supabase.from("cb_convenios").update(payload).eq("id", editing.id);
-      if (error) { setSaving(false); toast.error(error.message); return; }
+      if (error) { setSaving(false); mostrarErro(error); return; }
     } else {
       const { data, error } = await supabase.from("cb_convenios").insert(payload).select("id").single();
-      if (error || !data) { setSaving(false); toast.error(error?.message ?? "Erro ao criar"); return; }
+      if (error || !data) { setSaving(false); mostrarErro(error); return; }
       convenioId = data.id;
     }
     // Substitui faixas de preço
@@ -350,7 +351,7 @@ function ConveniosPage() {
     }));
     if (rowsToInsert.length) {
       const { error: fErr } = await supabase.from("cb_convenio_faixas").insert(rowsToInsert);
-      if (fErr) { setSaving(false); toast.error(fErr.message); return; }
+      if (fErr) { setSaving(false); mostrarErro(fErr); return; }
     }
     // Substitui benefícios
     await supabase.from("cb_beneficios").delete().eq("convenio_id", convenioId!);
@@ -391,7 +392,7 @@ function ConveniosPage() {
     }
     if (bensToInsert.length) {
       const { error: bErr } = await supabase.from("cb_beneficios").insert(bensToInsert);
-      if (bErr) { setSaving(false); toast.error(bErr.message); return; }
+      if (bErr) { setSaving(false); mostrarErro(bErr); return; }
     }
     setSaving(false);
     toast.success(editing ? "Convênio atualizado." : "Convênio criado.");
@@ -405,7 +406,7 @@ function ConveniosPage() {
   const confirmDelete = async () => {
     if (!toDelete) return;
     const { error } = await supabase.from("cb_convenios").delete().eq("id", toDelete.id);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Convênio excluído.");
     setToDelete(null);
     load();

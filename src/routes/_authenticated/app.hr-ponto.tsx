@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Clock, LogIn, LogOut, Coffee, MapPin } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { formatDateTime, formatHora } from "@/lib/date-utils";
 
 export const Route = createFileRoute("/_authenticated/app/hr-ponto")({
@@ -109,7 +110,7 @@ function PontoPage() {
       dentro_raio,
     });
     setMarcando(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success(`${TIPO_LABEL[tipo]} registrada`);
     void load();
   }

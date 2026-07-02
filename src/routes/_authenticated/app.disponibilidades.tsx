@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Trash2, Plus, CalendarRange, Pencil, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Button } from "@/components/ui/button";
@@ -136,7 +137,7 @@ function Page() {
       vigencia_fim: novo.vigencia_fim || null,
     }));
     const { error } = await supabase.from("medico_disponibilidades").insert(payload as never);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success(diasSel.length > 1 ? `${diasSel.length} horários adicionados` : "Horário adicionado");
     void load();
   };
@@ -153,7 +154,7 @@ function Page() {
       vigencia_fim: editRow.vigencia_fim || null,
     };
     const { error } = await supabase.from("medico_disponibilidades").update(payload as never).eq("id", dispEditando);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Horário atualizado");
     setDispEditando(null);
     setEditRow(null);
@@ -162,7 +163,7 @@ function Page() {
 
   const remover = async (id: string) => {
     const { error } = await supabase.from("medico_disponibilidades").delete().eq("id", id);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     setDisps((xs) => xs.filter((x) => x.id !== id));
   };
 

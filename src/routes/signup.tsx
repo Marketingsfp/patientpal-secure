@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate, redirect } from "@tanstack/react-ro
 import { useState, type FormEvent } from "react";
 import { Activity, Mail, Lock, User, Eye, EyeOff, Sparkles, CalendarCheck2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,7 +55,7 @@ function SignupPage() {
       },
     });
     setLoading(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Conta criada! Você já pode entrar.");
     navigate({ to: "/app" });
   };

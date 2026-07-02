@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 
 interface Ref { id: string; nome: string }
 
@@ -95,7 +96,7 @@ export function FuncionarioDadosDialog({ open, onOpenChange, clinicaId, editingC
       ? await supabase.from("hr_contratos").update(payload).eq("id", editingContratoId)
       : await supabase.from("hr_contratos").insert(payload);
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success(editingContratoId ? "Funcionário atualizado" : "Funcionário cadastrado");
     onOpenChange(false);
     onSaved?.();

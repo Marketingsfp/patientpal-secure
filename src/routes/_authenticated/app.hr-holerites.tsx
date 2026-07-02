@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { FileText, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { formatDatePura } from "@/lib/date-utils";
 
 export const Route = createFileRoute("/_authenticated/app/hr-holerites")({
@@ -94,7 +95,7 @@ function HoleritesPage() {
       status: "rascunho",
     });
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Holerite criado");
     setOpen(false);
     void load();
@@ -104,7 +105,7 @@ function HoleritesPage() {
     const { error } = await supabase.from("hr_holerites").update({
       status: "pago", pago_em: new Date().toISOString().slice(0, 10),
     }).eq("id", id);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Holerite marcado como pago");
     void load();
   }

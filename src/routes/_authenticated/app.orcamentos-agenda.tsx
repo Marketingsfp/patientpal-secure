@@ -18,6 +18,7 @@ import {
   Info,
 } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -76,7 +77,7 @@ function OrcamentosAgendaPage() {
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch((err) => {
-        toast.error("Erro ao entrar em tela cheia: " + err.message);
+        mostrarErro(err, "erro ao entrar em tela cheia");
       });
       setIsFullscreen(true);
     } else {

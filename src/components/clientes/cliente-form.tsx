@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Camera, ChevronDown, CreditCard, FileHeart, History, Loader2, MapPin, Mic, MicOff, ScanFace, Search, UserCheck, Upload, X, Check } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { isCPFValido, somenteDigitos } from "@/lib/cpf";
 import { Button } from "@/components/ui/button";
@@ -644,7 +645,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
       consentimento_em: new Date().toISOString(),
     });
     setBioLoading(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     setHasBiometria(true);
     toast.success("Biometria facial cadastrada");
   }
@@ -659,7 +660,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
       .eq("clinica_id", clinicaId)
       .is("revogado_em", null);
     setBioLoading(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     setHasBiometria(false);
     toast.success("Biometria removida");
   }
@@ -749,11 +750,11 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
     let pacienteId: string | undefined = editing?.id;
     if (editing) {
       const { error } = await supabase.from("pacientes").update(payload).eq("id", editing.id);
-      if (error) { setSaving(false); toast.error(error.message); return; }
+      if (error) { setSaving(false); mostrarErro(error); return; }
     } else {
       const { data: novo, error } = await supabase
         .from("pacientes").insert(payload).select("id").single();
-      if (error) { setSaving(false); toast.error(error.message); return; }
+      if (error) { setSaving(false); mostrarErro(error); return; }
       pacienteId = novo?.id;
     }
 
@@ -765,7 +766,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
         .upload(path, fotoFile, { upsert: true, contentType: fotoFile.type || "image/jpeg" });
       if (upErr) {
         setSaving(false);
-        toast.error("Cliente salvo, mas a foto falhou: " + upErr.message);
+        mostrarErro(upErr, "cliente salvo, mas a foto falhou");
         onSaved(pacienteId); return;
       }
       await supabase.from("pacientes")

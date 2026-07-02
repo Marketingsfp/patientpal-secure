@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 
 const PERFIS = [
   { value: "admin", label: "Administrador" },
@@ -206,7 +207,7 @@ export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUs
       error = e;
     }
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     // Atualiza telefones em profiles quando há um usuário vinculado
     const targetUserId = editingUserId ?? userId ?? prefillUserId ?? null;
     if (targetUserId) {

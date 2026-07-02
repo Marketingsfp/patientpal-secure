@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, CalendarRange, ArrowLeft, Pencil, Check, X } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Button } from "@/components/ui/button";
@@ -242,7 +243,7 @@ export function EnfermagemRecursosHorariosEditor() {
     const { error } = await supabase.from("enfermagem_recursos")
       .update({ nome }).eq("id", renomeandoId);
     setSalvandoNome(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Nome atualizado");
     setRenomeandoId(null);
     void reload();
@@ -261,7 +262,7 @@ export function EnfermagemRecursosHorariosEditor() {
     if (dispEditando) {
       const { error } = await supabase.from("enfermagem_recurso_disponibilidades")
         .update(payload).eq("id", dispEditando);
-      if (error) { toast.error(error.message); return; }
+      if (error) { mostrarErro(error); return; }
       toast.success("Horário atualizado"); setDispEditando(null);
     } else {
       // need clinica_id on insert
@@ -272,7 +273,7 @@ export function EnfermagemRecursosHorariosEditor() {
       if (!rec) { toast.error("Recurso não encontrado"); return; }
       const { error } = await supabase.from("enfermagem_recurso_disponibilidades")
         .insert({ ...payload, clinica_id: (rec as any).clinica_id });
-      if (error) { toast.error(error.message); return; }
+      if (error) { mostrarErro(error); return; }
       toast.success("Horário adicionado");
     }
     void reload();
@@ -280,7 +281,7 @@ export function EnfermagemRecursosHorariosEditor() {
 
   const remover = async (id: string) => {
     const { error } = await supabase.from("enfermagem_recurso_disponibilidades").delete().eq("id", id);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     setDisps((xs) => xs.filter((x) => x.id !== id));
   };
 

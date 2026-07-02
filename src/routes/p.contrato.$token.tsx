@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { Check, Eraser } from "lucide-react";
 
 export const Route = createFileRoute("/p/contrato/$token")({
@@ -27,7 +28,7 @@ function AssinarContrato() {
   useEffect(() => {
     (async () => {
       const { data, error } = await supabase.rpc("contrato_publico", { _token: token });
-      if (error) toast.error(error.message);
+      if (error) mostrarErro(error);
       setData(data);
       setLoading(false);
     })();
@@ -63,7 +64,7 @@ function AssinarContrato() {
     try { ip = (await (await fetch("https://api.ipify.org?format=json")).json()).ip; } catch {}
     const { error } = await supabase.rpc("assinar_contrato_publico", { _token: token, _assinatura_svg: dataUrl, _ip: ip });
     setSaving(false);
-    if (error) return toast.error(error.message);
+    if (error) return mostrarErro(error);
     toast.success("Contrato assinado com sucesso!");
     const { data: novo } = await supabase.rpc("contrato_publico", { _token: token });
     setData(novo);

@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Palmtree, Plus, Check, X } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { formatDatePura } from "@/lib/date-utils";
 
 export const Route = createFileRoute("/_authenticated/app/hr-ferias")({
@@ -82,7 +83,7 @@ function FeriasPage() {
       status: "solicitada",
     });
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Solicitação criada");
     setOpen(false);
     void load();
@@ -93,7 +94,7 @@ function FeriasPage() {
     const { error } = await supabase.from("hr_ferias").update({
       status, aprovado_por: user?.id, aprovado_em: new Date().toISOString(),
     }).eq("id", id);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Solicitação atualizada");
     void load();
   }

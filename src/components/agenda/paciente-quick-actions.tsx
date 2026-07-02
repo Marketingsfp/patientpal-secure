@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 
 interface Props {
   pacienteId: string;
@@ -91,7 +92,7 @@ export function PacienteQuickActions({ pacienteId, clinicaId }: Props) {
       })
       .eq("id", pacienteId);
     setSavingPhone(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Dados do paciente atualizados.");
     setEdited(false);
   }
@@ -109,7 +110,7 @@ export function PacienteQuickActions({ pacienteId, clinicaId }: Props) {
         estado: data.estado?.trim().toUpperCase() || null,
       })
       .eq("id", pacienteId);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Endereço atualizado.");
     setEndOpen(false);
   }
@@ -343,7 +344,7 @@ function FotoDialog({
       stop();
       onClose();
     } catch (e: any) {
-      toast.error(e?.message ?? "Erro ao salvar foto.");
+      mostrarErro(e);
     } finally {
       setBusy(false);
     }

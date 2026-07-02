@@ -13,6 +13,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { VoiceInput } from "@/components/voice-input";
 import { Cid10Picker } from "@/components/cid10-picker";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import {
   gerarAnamneseEstruturada,
   sugerirCondutaClinica,
@@ -227,7 +228,7 @@ function AtendimentoEditorPage() {
         prescricao: out.prescricao || s.prescricao,
       }));
       toast.success("Anamnese estruturada");
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Falha"); }
+    } catch (e) { mostrarErro(e); }
     finally { setLoading(null); }
   }
 
@@ -237,7 +238,7 @@ function AtendimentoEditorPage() {
       const out = await sugerir({ data: { ...soap, especialidade } });
       setSugestoes(out);
       toast.success("Sugestões geradas");
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Falha"); }
+    } catch (e) { mostrarErro(e); }
     finally { setLoading(null); }
   }
 
@@ -249,7 +250,7 @@ function AtendimentoEditorPage() {
       setResumo(out.resumo);
       setResumoOpen(true);
       if (out.total === 0) toast.info("Sem prontuários anteriores");
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Falha"); }
+    } catch (e) { mostrarErro(e); }
     finally { setLoading(null); }
   }
 
@@ -327,7 +328,7 @@ function AtendimentoEditorPage() {
         ? `Prontuário salvo · Repasse médico: R$ ${valorMedico.toFixed(2)}`
         : "Prontuário salvo");
       setSalvo({ valorMedico });
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Falha ao salvar"); }
+    } catch (e) { mostrarErro(e); }
     finally { setLoading(null); }
   }
 

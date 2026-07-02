@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,8 +44,8 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
       supabase.from("especialidades").select("id,nome").eq("ativo", true).order("nome"),
     ]);
     setLoading(false);
-    if (e1) { toast.error(e1.message); return; }
-    if (e2) { toast.error(e2.message); return; }
+    if (e1) { mostrarErro(e1); return; }
+    if (e2) { mostrarErro(e2); return; }
     setRegras((r ?? []) as CbRegra[]);
     setEspecialidades((e ?? []) as EspOpt[]);
   };
@@ -83,7 +84,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     if (!confirm("Excluir esta regra?")) return;
     if (!r.id.startsWith("new-")) {
       const { error } = await (supabase as any).from("cb_convenio_regras").delete().eq("id", r.id);
-      if (error) { toast.error(error.message); return; }
+      if (error) { mostrarErro(error); return; }
     }
     setRegras(prev => prev.filter((_, i) => i !== idx));
   };
@@ -106,10 +107,10 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
       };
       if (r.id.startsWith("new-")) {
         const { error } = await (supabase as any).from("cb_convenio_regras").insert(payload);
-        if (error) { setLoading(false); toast.error(error.message); return; }
+        if (error) { setLoading(false); mostrarErro(error); return; }
       } else {
         const { error } = await (supabase as any).from("cb_convenio_regras").update(payload).eq("id", r.id);
-        if (error) { setLoading(false); toast.error(error.message); return; }
+        if (error) { setLoading(false); mostrarErro(error); return; }
       }
     }
     setLoading(false);
@@ -214,7 +215,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
       }
       toast.success(`Regras aplicadas a ${upserts.length} serviços.`);
     } catch (err: any) {
-      toast.error(err?.message ?? "Erro ao reaplicar.");
+      mostrarErro(err);
     } finally {
       setReapplying(false);
       setProgress("");

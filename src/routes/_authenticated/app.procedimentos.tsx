@@ -3,6 +3,7 @@ import { SectionTabs, SERVICOS_TABS, SERVICOS_META } from "@/components/section-
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Plus, Search, Pencil, Trash2, ClipboardList, Sparkles, CreditCard, Download, ArrowUp, ArrowDown, ArrowUpDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { exportToExcel } from "@/lib/export-csv";
@@ -348,7 +349,7 @@ function ProcedimentosPage() {
         .select("id,nome")
         .eq("ativo", true)
         .order("nome");
-      if (error) { toast.error(error.message); return; }
+      if (error) { mostrarErro(error); return; }
       setTipos((data ?? []) as { id: string; nome: string }[]);
     })();
   }, []);
@@ -363,7 +364,7 @@ function ProcedimentosPage() {
       .select("id,nome")
       .eq("ativo", true)
       .order("nome");
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     setEspecialidades((data ?? []) as { id: string; nome: string }[]);
   };
   useEffect(() => {
@@ -376,7 +377,7 @@ function ProcedimentosPage() {
       .from("procedimento_especialidades")
       .select("procedimento_id,especialidade_id")
       .eq("clinica_id", clinicaAtual.clinica_id);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     const m = new Map<string, Set<string>>();
     (data ?? []).forEach((r: any) => {
       if (!m.has(r.procedimento_id)) m.set(r.procedimento_id, new Set());
@@ -399,7 +400,7 @@ function ProcedimentosPage() {
         .order("grupo", { ascending: true, nullsFirst: false })
         .order("nome")
         .range(from, from + pageSize - 1);
-      if (error) { setLoading(false); toast.error(error.message); return; }
+      if (error) { setLoading(false); mostrarErro(error); return; }
       all.push(...(data ?? []));
       if (!data || data.length < pageSize) break;
       from += pageSize;
@@ -421,7 +422,7 @@ function ProcedimentosPage() {
       .select("*")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("nome");
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     setCartoes((data ?? []) as any);
   };
 
@@ -444,7 +445,7 @@ function ProcedimentosPage() {
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("ativo", true)
       .order("nome");
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     setConvenios((data ?? []) as CbConvenio[]);
   };
 
@@ -458,7 +459,7 @@ function ProcedimentosPage() {
         .select("procedimento_id,convenio_id,valor_dinheiro,valor_outros")
         .eq("clinica_id", clinicaAtual.clinica_id)
         .range(from, from + PAGE - 1);
-      if (error) { toast.error(error.message); return; }
+      if (error) { mostrarErro(error); return; }
       const rows = (data ?? []) as any[];
       rows.forEach((r) => {
         m.set(`${r.procedimento_id}::${r.convenio_id}`, {
@@ -478,7 +479,7 @@ function ProcedimentosPage() {
       .select("id,convenio_id,especialidade_id,tipo,modo,valor,percentual,prioridade,ativo")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("ativo", true);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     setRegras((data ?? []) as CbRegra[]);
   };
 
@@ -739,10 +740,10 @@ function ProcedimentosPage() {
       // registro original seja diferente da clínica atualmente selecionada.
       const { clinica_id: _ignoreClinica, ...updatePayload } = payload;
       const { error } = await supabase.from("procedimentos").update(updatePayload).eq("id", editing.id);
-      if (error) { setSaving(false); toast.error(error.message); return; }
+      if (error) { setSaving(false); mostrarErro(error); return; }
     } else {
       const { data, error } = await supabase.from("procedimentos").insert(payload).select("id").single();
-      if (error) { setSaving(false); toast.error(error.message); return; }
+      if (error) { setSaving(false); mostrarErro(error); return; }
       procId = data?.id;
     }
     // Sincroniza vínculos N:N de especialidades (todos os tipos)
@@ -755,7 +756,7 @@ function ProcedimentosPage() {
           clinica_id: clinicaAtual.clinica_id,
         }));
         const { error: errVinc } = await supabase.from("procedimento_especialidades").insert(rows);
-        if (errVinc) { setSaving(false); toast.error(errVinc.message); return; }
+        if (errVinc) { setSaving(false); mostrarErro(errVinc); return; }
       }
     }
     // Sincroniza valores por convênio (cartão benefícios)
@@ -774,7 +775,7 @@ function ProcedimentosPage() {
       const { error: errConv } = await (supabase as any)
         .from("procedimento_cb_convenio_valores")
         .upsert(rows, { onConflict: "procedimento_id,convenio_id" });
-      if (errConv) { setSaving(false); toast.error(errConv.message); return; }
+      if (errConv) { setSaving(false); mostrarErro(errConv); return; }
     }
     setSaving(false);
     toast.success(editing ? "Atualizado." : "Cadastrado.");
@@ -787,7 +788,7 @@ function ProcedimentosPage() {
   const onDelete = async (p: Procedimento) => {
     if (!confirm(`Excluir ${p.nome}?`)) return;
     const { error } = await supabase.from("procedimentos").delete().eq("id", p.id);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Excluído.");
     void load();
   };
@@ -816,7 +817,7 @@ function ProcedimentosPage() {
     }
     const { error } = await supabase.from("procedimentos").insert(novos);
     setSeeding(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success(`${novos.length} exames de ${pacote.grupo} cadastrados. Ajuste os valores em cada um.`);
     void load();
   };
@@ -839,7 +840,7 @@ function ProcedimentosPage() {
       .map(c => ({ ...c, ativo: true, clinica_id: clinicaAtual.clinica_id }));
     if (novos.length === 0) { toast.info("Cartões padrão já cadastrados."); return; }
     const { error } = await supabase.from("cartoes_convenio").insert(novos);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Cartões cadastrados.");
     void loadCartoes();
   };
@@ -867,7 +868,7 @@ function ProcedimentosPage() {
     const { error } = editingCartao
       ? await supabase.from("cartoes_convenio").update(payload).eq("id", editingCartao.id)
       : await supabase.from("cartoes_convenio").insert(payload);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success(editingCartao ? "Cartão atualizado." : "Cartão cadastrado.");
     setOpenCartao(false);
     void loadCartoes();
@@ -875,7 +876,7 @@ function ProcedimentosPage() {
   const onDeleteCartao = async (c: Cartao) => {
     if (!confirm(`Excluir ${c.nome}?`)) return;
     const { error } = await supabase.from("cartoes_convenio").delete().eq("id", c.id);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Excluído.");
     void loadCartoes();
   };

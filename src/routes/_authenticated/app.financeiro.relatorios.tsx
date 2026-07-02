@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { FileBarChart, Download } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Button } from "@/components/ui/button";
@@ -71,7 +72,7 @@ function Page() {
       }
     } catch (e: any) {
       setLoading(false);
-      toast.error(e?.message ?? "Erro ao buscar dados");
+      mostrarErro(e);
       return;
     }
     setLoading(false);

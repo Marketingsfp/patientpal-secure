@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
 
 type Tipo = "receita" | "despesa";
@@ -345,7 +346,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       criado_por: user?.id ?? null,
     } as never).select("id").single();
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success(`${tipo === "receita" ? "Receita" : "Despesa"} registrada`);
     // ----- Registra o split de repasse médico ----------------------------
     // Antes esse cálculo só era feito em memória (na hora de imprimir a GR

@@ -11,6 +11,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { Loader2, Sparkles, Save, Stethoscope, AlertTriangle, CheckCircle2, Bell, Upload, UserCheck } from "lucide-react";
 import { classificarResultadoExame, extrairTextoExameDeArquivo, type ClassificacaoExame } from "@/lib/exames-ia.functions";
 
@@ -137,7 +138,7 @@ function ExamesResultadosPage() {
       setAnalise(result);
       toast.success("Classificação concluída.");
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Falha ao classificar");
+      mostrarErro(e);
     } finally {
       setClassificando(false);
     }
@@ -190,7 +191,7 @@ function ExamesResultadosPage() {
         setClassificando(false);
       }
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Falha ao processar arquivo");
+      mostrarErro(e);
     } finally {
       setExtraindo(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -244,7 +245,7 @@ function ExamesResultadosPage() {
       setRows((r) => [ins as Row, ...r].slice(0, 50));
       setTipo(""); setTexto(""); setContexto(""); setAnalise(null);
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Erro ao salvar");
+      mostrarErro(e);
     } finally {
       setSalvando(false);
     }

@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { Plus, Pencil, Trash2, ArrowUpCircle, ArrowDownCircle, Download } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { exportToExcel } from "@/lib/export-csv";
@@ -64,7 +65,7 @@ function Page() {
       .range(0, 499);
     if (filterTipo !== "todos") q = q.eq("tipo", filterTipo);
     const { data, error } = await q;
-    if (error) toast.error(error.message); else setItems((data ?? []) as Lanc[]);
+    if (error) mostrarErro(error); else setItems((data ?? []) as Lanc[]);
     setLoading(false);
   };
   const loadResumo = async () => {
@@ -72,7 +73,7 @@ function Page() {
     const { data, error } = await supabase.rpc("fin_resumo_periodo", {
       p_clinica: clinicaAtual.clinica_id, p_ini: fromDate, p_fim: toDate,
     });
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     let r = 0, d = 0, totalRows = 0;
     for (const row of (data ?? []) as Array<{ tipo: string; status: string; qtd: number; total: number }>) {
       totalRows += Number(row.qtd) || 0;
@@ -116,14 +117,14 @@ function Page() {
       ? await supabase.from("fin_lancamentos").update(payload).eq("id", editing.id)
       : await supabase.from("fin_lancamentos").insert(payload);
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Salvo"); setOpen(false); await load(); await loadResumo();
   };
 
   const remove = async (l: Lanc) => {
     if (!confirm(`Excluir "${l.descricao}"?`)) return;
     const { error } = await supabase.from("fin_lancamentos").delete().eq("id", l.id);
-    if (error) toast.error(error.message); else { toast.success("Removido"); await load(); await loadResumo(); }
+    if (error) mostrarErro(error); else { toast.success("Removido"); await load(); await loadResumo(); }
   };
 
   const catsFiltradas = cats.filter((c) => !c.tipo || c.tipo === form.tipo);

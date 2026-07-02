@@ -11,6 +11,7 @@ import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 
 interface Ref { id: string; nome: string }
 
@@ -218,7 +219,7 @@ export function EnfermeiroFormDialog({ open, onOpenChange, clinicaId, editingUse
       });
       error = e;
     }
-    if (error) { setSaving(false); toast.error(error.message); return; }
+    if (error) { setSaving(false); mostrarErro(error); return; }
 
     const targetUserId = editingUserId ?? userId ?? prefillUserId ?? null;
     if (targetUserId) {
