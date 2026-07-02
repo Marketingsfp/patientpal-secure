@@ -196,6 +196,26 @@ function TriagemEnfermagemPage() {
 
   async function salvarEAvancar(avancar: boolean) {
     if (!clinicaAtual || !aberto) return;
+    // Validação de faixas plausíveis (só valida se preenchido)
+    const range = (v: string, min: number, max: number, label: string) => {
+      if (!v.trim()) return true;
+      const n = parseFloat(v.replace(",", "."));
+      if (!isFinite(n) || n < min || n > max) {
+        toast.error(`${label} fora da faixa esperada (${min}–${max})`);
+        return false;
+      }
+      return true;
+    };
+    if (
+      !range(form.pa_sis, 50, 260, "PA sistólica") ||
+      !range(form.pa_dia, 30, 180, "PA diastólica") ||
+      !range(form.fc, 20, 250, "Frequência cardíaca") ||
+      !range(form.temp, 30, 45, "Temperatura") ||
+      !range(form.sat, 40, 100, "Saturação O₂") ||
+      !range(form.glicemia, 20, 800, "Glicemia") ||
+      !range(form.peso, 1, 400, "Peso") ||
+      !range(form.altura, 30, 260, "Altura")
+    ) return;
     setSalvando(true);
     const num = (v: string) => {
       const n = parseFloat(v.replace(",", "."));
@@ -374,23 +394,31 @@ function TriagemEnfermagemPage() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div><Label className="text-xs">Peso (kg)</Label>
-                <Input value={form.peso} onChange={(e) => setForm({ ...form, peso: e.target.value })} placeholder="70" /></div>
+                <Input inputMode="decimal" pattern="[0-9.,]*" value={form.peso}
+                  onChange={(e) => setForm({ ...form, peso: e.target.value.replace(/[^0-9.,]/g, "") })} placeholder="70" /></div>
               <div><Label className="text-xs">Altura (cm ou m)</Label>
-                <Input value={form.altura} onChange={(e) => setForm({ ...form, altura: e.target.value })} placeholder="170" /></div>
+                <Input inputMode="decimal" pattern="[0-9.,]*" value={form.altura}
+                  onChange={(e) => setForm({ ...form, altura: e.target.value.replace(/[^0-9.,]/g, "") })} placeholder="170" /></div>
               <div><Label className="text-xs">IMC</Label>
                 <Input value={imc} readOnly placeholder="—" /></div>
               <div><Label className="text-xs">Temperatura (°C)</Label>
-                <Input value={form.temp} onChange={(e) => setForm({ ...form, temp: e.target.value })} placeholder="36.5" /></div>
+                <Input inputMode="decimal" pattern="[0-9.,]*" value={form.temp}
+                  onChange={(e) => setForm({ ...form, temp: e.target.value.replace(/[^0-9.,]/g, "") })} placeholder="36.5" /></div>
               <div><Label className="text-xs">PA Sistólica</Label>
-                <Input value={form.pa_sis} onChange={(e) => setForm({ ...form, pa_sis: e.target.value })} placeholder="120" /></div>
+                <Input inputMode="numeric" pattern="[0-9]*" maxLength={3} value={form.pa_sis}
+                  onChange={(e) => setForm({ ...form, pa_sis: e.target.value.replace(/\D/g, "") })} placeholder="120" /></div>
               <div><Label className="text-xs">PA Diastólica</Label>
-                <Input value={form.pa_dia} onChange={(e) => setForm({ ...form, pa_dia: e.target.value })} placeholder="80" /></div>
+                <Input inputMode="numeric" pattern="[0-9]*" maxLength={3} value={form.pa_dia}
+                  onChange={(e) => setForm({ ...form, pa_dia: e.target.value.replace(/\D/g, "") })} placeholder="80" /></div>
               <div><Label className="text-xs">Freq. Cardíaca</Label>
-                <Input value={form.fc} onChange={(e) => setForm({ ...form, fc: e.target.value })} placeholder="75" /></div>
+                <Input inputMode="numeric" pattern="[0-9]*" maxLength={3} value={form.fc}
+                  onChange={(e) => setForm({ ...form, fc: e.target.value.replace(/\D/g, "") })} placeholder="75" /></div>
               <div><Label className="text-xs">Saturação O₂ (%)</Label>
-                <Input value={form.sat} onChange={(e) => setForm({ ...form, sat: e.target.value })} placeholder="98" /></div>
+                <Input inputMode="numeric" pattern="[0-9]*" maxLength={3} value={form.sat}
+                  onChange={(e) => setForm({ ...form, sat: e.target.value.replace(/\D/g, "") })} placeholder="98" /></div>
               <div><Label className="text-xs">Glicemia (mg/dL)</Label>
-                <Input value={form.glicemia} onChange={(e) => setForm({ ...form, glicemia: e.target.value })} placeholder="90" /></div>
+                <Input inputMode="numeric" pattern="[0-9]*" maxLength={4} value={form.glicemia}
+                  onChange={(e) => setForm({ ...form, glicemia: e.target.value.replace(/\D/g, "") })} placeholder="90" /></div>
             </div>
 
             <div>
