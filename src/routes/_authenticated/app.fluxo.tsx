@@ -228,6 +228,19 @@ function FluxoPage() {
     const m = new Map<Etapa, Ag[]>();
     ETAPAS.forEach((e) => m.set(e.id, []));
     for (const a of ags) m.get(a.fluxo_etapa)?.push(a);
+    const peso: Record<"urgente" | "prioritario" | "normal", number> = {
+      urgente: 0,
+      prioritario: 1,
+      normal: 2,
+    };
+    for (const lista of m.values()) {
+      lista.sort((a, b) => {
+        const pa = peso[a.prioridade ?? "normal"];
+        const pb = peso[b.prioridade ?? "normal"];
+        if (pa !== pb) return pa - pb;
+        return a.inicio.localeCompare(b.inicio);
+      });
+    }
     return m;
   }, [ags]);
 
