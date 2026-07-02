@@ -681,12 +681,46 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!form.nome.trim()) { toast.error("Informe o nome."); return; }
+    const nomeTrim = form.nome.trim();
+    if (!nomeTrim) { toast.error("Informe o nome."); return; }
+    if (nomeTrim.length > 120) { toast.error("Nome muito longo (máx. 120 caracteres)."); return; }
+    // Exige pelo menos uma letra (aceita acentos) — bloqueia nomes só com números/símbolos
+    if (!/\p{L}/u.test(nomeTrim)) { toast.error("Nome deve conter letras."); return; }
+    // Bloqueia HTML/script embutido
+    if (/[<>]/.test(nomeTrim)) { toast.error("Nome contém caracteres inválidos."); return; }
     if (!form.telefone.trim()) { toast.error("Informe o telefone."); return; }
     if (!form.data_nascimento) { toast.error("Informe a data de nascimento."); return; }
+    // Faixa plausível da data de nascimento
+    const dn = new Date(form.data_nascimento + "T00:00:00");
+    if (isNaN(dn.getTime())) { toast.error("Data de nascimento inválida."); return; }
+    const hoje = new Date();
+    if (dn > hoje) { toast.error("Data de nascimento não pode ser futura."); return; }
+    const anosDiff = hoje.getFullYear() - dn.getFullYear();
+    if (anosDiff > 120) { toast.error("Data de nascimento inválida (idade acima de 120 anos)."); return; }
+    if (dn.getFullYear() < 1900) { toast.error("Data de nascimento inválida (ano anterior a 1900)."); return; }
+    // Valida e-mail sem depender do tooltip nativo do HTML5
+    if (form.email.trim()) {
+      const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim());
+      if (!emailOk) { toast.error("E-mail inválido."); return; }
+    }
     if (form.cpf.trim() && !isCPFValido(form.cpf)) { toast.error("CPF inválido."); return; }
     if (form.responsavel_cpf.trim() && !isCPFValido(form.responsavel_cpf)) {
       toast.error("CPF do responsável inválido."); return;
+    }
+    // Impede CPF duplicado na mesma clínica
+    if (form.cpf.trim()) {
+      const cpfDigits = somenteDigitos(form.cpf);
+      const { data: dup } = await supabase
+        .from("pacientes")
+        .select("id, nome")
+        .eq("clinica_id", clinicaId)
+        .eq("cpf", cpfDigits)
+        .limit(1);
+      const existente = (dup ?? [])[0];
+      if (existente && existente.id !== editing?.id) {
+        toast.error(`CPF já cadastrado para: ${existente.nome}`);
+        return;
+      }
     }
     setSaving(true);
     const payload = {
@@ -801,7 +835,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
                 <p className="text-xs text-muted-foreground">JPG, PNG ou WebP até 5 MB. Acesso restrito à clínica.</p>
               </div>
             </div>
-            <div className="space-y-1"><Label>Nome *</Label><InputVoz {...fieldProps("nome")} required /></div>
+            <div className="space-y-1"><Label>Nome *</Label><InputVoz {...fieldProps("nome")} required maxLength={120} /></div>
             <div className="space-y-1"><Label>Número de serviço</Label><InputVoz {...fieldProps("numero_pasta")} placeholder="Ex.: 1234" /></div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1"><Label>CPF</Label><InputVoz {...fieldProps("cpf")} /></div>
@@ -813,6 +847,8 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
               <div className="space-y-1">
                 <Label>Data de nascimento *</Label>
                 <Input type="date" required value={form.data_nascimento}
+                  min="1900-01-01"
+                  max={new Date().toISOString().slice(0, 10)}
                   onChange={(e) => setForm({ ...form, data_nascimento: e.target.value })} />
               </div>
               <div className="space-y-1">
