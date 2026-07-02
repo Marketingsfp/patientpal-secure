@@ -835,7 +835,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
                 <p className="text-xs text-muted-foreground">JPG, PNG ou WebP até 5 MB. Acesso restrito à clínica.</p>
               </div>
             </div>
-            <div className="space-y-1"><Label>Nome *</Label><InputVoz {...fieldProps("nome")} required /></div>
+            <div className="space-y-1"><Label>Nome *</Label><InputVoz {...fieldProps("nome")} required maxLength={120} /></div>
             <div className="space-y-1"><Label>Número de serviço</Label><InputVoz {...fieldProps("numero_pasta")} placeholder="Ex.: 1234" /></div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1"><Label>CPF</Label><InputVoz {...fieldProps("cpf")} /></div>
@@ -847,6 +847,8 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
               <div className="space-y-1">
                 <Label>Data de nascimento *</Label>
                 <Input type="date" required value={form.data_nascimento}
+                  min="1900-01-01"
+                  max={new Date().toISOString().slice(0, 10)}
                   onChange={(e) => setForm({ ...form, data_nascimento: e.target.value })} />
               </div>
               <div className="space-y-1">
