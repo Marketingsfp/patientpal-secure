@@ -1,38 +1,25 @@
-## Simulação — 5 agendamentos com pagamento + verificação no Check-in
+## Verificação visual dos 5 pacientes no Check-in
 
-### Dados de base (clínica POLICLINICA MENINO JESUS)
-- **Clínica:** `7570ddde-…-a6c940` (POLICLINICA MENINO JESUS)
-- **Pacientes reais existentes:** JOAO PEDRO NEVES CANTARELA, QA CODEX PACIENTE 01072026, e 3 outros pacientes reais do topo da lista (evito nomes-lixo `"___"`, `"@#$%"` etc.)
-- **Médicos reais existentes:** SUELY MARTINS DA SILVA, CARLOS ALBERTO OLIVERO VARILLAS, JEAN FERREIRA CAMPOS, RAFAEL SOARES MONTEIRO DE BARROS, ELETROCARDIOGRAMA (recurso técnico)
+### Status no banco (já confirmado por SQL)
+Todos os 5 agendamentos existem com `fluxo_etapa = aguardando_recepcao`, `status = agendado` e `fin_lancamentos` receita associado (=> aparecerão com badge **PAGO**):
 
-### Grade proposta (5 agendamentos, dias/horários variados)
+| Paciente | Data/Hora BRT |
+|---|---|
+| JOAO PEDRO NEVES CANTARELA | 02/07 09:00 |
+| QA CODEX PACIENTE 01072026 | 02/07 14:30 |
+| NICOLY KIDMAN | 03/07 10:15 |
+| ASTOLFO ARNALDO | 04/07 16:00 |
+| DANIELE CRISTINA DA SILVA SOARES | 09/07 08:45 |
 
-| # | Dia | Horário (BRT) | Paciente | Médico | Procedimento | Valor |
-|---|---|---|---|---|---|---|
-| 1 | Hoje | 09:00 | JOAO PEDRO NEVES CANTARELA | SUELY MARTINS DA SILVA | Consulta | R$ 150 |
-| 2 | Hoje | 14:30 | QA CODEX PACIENTE 01072026 | CARLOS ALBERTO OLIVERO VARILLAS | Consulta | R$ 200 |
-| 3 | Amanhã | 10:15 | (3º paciente real) | JEAN FERREIRA CAMPOS | Consulta | R$ 180 |
-| 4 | +2 dias | 16:00 | (4º paciente real) | RAFAEL SOARES MONTEIRO DE BARROS | Consulta | R$ 220 |
-| 5 | +7 dias | 08:45 | (5º paciente real) | ELETROCARDIOGRAMA | Eletrocardiograma | R$ 120 |
+### O que vou fazer
+Abrir `/app/checkin` no Playwright (autenticado com sua sessão, clínica POLICLINICA MENINO JESUS) e trocar o seletor de data 4 vezes, tirando um screenshot em cada:
 
-Todos com `duracao = 15 min`, `status = 'agendado'`, `fluxo_etapa = 'aguardando_recepcao'` (que é a etapa que a tela Check-in filtra).
+1. **02/07/2026** → esperar ver Joao Pedro + QA Codex (contador "2 aguardando").
+2. **03/07/2026** → esperar ver Nicoly Kidman (contador "1 aguardando").
+3. **04/07/2026** → esperar ver Astolfo Arnaldo (contador "1 aguardando").
+4. **09/07/2026** → esperar ver Daniele Cristina (contador "1 aguardando").
 
-### O que será inserido no banco
-Para cada linha da tabela:
-1. `INSERT` em `agendamentos` (clinica, paciente_id, medico_id, paciente_nome, inicio, fim, procedimento, status=`agendado`, fluxo_etapa=`aguardando_recepcao`).
-2. `INSERT` em `fin_lancamentos` (tipo=`receita`, status=`confirmado`, `agendamento_id` apontando para o item 1, valor, forma_pagamento=`dinheiro`, data = hoje). É essa linha que marca "pago = true" no Check-in (query em `app.checkin.tsx` linha 92-99).
+Para cada data, extraio o texto da lista e comparo com o nome esperado.
 
-Nenhuma alteração de schema, apenas inserção de dados de teste — via ferramenta de insert.
-
-### Verificação no Check-in
-Depois de inserido:
-1. Rodo uma consulta SQL confirmando que os 5 registros existem, com `fluxo_etapa = 'aguardando_recepcao'` e um `fin_lancamentos` receita associado (=> aparecerá com badge "PAGO").
-2. Abro Playwright, autentico com sua sessão, navego para `/app/checkin`, mudo o seletor de data para **hoje** e tiro screenshot. Devo ver os 2 agendamentos de hoje (Joao Pedro 09:00 e QA Codex 14:30) listados com indicador de pagamento.
-3. Mudo o seletor para amanhã e tiro outro screenshot para confirmar o 3º agendamento.
-4. Reporto: URL, screenshots, e status ("aparece / não aparece") de cada um dos 5.
-
-### Reversão
-Ao final, te entrego a lista dos 5 `agendamento_id` gerados. Se você quiser limpar depois, é só me pedir e eu removo em uma passada (deleta os `fin_lancamentos` e depois os `agendamentos`).
-
-### Ponto de atenção
-Os pacientes "QA CODEX PACIENTE 01072026" e outros da lista são pacientes reais do seu banco. Se preferir que eu **crie 5 pacientes fictícios novos** ("PACIENTE TESTE 01", "…02" etc.) para deixar claro que são simulação e facilitar a limpeza, me avisa antes de aprovar que ajusto o plano.
+### Entrega
+Uma tabela com: data testada, quem apareceu, badge PAGO presente (sim/não), e os 4 screenshots anexados. Sem alterações no código nem no banco — só leitura/navegação.
