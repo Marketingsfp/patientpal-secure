@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -90,7 +91,7 @@ export function EditarPacienteRapidoDialog({
       toast.success("Dados do paciente atualizados.");
       onOpenChange(false);
     } catch (e: any) {
-      toast.error(e?.message ?? "Erro ao salvar.");
+      mostrarErro(e);
     } finally {
       setSaving(false);
     }

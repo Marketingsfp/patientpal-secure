@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Activity, Video, ClipboardList, LogOut, Calendar } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 
 export const Route = createFileRoute("/paciente/consultas")({
   component: MinhasConsultasPage,
@@ -38,7 +39,7 @@ function MinhasConsultasPage() {
       }
       setUserEmail(session.user.email ?? null);
       const { data, error } = await supabase.rpc("minhas_consultas");
-      if (error) toast.error(error.message);
+      if (error) mostrarErro(error);
       else setConsultas((data ?? []) as Consulta[]);
       setLoading(false);
     })();

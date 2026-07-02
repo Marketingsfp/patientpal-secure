@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Plus, Pencil, HeartPulse, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Button } from "@/components/ui/button";
@@ -132,13 +133,13 @@ function EnfermagemRecursosPage() {
     if (editingId) {
       const { error } = await supabase
         .from("enfermagem_recursos").update(payload).eq("id", editingId);
-      if (error) { setSaving(false); toast.error(error.message); return; }
+      if (error) { setSaving(false); mostrarErro(error); return; }
       await supabase
         .from("enfermagem_recurso_procedimentos").delete().eq("recurso_id", editingId);
     } else {
       const { data: novo, error } = await supabase
         .from("enfermagem_recursos").insert(payload).select("id").single();
-      if (error || !novo) { setSaving(false); toast.error(error?.message ?? "Erro"); return; }
+      if (error || !novo) { setSaving(false); mostrarErro(error); return; }
       recursoId = novo.id;
     }
     const procs = Array.from(new Set(form.procedimentos.filter(Boolean)));
@@ -146,7 +147,7 @@ function EnfermagemRecursosPage() {
       const rows = procs.map((pid) => ({ recurso_id: recursoId!, procedimento_id: pid }));
       const { error: e2 } = await supabase
         .from("enfermagem_recurso_procedimentos").insert(rows);
-      if (e2) { setSaving(false); toast.error(e2.message); return; }
+      if (e2) { setSaving(false); mostrarErro(e2); return; }
     }
     setSaving(false);
     toast.success(editingId ? "Recurso atualizado" : "Recurso criado");
@@ -157,7 +158,7 @@ function EnfermagemRecursosPage() {
   const remover = async (r: Recurso) => {
     if (!confirm(`Excluir "${r.nome}"? Agendamentos existentes ficarão sem recurso vinculado.`)) return;
     const { error } = await supabase.from("enfermagem_recursos").delete().eq("id", r.id);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Removido");
     await load();
   };

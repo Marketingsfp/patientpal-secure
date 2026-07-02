@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Users, Search, Plus, Trash2, AlertCircle, CheckCircle2, X } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -67,7 +68,7 @@ function DependentesPage() {
         .neq("status", "cancelado")
         .order("paciente_nome")
         .range(from, from + PAGE - 1);
-      if (error) { toast.error(error.message); break; }
+      if (error) { mostrarErro(error); break; }
       const batch = (data ?? []) as Contrato[];
       cList.push(...batch);
       if (batch.length < PAGE) break;
@@ -81,7 +82,7 @@ function DependentesPage() {
         .eq("contratos_assinatura.clinica_id", cid)
         .eq("ativo", true)
         .range(from, from + PAGE - 1);
-      if (error) { toast.error(error.message); break; }
+      if (error) { mostrarErro(error); break; }
       const batch = (data ?? []) as Dep[];
       dList.push(...batch);
       if (batch.length < PAGE) break;
@@ -131,7 +132,7 @@ function DependentesPage() {
       ativo: true,
     });
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Dependente adicionado.");
     setNovoDep(null);
     setParentesco("");
@@ -150,7 +151,7 @@ function DependentesPage() {
       .from("contrato_dependentes")
       .update({ ativo: false, excluido_em: new Date().toISOString().slice(0, 10) })
       .eq("id", depId);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Dependente removido.");
     await load();
   };

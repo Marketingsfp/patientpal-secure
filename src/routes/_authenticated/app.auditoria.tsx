@@ -3,6 +3,7 @@ import { SectionTabs, SEGURANCA_TABS, SEGURANCA_META } from "@/components/sectio
 import { useEffect, useMemo, useState } from "react";
 import { Download, ShieldCheck, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Button } from "@/components/ui/button";
@@ -66,7 +67,7 @@ function Page() {
     if (dataFim) q = q.lte("created_at", new Date(`${dataFim}T23:59:59`).toISOString());
     const { data, error } = await q;
     setLoading(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     setRows((data as unknown as AuditRow[]) ?? []);
   };
 

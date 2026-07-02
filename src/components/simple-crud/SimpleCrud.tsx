@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { Plus, Search, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Button } from "@/components/ui/button";
@@ -70,7 +71,7 @@ export function SimpleCrud<T extends { id: string }, F>({
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order(o.column, { ascending: o.ascending ?? false });
     setLoading(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     setItems((data ?? []) as T[]);
   };
   useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clinicaAtual?.clinica_id]);
@@ -101,7 +102,7 @@ export function SimpleCrud<T extends { id: string }, F>({
       ? await q.update(payload).eq("id", editing.id).select("id")
       : await q.insert(payload).select("id");
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     if (!ret || (Array.isArray(ret) && ret.length === 0)) {
       toast.error(
         editing
@@ -119,7 +120,7 @@ export function SimpleCrud<T extends { id: string }, F>({
     if (!confirm("Excluir este registro?")) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabase.from(table as any) as any).delete().eq("id", r.id);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Excluído.");
     void load();
   };

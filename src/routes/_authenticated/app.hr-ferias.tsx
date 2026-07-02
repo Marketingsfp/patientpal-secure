@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Palmtree, Plus, Check, X } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { formatDatePura } from "@/lib/date-utils";
 
 export const Route = createFileRoute("/_authenticated/app/hr-ferias")({
@@ -47,7 +48,7 @@ function FeriasPage() {
       supabase.from("hr_ferias").select("*").eq("clinica_id", clinicaAtual.clinica_id).order("created_at", { ascending: false }),
       supabase.from("hr_contratos").select("id,funcionario_nome,data_admissao").eq("clinica_id", clinicaAtual.clinica_id).eq("status", "ativo").order("funcionario_nome"),
     ]);
-    if (f.error) toast.error(f.error.message);
+    if (f.error) mostrarErro(f.error);
     setRows((f.data ?? []) as Ferias[]);
     setContratos((c.data ?? []) as Contrato[]);
     setLoading(false);
@@ -82,7 +83,7 @@ function FeriasPage() {
       status: "solicitada",
     });
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Solicitação criada");
     setOpen(false);
     void load();
@@ -93,7 +94,7 @@ function FeriasPage() {
     const { error } = await supabase.from("hr_ferias").update({
       status, aprovado_por: user?.id, aprovado_em: new Date().toISOString(),
     }).eq("id", id);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Solicitação atualizada");
     void load();
   }

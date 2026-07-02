@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from "@/components/ui/button";
 import { Camera, Loader2, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { detectDescriptor, ensureFaceModels } from "@/lib/face-recognition";
 
 interface Props { open: boolean; onClose: () => void; onCaptured: (descriptor: number[]) => Promise<void> | void; titulo?: string; }
@@ -38,7 +39,7 @@ export function FaceCaptureDialog({ open, onClose, onCaptured, titulo = "Captura
     if (!desc) { setMsg("Rosto não detectado. Aproxime e tente novamente."); setBusy(false); return; }
     setMsg("Salvando…");
     try { await onCaptured(Array.from(desc)); setMsg("Foto registrada!"); stop(); setTimeout(onClose, 700); }
-    catch (e: any) { toast.error(e?.message ?? "Erro ao salvar"); setBusy(false); setMsg("Tente novamente"); }
+    catch (e: any) { mostrarErro(e); setBusy(false); setMsg("Tente novamente"); }
   }
 
   return (

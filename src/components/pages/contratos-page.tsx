@@ -19,6 +19,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
@@ -168,7 +169,7 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
         .eq("ativo", true)
         .order("nome"),
     ]);
-    if (cs.error) toast.error(cs.error.message);
+    if (cs.error) mostrarErro(cs.error);
     setList((cs.data ?? []) as Contrato[]);
     setConvenios((cv.data ?? []) as Convenio[]);
     setLoading(false);
@@ -523,7 +524,7 @@ function NovoContratoForm({
       .single();
     if (error || !contrato) {
       setSaving(false);
-      return toast.error(error?.message ?? "Erro");
+      return mostrarErro(error);
     }
 
     if (deps.length > 0) {
@@ -562,14 +563,14 @@ function NovoContratoForm({
       try {
         await gerarCarnePDF(contrato.id);
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Falha ao gerar carnê");
+        mostrarErro(e);
       }
     } else if (tipoCobranca === "boleto") {
       try {
         const res = await gerarBoletosFn({ data: { contratoId: contrato.id } });
         toast.info(res.mensagem);
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Falha ao gerar boletos");
+        mostrarErro(e);
       }
     }
     onCreated();
@@ -1022,7 +1023,7 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
       .eq("id", contrato.id);
     if (error) {
       setSavingDados(false);
-      toast.error(error.message);
+      mostrarErro(error);
       return;
     }
     (contrato as any).valor_mensal = v;
@@ -1066,7 +1067,7 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
       const { error: insErr } = await supabase.from("contrato_mensalidades").insert(rows);
       if (insErr) {
         setSavingDados(false);
-        toast.error("Dados salvos, mas falha ao gerar parcelas: " + insErr.message);
+        mostrarErro(insErr, "dados salvos, mas falha ao gerar parcelas");
         await load();
         return;
       }
@@ -1094,7 +1095,7 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
       .eq("id", contrato.id);
     setCancelSaving(false);
     if (error) {
-      toast.error(error.message);
+      mostrarErro(error);
       return;
     }
     toast.success("Contrato cancelado");
@@ -1228,7 +1229,7 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
         }
       : { status: "pendente", pago_em: null, forma_pagamento: null };
     const { error } = await supabase.from("contrato_mensalidades").update(patch).eq("id", id);
-    if (error) return toast.error(error.message);
+    if (error) return mostrarErro(error);
     load();
   };
 
@@ -1483,7 +1484,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
       .maybeSingle();
     setIncSaving(false);
     if (error) {
-      toast.error(error.message);
+      mostrarErro(error);
       return;
     }
     toast.success("Dependente incluído");
@@ -1517,7 +1518,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
       .update({ ativo: false, excluido_em: hoje })
       .eq("id", excAlvo.id);
     if (error) {
-      toast.error(error.message);
+      mostrarErro(error);
       return;
     }
     toast.success("Dependente excluído");
@@ -1668,7 +1669,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     try {
                       await gerarCarnePDF(contrato.id);
                     } catch (e) {
-                      toast.error(e instanceof Error ? e.message : "Falha ao gerar carnê");
+                      mostrarErro(e);
                     }
                   }}
                 >
@@ -1684,7 +1685,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                       if (res.erro) toast.error(res.mensagem);
                       else toast.info(res.mensagem);
                     } catch (e) {
-                      toast.error(e instanceof Error ? e.message : "Falha ao gerar boletos");
+                      mostrarErro(e);
                     }
                   }}
                 >
@@ -2098,7 +2099,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
             });
             toast.success("Pagamento registrado e GR enviado para impressão.");
           } catch (err) {
-            toast.error(err instanceof Error ? err.message : "Falha ao imprimir GR");
+            mostrarErro(err);
           }
           setPagMens(null);
           setPagInitialForma("");

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Activity, CreditCard, LogOut, Calendar, Users, CheckCircle2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 
 export const Route = createFileRoute("/paciente/cartoes")({
   component: MeusCartoesPage,
@@ -42,7 +43,7 @@ function MeusCartoesPage() {
       }
       setEmail(session.user.email ?? null);
       const { data, error } = await supabase.rpc("meus_cartoes" as any);
-      if (error) toast.error(error.message);
+      if (error) mostrarErro(error);
       else setCartoes((data ?? []) as Cartao[]);
       setLoading(false);
     })();

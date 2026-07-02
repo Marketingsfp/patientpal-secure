@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { BellRing, Phone, CheckCircle2, MessageCircle, Clock, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/alertas-enfermagem")({
@@ -71,7 +72,7 @@ function AlertasEnfermagemPage() {
     if (novo === "em_contato") patch.contatado_em = new Date().toISOString();
     if (novo === "resolvido") patch.resolvido_em = new Date().toISOString();
     const { error } = await supabase.from("alertas_enfermagem").update(patch as never).eq("id", a.id);
-    if (error) return toast.error(error.message);
+    if (error) return mostrarErro(error);
     toast.success("Alerta atualizado");
     load();
   };

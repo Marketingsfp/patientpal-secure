@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Card, CardContent } from "@/components/ui/card";
@@ -29,19 +30,19 @@ function Page() {
       .select("id, tipo_alerta, mensagem, data_alerta, lido")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("lido").order("data_alerta", { ascending: false });
-    if (error) toast.error(error.message); else setItems((data ?? []) as Alerta[]);
+    if (error) mostrarErro(error); else setItems((data ?? []) as Alerta[]);
     setLoading(false);
   };
   useEffect(() => { void load(); }, [clinicaAtual?.clinica_id]);
 
   const marcar = async (a: Alerta) => {
     const { error } = await supabase.from("fin_alertas").update({ lido: !a.lido }).eq("id", a.id);
-    if (error) toast.error(error.message); else await load();
+    if (error) mostrarErro(error); else await load();
   };
   const remove = async (a: Alerta) => {
     if (!confirm("Excluir alerta?")) return;
     const { error } = await supabase.from("fin_alertas").delete().eq("id", a.id);
-    if (error) toast.error(error.message); else { toast.success("Removido"); await load(); }
+    if (error) mostrarErro(error); else { toast.success("Removido"); await load(); }
   };
 
   return (

@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { Plus, Bell, Trash2, Pencil, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Button } from "@/components/ui/button";
@@ -39,7 +40,7 @@ function Page() {
     const { data, error } = await supabase.from("fin_lembretes")
       .select("id, titulo, descricao, data_lembrete, prioridade, concluido")
       .eq("clinica_id", clinicaAtual.clinica_id).order("concluido").order("data_lembrete");
-    if (error) toast.error(error.message); else setItems((data ?? []) as Lemb[]);
+    if (error) mostrarErro(error); else setItems((data ?? []) as Lemb[]);
     setLoading(false);
   };
   useEffect(() => { void load(); }, [clinicaAtual?.clinica_id]);
@@ -59,18 +60,18 @@ function Page() {
       ? await supabase.from("fin_lembretes").update(payload).eq("id", editing.id)
       : await supabase.from("fin_lembretes").insert(payload);
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Salvo"); setOpen(false); await load();
   };
 
   const toggle = async (l: Lemb) => {
     const { error } = await supabase.from("fin_lembretes").update({ concluido: !l.concluido }).eq("id", l.id);
-    if (error) toast.error(error.message); else await load();
+    if (error) mostrarErro(error); else await load();
   };
   const remove = async (l: Lemb) => {
     if (!confirm(`Excluir "${l.titulo}"?`)) return;
     const { error } = await supabase.from("fin_lembretes").delete().eq("id", l.id);
-    if (error) toast.error(error.message); else { toast.success("Removido"); await load(); }
+    if (error) mostrarErro(error); else { toast.success("Removido"); await load(); }
   };
 
   const prioColor = (p: string) => p === "alta" ? "destructive" : p === "baixa" ? "secondary" : "default";

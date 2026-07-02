@@ -13,6 +13,7 @@ import { TableCell } from "@tiptap/extension-table-cell";
 import { Image } from "@tiptap/extension-image";
 import { NodeSelection } from "@tiptap/pm/state";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
@@ -487,7 +488,7 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
     const { error } = await supabase.storage.from("cb-informativos").upload(path, file, {
       cacheControl: "3600", upsert: false,
     });
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     const { data } = supabase.storage.from("cb-informativos").getPublicUrl(path);
     editor.chain().focus().setImage({ src: data.publicUrl }).run();
   };

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Activity, LogOut, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 
 export const Route = createFileRoute("/paciente/financeiro")({
   component: PortalFinanceiroPage,
@@ -48,7 +49,7 @@ function PortalFinanceiroPage() {
         .select("id")
         .ilike("email", email);
       if (error) {
-        toast.error(error.message);
+        mostrarErro(error);
         setLoading(false);
         return;
       }

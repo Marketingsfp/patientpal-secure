@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Briefcase, Plus, Pencil, Search } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 
 export const Route = createFileRoute("/_authenticated/app/cargos")({
   component: CargosPage,
@@ -45,7 +46,7 @@ function CargosPage() {
       .select("id,nome,descricao,cbo,salario_base,ativo")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("nome");
-    if (error) toast.error(error.message);
+    if (error) mostrarErro(error);
     else setRows((data ?? []) as Cargo[]);
     setLoading(false);
   }
@@ -84,7 +85,7 @@ function CargosPage() {
       ? await supabase.from("cargos").update(payload).eq("id", editing.id)
       : await supabase.from("cargos").insert(payload);
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success(editing ? "Cargo atualizado" : "Cargo criado");
     setOpen(false);
     void load();

@@ -13,6 +13,7 @@ import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ShieldCheck, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { formatDateTime } from "@/lib/date-utils";
 
 export const Route = createFileRoute("/_authenticated/app/lgpd")({
@@ -59,7 +60,7 @@ function LgpdPage() {
       .select("id,tipo,descricao,status,resposta,respondido_em,created_at")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("created_at", { ascending: false });
-    if (error) toast.error(error.message);
+    if (error) mostrarErro(error);
     else setRows((data ?? []) as Solicitacao[]);
     setLoading(false);
   }
@@ -77,7 +78,7 @@ function LgpdPage() {
       descricao: form.descricao.trim(),
     });
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Solicitação registrada");
     setOpen(false);
     setForm({ tipo: "acesso", descricao: "" });
@@ -93,7 +94,7 @@ function LgpdPage() {
       respondido_em: new Date().toISOString(),
       respondido_por: user?.id,
     }).eq("id", respondendo.id);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Solicitação atualizada");
     setRespondendo(null);
     void load();

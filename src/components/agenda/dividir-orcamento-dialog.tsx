@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -428,7 +429,7 @@ export function DividirOrcamentoDialog({
           .from("agendamentos")
           .insert(insertPayloads.map((x) => x.payload) as never)
           .select("id");
-        if (error) { toast.error(error.message); return; }
+        if (error) { mostrarErro(error); return; }
         (inseridos ?? []).forEach((r: { id: string }, i: number) => {
           agendamentoIds.push({ id: r.id, itens: insertPayloads[i].itens });
         });
@@ -438,7 +439,7 @@ export function DividirOrcamentoDialog({
           .from("agendamentos")
           .update(u.payload as never)
           .eq("id", u.id);
-        if (error) { toast.error(error.message); return; }
+        if (error) { mostrarErro(error); return; }
         agendamentoIds.push({ id: u.id, itens: u.itens });
       }
 
@@ -461,7 +462,7 @@ export function DividirOrcamentoDialog({
         const { error: vErr } = await supabase
           .from("agendamento_orcamento_itens")
           .insert(vinculos as never);
-        if (vErr) toast.error(`Agendamentos criados, mas vínculo com itens falhou: ${vErr.message}`);
+        if (vErr) mostrarErro(vErr, "agendamentos criados, mas vínculo com itens falhou");
       }
       toast.success(`${grupos.length} agendamentos criados (pacote do orçamento #${String(orcamento.numero).padStart(5, "0")}).`);
       onOpenChange(false);

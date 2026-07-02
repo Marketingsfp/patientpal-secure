@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { Plus, Tag, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Button } from "@/components/ui/button";
@@ -48,7 +49,7 @@ function Page() {
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("ativo", true)
       .order("tipo").order("nome");
-    if (error) toast.error(error.message); else setItems((data ?? []) as Categoria[]);
+    if (error) mostrarErro(error); else setItems((data ?? []) as Categoria[]);
     setLoading(false);
   };
   useEffect(() => { void load(); }, [clinicaAtual?.clinica_id]);
@@ -65,7 +66,7 @@ function Page() {
       ? await supabase.from("fin_categorias").update(payload).eq("id", editing.id)
       : await supabase.from("fin_categorias").insert(payload);
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success(editing ? "Atualizada" : "Criada");
     setOpen(false); await load();
   };
@@ -73,7 +74,7 @@ function Page() {
   const remove = async (c: Categoria) => {
     if (!confirm(`Excluir "${c.nome}"?`)) return;
     const { error } = await supabase.from("fin_categorias").update({ ativo: false }).eq("id", c.id);
-    if (error) toast.error(error.message); else { toast.success("Removida"); await load(); }
+    if (error) mostrarErro(error); else { toast.success("Removida"); await load(); }
   };
 
   return (

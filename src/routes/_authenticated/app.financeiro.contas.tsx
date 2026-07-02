@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { Plus, Wallet, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Button } from "@/components/ui/button";
@@ -42,7 +43,7 @@ function Page() {
     const { data, error } = await supabase
       .from("fin_contas").select("id, nome, tipo, banco, agencia, conta, saldo_inicial, ativo")
       .eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome");
-    if (error) toast.error(error.message); else setItems((data ?? []) as Conta[]);
+    if (error) mostrarErro(error); else setItems((data ?? []) as Conta[]);
     setLoading(false);
   };
   useEffect(() => { void load(); }, [clinicaAtual?.clinica_id]);
@@ -66,14 +67,14 @@ function Page() {
       ? await supabase.from("fin_contas").update(payload).eq("id", editing.id)
       : await supabase.from("fin_contas").insert(payload);
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Salvo"); setOpen(false); await load();
   };
 
   const remove = async (c: Conta) => {
     if (!confirm(`Excluir "${c.nome}"?`)) return;
     const { error } = await supabase.from("fin_contas").update({ ativo: false }).eq("id", c.id);
-    if (error) toast.error(error.message); else { toast.success("Removida"); await load(); }
+    if (error) mostrarErro(error); else { toast.success("Removida"); await load(); }
   };
 
   return (

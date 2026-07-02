@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { FileText, Plus, Printer, Trash2, Search, AlertTriangle, Calendar, Columns2, CheckCircle2, CircleDashed, Download } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
@@ -94,7 +95,7 @@ function OrcamentosPage() {
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("created_at", { ascending: false })
       .limit(200);
-    if (error) toast.error(error.message);
+    if (error) mostrarErro(error);
     const orcs = (data ?? []) as Orc[];
     const ids = orcs.map((o) => o.id);
     if (ids.length > 0) {
@@ -203,7 +204,7 @@ function OrcamentosPage() {
   const remover = async (id: string) => {
     if (!confirm("Excluir este orçamento?")) return;
     const { error } = await supabase.from("orcamentos").delete().eq("id", id);
-    if (error) return toast.error(error.message);
+    if (error) return mostrarErro(error);
     toast.success("Orçamento excluído");
     load();
   };
@@ -683,7 +684,7 @@ function NovoOrcamentoDialog({
       .select("id")
       .single();
 
-    if (error || !orc) { setSaving(false); return toast.error(error?.message ?? "Erro ao salvar"); }
+    if (error || !orc) { setSaving(false); return mostrarErro(error); }
 
     const itensPayload = itens.map((i, idx) => ({
       orcamento_id: orc.id,
@@ -697,7 +698,7 @@ function NovoOrcamentoDialog({
     }));
     const { error: e2 } = await supabase.from("orcamento_itens").insert(itensPayload);
     setSaving(false);
-    if (e2) return toast.error(e2.message);
+    if (e2) return mostrarErro(e2);
     toast.success("Orçamento criado");
     onCreated(orc.id);
   };

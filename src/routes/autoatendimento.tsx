@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ClinicaProvider, useClinica } from "@/hooks/use-clinica";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import {
   Ticket,
   BadgeCheck,
@@ -155,7 +156,7 @@ function AutoatendimentoPage() {
       .eq("cpf", limpo)
       .maybeSingle();
     if (error) {
-      toast.error(error.message);
+      mostrarErro(error);
       return null;
     }
     if (!data) {
@@ -248,7 +249,7 @@ function AutoatendimentoPage() {
       .limit(1);
     setBusy(false);
     if (error) {
-      toast.error(error.message);
+      mostrarErro(error);
       return;
     }
     if (!ags || ags.length === 0) {
@@ -444,7 +445,7 @@ function AutoatendimentoPage() {
     });
     if (errAg) {
       setBusy(false);
-      toast.error(errAg.message);
+      mostrarErro(errAg);
       return;
     }
     const { data: senhaData, error: errSenha } = await supabase.rpc("emitir_senha", {
@@ -455,7 +456,7 @@ function AutoatendimentoPage() {
     });
     setBusy(false);
     if (errSenha || !senhaData) {
-      toast.error(errSenha?.message ?? "Erro ao emitir senha");
+      mostrarErro(errSenha);
       return;
     }
     const row = Array.isArray(senhaData) ? senhaData[0] : senhaData;

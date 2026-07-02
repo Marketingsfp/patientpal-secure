@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Search, Stethoscope, ClipboardList, Clock, BookOpen, Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -142,7 +143,7 @@ function ConsultaRapidaPage() {
       ? await supabase.from("procedimentos").update(payload).eq("id", procForm.id)
       : await supabase.from("procedimentos").insert(payload);
     setSavingProc(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success(procForm.id ? "Atualizado." : "Cadastrado.");
     setProcOpen(false);
     reload();
@@ -177,7 +178,7 @@ function ConsultaRapidaPage() {
       ? await supabase.from("medicos").update(payload).eq("id", medForm.id)
       : await supabase.from("medicos").insert(payload);
     setSavingMed(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success(medForm.id ? "Atualizado." : "Cadastrado.");
     setMedOpen(false);
     reload();

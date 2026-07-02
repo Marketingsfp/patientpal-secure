@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { AlertTriangle, ShieldCheck, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 
 interface Mensalidade { id: string; numero_parcela: number; vencimento: string; valor: number; status: string; contrato_numero: number; plano_nome: string; dias_atraso: number; }
 interface Lancamento { id: string; descricao: string; vencimento: string | null; valor: number; dias_atraso: number; }
@@ -29,7 +30,7 @@ export function PendenciasAlert({ pacienteId, pacienteNome, open, onClose, onLib
     if (!open || !pacienteId) return;
     setLoading(true);
     supabase.rpc("pendencias_paciente" as any, { _paciente_id: pacienteId }).then(({ data, error }) => {
-      if (error) toast.error(error.message);
+      if (error) mostrarErro(error);
       else setData(data as Pendencias);
       setLoading(false);
     });

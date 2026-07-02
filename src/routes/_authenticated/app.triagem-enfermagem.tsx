@@ -14,6 +14,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { HeartPulse, Bell, ChevronRight, AlertTriangle, Stethoscope, Wallet } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { agendamentosStatusPagamento } from "@/lib/pagamento-status";
@@ -125,7 +126,7 @@ function TriagemEnfermagemPage() {
       .lt("inicio", amanha.toISOString())
       .order("inicio");
     setLoading(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     const lista = (data ?? []) as unknown as Ag[];
     setAgs(lista);
     const status = await agendamentosStatusPagamento(lista.map((a) => a.id));
@@ -189,7 +190,7 @@ function TriagemEnfermagemPage() {
       codigo: nomeCurto, status: "chamada", paciente_id: g.paciente_id,
       guiche: guicheStr, chamada_em: new Date().toISOString(),
     } as never);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success(`Chamando ${nomeCurto} · ${guicheStr}`);
     abrir(g);
   }
@@ -252,7 +253,7 @@ function TriagemEnfermagemPage() {
     };
     const rows = aberto.agendamentos.map((a) => ({ ...base, agendamento_id: a.id }));
     const { error } = await supabase.from("triagens_enfermagem").insert(rows as never);
-    if (error) { setSalvando(false); toast.error(error.message); return; }
+    if (error) { setSalvando(false); mostrarErro(error); return; }
 
     const ids = aberto.agendamentos.map((a) => a.id);
     if (form.prioridade !== "normal" && ids.length) {

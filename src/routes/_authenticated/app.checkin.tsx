@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { BadgeCheck, Search, ConciergeBell, X } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/checkin")({
@@ -85,7 +86,7 @@ function CheckinPage() {
     // Sempre mostrar apenas pacientes que ainda NÃO fizeram check-in.
     query = query.in("fluxo_etapa", ETAPAS_CHECKIN);
     const { data: ags, error } = await query.order("inicio", { ascending: true });
-    if (error) { setLoading(false); toast.error(error.message); return; }
+    if (error) { setLoading(false); mostrarErro(error); return; }
     const ids = (ags ?? []).map((a) => a.id);
     let pagos = new Set<string>();
     if (ids.length) {
@@ -176,7 +177,7 @@ function CheckinPage() {
       .from("agendamentos")
       .update({ fluxo_etapa: "triagem", fluxo_atualizado_em: new Date().toISOString() } as never)
       .eq("id", a.id);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success(`Presença de ${a.paciente_nome} confirmada — liberado para triagem`);
     setItems((xs) => xs.filter((x) => x.id !== a.id));
   };

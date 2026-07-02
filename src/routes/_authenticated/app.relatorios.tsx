@@ -13,6 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { exportToExcel } from "@/lib/export-csv";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import {
   Download, CalendarDays, Users, ClipboardList, FileText, DollarSign,
   Stethoscope, Clock, Brain, FlaskConical, BellRing, FileHeart, Target,
@@ -379,7 +380,7 @@ function RelatoriosPage() {
       exportToExcel(rows, `relatorio-${r.id}-${hoje}`);
       toast.success(`${rows.length} registros exportados.`);
     } catch (e: any) {
-      toast.error(e?.message ?? "Erro ao gerar relatório");
+      mostrarErro(e);
     } finally {
       setLoading(null);
     }
@@ -612,7 +613,7 @@ function DashboardView({
         });
       } catch (e: any) {
         console.error("dashboard relatorios:", e);
-        toast.error(e?.message ?? "Erro ao carregar dashboard");
+        mostrarErro(e);
       } finally {
         if (!cancel) setLoading(false);
       }
@@ -943,7 +944,7 @@ function AgendamentosDiarioView({ clinicaId, ini, fim }: { clinicaId?: string; i
         setMedMap(mMap);
         setSetorMap(sMap);
       } catch (e: any) {
-        toast.error(e?.message ?? "Erro ao carregar relatório");
+        mostrarErro(e);
       } finally {
         if (!cancel) setLoading(false);
       }

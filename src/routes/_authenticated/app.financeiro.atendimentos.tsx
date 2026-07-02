@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Plus, Pencil, Trash2, Stethoscope, Download, Filter, Wallet, CheckCircle2, Clock, Undo2, Check, ChevronsUpDown, BellRing, Send, Loader2, Banknote, CreditCard, QrCode, HelpCircle } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useMedicoContext } from "@/hooks/use-medico-context";
@@ -187,7 +188,7 @@ function Page() {
       }
       setNfseDialog({ open: false, atend: null });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Falha ao emitir");
+      mostrarErro(e);
     } finally { setNfseEmitting(false); }
   };
 
@@ -217,7 +218,7 @@ function Page() {
       })
       .eq("id", laudoTarget.id);
     setLaudoSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Laudo emitido — repasse do laudador gerado");
     setLaudoOpen(false);
     setLaudoTarget(null);
@@ -273,7 +274,7 @@ function Page() {
       resolvido_em: new Date().toISOString(),
       resposta: alvo ? "Estorno executado" : "Aprovado manualmente (processar baixa)",
     }).eq("id", s.id);
-    if (error) toast.error(error.message);
+    if (error) mostrarErro(error);
     else { toast.success("Solicitação aprovada"); void loadSolicitacoes(); }
   };
 
@@ -287,7 +288,7 @@ function Page() {
       resolvido_em: new Date().toISOString(),
       resposta: resp || null,
     }).eq("id", s.id);
-    if (error) toast.error(error.message);
+    if (error) mostrarErro(error);
     else { toast.success("Solicitação recusada"); void loadSolicitacoes(); }
   };
 
@@ -453,8 +454,8 @@ function Page() {
       // logo após o mapeamento abaixo.
     }
     const [mr, ar] = await Promise.all([qManual.order("data", { ascending: false }), qAgenda.order("data", { ascending: false })]);
-    if (mr.error) { toast.error(mr.error.message); setLoading(false); return; }
-    if (ar.error) { toast.error(ar.error.message); setLoading(false); return; }
+    if (mr.error) { mostrarErro(mr.error); setLoading(false); return; }
+    if (ar.error) { mostrarErro(ar.error); setLoading(false); return; }
     const manuais: Atend[] = (mr.data ?? []).map((r) => {
       const pago = Number(r.valor_total);
       // Recalcula repasse usando convênio cadastrado por procedimento
@@ -610,14 +611,14 @@ function Page() {
       ? await supabase.from("fin_atendimentos").update(payload).eq("id", editing.id)
       : await supabase.from("fin_atendimentos").insert(payload);
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Salvo"); setOpen(false); await load();
   };
 
   const remove = async (a: Atend) => {
     if (!confirm("Excluir atendimento?")) return;
     const { error } = await supabase.from("fin_atendimentos").delete().eq("id", a.id);
-    if (error) toast.error(error.message); else { toast.success("Removido"); await load(); }
+    if (error) mostrarErro(error); else { toast.success("Removido"); await load(); }
   };
 
   const estornar = async (a: Atend) => {
@@ -635,7 +636,7 @@ function Page() {
       .select("agendamento_id, valor, descricao")
       .eq("id", a.id)
       .maybeSingle();
-    if (eLanc) { toast.error(eLanc.message); return; }
+    if (eLanc) { mostrarErro(eLanc); return; }
     const agId = lanc?.agendamento_id;
     if (!agId) { toast.error("Agendamento de origem não encontrado."); return; }
     const { data: agAntes } = await supabase
@@ -646,14 +647,14 @@ function Page() {
       .from("caixa_movimentos")
       .delete()
       .eq("lancamento_id", a.id);
-    if (eMov) { toast.error(`Falha ao reverter caixa: ${eMov.message}`); return; }
+    if (eMov) { mostrarErro(eMov, "falha ao reverter caixa"); return; }
     // 2) Remove o lançamento de receita (libera ja_pago da fila do caixa
     //    e zera repasse/relatórios).
     const { error: eDel } = await supabase
       .from("fin_lancamentos")
       .delete()
       .eq("id", a.id);
-    if (eDel) { toast.error(`Falha ao excluir lançamento: ${eDel.message}`); return; }
+    if (eDel) { mostrarErro(eDel, "falha ao excluir lançamento"); return; }
     // 3) Reabre o fluxo do agendamento para que possa ser cobrado de novo.
     const { error: eUpd } = await supabase
       .from("agendamentos")
@@ -663,7 +664,7 @@ function Page() {
         fluxo_atualizado_em: new Date().toISOString(),
       })
       .eq("id", agId);
-    if (eUpd) { toast.error(eUpd.message); return; }
+    if (eUpd) { mostrarErro(eUpd); return; }
     try {
       await logAction({
         table_name: "agendamentos",
@@ -842,7 +843,7 @@ function Page() {
       await load();
     } catch (e) {
       const err = e as { message?: string };
-      toast.error(err.message ?? "Falha ao registrar pagamento");
+      mostrarErro(err);
     } finally {
       setPayingNow(false);
     }

@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Building2, Plus, Pencil, Search } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 
 export const Route = createFileRoute("/_authenticated/app/setores")({
   component: SetoresPage,
@@ -38,7 +39,7 @@ function SetoresPage() {
       .select("id,nome,descricao,ativo")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("nome");
-    if (error) toast.error(error.message);
+    if (error) mostrarErro(error);
     else setRows((data ?? []) as Setor[]);
     setLoading(false);
   }
@@ -61,7 +62,7 @@ function SetoresPage() {
       ? await supabase.from("setores").update(payload).eq("id", editing.id)
       : await supabase.from("setores").insert(payload);
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success(editing ? "Setor atualizado" : "Setor criado");
     setOpen(false);
     void load();

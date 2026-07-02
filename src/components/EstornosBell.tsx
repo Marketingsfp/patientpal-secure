@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Bell, Check, X, ExternalLink, Undo2 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
@@ -77,7 +78,7 @@ export function EstornosBell() {
       .from("estorno_solicitacoes")
       .update({ status: "cancelado", resolvido_em: new Date().toISOString() })
       .eq("id", id);
-    if (error) toast.error(error.message); else { toast.success("Solicitação cancelada"); void load(); }
+    if (error) mostrarErro(error); else { toast.success("Solicitação cancelada"); void load(); }
   };
 
   const rejeitar = async (id: string) => {
@@ -92,7 +93,7 @@ export function EstornosBell() {
         resposta: resp || null,
       })
       .eq("id", id);
-    if (error) toast.error(error.message); else { toast.success("Recusado"); void load(); }
+    if (error) mostrarErro(error); else { toast.success("Recusado"); void load(); }
   };
 
   return (

@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Users, Plus, Pencil, Search } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { formatDatePura } from "@/lib/date-utils";
 
 export const Route = createFileRoute("/_authenticated/app/hr-contratos")({
@@ -74,7 +75,7 @@ function ContratosPage() {
       supabase.from("cargos").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("setores").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
     ]);
-    if (c.error) toast.error(c.error.message);
+    if (c.error) mostrarErro(c.error);
     setRows((c.data ?? []) as Contrato[]);
     setCargos((cg.data ?? []) as Ref[]);
     setSetores((st.data ?? []) as Ref[]);
@@ -169,7 +170,7 @@ function ContratosPage() {
         userId = (res as any)?.userId ?? null;
       } catch (e: any) {
         setSaving(false);
-        toast.error(e?.message ?? "Erro ao criar login");
+        mostrarErro(e);
         return;
       }
     }
@@ -194,7 +195,7 @@ function ContratosPage() {
       ? await supabase.from("hr_contratos").update(payload).eq("id", editing.id)
       : await supabase.from("hr_contratos").insert(payload);
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success(editing ? "Funcionário atualizado" : "Funcionário cadastrado");
     setOpen(false);
     void load();
