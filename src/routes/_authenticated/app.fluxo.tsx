@@ -312,26 +312,28 @@ function FluxoPage() {
         </div>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-2 snap-x">
+      <div className="flex gap-3 overflow-x-auto pb-2 snap-x">
         {ETAPAS.map((col) => {
           const items = colunas.get(col.id) ?? [];
           return (
-            <div key={col.id} className="space-y-2 flex-1 min-w-[180px] snap-start">
-              <div className="flex items-center justify-between">
+            <div key={col.id} className="flex flex-col flex-1 min-w-[210px] snap-start rounded-lg border bg-muted/30 p-2">
+              <div className="flex items-center justify-between px-1 pb-2 mb-2 border-b border-border/60">
                 <Badge className={`${col.cor} border-0 text-[11px] px-1.5 py-0`}>{col.label}</Badge>
                 <span className="text-[11px] text-muted-foreground">{items.length}</span>
               </div>
-              <div className="space-y-1.5 max-h-[78vh] overflow-auto pr-1">
+              <div className="space-y-2 max-h-[78vh] overflow-auto pr-1">
                 {items.length === 0 && (
-                  <div className="text-[11px] text-muted-foreground text-center py-2 border border-dashed rounded">vazio</div>
+                  <div className="text-[11px] text-muted-foreground text-center py-4 border border-dashed rounded-md bg-background/40">vazio</div>
                 )}
                 {items.map((a) => {
                   const h = new Date(a.inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
                   const isExame = /exame|raio|usg|ultra|tomo|ressona/i.test(a.procedimento ?? "");
                   const next = proxima(a.fluxo_etapa, isExame ? "exame" : "atendimento");
                   const prev = anterior(a.fluxo_etapa);
+                  const prio = a.prioridade ?? "normal";
+                  const prioBorder = prio === "urgente" ? "border-l-rose-500" : prio === "prioritario" ? "border-l-amber-500" : "border-l-transparent";
                   return (
-                    <Card key={a.id} className="p-2 text-xs space-y-1">
+                    <Card key={a.id} className={`p-2.5 text-xs space-y-1.5 border border-border/70 border-l-2 ${prioBorder} shadow-sm hover:shadow-md hover:border-border transition-colors`}>
                       <div className="flex items-start justify-between gap-2">
                         <div className="font-medium leading-tight text-[12px] truncate">{a.paciente_nome}</div>
                         <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">{h}</span>
@@ -351,7 +353,7 @@ function FluxoPage() {
                       <div className="text-[11px] text-muted-foreground line-clamp-1">
                         {a.procedimento ?? "—"}{a.medicos?.nome ? ` · ${a.medicos.nome}` : ""}
                       </div>
-                      <div className="flex items-center gap-0.5 pt-0.5">
+                      <div className="flex items-center gap-1 -mx-2.5 px-2.5 mt-1 pt-1.5 border-t border-border/50">
                         <Button
                           size="sm"
                           variant="ghost"
