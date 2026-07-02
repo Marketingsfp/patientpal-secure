@@ -341,7 +341,9 @@ function AtendimentoEditorPage() {
     const clinicaNome = clinicaAtual?.clinica?.nome ?? "";
     const dataStr = new Date().toLocaleDateString("pt-BR");
     const horaStr = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${tipo} — ${pacienteNome}</title>
+    const esc = (v: unknown) =>
+      String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(tipo)} — ${esc(pacienteNome)}</title>
 <style>
   @page { size: A4; margin: 20mm; }
   * { box-sizing: border-box; }
@@ -360,19 +362,19 @@ function AtendimentoEditorPage() {
   .rodape { margin-top: 24px; text-align: center; font-size: 9pt; color: #666; }
 </style></head><body>
   <div class="header">
-    <h1>${clinicaNome || "Clínica"}</h1>
+    <h1>${esc(clinicaNome || "Clínica")}</h1>
     ${clinicaNome ? '<div class="sub">Documento médico</div>' : ""}
   </div>
-  <div class="titulo">${tipo}</div>
+  <div class="titulo">${esc(tipo)}</div>
   <div class="meta">
-    <div>Paciente: <b>${pacienteNome}</b></div>
+    <div>Paciente: <b>${esc(pacienteNome)}</b></div>
     <div>Data: <b>${dataStr} ${horaStr}</b></div>
   </div>
-  <div class="conteudo">${conteudo.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]!))}</div>
+  <div class="conteudo">${esc(conteudo)}</div>
   <div class="assinatura">
     <div class="linha"></div>
-    <div class="nome">${medico?.nome ?? ""}</div>
-    ${especialidadeMedico ? `<div class="esp">${especialidadeMedico}</div>` : ""}
+    <div class="nome">${esc(medico?.nome ?? "")}</div>
+    ${especialidadeMedico ? `<div class="esp">${esc(especialidadeMedico)}</div>` : ""}
   </div>
   <div class="rodape">Emitido em ${dataStr} ${horaStr}</div>
   <script>window.onload = () => { window.print(); setTimeout(() => window.close(), 500); };</script>
