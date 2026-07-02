@@ -283,12 +283,13 @@ function CheckinPage() {
               {estaPendenteCheckin(a.fluxo_etapa) ? (
                 <Button
                   onClick={() => confirmar(a)}
+                  aria-label={`Confirmar presença de ${a.paciente_nome}`}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white"
                 >
                   <BadgeCheck className="h-4 w-4 mr-2" /> Confirmar presença
                 </Button>
               ) : (
-                <Button variant="outline" disabled>
+                <Button variant="outline" disabled aria-label={`${etapaLabel(a.fluxo_etapa)} — ${a.paciente_nome}`}>
                   {etapaLabel(a.fluxo_etapa)}
                 </Button>
               )}
