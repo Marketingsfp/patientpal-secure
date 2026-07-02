@@ -156,22 +156,33 @@ function FluxoPage() {
   }, [carregar, clinicaAtual]);
 
   async function setEtapa(id: string, etapa: Etapa) {
+    const prevAgs = ags;
+    setAgs((prev) => prev.map((a) => (a.id === id ? { ...a, fluxo_etapa: etapa } : a)));
     const { error } = await supabase
       .from("agendamentos")
       .update({ fluxo_etapa: etapa, fluxo_atualizado_em: new Date().toISOString() } as never)
       .eq("id", id);
-    if (error) mostrarErro(error);
+    if (error) {
+      setAgs(prevAgs);
+      mostrarErro(error);
+    }
   }
 
   async function ciclarPrioridade(a: Ag) {
     const atual = a.prioridade ?? "normal";
     const prox = atual === "normal" ? "prioritario" : atual === "prioritario" ? "urgente" : "normal";
+    const prevAgs = ags;
+    setAgs((prev) => prev.map((x) => (x.id === a.id ? { ...x, prioridade: prox } : x)));
     const { error } = await supabase
       .from("agendamentos")
       .update({ prioridade: prox } as never)
       .eq("id", a.id);
-    if (error) mostrarErro(error);
-    else toast.success(`Prioridade: ${prox}`);
+    if (error) {
+      setAgs(prevAgs);
+      mostrarErro(error);
+    } else {
+      toast.success(`Prioridade: ${prox}`);
+    }
   }
 
   async function chamarPaciente(a: Ag) {
