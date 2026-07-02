@@ -1379,8 +1379,10 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     const html = renderTermo(termoDep, termoMovimento);
     const safe = DOMPurify.sanitize(html);
     const titulo = `Termo de ${termoMovimento} — Contrato #${contrato.numero}`;
+    const esc = (v: unknown) =>
+      String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
     const doc = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/>
-<title>${titulo}</title>
+<title>${esc(titulo)}</title>
 <style>
 @page { size: A4; margin: 18mm; }
 body { font-family: Arial, Helvetica, sans-serif; font-size: 11pt; color:#000; line-height: 1.45; }
@@ -1389,11 +1391,11 @@ h1, h2, h3 { margin: 0 0 6mm; }
 .sig { margin-top: 14mm; display:flex; justify-content: space-around; gap:10mm; text-align:center; font-size: 10pt; }
 .sig div { width:45%; }
 </style></head><body>
-<div class="head"><strong>${clinica?.nome ?? ""}</strong><br/>${[clinica?.endereco, clinica?.cidade, clinica?.estado].filter(Boolean).join(" — ")}<br/>CNPJ: ${clinica?.cnpj ?? ""}</div>
+<div class="head"><strong>${esc(clinica?.nome ?? "")}</strong><br/>${esc([clinica?.endereco, clinica?.cidade, clinica?.estado].filter(Boolean).join(" — "))}<br/>CNPJ: ${esc(clinica?.cnpj ?? "")}</div>
 <div>${safe}</div>
 <div class="sig">
-  <div>____________________________<br/>${clinica?.nome ?? ""}</div>
-  <div>____________________________<br/>${contrato.paciente_nome}</div>
+  <div>____________________________<br/>${esc(clinica?.nome ?? "")}</div>
+  <div>____________________________<br/>${esc(contrato.paciente_nome)}</div>
 </div>
 <script>window.onload=()=>{setTimeout(()=>{window.print();},300);};</script>
 </body></html>`;
