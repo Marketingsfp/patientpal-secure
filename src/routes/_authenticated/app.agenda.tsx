@@ -1755,7 +1755,7 @@ function AgendaPage() {
           data_pagamento: origem.data_pagamento ?? null,
         } as never).eq("id", alvo.id),
       ]);
-      if (e1) { toast.error(`Falha em ${origem.paciente_nome}: ${e1.message}`); return false; }
+      if (e1) { mostrarErro(e1, `mover ${origem.paciente_nome}`); return false; }
       if (e2) { mostrarErro(e2, "falha ao mover para destino"); return false; }
       // 3) Transfere lançamentos financeiros
       await supabase.from("fin_lancamentos")
