@@ -27,14 +27,14 @@ type Etapa =
   | "exame"
   | "finalizado";
 
-const ETAPAS: { id: Etapa; label: string; cor: string }[] = [
-  { id: "aguardando_recepcao", label: "Aguardando", cor: "bg-slate-500/15 text-slate-700 dark:text-slate-300" },
-  { id: "recepcao", label: "Recepção", cor: "bg-rose-500/15 text-rose-700 dark:text-rose-300" },
-  { id: "caixa", label: "Caixa", cor: "bg-amber-500/15 text-amber-700 dark:text-amber-300" },
-  { id: "triagem", label: "Triagem (enfermagem)", cor: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" },
-  { id: "atendimento", label: "Atendimento médico", cor: "bg-blue-500/15 text-blue-700 dark:text-blue-300" },
-  { id: "exame", label: "Exame", cor: "bg-violet-500/15 text-violet-700 dark:text-violet-300" },
-  { id: "finalizado", label: "Finalizado", cor: "bg-zinc-500/15 text-zinc-700 dark:text-zinc-300" },
+const ETAPAS: { id: Etapa; label: string; labelCurto: string; cor: string }[] = [
+  { id: "aguardando_recepcao", label: "Aguardando", labelCurto: "Aguard.", cor: "bg-slate-500/15 text-slate-700 dark:text-slate-300" },
+  { id: "recepcao", label: "Recepção", labelCurto: "Recep.", cor: "bg-rose-500/15 text-rose-700 dark:text-rose-300" },
+  { id: "caixa", label: "Caixa", labelCurto: "Caixa", cor: "bg-amber-500/15 text-amber-700 dark:text-amber-300" },
+  { id: "triagem", label: "Triagem (enfermagem)", labelCurto: "Triagem", cor: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" },
+  { id: "atendimento", label: "Atendimento médico", labelCurto: "Atend.", cor: "bg-blue-500/15 text-blue-700 dark:text-blue-300" },
+  { id: "exame", label: "Exame", labelCurto: "Exame", cor: "bg-violet-500/15 text-violet-700 dark:text-violet-300" },
+  { id: "finalizado", label: "Finalizado", labelCurto: "Fim", cor: "bg-zinc-500/15 text-zinc-700 dark:text-zinc-300" },
 ];
 
 const PRIORIDADES = {
@@ -312,18 +312,21 @@ function FluxoPage() {
         </div>
       </div>
 
-      <div className="grid gap-3 pb-2 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
+      <div className="grid gap-2 sm:gap-3 pb-2 grid-cols-7">
         {ETAPAS.map((col) => {
           const items = colunas.get(col.id) ?? [];
           return (
-            <div key={col.id} className="flex flex-col min-w-0 rounded-lg border bg-muted/30 p-2">
-              <div className="flex items-center justify-between px-1 pb-2 mb-2 border-b border-border/60">
-                <Badge className={`${col.cor} border-0 text-[11px] px-1.5 py-0`}>{col.label}</Badge>
-                <span className="text-[11px] text-muted-foreground">{items.length}</span>
+            <div key={col.id} className="flex flex-col min-w-0 rounded-lg border bg-muted/30 p-1.5 sm:p-2">
+              <div className="flex items-center justify-between gap-1 px-1 pb-1.5 sm:pb-2 mb-1.5 sm:mb-2 border-b border-border/60">
+                <Badge className={`${col.cor} border-0 text-[10px] sm:text-[11px] px-1 sm:px-1.5 py-0 truncate max-w-full`}>
+                  <span className="sm:hidden">{col.labelCurto}</span>
+                  <span className="hidden sm:inline">{col.label}</span>
+                </Badge>
+                <span className="text-[10px] sm:text-[11px] text-muted-foreground shrink-0">{items.length}</span>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1.5 sm:space-y-2">
                 {items.length === 0 && (
-                  <div className="text-[11px] text-muted-foreground text-center py-4 border border-dashed rounded-md bg-background/40">vazio</div>
+                  <div className="text-[10px] sm:text-[11px] text-muted-foreground text-center py-3 sm:py-4 border border-dashed rounded-md bg-background/40">vazio</div>
                 )}
                 {items.map((a) => {
                   const h = new Date(a.inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -333,31 +336,31 @@ function FluxoPage() {
                   const prio = a.prioridade ?? "normal";
                   const prioBorder = prio === "urgente" ? "border-l-rose-500" : prio === "prioritario" ? "border-l-amber-500" : "border-l-transparent";
                   return (
-                    <Card key={a.id} className={`p-2.5 text-xs space-y-1.5 border border-border/70 border-l-2 ${prioBorder} shadow-sm hover:shadow-md hover:border-border transition-colors`}>
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="font-medium leading-tight text-[12px] truncate">{a.paciente_nome}</div>
-                        <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">{h}</span>
+                    <Card key={a.id} className={`p-1.5 sm:p-2.5 text-xs space-y-1 sm:space-y-1.5 border border-border/70 border-l-2 ${prioBorder} shadow-sm hover:shadow-md hover:border-border transition-colors`}>
+                      <div className="flex items-start justify-between gap-1 sm:gap-2">
+                        <div className="font-medium leading-tight text-[11px] sm:text-[12px] truncate min-w-0">{a.paciente_nome}</div>
+                        <span className="text-[9px] sm:text-[10px] text-muted-foreground tabular-nums shrink-0">{h}</span>
                       </div>
                       {a.prioridade && a.prioridade !== "normal" && (
                         (() => {
                           const p = PRIORIDADES[a.prioridade];
                           const Ico = p.Icon;
                           return (
-                            <Badge className={`border-0 text-[10px] px-1.5 py-0 gap-1 ${p.badge}`}>
+                            <Badge className={`border-0 text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0 gap-1 ${p.badge}`}>
                               <Ico className="h-3 w-3" />
-                              {p.label}
+                              <span className="hidden sm:inline">{p.label}</span>
                             </Badge>
                           );
                         })()
                       )}
-                      <div className="text-[11px] text-muted-foreground line-clamp-1">
+                      <div className="text-[10px] sm:text-[11px] text-muted-foreground line-clamp-1">
                         {a.procedimento ?? "—"}{a.medicos?.nome ? ` · ${a.medicos.nome}` : ""}
                       </div>
-                      <div className="flex items-center gap-1 -mx-2.5 px-2.5 mt-1 pt-1.5 border-t border-border/50">
+                      <div className="flex items-center gap-0.5 sm:gap-1 -mx-1.5 sm:-mx-2.5 px-1.5 sm:px-2.5 mt-1 pt-1 sm:pt-1.5 border-t border-border/50">
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="h-6 px-1.5"
+                          className="h-6 px-1 sm:px-1.5"
                           disabled={!prev}
                           onClick={() => prev && setEtapa(a.id, prev)}
                           title="Voltar etapa"
@@ -371,7 +374,7 @@ function FluxoPage() {
                             <Button
                               size="sm"
                               variant="ghost"
-                              className="h-6 px-1.5"
+                              className="h-6 px-1 sm:px-1.5"
                               onClick={() => ciclarPrioridade(a)}
                               title={`Prioridade: ${p.label} (clique para alternar)`}
                             >
@@ -381,12 +384,12 @@ function FluxoPage() {
                         })()}
                         {col.id === "triagem" && (
                           <>
-                            <Button size="sm" className="h-6 px-1.5 text-[11px] flex-1" onClick={() => chamarPaciente(a)} title="Chamar no painel e mover para Atendimento">
-                              <Bell className="h-3 w-3 mr-1" /> Chamar
+                            <Button size="sm" className="h-6 px-1 sm:px-1.5 text-[10px] sm:text-[11px] flex-1 min-w-0" onClick={() => chamarPaciente(a)} title="Chamar no painel e mover para Atendimento">
+                              <Bell className="h-3 w-3 sm:mr-1" /> <span className="hidden sm:inline">Chamar</span>
                             </Button>
                             {isExame && (
-                              <Button size="sm" variant="outline" className="h-6 px-1.5 text-[11px] flex-1" onClick={() => setEtapa(a.id, "exame")}>
-                                <ChevronRight className="h-3 w-3 mr-1" /> Exame
+                              <Button size="sm" variant="outline" className="h-6 px-1 sm:px-1.5 text-[10px] sm:text-[11px] flex-1 min-w-0" onClick={() => setEtapa(a.id, "exame")}>
+                                <ChevronRight className="h-3 w-3 sm:mr-1" /> <span className="hidden sm:inline">Exame</span>
                               </Button>
                             )}
                           </>
@@ -394,20 +397,20 @@ function FluxoPage() {
                         {col.id !== "triagem" && (
                           <>
                             {col.id === "atendimento" && (
-                              <Button size="sm" variant="outline" className="h-6 px-1.5 text-[11px]" onClick={() => chamarPaciente(a)} title="Rechamar no painel">
+                              <Button size="sm" variant="outline" className="h-6 px-1 sm:px-1.5 text-[10px] sm:text-[11px]" onClick={() => chamarPaciente(a)} title="Rechamar no painel">
                                 <Bell className="h-3 w-3" />
                               </Button>
                             )}
                             <Button
                               size="sm"
-                              className="h-6 px-1.5 text-[11px] flex-1"
+                              className="h-6 px-1 sm:px-1.5 text-[10px] sm:text-[11px] flex-1 min-w-0"
                               disabled={!next}
                               onClick={() => next && setEtapa(a.id, next)}
                             >
                               {col.id === "atendimento" || col.id === "exame" ? (
-                                <><CheckCircle2 className="h-3 w-3 mr-1" /> Finalizar</>
+                                <><CheckCircle2 className="h-3 w-3 sm:mr-1" /> <span className="hidden sm:inline">Finalizar</span></>
                               ) : (
-                                <>Avançar <ChevronRight className="h-3 w-3 ml-1" /></>
+                                <><span className="hidden sm:inline">Avançar</span> <ChevronRight className="h-3 w-3 sm:ml-1" /></>
                               )}
                             </Button>
                           </>
