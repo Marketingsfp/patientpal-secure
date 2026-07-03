@@ -2190,8 +2190,9 @@ function AgendaPage() {
       return;
     }
     // Bloqueio por mensalidade vencida em contrato de cartão benefícios (titular ou dependente).
-    // Gestores/admin podem liberar via prompt; demais usuários ficam bloqueados.
-    if (form.paciente_id) {
+    // Só aplica quando o paciente vai usar o CONVÊNIO neste atendimento.
+    // Se escolheu Particular, o débito do cartão não bloqueia o agendamento.
+    if (form.paciente_id && form.tipo_atendimento === "convenio") {
       const { data: blk } = await supabase.rpc("paciente_cartao_inadimplente", {
         _paciente_id: form.paciente_id,
         _clinica_id: clinicaAtual.clinica_id,
@@ -2202,7 +2203,7 @@ function AgendaPage() {
           .slice(0, 5)
           .map((m) => `• ${m.convenio_nome ?? "Cartão"} — venc. ${m.vencimento?.split("-").reverse().join("/")} R$ ${Number(m.valor).toFixed(2)}`)
           .join("\n");
-        const msg = `Paciente com mensalidade(s) vencida(s) no cartão benefícios.\nTotal em aberto: R$ ${Number(info.total_aberto ?? 0).toFixed(2)}\n\n${linhas}\n\nAgendamento bloqueado até a regularização.`;
+        const msg = `Paciente com mensalidade(s) vencida(s) no cartão benefícios.\nTotal em aberto: R$ ${Number(info.total_aberto ?? 0).toFixed(2)}\n\n${linhas}\n\nAgendamento bloqueado até a regularização — ou troque o Tipo de atendimento para "Particular".`;
         toast.error(msg, { duration: 10000 });
         return;
       }
@@ -2222,6 +2223,7 @@ function AgendaPage() {
       observacoes: form.observacoes.trim() || null,
       data_pagamento: form.data_pagamento ? form.data_pagamento : null,
       orcamento_id: form.orcamento_id || null,
+      tipo_atendimento: form.tipo_atendimento,
     };
     let novoId: string | null = editing?.id ?? null;
     if (editing) {
