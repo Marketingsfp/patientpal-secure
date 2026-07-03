@@ -52,6 +52,7 @@ export const Route = createFileRoute("/_authenticated/app/agenda")({
 });
 
 type Status = "agendado" | "confirmado" | "realizado" | "cancelado" | "faltou";
+type TipoAtendimento = "convenio" | "particular";
 type Agendamento = {
   id: string;
   paciente_nome: string;
@@ -69,6 +70,7 @@ type Agendamento = {
   orcamento_id?: string | null;
   orcamento_numero?: number | null;
   pacote_id?: string | null;
+  tipo_atendimento?: TipoAtendimento | null;
 };
 type Medico = { id: string; nome: string; sexo?: string | null; usa_sistema?: boolean; especialidade_id?: string | null; procedimento_padrao_id?: string | null; procedimento_padrao_em_branco?: boolean | null; procedimento_padrao_nome?: string | null; especialidade_nome?: string | null };
 type RecursoEnf = { id: string; nome: string };
@@ -415,6 +417,7 @@ const EMPTY = {
   orcamento_id: "",
   orcamento_numero: "",
   orcamento_itens: [] as string[],
+  tipo_atendimento: "particular" as TipoAtendimento,
 };
 
 function AgendaPage() {
