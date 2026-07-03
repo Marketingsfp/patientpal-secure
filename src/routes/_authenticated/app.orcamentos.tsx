@@ -656,8 +656,27 @@ function NovoOrcamentoDialog({
   const salvar = async () => {
     if (!categoria) return toast.error("Selecione o tipo do orçamento");
     if (!pacienteNome.trim()) return toast.error("Informe o nome do paciente");
+    if (/[<>]/.test(pacienteNome) || /[<>]/.test(pacienteTelefone)) {
+      return toast.error("Nome e telefone não podem conter os caracteres < ou >");
+    }
     if (itens.length === 0) return toast.error("Adicione ao menos um serviço");
     if (formasPagamento.length === 0) return toast.error("Selecione ao menos uma forma de pagamento");
+    for (let i = 0; i < itens.length; i++) {
+      const it = itens[i];
+      if (!it.descricao || !it.descricao.trim()) {
+        return toast.error(`Item ${i + 1}: informe a descrição do serviço`);
+      }
+      const qtd = Number(it.quantidade);
+      if (!Number.isFinite(qtd) || qtd < 1 || qtd > 999) {
+        return toast.error(`Item ${i + 1} (${it.descricao}): quantidade deve estar entre 1 e 999`);
+      }
+      const vu = Number(it.valor_unitario);
+      if (!Number.isFinite(vu) || vu <= 0) {
+        return toast.error(`Item ${i + 1} (${it.descricao}): valor unitário deve ser maior que zero`);
+      }
+    }
+    if (Number(desconto) < 0) return toast.error("Desconto não pode ser negativo");
+    if (Number(desconto) > subtotal) return toast.error("Desconto não pode ser maior que o subtotal");
     const valoresPag: Record<string, number> | null =
       formasPagamento.length > 1 ? { ...totaisPorForma } : null;
     setSaving(true);
