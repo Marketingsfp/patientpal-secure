@@ -282,8 +282,8 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         </div>
       </div>
 
-      <div className="border rounded-md overflow-x-auto">
-        <Table>
+      <div className="border rounded-md overflow-x-auto max-w-full">
+        <Table className="min-w-[1200px]">
           <TableHeader>
             <TableRow>
               <TableHead className="min-w-[200px]">Especialidade</TableHead>
