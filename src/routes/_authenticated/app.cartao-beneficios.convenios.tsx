@@ -25,6 +25,31 @@ import {
 import { RichEditor } from "@/components/cartao-beneficios/rich-editor";
 import { INFORMATIVO_CARTAO_CONSULTA_SEGUROS_HTML } from "@/components/cartao-beneficios/informativo-seed";
 import { RegrasConvenioTab } from "@/components/cartao-beneficios/regras-tab";
+import { z } from "zod";
+import DOMPurify from "dompurify";
+
+const NOME_MAX = 120;
+const DESCRICAO_MAX = 1000;
+const BENEFICIOS_MAX = 2000;
+
+const stripHtml = (v: string) =>
+  DOMPurify.sanitize(v, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
+
+const convenioSchema = z
+  .object({
+    nome: z.string().trim().min(2, "Nome deve ter ao menos 2 caracteres").max(NOME_MAX, `Nome pode ter no máximo ${NOME_MAX} caracteres`),
+    descricao: z.string().trim().max(DESCRICAO_MAX, `Descrição pode ter no máximo ${DESCRICAO_MAX} caracteres`).optional(),
+    beneficios: z.string().trim().max(BENEFICIOS_MAX, `Benefícios pode ter no máximo ${BENEFICIOS_MAX} caracteres`).optional(),
+    taxa_adesao: z.number().min(0, "Taxa não pode ser negativa").max(100000, "Taxa acima do permitido"),
+    num_parcelas: z.number().int().min(1, "Nº de parcelas deve ser ≥ 1").max(60, "Máximo de 60 parcelas"),
+    max_dependentes: z.number().int().min(0).max(50, "Máximo de 50 dependentes"),
+    fidelidade_meses: z.number().int().min(0).max(120),
+    vigencia_meses: z.number().int().min(1, "Vigência deve ser ≥ 1 mês").max(120),
+  })
+  .refine((d) => d.fidelidade_meses <= d.vigencia_meses, {
+    message: "Fidelidade não pode ser maior que a vigência",
+    path: ["fidelidade_meses"],
+  });
 
 const CONTRATO_VARIAVEIS: { label: string; token: string }[] = [
   { label: "Nome da clínica", token: "CLINICA_NOME" },
