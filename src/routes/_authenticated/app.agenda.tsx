@@ -3115,6 +3115,35 @@ function AgendaPage() {
                   />
                 )}
               </div>
+              {contratoPacienteInfo && (
+                <div className="space-y-1">
+                  <Label>Tipo de atendimento</Label>
+                  <Select
+                    value={form.tipo_atendimento}
+                    onValueChange={(v) => setForm((f) => ({ ...f, tipo_atendimento: v as TipoAtendimento }))}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="convenio">
+                        Convênio — {contratoPacienteInfo.convenioNome}
+                      </SelectItem>
+                      <SelectItem value="particular">Particular (paga valor cheio)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {contratoPacienteInfo.qtdAtrasadas > 0 && form.tipo_atendimento === "particular" && (
+                    <p className="text-xs rounded-md border border-amber-300 bg-amber-50 text-amber-900 px-2 py-1.5">
+                      Paciente tem <b>R$ {contratoPacienteInfo.totalAberto.toFixed(2)}</b> em aberto no cartão
+                      ({contratoPacienteInfo.qtdAtrasadas} parcela(s) vencida(s)). Este atendimento será cobrado como Particular.
+                    </p>
+                  )}
+                  {contratoPacienteInfo.qtdAtrasadas > 0 && form.tipo_atendimento === "convenio" && (
+                    <p className="text-xs rounded-md border border-destructive/40 bg-destructive/5 text-destructive px-2 py-1.5">
+                      Convênio bloqueado: paciente tem <b>R$ {contratoPacienteInfo.totalAberto.toFixed(2)}</b> em atraso.
+                      Para agendar, mude para <b>Particular</b> ou regularize o débito.
+                    </p>
+                  )}
+                </div>
+              )}
               <div className="space-y-1">
                 <Label>Médico ou Exame</Label>
                 <SearchableSelect
