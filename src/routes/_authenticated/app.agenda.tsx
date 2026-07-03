@@ -2050,6 +2050,7 @@ function AgendaPage() {
       orcamento_id: "",
       orcamento_numero: "",
       orcamento_itens: [],
+      tipo_atendimento: (a.tipo_atendimento as TipoAtendimento | null) ?? "particular",
     });
     if (pacienteCopia) setPacienteCopia(null);
     setOpen(true);
@@ -2110,6 +2111,7 @@ function AgendaPage() {
       orcamento_id: a.orcamento_id ?? "",
       orcamento_numero: a.orcamento_numero ? String(a.orcamento_numero) : "",
       orcamento_itens: itensOrc,
+      tipo_atendimento: (a.tipo_atendimento as TipoAtendimento | null) ?? "particular",
     });
     setOpen(true);
   };
