@@ -1,43 +1,23 @@
+# Salvar mapeamento do "caminho do dinheiro"
 
-## Objetivo
-Executar 50 testes automatizados na aba **Orçamentos** (`/app/orcamentos`), criando novos orçamentos via UI, sendo:
-- **25 orçamentos de Laboratório** (procedimentos com `tipo = 'exame'` / categoria laboratório)
-- **25 orçamentos de demais serviços** (consultas, procedimentos, odontologia, enfermagem, etc.)
+Gerar o arquivo `/mnt/documents/caminho-do-dinheiro.md` com o mapeamento ponta a ponta já apresentado no chat, para consulta e download.
 
-## Como será feito
+## Conteúdo do documento
 
-1. **Exploração inicial (leitura apenas)**
-   - Ler `src/routes/_authenticated/app.orcamentos.tsx` e componentes filhos usados pelo modal "Novo Orçamento" para mapear campos, validações e fluxo de submit.
-   - Consultar no banco: pacientes disponíveis, médicos, procedimentos separados por tipo (laboratório vs. demais), formas de pagamento suportadas.
+1. **Origem do valor** — orçamento, agendamento, convênio/cartão benefícios, mensalidade, boleto (tabelas + arquivos).
+2. **Recebimento no caixa** — `caixa_sessoes` / `caixa_movimentos` / `fin_lancamentos`, formas de pagamento, definição de "pago" (`pagamento-status.ts`).
+3. **Registro contábil** — colunas-chave de `fin_lancamentos`, categorias, contas, RPC `fin_resumo_periodo`, `fin_atendimentos`.
+4. **Repasse ao médico** — cascata Cartão Consulta → `medico_convenios` → padrão do médico; splits em `pagamento_splits` via `procedimento_split_regras`.
+5. **Saída** — pagamento de repasse (`confirmarPagamento`), aba Repasse no caixa, estorno (`estorno_solicitacoes`), lacuna RH.
+6. **NFS-e** — emissão manual, roteamento de CNPJ, Focus NFe.
+7. **Diagrama textual** do fluxo.
+8. **Tabela de pontos de decisão.**
+9. **Lacunas encontradas** (`regras_rateio`, `hr_holerites`, flag `emitir_nfse`, prestadores externos).
 
-2. **Preparo do ambiente de teste**
-   - Selecionar uma clínica ativa e um conjunto variado de pacientes reais já cadastrados (sem criar novos).
-   - Montar 50 combinações variando: paciente, profissional, quantidade de itens (1 a 5), quantidade × valor unitário, desconto (0%, %, valor fixo), forma de pagamento (única e mista), validade e observações.
+## Entrega
 
-3. **Execução via Playwright (headless)**
-   - Script em `/tmp/browser/orcamentos/` que restaura sessão Supabase, navega para `/app/orcamentos`, abre "Novo Orçamento" e preenche/submete cada cenário.
-   - Cenários incluem tanto **caminhos felizes** quanto **erros forçados**:
-     - Salvar sem paciente
-     - Salvar sem itens
-     - Quantidade 0 / negativa
-     - Valor unitário com vírgula, ponto e caracteres inválidos
-     - Desconto maior que subtotal
-     - Divisão de formas de pagamento com soma diferente do total
-     - Observações muito longas / com `<script>` (XSS)
-     - Data de validade no passado
-   - Capturar screenshot em cada falha e coletar toast/erros exibidos.
+- Arquivo: `/mnt/documents/caminho-do-dinheiro.md`
+- Nenhuma alteração em código do projeto.
+- Preview via `<presentation-artifact>` para download.
 
-4. **Verificação no banco**
-   - Para cada orçamento supostamente salvo, confirmar `orcamentos` + `orcamento_itens` correspondentes, numeração sequencial, `valor_total` correto e `clinica_id` certo.
-   - Marcar todos os 50 registros de teste com prefixo em `observacoes` (ex.: `[TESTE-QA]`) para fácil identificação/limpeza depois.
-
-5. **Relatório final** (entregue no chat, sem alterar código)
-   - Total: sucesso × falha por categoria (Laboratório / Demais).
-   - Lista dos bugs encontrados: passos para reproduzir, mensagem exibida, comportamento esperado × observado, severidade e sugestão de correção.
-   - Observações de UX (lentidão, campos confusos, validações ausentes, mensagens em "linguagem de código" que escaparam do `traduzirErro`).
-
-## O que NÃO será feito nesta etapa
-- Nenhuma alteração de código, migração ou correção. Este plano é **somente teste + relatório**. As correções vêm em um segundo plano depois que você aprovar quais bugs priorizar (igual ao fluxo que fizemos na aba Clientes e no Fluxo do Paciente).
-
-## Saída esperada
-Um relatório em português no chat listando: cenários executados, erros encontrados (com screenshots referenciados quando útil), e recomendações priorizadas de correção.
+Sem impacto em build, banco ou runtime.
