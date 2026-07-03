@@ -335,7 +335,7 @@ async function obterInfoConvenioPaciente(params: {
   const procNorm = (procedimentoNome ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
   const { data: procs } = await supabase
     .from("procedimentos")
-    .select("id,nome")
+    .select("id,nome,tipo")
     .eq("clinica_id", clinicaId)
     .eq("ativo", true)
     .limit(5000);
@@ -345,6 +345,7 @@ async function obterInfoConvenioPaciente(params: {
     (p: any) => (p.nome ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().includes(procNorm),
   );
   const procedimentoId = (procRow as any)?.id ?? null;
+  const procedimentoTipo = ((procRow as any)?.tipo ?? "").toString().toLowerCase() || null;
 
   let especialidadeId: string | null = null;
   if (medicoId) {
