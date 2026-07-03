@@ -342,6 +342,7 @@ export type Database = {
           procedimento: string | null
           status: Database["public"]["Enums"]["agendamento_status"]
           teleconsulta: boolean
+          tipo_atendimento: string
           token_publico: string | null
           updated_at: string
         }
@@ -370,6 +371,7 @@ export type Database = {
           procedimento?: string | null
           status?: Database["public"]["Enums"]["agendamento_status"]
           teleconsulta?: boolean
+          tipo_atendimento?: string
           token_publico?: string | null
           updated_at?: string
         }
@@ -398,6 +400,7 @@ export type Database = {
           procedimento?: string | null
           status?: Database["public"]["Enums"]["agendamento_status"]
           teleconsulta?: boolean
+          tipo_atendimento?: string
           token_publico?: string | null
           updated_at?: string
         }

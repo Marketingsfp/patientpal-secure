@@ -1,36 +1,45 @@
-## 25 simulações — aba Cartão Benefícios → Convênios
 
-### Objetivo
-Rodar 25 criações reais de convênios via UI em `/app/cartao-beneficios/convenios`, exercitando todos os campos do formulário e todas as abas (Dados, Faixas, Benefícios, Regras, Modelos), e entregar um relatório de bugs + melhorias.
+## O que muda
 
-### Como
+Hoje, quando o paciente tem cartão benefícios com mensalidade vencida, o agendamento é bloqueado sem alternativa. Vamos permitir que, na hora de agendar, o operador escolha se aquele atendimento vai usar o **Convênio (cartão benefícios)** ou vai ser **Particular**. Se for Particular, o bloqueio de inadimplência não se aplica — o paciente paga o valor cheio, como qualquer outro.
 
-1. **Setup Playwright headless** contra `http://localhost:8080`, restaurando sessão Supabase (LOVABLE_BROWSER_*). Navegar para a página de convênios e clicar "+ Novo".
+## Fluxo novo
 
-2. **25 cenários variados** cobrindo:
-   - Dados básicos: nome curto/longo/com acentos/com HTML (`<script>`), descrição vazia/longa, ativo on/off.
-   - Financeiro: taxa de adesão 0 / negativa / muito alta, num_parcelas 1/12/24, fidelidade e vigência 0/6/12/60 meses.
-   - Faixas de preço: 1 faixa aberta (1+), múltiplas faixas contíguas, faixas com sobreposição, faixa com `até < de` (deve rejeitar), valor 0 e valor R$ 9999.
-   - Dependentes: `max_dependentes` 0, 3, 10.
-   - Benefícios: pelo menos 1 caso por escopo (serviço único, especialidade, consultas), tipo_desconto percentual/valor/gratuidade, valor 0 / >100% / negativo, campos obrigatórios em branco, seleção de múltiplos procedimentos no escopo "consulta".
-   - Modelos: modelo_contrato vazio / com tokens válidos / com token inválido, informativo_html com tags perigosas, termo_inclusao_html vazio.
-   - Regras (aba Regras, se existir): cadastrar 1-2 regras por convênio quando cabível.
-   - Salvar → reeditar → alterar 1 campo → salvar de novo (persistência), depois excluir alguns para testar delete.
+1. No modal de "Novo/Editar agendamento", assim que o paciente for selecionado, o sistema verifica se ele tem contrato ativo de cartão benefícios (titular ou dependente).
+2. Se **tem contrato**, aparece um seletor **"Tipo de atendimento"** logo abaixo do paciente:
+   - **Convênio — {nome do convênio}** (padrão quando o contrato está em dia)
+   - **Particular** (padrão quando o contrato está com mensalidade vencida, para não travar o operador)
+3. Se **não tem contrato**, o campo não aparece — segue Particular implícito, como hoje.
+4. Regra de bloqueio no `save()`:
+   - Só chama `paciente_cartao_inadimplente` quando o tipo escolhido = **Convênio**.
+   - Particular ignora inadimplência e agenda normalmente.
+5. A escolha é persistida no agendamento (nova coluna `tipo_atendimento` em `agendamentos`: `convenio` | `particular`) e propagada ao fluxo de pagamento:
+   - Ao clicar em **Pagar/Imprimir** ou **Pagar/Imprimir/Nota**, o diálogo já abre com "Particular" ou "Convênio" pré-selecionado conforme o agendamento — o operador ainda pode trocar lá dentro se precisar (mantém a flexibilidade que você já tem).
+   - Se trocar para Convênio no momento do pagamento e houver inadimplência, mostramos o mesmo alerta atual antes de confirmar.
+6. Mesma lógica aplicada ao **check-in** (`app.checkin.tsx`): só bloqueia se o agendamento estiver marcado como Convênio.
 
-3. **Sinais coletados por caso**
-   - Toast (sucesso/erro/mensagem exata), tempo submit→toast, erros de console, respostas HTTP com status ≥400, screenshot antes/depois.
-   - Após salvar: SELECT em `cb_convenios`, `cb_convenio_faixas`, `cb_beneficios` (e `cb_convenio_regras` se usadas) confirmando persistência do que foi digitado.
-   - Tag: adicionar sufixo `SIM-CV-<ts>` no nome do convênio criado para localizar/limpar depois. Sem cleanup automático (mesma regra do teste anterior: "deixar no banco").
+## Sugestões extras (aviso, não bloqueio)
 
-4. **Relatório em `/mnt/documents/relatorio-cb-convenios-25sim.md`** com:
-   - Resumo executivo (OK/FAIL/EXCEPTION, tempos médios).
-   - Tabela caso-a-caso (id, entrada, resultado, tempo, evidências).
-   - Bugs classificados 🔴/🟠/🟡 com trecho de código/arquivo suspeito.
-   - Sugestões de UX/validação (Zod, contadores, sanitização, mensagens).
-   - Screenshots em `/mnt/documents/cb-cv-sim/`.
+- Quando o operador escolher **Particular** existindo débito no cartão, mostrar um aviso não-bloqueante (banner amarelo dentro do modal): *"Paciente tem R$ X em aberto no cartão. Este atendimento será cobrado como Particular."* — ajuda a recepção a lembrar de comentar com o paciente sem travar o agendamento.
+- Registrar no histórico/observação automática do agendamento a escolha feita (ex.: `TIPO: PARTICULAR (paciente possui cartão convênio)`) para rastreabilidade em auditoria.
 
-### Fora de escopo
-- Sem correções nesta rodada: só teste + relatório. Após aprovado, discutimos correções em plano separado (igual ao ciclo anterior).
-- Sem editar `cb_beneficios`/`cb_convenio_regras` de convênios pré-existentes; só nos criados.
+## Detalhes técnicos
 
-Se aprovado, executo direto e volto com o relatório.
+- **Migração**: adicionar `tipo_atendimento text not null default 'particular' check (tipo_atendimento in ('convenio','particular'))` em `public.agendamentos`. Backfill: linhas existentes ficam `particular` (comportamento atual do bloqueio equivale a "sempre convênio se tem contrato" — mas para o histórico já pago não muda nada, pois o pagamento já registrou a forma).
+- `src/routes/_authenticated/app.agenda.tsx`:
+  - Estender `form` com `tipo_atendimento`.
+  - Ao selecionar paciente, chamar `obterInfoConvenioPaciente` (já existe) para saber se há contrato; guardar em estado `contratoInfo`.
+  - Renderizar `<Select>` "Tipo de atendimento" só quando `contratoInfo` existe.
+  - No `save()`, envolver o bloco de bloqueio (linhas ~2187-2204) em `if (form.tipo_atendimento === 'convenio')`.
+  - Incluir `tipo_atendimento: form.tipo_atendimento` no `payload`.
+  - Passar essa escolha ao abrir o diálogo de pagamento (já existe `irParaPagamento`) como valor inicial de `forma_pagamento` / `convenio_id`.
+- `src/routes/_authenticated/app.checkin.tsx`: só chamar o alerta de mensalidade vencida quando `agendamento.tipo_atendimento === 'convenio'`.
+- Sem mudança em `PendenciasAlert.tsx` (continua usado no fluxo do paciente / atendimento onde o débito é geral, não específico do cartão).
+
+## O que **não** muda
+
+- Override do gestor por senha continua existindo para o caso Convênio + inadimplente.
+- Nenhuma outra tela do cartão benefícios é alterada.
+- Nenhum comportamento financeiro de contratos existentes é tocado.
+
+Confirma que posso seguir assim? Se preferir, também dá para deixar a escolha só no momento do **pagamento** (sem seletor no agendamento), mas aí o bloqueio no agendar continua — por isso a recomendação é colocar o toggle já no agendamento.

@@ -52,6 +52,7 @@ export const Route = createFileRoute("/_authenticated/app/agenda")({
 });
 
 type Status = "agendado" | "confirmado" | "realizado" | "cancelado" | "faltou";
+type TipoAtendimento = "convenio" | "particular";
 type Agendamento = {
   id: string;
   paciente_nome: string;
@@ -69,6 +70,7 @@ type Agendamento = {
   orcamento_id?: string | null;
   orcamento_numero?: number | null;
   pacote_id?: string | null;
+  tipo_atendimento?: TipoAtendimento | null;
 };
 type Medico = { id: string; nome: string; sexo?: string | null; usa_sistema?: boolean; especialidade_id?: string | null; procedimento_padrao_id?: string | null; procedimento_padrao_em_branco?: boolean | null; procedimento_padrao_nome?: string | null; especialidade_nome?: string | null };
 type RecursoEnf = { id: string; nome: string };
@@ -415,6 +417,7 @@ const EMPTY = {
   orcamento_id: "",
   orcamento_numero: "",
   orcamento_itens: [] as string[],
+  tipo_atendimento: "particular" as TipoAtendimento,
 };
 
 function AgendaPage() {
@@ -489,6 +492,73 @@ function AgendaPage() {
   // IDs dos itens do orçamento que serão consumidos pelo agendamento atual
   // (fluxo de 1 grupo). Gravados em `agendamento_orcamento_itens` após o save.
   const [pendingOrcItemIds, setPendingOrcItemIds] = useState<string[]>([]);
+  // Informações do contrato ativo de cartão benefícios do paciente selecionado no modal.
+  // Usado para mostrar o seletor "Tipo de atendimento" (Convênio × Particular) e alertar sobre mensalidade em atraso.
+  const [contratoPacienteInfo, setContratoPacienteInfo] = useState<
+    { convenioNome: string; totalAberto: number; qtdAtrasadas: number } | null
+  >(null);
+  const contratoPacienteReqId = useRef(0);
+  useEffect(() => {
+    if (!open || !clinicaAtual || !form.paciente_id) {
+      setContratoPacienteInfo(null);
+      return;
+    }
+    const reqId = ++contratoPacienteReqId.current;
+    const pacId = form.paciente_id;
+    const clinicaId = clinicaAtual.clinica_id;
+    (async () => {
+      // 1) Contrato ativo (titular ou dependente)
+      const { data: titular } = await supabase
+        .from("contratos_assinatura")
+        .select("id, cb_convenios(nome)")
+        .eq("clinica_id", clinicaId)
+        .eq("status", "ativo")
+        .eq("paciente_id", pacId)
+        .limit(1);
+      let contrato: { id: string; convenioNome: string } | null = null;
+      const t0 = (titular ?? [])[0] as any;
+      if (t0) contrato = { id: t0.id, convenioNome: t0.cb_convenios?.nome ?? "Convênio" };
+      if (!contrato) {
+        const { data: deps } = await supabase
+          .from("contrato_dependentes")
+          .select("contratos_assinatura!inner(id,clinica_id,status,cb_convenios(nome))")
+          .eq("paciente_id", pacId)
+          .eq("ativo", true)
+          .limit(5);
+        const cand = ((deps ?? []) as any[])
+          .map((d) => d.contratos_assinatura)
+          .find((c: any) => c && c.clinica_id === clinicaId && c.status === "ativo");
+        if (cand) contrato = { id: cand.id, convenioNome: cand.cb_convenios?.nome ?? "Convênio" };
+      }
+      if (reqId !== contratoPacienteReqId.current) return;
+      if (!contrato) { setContratoPacienteInfo(null); return; }
+      // 2) Mensalidades vencidas
+      const hojeStr = new Date().toISOString().slice(0, 10);
+      const { data: mens } = await supabase
+        .from("contrato_mensalidades")
+        .select("valor,vencimento,status")
+        .eq("contrato_id", contrato.id)
+        .in("status", ["pendente", "aberto", "atrasado"])
+        .lte("vencimento", hojeStr);
+      if (reqId !== contratoPacienteReqId.current) return;
+      const lista = (mens ?? []) as Array<{ valor: number | string; vencimento: string }>;
+      const totalAberto = lista.reduce((s, m) => s + (Number(m.valor) || 0), 0);
+      setContratoPacienteInfo({
+        convenioNome: contrato.convenioNome,
+        totalAberto,
+        qtdAtrasadas: lista.length,
+      });
+      // Se é um agendamento novo (sem editing) e o paciente tem contrato em dia,
+      // já sugere "Convênio"; se está com atraso, mantém "Particular" (padrão) para não travar o operador.
+      if (!editing) {
+        setForm((f) => ({
+          ...f,
+          tipo_atendimento: lista.length === 0 ? "convenio" : "particular",
+        }));
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, form.paciente_id, clinicaAtual?.clinica_id]);
   // Abre o diálogo "Novo agendamento" pré-preenchido a partir de querystring
   // (usado pelo botão "Agendar" da conversa do WhatsApp).
   const novoFromUrlConsumido = useRef(false);
@@ -779,7 +849,7 @@ function AgendaPage() {
     setLoading(true);
     let q = supabase
       .from("agendamentos")
-      .select("id,paciente_nome,paciente_id,medico_id,enfermagem_recurso_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as never)
+      .select("id,paciente_nome,paciente_id,medico_id,enfermagem_recurso_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as never)
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("inicio", { ascending: false });
     // "agendado" agora significa "qualquer ficha com paciente alocado",
@@ -2047,6 +2117,7 @@ function AgendaPage() {
       orcamento_id: "",
       orcamento_numero: "",
       orcamento_itens: [],
+      tipo_atendimento: (a.tipo_atendimento as TipoAtendimento | null) ?? "particular",
     });
     if (pacienteCopia) setPacienteCopia(null);
     setOpen(true);
@@ -2107,6 +2178,7 @@ function AgendaPage() {
       orcamento_id: a.orcamento_id ?? "",
       orcamento_numero: a.orcamento_numero ? String(a.orcamento_numero) : "",
       orcamento_itens: itensOrc,
+      tipo_atendimento: (a.tipo_atendimento as TipoAtendimento | null) ?? "particular",
     });
     setOpen(true);
   };
@@ -2185,8 +2257,9 @@ function AgendaPage() {
       return;
     }
     // Bloqueio por mensalidade vencida em contrato de cartão benefícios (titular ou dependente).
-    // Gestores/admin podem liberar via prompt; demais usuários ficam bloqueados.
-    if (form.paciente_id) {
+    // Só aplica quando o paciente vai usar o CONVÊNIO neste atendimento.
+    // Se escolheu Particular, o débito do cartão não bloqueia o agendamento.
+    if (form.paciente_id && form.tipo_atendimento === "convenio") {
       const { data: blk } = await supabase.rpc("paciente_cartao_inadimplente", {
         _paciente_id: form.paciente_id,
         _clinica_id: clinicaAtual.clinica_id,
@@ -2197,7 +2270,7 @@ function AgendaPage() {
           .slice(0, 5)
           .map((m) => `• ${m.convenio_nome ?? "Cartão"} — venc. ${m.vencimento?.split("-").reverse().join("/")} R$ ${Number(m.valor).toFixed(2)}`)
           .join("\n");
-        const msg = `Paciente com mensalidade(s) vencida(s) no cartão benefícios.\nTotal em aberto: R$ ${Number(info.total_aberto ?? 0).toFixed(2)}\n\n${linhas}\n\nAgendamento bloqueado até a regularização.`;
+        const msg = `Paciente com mensalidade(s) vencida(s) no cartão benefícios.\nTotal em aberto: R$ ${Number(info.total_aberto ?? 0).toFixed(2)}\n\n${linhas}\n\nAgendamento bloqueado até a regularização — ou troque o Tipo de atendimento para "Particular".`;
         toast.error(msg, { duration: 10000 });
         return;
       }
@@ -2217,6 +2290,7 @@ function AgendaPage() {
       observacoes: form.observacoes.trim() || null,
       data_pagamento: form.data_pagamento ? form.data_pagamento : null,
       orcamento_id: form.orcamento_id || null,
+      tipo_atendimento: form.tipo_atendimento,
     };
     let novoId: string | null = editing?.id ?? null;
     if (editing) {
@@ -3041,6 +3115,35 @@ function AgendaPage() {
                   />
                 )}
               </div>
+              {contratoPacienteInfo && (
+                <div className="space-y-1">
+                  <Label>Tipo de atendimento</Label>
+                  <Select
+                    value={form.tipo_atendimento}
+                    onValueChange={(v) => setForm((f) => ({ ...f, tipo_atendimento: v as TipoAtendimento }))}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="convenio">
+                        Convênio — {contratoPacienteInfo.convenioNome}
+                      </SelectItem>
+                      <SelectItem value="particular">Particular (paga valor cheio)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {contratoPacienteInfo.qtdAtrasadas > 0 && form.tipo_atendimento === "particular" && (
+                    <p className="text-xs rounded-md border border-amber-300 bg-amber-50 text-amber-900 px-2 py-1.5">
+                      Paciente tem <b>R$ {contratoPacienteInfo.totalAberto.toFixed(2)}</b> em aberto no cartão
+                      ({contratoPacienteInfo.qtdAtrasadas} parcela(s) vencida(s)). Este atendimento será cobrado como Particular.
+                    </p>
+                  )}
+                  {contratoPacienteInfo.qtdAtrasadas > 0 && form.tipo_atendimento === "convenio" && (
+                    <p className="text-xs rounded-md border border-destructive/40 bg-destructive/5 text-destructive px-2 py-1.5">
+                      Convênio bloqueado: paciente tem <b>R$ {contratoPacienteInfo.totalAberto.toFixed(2)}</b> em atraso.
+                      Para agendar, mude para <b>Particular</b> ou regularize o débito.
+                    </p>
+                  )}
+                </div>
+              )}
               <div className="space-y-1">
                 <Label>Médico ou Exame</Label>
                 <SearchableSelect

@@ -26,6 +26,7 @@ type Item = {
   medicos?: { nome: string } | null;
   paciente?: { cpf: string | null; telefone: string | null; foto_url: string | null } | null;
   pago?: boolean;
+  tipo_atendimento?: string | null;
 };
 
 const ETAPAS_CHECKIN = ["aguardando_recepcao", "recepcao"] as const;
@@ -77,7 +78,7 @@ function CheckinPage() {
     const fim = new Date(`${data}T23:59:59`).toISOString();
     let query = supabase
       .from("agendamentos")
-      .select("id,paciente_nome,paciente_id,inicio,procedimento,fluxo_etapa,medicos(nome)")
+      .select("id,paciente_nome,paciente_id,inicio,procedimento,fluxo_etapa,tipo_atendimento,medicos(nome)")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .gte("inicio", inicio)
       .lte("inicio", fim)
@@ -154,8 +155,9 @@ function CheckinPage() {
   const limparBusca = () => { setBusca(""); setBuscaAplicada(""); setBuscaAmpla(false); };
 
   const confirmar = async (a: Item) => {
-    // Bloqueia check-in se houver mensalidade vencida no cartão benefícios
-    if (a.paciente_id && clinicaAtual) {
+    // Bloqueia check-in se houver mensalidade vencida no cartão benefícios —
+    // só quando o agendamento vai usar o Convênio (Particular ignora o débito).
+    if (a.paciente_id && clinicaAtual && a.tipo_atendimento === "convenio") {
       const { data: blk } = await supabase.rpc("paciente_cartao_inadimplente", {
         _paciente_id: a.paciente_id,
         _clinica_id: clinicaAtual.clinica_id,
