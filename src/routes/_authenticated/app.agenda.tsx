@@ -548,9 +548,10 @@ function AgendaPage() {
         totalAberto,
         qtdAtrasadas: lista.length,
       });
-      // Se é um agendamento novo (sem editing) e o paciente tem contrato em dia,
-      // já sugere "Convênio"; se está com atraso, mantém "Particular" (padrão) para não travar o operador.
-      if (!editing) {
+      // Se o paciente tem contrato em dia, sugere "Convênio" como padrão;
+      // se está em atraso, cai para "Particular". Preserva a escolha explícita
+      // gravada em um agendamento já existente (não sobrescreve edição).
+      if (!editing || !editing.tipo_atendimento) {
         setForm((f) => ({
           ...f,
           tipo_atendimento: lista.length === 0 ? "convenio" : "particular",
