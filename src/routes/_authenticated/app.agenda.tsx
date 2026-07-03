@@ -946,7 +946,7 @@ function AgendaPage() {
         .filter((x): x is string => !!x),
     ));
     if (pacIds.length) {
-      const [{ data: nasc }, { data: contratos }] = await Promise.all([
+      const [{ data: nasc }, { data: contratos }, { data: deps }] = await Promise.all([
         supabase
           .from("pacientes")
           .select("id,data_nascimento")
@@ -957,6 +957,13 @@ function AgendaPage() {
           .eq("clinica_id", clinicaAtual.clinica_id)
           .eq("status", "ativo")
           .in("paciente_id", pacIds),
+        supabase
+          .from("contrato_dependentes")
+          .select("paciente_id,ativo,contratos_assinatura!inner(clinica_id,status,cb_convenios(nome))")
+          .in("paciente_id", pacIds)
+          .eq("ativo", true)
+          .eq("contratos_assinatura.clinica_id", clinicaAtual.clinica_id)
+          .eq("contratos_assinatura.status", "ativo"),
       ]);
       const map = new Map<string, string | null>();
       (nasc ?? []).forEach((p: any) => map.set(p.id, p.data_nascimento ?? null));
@@ -966,6 +973,12 @@ function AgendaPage() {
         .forEach((c) => {
           if (c.paciente_id && !cmap.has(c.paciente_id)) {
             cmap.set(c.paciente_id, c.cb_convenios?.nome ?? "Convênio");
+          }
+        });
+      ((deps ?? []) as Array<{ paciente_id: string | null; contratos_assinatura: { cb_convenios: { nome: string } | null } | null }>)
+        .forEach((d) => {
+          if (d.paciente_id && !cmap.has(d.paciente_id)) {
+            cmap.set(d.paciente_id, d.contratos_assinatura?.cb_convenios?.nome ?? "Convênio");
           }
         });
       setConvenioMap(cmap);
