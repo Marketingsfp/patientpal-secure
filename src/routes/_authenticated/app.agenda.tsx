@@ -492,6 +492,73 @@ function AgendaPage() {
   // IDs dos itens do orçamento que serão consumidos pelo agendamento atual
   // (fluxo de 1 grupo). Gravados em `agendamento_orcamento_itens` após o save.
   const [pendingOrcItemIds, setPendingOrcItemIds] = useState<string[]>([]);
+  // Informações do contrato ativo de cartão benefícios do paciente selecionado no modal.
+  // Usado para mostrar o seletor "Tipo de atendimento" (Convênio × Particular) e alertar sobre mensalidade em atraso.
+  const [contratoPacienteInfo, setContratoPacienteInfo] = useState<
+    { convenioNome: string; totalAberto: number; qtdAtrasadas: number } | null
+  >(null);
+  const contratoPacienteReqId = useRef(0);
+  useEffect(() => {
+    if (!open || !clinicaAtual || !form.paciente_id) {
+      setContratoPacienteInfo(null);
+      return;
+    }
+    const reqId = ++contratoPacienteReqId.current;
+    const pacId = form.paciente_id;
+    const clinicaId = clinicaAtual.clinica_id;
+    (async () => {
+      // 1) Contrato ativo (titular ou dependente)
+      const { data: titular } = await supabase
+        .from("contratos_assinatura")
+        .select("id, cb_convenios(nome)")
+        .eq("clinica_id", clinicaId)
+        .eq("status", "ativo")
+        .eq("paciente_id", pacId)
+        .limit(1);
+      let contrato: { id: string; convenioNome: string } | null = null;
+      const t0 = (titular ?? [])[0] as any;
+      if (t0) contrato = { id: t0.id, convenioNome: t0.cb_convenios?.nome ?? "Convênio" };
+      if (!contrato) {
+        const { data: deps } = await supabase
+          .from("contrato_dependentes")
+          .select("contratos_assinatura!inner(id,clinica_id,status,cb_convenios(nome))")
+          .eq("paciente_id", pacId)
+          .eq("ativo", true)
+          .limit(5);
+        const cand = ((deps ?? []) as any[])
+          .map((d) => d.contratos_assinatura)
+          .find((c: any) => c && c.clinica_id === clinicaId && c.status === "ativo");
+        if (cand) contrato = { id: cand.id, convenioNome: cand.cb_convenios?.nome ?? "Convênio" };
+      }
+      if (reqId !== contratoPacienteReqId.current) return;
+      if (!contrato) { setContratoPacienteInfo(null); return; }
+      // 2) Mensalidades vencidas
+      const hojeStr = new Date().toISOString().slice(0, 10);
+      const { data: mens } = await supabase
+        .from("contrato_mensalidades")
+        .select("valor,vencimento,status")
+        .eq("contrato_id", contrato.id)
+        .in("status", ["pendente", "aberto", "atrasado"])
+        .lte("vencimento", hojeStr);
+      if (reqId !== contratoPacienteReqId.current) return;
+      const lista = (mens ?? []) as Array<{ valor: number | string; vencimento: string }>;
+      const totalAberto = lista.reduce((s, m) => s + (Number(m.valor) || 0), 0);
+      setContratoPacienteInfo({
+        convenioNome: contrato.convenioNome,
+        totalAberto,
+        qtdAtrasadas: lista.length,
+      });
+      // Se é um agendamento novo (sem editing) e o paciente tem contrato em dia,
+      // já sugere "Convênio"; se está com atraso, mantém "Particular" (padrão) para não travar o operador.
+      if (!editing) {
+        setForm((f) => ({
+          ...f,
+          tipo_atendimento: lista.length === 0 ? "convenio" : "particular",
+        }));
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, form.paciente_id, clinicaAtual?.clinica_id]);
   // Abre o diálogo "Novo agendamento" pré-preenchido a partir de querystring
   // (usado pelo botão "Agendar" da conversa do WhatsApp).
   const novoFromUrlConsumido = useRef(false);
