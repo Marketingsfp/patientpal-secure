@@ -331,20 +331,48 @@ function ConveniosPage() {
 
   const save = async () => {
     if (!clinicaAtual) return;
-    if (!nome.trim()) { toast.error("Informe o nome."); return; }
+    // 1) Sanitiza campos texto (remove HTML/scripts) antes de validar
+    const nomeClean = stripHtml(nome.trim());
+    const descClean = stripHtml(descricao.trim());
+    const benefClean = stripHtml(beneficiosTxt.trim());
+    // 2) Validação com Zod
+    const parsed = convenioSchema.safeParse({
+      nome: nomeClean,
+      descricao: descClean || undefined,
+      beneficios: benefClean || undefined,
+      taxa_adesao: taxaAdesao,
+      num_parcelas: numParcelas,
+      max_dependentes: maxDependentes,
+      fidelidade_meses: fidelidadeMeses,
+      vigencia_meses: vigenciaMeses,
+    });
+    if (!parsed.success) {
+      const first = parsed.error.issues[0];
+      toast.error(first?.message ?? "Dados inválidos.");
+      return;
+    }
+    // 3) Faixas: exigir pelo menos 1, valor > 0 e sem vidas_de duplicado
     if (!faixas.length) { toast.error("Adicione pelo menos uma faixa de preço."); return; }
+    const vistas = new Set<number>();
     for (const f of faixas) {
       if (!f.vidas_de || f.vidas_de < 1) { toast.error("Campo 'De' inválido em uma faixa."); return; }
       if (f.vidas_ate !== null && f.vidas_ate < f.vidas_de) {
         toast.error("Campo 'Até' deve ser maior ou igual a 'De'."); return;
       }
+      if (!(Number(f.valor_mensal) > 0)) {
+        toast.error(`Valor mensal da faixa de ${f.vidas_de} pessoa(s) deve ser maior que zero.`); return;
+      }
+      if (vistas.has(f.vidas_de)) {
+        toast.error(`Faixa duplicada para ${f.vidas_de} pessoa(s). Remova a repetição.`); return;
+      }
+      vistas.add(f.vidas_de);
     }
     setSaving(true);
     const valorMin = faixas.reduce((m, f) => Math.min(m, Number(f.valor_mensal) || 0), Number(faixas[0].valor_mensal) || 0);
     const payload = {
       clinica_id: clinicaAtual.clinica_id,
-      nome: nome.trim(),
-      descricao: descricao.trim() || null,
+      nome: nomeClean,
+      descricao: descClean || null,
       ativo,
       valor_mensal: valorMin,
       taxa_adesao: taxaAdesao,
@@ -352,7 +380,7 @@ function ConveniosPage() {
       max_dependentes: maxDependentes,
       fidelidade_meses: fidelidadeMeses,
       vigencia_meses: vigenciaMeses,
-      beneficios: beneficiosTxt.trim() || null,
+      beneficios: benefClean || null,
       modelo_contrato: modeloContrato.trim() || null,
       informativo_html: informativoHtml.trim() || null,
       termo_inclusao_html: termoInclusaoHtml.trim() || null,
