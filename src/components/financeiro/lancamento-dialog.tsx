@@ -612,6 +612,15 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-3 overflow-y-auto pr-1 -mr-1 flex-1 min-h-0">
+          {bloqueioCartao?.bloqueado && (
+            <div className="rounded-md border border-destructive/40 bg-destructive/5 text-destructive px-3 py-2 text-sm">
+              <strong>Cartão benefícios em atraso.</strong> Paciente tem{" "}
+              <strong>R$ {bloqueioCartao.totalAberto.toFixed(2)}</strong> em aberto
+              ({bloqueioCartao.qtdAtrasadas} parcela(s) vencida(s)). Este atendimento
+              só pode ser pago como <strong>Particular</strong> — não use a categoria
+              "{bloqueioCartao.convenioNome ?? "Convênio"}" nem a forma "Convênio".
+            </div>
+          )}
           <div className="space-y-1.5">
             <Label>Descrição *</Label>
             <Input value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Ex: Consulta João Silva" />
