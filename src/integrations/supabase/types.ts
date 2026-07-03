@@ -1716,8 +1716,14 @@ export type Database = {
           descricao: string | null
           escopo: string
           especialidade_id: string | null
+          excedente_modo: string | null
+          excedente_percentual: number | null
+          excedente_valor: number | null
           id: string
           inicio_a_partir: number
+          limite_escopo: string | null
+          limite_periodo: string | null
+          limite_qtd: number | null
           limite_uso: string
           nome: string
           periodicidade: string
@@ -1738,8 +1744,14 @@ export type Database = {
           descricao?: string | null
           escopo?: string
           especialidade_id?: string | null
+          excedente_modo?: string | null
+          excedente_percentual?: number | null
+          excedente_valor?: number | null
           id?: string
           inicio_a_partir?: number
+          limite_escopo?: string | null
+          limite_periodo?: string | null
+          limite_qtd?: number | null
           limite_uso?: string
           nome: string
           periodicidade?: string
@@ -1760,8 +1772,14 @@ export type Database = {
           descricao?: string | null
           escopo?: string
           especialidade_id?: string | null
+          excedente_modo?: string | null
+          excedente_percentual?: number | null
+          excedente_valor?: number | null
           id?: string
           inicio_a_partir?: number
+          limite_escopo?: string | null
+          limite_periodo?: string | null
+          limite_qtd?: number | null
           limite_uso?: string
           nome?: string
           periodicidade?: string
