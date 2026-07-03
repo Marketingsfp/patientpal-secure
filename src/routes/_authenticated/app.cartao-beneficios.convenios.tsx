@@ -25,6 +25,31 @@ import {
 import { RichEditor } from "@/components/cartao-beneficios/rich-editor";
 import { INFORMATIVO_CARTAO_CONSULTA_SEGUROS_HTML } from "@/components/cartao-beneficios/informativo-seed";
 import { RegrasConvenioTab } from "@/components/cartao-beneficios/regras-tab";
+import { z } from "zod";
+import DOMPurify from "dompurify";
+
+const NOME_MAX = 120;
+const DESCRICAO_MAX = 1000;
+const BENEFICIOS_MAX = 2000;
+
+const stripHtml = (v: string) =>
+  DOMPurify.sanitize(v, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
+
+const convenioSchema = z
+  .object({
+    nome: z.string().trim().min(2, "Nome deve ter ao menos 2 caracteres").max(NOME_MAX, `Nome pode ter no máximo ${NOME_MAX} caracteres`),
+    descricao: z.string().trim().max(DESCRICAO_MAX, `Descrição pode ter no máximo ${DESCRICAO_MAX} caracteres`).optional(),
+    beneficios: z.string().trim().max(BENEFICIOS_MAX, `Benefícios pode ter no máximo ${BENEFICIOS_MAX} caracteres`).optional(),
+    taxa_adesao: z.number().min(0, "Taxa não pode ser negativa").max(100000, "Taxa acima do permitido"),
+    num_parcelas: z.number().int().min(1, "Nº de parcelas deve ser ≥ 1").max(60, "Máximo de 60 parcelas"),
+    max_dependentes: z.number().int().min(0).max(50, "Máximo de 50 dependentes"),
+    fidelidade_meses: z.number().int().min(0).max(120),
+    vigencia_meses: z.number().int().min(1, "Vigência deve ser ≥ 1 mês").max(120),
+  })
+  .refine((d) => d.fidelidade_meses <= d.vigencia_meses, {
+    message: "Fidelidade não pode ser maior que a vigência",
+    path: ["fidelidade_meses"],
+  });
 
 const CONTRATO_VARIAVEIS: { label: string; token: string }[] = [
   { label: "Nome da clínica", token: "CLINICA_NOME" },
@@ -306,20 +331,48 @@ function ConveniosPage() {
 
   const save = async () => {
     if (!clinicaAtual) return;
-    if (!nome.trim()) { toast.error("Informe o nome."); return; }
+    // 1) Sanitiza campos texto (remove HTML/scripts) antes de validar
+    const nomeClean = stripHtml(nome.trim());
+    const descClean = stripHtml(descricao.trim());
+    const benefClean = stripHtml(beneficiosTxt.trim());
+    // 2) Validação com Zod
+    const parsed = convenioSchema.safeParse({
+      nome: nomeClean,
+      descricao: descClean || undefined,
+      beneficios: benefClean || undefined,
+      taxa_adesao: taxaAdesao,
+      num_parcelas: numParcelas,
+      max_dependentes: maxDependentes,
+      fidelidade_meses: fidelidadeMeses,
+      vigencia_meses: vigenciaMeses,
+    });
+    if (!parsed.success) {
+      const first = parsed.error.issues[0];
+      toast.error(first?.message ?? "Dados inválidos.");
+      return;
+    }
+    // 3) Faixas: exigir pelo menos 1, valor > 0 e sem vidas_de duplicado
     if (!faixas.length) { toast.error("Adicione pelo menos uma faixa de preço."); return; }
+    const vistas = new Set<number>();
     for (const f of faixas) {
       if (!f.vidas_de || f.vidas_de < 1) { toast.error("Campo 'De' inválido em uma faixa."); return; }
       if (f.vidas_ate !== null && f.vidas_ate < f.vidas_de) {
         toast.error("Campo 'Até' deve ser maior ou igual a 'De'."); return;
       }
+      if (!(Number(f.valor_mensal) > 0)) {
+        toast.error(`Valor mensal da faixa de ${f.vidas_de} pessoa(s) deve ser maior que zero.`); return;
+      }
+      if (vistas.has(f.vidas_de)) {
+        toast.error(`Faixa duplicada para ${f.vidas_de} pessoa(s). Remova a repetição.`); return;
+      }
+      vistas.add(f.vidas_de);
     }
     setSaving(true);
     const valorMin = faixas.reduce((m, f) => Math.min(m, Number(f.valor_mensal) || 0), Number(faixas[0].valor_mensal) || 0);
     const payload = {
       clinica_id: clinicaAtual.clinica_id,
-      nome: nome.trim(),
-      descricao: descricao.trim() || null,
+      nome: nomeClean,
+      descricao: descClean || null,
       ativo,
       valor_mensal: valorMin,
       taxa_adesao: taxaAdesao,
@@ -327,7 +380,7 @@ function ConveniosPage() {
       max_dependentes: maxDependentes,
       fidelidade_meses: fidelidadeMeses,
       vigencia_meses: vigenciaMeses,
-      beneficios: beneficiosTxt.trim() || null,
+      beneficios: benefClean || null,
       modelo_contrato: modeloContrato.trim() || null,
       informativo_html: informativoHtml.trim() || null,
       termo_inclusao_html: termoInclusaoHtml.trim() || null,
@@ -484,7 +537,15 @@ function ConveniosPage() {
             <TabsContent value="info" className="space-y-3 mt-3">
               <div>
                 <Label>Nome *</Label>
-                <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Convênio Família" />
+                <Input
+                  value={nome}
+                  maxLength={NOME_MAX}
+                  onChange={(e) => setNome(e.target.value)}
+                  placeholder="Ex: Convênio Família"
+                />
+                <p className={`text-xs mt-1 text-right ${nome.trim().length > NOME_MAX ? "text-red-600" : "text-muted-foreground"}`}>
+                  {nome.trim().length} / {NOME_MAX}
+                </p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
@@ -519,12 +580,28 @@ function ConveniosPage() {
               </div>
               <div>
                 <Label>Benefícios</Label>
-                <Textarea value={beneficiosTxt} onChange={(e) => setBeneficiosTxt(e.target.value)} rows={4}
-                  placeholder="Liste os benefícios deste convênio" />
+                <Textarea
+                  value={beneficiosTxt}
+                  maxLength={BENEFICIOS_MAX}
+                  onChange={(e) => setBeneficiosTxt(e.target.value)}
+                  rows={4}
+                  placeholder="Liste os benefícios deste convênio"
+                />
+                <p className={`text-xs mt-1 text-right ${beneficiosTxt.trim().length > BENEFICIOS_MAX ? "text-red-600" : "text-muted-foreground"}`}>
+                  {beneficiosTxt.trim().length} / {BENEFICIOS_MAX}
+                </p>
               </div>
               <div>
                 <Label>Descrição</Label>
-                <Textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} rows={3} />
+                <Textarea
+                  value={descricao}
+                  maxLength={DESCRICAO_MAX}
+                  onChange={(e) => setDescricao(e.target.value)}
+                  rows={3}
+                />
+                <p className={`text-xs mt-1 text-right ${descricao.trim().length > DESCRICAO_MAX ? "text-red-600" : "text-muted-foreground"}`}>
+                  {descricao.trim().length} / {DESCRICAO_MAX}
+                </p>
               </div>
               <div className="flex items-center gap-2">
                 <Switch checked={ativo} onCheckedChange={setAtivo} />
@@ -739,7 +816,19 @@ function ConveniosPage() {
           </Tabs>
             <div className="flex justify-end gap-2 border-t pt-4">
               <Button variant="outline" onClick={() => setView("list")}>Cancelar</Button>
-              <Button onClick={save} disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
+              <Button
+                onClick={save}
+                disabled={saving || !nome.trim() || faixas.length === 0}
+                title={
+                  !nome.trim()
+                    ? "Informe o nome do convênio"
+                    : faixas.length === 0
+                      ? "Adicione pelo menos uma faixa de preço"
+                      : undefined
+                }
+              >
+                {saving ? "Salvando…" : "Salvar"}
+              </Button>
             </div>
           </CardContent>
         </Card>
