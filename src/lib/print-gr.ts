@@ -54,25 +54,13 @@ const FORMA_LABEL: Record<string, string> = {
   transferencia: "TRANSFERÊNCIA",
 };
 
-// Número de vias da GR conforme a forma de pagamento:
-// - dinheiro / boleto / convênio / transferência → 1 via
-// - cartão crédito / débito / pix → 2 vias (1ª médico, 2ª financeiro)
-// - misto → 2 vias se houver qualquer parcela em cartão/pix; senão 1
-function numViasGR(pag?: {
+// Número de vias da GR: sempre 2 (1ª médico, 2ª financeiro),
+// independente da forma de pagamento.
+function numViasGR(_pag?: {
   forma_pagamento: string | null;
   detalhe?: Array<{ forma: string }>;
 } | null): number {
-  if (!pag) return 1;
-  const eletronico = (f: string | null | undefined) =>
-    f === "cartao_credito" || f === "cartao_debito" || f === "pix";
-  if (eletronico(pag.forma_pagamento)) return 2;
-  if (
-    pag.forma_pagamento === "misto" &&
-    (pag.detalhe ?? []).some((d) => eletronico(d.forma))
-  ) {
-    return 2;
-  }
-  return 1;
+  return 2;
 }
 
 const VIA_LABELS = ["1ª VIA — MÉDICO", "2ª VIA — FINANCEIRO"];
@@ -128,7 +116,10 @@ function imprimirViaIframe(html: string): void {
   doc.write(html);
   doc.close();
   const cleanup = () => { try { document.body.removeChild(iframe); } catch { /* noop */ } };
+  let jaDisparou = false;
   const dispararPrint = () => {
+    if (jaDisparou) return;
+    jaDisparou = true;
     try {
       cw.focus();
       cw.print();
@@ -138,7 +129,7 @@ function imprimirViaIframe(html: string): void {
   };
   iframe.onload = () => setTimeout(dispararPrint, 80);
   // Fallback se onload não disparar (alguns navegadores com document.write).
-  setTimeout(() => { if (iframe.isConnected) dispararPrint(); }, 600);
+  setTimeout(() => { if (!jaDisparou && iframe.isConnected) dispararPrint(); }, 600);
 }
 
 export async function printGuiaAtendimento(input: PrintGRInput) {
