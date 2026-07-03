@@ -548,15 +548,14 @@ function AgendaPage() {
         totalAberto,
         qtdAtrasadas: lista.length,
       });
-      // Se o paciente tem contrato em dia, sugere "Convênio" como padrão;
-      // se está em atraso, cai para "Particular". Preserva a escolha explícita
-      // gravada em um agendamento já existente (não sobrescreve edição).
-      if (!editing || !editing.tipo_atendimento) {
-        setForm((f) => ({
-          ...f,
-          tipo_atendimento: lista.length === 0 ? "convenio" : "particular",
-        }));
-      }
+      // Regra: se o paciente tem cartão convênio e está EM DIA → "Convênio".
+      // Se está EM ATRASO → "Particular". Aplica também na edição de
+      // agendamentos antigos que ficaram gravados incorretamente como
+      // "particular" mesmo com o cartão em dia.
+      setForm((f) => ({
+        ...f,
+        tipo_atendimento: lista.length === 0 ? "convenio" : "particular",
+      }));
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, form.paciente_id, clinicaAtual?.clinica_id]);
