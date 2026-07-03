@@ -310,7 +310,14 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
                 <TableCell>{BRL(c.valor_mensal)}</TableCell>
                 <TableCell>{c.forma_pagamento ?? "—"}</TableCell>
                 <TableCell>
-                  <Badge variant={c.status === "ativo" ? "default" : "secondary"}>{c.status}</Badge>
+                  <Badge
+                    variant={c.status === "ativo" ? "default" : "secondary"}
+                    className={
+                      c.status === "cancelado" ? "bg-red-600 text-black hover:bg-red-600" : undefined
+                    }
+                  >
+                    {c.status}
+                  </Badge>
                 </TableCell>
                 <TableCell>
                   {c.assinado_em ? (
