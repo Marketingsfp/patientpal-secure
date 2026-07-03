@@ -1,52 +1,56 @@
-## Objetivo
-Executar 50 simulações automatizadas de criação de contrato na aba **Cartão Benefícios → Vendas**, variando todos os campos do formulário, e entregar um **relatório consolidado de erros e sugestões de melhoria**.
+## Correção dos achados do relatório
 
-## Como vou executar
+Antes de corrigir, **preciso ajustar o relatório**: reinvestiguei o BUG-1 (dependentes = 0 no banco). O `authenticated` tem GRANT e a policy `cd_insert` está correta. O que aconteceu foi um **bug do meu script Playwright**: o autocomplete de dependentes usa `div.absolute.z-50 button` (não `role="option"`), e o script procurava `role=option`, então nunca clicava em nenhum dependente. **Nenhum dep foi realmente selecionado na UI** — logo não há bug de persistência a corrigir no app. Vou manter só as correções que são bugs reais.
 
-1. **Reconhecimento da tela** (Playwright headless em `http://localhost:8080`)
-   - Restaurar sessão Supabase injetada e navegar para `/app/cartao-beneficios/contratos`.
-   - Abrir o diálogo **+ Vendas** e mapear todos os campos: titular, convênio, plano/faixa, valor mensal, vencimento, dependentes, forma de pagamento, data de início, observações, etc.
-   - Ler os componentes envolvidos (`contratos-page.tsx`, formulário de venda, `cb_convenio_faixas`, `contratos_assinatura`) para saber quais valores são válidos.
+### Escopo das correções (frontend + validação)
 
-2. **Amostragem de dados reais** (via `supabase--read_query`, somente leitura)
-   - Pacientes existentes (para titulares e dependentes)
-   - Convênios ativos + faixas (`cb_convenios`, `cb_convenio_faixas`)
-   - Regras/procedimentos para validar coerência
+Arquivo principal: `src/components/pages/contratos-page.tsx` (formulário "Novo contrato").
 
-3. **Matriz de 50 casos variados** cobrindo:
-   - Convênios/faixas diferentes (todas as disponíveis, rotacionando)
-   - Valor mensal: valor da faixa, acima, abaixo, R$ 0, campo vazio
-   - Vencimento: dias 1, 5, 10, 15, 20, 28, 31, inválido
-   - Dependentes: 0, 1, 3, 10, com/sem parentesco, mesmo paciente duplicado
-   - Data de início: hoje, passado, futuro distante, inválida
-   - Forma de pagamento: cada opção do select
-   - Campos obrigatórios em branco (para checar validação)
-   - Textos longos / caracteres especiais em observações
-   - Titular já com contrato ativo (duplicidade)
-   - Submissão dupla (double-click)
+1. **BUG-2 — Titular duplicado detectado antecipadamente**
+   - Ao selecionar titular, consultar `contratos_assinatura` (status ativo, clinica atual). Se existir, mostrar badge vermelho inline com número do contrato e **desabilitar Salvar**. Mantém a checagem no submit por segurança.
 
-4. **Coleta de sinais por caso**
-   - Screenshot antes/depois do submit
-   - Toast/mensagem de erro capturada
-   - Console errors + falhas de rede (status ≥ 400)
-   - Estado final no banco (`contratos_assinatura`, `contrato_mensalidades`, `contrato_dependentes`)
-   - Tempo de resposta
+2. **BUG-4 — Bloqueio quando titular sem e-mail**
+   - Já existe badge "Sem e-mail". Adicionar: **desabilitar botão Salvar** enquanto `titular.email` estiver vazio ou for inválido (regex simples `.+@.+\..+`). Tooltip explica o motivo.
 
-5. **Limpeza**
-   - Marcar contratos gerados com prefixo/observação `SIM-QA-<timestamp>` para permitir remoção depois (não vou apagar sem confirmação).
+3. **BUG-5 / BUG-6 — Observações validadas com Zod**
+   - Aplicar `z.string().trim().max(1000, "Máximo 1000 caracteres")` no submit.
+   - Sanitizar tags HTML rudimentares: remover `<script>`, `<iframe>` e event handlers `on*=` antes de gravar (regex simples, não precisa DOMPurify).
+   - Contador visível abaixo do textarea: `NNN / 1000`.
 
-6. **Entrega**
-   - `/mnt/documents/relatorio-cb-vendas-50sim.md` com:
-     - Sumário executivo (X sucessos, Y erros, Z avisos)
-     - Tabela: caso, entrada, resultado esperado, resultado observado, evidência
-     - **Bugs encontrados** (com repro mínima)
-     - **Melhorias de UX/validação** priorizadas (alta/média/baixa)
-     - Screenshots-chave anexados em `/mnt/documents/cb-sim/`
+4. **BUG-7 — Aviso para data de início extrema**
+   - Se `dataInicio < hoje - 7d` ou `> hoje + 6m`: mostrar aviso amarelo abaixo do campo, sem bloquear (permite retroativo intencional).
 
-## Confirmações que preciso antes de rodar
+5. **BUG-3 — Salvar trava quando geração de carnê/boleto demora**
+   - Envolver `gerarCarnePDF` e `gerarBoletosFn` em `Promise.race([..., timeout(15000)])`.
+   - Se estourar 15s: toast informativo ("Carnê será gerado em segundo plano") e liberar UI (`setSaving(false)` já está antes, mas navegar para lista via `onCreated()`).
+   - Também: adicionar spinner explícito no botão Salvar (`{saving && <Loader2 className="animate-spin" />}` — hoje só troca texto).
 
-1. **Escrita no banco de produção**: os 50 contratos serão **realmente inseridos** via UI (é o único jeito de testar o fluxo ponta a ponta). Marco todos com tag `SIM-QA` nas observações. Posso executar ou prefere que eu use um **dry-run** só validando formulário (sem submit final)?
-2. **Limpeza pós-teste**: depois do relatório, quer que eu **remova** os 50 contratos criados (e mensalidades/dependentes vinculados) ou deixo para você decidir?
-3. **Escopo do formulário**: testo só a aba **+ Vendas** (novo contrato) ou incluo também edição, cancelamento, adição de dependente e emissão de mensalidade?
+6. **Robustez — não engolir erro do insert de dependentes/mensalidades**
+   - `contrato_dependentes` insert e `contrato_mensalidades` insert atualmente ignoram `error`. Passar por `mostrarErro()` se falhar. Se dep insert falhar, mostrar aviso "Contrato criado, mas X dependentes não foram salvos — reabra o contrato e adicione manualmente."
 
-Sem essas respostas eu paro aqui — inserir 50 registros reais e não limpar depois é destrutivo o suficiente para não assumir sozinho.
+7. **BUG-8 — 404 recorrente no console**
+   - Investigar via DevTools Network e corrigir asset faltante (favicon, imagem, ou fonte). Fix ou remover a referência.
+
+### Fora de escopo (registrado, não vou mexer agora)
+
+- **Validação de e-mail no cadastro do paciente** (raiz do BUG-4: valores como `"janete"` existem no banco). Precisa migração/backfill — item separado.
+- Dia de vencimento livre 1–28 (mudança de select para input numérico com validação).
+- Faixa vs. contagem real de dependentes (checagem no submit).
+
+### Validação
+
+- Rodar novamente ~10 dos 50 casos automatizados (com script corrigido para clicar no dropdown `div.absolute.z-50 button`) confirmando:
+  - Titular duplicado bloqueia botão antes do submit
+  - Titular sem e-mail bloqueia botão
+  - Observações rejeitando >1000 chars e limpando tags
+  - Data 2025-01-15 mostra aviso amarelo
+  - Deps agora persistem em `contrato_dependentes`
+- Screenshot antes/depois de cada correção em `/mnt/documents/cb-sim/fixes/`.
+
+### Arquivos que devem mudar
+
+- `src/components/pages/contratos-page.tsx` (todo o formulário + salvar + validações)
+- Possivelmente `src/lib/traduzir-erro.ts` — apenas se surgir erro novo a mapear
+- Nada de mudança de schema; sem migração.
+
+Se aprovado, sigo direto. Se preferir dividir (ex.: só bugs de alta prioridade agora), me avise antes.

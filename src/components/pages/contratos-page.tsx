@@ -17,6 +17,7 @@ import {
   Pencil,
   Mail,
   AlertTriangle,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -369,6 +370,56 @@ function NovoContratoForm({
     focus?: "email" | "telefone";
   }>(null);
   const gerarBoletosFn = useServerFn(gerarBoletosContrato);
+  // Duplicidade: verifica se titular já tem contrato ativo nesta clínica
+  const [titularContratoAtivo, setTitularContratoAtivo] = useState<number | null>(null);
+  const [checkingDup, setCheckingDup] = useState(false);
+
+  useEffect(() => {
+    setTitularContratoAtivo(null);
+    if (!titular) return;
+    let cancel = false;
+    (async () => {
+      setCheckingDup(true);
+      const { data } = await supabase
+        .from("contratos_assinatura")
+        .select("numero")
+        .eq("clinica_id", clinicaId)
+        .eq("paciente_id", titular.id)
+        .eq("status", "ativo")
+        .limit(1)
+        .maybeSingle();
+      if (!cancel) {
+        setTitularContratoAtivo((data as { numero: number } | null)?.numero ?? null);
+        setCheckingDup(false);
+      }
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [titular?.id, clinicaId]);
+
+  const emailValido = (e?: string | null) => !!e && /.+@.+\..+/.test(e);
+  const OBS_MAX = 1000;
+  const obsSanitizedLen = obs.trim().length;
+  const dataHoje = new Date().toISOString().slice(0, 10);
+  const dataAvisoExtrema = (() => {
+    if (!dataInicio) return null;
+    const d = new Date(dataInicio + "T00:00:00").getTime();
+    const hoje = new Date(dataHoje + "T00:00:00").getTime();
+    const dias = (d - hoje) / 86400000;
+    if (dias < -7) return `Data de início está ${Math.abs(Math.round(dias))} dias no passado — confirme.`;
+    if (dias > 180) return `Data de início está muito no futuro (${Math.round(dias)} dias). Confirme.`;
+    return null;
+  })();
+
+  const podeSalvar =
+    !!titular &&
+    !!convenio &&
+    !saving &&
+    !checkingDup &&
+    titularContratoAtivo === null &&
+    emailValido(titular?.email) &&
+    obsSanitizedLen <= OBS_MAX;
 
   useEffect(() => {
     if (convenio) {
@@ -463,16 +514,26 @@ function NovoContratoForm({
 
   const salvar = async () => {
     if (!titular || !convenio) return toast.error("Selecione paciente e convênio");
+    if (titularContratoAtivo !== null) {
+      return toast.error(
+        `Este titular já possui um contrato ativo (#${titularContratoAtivo}). Cancele o contrato anterior antes de criar um novo.`,
+      );
+    }
     const maxDep = Number(convenio.max_dependentes ?? 0) || 0;
     if (deps.length > maxDep) {
       return toast.error(
         maxDep === 0 ? "Este convênio não permite dependentes." : `Limite de ${maxDep} dependentes excedido.`,
       );
     }
-    if (!titular.email)
+    if (!emailValido(titular.email))
       return toast.error(
-        "Titular precisa ter e-mail para acessar o app. Cadastre o e-mail no paciente antes de gerar o contrato.",
+        "Titular precisa ter um e-mail válido para acessar o app. Cadastre/corrija o e-mail no paciente antes de gerar o contrato.",
       );
+    // Sanitiza observações (remove HTML/scripts) e aplica limite
+    const obsClean = DOMPurify.sanitize(obs.trim(), { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
+    if (obsClean.length > OBS_MAX) {
+      return toast.error(`Observações: máximo ${OBS_MAX} caracteres.`);
+    }
     const semEmailDeps = deps.filter((d) => !d.email);
     if (
       semEmailDeps.length > 0 &&
@@ -489,7 +550,7 @@ function NovoContratoForm({
     )
       return;
     setSaving(true);
-    // Bloquear duplicidade: 1 contrato ativo por titular/clínica
+    // Rede de segurança: revalida duplicidade no submit (o estado já bloqueia o botão)
     const { data: jaAtivo } = await supabase
       .from("contratos_assinatura")
       .select("id, numero")
@@ -517,7 +578,7 @@ function NovoContratoForm({
         taxa_adesao: taxa,
         num_parcelas: convenio.num_parcelas,
         forma_pagamento: tipoCobranca ?? null,
-        observacoes: obs,
+        observacoes: obsClean,
         criado_por: userId,
       })
       .select("*")
@@ -528,7 +589,7 @@ function NovoContratoForm({
     }
 
     if (deps.length > 0) {
-      await supabase.from("contrato_dependentes").insert(
+      const { error: depErr } = await supabase.from("contrato_dependentes").insert(
         deps.map((d) => ({
           contrato_id: contrato.id,
           paciente_id: d.id,
@@ -537,6 +598,11 @@ function NovoContratoForm({
           tipo: d.tipo,
         })),
       );
+      if (depErr) {
+        toast.error(
+          `Contrato #${contrato.numero} criado, mas ${deps.length} dependente(s) não foram salvos. Reabra o contrato e adicione manualmente.`,
+        );
+      }
     }
 
     // Gerar 12 parcelas
@@ -553,24 +619,40 @@ function NovoContratoForm({
         status: "pendente",
       };
     });
-    await supabase.from("contrato_mensalidades").insert(parcelas);
+    const { error: mensErr } = await supabase.from("contrato_mensalidades").insert(parcelas);
+    if (mensErr) {
+      toast.error(`Contrato #${contrato.numero} criado, mas as mensalidades não foram geradas: ${mensErr.message}`);
+    }
 
     setSaving(false);
     toast.success(`Contrato #${contrato.numero} criado com ${convenio.num_parcelas} mensalidades`);
 
-    // Pós-criação: gerar carnê ou boletos conforme tipo de cobrança
+    // Pós-criação: gerar carnê ou boletos com timeout de 15s (não trava UI)
+    const withTimeout = <T,>(p: Promise<T>, ms: number) =>
+      Promise.race<T>([
+        p,
+        new Promise<T>((_, r) => setTimeout(() => r(new Error("TIMEOUT")), ms)),
+      ]);
     if (tipoCobranca === "carne") {
       try {
-        await gerarCarnePDF(contrato.id);
+        await withTimeout(gerarCarnePDF(contrato.id), 15000);
       } catch (e) {
-        mostrarErro(e);
+        if ((e as Error).message === "TIMEOUT") {
+          toast.info("Geração do carnê demorou mais que o esperado — tente reimprimir na lista de contratos.");
+        } else {
+          mostrarErro(e);
+        }
       }
     } else if (tipoCobranca === "boleto") {
       try {
-        const res = await gerarBoletosFn({ data: { contratoId: contrato.id } });
+        const res = await withTimeout(gerarBoletosFn({ data: { contratoId: contrato.id } }), 15000);
         toast.info(res.mensagem);
       } catch (e) {
-        mostrarErro(e);
+        if ((e as Error).message === "TIMEOUT") {
+          toast.info("Emissão dos boletos ainda está em processamento — verifique a lista de contratos em instantes.");
+        } else {
+          mostrarErro(e);
+        }
       }
     }
     onCreated();
@@ -648,6 +730,22 @@ function NovoContratoForm({
                           <Mail className="h-3 w-3" />
                           Sem e-mail
                         </Badge>
+                      ) : !emailValido(titular.email) ? (
+                        <Badge variant="outline" className="gap-1 text-red-600 border-red-400">
+                          <Mail className="h-3 w-3" />
+                          E-mail inválido
+                        </Badge>
+                      ) : null}
+                      {checkingDup ? (
+                        <Badge variant="outline" className="gap-1 text-muted-foreground">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Verificando…
+                        </Badge>
+                      ) : titularContratoAtivo !== null ? (
+                        <Badge variant="outline" className="gap-1 text-red-600 border-red-400">
+                          <AlertTriangle className="h-3 w-3" />
+                          Já possui contrato #{titularContratoAtivo}
+                        </Badge>
                       ) : null}
                     </span>
                     <div className="flex gap-1">
@@ -706,6 +804,12 @@ function NovoContratoForm({
             <div>
               <Label>Data início</Label>
               <Input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
+              {dataAvisoExtrema ? (
+                <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  {dataAvisoExtrema}
+                </p>
+              ) : null}
             </div>
             <div>
               <Label>Dia de vencimento</Label>
@@ -872,16 +976,43 @@ function NovoContratoForm({
             </div>
             <div className="col-span-2">
               <Label>Observações</Label>
-              <Textarea rows={2} value={obs} onChange={(e) => setObs(e.target.value)} />
+              <Textarea
+                rows={2}
+                value={obs}
+                maxLength={OBS_MAX}
+                onChange={(e) => setObs(e.target.value)}
+              />
+              <p
+                className={`text-xs mt-1 text-right ${
+                  obsSanitizedLen > OBS_MAX ? "text-red-600" : "text-muted-foreground"
+                }`}
+              >
+                {obsSanitizedLen} / {OBS_MAX} caracteres
+              </p>
             </div>
           </div>
           <div className="flex justify-end gap-2 border-t pt-4">
             <Button variant="ghost" onClick={onBack}>
               Cancelar
             </Button>
-            <Button onClick={salvar} disabled={saving || !titular || !convenio}>
+            <Button
+              onClick={salvar}
+              disabled={!podeSalvar}
+              title={
+                titularContratoAtivo !== null
+                  ? `Titular já possui contrato ativo #${titularContratoAtivo}`
+                  : !emailValido(titular?.email)
+                    ? "Titular precisa ter e-mail válido"
+                    : obsSanitizedLen > OBS_MAX
+                      ? `Observações excedem ${OBS_MAX} caracteres`
+                      : undefined
+              }
+            >
               {saving ? (
-                "Salvando..."
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Salvando…
+                </>
               ) : (
                 <>
                   <Printer className="h-4 w-4 mr-2" />
