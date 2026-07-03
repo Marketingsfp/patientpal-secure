@@ -293,14 +293,16 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
               <TableHead className="w-20">Prioridade</TableHead>
               <TableHead>Exemplo</TableHead>
               <TableHead>Limite</TableHead>
+              <TableHead>Carência</TableHead>
+              <TableHead className="text-center">Gratuito</TableHead>
               <TableHead className="w-10"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">Carregando…</TableCell></TableRow>
+              <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-6">Carregando…</TableCell></TableRow>
             ) : regras.length === 0 ? (
-              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">Nenhuma regra. Clique em "Adicionar regra".</TableCell></TableRow>
+              <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-6">Nenhuma regra. Clique em "Adicionar regra".</TableCell></TableRow>
             ) : regras.map((r, idx) => (
               <TableRow key={r.id}>
                 <TableCell>
