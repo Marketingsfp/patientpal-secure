@@ -396,6 +396,69 @@ function BeneficiosPage() {
               <Label>Descrição</Label>
               <Textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} rows={3} />
             </div>
+            <div className="rounded-md border p-3 space-y-3 bg-muted/30">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-sm font-semibold">Limite de uso (opcional)</Label>
+                  <p className="text-xs text-muted-foreground">Ex.: "1 consulta por dia por contrato". Deixe vazio = sem limite.</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <Label className="text-xs">Quantidade</Label>
+                  <Input type="number" min="1" value={limiteQtd} onChange={(e) => setLimiteQtd(e.target.value)} placeholder="Ex.: 1" />
+                </div>
+                <div>
+                  <Label className="text-xs">Período</Label>
+                  <Select value={limitePeriodo} onValueChange={setLimitePeriodo}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="dia">Por dia</SelectItem>
+                      <SelectItem value="semana">Por semana</SelectItem>
+                      <SelectItem value="mes">Por mês</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs">Escopo</Label>
+                  <Select value={limiteEscopo} onValueChange={setLimiteEscopo}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="contrato">Contrato inteiro (titular + dependentes)</SelectItem>
+                      <SelectItem value="paciente">Por paciente</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              {limiteQtd && (
+                <div className="grid grid-cols-2 gap-3 pt-2 border-t">
+                  <div>
+                    <Label className="text-xs">Quando exceder, cobrar:</Label>
+                    <Select value={excedenteModo} onValueChange={setExcedenteModo}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="percentual_particular">% do valor particular</SelectItem>
+                        <SelectItem value="valor_fixo">Valor fixo (R$)</SelectItem>
+                        <SelectItem value="particular">Valor particular cheio (100%)</SelectItem>
+                        <SelectItem value="bloquear">Bloquear agendamento</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {excedenteModo === "percentual_particular" && (
+                    <div>
+                      <Label className="text-xs">% do particular (0-100)</Label>
+                      <Input type="number" min="0" max="100" value={excedentePercentual} onChange={(e) => setExcedentePercentual(e.target.value)} placeholder="Ex.: 50" />
+                    </div>
+                  )}
+                  {excedenteModo === "valor_fixo" && (
+                    <div>
+                      <Label className="text-xs">Valor fixo (R$)</Label>
+                      <Input type="number" inputMode="decimal" value={excedenteValor} onChange={(e) => setExcedenteValor(e.target.value)} placeholder="Ex.: 50.00" />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
             <div className="flex items-center gap-2">
               <Switch checked={ativo} onCheckedChange={setAtivo} />
               <Label>Ativo</Label>
