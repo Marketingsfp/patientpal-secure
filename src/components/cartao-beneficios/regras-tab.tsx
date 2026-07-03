@@ -371,6 +371,36 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                   </Button>
                 </TableCell>
                 <TableCell>
+                  <Select
+                    value={String(r.carencia_mensalidades ?? 0)}
+                    onValueChange={(v) => update(idx, { carencia_mensalidades: Number(v) })}
+                  >
+                    <SelectTrigger className="w-40 h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">Imediato</SelectItem>
+                      <SelectItem value="2">Após 2ª mensalidade</SelectItem>
+                      <SelectItem value="6">Após 6ª mensalidade</SelectItem>
+                      <SelectItem value="1">Após 1ª mensalidade</SelectItem>
+                      <SelectItem value="3">Após 3ª mensalidade</SelectItem>
+                      <SelectItem value="12">Após 12ª mensalidade</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </TableCell>
+                <TableCell className="text-center">
+                  <div className="flex items-center justify-center gap-1" title="Marca como cortesia (valor 0, exibido como Gratuito)">
+                    <Checkbox
+                      checked={!!r.gratuito}
+                      onCheckedChange={(v) => {
+                        const on = v === true;
+                        update(idx, on
+                          ? { gratuito: true, modo: "valor_fixo", valor: 0, percentual: null }
+                          : { gratuito: false });
+                      }}
+                    />
+                    {r.gratuito && <Gift className="h-3.5 w-3.5 text-emerald-600" />}
+                  </div>
+                </TableCell>
+                <TableCell>
                   <Button size="sm" variant="ghost" onClick={() => remove(idx)}>
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
