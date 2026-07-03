@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, RefreshCw } from "lucide-react";
+import { Plus, Trash2, RefreshCw, Timer } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,6 +13,10 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from "@/components/ui/dialog";
 import { findRegra, computeValor, type CbRegra } from "@/lib/cb-regras";
 
 type EspOpt = { id: string; nome: string };
@@ -31,6 +35,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
   const [loading, setLoading] = useState(false);
   const [reapplying, setReapplying] = useState(false);
   const [progress, setProgress] = useState<string>("");
+  const [limiteIdx, setLimiteIdx] = useState<number | null>(null);
 
   const load = async () => {
     if (!convenioId) return;
@@ -38,7 +43,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     const [{ data: r, error: e1 }, { data: e, error: e2 }] = await Promise.all([
       (supabase as any)
         .from("cb_convenio_regras")
-        .select("id,convenio_id,especialidade_id,tipo,modo,valor,percentual,prioridade,ativo")
+        .select("id,convenio_id,especialidade_id,tipo,modo,valor,percentual,prioridade,ativo,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor")
         .eq("convenio_id", convenioId)
         .order("prioridade", { ascending: false }),
       supabase.from("especialidades").select("id,nome").eq("ativo", true).order("nome"),
@@ -71,6 +76,12 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         percentual: null,
         prioridade: 10,
         ativo: true,
+        limite_qtd: null,
+        limite_periodo: null,
+        limite_escopo: null,
+        excedente_modo: null,
+        excedente_percentual: null,
+        excedente_valor: null,
       },
     ]);
   };
@@ -104,6 +115,14 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         percentual: r.modo === "percentual_desconto" ? Number(r.percentual) || 0 : null,
         prioridade: Number(r.prioridade) || 1,
         ativo: r.ativo !== false,
+        limite_qtd: r.limite_qtd != null ? Number(r.limite_qtd) : null,
+        limite_periodo: r.limite_qtd != null ? (r.limite_periodo ?? "dia") : null,
+        limite_escopo: r.limite_qtd != null ? (r.limite_escopo ?? "contrato") : null,
+        excedente_modo: r.limite_qtd != null ? (r.excedente_modo ?? "percentual_particular") : null,
+        excedente_percentual: r.limite_qtd != null && (r.excedente_modo ?? "percentual_particular") === "percentual_particular"
+          ? Number(r.excedente_percentual ?? 50) : null,
+        excedente_valor: r.limite_qtd != null && r.excedente_modo === "valor_fixo"
+          ? Number(r.excedente_valor ?? 0) : null,
       };
       if (r.id.startsWith("new-")) {
         const { error } = await (supabase as any).from("cb_convenio_regras").insert(payload);
