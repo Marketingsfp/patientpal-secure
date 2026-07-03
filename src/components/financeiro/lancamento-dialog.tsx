@@ -254,6 +254,22 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       toast.error("O valor do pagamento deve ser maior que zero.");
       return;
     }
+    // Bloqueio por débito no cartão benefícios — só libera se o pagamento
+    // for feito como Particular.
+    if (bloqueioCartao?.bloqueado) {
+      const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+      const catEscolhida = categorias.find((c) => c.id === categoriaId) ?? null;
+      const catEhConvenio = !!(catEscolhida && convenioNome && norm(catEscolhida.nome) === norm(convenioNome));
+      const formaEhConvenio = !pagamentoMisto && formaPagamento === "convenio";
+      const mistoTemConvenio = pagamentoMisto && pagamentos.some((p) => p.forma === "convenio" && Number(p.recebido || 0) > 0);
+      if (catEhConvenio || formaEhConvenio || mistoTemConvenio) {
+        toast.error(
+          `Paciente com R$ ${bloqueioCartao.totalAberto.toFixed(2)} em atraso no cartão benefícios (${bloqueioCartao.qtdAtrasadas} parcela(s)). Este atendimento só pode ser pago como Particular — troque a categoria/forma e tente novamente.`,
+          { duration: 10000 },
+        );
+        return;
+      }
+    }
     setSaving(true);
     if (descontoAtivo) {
       if (!supervisorInfo && !ehSupervisor) {
