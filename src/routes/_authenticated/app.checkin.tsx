@@ -680,7 +680,7 @@ function CheckinPage() {
             Check-in de pacientes
           </h1>
           <p className="text-sm text-muted-foreground">
-            {clinicaAtual.nome && `Clínica: ${clinicaAtual.nome}`}
+            {clinicaAtual.clinica.nome && `Clínica: ${clinicaAtual.clinica.nome}`}
             {data && ` • ${formatarDataExtenso(data)}`}
           </p>
         </div>
