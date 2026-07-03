@@ -656,8 +656,27 @@ function NovoOrcamentoDialog({
   const salvar = async () => {
     if (!categoria) return toast.error("Selecione o tipo do orçamento");
     if (!pacienteNome.trim()) return toast.error("Informe o nome do paciente");
+    if (/[<>]/.test(pacienteNome) || /[<>]/.test(pacienteTelefone)) {
+      return toast.error("Nome e telefone não podem conter os caracteres < ou >");
+    }
     if (itens.length === 0) return toast.error("Adicione ao menos um serviço");
     if (formasPagamento.length === 0) return toast.error("Selecione ao menos uma forma de pagamento");
+    for (let i = 0; i < itens.length; i++) {
+      const it = itens[i];
+      if (!it.descricao || !it.descricao.trim()) {
+        return toast.error(`Item ${i + 1}: informe a descrição do serviço`);
+      }
+      const qtd = Number(it.quantidade);
+      if (!Number.isFinite(qtd) || qtd < 1 || qtd > 999) {
+        return toast.error(`Item ${i + 1} (${it.descricao}): quantidade deve estar entre 1 e 999`);
+      }
+      const vu = Number(it.valor_unitario);
+      if (!Number.isFinite(vu) || vu <= 0) {
+        return toast.error(`Item ${i + 1} (${it.descricao}): valor unitário deve ser maior que zero`);
+      }
+    }
+    if (Number(desconto) < 0) return toast.error("Desconto não pode ser negativo");
+    if (Number(desconto) > subtotal) return toast.error("Desconto não pode ser maior que o subtotal");
     const valoresPag: Record<string, number> | null =
       formasPagamento.length > 1 ? { ...totaisPorForma } : null;
     setSaving(true);
@@ -766,8 +785,8 @@ function NovoOrcamentoDialog({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="space-y-1"><Label>Paciente *</Label><Input value={pacienteNome} onChange={(e) => setPacienteNome(e.target.value)} /></div>
-            <div className="space-y-1"><Label>Telefone</Label><Input value={pacienteTelefone} onChange={(e) => setPacienteTelefone(e.target.value)} /></div>
+            <div className="space-y-1"><Label>Paciente *</Label><Input maxLength={120} value={pacienteNome} onChange={(e) => setPacienteNome(e.target.value.replace(/[<>]/g, ""))} /></div>
+            <div className="space-y-1"><Label>Telefone</Label><Input maxLength={20} value={pacienteTelefone} onChange={(e) => setPacienteTelefone(e.target.value.replace(/[<>]/g, ""))} /></div>
             <div className="space-y-1 md:col-span-2">
               <Label>Médico solicitante</Label>
               <div className="flex gap-1 rounded-md border p-1 w-fit">
@@ -899,7 +918,10 @@ function NovoOrcamentoDialog({
                       <td className="px-2 py-1">
                         <Input value={it.descricao} onChange={(e) => setItens((a) => a.map((x, i) => i === idx ? { ...x, descricao: e.target.value } : x))} />
                       </td>
-                      <td className="px-2 py-1"><Input type="number" min={1} step="1" value={it.quantidade} onChange={(e) => setItens((a) => a.map((x, i) => i === idx ? { ...x, quantidade: Number(e.target.value) || 0 } : x))} /></td>
+                      <td className="px-2 py-1"><Input type="number" min={1} max={999} step="1" value={it.quantidade} onChange={(e) => {
+                        const n = Math.min(999, Math.max(1, Math.floor(Number(e.target.value) || 1)));
+                        setItens((a) => a.map((x, i) => i === idx ? { ...x, quantidade: n } : x));
+                      }} /></td>
                       <td className="px-2 py-1"><CurrencyInput value={String(it.valor_unitario ?? "")} onChange={(v) => setItens((a) => a.map((x, i) => i === idx ? { ...x, valor_unitario: Number(v) || 0 } : x))} /></td>
                       <td className="px-2 py-1 text-right font-medium">
                         {BRL(it.quantidade * it.valor_unitario)}
