@@ -323,6 +323,14 @@ async function obterInfoConvenioPaciente(params: {
   const parcelasAtrasadas = (mens ?? []).length;
   const emDia = parcelasAtrasadas === 0;
 
+  // 2b) Conta mensalidades pagas do contrato (para checagem de carência).
+  const { count: pagasCount } = await supabase
+    .from("contrato_mensalidades")
+    .select("id", { count: "exact", head: true })
+    .eq("contrato_id", contrato.id)
+    .eq("status", "pago");
+  const mensalidadesPagas = pagasCount ?? 0;
+
   // 3) Busca procedimento_id e especialidade do médico
   const procNorm = (procedimentoNome ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
   const { data: procs } = await supabase
