@@ -730,6 +730,22 @@ function NovoContratoForm({
                           <Mail className="h-3 w-3" />
                           Sem e-mail
                         </Badge>
+                      ) : !emailValido(titular.email) ? (
+                        <Badge variant="outline" className="gap-1 text-red-600 border-red-400">
+                          <Mail className="h-3 w-3" />
+                          E-mail inválido
+                        </Badge>
+                      ) : null}
+                      {checkingDup ? (
+                        <Badge variant="outline" className="gap-1 text-muted-foreground">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Verificando…
+                        </Badge>
+                      ) : titularContratoAtivo !== null ? (
+                        <Badge variant="outline" className="gap-1 text-red-600 border-red-400">
+                          <AlertTriangle className="h-3 w-3" />
+                          Já possui contrato #{titularContratoAtivo}
+                        </Badge>
                       ) : null}
                     </span>
                     <div className="flex gap-1">
@@ -788,6 +804,12 @@ function NovoContratoForm({
             <div>
               <Label>Data início</Label>
               <Input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
+              {dataAvisoExtrema ? (
+                <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  {dataAvisoExtrema}
+                </p>
+              ) : null}
             </div>
             <div>
               <Label>Dia de vencimento</Label>
@@ -954,16 +976,43 @@ function NovoContratoForm({
             </div>
             <div className="col-span-2">
               <Label>Observações</Label>
-              <Textarea rows={2} value={obs} onChange={(e) => setObs(e.target.value)} />
+              <Textarea
+                rows={2}
+                value={obs}
+                maxLength={OBS_MAX}
+                onChange={(e) => setObs(e.target.value)}
+              />
+              <p
+                className={`text-xs mt-1 text-right ${
+                  obsSanitizedLen > OBS_MAX ? "text-red-600" : "text-muted-foreground"
+                }`}
+              >
+                {obsSanitizedLen} / {OBS_MAX} caracteres
+              </p>
             </div>
           </div>
           <div className="flex justify-end gap-2 border-t pt-4">
             <Button variant="ghost" onClick={onBack}>
               Cancelar
             </Button>
-            <Button onClick={salvar} disabled={saving || !titular || !convenio}>
+            <Button
+              onClick={salvar}
+              disabled={!podeSalvar}
+              title={
+                titularContratoAtivo !== null
+                  ? `Titular já possui contrato ativo #${titularContratoAtivo}`
+                  : !emailValido(titular?.email)
+                    ? "Titular precisa ter e-mail válido"
+                    : obsSanitizedLen > OBS_MAX
+                      ? `Observações excedem ${OBS_MAX} caracteres`
+                      : undefined
+              }
+            >
               {saving ? (
-                "Salvando..."
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Salvando…
+                </>
               ) : (
                 <>
                   <Printer className="h-4 w-4 mr-2" />
