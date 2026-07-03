@@ -75,6 +75,18 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
   const [valorOriginal, setValorOriginal] = useState<string>("");
   const [supervisorOpen, setSupervisorOpen] = useState(false);
   const [supervisorInfo, setSupervisorInfo] = useState<{ userId: string; nome: string; role: string } | null>(null);
+  // Bloqueio: paciente com mensalidade vencida no cartão benefícios.
+  // Quando bloqueado, o pagamento só pode ser feito como Particular.
+  const [bloqueioCartao, setBloqueioCartao] = useState<{
+    bloqueado: boolean;
+    totalAberto: number;
+    qtdAtrasadas: number;
+    convenioNome: string | null;
+  } | null>(null);
+  // Tipo de atendimento definido no agendamento ("convenio" | "particular" | null).
+  const [tipoAgendamento, setTipoAgendamento] = useState<string | null>(null);
+  // Nome do convênio do contrato ativo (usado para detectar categoria "de convênio").
+  const [convenioNome, setConvenioNome] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open || !clinicaAtual) return;
@@ -85,6 +97,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     setDescontoAtivo(false); setDescontoTipo("valor");
     setDescontoInput(""); setDescontoAutorizado(""); setDescontoMotivo("");
     setSupervisorInfo(null); setSupervisorOpen(false);
+    setBloqueioCartao(null); setTipoAgendamento(null); setConvenioNome(null);
     if (initialFormaPagamento !== undefined) {
       if (initialFormaPagamento === "__misto__") {
         setPagamentoMisto(true);
@@ -120,10 +133,12 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         try {
           const { data: ag } = await supabase
             .from("agendamentos")
-            .select("paciente_id")
+            .select("paciente_id, tipo_atendimento")
             .eq("id", agendamentoId)
             .maybeSingle();
           const pid = ag?.paciente_id ?? null;
+          const tipoAg = (ag as { tipo_atendimento?: string | null } | null)?.tipo_atendimento ?? null;
+          setTipoAgendamento(tipoAg);
           if (pid) {
             const { data: contrato } = await supabase
               .from("contratos_assinatura")
@@ -135,9 +150,33 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
               .limit(1)
               .maybeSingle();
             const convNome = (contrato as { cb_convenios?: { nome?: string } } | null)?.cb_convenios?.nome;
-            if (convNome) {
+            if (convNome) setConvenioNome(convNome);
+            // Só sugere a categoria do convênio quando o agendamento foi
+            // marcado como "convenio". Se for "particular", mantém a
+            // categoria PARTICULAR (não força o operador a mudar).
+            if (convNome && tipoAg !== "particular") {
               const match = lista.find((c) => norm(c.nome) === norm(convNome));
               if (match) categoriaEscolhidaId = match.id;
+            }
+            // Verifica débito no cartão benefícios do paciente.
+            const { data: blk } = await supabase.rpc("paciente_cartao_inadimplente", {
+              _paciente_id: pid,
+              _clinica_id: clinicaAtual.clinica_id,
+            });
+            const info = (blk ?? {}) as {
+              bloqueado?: boolean;
+              total_aberto?: number;
+              mensalidades?: Array<{ vencimento: string; valor: number; convenio_nome?: string }>;
+            };
+            if (info.bloqueado) {
+              setBloqueioCartao({
+                bloqueado: true,
+                totalAberto: Number(info.total_aberto ?? 0),
+                qtdAtrasadas: (info.mensalidades ?? []).length,
+                convenioNome: convNome ?? null,
+              });
+              // Força categoria = Particular para não induzir o operador ao erro.
+              if (particular) categoriaEscolhidaId = particular.id;
             }
           }
         } catch {
