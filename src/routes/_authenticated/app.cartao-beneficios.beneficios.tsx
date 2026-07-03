@@ -37,12 +37,6 @@ type Beneficio = {
   especialidade_id: string | null;
   tipo_desconto: "percentual" | "valor" | "gratuidade";
   valor_desconto: number | null;
-  limite_qtd?: number | null;
-  limite_periodo?: string | null;
-  limite_escopo?: string | null;
-  excedente_modo?: string | null;
-  excedente_percentual?: number | null;
-  excedente_valor?: number | null;
 };
 type Procedimento = { id: string; nome: string };
 type Especialidade = { id: string; nome: string };
@@ -67,12 +61,6 @@ function BeneficiosPage() {
   const [especialidadeId, setEspecialidadeId] = useState<string>("");
   const [tipoDesconto, setTipoDesconto] = useState<"percentual" | "valor" | "gratuidade">("percentual");
   const [valorDesconto, setValorDesconto] = useState<string>("");
-  const [limiteQtd, setLimiteQtd] = useState<string>("");
-  const [limitePeriodo, setLimitePeriodo] = useState<string>("dia");
-  const [limiteEscopo, setLimiteEscopo] = useState<string>("contrato");
-  const [excedenteModo, setExcedenteModo] = useState<string>("percentual_particular");
-  const [excedentePercentual, setExcedentePercentual] = useState<string>("50");
-  const [excedenteValor, setExcedenteValor] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [toDelete, setToDelete] = useState<Beneficio | null>(null);
 
@@ -82,7 +70,7 @@ function BeneficiosPage() {
     const cid = clinicaAtual.clinica_id;
     const [cs, bs, es] = await Promise.all([
       supabase.from("cb_convenios").select("id, nome, ativo").eq("clinica_id", cid).order("nome"),
-      supabase.from("cb_beneficios").select("id, clinica_id, convenio_id, nome, descricao, ativo, escopo, procedimento_id, especialidade_id, tipo_desconto, valor_desconto, limite_qtd, limite_periodo, limite_escopo, excedente_modo, excedente_percentual, excedente_valor").eq("clinica_id", cid).order("nome"),
+      supabase.from("cb_beneficios").select("id, clinica_id, convenio_id, nome, descricao, ativo, escopo, procedimento_id, especialidade_id, tipo_desconto, valor_desconto").eq("clinica_id", cid).order("nome"),
       supabase.from("especialidades").select("id, nome").eq("ativo", true).order("nome").range(0, 9999),
     ]);
     // PostgREST aplica db-max-rows=1000 mesmo com .range() amplo —
@@ -136,8 +124,6 @@ function BeneficiosPage() {
     setEspecialidadeId("");
     setTipoDesconto("percentual");
     setValorDesconto("");
-    setLimiteQtd(""); setLimitePeriodo("dia"); setLimiteEscopo("contrato");
-    setExcedenteModo("percentual_particular"); setExcedentePercentual("50"); setExcedenteValor("");
     setView("form");
   };
 
@@ -152,12 +138,6 @@ function BeneficiosPage() {
     setEspecialidadeId(b.especialidade_id ?? "");
     setTipoDesconto(b.tipo_desconto);
     setValorDesconto(b.valor_desconto != null ? String(b.valor_desconto) : "");
-    setLimiteQtd(b.limite_qtd != null ? String(b.limite_qtd) : "");
-    setLimitePeriodo(b.limite_periodo ?? "dia");
-    setLimiteEscopo(b.limite_escopo ?? "contrato");
-    setExcedenteModo(b.excedente_modo ?? "percentual_particular");
-    setExcedentePercentual(b.excedente_percentual != null ? String(b.excedente_percentual) : "50");
-    setExcedenteValor(b.excedente_valor != null ? String(b.excedente_valor) : "");
     setView("form");
   };
 
@@ -177,19 +157,6 @@ function BeneficiosPage() {
     const nomeFinal = nome.trim() || (alvoNome ? (escopo === "servico" ? alvoNome : `Especialidade: ${alvoNome}`) : "");
     if (!nomeFinal) { toast.error("Informe o nome."); return; }
     setSaving(true);
-    const limiteNum = limiteQtd ? Number(limiteQtd) : null;
-    if (limiteNum !== null && (!Number.isFinite(limiteNum) || limiteNum <= 0)) {
-      toast.error("Limite deve ser um número positivo (ou vazio para sem limite).");
-      return;
-    }
-    if (limiteNum !== null && excedenteModo === "percentual_particular") {
-      const p = Number(excedentePercentual);
-      if (!Number.isFinite(p) || p < 0 || p > 100) { toast.error("% do particular deve estar entre 0 e 100."); return; }
-    }
-    if (limiteNum !== null && excedenteModo === "valor_fixo") {
-      const v = Number(excedenteValor);
-      if (!Number.isFinite(v) || v < 0) { toast.error("Valor fixo excedente deve ser positivo."); return; }
-    }
     const payload = {
       clinica_id: clinicaAtual.clinica_id,
       convenio_id: convenioId,
@@ -201,12 +168,6 @@ function BeneficiosPage() {
       especialidade_id: escopo === "especialidade" ? especialidadeId : null,
       tipo_desconto: tipoDesconto,
       valor_desconto: tipoDesconto === "gratuidade" ? null : valorNum,
-      limite_qtd: limiteNum,
-      limite_periodo: limiteNum !== null ? limitePeriodo : null,
-      limite_escopo: limiteNum !== null ? limiteEscopo : null,
-      excedente_modo: limiteNum !== null ? excedenteModo : null,
-      excedente_percentual: limiteNum !== null && excedenteModo === "percentual_particular" ? Number(excedentePercentual) : null,
-      excedente_valor: limiteNum !== null && excedenteModo === "valor_fixo" ? Number(excedenteValor) : null,
     };
     const { error } = editing
       ? await supabase.from("cb_beneficios").update(payload).eq("id", editing.id)
