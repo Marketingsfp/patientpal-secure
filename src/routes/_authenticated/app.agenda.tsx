@@ -323,11 +323,19 @@ async function obterInfoConvenioPaciente(params: {
   const parcelasAtrasadas = (mens ?? []).length;
   const emDia = parcelasAtrasadas === 0;
 
+  // 2b) Conta mensalidades pagas do contrato (para checagem de carência).
+  const { count: pagasCount } = await supabase
+    .from("contrato_mensalidades")
+    .select("id", { count: "exact", head: true })
+    .eq("contrato_id", contrato.id)
+    .eq("status", "pago");
+  const mensalidadesPagas = pagasCount ?? 0;
+
   // 3) Busca procedimento_id e especialidade do médico
   const procNorm = (procedimentoNome ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
   const { data: procs } = await supabase
     .from("procedimentos")
-    .select("id,nome")
+    .select("id,nome,tipo")
     .eq("clinica_id", clinicaId)
     .eq("ativo", true)
     .limit(5000);
@@ -337,6 +345,7 @@ async function obterInfoConvenioPaciente(params: {
     (p: any) => (p.nome ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().includes(procNorm),
   );
   const procedimentoId = (procRow as any)?.id ?? null;
+  const procedimentoTipo = ((procRow as any)?.tipo ?? "").toString().toLowerCase() || null;
 
   let especialidadeId: string | null = null;
   if (medicoId) {
@@ -515,6 +524,44 @@ async function obterInfoConvenioPaciente(params: {
         }
       }
     }
+  }
+
+  // 6) Checa carência / gratuidade configuradas nas regras do convênio
+  //    (aba Regras/Valores do lápis). A regra mais específica para
+  //    especialidade+tipo vence. Se a carência não foi cumprida, o desconto
+  //    do convênio é suspenso (paga particular). Se a regra está marcada
+  //    como "gratuito", força o benefício a gratuidade.
+  try {
+    const { data: regrasRaw } = await (supabase as any)
+      .from("cb_convenio_regras")
+      .select("id,convenio_id,especialidade_id,tipo,modo,valor,percentual,prioridade,ativo,carencia_mensalidades,gratuito")
+      .eq("convenio_id", contrato.convenio_id)
+      .eq("ativo", true);
+    const regrasCb = (regrasRaw ?? []) as any[];
+    if (regrasCb.length) {
+      const { findRegra: findR, carenciaCumprida } = await import("@/lib/cb-regras");
+      // Tenta cada especialidade possível do médico; usa a mais específica
+      const espsTentativa: (string | null)[] = especialidadesMedico.length
+        ? [...especialidadesMedico, null]
+        : [null];
+      let regraMatch: any = null;
+      for (const eid of espsTentativa) {
+        const r = findR(regrasCb, eid, procedimentoTipo);
+        if (r) { regraMatch = r; break; }
+      }
+      if (regraMatch) {
+        if (!carenciaCumprida(regraMatch, mensalidadesPagas)) {
+          const n = Number(regraMatch.carencia_mensalidades) || 0;
+          desconto = null;
+          bloquear = false;
+          avisoLimite = `Convênio ${convenioNome}: benefício disponível somente após a ${n}ª mensalidade paga (contrato tem ${mensalidadesPagas} paga(s)). Cobrando valor particular.`;
+        } else if (regraMatch.gratuito) {
+          desconto = { tipo: "gratuidade", valor: 0 };
+        }
+      }
+    }
+  } catch {
+    // silencioso — se a checagem de carência falhar, mantém o comportamento anterior
   }
 
   return { convenioNome, emDia, parcelasAtrasadas, desconto, avisoLimite, bloquear };

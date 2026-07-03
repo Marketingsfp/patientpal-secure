@@ -1864,6 +1864,7 @@ export type Database = {
       cb_convenio_regras: {
         Row: {
           ativo: boolean
+          carencia_mensalidades: number
           clinica_id: string
           convenio_id: string
           created_at: string
@@ -1871,6 +1872,7 @@ export type Database = {
           excedente_modo: string | null
           excedente_percentual: number | null
           excedente_valor: number | null
+          gratuito: boolean
           id: string
           limite_escopo: string | null
           limite_periodo: string | null
@@ -1885,6 +1887,7 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean
+          carencia_mensalidades?: number
           clinica_id: string
           convenio_id: string
           created_at?: string
@@ -1892,6 +1895,7 @@ export type Database = {
           excedente_modo?: string | null
           excedente_percentual?: number | null
           excedente_valor?: number | null
+          gratuito?: boolean
           id?: string
           limite_escopo?: string | null
           limite_periodo?: string | null
@@ -1906,6 +1910,7 @@ export type Database = {
         }
         Update: {
           ativo?: boolean
+          carencia_mensalidades?: number
           clinica_id?: string
           convenio_id?: string
           created_at?: string
@@ -1913,6 +1918,7 @@ export type Database = {
           excedente_modo?: string | null
           excedente_percentual?: number | null
           excedente_valor?: number | null
+          gratuito?: boolean
           id?: string
           limite_escopo?: string | null
           limite_periodo?: string | null
