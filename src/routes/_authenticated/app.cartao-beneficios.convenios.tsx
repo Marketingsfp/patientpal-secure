@@ -481,14 +481,14 @@ function ConveniosPage() {
 
       <Card>
         <CardContent className="p-0">
-          <Table>
+          <Table className="table-fixed w-full">
             <TableHeader>
               <TableRow>
                 <TableHead>Nome</TableHead>
-                <TableHead>A partir de</TableHead>
-                <TableHead>Descrição</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
+                <TableHead className="w-[140px]">A partir de</TableHead>
+                <TableHead className="w-[240px]">Descrição</TableHead>
+                <TableHead className="w-[100px]">Status</TableHead>
+                <TableHead className="w-[110px] text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -498,9 +498,9 @@ function ConveniosPage() {
                 <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">Nenhum convênio cadastrado.</TableCell></TableRow>
               ) : rows.map((c) => (
                 <TableRow key={c.id}>
-                  <TableCell className="font-medium">{c.nome}</TableCell>
+                  <TableCell className="font-medium truncate" title={c.nome}>{c.nome}</TableCell>
                   <TableCell>{valoresMin[c.id] !== undefined ? `R$ ${valoresMin[c.id].toFixed(2)}` : "—"}</TableCell>
-                  <TableCell className="text-muted-foreground">{c.descricao ?? "—"}</TableCell>
+                  <TableCell className="text-muted-foreground truncate" title={c.descricao ?? ""}>{c.descricao ?? "—"}</TableCell>
                   <TableCell>
                     <Badge variant={c.ativo ? "default" : "outline"}>{c.ativo ? "Ativo" : "Inativo"}</Badge>
                   </TableCell>
