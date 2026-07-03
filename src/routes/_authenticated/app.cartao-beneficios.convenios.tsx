@@ -537,7 +537,15 @@ function ConveniosPage() {
             <TabsContent value="info" className="space-y-3 mt-3">
               <div>
                 <Label>Nome *</Label>
-                <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Convênio Família" />
+                <Input
+                  value={nome}
+                  maxLength={NOME_MAX}
+                  onChange={(e) => setNome(e.target.value)}
+                  placeholder="Ex: Convênio Família"
+                />
+                <p className={`text-xs mt-1 text-right ${nome.trim().length > NOME_MAX ? "text-red-600" : "text-muted-foreground"}`}>
+                  {nome.trim().length} / {NOME_MAX}
+                </p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
@@ -572,12 +580,28 @@ function ConveniosPage() {
               </div>
               <div>
                 <Label>Benefícios</Label>
-                <Textarea value={beneficiosTxt} onChange={(e) => setBeneficiosTxt(e.target.value)} rows={4}
-                  placeholder="Liste os benefícios deste convênio" />
+                <Textarea
+                  value={beneficiosTxt}
+                  maxLength={BENEFICIOS_MAX}
+                  onChange={(e) => setBeneficiosTxt(e.target.value)}
+                  rows={4}
+                  placeholder="Liste os benefícios deste convênio"
+                />
+                <p className={`text-xs mt-1 text-right ${beneficiosTxt.trim().length > BENEFICIOS_MAX ? "text-red-600" : "text-muted-foreground"}`}>
+                  {beneficiosTxt.trim().length} / {BENEFICIOS_MAX}
+                </p>
               </div>
               <div>
                 <Label>Descrição</Label>
-                <Textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} rows={3} />
+                <Textarea
+                  value={descricao}
+                  maxLength={DESCRICAO_MAX}
+                  onChange={(e) => setDescricao(e.target.value)}
+                  rows={3}
+                />
+                <p className={`text-xs mt-1 text-right ${descricao.trim().length > DESCRICAO_MAX ? "text-red-600" : "text-muted-foreground"}`}>
+                  {descricao.trim().length} / {DESCRICAO_MAX}
+                </p>
               </div>
               <div className="flex items-center gap-2">
                 <Switch checked={ativo} onCheckedChange={setAtivo} />
@@ -792,7 +816,19 @@ function ConveniosPage() {
           </Tabs>
             <div className="flex justify-end gap-2 border-t pt-4">
               <Button variant="outline" onClick={() => setView("list")}>Cancelar</Button>
-              <Button onClick={save} disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
+              <Button
+                onClick={save}
+                disabled={saving || !nome.trim() || faixas.length === 0}
+                title={
+                  !nome.trim()
+                    ? "Informe o nome do convênio"
+                    : faixas.length === 0
+                      ? "Adicione pelo menos uma faixa de preço"
+                      : undefined
+                }
+              >
+                {saving ? "Salvando…" : "Salvar"}
+              </Button>
             </div>
           </CardContent>
         </Card>
