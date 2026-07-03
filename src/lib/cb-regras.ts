@@ -16,6 +16,21 @@ export interface CbRegra {
   excedente_modo?: string | null; // "percentual_particular" | "valor_fixo" | "particular" | "bloquear"
   excedente_percentual?: number | null;
   excedente_valor?: number | null;
+  /**
+   * Nº de mensalidades pagas que o contrato precisa ter antes desta regra
+   * (desconto do convênio) valer. 0 = imediato.
+   */
+  carencia_mensalidades?: number | null;
+  /** Regra é cortesia — exibida como "Gratuito" no sistema. */
+  gratuito?: boolean | null;
+}
+
+/** Retorna true se o contrato já cumpriu a carência exigida pela regra. */
+export function carenciaCumprida(regra: CbRegra | null, mensalidadesPagas: number): boolean {
+  if (!regra) return true;
+  const min = Number(regra.carencia_mensalidades ?? 0) || 0;
+  if (min <= 0) return true;
+  return mensalidadesPagas >= min;
 }
 
 /**
