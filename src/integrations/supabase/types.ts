@@ -1850,7 +1850,13 @@ export type Database = {
           convenio_id: string
           created_at: string
           especialidade_id: string | null
+          excedente_modo: string | null
+          excedente_percentual: number | null
+          excedente_valor: number | null
           id: string
+          limite_escopo: string | null
+          limite_periodo: string | null
+          limite_qtd: number | null
           modo: string
           nome_padrao: string | null
           percentual: number | null
@@ -1865,7 +1871,13 @@ export type Database = {
           convenio_id: string
           created_at?: string
           especialidade_id?: string | null
+          excedente_modo?: string | null
+          excedente_percentual?: number | null
+          excedente_valor?: number | null
           id?: string
+          limite_escopo?: string | null
+          limite_periodo?: string | null
+          limite_qtd?: number | null
           modo: string
           nome_padrao?: string | null
           percentual?: number | null
@@ -1880,7 +1892,13 @@ export type Database = {
           convenio_id?: string
           created_at?: string
           especialidade_id?: string | null
+          excedente_modo?: string | null
+          excedente_percentual?: number | null
+          excedente_valor?: number | null
           id?: string
+          limite_escopo?: string | null
+          limite_periodo?: string | null
+          limite_qtd?: number | null
           modo?: string
           nome_padrao?: string | null
           percentual?: number | null
