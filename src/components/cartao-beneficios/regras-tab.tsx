@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, RefreshCw, Timer } from "lucide-react";
+import { Plus, Trash2, RefreshCw, Timer, Gift } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { findRegra, computeValor, type CbRegra } from "@/lib/cb-regras";
 
 type EspOpt = { id: string; nome: string };
@@ -43,7 +44,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     const [{ data: r, error: e1 }, { data: e, error: e2 }] = await Promise.all([
       (supabase as any)
         .from("cb_convenio_regras")
-        .select("id,convenio_id,especialidade_id,tipo,modo,valor,percentual,prioridade,ativo,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor")
+        .select("id,convenio_id,especialidade_id,tipo,modo,valor,percentual,prioridade,ativo,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor,carencia_mensalidades,gratuito")
         .eq("convenio_id", convenioId)
         .order("prioridade", { ascending: false }),
       supabase.from("especialidades").select("id,nome").eq("ativo", true).order("nome"),
@@ -82,6 +83,8 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         excedente_modo: null,
         excedente_percentual: null,
         excedente_valor: null,
+        carencia_mensalidades: 0,
+        gratuito: false,
       },
     ]);
   };
@@ -123,6 +126,8 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
           ? Number(r.excedente_percentual ?? 50) : null,
         excedente_valor: r.limite_qtd != null && r.excedente_modo === "valor_fixo"
           ? Number(r.excedente_valor ?? 0) : null,
+        carencia_mensalidades: Number(r.carencia_mensalidades ?? 0) || 0,
+        gratuito: !!r.gratuito,
       };
       if (r.id.startsWith("new-")) {
         const { error } = await (supabase as any).from("cb_convenio_regras").insert(payload);
