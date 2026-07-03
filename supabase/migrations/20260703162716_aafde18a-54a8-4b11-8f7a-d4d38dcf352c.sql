@@ -1,0 +1,1 @@
+ALTER TABLE public.agendamentos ADD COLUMN IF NOT EXISTS tipo_atendimento text NOT NULL DEFAULT 'particular' CHECK (tipo_atendimento IN ('convenio','particular'));
