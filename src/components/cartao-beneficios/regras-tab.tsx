@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, RefreshCw } from "lucide-react";
+import { Plus, Trash2, RefreshCw, Timer } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,6 +13,10 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from "@/components/ui/dialog";
 import { findRegra, computeValor, type CbRegra } from "@/lib/cb-regras";
 
 type EspOpt = { id: string; nome: string };
@@ -31,6 +35,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
   const [loading, setLoading] = useState(false);
   const [reapplying, setReapplying] = useState(false);
   const [progress, setProgress] = useState<string>("");
+  const [limiteIdx, setLimiteIdx] = useState<number | null>(null);
 
   const load = async () => {
     if (!convenioId) return;
@@ -38,7 +43,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     const [{ data: r, error: e1 }, { data: e, error: e2 }] = await Promise.all([
       (supabase as any)
         .from("cb_convenio_regras")
-        .select("id,convenio_id,especialidade_id,tipo,modo,valor,percentual,prioridade,ativo")
+        .select("id,convenio_id,especialidade_id,tipo,modo,valor,percentual,prioridade,ativo,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor")
         .eq("convenio_id", convenioId)
         .order("prioridade", { ascending: false }),
       supabase.from("especialidades").select("id,nome").eq("ativo", true).order("nome"),
@@ -71,6 +76,12 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         percentual: null,
         prioridade: 10,
         ativo: true,
+        limite_qtd: null,
+        limite_periodo: null,
+        limite_escopo: null,
+        excedente_modo: null,
+        excedente_percentual: null,
+        excedente_valor: null,
       },
     ]);
   };
@@ -104,6 +115,14 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         percentual: r.modo === "percentual_desconto" ? Number(r.percentual) || 0 : null,
         prioridade: Number(r.prioridade) || 1,
         ativo: r.ativo !== false,
+        limite_qtd: r.limite_qtd != null ? Number(r.limite_qtd) : null,
+        limite_periodo: r.limite_qtd != null ? (r.limite_periodo ?? "dia") : null,
+        limite_escopo: r.limite_qtd != null ? (r.limite_escopo ?? "contrato") : null,
+        excedente_modo: r.limite_qtd != null ? (r.excedente_modo ?? "percentual_particular") : null,
+        excedente_percentual: r.limite_qtd != null && (r.excedente_modo ?? "percentual_particular") === "percentual_particular"
+          ? Number(r.excedente_percentual ?? 50) : null,
+        excedente_valor: r.limite_qtd != null && r.excedente_modo === "valor_fixo"
+          ? Number(r.excedente_valor ?? 0) : null,
       };
       if (r.id.startsWith("new-")) {
         const { error } = await (supabase as any).from("cb_convenio_regras").insert(payload);
@@ -268,14 +287,15 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
               <TableHead className="text-right">Valor / %</TableHead>
               <TableHead className="w-20">Prioridade</TableHead>
               <TableHead>Exemplo</TableHead>
+              <TableHead>Limite</TableHead>
               <TableHead className="w-10"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">Carregando…</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">Carregando…</TableCell></TableRow>
             ) : regras.length === 0 ? (
-              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">Nenhuma regra. Clique em "Adicionar regra".</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">Nenhuma regra. Clique em "Adicionar regra".</TableCell></TableRow>
             ) : regras.map((r, idx) => (
               <TableRow key={r.id}>
                 <TableCell>
@@ -330,6 +350,20 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground">{sample(r)}</TableCell>
                 <TableCell>
+                  <Button
+                    size="sm"
+                    variant={r.limite_qtd ? "secondary" : "ghost"}
+                    className="text-xs h-7"
+                    onClick={() => setLimiteIdx(idx)}
+                    title="Configurar limite de uso"
+                  >
+                    <Timer className="h-3.5 w-3.5 mr-1" />
+                    {r.limite_qtd
+                      ? `${r.limite_qtd}/${r.limite_periodo ?? "dia"} ${r.limite_escopo === "paciente" ? "paciente" : "contrato"}`
+                      : "Sem limite"}
+                  </Button>
+                </TableCell>
+                <TableCell>
                   <Button size="sm" variant="ghost" onClick={() => remove(idx)}>
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
@@ -348,6 +382,129 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
           {loading ? "Salvando…" : "Salvar regras"}
         </Button>
       </div>
+
+      <LimiteDialog
+        idx={limiteIdx}
+        regras={regras}
+        onClose={() => setLimiteIdx(null)}
+        onChange={(patch) => { if (limiteIdx != null) update(limiteIdx, patch); }}
+      />
     </div>
+  );
+}
+
+function LimiteDialog({
+  idx, regras, onClose, onChange,
+}: {
+  idx: number | null;
+  regras: CbRegra[];
+  onClose: () => void;
+  onChange: (patch: Partial<CbRegra>) => void;
+}) {
+  const open = idx != null;
+  const r = idx != null ? regras[idx] : null;
+  if (!r) {
+    return (
+      <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+        <DialogContent />
+      </Dialog>
+    );
+  }
+  const hasLimit = r.limite_qtd != null && r.limite_qtd > 0;
+  const modo = r.excedente_modo ?? "percentual_particular";
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Limite de uso desta regra</DialogTitle>
+          <DialogDescription>
+            Ex.: "1 consulta por dia por contrato". Vazio = sem limite. Após salvar as regras, o limite passa a valer na agenda.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <Label className="text-xs">Quantidade</Label>
+              <Input
+                type="number" min="1"
+                value={r.limite_qtd ?? ""}
+                onChange={(e) => onChange({ limite_qtd: e.target.value ? Number(e.target.value) : null })}
+                placeholder="Ex.: 1"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Período</Label>
+              <Select
+                value={r.limite_periodo ?? "dia"}
+                onValueChange={(v) => onChange({ limite_periodo: v })}
+                disabled={!hasLimit}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="dia">Por dia</SelectItem>
+                  <SelectItem value="semana">Por semana</SelectItem>
+                  <SelectItem value="mes">Por mês</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Escopo</Label>
+              <Select
+                value={r.limite_escopo ?? "contrato"}
+                onValueChange={(v) => onChange({ limite_escopo: v })}
+                disabled={!hasLimit}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="contrato">Contrato (titular + deps)</SelectItem>
+                  <SelectItem value="paciente">Por paciente</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          {hasLimit && (
+            <div className="grid grid-cols-2 gap-3 border-t pt-3">
+              <div>
+                <Label className="text-xs">Quando exceder, cobrar:</Label>
+                <Select value={modo} onValueChange={(v) => onChange({ excedente_modo: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="percentual_particular">% do valor particular</SelectItem>
+                    <SelectItem value="valor_fixo">Valor fixo (R$)</SelectItem>
+                    <SelectItem value="particular">Valor particular cheio (100%)</SelectItem>
+                    <SelectItem value="bloquear">Bloquear agendamento</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {modo === "percentual_particular" && (
+                <div>
+                  <Label className="text-xs">% do particular (0-100)</Label>
+                  <Input
+                    type="number" min="0" max="100"
+                    value={r.excedente_percentual ?? 50}
+                    onChange={(e) => onChange({ excedente_percentual: e.target.value ? Number(e.target.value) : 0 })}
+                    placeholder="Ex.: 50"
+                  />
+                </div>
+              )}
+              {modo === "valor_fixo" && (
+                <div>
+                  <Label className="text-xs">Valor fixo (R$)</Label>
+                  <Input
+                    type="number" inputMode="decimal"
+                    value={r.excedente_valor ?? ""}
+                    onChange={(e) => onChange({ excedente_valor: e.target.value ? Number(e.target.value) : null })}
+                    placeholder="Ex.: 50.00"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Fechar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
