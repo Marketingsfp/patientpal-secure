@@ -96,20 +96,24 @@ function proxima(e: Etapa): Etapa | null {
   return arr[i + 1];
 }
 
-function anterior(e: Etapa): Etapa | null {
+function anterior(e: Etapa, isExame: boolean): Etapa | null {
   const ordem: Etapa[] = ["aguardando_recepcao", "recepcao", "caixa", "triagem", "atendimento", "finalizado"];
   const ordemExame: Etapa[] = ["aguardando_recepcao", "recepcao", "caixa", "triagem", "exame", "finalizado"];
-  const arr = e === "exame" ? ordemExame : ordem;
+  const arr = isExame ? ordemExame : ordem;
   const i = arr.indexOf(e);
   if (i <= 0) return null;
   return arr[i - 1];
 }
+// E no botão: onClick={() => prev && setEtapa(a.id, anterior(a.fluxo_etapa, isExame))}
 
 function FluxoPage() {
   const { clinicaAtual } = useClinica();
   const [ags, setAgs] = useState<Ag[]>([]);
   const [loading, setLoading] = useState(false);
-  const [dataRef, setDataRef] = useState(() => new Date().toISOString().slice(0, 10));
+  const [dataRef, setDataRef] = useState(() => {
+    const tzOffset = new Date().getTimezoneOffset() * 60000;
+    return new Date(Date.now() - tzOffset).toISOString().slice(0, 10);
+  });
   const [fallbackAplicado, setFallbackAplicado] = useState(false);
   const [consultorio, setConsultorio] = useState<string>(() =>
     typeof window !== "undefined" ? (localStorage.getItem("fluxo_consultorio") ?? "1") : "1",
