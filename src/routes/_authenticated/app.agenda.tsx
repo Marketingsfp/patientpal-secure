@@ -2465,6 +2465,8 @@ function AgendaPage() {
           pacienteId: payload.paciente_id,
           medicoId: payload.medico_id,
           procedimentoNome: payload.procedimento ?? "",
+          agendamentoId: novoId,
+          dataRef: payload.inicio ?? null,
         }),
       ]);
       const proc: any = await buscarProcedimentoPorNome(clinicaAtual.clinica_id, payload.procedimento ?? "CONSULTA", lista);
@@ -2487,6 +2489,9 @@ function AgendaPage() {
         if (!info.emDia) {
           toast.error(`Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.`);
           descSuffix = ` — ${info.convenioNome} EM ATRASO`;
+        } else if (info.bloquear) {
+          toast.error(info.avisoLimite ?? "Limite do convênio atingido — agendamento bloqueado.");
+          descSuffix = ` — ${info.convenioNome} BLOQUEADO`;
         } else if (info.desconto) {
           opcoes = opcoes.map((o) => ({ ...o, valor: aplicarDescontoPorForma(o.valor, o.forma, info.desconto!) }));
           const rotulo =
@@ -2498,7 +2503,11 @@ function AgendaPage() {
                   ? `R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} dinheiro / R$ ${Number(info.desconto.valorOutros).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} outros`
                   : `-R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
           descSuffix = ` — Convênio ${info.convenioNome} (${rotulo})`;
-          toast.success(`Desconto do convênio ${info.convenioNome} aplicado (${rotulo}).`);
+          if (info.avisoLimite) toast.warning(info.avisoLimite);
+          else toast.success(`Desconto do convênio ${info.convenioNome} aplicado (${rotulo}).`);
+        } else if (info.avisoLimite) {
+          toast.warning(info.avisoLimite);
+          descSuffix = ` — ${info.convenioNome} (limite atingido)`;
         } else {
           toast.info(`Cliente possui convênio ${info.convenioNome}, mas sem benefício para este procedimento.`);
         }
