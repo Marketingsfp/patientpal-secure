@@ -403,6 +403,27 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     setSaving(false);
     if (error) { mostrarErro(error); return; }
     toast.success(`${tipo === "receita" ? "Receita" : "Despesa"} registrada`);
+    // Sincroniza `tipo_atendimento` do agendamento com o que foi pago,
+    // para que o check-in e relatórios reflitam a decisão final.
+    if (agendamentoId && tipo === "receita") {
+      try {
+        const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+        const catEscolhida = categorias.find((c) => c.id === categoriaId) ?? null;
+        const catEhConvenio = !!(catEscolhida && convenioNome && norm(catEscolhida.nome) === norm(convenioNome));
+        const formaEhConvenio = !pagamentoMisto && formaPagamento === "convenio";
+        const mistoTemConvenio = pagamentoMisto && pagamentos.some((p) => p.forma === "convenio" && Number(p.recebido || 0) > 0);
+        const pagouComoConvenio = catEhConvenio || formaEhConvenio || mistoTemConvenio;
+        const novoTipo = pagouComoConvenio ? "convenio" : "particular";
+        if (novoTipo !== tipoAgendamento) {
+          await supabase
+            .from("agendamentos")
+            .update({ tipo_atendimento: novoTipo } as never)
+            .eq("id", agendamentoId);
+        }
+      } catch (e) {
+        console.error("Falha ao sincronizar tipo_atendimento do agendamento:", e);
+      }
+    }
     // ----- Registra o split de repasse médico ----------------------------
     // Antes esse cálculo só era feito em memória (na hora de imprimir a GR
     // ou nos relatórios). Agora persistimos em `pagamento_splits` para que o
