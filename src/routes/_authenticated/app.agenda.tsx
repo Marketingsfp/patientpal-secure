@@ -253,6 +253,8 @@ type ConvenioInfo = {
   emDia: boolean;
   parcelasAtrasadas: number;
   desconto: DescontoConvenio | null;
+  avisoLimite?: string;
+  bloquear?: boolean;
 };
 
 function aplicarDesconto(valor: number, d: DescontoConvenio): number {
@@ -277,8 +279,10 @@ async function obterInfoConvenioPaciente(params: {
   pacienteId: string | null | undefined;
   medicoId: string | null | undefined;
   procedimentoNome: string;
+  agendamentoId?: string | null;
+  dataRef?: string | null; // ISO do agendamento (para checar limite no dia)
 }): Promise<ConvenioInfo | null> {
-  const { clinicaId, pacienteId, medicoId, procedimentoNome } = params;
+  const { clinicaId, pacienteId, medicoId, procedimentoNome, agendamentoId, dataRef } = params;
   if (!pacienteId) return null;
 
   // 1) Contrato ativo: paciente como titular OU dependente ativo
@@ -365,7 +369,7 @@ async function obterInfoConvenioPaciente(params: {
   // 4) Benefícios aplicáveis para o convênio
   const { data: beneficios } = await supabase
     .from("cb_beneficios")
-    .select("escopo,procedimento_id,especialidade_id,tipo_desconto,valor_desconto,valor_outros,ativo")
+    .select("escopo,procedimento_id,especialidade_id,tipo_desconto,valor_desconto,valor_outros,ativo,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor")
     .eq("clinica_id", clinicaId)
     .eq("convenio_id", contrato.convenio_id)
     .eq("ativo", true);
@@ -379,9 +383,11 @@ async function obterInfoConvenioPaciente(params: {
 
   // Prioridade: gratuidade > maior percentual > maior valor absoluto
   let desconto: DescontoConvenio | null = null;
+  let beneficioEscolhido: any = null;
   const grat = aplicaveis.find((b) => b.tipo_desconto === "gratuidade");
   if (grat) {
     desconto = { tipo: "gratuidade", valor: 0 };
+    beneficioEscolhido = grat;
   } else {
     const fixo = aplicaveis.find((b) => b.tipo_desconto === "valor_fixo");
     if (fixo) {
@@ -390,17 +396,128 @@ async function obterInfoConvenioPaciente(params: {
         valor: Number(fixo.valor_desconto) || 0,
         valorOutros: Number(fixo.valor_outros ?? fixo.valor_desconto) || 0,
       };
+      beneficioEscolhido = fixo;
     } else {
     const perc = aplicaveis.filter((b) => b.tipo_desconto === "percentual");
     const vals = aplicaveis.filter((b) => b.tipo_desconto === "valor");
     const maiorPerc = perc.reduce((m, b) => Math.max(m, Number(b.valor_desconto) || 0), 0);
     const maiorVal = vals.reduce((m, b) => Math.max(m, Number(b.valor_desconto) || 0), 0);
-    if (maiorPerc > 0) desconto = { tipo: "percentual", valor: maiorPerc };
-    else if (maiorVal > 0) desconto = { tipo: "valor", valor: maiorVal };
+    if (maiorPerc > 0) {
+      desconto = { tipo: "percentual", valor: maiorPerc };
+      beneficioEscolhido = perc.find((b) => Number(b.valor_desconto) === maiorPerc) ?? null;
+    } else if (maiorVal > 0) {
+      desconto = { tipo: "valor", valor: maiorVal };
+      beneficioEscolhido = vals.find((b) => Number(b.valor_desconto) === maiorVal) ?? null;
+    }
     }
   }
 
-  return { convenioNome, emDia, parcelasAtrasadas, desconto };
+  // 5) Checa limite de uso do benefício escolhido (ex.: "1 consulta R$9,99/dia/contrato")
+  let avisoLimite: string | undefined;
+  let bloquear = false;
+  if (beneficioEscolhido && beneficioEscolhido.limite_qtd && emDia) {
+    const dataBase = dataRef ? new Date(dataRef) : new Date();
+    const inicioDia = new Date(dataBase); inicioDia.setHours(0, 0, 0, 0);
+    const fimDia = new Date(dataBase); fimDia.setHours(23, 59, 59, 999);
+
+    // Pacientes que compartilham a cota do contrato
+    let pacientesCota: string[] = [];
+    if (beneficioEscolhido.limite_escopo === "paciente") {
+      pacientesCota = [pacienteId];
+    } else {
+      // titular + dependentes ativos do contrato
+      pacientesCota = [contrato.id ? "" : ""]; // placeholder, substituído abaixo
+      const { data: tit } = await supabase
+        .from("contratos_assinatura")
+        .select("paciente_id")
+        .eq("id", contrato.id)
+        .maybeSingle();
+      const { data: depsCota } = await supabase
+        .from("contrato_dependentes")
+        .select("paciente_id")
+        .eq("contrato_id", contrato.id)
+        .eq("ativo", true);
+      pacientesCota = Array.from(new Set([
+        ...((tit as any)?.paciente_id ? [(tit as any).paciente_id as string] : []),
+        ...((depsCota ?? []) as Array<{ paciente_id: string }>).map((d) => d.paciente_id),
+      ]));
+    }
+
+    if (pacientesCota.length > 0) {
+      // Conta agendamentos do dia, dos pacientes da cota, cujo médico tem a
+      // mesma especialidade do benefício, e que não estejam cancelados.
+      // Exclui o próprio agendamento (caso já esteja salvo).
+      let q = supabase
+        .from("agendamentos")
+        .select("id,medico_id,procedimento", { count: "exact" })
+        .eq("clinica_id", clinicaId)
+        .in("paciente_id", pacientesCota)
+        .gte("inicio", inicioDia.toISOString())
+        .lte("inicio", fimDia.toISOString())
+        .neq("status", "cancelado");
+      if (agendamentoId) q = q.neq("id", agendamentoId);
+      const { data: agsDia } = await q;
+
+      // Se o benefício é por especialidade, filtra pelos agendamentos cujo
+      // médico tem a mesma especialidade.
+      let usados = 0;
+      if (beneficioEscolhido.escopo === "especialidade" && beneficioEscolhido.especialidade_id) {
+        const medicoIds = Array.from(new Set(((agsDia ?? []) as Array<{ medico_id: string | null }>).map((a) => a.medico_id).filter((x): x is string => !!x)));
+        if (medicoIds.length) {
+          const { data: meds } = await supabase
+            .from("medicos")
+            .select("id,especialidade_id")
+            .in("id", medicoIds);
+          const { data: medEspN } = await supabase
+            .from("medico_especialidades")
+            .select("medico_id,especialidade_id")
+            .in("medico_id", medicoIds);
+          const espByMed = new Map<string, Set<string>>();
+          ((meds ?? []) as Array<{ id: string; especialidade_id: string | null }>).forEach((m) => {
+            const s = espByMed.get(m.id) ?? new Set<string>();
+            if (m.especialidade_id) s.add(m.especialidade_id);
+            espByMed.set(m.id, s);
+          });
+          ((medEspN ?? []) as Array<{ medico_id: string; especialidade_id: string | null }>).forEach((m) => {
+            const s = espByMed.get(m.medico_id) ?? new Set<string>();
+            if (m.especialidade_id) s.add(m.especialidade_id);
+            espByMed.set(m.medico_id, s);
+          });
+          usados = ((agsDia ?? []) as Array<{ medico_id: string | null }>).filter((a) => {
+            if (!a.medico_id) return false;
+            const s = espByMed.get(a.medico_id);
+            return s ? s.has(beneficioEscolhido.especialidade_id) : false;
+          }).length;
+        }
+      } else {
+        usados = (agsDia ?? []).length;
+      }
+
+      if (usados >= Number(beneficioEscolhido.limite_qtd)) {
+        const modo = beneficioEscolhido.excedente_modo;
+        const escopoTxt = beneficioEscolhido.limite_escopo === "paciente" ? "paciente" : "contrato";
+        if (modo === "bloquear") {
+          bloquear = true;
+          desconto = null;
+          avisoLimite = `Limite de ${beneficioEscolhido.limite_qtd}/dia por ${escopoTxt} atingido — agendamento bloqueado pelo convênio.`;
+        } else if (modo === "particular") {
+          desconto = null;
+          avisoLimite = `Limite de ${beneficioEscolhido.limite_qtd}/dia por ${escopoTxt} atingido — cobrando valor particular cheio.`;
+        } else if (modo === "valor_fixo") {
+          const v = Number(beneficioEscolhido.excedente_valor) || 0;
+          desconto = { tipo: "valor_fixo", valor: v, valorOutros: v };
+          avisoLimite = `Limite atingido — cobrando valor fixo excedente R$ ${v.toFixed(2)}.`;
+        } else if (modo === "percentual_particular") {
+          const pct = Number(beneficioEscolhido.excedente_percentual) || 0;
+          // pct = desconto sobre o particular; ex.: 50 → paga 50% do particular
+          desconto = { tipo: "percentual", valor: pct };
+          avisoLimite = `Limite de ${beneficioEscolhido.limite_qtd}/dia por ${escopoTxt} atingido — cobrando ${100 - pct}% do valor particular.`;
+        }
+      }
+    }
+  }
+
+  return { convenioNome, emDia, parcelasAtrasadas, desconto, avisoLimite, bloquear };
 }
 
 const toLocalInput = (iso: string) => {
@@ -2348,6 +2465,8 @@ function AgendaPage() {
           pacienteId: payload.paciente_id,
           medicoId: payload.medico_id,
           procedimentoNome: payload.procedimento ?? "",
+          agendamentoId: novoId,
+          dataRef: payload.inicio ?? null,
         }),
       ]);
       const proc: any = await buscarProcedimentoPorNome(clinicaAtual.clinica_id, payload.procedimento ?? "CONSULTA", lista);
@@ -2370,6 +2489,9 @@ function AgendaPage() {
         if (!info.emDia) {
           toast.error(`Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.`);
           descSuffix = ` — ${info.convenioNome} EM ATRASO`;
+        } else if (info.bloquear) {
+          toast.error(info.avisoLimite ?? "Limite do convênio atingido — agendamento bloqueado.");
+          descSuffix = ` — ${info.convenioNome} BLOQUEADO`;
         } else if (info.desconto) {
           opcoes = opcoes.map((o) => ({ ...o, valor: aplicarDescontoPorForma(o.valor, o.forma, info.desconto!) }));
           const rotulo =
@@ -2381,7 +2503,11 @@ function AgendaPage() {
                   ? `R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} dinheiro / R$ ${Number(info.desconto.valorOutros).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} outros`
                   : `-R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
           descSuffix = ` — Convênio ${info.convenioNome} (${rotulo})`;
-          toast.success(`Desconto do convênio ${info.convenioNome} aplicado (${rotulo}).`);
+          if (info.avisoLimite) toast.warning(info.avisoLimite);
+          else toast.success(`Desconto do convênio ${info.convenioNome} aplicado (${rotulo}).`);
+        } else if (info.avisoLimite) {
+          toast.warning(info.avisoLimite);
+          descSuffix = ` — ${info.convenioNome} (limite atingido)`;
         } else {
           toast.info(`Cliente possui convênio ${info.convenioNome}, mas sem benefício para este procedimento.`);
         }
@@ -2567,6 +2693,8 @@ function AgendaPage() {
         pacienteId: a.paciente_id,
         medicoId: a.medico_id,
         procedimentoNome: a.procedimento ?? "",
+        agendamentoId: a.id,
+        dataRef: a.inicio ?? null,
       }),
     ]);
     if ((jaPagos ?? []).length > 0) {
@@ -2595,6 +2723,9 @@ function AgendaPage() {
       if (!info.emDia) {
         toast.error(`Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.`);
         descSuffix = ` — ${info.convenioNome} EM ATRASO`;
+      } else if (info.bloquear) {
+        toast.error(info.avisoLimite ?? "Limite do convênio atingido — cobrança bloqueada.");
+        descSuffix = ` — ${info.convenioNome} BLOQUEADO`;
       } else if (info.desconto) {
         opcoes = opcoes.map((o) => ({ ...o, valor: aplicarDescontoPorForma(o.valor, o.forma, info.desconto!) }));
         const rotulo =
@@ -2606,7 +2737,11 @@ function AgendaPage() {
                 ? `R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} dinheiro / R$ ${Number(info.desconto.valorOutros).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} outros`
                 : `-R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
         descSuffix = ` — Convênio ${info.convenioNome} (${rotulo})`;
-        toast.success(`Desconto do convênio ${info.convenioNome} aplicado (${rotulo}).`);
+        if (info.avisoLimite) toast.warning(info.avisoLimite);
+        else toast.success(`Desconto do convênio ${info.convenioNome} aplicado (${rotulo}).`);
+      } else if (info.avisoLimite) {
+        toast.warning(info.avisoLimite);
+        descSuffix = ` — ${info.convenioNome} (limite atingido)`;
       } else {
         toast.info(`Cliente possui convênio ${info.convenioNome}, mas sem benefício para este procedimento.`);
       }
