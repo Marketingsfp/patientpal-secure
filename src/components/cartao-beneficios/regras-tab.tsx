@@ -319,9 +319,9 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         <Table className="min-w-[1400px]">
           <TableHeader>
             <TableRow>
-              <TableHead className="min-w-[220px]">Serviço</TableHead>
               <TableHead className="min-w-[200px]">Especialidade</TableHead>
               <TableHead>Categoria</TableHead>
+              <TableHead className="min-w-[220px]">Serviço</TableHead>
               <TableHead>Modo</TableHead>
               <TableHead className="text-right">Valor / %</TableHead>
               <TableHead className="w-20">Prioridade</TableHead>
