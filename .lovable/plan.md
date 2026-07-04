@@ -1,29 +1,55 @@
-# Sincronizar sinal de triagem — Atendimento médico × Fluxo do paciente
+# Plano — Teste de estresse do módulo CRM
 
-## Problema
+## Objetivo
+Executar 20 simulações variadas de cadastro na aba **CRM** (`/app/crm`), identificar bugs, erros de validação, comportamentos inesperados de UI/UX e persistência, e entregar relatório em Excel.
 
-Na aba **Atendimento médico**, a coluna "Triagem" da fila mostra ✓ (verde) apenas quando existe um registro na tabela `triagens_enfermagem` para o agendamento. Já a aba **Fluxo do paciente** trata a triagem como concluída sempre que o paciente avançou da coluna "Triagem" para "Atendimento" (independentemente de existir ou não formulário de triagem preenchido).
+## Escopo dos 20 cadastros
 
-Resultado: pacientes que a recepção/enfermagem moveram para "Atendimento" no fluxo aparecem com ✗ vermelho ("Triagem pendente") na aba Atendimento médico — as duas telas ficam contando coisas diferentes.
+Distribuição planejada (mix de casos válidos e de borda para expor bugs):
 
-## O que ajustar
+**Casos "felizes" (10)** — variando origens, status e valores:
+1. Lead Instagram, aberta, R$ 1.500 — telefone + email
+2. Lead Facebook, ganha, R$ 8.900
+3. Lead Google Ads, perdida, R$ 3.200
+4. Lead indicação, aberta, R$ 15.000 (valor alto)
+5. Lead WhatsApp, ganha, R$ 450
+6. Lead site, aberta, R$ 0 (valor zerado)
+7. Lead evento, ganha, R$ 22.500
+8. Lead TikTok, perdida, R$ 780
+9. Lead LinkedIn, aberta, R$ 5.400
+10. Lead orgânico, ganha, R$ 12.000
 
-Na aba **Atendimento médico** (`src/routes/_authenticated/app.atendimento-ia.index.tsx`), passar a considerar a triagem como **concluída** quando **qualquer uma** das condições for verdadeira:
+**Casos de borda / validação (10)**:
+11. Nome com acentos e caracteres especiais (`João D'Ávila-Süß`)
+12. Nome muito longo (200+ caracteres)
+13. Email inválido (`abc@`, sem TLD)
+14. Telefone com formatação livre (`+55 (11) 9 8888-7777`)
+15. Telefone só com letras (`abcdef`)
+16. Valor negativo (`-500`)
+17. Valor com casas decimais quebradas (`R$ 1.234,567`)
+18. Campos opcionais todos vazios (só nome + status)
+19. Nome em branco (deve falhar — required)
+20. Observações longas (2000+ caracteres) + emojis
 
-1. Existe um registro em `triagens_enfermagem` para o agendamento (comportamento atual), **ou**
-2. O paciente já está na etapa `atendimento` do fluxo (ou seja, ultrapassou a coluna "Triagem" no Fluxo do paciente).
+## Etapas de execução
 
-Para as etapas anteriores (`aguardando_recepcao`, `recepcao`, `caixa`, `triagem`) sem registro de triagem, continua exibindo ✗ "Triagem pendente".
+1. **Ler o código do CRM** (`app.crm.tsx`, `SimpleCrud.tsx`, `CurrencyInput`) para entender validações existentes.
+2. **Rodar Playwright headless** em `http://localhost:8080/app/crm` com sessão Supabase injetada:
+   - Para cada cenário: abrir "Novo", preencher, submeter, capturar screenshot, ler toast/erro, verificar se a linha aparece na tabela.
+   - Registrar comportamento observado (sucesso, erro, silêncio, crash).
+3. **Verificar no banco** (`crm_oportunidades`) se cada registro foi persistido conforme esperado (valor, status, telefone/email null vs string vazia, sanitização).
+4. **Testar interações pós-cadastro**: busca por nome/telefone/email, editar um registro, excluir, exportar (se houver).
+5. **Consolidar achados** por categoria: validação, UX, persistência, formatação, acessibilidade, erros de console/rede.
+6. **Gerar `relatorio-bugs-crm-2026-07-04.xlsx`** em `/mnt/documents/` com abas:
+   - **Resumo** (total testes, ok, falhas, bugs críticos/médios/baixos)
+   - **Cenários** (nº, descrição, entrada, resultado esperado, resultado obtido, status)
+   - **Bugs** (id, severidade, título, passos, evidência/screenshot, sugestão de correção)
+   - **Console/Rede** (erros capturados durante os testes)
+7. **Limpeza**: deletar leads de teste ao final (prefixo `[TESTE CRM]` nos nomes) para não poluir o CRM real.
 
-## Detalhes técnicos
+## O que NÃO será feito
+- Nenhuma alteração de código, schema ou RLS nesta rodada — apenas diagnóstico.
+- Correções de bugs virão em um próximo passo, após você aprovar quais priorizar com base no relatório.
 
-- Introduzir helper `triagemFeita(it)` que retorna `true` se `triagens[it.id]` existir **ou** `it.fluxo_etapa === "atendimento"`.
-- Usar esse helper na célula da coluna Triagem (ícone Check/X + tooltip).
-- Manter o HoverCard de prioridade exibindo os dados de `triagens[it.id]` quando existir; quando o paciente está em `atendimento` sem registro formal, mostrar mensagem "Paciente avançou sem registro de triagem no sistema."
-- Nenhuma mudança de schema, RLS ou lógica de backend. Apenas frontend, na tela de Atendimento médico.
-
-## Fora de escopo
-
-- Não alterar a aba Fluxo do paciente nem a aba Triagem de enfermagem.
-- Não criar registros retroativos em `triagens_enfermagem`.
-- Não mexer nos dados de teste (`[TESTE FLUXO 2]`).
+## Entregável
+Arquivo `relatorio-bugs-crm-2026-07-04.xlsx` em `/mnt/documents/` + resumo em chat com os principais achados.
