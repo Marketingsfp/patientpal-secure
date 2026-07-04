@@ -204,9 +204,9 @@ async function identificarPaciente(
 
   const { data, error } = await supabaseAdmin.rpc("buscar_paciente_contato", {
     _clinica_id: clinicaId,
-    _cpf: ids.cpf,
-    _telefone: telBusca,
-    _nome: ids.nome,
+    _cpf: ids.cpf ?? undefined,
+    _telefone: telBusca ?? undefined,
+    _nome: ids.nome ?? undefined,
   });
   if (error) {
     console.error("[Nina] buscar_paciente_contato error", error);
