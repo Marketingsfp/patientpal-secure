@@ -7336,7 +7336,16 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_pacientes_duplicados_suspeitos: {
+        Row: {
+          chave: string | null
+          clinica_id: string | null
+          ids: string[] | null
+          qtd: number | null
+          tipo: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       _do_fix_phones_prontuarios_mj: {
@@ -7443,6 +7452,26 @@ export type Database = {
           nome: string
           numero_pasta: string
           telefone: string
+        }[]
+      }
+      buscar_pacientes_global: {
+        Args: { _clinica_ids: string[]; _limite?: number; _termo: string }
+        Returns: {
+          associado_convenio: string
+          cadastro_incompleto: boolean
+          clinica_id: string
+          codigo_prontuario: string
+          codigo_prontuario_anterior: string
+          cpf: string
+          data_nascimento: string
+          email: string
+          id: string
+          match_reason: string
+          match_score: number
+          nome: string
+          numero_pasta: string
+          telefone: string
+          ultima_consulta: string
         }[]
       }
       can_manage_clinica: {
@@ -7660,6 +7689,17 @@ export type Database = {
       is_member: {
         Args: { _clinica_id: string; _user_id: string }
         Returns: boolean
+      }
+      listar_duplicados_pacientes: {
+        Args: { _clinica_ids: string[]; _limite?: number; _tipo?: string }
+        Returns: {
+          chave: string
+          clinica_id: string
+          ids: string[]
+          pacientes: Json
+          qtd: number
+          tipo: string
+        }[]
       }
       log_action: {
         Args: {

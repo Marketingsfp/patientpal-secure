@@ -111,6 +111,7 @@ import { Route as AuthenticatedAppFinanceiroAtendimentosRouteImport } from './ro
 import { Route as AuthenticatedAppFinanceiroAnaliticoRouteImport } from './routes/_authenticated/app.financeiro.analitico'
 import { Route as AuthenticatedAppFinanceiroAlertasRouteImport } from './routes/_authenticated/app.financeiro.alertas'
 import { Route as AuthenticatedAppConfiguracoesNfseRouteImport } from './routes/_authenticated/app.configuracoes.nfse'
+import { Route as AuthenticatedAppClientesDuplicadosRouteImport } from './routes/_authenticated/app.clientes.duplicados'
 import { Route as AuthenticatedAppCartaoBeneficiosRelatoriosRouteImport } from './routes/_authenticated/app.cartao-beneficios.relatorios'
 import { Route as AuthenticatedAppCartaoBeneficiosModelosRouteImport } from './routes/_authenticated/app.cartao-beneficios.modelos'
 import { Route as AuthenticatedAppCartaoBeneficiosDependentesRouteImport } from './routes/_authenticated/app.cartao-beneficios.dependentes'
@@ -696,6 +697,12 @@ const AuthenticatedAppConfiguracoesNfseRoute =
     path: '/configuracoes/nfse',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
+const AuthenticatedAppClientesDuplicadosRoute =
+  AuthenticatedAppClientesDuplicadosRouteImport.update({
+    id: '/clientes/duplicados',
+    path: '/clientes/duplicados',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppCartaoBeneficiosRelatoriosRoute =
   AuthenticatedAppCartaoBeneficiosRelatoriosRouteImport.update({
     id: '/relatorios',
@@ -854,6 +861,7 @@ export interface FileRoutesByFullPath {
   '/app/cartao-beneficios/dependentes': typeof AuthenticatedAppCartaoBeneficiosDependentesRoute
   '/app/cartao-beneficios/modelos': typeof AuthenticatedAppCartaoBeneficiosModelosRoute
   '/app/cartao-beneficios/relatorios': typeof AuthenticatedAppCartaoBeneficiosRelatoriosRoute
+  '/app/clientes/duplicados': typeof AuthenticatedAppClientesDuplicadosRoute
   '/app/configuracoes/nfse': typeof AuthenticatedAppConfiguracoesNfseRoute
   '/app/financeiro/alertas': typeof AuthenticatedAppFinanceiroAlertasRoute
   '/app/financeiro/analitico': typeof AuthenticatedAppFinanceiroAnaliticoRoute
@@ -965,6 +973,7 @@ export interface FileRoutesByTo {
   '/app/cartao-beneficios/dependentes': typeof AuthenticatedAppCartaoBeneficiosDependentesRoute
   '/app/cartao-beneficios/modelos': typeof AuthenticatedAppCartaoBeneficiosModelosRoute
   '/app/cartao-beneficios/relatorios': typeof AuthenticatedAppCartaoBeneficiosRelatoriosRoute
+  '/app/clientes/duplicados': typeof AuthenticatedAppClientesDuplicadosRoute
   '/app/configuracoes/nfse': typeof AuthenticatedAppConfiguracoesNfseRoute
   '/app/financeiro/alertas': typeof AuthenticatedAppFinanceiroAlertasRoute
   '/app/financeiro/analitico': typeof AuthenticatedAppFinanceiroAnaliticoRoute
@@ -1082,6 +1091,7 @@ export interface FileRoutesById {
   '/_authenticated/app/cartao-beneficios/dependentes': typeof AuthenticatedAppCartaoBeneficiosDependentesRoute
   '/_authenticated/app/cartao-beneficios/modelos': typeof AuthenticatedAppCartaoBeneficiosModelosRoute
   '/_authenticated/app/cartao-beneficios/relatorios': typeof AuthenticatedAppCartaoBeneficiosRelatoriosRoute
+  '/_authenticated/app/clientes/duplicados': typeof AuthenticatedAppClientesDuplicadosRoute
   '/_authenticated/app/configuracoes/nfse': typeof AuthenticatedAppConfiguracoesNfseRoute
   '/_authenticated/app/financeiro/alertas': typeof AuthenticatedAppFinanceiroAlertasRoute
   '/_authenticated/app/financeiro/analitico': typeof AuthenticatedAppFinanceiroAnaliticoRoute
@@ -1199,6 +1209,7 @@ export interface FileRouteTypes {
     | '/app/cartao-beneficios/dependentes'
     | '/app/cartao-beneficios/modelos'
     | '/app/cartao-beneficios/relatorios'
+    | '/app/clientes/duplicados'
     | '/app/configuracoes/nfse'
     | '/app/financeiro/alertas'
     | '/app/financeiro/analitico'
@@ -1310,6 +1321,7 @@ export interface FileRouteTypes {
     | '/app/cartao-beneficios/dependentes'
     | '/app/cartao-beneficios/modelos'
     | '/app/cartao-beneficios/relatorios'
+    | '/app/clientes/duplicados'
     | '/app/configuracoes/nfse'
     | '/app/financeiro/alertas'
     | '/app/financeiro/analitico'
@@ -1426,6 +1438,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/cartao-beneficios/dependentes'
     | '/_authenticated/app/cartao-beneficios/modelos'
     | '/_authenticated/app/cartao-beneficios/relatorios'
+    | '/_authenticated/app/clientes/duplicados'
     | '/_authenticated/app/configuracoes/nfse'
     | '/_authenticated/app/financeiro/alertas'
     | '/_authenticated/app/financeiro/analitico'
@@ -2197,6 +2210,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppConfiguracoesNfseRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/app/clientes/duplicados': {
+      id: '/_authenticated/app/clientes/duplicados'
+      path: '/clientes/duplicados'
+      fullPath: '/app/clientes/duplicados'
+      preLoaderRoute: typeof AuthenticatedAppClientesDuplicadosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/app/cartao-beneficios/relatorios': {
       id: '/_authenticated/app/cartao-beneficios/relatorios'
       path: '/relatorios'
@@ -2478,6 +2498,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppTriagemEnfermagemRoute: typeof AuthenticatedAppTriagemEnfermagemRoute
   AuthenticatedAppUnidadesRoute: typeof AuthenticatedAppUnidadesRoute
   AuthenticatedAppIndexRoute: typeof AuthenticatedAppIndexRoute
+  AuthenticatedAppClientesDuplicadosRoute: typeof AuthenticatedAppClientesDuplicadosRoute
   AuthenticatedAppConfiguracoesNfseRoute: typeof AuthenticatedAppConfiguracoesNfseRoute
   AuthenticatedAppFuncionarioUserIdRoute: typeof AuthenticatedAppFuncionarioUserIdRoute
   AuthenticatedAppImprimirAgendamentoIdRoute: typeof AuthenticatedAppImprimirAgendamentoIdRoute
@@ -2554,6 +2575,8 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
     AuthenticatedAppTriagemEnfermagemRoute,
   AuthenticatedAppUnidadesRoute: AuthenticatedAppUnidadesRoute,
   AuthenticatedAppIndexRoute: AuthenticatedAppIndexRoute,
+  AuthenticatedAppClientesDuplicadosRoute:
+    AuthenticatedAppClientesDuplicadosRoute,
   AuthenticatedAppConfiguracoesNfseRoute:
     AuthenticatedAppConfiguracoesNfseRoute,
   AuthenticatedAppFuncionarioUserIdRoute:
