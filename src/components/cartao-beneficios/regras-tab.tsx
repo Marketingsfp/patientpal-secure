@@ -21,6 +21,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { findRegra, computeValor, type CbRegra } from "@/lib/cb-regras";
 
 type EspOpt = { id: string; nome: string };
+type ProcOpt = { id: string; nome: string; codigo: string | null };
 
 interface Props {
   clinicaId: string;
@@ -33,6 +34,7 @@ const TIPOS = ["consulta", "exame", "procedimento", "cirurgia"];
 export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props) {
   const [regras, setRegras] = useState<CbRegra[]>([]);
   const [especialidades, setEspecialidades] = useState<EspOpt[]>([]);
+  const [procedimentos, setProcedimentos] = useState<ProcOpt[]>([]);
   const [loading, setLoading] = useState(false);
   const [reapplying, setReapplying] = useState(false);
   const [progress, setProgress] = useState<string>("");
@@ -41,19 +43,22 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
   const load = async () => {
     if (!convenioId) return;
     setLoading(true);
-    const [{ data: r, error: e1 }, { data: e, error: e2 }] = await Promise.all([
+    const [{ data: r, error: e1 }, { data: e, error: e2 }, { data: p, error: e3 }] = await Promise.all([
       (supabase as any)
         .from("cb_convenio_regras")
-        .select("id,convenio_id,especialidade_id,tipo,modo,valor,percentual,prioridade,ativo,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor,carencia_mensalidades,gratuito")
+        .select("id,convenio_id,especialidade_id,procedimento_id,tipo,modo,valor,percentual,prioridade,ativo,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor,carencia_mensalidades,gratuito")
         .eq("convenio_id", convenioId)
         .order("prioridade", { ascending: false }),
       supabase.from("especialidades").select("id,nome").eq("ativo", true).order("nome"),
+      supabase.from("procedimentos").select("id,nome,codigo").eq("clinica_id", clinicaId).eq("ativo", true).order("nome"),
     ]);
     setLoading(false);
     if (e1) { mostrarErro(e1); return; }
     if (e2) { mostrarErro(e2); return; }
+    if (e3) { mostrarErro(e3); return; }
     setRegras((r ?? []) as CbRegra[]);
     setEspecialidades((e ?? []) as EspOpt[]);
+    setProcedimentos((p ?? []) as ProcOpt[]);
   };
 
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, [convenioId]);
@@ -63,6 +68,14 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     [especialidades],
   );
 
+  const procOpts = useMemo(
+    () => [
+      { value: "__any__", label: "Qualquer serviço" },
+      ...procedimentos.map(p => ({ value: p.id, label: p.codigo ? `${p.codigo} — ${p.nome}` : p.nome })),
+    ],
+    [procedimentos],
+  );
+
   const addRegra = () => {
     if (!convenioId) return;
     setRegras(prev => [
@@ -70,6 +83,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         id: `new-${crypto.randomUUID()}`,
         convenio_id: convenioId,
         especialidade_id: null,
+        procedimento_id: null,
         tipo: null,
         modo: "valor_fixo",
         valor: 0,
@@ -111,8 +125,10 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
       const payload: any = {
         clinica_id: clinicaId,
         convenio_id: convenioId,
-        especialidade_id: r.especialidade_id,
-        tipo: r.tipo,
+        // quando a regra é por serviço específico, ignora especialidade/tipo
+        procedimento_id: r.procedimento_id ?? null,
+        especialidade_id: r.procedimento_id ? null : r.especialidade_id,
+        tipo: r.procedimento_id ? null : r.tipo,
         modo: r.modo,
         valor: r.modo === "valor_fixo" ? Number(r.valor) || 0 : null,
         percentual: r.modo === "percentual_desconto" ? Number(r.percentual) || 0 : null,
