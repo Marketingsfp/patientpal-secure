@@ -401,7 +401,7 @@ function Page() {
       // tipo do procedimento: pega da tabela? simplificação: tenta consulta primeiro, depois exame
       const tentar = ["consulta", "exame", "procedimento"];
       for (const tipo of tentar) {
-        const regra = findRegra(regras, especId, tipo);
+        const regra = findRegra(regras, especId, tipo, base.procedimento_id ?? null);
         if (regra) {
           const v = computeValor(regra, base.dinheiro, base.cartao);
           if (v) {

@@ -21,6 +21,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { findRegra, computeValor, type CbRegra } from "@/lib/cb-regras";
 
 type EspOpt = { id: string; nome: string };
+type ProcOpt = { id: string; nome: string; codigo: string | null };
 
 interface Props {
   clinicaId: string;
@@ -33,6 +34,7 @@ const TIPOS = ["consulta", "exame", "procedimento", "cirurgia"];
 export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props) {
   const [regras, setRegras] = useState<CbRegra[]>([]);
   const [especialidades, setEspecialidades] = useState<EspOpt[]>([]);
+  const [procedimentos, setProcedimentos] = useState<ProcOpt[]>([]);
   const [loading, setLoading] = useState(false);
   const [reapplying, setReapplying] = useState(false);
   const [progress, setProgress] = useState<string>("");
@@ -41,19 +43,22 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
   const load = async () => {
     if (!convenioId) return;
     setLoading(true);
-    const [{ data: r, error: e1 }, { data: e, error: e2 }] = await Promise.all([
+    const [{ data: r, error: e1 }, { data: e, error: e2 }, { data: p, error: e3 }] = await Promise.all([
       (supabase as any)
         .from("cb_convenio_regras")
-        .select("id,convenio_id,especialidade_id,tipo,modo,valor,percentual,prioridade,ativo,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor,carencia_mensalidades,gratuito")
+        .select("id,convenio_id,especialidade_id,procedimento_id,tipo,modo,valor,percentual,prioridade,ativo,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor,carencia_mensalidades,gratuito")
         .eq("convenio_id", convenioId)
         .order("prioridade", { ascending: false }),
       supabase.from("especialidades").select("id,nome").eq("ativo", true).order("nome"),
+      supabase.from("procedimentos").select("id,nome,codigo").eq("clinica_id", clinicaId).eq("ativo", true).order("nome"),
     ]);
     setLoading(false);
     if (e1) { mostrarErro(e1); return; }
     if (e2) { mostrarErro(e2); return; }
+    if (e3) { mostrarErro(e3); return; }
     setRegras((r ?? []) as CbRegra[]);
     setEspecialidades((e ?? []) as EspOpt[]);
+    setProcedimentos((p ?? []) as ProcOpt[]);
   };
 
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, [convenioId]);
@@ -63,6 +68,14 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     [especialidades],
   );
 
+  const procOpts = useMemo(
+    () => [
+      { value: "__any__", label: "Qualquer serviço" },
+      ...procedimentos.map(p => ({ value: p.id, label: p.codigo ? `${p.codigo} — ${p.nome}` : p.nome })),
+    ],
+    [procedimentos],
+  );
+
   const addRegra = () => {
     if (!convenioId) return;
     setRegras(prev => [
@@ -70,6 +83,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         id: `new-${crypto.randomUUID()}`,
         convenio_id: convenioId,
         especialidade_id: null,
+        procedimento_id: null,
         tipo: null,
         modo: "valor_fixo",
         valor: 0,
@@ -111,8 +125,10 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
       const payload: any = {
         clinica_id: clinicaId,
         convenio_id: convenioId,
-        especialidade_id: r.especialidade_id,
-        tipo: r.tipo,
+        // quando a regra é por serviço específico, ignora especialidade/tipo
+        procedimento_id: r.procedimento_id ?? null,
+        especialidade_id: r.procedimento_id ? null : r.especialidade_id,
+        tipo: r.procedimento_id ? null : r.tipo,
         modo: r.modo,
         valor: r.modo === "valor_fixo" ? Number(r.valor) || 0 : null,
         percentual: r.modo === "percentual_desconto" ? Number(r.percentual) || 0 : null,
@@ -208,9 +224,9 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         let best: ReturnType<typeof computeValor> = null;
         let bestScore = -1;
         for (const eid of possibleEspIds) {
-          const r = findRegra(regras, eid, tipo);
+          const r = findRegra(regras, eid, tipo, p.id);
           if (!r) continue;
-          const sc = (r.especialidade_id ? 10 : 0) + (r.tipo ? 5 : 0) + (r.prioridade || 0) * 0.01;
+          const sc = (r.procedimento_id ? 100 : 0) + (r.especialidade_id ? 10 : 0) + (r.tipo ? 5 : 0) + (r.prioridade || 0) * 0.01;
           if (sc > bestScore) {
             const v = computeValor(r, baseDin, baseOut);
             if (v) { best = v; bestScore = sc; }
@@ -268,7 +284,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         <div>
           <div className="font-medium">Regras de preço automáticas</div>
           <p className="text-sm text-muted-foreground">
-            Cadastre regras por especialidade e/ou tipo. A regra mais específica e de maior prioridade vence. Ao cadastrar um serviço, o valor deste convênio será preenchido automaticamente.
+            Cadastre regras por serviço específico, especialidade e/ou tipo. A regra mais específica e de maior prioridade vence (serviço &gt; especialidade+tipo &gt; especialidade &gt; tipo). Ao cadastrar um serviço, o valor deste convênio será preenchido automaticamente.
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
@@ -283,9 +299,10 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
       </div>
 
       <div className="border rounded-md overflow-x-auto max-w-full">
-        <Table className="min-w-[1200px]">
+        <Table className="min-w-[1400px]">
           <TableHeader>
             <TableRow>
+              <TableHead className="min-w-[220px]">Serviço</TableHead>
               <TableHead className="min-w-[200px]">Especialidade</TableHead>
               <TableHead>Categoria</TableHead>
               <TableHead>Modo</TableHead>
@@ -300,21 +317,38 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-6">Carregando…</TableCell></TableRow>
+              <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-6">Carregando…</TableCell></TableRow>
             ) : regras.length === 0 ? (
-              <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-6">Nenhuma regra. Clique em "Adicionar regra".</TableCell></TableRow>
+              <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-6">Nenhuma regra. Clique em "Adicionar regra".</TableCell></TableRow>
             ) : regras.map((r, idx) => (
               <TableRow key={r.id}>
+                <TableCell>
+                  <SearchableSelect
+                    options={procOpts}
+                    value={r.procedimento_id ?? "__any__"}
+                    onChange={(v) => update(idx, {
+                      procedimento_id: v === "__any__" ? null : v,
+                      // limpar filtros por especialidade/tipo quando escolhe serviço
+                      ...(v !== "__any__" ? { especialidade_id: null, tipo: null } : {}),
+                    })}
+                    placeholder="Qualquer serviço"
+                  />
+                </TableCell>
                 <TableCell>
                   <SearchableSelect
                     options={espOpts}
                     value={r.especialidade_id ?? "__any__"}
                     onChange={(v) => update(idx, { especialidade_id: v === "__any__" ? null : v })}
                     placeholder="Qualquer"
+                    disabled={!!r.procedimento_id}
                   />
                 </TableCell>
                 <TableCell>
-                  <Select value={r.tipo ?? "__any__"} onValueChange={(v) => update(idx, { tipo: v === "__any__" ? null : v })}>
+                  <Select
+                    value={r.tipo ?? "__any__"}
+                    onValueChange={(v) => update(idx, { tipo: v === "__any__" ? null : v })}
+                    disabled={!!r.procedimento_id}
+                  >
                     <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__any__">Qualquer</SelectItem>
@@ -413,7 +447,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
 
       <div className="flex items-center justify-between gap-3 pt-2">
         <p className="text-xs text-muted-foreground">
-          Dica: prioridade maior vence em caso de empate. Especialidade + categoria é mais específico que só categoria.
+          Dica: prioridade maior vence em caso de empate. Regras por serviço específico sempre vencem regras por especialidade/categoria.
         </p>
         <Button size="sm" onClick={salvar} disabled={loading}>
           {loading ? "Salvando…" : "Salvar regras"}
