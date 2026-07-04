@@ -838,13 +838,19 @@ function NovoOrcamentoDialog({
               <div className="flex flex-wrap gap-2 rounded-md border p-2">
                 {FORMAS.map((f) => {
                   const checked = formasPagamento.includes(f);
+                  const disabled = !checked && formasPagamento.length >= 2;
                   return (
                     <label key={f}
-                      className={`flex items-center gap-2 px-2 py-1 rounded-md text-sm cursor-pointer border ${
-                        checked ? "bg-primary/10 border-primary/40" : "border-border hover:bg-muted/40"
+                      className={`flex items-center gap-2 px-2 py-1 rounded-md text-sm border ${
+                        checked
+                          ? "bg-primary/10 border-primary/40 cursor-pointer"
+                          : disabled
+                            ? "border-border opacity-40 cursor-not-allowed"
+                            : "border-border hover:bg-muted/40 cursor-pointer"
                       }`}
+                      title={disabled ? "Máximo de 2 formas de pagamento" : undefined}
                     >
-                      <Checkbox checked={checked} onCheckedChange={() => toggleForma(f)} />
+                      <Checkbox checked={checked} disabled={disabled} onCheckedChange={() => !disabled && toggleForma(f)} />
                       {f}
                     </label>
                   );
