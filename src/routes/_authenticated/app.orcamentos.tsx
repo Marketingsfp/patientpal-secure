@@ -524,6 +524,15 @@ function OrcamentosPage() {
           }}
         />
       )}
+
+      {historicoId && clinicaAtual && (
+        <HistoricoOrcamentoDialog
+          open={!!historicoId}
+          onClose={() => setHistoricoId(null)}
+          orcamentoId={historicoId}
+          clinicaId={clinicaAtual.clinica_id}
+        />
+      )}
     </div>
   );
 }
