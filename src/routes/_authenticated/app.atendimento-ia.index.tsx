@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { toast } from "sonner";
@@ -203,16 +203,14 @@ function AtendimentoIaPage() {
               {medicoSelecionado.nome}
             </div>
           ) : (
-            <Select value={medicoId} onValueChange={setMedicoId}>
-              <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
-              <SelectContent>
-                {medicos.map((m) => (
-                  <SelectItem key={m.id} value={m.id} className="uppercase">
-                    {m.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              options={medicos.map((m) => ({ value: m.id, label: m.nome.toUpperCase() }))}
+              value={medicoId}
+              onChange={setMedicoId}
+              placeholder="Selecione…"
+              searchPlaceholder="Buscar médico…"
+              emptyText="Nenhum médico encontrado."
+            />
           )}
           {medicoSelecionado && (
             <div className="text-xs text-muted-foreground pt-1">
