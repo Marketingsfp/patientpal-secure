@@ -341,18 +341,6 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
               <TableRow key={r.id}>
                 <TableCell>
                   <SearchableSelect
-                    options={procOpts}
-                    value={r.procedimento_id ?? "__any__"}
-                    onChange={(v) => update(idx, {
-                      procedimento_id: v === "__any__" ? null : v,
-                      // limpar filtros por especialidade/tipo quando escolhe serviço
-                      ...(v !== "__any__" ? { especialidade_id: null, tipo: null } : {}),
-                    })}
-                    placeholder="Qualquer serviço"
-                  />
-                </TableCell>
-                <TableCell>
-                  <SearchableSelect
                     options={espOpts}
                     value={r.especialidade_id ?? "__any__"}
                     onChange={(v) => update(idx, { especialidade_id: v === "__any__" ? null : v })}
@@ -372,6 +360,18 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                       {TIPOS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                </TableCell>
+                <TableCell>
+                  <SearchableSelect
+                    options={procOpts}
+                    value={r.procedimento_id ?? "__any__"}
+                    onChange={(v) => update(idx, {
+                      procedimento_id: v === "__any__" ? null : v,
+                      // limpar filtros por especialidade/tipo quando escolhe serviço
+                      ...(v !== "__any__" ? { especialidade_id: null, tipo: null } : {}),
+                    })}
+                    placeholder="Qualquer serviço"
+                  />
                 </TableCell>
                 <TableCell>
                   <Select value={r.modo} onValueChange={(v) => update(idx, { modo: v })}>
