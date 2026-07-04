@@ -62,7 +62,7 @@ const ROUTE_TO_MODULE: Record<string, string> = {
   "/app/financeiro/atendimentos": "financeiro",
   "/app/chat": "chat",
   "/app/clientes": "clientes",
-  "/app/painel": "dashboard",
+  "/app/painel": "painel",
   "/app/fluxo": "fluxo",
   "/app/orcamentos": "orcamentos",
   "/app/recepcao": "recepcao",
