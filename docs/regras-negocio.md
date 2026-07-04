@@ -343,16 +343,21 @@ RLS em `profiles`: 6 policies (detalhamento em R16).
 > Cada rodada acrescenta itens aqui. Nesta versão, apenas Rodada 1.
 
 ### 5.1 ✅ Regras confirmadas pelo código
-FUN-001, FUN-002, FUN-003, FUN-004, FUN-005, FUN-006, FUN-007, FUN-020, FUN-021, FUN-022, FUN-023, FUN-024, FUN-025, FUN-026, FUN-027, FUN-028, AUT-001, AUT-002, AUT-003, AUT-006.
+FUN-001..FUN-007, FUN-020..FUN-028, FUN-035, AUT-001, AUT-002, AUT-003, AUT-006.
 
 ### 5.2 🟡 Regras inferidas do histórico de prompts
 AUT-004, FUN-030.
 
 ### 5.3 🟠 Regras incompletas
-FUN-008 (branding sem UI), FUN-029 (tabelas antigas coexistindo), FUN-030 (falta FK), o gating de rotas por permissão (só menu é filtrado).
+FUN-008 (branding sem UI), FUN-010 (base_importada só cliente), FUN-029 (tabelas antigas coexistindo), FUN-035 (gating só de menu).
 
 ### 5.4 🔴 Regras conflitantes
-*Nenhuma detectada nesta rodada.*
+- **FUN-009** — self-insert em `clinica_memberships` (bug de segurança).
+- **FUN-011** — `/app/clinicas` é rota morta.
+- **FUN-031** — enum SQL não tem `caixa`; front usa `caixa`.
+- **FUN-032** — `app_role` × `app_role_global` (dois sistemas paralelos).
+- **FUN-033** — PRESETS duplicados divergentes.
+- **FUN-034** — vazamento de permissão em `modoTodas`.
 
 ### 5.5 ❓ Regras a validar com a clínica
 - Semântica de `unidades` — sub-clínica ou consultório?
@@ -364,6 +369,17 @@ FUN-008 (branding sem UI), FUN-029 (tabelas antigas coexistindo), FUN-030 (falta
 - `role_permissions` / `permissions` são legado ou uso real?
 - Enum `app_role` vs. `clinica_memberships.role` — qual manda?
 - Existe guard de rota (não só menu) por módulo?
+- `user_roles` / `app_role_global` — remover ou passar a usar?
+
+### 5.6 🔴 Achados de segurança (tratar antes de novas features)
+
+| ID       | Impacto                                                                     | Correção sugerida                                                                          |
+| -------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| FUN-009  | Elevação de privilégio: qualquer autenticado vira admin de qualquer clínica | Remover ramo `user_id = auth.uid()` do WITH CHECK e trocar por fluxo de convite            |
+| FUN-031  | Salvar `role='caixa'` sempre falha em produção                              | Adicionar `caixa` ao enum `app_role` via nova migration                                    |
+| FUN-034  | Menu incorreto em modo agregado                                             | Calcular `allowed` como interseção OU exigir clínica única antes de operar em `modoTodas`  |
+| FUN-035  | Rotas diretas ignoram permissão                                             | Adicionar `beforeLoad` gate por módulo em `_authenticated`                                 |
+| FUN-010  | `base_importada` não protege chamadas diretas                               | Reforçar via RLS: policy que bloqueia `SELECT/INSERT` quando `base_importada=false` para não-admin |
 
 ---
 
