@@ -15,8 +15,14 @@ export interface PatientOption {
   clinica_id: string;
   codigo_prontuario?: string | null;
   numero_pasta?: string | null;
+  codigo_prontuario_anterior?: string | null;
+  email?: string | null;
   /** Preenchido quando o paciente tem contrato ativo de convênio. */
   associado_convenio?: string | null;
+  ultima_consulta?: string | null;
+  cadastro_incompleto?: boolean;
+  match_score?: number;
+  match_reason?: string;
 }
 
 interface PatientSearchInputProps {
@@ -87,7 +93,6 @@ export function PatientSearchInput({
   const [options, setOptions] = useState<PatientOption[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [associadosMap, setAssociadosMap] = useState<Map<string, string>>(new Map());
   const containerRef = useRef<HTMLDivElement>(null);
   const reqIdRef = useRef(0);
   const cacheRef = useRef<Map<string, PatientOption[]>>(new Map());
@@ -114,11 +119,10 @@ export function PatientSearchInput({
     const handle = setTimeout(async () => {
       const myReq = ++reqIdRef.current;
       setLoading(true);
-      const termoSemAcento = normalizarBusca(term);
       const dataBusca = parseDataBusca(term);
-      // Busca via RPC otimizada no banco: valida a clínica uma única vez e
-      // evita os timeouts do PostgREST/RLS em consultas diretas na tabela.
-      const { data, error } = await supabase.rpc("buscar_pacientes_agenda", {
+      // Busca única global: nome, CPF, telefone, DN, prontuário, pasta,
+      // código antigo — com ranking por relevância e status/última consulta.
+      const { data, error } = await supabase.rpc("buscar_pacientes_global", {
         _clinica_ids: scope,
         _termo: term,
         _limite: 20,
@@ -127,12 +131,8 @@ export function PatientSearchInput({
         // eslint-disable-next-line no-console
         console.error("[patient-search] rpc error", { term, scope, error });
       }
-      // Ignora respostas obsoletas (digitação rápida -> várias requests)
       if (myReq !== reqIdRef.current) return;
-      // Reordena: nomes que COMEÇAM com o termo aparecem primeiro
-      // (match de "primeiro nome" tem prioridade sobre meio/sobrenome).
       const todas = (data ?? []) as PatientOption[];
-      // Se busca for DD/MM sem ano, filtra em memória pelo mês/dia
       let base = todas;
       if (dataBusca?.partial) {
         const { dia, mes } = dataBusca.partial;
@@ -141,7 +141,6 @@ export function PatientSearchInput({
           const [, m2, d2] = p.data_nascimento.split("-");
           return m2 === mes && d2 === dia;
         });
-        // Quando a busca é claramente uma data, queremos só esses
         if (base.length > 0) {
           setOptions(base.slice(0, 20));
           if (cacheRef.current.size > 50) cacheRef.current.clear();
@@ -150,38 +149,12 @@ export function PatientSearchInput({
           return;
         }
       }
-      const prefixo: PatientOption[] = [];
-      const meio: PatientOption[] = [];
-      for (const p of base) {
-        const nomeNorm = normalizarBusca(p.nome ?? "");
-        if (nomeNorm.startsWith(termoSemAcento)) prefixo.push(p);
-        else meio.push(p);
-      }
-      const rows = [...prefixo, ...meio].slice(0, 20);
-      // Cache simples (até 50 termos) para repetidos backspace/typing
+      // A RPC já retorna ordenado por match_score desc; mantemos como veio.
+      const rows = base.slice(0, 20);
       if (cacheRef.current.size > 50) cacheRef.current.clear();
       cacheRef.current.set(cacheKey, rows);
       setOptions(rows);
       setLoading(false);
-      // Consulta em lote se algum dos resultados é associado (contrato ativo)
-      if (rows.length > 0) {
-        void supabase
-          .from("contratos_assinatura")
-          .select("paciente_id, cb_convenios(nome)")
-          .in("paciente_id", rows.map((r) => r.id))
-          .eq("status", "ativo")
-          .then(({ data }) => {
-            if (myReq !== reqIdRef.current) return;
-            const map = new Map<string, string>();
-            for (const c of (data ?? []) as Array<{ paciente_id: string; cb_convenios?: { nome?: string } | null }>) {
-              const nome = c.cb_convenios?.nome ?? "Convênio";
-              if (c.paciente_id) map.set(c.paciente_id, nome);
-            }
-            setAssociadosMap(map);
-          });
-      } else {
-        setAssociadosMap(new Map());
-      }
     }, 150);
     return () => clearTimeout(handle);
   }, [query, open, scope]);
