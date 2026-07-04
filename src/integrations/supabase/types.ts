@@ -7753,6 +7753,16 @@ export type Database = {
         Args: { _clinica_id: string; _paciente_id: string }
         Returns: Json
       }
+      paciente_pendencias_cadastro: {
+        Args: { _paciente_id: string }
+        Returns: {
+          contato_ok: boolean
+          documentacao_ok: boolean
+          endereco_ok: boolean
+          faltantes: string[]
+          nfse_ok: boolean
+        }[]
+      }
       pacientes_face_lista: {
         Args: { _clinica_id: string }
         Returns: {
@@ -7780,6 +7790,23 @@ export type Database = {
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       strip_accents: { Args: { _text: string }; Returns: string }
+      top_procedimentos_agendamento: {
+        Args: {
+          _clinica_id: string
+          _especialidade_id?: string
+          _janela_dias?: number
+          _limit?: number
+          _tipo?: string
+        }
+        Returns: {
+          grupo: string
+          nome: string
+          procedimento_id: string
+          quantidade: number
+          tipo: string
+          ultimo_uso: string
+        }[]
+      }
       unaccent: { Args: { "": string }; Returns: string }
       user_is_any_manager: { Args: { _user_id: string }; Returns: boolean }
       verificar_certificado: { Args: { _codigo: string }; Returns: Json }
