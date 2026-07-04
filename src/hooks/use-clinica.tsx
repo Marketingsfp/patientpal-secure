@@ -12,6 +12,7 @@ export interface ClinicaMembership {
     cidade: string | null;
     estado: string | null;
     branding?: ClinicaBranding | null;
+    base_importada?: boolean | null;
   };
 }
 
@@ -84,11 +85,33 @@ export function ClinicaProvider({ children }: { children: ReactNode }) {
     if (showLoading) setLoading(true);
     const { data, error } = await supabase
       .from("clinica_memberships")
-      .select("id, clinica_id, role, clinica:clinicas(id, nome, cidade, estado, branding)")
+      .select("id, clinica_id, role, clinica:clinicas(id, nome, cidade, estado, branding, base_importada)")
       .eq("user_id", user.id)
       .eq("ativo", true);
     if (!error && data) {
-      const next = (data as unknown[]).filter(isClinicaMembership);
+      const raw = (data as unknown[]).filter(isClinicaMembership);
+      // A6 — Oculta unidades ainda não operacionais (base não importada
+      // E sem médicos ativos), exceto para admin, que precisa enxergá-las
+      // para configurar. Ex.: "CLINICA CONSULTA HOJE".
+      const naoOperacionais = raw.filter(
+        (m) => m.role !== "admin" && m.clinica.base_importada === false,
+      );
+      let next = raw;
+      if (naoOperacionais.length > 0) {
+        const ids = naoOperacionais.map((m) => m.clinica_id);
+        const { data: medicos } = await supabase
+          .from("medicos")
+          .select("clinica_id")
+          .in("clinica_id", ids)
+          .eq("ativo", true)
+          .limit(1000);
+        const comMedico = new Set((medicos ?? []).map((r: { clinica_id: string }) => r.clinica_id));
+        next = raw.filter((m) => {
+          if (m.role === "admin") return true;
+          if (m.clinica.base_importada !== false) return true;
+          return comMedico.has(m.clinica_id);
+        });
+      }
       setMemberships(next);
       try {
         window.localStorage.setItem(MEMBERSHIPS_CACHE_KEY, JSON.stringify({ userId: user.id, memberships: next }));
