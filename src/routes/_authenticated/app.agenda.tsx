@@ -3152,6 +3152,7 @@ function AgendaPage() {
               Por médico
             </button>
           </div>
+          <EncerrarExpedienteButton />
           <Button asChild variant="outline" size="sm" className="h-7 text-[11px] px-2" title="Cadastrar horários semanais e gerar slots da agenda">
             <Link to="/app/disponibilidades">
               <Clock className="h-3 w-3 mr-1.5" /> Criar/gerar horários
