@@ -1881,6 +1881,7 @@ export type Database = {
           nome_padrao: string | null
           percentual: number | null
           prioridade: number
+          procedimento_id: string | null
           tipo: string | null
           updated_at: string
           valor: number | null
@@ -1904,6 +1905,7 @@ export type Database = {
           nome_padrao?: string | null
           percentual?: number | null
           prioridade?: number
+          procedimento_id?: string | null
           tipo?: string | null
           updated_at?: string
           valor?: number | null
@@ -1927,6 +1929,7 @@ export type Database = {
           nome_padrao?: string | null
           percentual?: number | null
           prioridade?: number
+          procedimento_id?: string | null
           tipo?: string | null
           updated_at?: string
           valor?: number | null
@@ -1951,6 +1954,13 @@ export type Database = {
             columns: ["especialidade_id"]
             isOneToOne: false
             referencedRelation: "especialidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cb_convenio_regras_procedimento_id_fkey"
+            columns: ["procedimento_id"]
+            isOneToOne: false
+            referencedRelation: "procedimentos"
             referencedColumns: ["id"]
           },
         ]

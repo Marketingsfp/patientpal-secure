@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Brain, Sparkles, FileHeart, Stethoscope, Save, Loader2, History, Wand2, ArrowLeft, HeartPulse, CheckCircle2, Printer } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,6 +20,7 @@ import {
   resumirHistoricoPaciente,
 } from "@/lib/atendimento-ai.functions";
 import { agendamentoStatusPagamento, type StatusPagamento } from "@/lib/pagamento-status";
+import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 
 export const Route = createFileRoute("/_authenticated/app/atendimento-ia/$agendamentoId")({
   component: AtendimentoEditorPage,
@@ -91,23 +92,19 @@ function AtendimentoEditorPage() {
   const [loading, setLoading] = useState<"estruturar" | "sugerir" | "resumir" | "salvar" | null>(null);
   const [salvo, setSalvo] = useState<{ valorMedico: number } | null>(null);
 
-  // Carrega agendamento + médico + modelo
-  useEffect(() => {
+  // Carrega agendamento + médico + pagamento (usado no mount e no realtime).
+  const carregarAgendamento = useCallback(async () => {
     if (!clinicaAtual || !agendamentoId) return;
-    let cancel = false;
-    (async () => {
-      const { data: ag, error } = await supabase
+    const { data: ag, error } = await supabase
         .from("agendamentos")
         .select("id, paciente_id, paciente_nome, medico_id, procedimento, fluxo_etapa")
         .eq("id", agendamentoId)
         .maybeSingle();
-      if (cancel) return;
       if (error || !ag) { toast.error("Agendamento não encontrado"); navigate({ to: "/app/atendimento-ia" }); return; }
       setAgendamento(ag as never);
 
       // Pagamento ANTES da consulta — bloqueia avanço enquanto pendente.
       const status = await agendamentoStatusPagamento(ag.id);
-      if (cancel) return;
       setPagamento(status);
 
       if (ag.medico_id) {
@@ -116,7 +113,7 @@ function AtendimentoEditorPage() {
           .select("id, nome, email, user_id, especialidade_id, especialidades:especialidades!medicos_especialidade_id_fkey(nome)")
           .eq("id", ag.medico_id)
           .maybeSingle();
-        if (!cancel && med) {
+        if (med) {
           let sens: any = {};
           try {
             const { data: s } = await supabase.rpc("medico_dados_sensiveis", { _medico_id: ag.medico_id });
@@ -132,9 +129,11 @@ function AtendimentoEditorPage() {
           .update({ fluxo_etapa: "atendimento", fluxo_atualizado_em: new Date().toISOString() } as never)
           .eq("id", ag.id);
       }
-    })();
-    return () => { cancel = true; };
-  }, [agendamentoId, clinicaAtual?.clinica_id]);
+  }, [agendamentoId, clinicaAtual?.clinica_id, navigate]);
+
+  useEffect(() => {
+    void carregarAgendamento();
+  }, [carregarAgendamento]);
 
   // Carrega modelo a partir da especialidade
   useEffect(() => {
@@ -153,22 +152,34 @@ function AtendimentoEditorPage() {
     })();
   }, [clinicaAtual?.clinica_id, medico?.especialidades?.nome]);
 
-  // Carrega triagem
-  useEffect(() => {
+  // Carrega triagem (usado no mount e no realtime).
+  const carregarTriagem = useCallback(async () => {
     if (!agendamentoId) return;
-    let cancel = false;
-    (async () => {
-      const { data } = await supabase
+    const { data } = await supabase
         .from("triagens_enfermagem")
         .select("id, created_at, enfermeira_nome, peso_kg, altura_cm, imc, pa_sistolica, pa_diastolica, freq_cardiaca, temperatura, saturacao, glicemia, queixa_principal, doencas, medicamentos, alergias, observacoes")
         .eq("agendamento_id", agendamentoId)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (!cancel) setTriagem((data as unknown as Triagem) ?? null);
-    })();
-    return () => { cancel = true; };
+    setTriagem((data as unknown as Triagem) ?? null);
   }, [agendamentoId]);
+
+  useEffect(() => {
+    void carregarTriagem();
+  }, [carregarTriagem]);
+
+  // Realtime: pagamento (fin_lancamentos / orçamento), triagem e o próprio
+  // agendamento (etapa/status). Recarrega ao vivo enquanto o médico atende.
+  const recarregarAoVivo = useCallback(() => {
+    void carregarAgendamento();
+    void carregarTriagem();
+  }, [carregarAgendamento, carregarTriagem]);
+  useRealtimeRefresh(
+    ["agendamentos", "triagens_enfermagem", "fin_lancamentos", "agendamento_orcamento_itens"],
+    recarregarAoVivo,
+    Boolean(agendamentoId && clinicaAtual?.clinica_id),
+  );
 
   function aplicarTriagemNoSoap(t: Triagem) {
     const linhas: string[] = [];

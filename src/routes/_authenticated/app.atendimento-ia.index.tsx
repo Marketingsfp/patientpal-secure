@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { toast } from "sonner";
@@ -25,6 +25,7 @@ type Medico = {
   user_id: string | null;
   especialidade_id: string | null;
   especialidades?: { nome: string } | null;
+  ativo?: boolean;
 };
 type FilaItem = {
   id: string;
@@ -72,7 +73,7 @@ function AtendimentoIaPage() {
       const cid = clinicaAtual.clinica_id;
       const { data, error } = await supabase
         .from("medicos")
-        .select("id, nome, email, user_id, especialidade_id, especialidades:especialidades!medicos_especialidade_id_fkey(nome)")
+        .select("id, nome, email, user_id, especialidade_id, ativo, especialidades:especialidades!medicos_especialidade_id_fkey(nome)")
         .eq("clinica_id", cid)
         .eq("ativo", true)
         .order("nome");
@@ -81,7 +82,36 @@ function AtendimentoIaPage() {
         setMedicos([]);
         return;
       }
-      const meds = (data ?? []) as unknown as Medico[];
+      const ativos = ((data ?? []) as unknown as Medico[]).map((m) => ({ ...m, ativo: true }));
+
+      // Inclui médicos inativos que ainda têm pacientes na fila do dia,
+      // para que nenhum atendimento em andamento fique órfão.
+      const hoje = new Date().toISOString().slice(0, 10);
+      const { data: pendAll } = await supabase
+        .from("agendamentos")
+        .select("medico_id, paciente_id, paciente_nome, fluxo_etapa")
+        .eq("clinica_id", cid)
+        .in("fluxo_etapa", ["aguardando_recepcao", "recepcao", "caixa", "triagem", "atendimento"])
+        .gte("inicio", `${hoje}T00:00:00`)
+        .lte("inicio", `${hoje}T23:59:59`);
+      const idsAtivos = new Set(ativos.map((m) => m.id));
+      const idsExtras = Array.from(
+        new Set(
+          ((pendAll ?? []) as Array<{ medico_id: string | null; paciente_id: string | null; paciente_nome: string | null }>)
+            .filter((r) => r.medico_id && r.paciente_id && (r.paciente_nome ?? "").toUpperCase() !== "DISPONIVEL" && (r.paciente_nome ?? "").toUpperCase() !== "DISPONÍVEL")
+            .map((r) => r.medico_id as string)
+            .filter((id) => !idsAtivos.has(id)),
+        ),
+      );
+      let inativos: Medico[] = [];
+      if (idsExtras.length > 0) {
+        const { data: extras } = await supabase
+          .from("medicos")
+          .select("id, nome, email, user_id, especialidade_id, ativo, especialidades:especialidades!medicos_especialidade_id_fkey(nome)")
+          .in("id", idsExtras);
+        inativos = ((extras ?? []) as unknown as Medico[]).map((m) => ({ ...m, ativo: false }));
+      }
+      const meds = [...ativos, ...inativos].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
       setMedicos(meds);
       const emailLogado = user?.email?.toLowerCase() ?? null;
       const meu = user?.id
@@ -90,17 +120,9 @@ function AtendimentoIaPage() {
         : null;
       if (meu) setMedicoId(meu.id);
       else if (meds.length && !medicoId) {
-        const hoje = new Date().toISOString().slice(0, 10);
-        const { data: pend } = await supabase
-          .from("agendamentos")
-          .select("medico_id")
-          .eq("clinica_id", cid)
-          .in("fluxo_etapa", ["triagem", "atendimento"])
-          .gte("inicio", `${hoje}T00:00:00`)
-          .lte("inicio", `${hoje}T23:59:59`)
-          .order("inicio")
-          .limit(1);
-        const comFila = pend?.[0]?.medico_id as string | undefined;
+        const comFila = ((pendAll ?? []) as Array<{ medico_id: string | null; fluxo_etapa: string }>)
+          .find((r) => r.medico_id && (r.fluxo_etapa === "triagem" || r.fluxo_etapa === "atendimento"))
+          ?.medico_id as string | undefined;
         const escolhido = comFila && meds.find((x) => x.id === comFila) ? comFila : meds[0].id;
         setMedicoId(escolhido);
       }
@@ -203,16 +225,17 @@ function AtendimentoIaPage() {
               {medicoSelecionado.nome}
             </div>
           ) : (
-            <Select value={medicoId} onValueChange={setMedicoId}>
-              <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
-              <SelectContent>
-                {medicos.map((m) => (
-                  <SelectItem key={m.id} value={m.id} className="uppercase">
-                    {m.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              options={medicos.map((m) => ({
+                value: m.id,
+                label: `${m.nome.toUpperCase()}${m.ativo === false ? " (INATIVO)" : ""}`,
+              }))}
+              value={medicoId}
+              onChange={setMedicoId}
+              placeholder="Selecione…"
+              searchPlaceholder="Buscar médico…"
+              emptyText="Nenhum médico encontrado."
+            />
           )}
           {medicoSelecionado && (
             <div className="text-xs text-muted-foreground pt-1">
@@ -249,6 +272,8 @@ function AtendimentoIaPage() {
                       : it.prioridade === "prioritario"
                       ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200"
                       : "";
+                    const temRegistroTriagem = Boolean(triagens[it.id]);
+                    const triagemFeita = temRegistroTriagem || it.fluxo_etapa === "atendimento";
                     return (
                       <TableRow key={it.id}>
                         <TableCell className="tabular-nums text-xs text-muted-foreground">{idx + 1}</TableCell>
@@ -258,8 +283,11 @@ function AtendimentoIaPage() {
                           {it.procedimento ?? "—"} · {it.fluxo_etapa.replace("_", " ")}
                         </TableCell>
                         <TableCell className="text-center">
-                          {triagens[it.id] ? (
-                            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300" title="Triagem realizada">
+                          {triagemFeita ? (
+                            <span
+                              className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                              title={temRegistroTriagem ? "Triagem realizada" : "Paciente avançou no fluxo (sem registro formal de triagem)"}
+                            >
                               <Check className="h-3.5 w-3.5" />
                             </span>
                           ) : (
@@ -285,7 +313,15 @@ function AtendimentoIaPage() {
                             <HoverCardContent align="start" className="w-80 text-xs space-y-2">
                               {(() => {
                                 const t = triagens[it.id];
-                                if (!t) return <div className="text-muted-foreground">Paciente ainda não passou pela triagem.</div>;
+                                if (!t) {
+                                  return (
+                                    <div className="text-muted-foreground">
+                                      {it.fluxo_etapa === "atendimento"
+                                        ? "Paciente avançou no fluxo sem registro formal de triagem no sistema."
+                                        : "Paciente ainda não passou pela triagem."}
+                                    </div>
+                                  );
+                                }
                                 const sv: string[] = [];
                                 if (t.pa_sistolica && t.pa_diastolica) sv.push(`PA ${t.pa_sistolica}/${t.pa_diastolica}`);
                                 if (t.freq_cardiaca) sv.push(`FC ${t.freq_cardiaca}`);

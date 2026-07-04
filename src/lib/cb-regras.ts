@@ -4,6 +4,8 @@ export interface CbRegra {
   id: string;
   convenio_id: string;
   especialidade_id: string | null;
+  /** Serviço específico (procedimento) ao qual esta regra se aplica. Null = qualquer serviço. */
+  procedimento_id?: string | null;
   tipo: string | null;
   modo: string; // "valor_fixo" | "percentual_desconto"
   valor: number | null;
@@ -35,24 +37,35 @@ export function carenciaCumprida(regra: CbRegra | null, mensalidadesPagas: numbe
 
 /**
  * Escolhe a regra mais específica e de maior prioridade para a combinação
- * (especialidade, tipo). Especificidade: especialidade+tipo > especialidade > tipo > genérica.
+ * (procedimento, especialidade, tipo). Especificidade: serviço específico >
+ * especialidade+tipo > especialidade > tipo > genérica.
  */
 export function findRegra(
   regras: CbRegra[],
   especialidadeId: string | null | undefined,
   tipo: string | null | undefined,
+  procedimentoId?: string | null,
 ): CbRegra | null {
   const tipoNorm = (tipo ?? "").toLowerCase() || null;
   const espId = especialidadeId || null;
+  const procId = procedimentoId || null;
   const candidates = regras.filter((r) => {
     if (r.ativo === false) return false;
+    if (r.procedimento_id) {
+      // regra específica por serviço só bate se o serviço confere
+      if (!procId || r.procedimento_id !== procId) return false;
+      return true;
+    }
     if (r.especialidade_id && r.especialidade_id !== espId) return false;
     if (r.tipo && (r.tipo.toLowerCase() !== tipoNorm)) return false;
     return true;
   });
   if (candidates.length === 0) return null;
   const score = (r: CbRegra) =>
-    (r.especialidade_id ? 10 : 0) + (r.tipo ? 5 : 0) + (r.prioridade || 0) * 0.01;
+    (r.procedimento_id ? 100 : 0)
+    + (r.especialidade_id ? 10 : 0)
+    + (r.tipo ? 5 : 0)
+    + (r.prioridade || 0) * 0.01;
   return candidates.slice().sort((a, b) => score(b) - score(a))[0];
 }
 
