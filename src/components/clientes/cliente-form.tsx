@@ -131,6 +131,22 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
   const [saving, setSaving] = useState(false);
   const [cepLoading, setCepLoading] = useState(false);
 
+  // Aviso: base da unidade ainda não importada (só quando cadastrando novo)
+  const [baseImportada, setBaseImportada] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (editing) { setBaseImportada(null); return; }
+    let cancel = false;
+    void supabase
+      .from("clinicas")
+      .select("base_importada")
+      .eq("id", clinicaId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancel) setBaseImportada((data as any)?.base_importada ?? true);
+      });
+    return () => { cancel = true; };
+  }, [clinicaId, editing]);
+
   // Biometria
   const [hasBiometria, setHasBiometria] = useState(false);
   const [bioLoading, setBioLoading] = useState(false);
