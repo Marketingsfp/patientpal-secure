@@ -1372,8 +1372,10 @@ export type Database = {
           dados_antes: Json | null
           dados_depois: Json | null
           id: string
+          ip_address: unknown
           record_id: string | null
           table_name: string
+          user_agent: string | null
           user_email: string | null
           user_id: string | null
         }
@@ -1384,8 +1386,10 @@ export type Database = {
           dados_antes?: Json | null
           dados_depois?: Json | null
           id?: string
+          ip_address?: unknown
           record_id?: string | null
           table_name: string
+          user_agent?: string | null
           user_email?: string | null
           user_id?: string | null
         }
@@ -1396,8 +1400,10 @@ export type Database = {
           dados_antes?: Json | null
           dados_depois?: Json | null
           id?: string
+          ip_address?: unknown
           record_id?: string | null
           table_name?: string
+          user_agent?: string | null
           user_email?: string | null
           user_id?: string | null
         }
@@ -5761,6 +5767,7 @@ export type Database = {
       }
       orcamentos: {
         Row: {
+          atualizado_por: string | null
           categoria: string
           clinica_id: string
           clinica_solicitante: string | null
@@ -5784,6 +5791,7 @@ export type Database = {
           valores_pagamento: Json | null
         }
         Insert: {
+          atualizado_por?: string | null
           categoria?: string
           clinica_id: string
           clinica_solicitante?: string | null
@@ -5807,6 +5815,7 @@ export type Database = {
           valores_pagamento?: Json | null
         }
         Update: {
+          atualizado_por?: string | null
           categoria?: string
           clinica_id?: string
           clinica_solicitante?: string | null
