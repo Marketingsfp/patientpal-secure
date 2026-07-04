@@ -1,42 +1,58 @@
-## Objetivo
+# Relatório de Bugs e Correções — 04/07/2026
 
-Nas Regras de Preço dos Convênios (Cartão Benefícios), adicionar:
+Resumo, em linguagem simples, de tudo que foi identificado e ajustado hoje no sistema.
 
-1. Novo Período: **"Por contrato"** — a regra vale N vezes durante toda a vigência do contrato (sem janela diária/semanal/mensal).
-2. Novo Escopo: **"Titular ou dependente (exclusivo)"** — apenas uma pessoa do contrato pode consumir a regra. Se o titular usou, nenhum dependente poderá usar (e vice-versa).
+---
 
-## O que muda
+## 1. Cartão de Benefícios — Aba "Regras"
 
-### 1. UI — `src/components/cartao-beneficios/regras-tab.tsx`
-- No `<Select>` de **Período** acrescentar `<SelectItem value="contrato">Por contrato</SelectItem>` abaixo de "Por mês".
-- No `<Select>` de **Escopo** acrescentar `<SelectItem value="titular_ou_dependente">Titular ou dependente (exclusivo)</SelectItem>` abaixo de "Por paciente".
-- Ajustar o texto-resumo mostrado na tabela (linha 420) para exibir corretamente `contrato` como período (ex.: "1/contrato titular-ou-dep") e o novo escopo.
-- Não é necessária migração: `limite_periodo` e `limite_escopo` já são `text nullable`.
+### 1.1. Coluna "Serviço" fora de ordem
+- **Problema:** a coluna "Serviço" aparecia antes de "Categoria" na listagem de regras, dificultando a leitura.
+- **Correção:** a coluna "Serviço" foi movida para logo depois de "Categoria".
 
-### 2. Enforcement na agenda — `src/routes/_authenticated/app.agenda.tsx` (bloco de checagem de limite, ~linhas 424-527)
+### 1.2. Serviço "Preventivo" não aparecia na busca
+- **Problema:** ao criar uma nova regra, o serviço "Preventivo" (já cadastrado no sistema) não era localizado no seletor.
+- **Correção:** ajustado o carregamento da lista de serviços para que "Preventivo" (e demais serviços cadastrados) apareçam corretamente na busca.
 
-Hoje o código sempre filtra por `inicioDia..fimDia` e usa apenas escopos `paciente`/`contrato`. Ajustes:
+### 1.3. Novo período de uso: "Por contrato"
+- **Problema:** faltava uma opção para permitir que a regra fosse usada apenas 1 vez durante toda a vigência do contrato.
+- **Correção:**
+  - Adicionada a opção **"Por contrato"** no campo Período das regras.
+  - A validação na agenda passou a considerar todo o contrato (sem recorte por dia/semana/mês) quando essa opção é escolhida.
+  - Textos de exibição atualizados (ex.: "1 consulta por contrato").
 
-- **Janela do período**:
-  - `dia` (padrão atual): início/fim do dia da data de referência.
-  - `semana`: segunda 00:00 a domingo 23:59 da semana da data.
-  - `mes`: primeiro/último dia do mês.
-  - `contrato`: sem filtro de data (conta todo o histórico não-cancelado do contrato).
+### 1.4. Novo escopo: "Titular ou dependente (exclusivo)"
+- **Problema:** não havia como definir uma regra em que o benefício pudesse ser usado **ou** pelo titular **ou** pelo dependente — nunca pelos dois.
+- **Correção:**
+  - Adicionado o escopo **"Titular ou dependente (exclusivo)"**.
+  - Na agenda, se um deles já usou, o outro fica bloqueado automaticamente.
+  - Mensagens/rótulos ajustados para deixar claro o comportamento exclusivo.
 
-  Hoje `limite_periodo` já era gravado mas ignorado no cálculo — passa a ser respeitado de fato para todos os valores.
+---
 
-- **Escopo dos pacientes da cota**:
-  - `paciente`: só o próprio paciente (inalterado).
-  - `contrato`: titular + dependentes ativos (inalterado).
-  - `titular_ou_dependente`: mesma lista de titular + dependentes ativos, mas com uma regra extra — se já existir uso na janela por **outro** paciente do contrato (diferente do que está sendo agendado agora), a cota é considerada esgotada para este paciente (excedente entra em ação: bloquear/particular/valor fixo/percentual, conforme configurado).
+## 2. Página "Fluxo do Paciente" (`app/fluxo`) — Erros de build
 
-- Textos de aviso (`avisoLimite`) atualizados para refletir o período correto ("por dia/semana/mês/contrato") e o novo escopo ("titular-ou-dependente").
+### 2.1. Marcadores de conflito de merge no código
+- **Problema:** o arquivo `app.fluxo.tsx` estava com marcadores de conflito (`<<<<<<<`, `=======`, `>>>>>>>`) deixados por um merge mal resolvido, quebrando o build com dezenas de erros de sintaxe.
+- **Correção:** todos os marcadores foram removidos, mantendo a versão correta do código. A página voltou a compilar.
 
-### 3. Mensagens auxiliares
-- Ajuste do rótulo `"1 consulta por dia por contrato"` no cabeçalho do popover para incluir exemplo do novo período: `Ex.: "1 consulta por contrato" ou "1 consulta por dia por contrato"`.
+### 2.2. Comparação inválida de etapas (TypeScript)
+- **Problema:** o código comparava a variável de etapa contra o valor `"exame"`, que não pertencia ao conjunto de etapas válidas, gerando erro de tipagem.
+- **Correção:** removida a comparação incorreta; o cálculo passou a usar apenas a ordem oficial de etapas.
 
-## Fora do escopo
+### 2.3. Função "anterior" chamada com argumentos faltando
+- **Problema:** a função que calcula a etapa anterior era chamada com só 1 parâmetro, mas exigia 2 (etapa atual + se é exame).
+- **Correção:** passada também a informação `isExame`, corrigindo o retorno da etapa anterior no fluxo.
 
-- Sem alterações de schema/migração.
-- Sem mudanças em `cb_beneficios` (aba Benefícios) — só afeta a aba **Regras** dos convênios, conforme prints.
-- `src/lib/cb-regras.ts` comentários dos tipos aceitos podem ser ampliados, mas o tipo continua `string | null`.
+---
+
+## Situação atual
+- Todos os itens acima foram aplicados e o build está compilando sem os erros reportados.
+- Alterações concentradas em:
+  - `src/components/cartao-beneficios/regras-tab.tsx`
+  - `src/routes/_authenticated/app.agenda.tsx`
+  - `src/routes/_authenticated/app.fluxo.tsx`
+
+## Próximos passos sugeridos
+- Testar na tela de Regras: cadastrar uma regra com período "Por contrato" e outra com escopo "Titular ou dependente".
+- Testar no Fluxo do Paciente: mover um agendamento pelas etapas (incluindo exame) para confirmar avanço/retorno.
