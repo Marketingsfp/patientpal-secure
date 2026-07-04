@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { LayoutGrid, Plus, Pencil, Search } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 
 export const Route = createFileRoute("/_authenticated/app/tipos-servico")({
   component: TiposServicoPageWithTabs,
@@ -33,7 +34,7 @@ function TiposServicoPage() {
       .from("tipos_servico")
       .select("id,nome,ativo")
       .order("nome");
-    if (error) toast.error(error.message);
+    if (error) mostrarErro(error);
     else setRows((data ?? []) as Tipo[]);
     setLoading(false);
   }
@@ -59,7 +60,7 @@ function TiposServicoPage() {
       ? await supabase.from("tipos_servico").update(payload).eq("id", editing.id)
       : await supabase.from("tipos_servico").insert(payload);
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success(editing ? "Categoria atualizada" : "Categoria criada");
     setOpen(false);
     void load();

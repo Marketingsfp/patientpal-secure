@@ -1,7 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { FileText, Plus, Printer, Trash2, Search, AlertTriangle, Calendar, Columns2, CheckCircle2, Download } from "lucide-react";
+import { FileText, Plus, Printer, Trash2, Search, AlertTriangle, Calendar, Columns2, CheckCircle2, CircleDashed, Download } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
@@ -35,6 +36,8 @@ type Orc = {
   categoria: "laboratorio" | "demais" | null;
   agendamentos_total?: number;
   agendamentos_realizados?: number;
+  itens_total?: number;
+  itens_consumidos?: number;
 };
 
 type Procedimento = {
@@ -92,7 +95,7 @@ function OrcamentosPage() {
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("created_at", { ascending: false })
       .limit(200);
-    if (error) toast.error(error.message);
+    if (error) mostrarErro(error);
     const orcs = (data ?? []) as Orc[];
     const ids = orcs.map((o) => o.id);
     if (ids.length > 0) {
@@ -110,6 +113,24 @@ function OrcamentosPage() {
       for (const o of orcs) {
         o.agendamentos_total = tot.get(o.id) ?? 0;
         o.agendamentos_realizados = real.get(o.id) ?? 0;
+      }
+      // Itens totais e consumidos (uso parcial vs total)
+      const [{ data: itens }, { data: links }] = await Promise.all([
+        supabase.from("orcamento_itens").select("orcamento_id, quantidade").in("orcamento_id", ids),
+        supabase.from("agendamento_orcamento_itens").select("orcamento_id, orcamento_item_id").in("orcamento_id", ids),
+      ]);
+      const totItens = new Map<string, number>();
+      for (const it of (itens ?? []) as { orcamento_id: string; quantidade: number }[]) {
+        totItens.set(it.orcamento_id, (totItens.get(it.orcamento_id) ?? 0) + Number(it.quantidade || 1));
+      }
+      const consumidos = new Map<string, Set<string>>();
+      for (const l of (links ?? []) as { orcamento_id: string; orcamento_item_id: string }[]) {
+        if (!consumidos.has(l.orcamento_id)) consumidos.set(l.orcamento_id, new Set());
+        consumidos.get(l.orcamento_id)!.add(l.orcamento_item_id);
+      }
+      for (const o of orcs) {
+        o.itens_total = totItens.get(o.id) ?? 0;
+        o.itens_consumidos = consumidos.get(o.id)?.size ?? 0;
       }
     }
     setList(orcs);
@@ -183,7 +204,7 @@ function OrcamentosPage() {
   const remover = async (id: string) => {
     if (!confirm("Excluir este orçamento?")) return;
     const { error } = await supabase.from("orcamentos").delete().eq("id", id);
-    if (error) return toast.error(error.message);
+    if (error) return mostrarErro(error);
     toast.success("Orçamento excluído");
     load();
   };
@@ -298,17 +319,29 @@ function OrcamentosPage() {
                 <td className="px-3 py-2 font-mono">
                   <div className="flex items-center gap-1.5">
                     <span>#{String(o.numero).padStart(5, "0")}</span>
-                    {(o.agendamentos_total ?? 0) > 0 && (
-                      <span
-                        title={`Realizado · ${o.agendamentos_total} agendamento(s)${(o.agendamentos_realizados ?? 0) > 0 ? `, ${o.agendamentos_realizados} realizado(s)` : ""}`}
-                        className="inline-flex items-center gap-0.5 text-emerald-600"
-                      >
-                        <CheckCircle2 className="h-4 w-4" />
-                        {(o.agendamentos_total ?? 0) > 1 && (
-                          <span className="text-[10px] font-semibold">{o.agendamentos_total}</span>
-                        )}
-                      </span>
-                    )}
+                     {(o.agendamentos_total ?? 0) > 0 && (() => {
+                       const total = o.itens_total ?? 0;
+                       const usados = o.itens_consumidos ?? 0;
+                       const parcial = total > 0 && usados > 0 && usados < total;
+                       const titulo = total > 0
+                         ? (parcial
+                             ? `Uso parcial · ${usados} de ${total} itens agendados`
+                             : `Totalmente agendado · ${usados}/${total} itens`)
+                         : `${o.agendamentos_total} agendamento(s)`;
+                       return (
+                         <span
+                           title={titulo}
+                           className={`inline-flex items-center gap-0.5 ${parcial ? "text-amber-600" : "text-emerald-600"}`}
+                         >
+                           {parcial
+                             ? <CircleDashed className="h-4 w-4" />
+                             : <CheckCircle2 className="h-4 w-4" />}
+                           {total > 0 && (
+                             <span className="text-[10px] font-semibold">{usados}/{total}</span>
+                           )}
+                         </span>
+                       );
+                     })()}
                   </div>
                 </td>
                 <td className="px-3 py-2">{new Date(o.created_at).toLocaleDateString("pt-BR")}</td>
@@ -623,8 +656,27 @@ function NovoOrcamentoDialog({
   const salvar = async () => {
     if (!categoria) return toast.error("Selecione o tipo do orçamento");
     if (!pacienteNome.trim()) return toast.error("Informe o nome do paciente");
+    if (/[<>]/.test(pacienteNome) || /[<>]/.test(pacienteTelefone)) {
+      return toast.error("Nome e telefone não podem conter os caracteres < ou >");
+    }
     if (itens.length === 0) return toast.error("Adicione ao menos um serviço");
     if (formasPagamento.length === 0) return toast.error("Selecione ao menos uma forma de pagamento");
+    for (let i = 0; i < itens.length; i++) {
+      const it = itens[i];
+      if (!it.descricao || !it.descricao.trim()) {
+        return toast.error(`Item ${i + 1}: informe a descrição do serviço`);
+      }
+      const qtd = Number(it.quantidade);
+      if (!Number.isFinite(qtd) || qtd < 1 || qtd > 999) {
+        return toast.error(`Item ${i + 1} (${it.descricao}): quantidade deve estar entre 1 e 999`);
+      }
+      const vu = Number(it.valor_unitario);
+      if (!Number.isFinite(vu) || vu <= 0) {
+        return toast.error(`Item ${i + 1} (${it.descricao}): valor unitário deve ser maior que zero`);
+      }
+    }
+    if (Number(desconto) < 0) return toast.error("Desconto não pode ser negativo");
+    if (Number(desconto) > subtotal) return toast.error("Desconto não pode ser maior que o subtotal");
     const valoresPag: Record<string, number> | null =
       formasPagamento.length > 1 ? { ...totaisPorForma } : null;
     setSaving(true);
@@ -651,7 +703,7 @@ function NovoOrcamentoDialog({
       .select("id")
       .single();
 
-    if (error || !orc) { setSaving(false); return toast.error(error?.message ?? "Erro ao salvar"); }
+    if (error || !orc) { setSaving(false); return mostrarErro(error); }
 
     const itensPayload = itens.map((i, idx) => ({
       orcamento_id: orc.id,
@@ -665,7 +717,7 @@ function NovoOrcamentoDialog({
     }));
     const { error: e2 } = await supabase.from("orcamento_itens").insert(itensPayload);
     setSaving(false);
-    if (e2) return toast.error(e2.message);
+    if (e2) return mostrarErro(e2);
     toast.success("Orçamento criado");
     onCreated(orc.id);
   };
@@ -733,8 +785,8 @@ function NovoOrcamentoDialog({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="space-y-1"><Label>Paciente *</Label><Input value={pacienteNome} onChange={(e) => setPacienteNome(e.target.value)} /></div>
-            <div className="space-y-1"><Label>Telefone</Label><Input value={pacienteTelefone} onChange={(e) => setPacienteTelefone(e.target.value)} /></div>
+            <div className="space-y-1"><Label>Paciente *</Label><Input maxLength={120} value={pacienteNome} onChange={(e) => setPacienteNome(e.target.value.replace(/[<>]/g, ""))} /></div>
+            <div className="space-y-1"><Label>Telefone</Label><Input maxLength={20} value={pacienteTelefone} onChange={(e) => setPacienteTelefone(e.target.value.replace(/[<>]/g, ""))} /></div>
             <div className="space-y-1 md:col-span-2">
               <Label>Médico solicitante</Label>
               <div className="flex gap-1 rounded-md border p-1 w-fit">
@@ -866,7 +918,10 @@ function NovoOrcamentoDialog({
                       <td className="px-2 py-1">
                         <Input value={it.descricao} onChange={(e) => setItens((a) => a.map((x, i) => i === idx ? { ...x, descricao: e.target.value } : x))} />
                       </td>
-                      <td className="px-2 py-1"><Input type="number" min={1} step="1" value={it.quantidade} onChange={(e) => setItens((a) => a.map((x, i) => i === idx ? { ...x, quantidade: Number(e.target.value) || 0 } : x))} /></td>
+                      <td className="px-2 py-1"><Input type="number" min={1} max={999} step="1" value={it.quantidade} onChange={(e) => {
+                        const n = Math.min(999, Math.max(1, Math.floor(Number(e.target.value) || 1)));
+                        setItens((a) => a.map((x, i) => i === idx ? { ...x, quantidade: n } : x));
+                      }} /></td>
                       <td className="px-2 py-1"><CurrencyInput value={String(it.valor_unitario ?? "")} onChange={(v) => setItens((a) => a.map((x, i) => i === idx ? { ...x, valor_unitario: Number(v) || 0 } : x))} /></td>
                       <td className="px-2 py-1 text-right font-medium">
                         {BRL(it.quantidade * it.valor_unitario)}

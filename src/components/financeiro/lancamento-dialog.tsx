@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
 
 type Tipo = "receita" | "despesa";
@@ -35,9 +36,11 @@ interface Props {
   initialValor?: string;
   agendamentoId?: string | null;
   initialFormaPagamento?: string;
+  /** Nome exato da categoria a fixar (ex.: "MENSALIDADE CARTAO CONSULTA"). Quando setado, o select fica desabilitado. */
+  categoriaFixaNome?: string;
 }
 
-export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWithData, initialDescricao, initialValor, agendamentoId, initialFormaPagamento }: Props) {
+export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWithData, initialDescricao, initialValor, agendamentoId, initialFormaPagamento, categoriaFixaNome }: Props) {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
   const role = clinicaAtual?.role ?? null;
@@ -72,6 +75,18 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
   const [valorOriginal, setValorOriginal] = useState<string>("");
   const [supervisorOpen, setSupervisorOpen] = useState(false);
   const [supervisorInfo, setSupervisorInfo] = useState<{ userId: string; nome: string; role: string } | null>(null);
+  // Bloqueio: paciente com mensalidade vencida no cartão benefícios.
+  // Quando bloqueado, o pagamento só pode ser feito como Particular.
+  const [bloqueioCartao, setBloqueioCartao] = useState<{
+    bloqueado: boolean;
+    totalAberto: number;
+    qtdAtrasadas: number;
+    convenioNome: string | null;
+  } | null>(null);
+  // Tipo de atendimento definido no agendamento ("convenio" | "particular" | null).
+  const [tipoAgendamento, setTipoAgendamento] = useState<string | null>(null);
+  // Nome do convênio do contrato ativo (usado para detectar categoria "de convênio").
+  const [convenioNome, setConvenioNome] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open || !clinicaAtual) return;
@@ -82,6 +97,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     setDescontoAtivo(false); setDescontoTipo("valor");
     setDescontoInput(""); setDescontoAutorizado(""); setDescontoMotivo("");
     setSupervisorInfo(null); setSupervisorOpen(false);
+    setBloqueioCartao(null); setTipoAgendamento(null); setConvenioNome(null);
     if (initialFormaPagamento !== undefined) {
       if (initialFormaPagamento === "__misto__") {
         setPagamentoMisto(true);
@@ -98,6 +114,16 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       const lista = cats ?? [];
       setCategorias(lista);
       const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+      const listaContas = cs ?? [];
+      setContas(listaContas);
+      const caixa = listaContas.find((c) => norm(c.nome) === "caixa");
+      if (caixa) setContaId((cur) => cur || caixa.id);
+      // Categoria fixa tem prioridade absoluta (ex.: pagamento de mensalidade)
+      if (categoriaFixaNome) {
+        const fixa = lista.find((c) => norm(c.nome) === norm(categoriaFixaNome));
+        if (fixa) setCategoriaId(fixa.id);
+        return;
+      }
       const particular = lista.find((c) => norm(c.nome) === "particular");
       // Default: paciente comum (sem convênio ativo) → PARTICULAR.
       // Se o agendamento estiver vinculado a um paciente com contrato de
@@ -107,10 +133,12 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         try {
           const { data: ag } = await supabase
             .from("agendamentos")
-            .select("paciente_id")
+            .select("paciente_id, tipo_atendimento")
             .eq("id", agendamentoId)
             .maybeSingle();
           const pid = ag?.paciente_id ?? null;
+          const tipoAg = (ag as { tipo_atendimento?: string | null } | null)?.tipo_atendimento ?? null;
+          setTipoAgendamento(tipoAg);
           if (pid) {
             const { data: contrato } = await supabase
               .from("contratos_assinatura")
@@ -122,9 +150,33 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
               .limit(1)
               .maybeSingle();
             const convNome = (contrato as { cb_convenios?: { nome?: string } } | null)?.cb_convenios?.nome;
-            if (convNome) {
+            if (convNome) setConvenioNome(convNome);
+            // Só sugere a categoria do convênio quando o agendamento foi
+            // marcado como "convenio". Se for "particular", mantém a
+            // categoria PARTICULAR (não força o operador a mudar).
+            if (convNome && tipoAg !== "particular") {
               const match = lista.find((c) => norm(c.nome) === norm(convNome));
               if (match) categoriaEscolhidaId = match.id;
+            }
+            // Verifica débito no cartão benefícios do paciente.
+            const { data: blk } = await supabase.rpc("paciente_cartao_inadimplente", {
+              _paciente_id: pid,
+              _clinica_id: clinicaAtual.clinica_id,
+            });
+            const info = (blk ?? {}) as {
+              bloqueado?: boolean;
+              total_aberto?: number;
+              mensalidades?: Array<{ vencimento: string; valor: number; convenio_nome?: string }>;
+            };
+            if (info.bloqueado) {
+              setBloqueioCartao({
+                bloqueado: true,
+                totalAberto: Number(info.total_aberto ?? 0),
+                qtdAtrasadas: (info.mensalidades ?? []).length,
+                convenioNome: convNome ?? null,
+              });
+              // Força categoria = Particular para não induzir o operador ao erro.
+              if (particular) categoriaEscolhidaId = particular.id;
             }
           }
         } catch {
@@ -132,12 +184,8 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         }
       }
       if (categoriaEscolhidaId) setCategoriaId((cur) => cur || categoriaEscolhidaId!);
-      const listaContas = cs ?? [];
-      setContas(listaContas);
-      const caixa = listaContas.find((c) => norm(c.nome) === "caixa");
-      if (caixa) setContaId((cur) => cur || caixa.id);
     })();
-  }, [open, clinicaAtual, tipo, agendamentoId]);
+  }, [open, clinicaAtual, tipo, agendamentoId, categoriaFixaNome]);
 
   const formatBRL = (n: number) =>
     n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -205,6 +253,22 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     if (valorNum <= 0) {
       toast.error("O valor do pagamento deve ser maior que zero.");
       return;
+    }
+    // Bloqueio por débito no cartão benefícios — só libera se o pagamento
+    // for feito como Particular.
+    if (bloqueioCartao?.bloqueado) {
+      const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+      const catEscolhida = categorias.find((c) => c.id === categoriaId) ?? null;
+      const catEhConvenio = !!(catEscolhida && convenioNome && norm(catEscolhida.nome) === norm(convenioNome));
+      const formaEhConvenio = !pagamentoMisto && formaPagamento === "convenio";
+      const mistoTemConvenio = pagamentoMisto && pagamentos.some((p) => p.forma === "convenio" && Number(p.recebido || 0) > 0);
+      if (catEhConvenio || formaEhConvenio || mistoTemConvenio) {
+        toast.error(
+          `Paciente com R$ ${bloqueioCartao.totalAberto.toFixed(2)} em atraso no cartão benefícios (${bloqueioCartao.qtdAtrasadas} parcela(s)). Este atendimento só pode ser pago como Particular — troque a categoria/forma e tente novamente.`,
+          { duration: 10000 },
+        );
+        return;
+      }
     }
     setSaving(true);
     if (descontoAtivo) {
@@ -337,8 +401,29 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       criado_por: user?.id ?? null,
     } as never).select("id").single();
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success(`${tipo === "receita" ? "Receita" : "Despesa"} registrada`);
+    // Sincroniza `tipo_atendimento` do agendamento com o que foi pago,
+    // para que o check-in e relatórios reflitam a decisão final.
+    if (agendamentoId && tipo === "receita") {
+      try {
+        const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+        const catEscolhida = categorias.find((c) => c.id === categoriaId) ?? null;
+        const catEhConvenio = !!(catEscolhida && convenioNome && norm(catEscolhida.nome) === norm(convenioNome));
+        const formaEhConvenio = !pagamentoMisto && formaPagamento === "convenio";
+        const mistoTemConvenio = pagamentoMisto && pagamentos.some((p) => p.forma === "convenio" && Number(p.recebido || 0) > 0);
+        const pagouComoConvenio = catEhConvenio || formaEhConvenio || mistoTemConvenio;
+        const novoTipo = pagouComoConvenio ? "convenio" : "particular";
+        if (novoTipo !== tipoAgendamento) {
+          await supabase
+            .from("agendamentos")
+            .update({ tipo_atendimento: novoTipo } as never)
+            .eq("id", agendamentoId);
+        }
+      } catch (e) {
+        console.error("Falha ao sincronizar tipo_atendimento do agendamento:", e);
+      }
+    }
     // ----- Registra o split de repasse médico ----------------------------
     // Antes esse cálculo só era feito em memória (na hora de imprimir a GR
     // ou nos relatórios). Agora persistimos em `pagamento_splits` para que o
@@ -527,6 +612,15 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-3 overflow-y-auto pr-1 -mr-1 flex-1 min-h-0">
+          {bloqueioCartao?.bloqueado && (
+            <div className="rounded-md border border-destructive/40 bg-destructive/5 text-destructive px-3 py-2 text-sm">
+              <strong>Cartão benefícios em atraso.</strong> Paciente tem{" "}
+              <strong>R$ {bloqueioCartao.totalAberto.toFixed(2)}</strong> em aberto
+              ({bloqueioCartao.qtdAtrasadas} parcela(s) vencida(s)). Este atendimento
+              só pode ser pago como <strong>Particular</strong> — não use a categoria
+              "{bloqueioCartao.convenioNome ?? "Convênio"}" nem a forma "Convênio".
+            </div>
+          )}
           <div className="space-y-1.5">
             <Label>Descrição *</Label>
             <Input value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Ex: Consulta João Silva" />
@@ -639,12 +733,17 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
           )}
           <div className="space-y-1.5">
             <Label>Categoria</Label>
-            <Select value={categoriaId} onValueChange={setCategoriaId}>
+            <Select value={categoriaId} onValueChange={setCategoriaId} disabled={!!categoriaFixaNome}>
               <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
               <SelectContent>
                 {categorias.map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
               </SelectContent>
             </Select>
+            {categoriaFixaNome && !categorias.some((c) => c.id === categoriaId) && (
+              <p className="text-xs text-amber-600">
+                Categoria fixa "{categoriaFixaNome}" não encontrada — cadastre em Financeiro › Categorias.
+              </p>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">

@@ -8,6 +8,7 @@ import { obterWhatsappConfig, salvarWhatsappConfig, testarConexaoWhatsapp } from
 import { enviarMensagemWhatsapp, listarTemplatesWhatsapp, criarTemplateWhatsapp, excluirTemplateWhatsapp } from "@/lib/whatsapp.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -121,7 +122,7 @@ function NinaPage() {
       setDraft("");
       await carregar();
     } catch (e: any) {
-      toast.error(e?.message || "Falha ao enviar mensagem");
+      mostrarErro(e);
     } finally {
       setEnviando(false);
     }
@@ -138,7 +139,7 @@ function NinaPage() {
       .limit(1000);
     setLoadingConv(false);
     if (error) {
-      toast.error("Erro ao carregar conversas: " + error.message);
+      mostrarErro(error, "erro ao carregar conversas");
       return;
     }
     const map = new Map<string, Conv>();
@@ -459,7 +460,7 @@ function ConfiguracaoWhatsApp() {
         fim: (data as WppCfg).horario_fim || "18:00",
       });
     } catch (e: any) {
-      toast.error(e?.message ?? "Erro ao carregar configuração");
+      mostrarErro(e);
     } finally {
       setLoading(false);
     }
@@ -518,7 +519,7 @@ function ConfiguracaoWhatsApp() {
       setDialogOpen(false);
       await carregar();
     } catch (e: any) {
-      toast.error(e?.message ?? "Erro ao salvar");
+      mostrarErro(e);
     } finally {
       setSaving(false);
     }
@@ -539,7 +540,7 @@ function ConfiguracaoWhatsApp() {
       }
       await carregar();
     } catch (e: any) {
-      toast.error(e?.message ?? "Falha ao testar conexão");
+      mostrarErro(e);
     } finally {
       setTesting(false);
     }
@@ -563,7 +564,7 @@ function ConfiguracaoWhatsApp() {
       toast.success("Horário salvo");
       await carregar();
     } catch (e: any) {
-      toast.error(e?.message ?? "Erro ao salvar horário");
+      mostrarErro(e);
     } finally {
       setSavingHorario(false);
     }
@@ -1191,7 +1192,7 @@ function TemplatesWhatsapp() {
       const r = await listar({ data: { clinicaId } });
       setItems((r.templates as TplRow[]) ?? []);
     } catch (e: any) {
-      toast.error(e?.message ?? "Erro ao listar templates");
+      mostrarErro(e);
     } finally {
       setLoading(false);
     }
@@ -1234,7 +1235,7 @@ function TemplatesWhatsapp() {
       resetForm();
       await carregar();
     } catch (e: any) {
-      toast.error(e?.message ?? "Erro ao criar template");
+      mostrarErro(e);
     } finally {
       setSaving(false);
     }
@@ -1248,7 +1249,7 @@ function TemplatesWhatsapp() {
       toast.success("Template excluído");
       await carregar();
     } catch (e: any) {
-      toast.error(e?.message ?? "Erro ao excluir");
+      mostrarErro(e);
     }
   };
 

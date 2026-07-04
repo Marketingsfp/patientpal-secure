@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { Award, BookOpen, CheckCircle2, PlayCircle } from "lucide-react";
 // jsPDF + QRCode são pesados (~400 KB). Carregamos só quando o aluno
 // realmente emite o certificado.
@@ -72,7 +73,7 @@ function TreinamentosPage() {
     const { error } = await supabase.from("lms_progresso").insert({
       user_id: user.id, curso_id: cursoSel, licao_id: licao.id,
     });
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     const nova = new Set(concluidas); nova.add(licao.id);
     setConcluidas(nova);
     toast.success("Lição concluída");
@@ -95,7 +96,7 @@ function TreinamentosPage() {
         .from("lms_certificados")
         .insert({ user_id: user.id, curso_id: cursoSel, clinica_id: clinicaId })
         .select("codigo_verificacao, emitido_em").single();
-      if (error || !data) { toast.error(error?.message ?? "Falha ao emitir"); return; }
+      if (error || !data) { mostrarErro(error); return; }
       codigo = data.codigo_verificacao; emitido = new Date(data.emitido_em);
     }
     const nomeAluno = (user.user_metadata?.full_name as string) ?? (user.email ?? "Aluno");

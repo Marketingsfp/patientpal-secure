@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ArrowLeft, Users } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Button } from "@/components/ui/button";
@@ -32,7 +33,7 @@ function EditarClientePage() {
         if (error || !data) {
           setNotFound(true);
           setLoading(false);
-          if (error) toast.error(error.message);
+          if (error) mostrarErro(error);
           return;
         }
         setPaciente(data as Paciente);

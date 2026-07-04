@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { Plus, Search, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,10 @@ import { Input } from "@/components/ui/input";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -45,11 +50,15 @@ export interface SimpleCrudProps<T extends { id: string }, F> {
   orderBy?: { column: string; ascending?: boolean };
   /** Optional max-width class for the dialog (default: max-w-2xl). */
   dialogClassName?: string;
+  /** Optional custom labels for the create/edit dialog title. */
+  newLabel?: string;
+  editLabel?: string;
 }
 
 export function SimpleCrud<T extends { id: string }, F>({
   table, selectColumns, title, subtitle, icon, columns,
   emptyForm, toForm, toPayload, renderForm, validate, searchFields, orderBy, dialogClassName,
+  newLabel, editLabel,
 }: SimpleCrudProps<T, F>) {
   const { clinicaAtual } = useClinica();
   const [items, setItems] = useState<T[]>([]);
@@ -59,6 +68,8 @@ export function SimpleCrud<T extends { id: string }, F>({
   const [editing, setEditing] = useState<T | null>(null);
   const [form, setForm] = useState<F>(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [toDelete, setToDelete] = useState<T | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = async () => {
     if (!clinicaAtual) return;
@@ -70,7 +81,7 @@ export function SimpleCrud<T extends { id: string }, F>({
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order(o.column, { ascending: o.ascending ?? false });
     setLoading(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     setItems((data ?? []) as T[]);
   };
   useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clinicaAtual?.clinica_id]);
@@ -101,7 +112,7 @@ export function SimpleCrud<T extends { id: string }, F>({
       ? await q.update(payload).eq("id", editing.id).select("id")
       : await q.insert(payload).select("id");
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     if (!ret || (Array.isArray(ret) && ret.length === 0)) {
       toast.error(
         editing
@@ -116,11 +127,13 @@ export function SimpleCrud<T extends { id: string }, F>({
   };
 
   const onDelete = async (r: T) => {
-    if (!confirm("Excluir este registro?")) return;
+    setDeleting(true);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabase.from(table as any) as any).delete().eq("id", r.id);
-    if (error) { toast.error(error.message); return; }
+    setDeleting(false);
+    if (error) { mostrarErro(error); return; }
     toast.success("Excluído.");
+    setToDelete(null);
     void load();
   };
 
@@ -163,7 +176,7 @@ export function SimpleCrud<T extends { id: string }, F>({
                 {columns.map(c => <TableCell key={c.key} className={c.className}>{c.render(r)}</TableCell>)}
                 <TableCell className="text-right">
                   <Button variant="ghost" size="icon" onClick={() => openEdit(r)}><Pencil className="h-4 w-4" /></Button>
-                  <Button variant="ghost" size="icon" onClick={() => onDelete(r)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                  <Button variant="ghost" size="icon" onClick={() => setToDelete(r)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                 </TableCell>
               </TableRow>
             ))}
@@ -174,7 +187,7 @@ export function SimpleCrud<T extends { id: string }, F>({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className={`${dialogClassName ?? "max-w-2xl"} max-h-[90vh] overflow-y-auto`}>
           <DialogHeader>
-            <DialogTitle>{editing ? `Editar ${title.toLowerCase()}` : `Novo ${title.toLowerCase().replace(/s$/, "")}`}</DialogTitle>
+            <DialogTitle>{editing ? (editLabel ?? `Editar ${title.toLowerCase()}`) : (newLabel ?? `Novo ${title.toLowerCase().replace(/s$/, "")}`)}</DialogTitle>
           </DialogHeader>
           <form onSubmit={onSubmit} className="space-y-4">
             {renderForm(form, setForm)}
@@ -185,6 +198,27 @@ export function SimpleCrud<T extends { id: string }, F>({
           </form>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={toDelete !== null} onOpenChange={(o) => !o && setToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir registro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleting}
+              onClick={(e) => { e.preventDefault(); if (toDelete) void onDelete(toDelete); }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Excluindo…" : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

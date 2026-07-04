@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -31,7 +32,7 @@ export function ChangePasswordDialog({ open, onOpenChange }: Props) {
     const { error } = await supabase.auth.updateUser({ password: pwNew });
     setPwSaving(false);
     if (error) {
-      toast.error(error.message);
+      mostrarErro(error);
       return;
     }
     toast.success("Senha alterada com sucesso.");

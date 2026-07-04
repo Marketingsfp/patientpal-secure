@@ -22,6 +22,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 
 export const Route = createFileRoute("/_authenticated/app/especialidades")({
   component: EspecialidadesPageWithTabs,
@@ -49,7 +50,7 @@ function EspecialidadesPage() {
       .from("especialidades")
       .select("id,nome,descricao,ativo")
       .order("nome");
-    if (error) toast.error(error.message);
+    if (error) mostrarErro(error);
     else setRows((data ?? []) as Esp[]);
     setLoading(false);
   }
@@ -88,7 +89,7 @@ function EspecialidadesPage() {
       ? await supabase.from("especialidades").update(payload).eq("id", editing.id)
       : await supabase.from("especialidades").insert(payload);
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success(editing ? "Especialidade atualizada" : "Especialidade criada");
     setOpen(false);
     void load();
@@ -110,7 +111,7 @@ function EspecialidadesPage() {
       .from("procedimentos")
       .select("clinica_id")
       .ilike("grupo", toDelete.nome);
-    if (countError) { setDeleting(false); toast.error(countError.message); return; }
+    if (countError) { setDeleting(false); mostrarErro(countError); return; }
     if ((vinculos?.length ?? 0) > 0) {
       setDeleting(false);
       const clinicaIds = Array.from(new Set(
@@ -139,7 +140,7 @@ function EspecialidadesPage() {
       .from("medicos")
       .select("nome")
       .eq("especialidade_id", toDelete.id);
-    if (medErr) { setDeleting(false); toast.error(medErr.message); return; }
+    if (medErr) { setDeleting(false); mostrarErro(medErr); return; }
     if ((medVinc?.length ?? 0) > 0) {
       setDeleting(false);
       const nomes = (medVinc ?? []).map((m: any) => m.nome).filter(Boolean).slice(0, 5);
@@ -156,7 +157,7 @@ function EspecialidadesPage() {
       .delete({ count: "exact" })
       .eq("id", toDelete.id);
     setDeleting(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     if (!delCount) {
       toast.error("Não foi possível excluir. Verifique se você tem permissão.");
       return;

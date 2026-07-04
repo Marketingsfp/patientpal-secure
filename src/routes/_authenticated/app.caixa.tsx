@@ -6,6 +6,7 @@ import {
   Unlock, Eye, FileDown, Users, Receipt, ChevronRight, Trash2, Plus, HandCoins, ArrowRight, Undo2, Printer,
 } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
@@ -400,7 +401,7 @@ function Page() {
       // tipo do procedimento: pega da tabela? simplificação: tenta consulta primeiro, depois exame
       const tentar = ["consulta", "exame", "procedimento"];
       for (const tipo of tentar) {
-        const regra = findRegra(regras, especId, tipo);
+        const regra = findRegra(regras, especId, tipo, base.procedimento_id ?? null);
         if (regra) {
           const v = computeValor(regra, base.dinheiro, base.cartao);
           if (v) {
@@ -528,7 +529,7 @@ function Page() {
       setCobrancaLinhas([linhaVazia()]);
       void load(); void loadFilaCaixa();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha na cobrança");
+      mostrarErro(err);
     } finally { setSaving(false); }
   };
 
@@ -641,7 +642,7 @@ function Page() {
       .single();
     if (error || !sess) {
       setSaving(false);
-      toast.error(error?.message || "Erro ao abrir caixa");
+      mostrarErro(error);
       return;
     }
     // movimento abertura
@@ -682,7 +683,7 @@ function Page() {
       forma_pagamento: ehPagto ? movForma : null,
     });
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     setOpenMov(null);
     setMovValor(""); setMovDesc(""); setMovForma("dinheiro");
     setMovBandeira(""); setMovParcelas("1");
@@ -720,7 +721,7 @@ function Page() {
       });
     }
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     setOpenFechar(false);
     setValorInformado(""); setObsFechamento("");
     toast.success("Caixa fechado");
@@ -770,13 +771,15 @@ function Page() {
   const imprimirDetalhe = () => {
     if (!openDetalhe) return;
     const s = openDetalhe;
+    const esc = (v: unknown) =>
+      String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
     const linhas = detalheMovs.map((m) => `
       <tr>
         <td>${new Date(m.created_at).toLocaleDateString("pt-BR")}</td>
         <td>${new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</td>
         <td>${TIPO_LABEL[m.tipo]}</td>
-        <td>${(m.descricao ?? "").replace(/</g, "&lt;")}</td>
-        <td>${m.forma_pagamento ?? "—"}</td>
+        <td>${esc(m.descricao ?? "")}</td>
+        <td>${esc(m.forma_pagamento ?? "—")}</td>
         <td style="text-align:right;">${TIPO_SINAL[m.tipo] < 0 ? "-" : ""}${fmt(m.valor)}</td>
       </tr>`).join("");
     const html = `<!doctype html><html><head><meta charset="utf-8"/>
@@ -792,7 +795,7 @@ function Page() {
         th{background:#f1f5f9;}
       </style></head><body>
       <h1>Sessão de caixa</h1>
-      <div class="meta">${s.user_nome ?? "—"} · ${fmtDT(s.aberto_em)} → ${fmtDT(s.fechado_em)}</div>
+      <div class="meta">${esc(s.user_nome ?? "—")} · ${fmtDT(s.aberto_em)} → ${fmtDT(s.fechado_em)}</div>
       <div class="grid">
         <div><b>Abertura</b><br/>${fmt(s.valor_abertura)}</div>
         <div><b>Calculado</b><br/>${fmt(s.valor_fechamento_calculado)}</div>

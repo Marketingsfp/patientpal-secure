@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ClinicaProvider, useClinica } from "@/hooks/use-clinica";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { Accessibility, Stethoscope, Hash, RotateCcw, Camera, ShieldCheck, X, ArrowLeft, Loader2 } from "lucide-react";
 import { detectDescriptor, ensureFaceModels, euclidean, FACE_MATCH_THRESHOLD } from "@/lib/face-recognition";
 
@@ -80,7 +81,7 @@ function TotemPage() {
     });
     setBusy(false);
     if (error || !data) {
-      toast.error(error?.message ?? "Erro ao emitir senha");
+      mostrarErro(error);
       return;
     }
     const row = Array.isArray(data) ? data[0] : data;
@@ -206,7 +207,7 @@ function TotemPage() {
         .single();
       if (error || !novo) {
         setBusy(false);
-        toast.error(error?.message ?? "Erro ao cadastrar paciente");
+        mostrarErro(error);
         return;
       }
       pacienteId = novo.id;

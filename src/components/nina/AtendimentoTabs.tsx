@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,7 +39,7 @@ export function AtendDashboard() {
     if (!clinicaId) return;
     setLoading(true);
     try { setM(await dashFn({ data: { clinicaId } })); }
-    catch (e: any) { toast.error(e?.message || "Erro ao carregar painel"); }
+    catch (e: any) { mostrarErro(e); }
     finally { setLoading(false); }
   }, [clinicaId, dashFn]);
   useEffect(() => { carregar(); const t = setInterval(carregar, 15000); return () => clearInterval(t); }, [carregar]);
@@ -89,7 +90,7 @@ export function AtendDepartamentos() {
   const carregar = useCallback(async () => {
     if (!clinicaId) return;
     try { setRows(await listar({ data: { clinicaId } })); }
-    catch (e: any) { toast.error(e?.message); }
+    catch (e: any) { mostrarErro(e); }
   }, [clinicaId, listar]);
   useEffect(() => { carregar(); }, [carregar]);
   useRealtimeRefresh(["atend_departamentos", "atend_departamento_membros"], carregar, !!clinicaId);
@@ -109,7 +110,7 @@ export function AtendDepartamentos() {
       }});
       toast.success("Departamento salvo");
       setOpen(false); setEdit(null); await carregar();
-    } catch (err: any) { toast.error(err?.message); }
+    } catch (err: any) { mostrarErro(err); }
   };
 
   return (
@@ -137,7 +138,7 @@ export function AtendDepartamentos() {
               <Button size="icon" variant="ghost" onClick={async () => {
                 if (!confirm("Excluir departamento?")) return;
                 try { await excluir({ data: { clinicaId: clinicaId!, id: r.id } }); await carregar(); toast.success("Excluído"); }
-                catch (e: any) { toast.error(e?.message); }
+                catch (e: any) { mostrarErro(e); }
               }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
             </div>
           </div>
@@ -192,7 +193,7 @@ export function AtendMacros() {
   const carregar = useCallback(async () => {
     if (!clinicaId) return;
     try { setRows(await listar({ data: { clinicaId } })); }
-    catch (e: any) { toast.error(e?.message); }
+    catch (e: any) { mostrarErro(e); }
   }, [clinicaId, listar]);
   useEffect(() => { carregar(); }, [carregar]);
   useRealtimeRefresh(["atend_macros"], carregar, !!clinicaId);
@@ -211,7 +212,7 @@ export function AtendMacros() {
       }});
       toast.success("Macro salva");
       setOpen(false); setEdit(null); await carregar();
-    } catch (err: any) { toast.error(err?.message); }
+    } catch (err: any) { mostrarErro(err); }
   };
 
   return (
@@ -237,7 +238,7 @@ export function AtendMacros() {
               <Button size="icon" variant="ghost" onClick={async () => {
                 if (!confirm("Excluir macro?")) return;
                 try { await excluir({ data: { clinicaId: clinicaId!, id: r.id } }); await carregar(); toast.success("Excluída"); }
-                catch (e: any) { toast.error(e?.message); }
+                catch (e: any) { mostrarErro(e); }
               }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
             </div>
           </div>
@@ -284,7 +285,7 @@ export function AtendKb() {
   const carregar = useCallback(async () => {
     if (!clinicaId) return;
     try { setRows(await listar({ data: { clinicaId } })); }
-    catch (e: any) { toast.error(e?.message); }
+    catch (e: any) { mostrarErro(e); }
   }, [clinicaId, listar]);
   useEffect(() => { carregar(); }, [carregar]);
   useRealtimeRefresh(["atend_kb"], carregar, !!clinicaId);
@@ -305,7 +306,7 @@ export function AtendKb() {
       }});
       toast.success("Artigo salvo");
       setOpen(false); setEdit(null); await carregar();
-    } catch (err: any) { toast.error(err?.message); }
+    } catch (err: any) { mostrarErro(err); }
   };
 
   return (
@@ -332,7 +333,7 @@ export function AtendKb() {
               <Button size="icon" variant="ghost" onClick={async () => {
                 if (!confirm("Excluir artigo?")) return;
                 try { await excluir({ data: { clinicaId: clinicaId!, id: r.id } }); await carregar(); toast.success("Excluído"); }
-                catch (e: any) { toast.error(e?.message); }
+                catch (e: any) { mostrarErro(e); }
               }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
             </div>
           </div>
@@ -387,7 +388,7 @@ export function AtendPausas() {
         atualFn({ data: { clinicaId } }),
       ]);
       setRows(r); setAtual(a);
-    } catch (e: any) { toast.error(e?.message); }
+    } catch (e: any) { mostrarErro(e); }
   }, [clinicaId, listar, atualFn]);
   useEffect(() => { carregar(); }, [carregar]);
   useRealtimeRefresh(["atend_pause_reasons", "atend_pausas_log"], carregar, !!clinicaId);
@@ -408,7 +409,7 @@ export function AtendPausas() {
       }});
       toast.success("Motivo salvo");
       setOpen(false); setEdit(null); await carregar();
-    } catch (err: any) { toast.error(err?.message); }
+    } catch (err: any) { mostrarErro(err); }
   };
 
   return (
@@ -427,7 +428,7 @@ export function AtendPausas() {
               </div>
               <Button size="sm" variant="outline" onClick={async () => {
                 try { await finalizar({ data: { clinicaId: clinicaId! } }); toast.success("Pausa finalizada"); await carregar(); }
-                catch (e: any) { toast.error(e?.message); }
+                catch (e: any) { mostrarErro(e); }
               }}><PauseIcon className="h-4 w-4 mr-1" /> Finalizar</Button>
             </div>
           ) : (
@@ -435,7 +436,7 @@ export function AtendPausas() {
               {rows.filter((r) => r.ativo).map((r) => (
                 <Button key={r.id} variant="outline" className="justify-start" onClick={async () => {
                   try { await iniciar({ data: { clinicaId: clinicaId!, reasonId: r.id } }); toast.success("Pausa iniciada"); await carregar(); }
-                  catch (e: any) { toast.error(e?.message); }
+                  catch (e: any) { mostrarErro(e); }
                 }}>
                   <Play className="h-4 w-4 mr-2" style={{ color: r.cor }} />{r.nome}
                 </Button>
@@ -469,7 +470,7 @@ export function AtendPausas() {
                 <Button size="icon" variant="ghost" onClick={async () => {
                   if (!confirm("Excluir motivo?")) return;
                   try { await excluir({ data: { clinicaId: clinicaId!, id: r.id } }); await carregar(); toast.success("Excluído"); }
-                  catch (e: any) { toast.error(e?.message); }
+                  catch (e: any) { mostrarErro(e); }
                 }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
               </div>
             </div>
@@ -537,7 +538,7 @@ export function AtendMeuStatus() {
       setDeptos(ds);
       setReasons(rs);
       setAtual(a);
-    } catch (e: any) { toast.error(e?.message); }
+    } catch (e: any) { mostrarErro(e); }
     finally { setLoading(false); }
   }, [clinicaId, listarMembrosFn, listarDeptos, listarReasons, atualFn]);
   useEffect(() => { carregar(); }, [carregar]);
@@ -549,7 +550,7 @@ export function AtendMeuStatus() {
       await travarFn({ data: { clinicaId, travada } });
       toast.success(travada ? "Fila fechada — você não receberá novos atendimentos" : "Fila aberta — pronto para receber");
       await carregar();
-    } catch (e: any) { toast.error(e?.message); }
+    } catch (e: any) { mostrarErro(e); }
   };
 
   const deptoNome = (id: string) => deptos.find((d) => d.id === id)?.nome ?? id;
@@ -617,7 +618,7 @@ export function AtendMeuStatus() {
                             if (error) throw error;
                             toast.success(open ? "Fila aberta" : "Fila fechada");
                             await carregar();
-                          } catch (e: any) { toast.error(e?.message); }
+                          } catch (e: any) { mostrarErro(e); }
                         }}
                       />
                       <span className="text-xs text-muted-foreground w-16 text-right">
@@ -651,7 +652,7 @@ export function AtendMeuStatus() {
               </div>
               <Button size="sm" variant="outline" onClick={async () => {
                 try { await finalizar({ data: { clinicaId: clinicaId! } }); toast.success("Pausa finalizada"); await carregar(); }
-                catch (e: any) { toast.error(e?.message); }
+                catch (e: any) { mostrarErro(e); }
               }}><PauseIcon className="h-4 w-4 mr-1" /> Finalizar pausa</Button>
             </div>
           ) : (
@@ -659,7 +660,7 @@ export function AtendMeuStatus() {
               {reasons.filter((r) => r.ativo).map((r) => (
                 <Button key={r.id} variant="outline" className="justify-start" onClick={async () => {
                   try { await iniciar({ data: { clinicaId: clinicaId!, reasonId: r.id } }); toast.success("Pausa iniciada"); await carregar(); }
-                  catch (e: any) { toast.error(e?.message); }
+                  catch (e: any) { mostrarErro(e); }
                 }}>
                   <Play className="h-4 w-4 mr-2" style={{ color: r.cor }} />{r.nome}
                 </Button>

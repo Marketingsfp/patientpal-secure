@@ -260,6 +260,62 @@ export type Database = {
         }
         Relationships: []
       }
+      agendamento_orcamento_itens: {
+        Row: {
+          agendamento_id: string
+          clinica_id: string
+          created_at: string
+          id: string
+          orcamento_id: string
+          orcamento_item_id: string
+        }
+        Insert: {
+          agendamento_id: string
+          clinica_id: string
+          created_at?: string
+          id?: string
+          orcamento_id: string
+          orcamento_item_id: string
+        }
+        Update: {
+          agendamento_id?: string
+          clinica_id?: string
+          created_at?: string
+          id?: string
+          orcamento_id?: string
+          orcamento_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agendamento_orcamento_itens_agendamento_id_fkey"
+            columns: ["agendamento_id"]
+            isOneToOne: false
+            referencedRelation: "agendamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agendamento_orcamento_itens_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agendamento_orcamento_itens_orcamento_id_fkey"
+            columns: ["orcamento_id"]
+            isOneToOne: false
+            referencedRelation: "orcamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agendamento_orcamento_itens_orcamento_item_id_fkey"
+            columns: ["orcamento_item_id"]
+            isOneToOne: false
+            referencedRelation: "orcamento_itens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agendamentos: {
         Row: {
           agenda_id: string | null
@@ -286,6 +342,7 @@ export type Database = {
           procedimento: string | null
           status: Database["public"]["Enums"]["agendamento_status"]
           teleconsulta: boolean
+          tipo_atendimento: string
           token_publico: string | null
           updated_at: string
         }
@@ -314,6 +371,7 @@ export type Database = {
           procedimento?: string | null
           status?: Database["public"]["Enums"]["agendamento_status"]
           teleconsulta?: boolean
+          tipo_atendimento?: string
           token_publico?: string | null
           updated_at?: string
         }
@@ -342,6 +400,7 @@ export type Database = {
           procedimento?: string | null
           status?: Database["public"]["Enums"]["agendamento_status"]
           teleconsulta?: boolean
+          tipo_atendimento?: string
           token_publico?: string | null
           updated_at?: string
         }
@@ -1657,8 +1716,14 @@ export type Database = {
           descricao: string | null
           escopo: string
           especialidade_id: string | null
+          excedente_modo: string | null
+          excedente_percentual: number | null
+          excedente_valor: number | null
           id: string
           inicio_a_partir: number
+          limite_escopo: string | null
+          limite_periodo: string | null
+          limite_qtd: number | null
           limite_uso: string
           nome: string
           periodicidade: string
@@ -1679,8 +1744,14 @@ export type Database = {
           descricao?: string | null
           escopo?: string
           especialidade_id?: string | null
+          excedente_modo?: string | null
+          excedente_percentual?: number | null
+          excedente_valor?: number | null
           id?: string
           inicio_a_partir?: number
+          limite_escopo?: string | null
+          limite_periodo?: string | null
+          limite_qtd?: number | null
           limite_uso?: string
           nome: string
           periodicidade?: string
@@ -1701,8 +1772,14 @@ export type Database = {
           descricao?: string | null
           escopo?: string
           especialidade_id?: string | null
+          excedente_modo?: string | null
+          excedente_percentual?: number | null
+          excedente_valor?: number | null
           id?: string
           inicio_a_partir?: number
+          limite_escopo?: string | null
+          limite_periodo?: string | null
+          limite_qtd?: number | null
           limite_uso?: string
           nome?: string
           periodicidade?: string
@@ -1787,45 +1864,72 @@ export type Database = {
       cb_convenio_regras: {
         Row: {
           ativo: boolean
+          carencia_mensalidades: number
           clinica_id: string
           convenio_id: string
           created_at: string
           especialidade_id: string | null
+          excedente_modo: string | null
+          excedente_percentual: number | null
+          excedente_valor: number | null
+          gratuito: boolean
           id: string
+          limite_escopo: string | null
+          limite_periodo: string | null
+          limite_qtd: number | null
           modo: string
           nome_padrao: string | null
           percentual: number | null
           prioridade: number
+          procedimento_id: string | null
           tipo: string | null
           updated_at: string
           valor: number | null
         }
         Insert: {
           ativo?: boolean
+          carencia_mensalidades?: number
           clinica_id: string
           convenio_id: string
           created_at?: string
           especialidade_id?: string | null
+          excedente_modo?: string | null
+          excedente_percentual?: number | null
+          excedente_valor?: number | null
+          gratuito?: boolean
           id?: string
+          limite_escopo?: string | null
+          limite_periodo?: string | null
+          limite_qtd?: number | null
           modo: string
           nome_padrao?: string | null
           percentual?: number | null
           prioridade?: number
+          procedimento_id?: string | null
           tipo?: string | null
           updated_at?: string
           valor?: number | null
         }
         Update: {
           ativo?: boolean
+          carencia_mensalidades?: number
           clinica_id?: string
           convenio_id?: string
           created_at?: string
           especialidade_id?: string | null
+          excedente_modo?: string | null
+          excedente_percentual?: number | null
+          excedente_valor?: number | null
+          gratuito?: boolean
           id?: string
+          limite_escopo?: string | null
+          limite_periodo?: string | null
+          limite_qtd?: number | null
           modo?: string
           nome_padrao?: string | null
           percentual?: number | null
           prioridade?: number
+          procedimento_id?: string | null
           tipo?: string | null
           updated_at?: string
           valor?: number | null
@@ -1850,6 +1954,13 @@ export type Database = {
             columns: ["especialidade_id"]
             isOneToOne: false
             referencedRelation: "especialidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cb_convenio_regras_procedimento_id_fkey"
+            columns: ["procedimento_id"]
+            isOneToOne: false
+            referencedRelation: "procedimentos"
             referencedColumns: ["id"]
           },
         ]

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Activity, LogOut, Save } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 
 export const Route = createFileRoute("/paciente/perfil")({
   component: PerfilPage,
@@ -46,7 +47,7 @@ function PerfilPage() {
           .from("pacientes")
           .select("id, nome, telefone, cep, logradouro, numero, bairro, cidade, estado")
           .ilike("email", e);
-        if (error) toast.error(error.message);
+        if (error) mostrarErro(error);
         else setPacientes((data ?? []) as Paciente[]);
       }
       setLoading(false);
@@ -68,7 +69,7 @@ function PerfilPage() {
       })
       .eq("id", p.id);
     setSaving(false);
-    if (error) toast.error(error.message);
+    if (error) mostrarErro(error);
     else toast.success("Dados atualizados");
   }
 

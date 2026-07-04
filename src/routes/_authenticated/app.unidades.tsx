@@ -13,6 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Plus, Pencil, Building2, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 
 export const Route = createFileRoute("/_authenticated/app/unidades")({
   component: UnidadesPage,
@@ -68,7 +69,7 @@ function ClinicasTab() {
       .select("nome, cnpj, endereco, cidade, estado, cep, telefone, latitude, longitude, raio_metros, ativo")
       .eq("id", id).single();
     setLoading(false);
-    if (error || !data) { toast.error(error?.message ?? "Erro ao carregar clínica"); return; }
+    if (error || !data) { mostrarErro(error); return; }
     setEditingId(id);
     setForm({
       nome: data.nome ?? "",
@@ -121,7 +122,7 @@ function ClinicasTab() {
         ...extras(),
       }).eq("id", editingId);
       setLoading(false);
-      if (error) { toast.error(error.message); return; }
+      if (error) { mostrarErro(error); return; }
       toast.success("Clínica atualizada!");
       setOpen(false); resetForm(); await refresh();
       return;
@@ -133,12 +134,12 @@ function ClinicasTab() {
       _cidade: form.cidade.trim() || undefined,
       _estado: form.estado.trim() || undefined,
     });
-    if (error || !clinicaId) { toast.error(error?.message ?? "Erro ao criar clínica"); return; }
+    if (error || !clinicaId) { mostrarErro(error); return; }
     // Persist extra fields (endereco, cep, geo, ativo) right after creation.
     const { error: updErr } = await supabase.from("clinicas").update(extras())
       .eq("id", clinicaId as unknown as string);
     setLoading(false);
-    if (updErr) { toast.error(updErr.message); return; }
+    if (updErr) { mostrarErro(updErr); return; }
     toast.success("Clínica criada!");
     setOpen(false); resetForm(); await refresh();
     setClinicaAtual(clinicaId as unknown as string);

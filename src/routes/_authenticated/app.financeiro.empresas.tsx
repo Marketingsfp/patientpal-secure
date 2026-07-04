@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { Plus, Building2, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Button } from "@/components/ui/button";
@@ -49,7 +50,7 @@ function FinEmpresasPage() {
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("ativo", true)
       .order("nome");
-    if (error) toast.error(error.message);
+    if (error) mostrarErro(error);
     else setEmpresas(data ?? []);
     setLoading(false);
   };
@@ -85,7 +86,7 @@ function FinEmpresasPage() {
       ? await supabase.from("fin_empresas").update(payload).eq("id", editing.id)
       : await supabase.from("fin_empresas").insert(payload);
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success(editing ? "Empresa atualizada" : "Empresa criada");
     setOpen(false);
     setForm(EMPTY);
@@ -96,7 +97,7 @@ function FinEmpresasPage() {
   const handleDelete = async (e: Empresa) => {
     if (!confirm(`Excluir empresa "${e.nome}"?`)) return;
     const { error } = await supabase.from("fin_empresas").update({ ativo: false }).eq("id", e.id);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Empresa removida");
     await load();
   };

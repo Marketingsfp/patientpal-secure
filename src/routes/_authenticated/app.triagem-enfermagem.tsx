@@ -14,7 +14,10 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { HeartPulse, Bell, ChevronRight, AlertTriangle, Stethoscope } from "lucide-react";
+import { mostrarErro } from "@/lib/traduzir-erro";
+import { HeartPulse, Bell, ChevronRight, AlertTriangle, Stethoscope, Wallet } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { agendamentosStatusPagamento } from "@/lib/pagamento-status";
 
 export const Route = createFileRoute("/_authenticated/app/triagem-enfermagem")({
   component: TriagemEnfermagemPage,
@@ -100,6 +103,7 @@ function TriagemEnfermagemPage() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [ags, setAgs] = useState<Ag[]>([]);
+  const [pagosSet, setPagosSet] = useState<Set<string>>(new Set());
   const [aberto, setAberto] = useState<Grupo | null>(null);
   const [form, setForm] = useState<Form>(formVazio);
   const [salvando, setSalvando] = useState(false);
@@ -122,8 +126,13 @@ function TriagemEnfermagemPage() {
       .lt("inicio", amanha.toISOString())
       .order("inicio");
     setLoading(false);
-    if (error) { toast.error(error.message); return; }
-    setAgs((data ?? []) as unknown as Ag[]);
+    if (error) { mostrarErro(error); return; }
+    const lista = (data ?? []) as unknown as Ag[];
+    setAgs(lista);
+    const status = await agendamentosStatusPagamento(lista.map((a) => a.id));
+    const pagos = new Set<string>();
+    status.forEach((s, id) => { if (s.pago) pagos.add(id); });
+    setPagosSet(pagos);
   }, [clinicaAtual]);
 
   useEffect(() => { void carregar(); }, [carregar]);
@@ -149,6 +158,9 @@ function TriagemEnfermagemPage() {
   }, [form.peso, form.altura]);
 
   const grupos = useMemo(() => agruparPorPaciente(ags), [ags]);
+  function grupoPago(g: Grupo) {
+    return g.agendamentos.every((a) => pagosSet.has(a.id));
+  }
 
   function abrir(g: Grupo) {
     setAberto(g); setForm(formVazio);
@@ -160,6 +172,10 @@ function TriagemEnfermagemPage() {
 
   async function chamarPaciente(g: Grupo) {
     if (!clinicaAtual) return;
+    if (!grupoPago(g)) {
+      toast.error("Pagamento pendente — envie o paciente ao caixa antes de chamar para a triagem.");
+      return;
+    }
     if (!consultorio.trim()) { toast.error("Informe o consultório/sala da enfermagem no topo."); return; }
     const hoje = new Date().toISOString().slice(0, 10);
     const { data: ult } = await supabase
@@ -174,13 +190,33 @@ function TriagemEnfermagemPage() {
       codigo: nomeCurto, status: "chamada", paciente_id: g.paciente_id,
       guiche: guicheStr, chamada_em: new Date().toISOString(),
     } as never);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success(`Chamando ${nomeCurto} · ${guicheStr}`);
     abrir(g);
   }
 
   async function salvarEAvancar(avancar: boolean) {
     if (!clinicaAtual || !aberto) return;
+    // Validação de faixas plausíveis (só valida se preenchido)
+    const range = (v: string, min: number, max: number, label: string) => {
+      if (!v.trim()) return true;
+      const n = parseFloat(v.replace(",", "."));
+      if (!isFinite(n) || n < min || n > max) {
+        toast.error(`${label} fora da faixa esperada (${min}–${max})`);
+        return false;
+      }
+      return true;
+    };
+    if (
+      !range(form.pa_sis, 50, 260, "PA sistólica") ||
+      !range(form.pa_dia, 30, 180, "PA diastólica") ||
+      !range(form.fc, 20, 250, "Frequência cardíaca") ||
+      !range(form.temp, 30, 45, "Temperatura") ||
+      !range(form.sat, 40, 100, "Saturação O₂") ||
+      !range(form.glicemia, 20, 800, "Glicemia") ||
+      !range(form.peso, 1, 400, "Peso") ||
+      !range(form.altura, 30, 260, "Altura")
+    ) return;
     setSalvando(true);
     const num = (v: string) => {
       const n = parseFloat(v.replace(",", "."));
@@ -217,7 +253,7 @@ function TriagemEnfermagemPage() {
     };
     const rows = aberto.agendamentos.map((a) => ({ ...base, agendamento_id: a.id }));
     const { error } = await supabase.from("triagens_enfermagem").insert(rows as never);
-    if (error) { setSalvando(false); toast.error(error.message); return; }
+    if (error) { setSalvando(false); mostrarErro(error); return; }
 
     const ids = aberto.agendamentos.map((a) => a.id);
     if (form.prioridade !== "normal" && ids.length) {
@@ -270,8 +306,10 @@ function TriagemEnfermagemPage() {
         </Card>
       ) : (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {grupos.map((g) => (
-            <Card key={g.chave} className="p-3 space-y-2">
+          {grupos.map((g) => {
+            const pago = grupoPago(g);
+            return (
+            <Card key={g.chave} className={`p-3 space-y-2 ${pago ? "" : "border-amber-400/70 bg-amber-50/40 dark:bg-amber-950/10"}`}>
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="font-semibold truncate">{g.paciente_nome}</div>
@@ -281,12 +319,19 @@ function TriagemEnfermagemPage() {
                     </div>
                   )}
                 </div>
-                {g.prioridade !== "normal" && (
-                  <Badge className={`border-0 text-[10px] gap-1 ${g.prioridade === "urgente" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}`}>
-                    <AlertTriangle className="h-3 w-3" />
-                    {g.prioridade === "urgente" ? "URGENTE" : "PRIORITÁRIO"}
-                  </Badge>
-                )}
+                <div className="flex flex-col items-end gap-1">
+                  {!pago && (
+                    <Badge className="border-0 text-[10px] gap-1 bg-amber-500 text-white">
+                      <Wallet className="h-3 w-3" /> PAGAMENTO PENDENTE
+                    </Badge>
+                  )}
+                  {g.prioridade !== "normal" && (
+                    <Badge className={`border-0 text-[10px] gap-1 ${g.prioridade === "urgente" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}`}>
+                      <AlertTriangle className="h-3 w-3" />
+                      {g.prioridade === "urgente" ? "URGENTE" : "PRIORITÁRIO"}
+                    </Badge>
+                  )}
+                </div>
               </div>
               <ul className="text-xs text-muted-foreground space-y-0.5">
                 {g.agendamentos.map((a) => {
@@ -299,15 +344,33 @@ function TriagemEnfermagemPage() {
                 })}
               </ul>
               <div className="flex items-center gap-2 pt-1">
-                <Button size="sm" className="flex-1" onClick={() => chamarPaciente(g)}>
+                <Button
+                  size="sm" className="flex-1"
+                  onClick={() => chamarPaciente(g)}
+                  disabled={!pago}
+                  title={!pago ? "Pagamento pendente" : undefined}
+                >
                   <Bell className="h-4 w-4 mr-1" /> Chamar
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => abrir(g)}>
+                <Button
+                  size="sm" variant="outline"
+                  onClick={() => abrir(g)}
+                  disabled={!pago}
+                  title={!pago ? "Pagamento pendente" : undefined}
+                >
                   <Stethoscope className="h-4 w-4 mr-1" /> Atender
                 </Button>
+                {!pago && (
+                  <Button size="sm" variant="secondary" asChild>
+                    <Link to="/app/caixa">
+                      <Wallet className="h-4 w-4 mr-1" /> Caixa
+                    </Link>
+                  </Button>
+                )}
               </div>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -332,23 +395,31 @@ function TriagemEnfermagemPage() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div><Label className="text-xs">Peso (kg)</Label>
-                <Input value={form.peso} onChange={(e) => setForm({ ...form, peso: e.target.value })} placeholder="70" /></div>
+                <Input inputMode="decimal" pattern="[0-9.,]*" value={form.peso}
+                  onChange={(e) => setForm({ ...form, peso: e.target.value.replace(/[^0-9.,]/g, "") })} placeholder="70" /></div>
               <div><Label className="text-xs">Altura (cm ou m)</Label>
-                <Input value={form.altura} onChange={(e) => setForm({ ...form, altura: e.target.value })} placeholder="170" /></div>
+                <Input inputMode="decimal" pattern="[0-9.,]*" value={form.altura}
+                  onChange={(e) => setForm({ ...form, altura: e.target.value.replace(/[^0-9.,]/g, "") })} placeholder="170" /></div>
               <div><Label className="text-xs">IMC</Label>
                 <Input value={imc} readOnly placeholder="—" /></div>
               <div><Label className="text-xs">Temperatura (°C)</Label>
-                <Input value={form.temp} onChange={(e) => setForm({ ...form, temp: e.target.value })} placeholder="36.5" /></div>
+                <Input inputMode="decimal" pattern="[0-9.,]*" value={form.temp}
+                  onChange={(e) => setForm({ ...form, temp: e.target.value.replace(/[^0-9.,]/g, "") })} placeholder="36.5" /></div>
               <div><Label className="text-xs">PA Sistólica</Label>
-                <Input value={form.pa_sis} onChange={(e) => setForm({ ...form, pa_sis: e.target.value })} placeholder="120" /></div>
+                <Input inputMode="numeric" pattern="[0-9]*" maxLength={3} value={form.pa_sis}
+                  onChange={(e) => setForm({ ...form, pa_sis: e.target.value.replace(/\D/g, "") })} placeholder="120" /></div>
               <div><Label className="text-xs">PA Diastólica</Label>
-                <Input value={form.pa_dia} onChange={(e) => setForm({ ...form, pa_dia: e.target.value })} placeholder="80" /></div>
+                <Input inputMode="numeric" pattern="[0-9]*" maxLength={3} value={form.pa_dia}
+                  onChange={(e) => setForm({ ...form, pa_dia: e.target.value.replace(/\D/g, "") })} placeholder="80" /></div>
               <div><Label className="text-xs">Freq. Cardíaca</Label>
-                <Input value={form.fc} onChange={(e) => setForm({ ...form, fc: e.target.value })} placeholder="75" /></div>
+                <Input inputMode="numeric" pattern="[0-9]*" maxLength={3} value={form.fc}
+                  onChange={(e) => setForm({ ...form, fc: e.target.value.replace(/\D/g, "") })} placeholder="75" /></div>
               <div><Label className="text-xs">Saturação O₂ (%)</Label>
-                <Input value={form.sat} onChange={(e) => setForm({ ...form, sat: e.target.value })} placeholder="98" /></div>
+                <Input inputMode="numeric" pattern="[0-9]*" maxLength={3} value={form.sat}
+                  onChange={(e) => setForm({ ...form, sat: e.target.value.replace(/\D/g, "") })} placeholder="98" /></div>
               <div><Label className="text-xs">Glicemia (mg/dL)</Label>
-                <Input value={form.glicemia} onChange={(e) => setForm({ ...form, glicemia: e.target.value })} placeholder="90" /></div>
+                <Input inputMode="numeric" pattern="[0-9]*" maxLength={4} value={form.glicemia}
+                  onChange={(e) => setForm({ ...form, glicemia: e.target.value.replace(/\D/g, "") })} placeholder="90" /></div>
             </div>
 
             <div>

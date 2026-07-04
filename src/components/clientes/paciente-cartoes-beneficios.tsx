@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { CreditCard, Plus, AlertTriangle, ExternalLink, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -141,7 +142,7 @@ export function PacienteCartoesBeneficios({
       ativo: true,
     });
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Dependente adicionado.");
     setOpenAdd(null); setNovoDep(null); setParentesco("");
     await load();
@@ -153,7 +154,7 @@ export function PacienteCartoesBeneficios({
       .from("contrato_dependentes")
       .update({ ativo: false, excluido_em: new Date().toISOString().slice(0,10) })
       .eq("id", depId);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Dependente removido.");
     await load();
   };

@@ -3,6 +3,7 @@ import { SectionTabs, SERVICOS_TABS, SERVICOS_META } from "@/components/section-
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Plus, Search, Pencil, Trash2, ClipboardList, Sparkles, CreditCard, Download, ArrowUp, ArrowDown, ArrowUpDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { exportToExcel } from "@/lib/export-csv";
@@ -348,7 +349,7 @@ function ProcedimentosPage() {
         .select("id,nome")
         .eq("ativo", true)
         .order("nome");
-      if (error) { toast.error(error.message); return; }
+      if (error) { mostrarErro(error); return; }
       setTipos((data ?? []) as { id: string; nome: string }[]);
     })();
   }, []);
@@ -363,7 +364,7 @@ function ProcedimentosPage() {
       .select("id,nome")
       .eq("ativo", true)
       .order("nome");
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     setEspecialidades((data ?? []) as { id: string; nome: string }[]);
   };
   useEffect(() => {
@@ -376,7 +377,7 @@ function ProcedimentosPage() {
       .from("procedimento_especialidades")
       .select("procedimento_id,especialidade_id")
       .eq("clinica_id", clinicaAtual.clinica_id);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     const m = new Map<string, Set<string>>();
     (data ?? []).forEach((r: any) => {
       if (!m.has(r.procedimento_id)) m.set(r.procedimento_id, new Set());
@@ -399,7 +400,7 @@ function ProcedimentosPage() {
         .order("grupo", { ascending: true, nullsFirst: false })
         .order("nome")
         .range(from, from + pageSize - 1);
-      if (error) { setLoading(false); toast.error(error.message); return; }
+      if (error) { setLoading(false); mostrarErro(error); return; }
       all.push(...(data ?? []));
       if (!data || data.length < pageSize) break;
       from += pageSize;
@@ -421,7 +422,7 @@ function ProcedimentosPage() {
       .select("*")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("nome");
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     setCartoes((data ?? []) as any);
   };
 
@@ -444,24 +445,30 @@ function ProcedimentosPage() {
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("ativo", true)
       .order("nome");
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     setConvenios((data ?? []) as CbConvenio[]);
   };
 
   const loadConvValores = async () => {
     if (!clinicaAtual) return;
-    const { data, error } = await (supabase as any)
-      .from("procedimento_cb_convenio_valores")
-      .select("procedimento_id,convenio_id,valor_dinheiro,valor_outros")
-      .eq("clinica_id", clinicaAtual.clinica_id);
-    if (error) { toast.error(error.message); return; }
     const m = new Map<string, ConvValor>();
-    (data ?? []).forEach((r: any) => {
-      m.set(`${r.procedimento_id}::${r.convenio_id}`, {
-        valor_dinheiro: Number(r.valor_dinheiro) || 0,
-        valor_outros: Number(r.valor_outros) || 0,
+    const PAGE = 1000;
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await (supabase as any)
+        .from("procedimento_cb_convenio_valores")
+        .select("procedimento_id,convenio_id,valor_dinheiro,valor_outros")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .range(from, from + PAGE - 1);
+      if (error) { mostrarErro(error); return; }
+      const rows = (data ?? []) as any[];
+      rows.forEach((r) => {
+        m.set(`${r.procedimento_id}::${r.convenio_id}`, {
+          valor_dinheiro: Number(r.valor_dinheiro) || 0,
+          valor_outros: Number(r.valor_outros) || 0,
+        });
       });
-    });
+      if (rows.length < PAGE) break;
+    }
     setConvValores(m);
   };
 
@@ -472,7 +479,7 @@ function ProcedimentosPage() {
       .select("id,convenio_id,especialidade_id,tipo,modo,valor,percentual,prioridade,ativo")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("ativo", true);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     setRegras((data ?? []) as CbRegra[]);
   };
 
@@ -503,7 +510,7 @@ function ProcedimentosPage() {
       for (const c of convenios) {
         if (formConvManual[c.id]) continue;
         const regrasDoConv = regras.filter(r => r.convenio_id === c.id);
-        const r = findRegra(regrasDoConv, espId, form.tipo);
+        const r = findRegra(regrasDoConv, espId, form.tipo, editing?.id ?? null);
         const calc = computeValor(r, baseDin, baseOut);
         if (calc) {
           next[c.id] = { dinheiro: calc.dinheiro.toFixed(2), outros: calc.outros.toFixed(2) };
@@ -568,6 +575,23 @@ function ProcedimentosPage() {
   const visiveis = ordenados.slice((paginaAtual - 1) * PAGE_SIZE, paginaAtual * PAGE_SIZE);
   const grupoSelecionadoKey = form.grupo ? especialidadeKey(form.grupo) : "__none__";
   const grupoExisteNasEspecialidades = especialidades.some(e => especialidadeKey(e.nome) === grupoSelecionadoKey);
+
+  const getConvValorExibicao = (p: Procedimento, c: CbConvenio): ConvValor => {
+    const salvo = convValores.get(`${p.id}::${c.id}`);
+    if (salvo && (salvo.valor_dinheiro > 0 || salvo.valor_outros > 0)) return salvo;
+
+    const espId = p.grupo
+      ? (especialidades.find(e => especialidadeKey(e.nome) === especialidadeKey(p.grupo))?.id ?? null)
+      : null;
+    const regra = findRegra(regras.filter(r => r.convenio_id === c.id), espId, p.tipo, p.id);
+    const calculado = computeValor(
+      regra,
+      Number(p.valor_dinheiro ?? p.valor_dinheiro_pix ?? p.valor_padrao ?? 0),
+      Number(p.valor_pix ?? p.valor_cartao_credito ?? p.valor_cartao_debito ?? p.valor_cartao ?? 0),
+    );
+    if (calculado) return { valor_dinheiro: calculado.dinheiro, valor_outros: calculado.outros };
+    return salvo ?? { valor_dinheiro: 0, valor_outros: 0 };
+  };
 
   // Reset de página quando filtros aplicados ou ordenação mudam
   useEffect(() => { setPagina(1); }, [buscaAplicada, tipoAplicado, grupoAplicado, situacaoAplicada, sort]);
@@ -716,10 +740,10 @@ function ProcedimentosPage() {
       // registro original seja diferente da clínica atualmente selecionada.
       const { clinica_id: _ignoreClinica, ...updatePayload } = payload;
       const { error } = await supabase.from("procedimentos").update(updatePayload).eq("id", editing.id);
-      if (error) { setSaving(false); toast.error(error.message); return; }
+      if (error) { setSaving(false); mostrarErro(error); return; }
     } else {
       const { data, error } = await supabase.from("procedimentos").insert(payload).select("id").single();
-      if (error) { setSaving(false); toast.error(error.message); return; }
+      if (error) { setSaving(false); mostrarErro(error); return; }
       procId = data?.id;
     }
     // Sincroniza vínculos N:N de especialidades (todos os tipos)
@@ -732,7 +756,7 @@ function ProcedimentosPage() {
           clinica_id: clinicaAtual.clinica_id,
         }));
         const { error: errVinc } = await supabase.from("procedimento_especialidades").insert(rows);
-        if (errVinc) { setSaving(false); toast.error(errVinc.message); return; }
+        if (errVinc) { setSaving(false); mostrarErro(errVinc); return; }
       }
     }
     // Sincroniza valores por convênio (cartão benefícios)
@@ -751,7 +775,7 @@ function ProcedimentosPage() {
       const { error: errConv } = await (supabase as any)
         .from("procedimento_cb_convenio_valores")
         .upsert(rows, { onConflict: "procedimento_id,convenio_id" });
-      if (errConv) { setSaving(false); toast.error(errConv.message); return; }
+      if (errConv) { setSaving(false); mostrarErro(errConv); return; }
     }
     setSaving(false);
     toast.success(editing ? "Atualizado." : "Cadastrado.");
@@ -764,7 +788,7 @@ function ProcedimentosPage() {
   const onDelete = async (p: Procedimento) => {
     if (!confirm(`Excluir ${p.nome}?`)) return;
     const { error } = await supabase.from("procedimentos").delete().eq("id", p.id);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Excluído.");
     void load();
   };
@@ -793,7 +817,7 @@ function ProcedimentosPage() {
     }
     const { error } = await supabase.from("procedimentos").insert(novos);
     setSeeding(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success(`${novos.length} exames de ${pacote.grupo} cadastrados. Ajuste os valores em cada um.`);
     void load();
   };
@@ -816,7 +840,7 @@ function ProcedimentosPage() {
       .map(c => ({ ...c, ativo: true, clinica_id: clinicaAtual.clinica_id }));
     if (novos.length === 0) { toast.info("Cartões padrão já cadastrados."); return; }
     const { error } = await supabase.from("cartoes_convenio").insert(novos);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Cartões cadastrados.");
     void loadCartoes();
   };
@@ -844,7 +868,7 @@ function ProcedimentosPage() {
     const { error } = editingCartao
       ? await supabase.from("cartoes_convenio").update(payload).eq("id", editingCartao.id)
       : await supabase.from("cartoes_convenio").insert(payload);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success(editingCartao ? "Cartão atualizado." : "Cartão cadastrado.");
     setOpenCartao(false);
     void loadCartoes();
@@ -852,7 +876,7 @@ function ProcedimentosPage() {
   const onDeleteCartao = async (c: Cartao) => {
     if (!confirm(`Excluir ${c.nome}?`)) return;
     const { error } = await supabase.from("cartoes_convenio").delete().eq("id", c.id);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Excluído.");
     void loadCartoes();
   };
@@ -1016,15 +1040,15 @@ function ProcedimentosPage() {
                     <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_dinheiro ?? p.valor_dinheiro_pix))}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_pix ?? p.valor_cartao_credito ?? p.valor_cartao_debito ?? p.valor_cartao))}</TableCell>
                     {convenios.map(c => {
-                      const v = convValores.get(`${p.id}::${c.id}`);
+                      const v = getConvValorExibicao(p, c);
                       return (
                         <TableCell key={c.id} className="text-right tabular-nums">
                           <div className="leading-tight">
-                            <div title={`Dinheiro: ${fmtBRL(v?.valor_dinheiro ?? 0)}`}>
-                              <span className="text-muted-foreground mr-1">D</span>{fmtBRL(v?.valor_dinheiro ?? 0)}
+                            <div title={`Dinheiro: ${fmtBRL(v.valor_dinheiro)}`}>
+                              <span className="text-muted-foreground mr-1">D</span>{fmtBRL(v.valor_dinheiro)}
                             </div>
-                            <div className="text-[10px] text-muted-foreground" title={`Pix / Débito / Crédito: ${fmtBRL(v?.valor_outros ?? 0)}`}>
-                              <span className="mr-1">C</span>{fmtBRL(v?.valor_outros ?? 0)}
+                            <div className="text-[10px] text-muted-foreground" title={`Pix / Débito / Crédito: ${fmtBRL(v.valor_outros)}`}>
+                              <span className="mr-1">C</span>{fmtBRL(v.valor_outros)}
                             </div>
                           </div>
                         </TableCell>

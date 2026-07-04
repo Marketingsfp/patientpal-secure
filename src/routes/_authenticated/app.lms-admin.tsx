@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { Plus, Trash2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/lms-admin")({
@@ -66,7 +67,7 @@ function LMSAdminPage() {
       clinica_id: clinicaId, titulo: novoCurso.titulo.trim(),
       descricao: novoCurso.descricao || null, carga_horaria_min: novoCurso.carga, criado_por: user.id,
     });
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Curso criado");
     setOpenCurso(false); setNovoCurso({ titulo: "", descricao: "", carga: 60 });
     await loadCursos();
@@ -74,7 +75,7 @@ function LMSAdminPage() {
 
   async function togglePublicado(c: Curso) {
     const { error } = await supabase.from("lms_cursos").update({ publicado: !c.publicado }).eq("id", c.id);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     await loadCursos();
   }
 
@@ -85,7 +86,7 @@ function LMSAdminPage() {
     const { error } = await supabase.from("lms_modulos").insert({
       curso_id: cursoSel, titulo, ordem: modulos.length,
     });
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     const { data } = await supabase.from("lms_modulos").select("id, curso_id, titulo, ordem").eq("curso_id", cursoSel).order("ordem");
     setModulos((data ?? []) as Modulo[]);
   }
@@ -98,7 +99,7 @@ function LMSAdminPage() {
     const { error } = await supabase.from("lms_licoes").insert({
       curso_id: cursoSel, modulo_id: moduloId, titulo, tipo: "texto", ordem,
     });
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     const { data } = await supabase.from("lms_licoes").select("id, modulo_id, curso_id, titulo, tipo, conteudo, video_url, ordem").eq("curso_id", cursoSel).order("ordem");
     setLicoes((data ?? []) as Licao[]);
   }
@@ -107,14 +108,14 @@ function LMSAdminPage() {
     const { error } = await supabase.from("lms_licoes").update({
       titulo: l.titulo, tipo: l.tipo, conteudo: l.conteudo, video_url: l.video_url,
     }).eq("id", l.id);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Lição salva");
   }
 
   async function removerLicao(id: string) {
     if (!confirm("Excluir lição?")) return;
     const { error } = await supabase.from("lms_licoes").delete().eq("id", id);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     setLicoes((p) => p.filter((x) => x.id !== id));
   }
 

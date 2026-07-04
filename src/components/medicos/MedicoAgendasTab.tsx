@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,7 +43,7 @@ export function MedicoAgendasTab({
         .select("id, nome, ativo, ordem")
         .single();
       if (errAg) {
-        toast.error(`Falha ao criar agenda padrão: ${errAg.message}`);
+        mostrarErro(errAg, "falha ao criar agenda padrão");
       } else if (novaAg) {
         ags = [novaAg as Agenda];
       }
@@ -62,7 +63,7 @@ export function MedicoAgendasTab({
         .eq("ativo", true)
         .in("id", idsPermitidos)
         .order("nome");
-      if (pe) toast.error(pe.message);
+      if (pe) mostrarErro(pe);
       setProcs(((ps as Procedimento[]) ?? []));
     } else {
       setProcs([]);
@@ -93,7 +94,7 @@ export function MedicoAgendasTab({
       .insert({ clinica_id: clinicaId, medico_id: medicoId, nome, ordem: agendas.length } as never)
       .select("id")
       .single();
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     setNova("");
     await load();
   };
@@ -102,13 +103,13 @@ export function MedicoAgendasTab({
     const nome = novoNome.trim();
     if (!nome || nome === a.nome) return;
     const { error } = await supabase.from("medico_agendas").update({ nome }).eq("id", a.id);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     void load();
   };
 
   const toggleAtivo = async (a: Agenda) => {
     const { error } = await supabase.from("medico_agendas").update({ ativo: !a.ativo }).eq("id", a.id);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     void load();
   };
 
@@ -119,7 +120,7 @@ export function MedicoAgendasTab({
       `- Consultas já agendadas NÃO serão excluídas, mas perderão o vínculo com esta agenda.`
     )) return;
     const { error } = await supabase.from("medico_agendas").delete().eq("id", a.id);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     void load();
   };
 
@@ -140,14 +141,14 @@ export function MedicoAgendasTab({
           { clinica_id: clinicaId, agenda_id: agendaId, procedimento_id: procId } as never,
           { onConflict: "agenda_id,procedimento_id", ignoreDuplicates: true } as never,
         );
-      if (error) { toast.error(error.message); void load(); return; }
+      if (error) { mostrarErro(error); void load(); return; }
     } else {
       const { error } = await supabase
         .from("medico_agenda_procedimentos")
         .delete()
         .eq("agenda_id", agendaId)
         .eq("procedimento_id", procId);
-      if (error) { toast.error(error.message); void load(); return; }
+      if (error) { mostrarErro(error); void load(); return; }
     }
     void load();
   };

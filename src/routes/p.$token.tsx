@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { Activity, Video, ClipboardList, CheckCircle2, Calendar } from "lucide-react";
 
 export const Route = createFileRoute("/p/$token")({
@@ -42,7 +43,7 @@ function PacientePublicoPage() {
   async function carregar() {
     setLoading(true);
     const { data, error } = await supabase.rpc("consulta_publica", { _token: token });
-    if (error) { toast.error(error.message); setLoading(false); return; }
+    if (error) { mostrarErro(error); setLoading(false); return; }
     const d = data as any;
     setAg(d.agendamento);
     setModelos(d.anamneses_modelos ?? []);
@@ -60,7 +61,7 @@ function PacientePublicoPage() {
       _token: token, _modelo_id: m.id, _respostas: payload,
     });
     setSalvando(null);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Anamnese enviada!");
     void carregar();
   }

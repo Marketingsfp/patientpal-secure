@@ -17,6 +17,7 @@ import {
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -51,6 +52,7 @@ export const Route = createFileRoute("/_authenticated/app/agenda")({
 });
 
 type Status = "agendado" | "confirmado" | "realizado" | "cancelado" | "faltou";
+type TipoAtendimento = "convenio" | "particular";
 type Agendamento = {
   id: string;
   paciente_nome: string;
@@ -68,6 +70,7 @@ type Agendamento = {
   orcamento_id?: string | null;
   orcamento_numero?: number | null;
   pacote_id?: string | null;
+  tipo_atendimento?: TipoAtendimento | null;
 };
 type Medico = { id: string; nome: string; sexo?: string | null; usa_sistema?: boolean; especialidade_id?: string | null; procedimento_padrao_id?: string | null; procedimento_padrao_em_branco?: boolean | null; procedimento_padrao_nome?: string | null; especialidade_nome?: string | null };
 type RecursoEnf = { id: string; nome: string };
@@ -250,6 +253,8 @@ type ConvenioInfo = {
   emDia: boolean;
   parcelasAtrasadas: number;
   desconto: DescontoConvenio | null;
+  avisoLimite?: string;
+  bloquear?: boolean;
 };
 
 function aplicarDesconto(valor: number, d: DescontoConvenio): number {
@@ -274,8 +279,10 @@ async function obterInfoConvenioPaciente(params: {
   pacienteId: string | null | undefined;
   medicoId: string | null | undefined;
   procedimentoNome: string;
+  agendamentoId?: string | null;
+  dataRef?: string | null; // ISO do agendamento (para checar limite no dia)
 }): Promise<ConvenioInfo | null> {
-  const { clinicaId, pacienteId, medicoId, procedimentoNome } = params;
+  const { clinicaId, pacienteId, medicoId, procedimentoNome, agendamentoId, dataRef } = params;
   if (!pacienteId) return null;
 
   // 1) Contrato ativo: paciente como titular OU dependente ativo
@@ -316,11 +323,19 @@ async function obterInfoConvenioPaciente(params: {
   const parcelasAtrasadas = (mens ?? []).length;
   const emDia = parcelasAtrasadas === 0;
 
+  // 2b) Conta mensalidades pagas do contrato (para checagem de carência).
+  const { count: pagasCount } = await supabase
+    .from("contrato_mensalidades")
+    .select("id", { count: "exact", head: true })
+    .eq("contrato_id", contrato.id)
+    .eq("status", "pago");
+  const mensalidadesPagas = pagasCount ?? 0;
+
   // 3) Busca procedimento_id e especialidade do médico
   const procNorm = (procedimentoNome ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
   const { data: procs } = await supabase
     .from("procedimentos")
-    .select("id,nome")
+    .select("id,nome,tipo")
     .eq("clinica_id", clinicaId)
     .eq("ativo", true)
     .limit(5000);
@@ -330,6 +345,7 @@ async function obterInfoConvenioPaciente(params: {
     (p: any) => (p.nome ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().includes(procNorm),
   );
   const procedimentoId = (procRow as any)?.id ?? null;
+  const procedimentoTipo = ((procRow as any)?.tipo ?? "").toString().toLowerCase() || null;
 
   let especialidadeId: string | null = null;
   if (medicoId) {
@@ -362,7 +378,7 @@ async function obterInfoConvenioPaciente(params: {
   // 4) Benefícios aplicáveis para o convênio
   const { data: beneficios } = await supabase
     .from("cb_beneficios")
-    .select("escopo,procedimento_id,especialidade_id,tipo_desconto,valor_desconto,valor_outros,ativo")
+    .select("escopo,procedimento_id,especialidade_id,tipo_desconto,valor_desconto,valor_outros,ativo,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor")
     .eq("clinica_id", clinicaId)
     .eq("convenio_id", contrato.convenio_id)
     .eq("ativo", true);
@@ -376,9 +392,11 @@ async function obterInfoConvenioPaciente(params: {
 
   // Prioridade: gratuidade > maior percentual > maior valor absoluto
   let desconto: DescontoConvenio | null = null;
+  let beneficioEscolhido: any = null;
   const grat = aplicaveis.find((b) => b.tipo_desconto === "gratuidade");
   if (grat) {
     desconto = { tipo: "gratuidade", valor: 0 };
+    beneficioEscolhido = grat;
   } else {
     const fixo = aplicaveis.find((b) => b.tipo_desconto === "valor_fixo");
     if (fixo) {
@@ -387,17 +405,166 @@ async function obterInfoConvenioPaciente(params: {
         valor: Number(fixo.valor_desconto) || 0,
         valorOutros: Number(fixo.valor_outros ?? fixo.valor_desconto) || 0,
       };
+      beneficioEscolhido = fixo;
     } else {
     const perc = aplicaveis.filter((b) => b.tipo_desconto === "percentual");
     const vals = aplicaveis.filter((b) => b.tipo_desconto === "valor");
     const maiorPerc = perc.reduce((m, b) => Math.max(m, Number(b.valor_desconto) || 0), 0);
     const maiorVal = vals.reduce((m, b) => Math.max(m, Number(b.valor_desconto) || 0), 0);
-    if (maiorPerc > 0) desconto = { tipo: "percentual", valor: maiorPerc };
-    else if (maiorVal > 0) desconto = { tipo: "valor", valor: maiorVal };
+    if (maiorPerc > 0) {
+      desconto = { tipo: "percentual", valor: maiorPerc };
+      beneficioEscolhido = perc.find((b) => Number(b.valor_desconto) === maiorPerc) ?? null;
+    } else if (maiorVal > 0) {
+      desconto = { tipo: "valor", valor: maiorVal };
+      beneficioEscolhido = vals.find((b) => Number(b.valor_desconto) === maiorVal) ?? null;
+    }
     }
   }
 
-  return { convenioNome, emDia, parcelasAtrasadas, desconto };
+  // 5) Checa limite de uso do benefício escolhido (ex.: "1 consulta R$9,99/dia/contrato")
+  let avisoLimite: string | undefined;
+  let bloquear = false;
+  if (beneficioEscolhido && beneficioEscolhido.limite_qtd && emDia) {
+    const dataBase = dataRef ? new Date(dataRef) : new Date();
+    const inicioDia = new Date(dataBase); inicioDia.setHours(0, 0, 0, 0);
+    const fimDia = new Date(dataBase); fimDia.setHours(23, 59, 59, 999);
+
+    // Pacientes que compartilham a cota do contrato
+    let pacientesCota: string[] = [];
+    if (beneficioEscolhido.limite_escopo === "paciente") {
+      pacientesCota = [pacienteId];
+    } else {
+      // titular + dependentes ativos do contrato
+      pacientesCota = [contrato.id ? "" : ""]; // placeholder, substituído abaixo
+      const { data: tit } = await supabase
+        .from("contratos_assinatura")
+        .select("paciente_id")
+        .eq("id", contrato.id)
+        .maybeSingle();
+      const { data: depsCota } = await supabase
+        .from("contrato_dependentes")
+        .select("paciente_id")
+        .eq("contrato_id", contrato.id)
+        .eq("ativo", true);
+      pacientesCota = Array.from(new Set([
+        ...((tit as any)?.paciente_id ? [(tit as any).paciente_id as string] : []),
+        ...((depsCota ?? []) as Array<{ paciente_id: string }>).map((d) => d.paciente_id),
+      ]));
+    }
+
+    if (pacientesCota.length > 0) {
+      // Conta agendamentos do dia, dos pacientes da cota, cujo médico tem a
+      // mesma especialidade do benefício, e que não estejam cancelados.
+      // Exclui o próprio agendamento (caso já esteja salvo).
+      let q = supabase
+        .from("agendamentos")
+        .select("id,medico_id,procedimento", { count: "exact" })
+        .eq("clinica_id", clinicaId)
+        .in("paciente_id", pacientesCota)
+        .gte("inicio", inicioDia.toISOString())
+        .lte("inicio", fimDia.toISOString())
+        .neq("status", "cancelado");
+      if (agendamentoId) q = q.neq("id", agendamentoId);
+      const { data: agsDia } = await q;
+
+      // Se o benefício é por especialidade, filtra pelos agendamentos cujo
+      // médico tem a mesma especialidade.
+      let usados = 0;
+      if (beneficioEscolhido.escopo === "especialidade" && beneficioEscolhido.especialidade_id) {
+        const medicoIds = Array.from(new Set(((agsDia ?? []) as Array<{ medico_id: string | null }>).map((a) => a.medico_id).filter((x): x is string => !!x)));
+        if (medicoIds.length) {
+          const { data: meds } = await supabase
+            .from("medicos")
+            .select("id,especialidade_id")
+            .in("id", medicoIds);
+          const { data: medEspN } = await supabase
+            .from("medico_especialidades")
+            .select("medico_id,especialidade_id")
+            .in("medico_id", medicoIds);
+          const espByMed = new Map<string, Set<string>>();
+          ((meds ?? []) as Array<{ id: string; especialidade_id: string | null }>).forEach((m) => {
+            const s = espByMed.get(m.id) ?? new Set<string>();
+            if (m.especialidade_id) s.add(m.especialidade_id);
+            espByMed.set(m.id, s);
+          });
+          ((medEspN ?? []) as Array<{ medico_id: string; especialidade_id: string | null }>).forEach((m) => {
+            const s = espByMed.get(m.medico_id) ?? new Set<string>();
+            if (m.especialidade_id) s.add(m.especialidade_id);
+            espByMed.set(m.medico_id, s);
+          });
+          usados = ((agsDia ?? []) as Array<{ medico_id: string | null }>).filter((a) => {
+            if (!a.medico_id) return false;
+            const s = espByMed.get(a.medico_id);
+            return s ? s.has(beneficioEscolhido.especialidade_id) : false;
+          }).length;
+        }
+      } else {
+        usados = (agsDia ?? []).length;
+      }
+
+      if (usados >= Number(beneficioEscolhido.limite_qtd)) {
+        const modo = beneficioEscolhido.excedente_modo;
+        const escopoTxt = beneficioEscolhido.limite_escopo === "paciente" ? "paciente" : "contrato";
+        if (modo === "bloquear") {
+          bloquear = true;
+          desconto = null;
+          avisoLimite = `Limite de ${beneficioEscolhido.limite_qtd}/dia por ${escopoTxt} atingido — agendamento bloqueado pelo convênio.`;
+        } else if (modo === "particular") {
+          desconto = null;
+          avisoLimite = `Limite de ${beneficioEscolhido.limite_qtd}/dia por ${escopoTxt} atingido — cobrando valor particular cheio.`;
+        } else if (modo === "valor_fixo") {
+          const v = Number(beneficioEscolhido.excedente_valor) || 0;
+          desconto = { tipo: "valor_fixo", valor: v, valorOutros: v };
+          avisoLimite = `Limite atingido — cobrando valor fixo excedente R$ ${v.toFixed(2)}.`;
+        } else if (modo === "percentual_particular") {
+          const pct = Number(beneficioEscolhido.excedente_percentual) || 0;
+          // pct = desconto sobre o particular; ex.: 50 → paga 50% do particular
+          desconto = { tipo: "percentual", valor: pct };
+          avisoLimite = `Limite de ${beneficioEscolhido.limite_qtd}/dia por ${escopoTxt} atingido — cobrando ${100 - pct}% do valor particular.`;
+        }
+      }
+    }
+  }
+
+  // 6) Checa carência / gratuidade configuradas nas regras do convênio
+  //    (aba Regras/Valores do lápis). A regra mais específica para
+  //    especialidade+tipo vence. Se a carência não foi cumprida, o desconto
+  //    do convênio é suspenso (paga particular). Se a regra está marcada
+  //    como "gratuito", força o benefício a gratuidade.
+  try {
+    const { data: regrasRaw } = await (supabase as any)
+      .from("cb_convenio_regras")
+      .select("id,convenio_id,especialidade_id,tipo,modo,valor,percentual,prioridade,ativo,carencia_mensalidades,gratuito")
+      .eq("convenio_id", contrato.convenio_id)
+      .eq("ativo", true);
+    const regrasCb = (regrasRaw ?? []) as any[];
+    if (regrasCb.length) {
+      const { findRegra: findR, carenciaCumprida } = await import("@/lib/cb-regras");
+      // Tenta cada especialidade possível do médico; usa a mais específica
+      const espsTentativa: (string | null)[] = especialidadesMedico.length
+        ? [...especialidadesMedico, null]
+        : [null];
+      let regraMatch: any = null;
+      for (const eid of espsTentativa) {
+        const r = findR(regrasCb, eid, procedimentoTipo);
+        if (r) { regraMatch = r; break; }
+      }
+      if (regraMatch) {
+        if (!carenciaCumprida(regraMatch, mensalidadesPagas)) {
+          const n = Number(regraMatch.carencia_mensalidades) || 0;
+          desconto = null;
+          bloquear = false;
+          avisoLimite = `Convênio ${convenioNome}: benefício disponível somente após a ${n}ª mensalidade paga (contrato tem ${mensalidadesPagas} paga(s)). Cobrando valor particular.`;
+        } else if (regraMatch.gratuito) {
+          desconto = { tipo: "gratuidade", valor: 0 };
+        }
+      }
+    }
+  } catch {
+    // silencioso — se a checagem de carência falhar, mantém o comportamento anterior
+  }
+
+  return { convenioNome, emDia, parcelasAtrasadas, desconto, avisoLimite, bloquear };
 }
 
 const toLocalInput = (iso: string) => {
@@ -414,6 +581,7 @@ const EMPTY = {
   orcamento_id: "",
   orcamento_numero: "",
   orcamento_itens: [] as string[],
+  tipo_atendimento: "particular" as TipoAtendimento,
 };
 
 function AgendaPage() {
@@ -485,6 +653,76 @@ function AgendaPage() {
     itens: DividirItem[];
     inicioPadrao: string;
   } | null>(null);
+  // IDs dos itens do orçamento que serão consumidos pelo agendamento atual
+  // (fluxo de 1 grupo). Gravados em `agendamento_orcamento_itens` após o save.
+  const [pendingOrcItemIds, setPendingOrcItemIds] = useState<string[]>([]);
+  // Informações do contrato ativo de cartão benefícios do paciente selecionado no modal.
+  // Usado para mostrar o seletor "Tipo de atendimento" (Convênio × Particular) e alertar sobre mensalidade em atraso.
+  const [contratoPacienteInfo, setContratoPacienteInfo] = useState<
+    { convenioNome: string; totalAberto: number; qtdAtrasadas: number } | null
+  >(null);
+  const contratoPacienteReqId = useRef(0);
+  useEffect(() => {
+    if (!open || !clinicaAtual || !form.paciente_id) {
+      setContratoPacienteInfo(null);
+      return;
+    }
+    const reqId = ++contratoPacienteReqId.current;
+    const pacId = form.paciente_id;
+    const clinicaId = clinicaAtual.clinica_id;
+    (async () => {
+      // 1) Contrato ativo (titular ou dependente)
+      const { data: titular } = await supabase
+        .from("contratos_assinatura")
+        .select("id, cb_convenios(nome)")
+        .eq("clinica_id", clinicaId)
+        .eq("status", "ativo")
+        .eq("paciente_id", pacId)
+        .limit(1);
+      let contrato: { id: string; convenioNome: string } | null = null;
+      const t0 = (titular ?? [])[0] as any;
+      if (t0) contrato = { id: t0.id, convenioNome: t0.cb_convenios?.nome ?? "Convênio" };
+      if (!contrato) {
+        const { data: deps } = await supabase
+          .from("contrato_dependentes")
+          .select("contratos_assinatura!inner(id,clinica_id,status,cb_convenios(nome))")
+          .eq("paciente_id", pacId)
+          .eq("ativo", true)
+          .limit(5);
+        const cand = ((deps ?? []) as any[])
+          .map((d) => d.contratos_assinatura)
+          .find((c: any) => c && c.clinica_id === clinicaId && c.status === "ativo");
+        if (cand) contrato = { id: cand.id, convenioNome: cand.cb_convenios?.nome ?? "Convênio" };
+      }
+      if (reqId !== contratoPacienteReqId.current) return;
+      if (!contrato) { setContratoPacienteInfo(null); return; }
+      // 2) Mensalidades vencidas
+      const hojeStr = new Date().toISOString().slice(0, 10);
+      const { data: mens } = await supabase
+        .from("contrato_mensalidades")
+        .select("valor,vencimento,status")
+        .eq("contrato_id", contrato.id)
+        .in("status", ["pendente", "aberto", "atrasado"])
+        .lte("vencimento", hojeStr);
+      if (reqId !== contratoPacienteReqId.current) return;
+      const lista = (mens ?? []) as Array<{ valor: number | string; vencimento: string }>;
+      const totalAberto = lista.reduce((s, m) => s + (Number(m.valor) || 0), 0);
+      setContratoPacienteInfo({
+        convenioNome: contrato.convenioNome,
+        totalAberto,
+        qtdAtrasadas: lista.length,
+      });
+      // Regra: se o paciente tem cartão convênio e está EM DIA → "Convênio".
+      // Se está EM ATRASO → "Particular". Aplica também na edição de
+      // agendamentos antigos que ficaram gravados incorretamente como
+      // "particular" mesmo com o cartão em dia.
+      setForm((f) => ({
+        ...f,
+        tipo_atendimento: lista.length === 0 ? "convenio" : "particular",
+      }));
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, form.paciente_id, clinicaAtual?.clinica_id]);
   // Abre o diálogo "Novo agendamento" pré-preenchido a partir de querystring
   // (usado pelo botão "Agendar" da conversa do WhatsApp).
   const novoFromUrlConsumido = useRef(false);
@@ -570,7 +808,7 @@ function AgendaPage() {
       observacoes: null,
       data_pagamento: null,
     } as never).eq("id", origem.id);
-    if (e1) { setReagSalvando(false); toast.error(e1.message); return; }
+    if (e1) { setReagSalvando(false); mostrarErro(e1); return; }
     // 2) Coloca a paciente na ficha de destino (slot escolhido), preservando o horário do slot
     const { error: e2 } = await supabase.from("agendamentos").update({
       paciente_id: origem.paciente_id ?? null,
@@ -580,7 +818,7 @@ function AgendaPage() {
       observacoes: novasObs,
       data_pagamento: origem.data_pagamento ?? null,
     } as never).eq("id", slot.id);
-    if (e2) { setReagSalvando(false); toast.error(e2.message); return; }
+    if (e2) { setReagSalvando(false); mostrarErro(e2); return; }
     // 3) Transfere lançamentos financeiros (pagamento) da ficha de origem para a de destino,
     //    para que o ícone de "pago" continue aparecendo na nova ficha.
     await supabase.from("fin_lancamentos")
@@ -715,7 +953,7 @@ function AgendaPage() {
       .eq("record_id", a.id)
       .order("created_at", { ascending: false })
       .limit(200);
-    if (error) { setAuditLoading(false); toast.error(error.message); return; }
+    if (error) { setAuditLoading(false); mostrarErro(error); return; }
     // 2) lançamentos financeiros vinculados ao agendamento (para status do repasse médico)
     const { data: lancs } = await supabase
       .from("fin_lancamentos")
@@ -762,7 +1000,7 @@ function AgendaPage() {
       .select("id,nome")
       .single();
     setSavingPac(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     setPacientes(prev => [...prev, { id: data.id, nome: data.nome }].sort((a, b) => a.nome.localeCompare(b.nome)));
     setForm(f => ({ ...f, paciente_nome: data.nome, paciente_id: data.id }));
     setNovoPac({ nome: "", cpf: "", telefone: "", data_nascimento: "", email: "" });
@@ -775,7 +1013,7 @@ function AgendaPage() {
     setLoading(true);
     let q = supabase
       .from("agendamentos")
-      .select("id,paciente_nome,paciente_id,medico_id,enfermagem_recurso_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as never)
+      .select("id,paciente_nome,paciente_id,medico_id,enfermagem_recurso_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as never)
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("inicio", { ascending: false });
     // "agendado" agora significa "qualquer ficha com paciente alocado",
@@ -847,7 +1085,7 @@ function AgendaPage() {
     }
     const { data, error } = await q;
     setLoading(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     // Recursos de enfermagem aparecem como "médicos virtuais": mapeamos o
     // enfermagem_recurso_id no campo medico_id para reuso de toda a UI.
     const mapped = (((data ?? []) as unknown) as Array<Agendamento & { enfermagem_recurso_id?: string | null; medico?: { nome: string | null; sexo: string | null } | null; orcamento?: { numero: number | null } | null }>).map((a) => ({
@@ -871,7 +1109,7 @@ function AgendaPage() {
         .filter((x): x is string => !!x),
     ));
     if (pacIds.length) {
-      const [{ data: nasc }, { data: contratos }] = await Promise.all([
+      const [{ data: nasc }, { data: contratos }, { data: deps }] = await Promise.all([
         supabase
           .from("pacientes")
           .select("id,data_nascimento")
@@ -882,6 +1120,13 @@ function AgendaPage() {
           .eq("clinica_id", clinicaAtual.clinica_id)
           .eq("status", "ativo")
           .in("paciente_id", pacIds),
+        supabase
+          .from("contrato_dependentes")
+          .select("paciente_id,ativo,contratos_assinatura!inner(clinica_id,status,cb_convenios(nome))")
+          .in("paciente_id", pacIds)
+          .eq("ativo", true)
+          .eq("contratos_assinatura.clinica_id", clinicaAtual.clinica_id)
+          .eq("contratos_assinatura.status", "ativo"),
       ]);
       const map = new Map<string, string | null>();
       (nasc ?? []).forEach((p: any) => map.set(p.id, p.data_nascimento ?? null));
@@ -891,6 +1136,12 @@ function AgendaPage() {
         .forEach((c) => {
           if (c.paciente_id && !cmap.has(c.paciente_id)) {
             cmap.set(c.paciente_id, c.cb_convenios?.nome ?? "Convênio");
+          }
+        });
+      ((deps ?? []) as Array<{ paciente_id: string | null; contratos_assinatura: { cb_convenios: { nome: string } | null } | null }>)
+        .forEach((d) => {
+          if (d.paciente_id && !cmap.has(d.paciente_id)) {
+            cmap.set(d.paciente_id, d.contratos_assinatura?.cb_convenios?.nome ?? "Convênio");
           }
         });
       setConvenioMap(cmap);
@@ -1137,6 +1388,61 @@ function AgendaPage() {
 
   useEffect(() => { loadRef(); }, [clinicaAtual?.clinica_id]);
 
+  // Fallback definitivo: se ao selecionar um médico a lista local de
+  // serviços vier vazia (por qualquer motivo — cache defasado, RLS,
+  // race com loadRef), busca direto no banco e popula o mapa.
+  useEffect(() => {
+    const medicoId = form.medico_id;
+    if (!medicoId || !clinicaAtual?.clinica_id) return;
+    const jaTem = (procOpcoesPorMedico.get(medicoId)?.length ?? 0) > 0;
+    if (jaTem) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("medico_procedimentos")
+        .select("procedimento_id, especialidade_id, procedimentos!inner(id,nome,grupo,ativo)")
+        .eq("medico_id", medicoId);
+      if (error || cancelled || !Array.isArray(data)) return;
+      const opcoes: { id: string; nome: string }[] = [];
+      const vistos = new Set<string>();
+      const ids = new Set<string>();
+      for (const r of data as Array<{ procedimento_id: string; procedimentos: { id: string; nome: string; grupo: string | null; ativo: boolean | null } | null }>) {
+        const p = r.procedimentos;
+        if (!p || p.ativo === false) continue;
+        const k = normalizar(p.nome);
+        if (vistos.has(k)) continue;
+        vistos.add(k);
+        ids.add(p.id);
+        opcoes.push({ id: p.id, nome: p.nome });
+      }
+      if (opcoes.length === 0) return;
+      setProcOpcoesPorMedico((prev) => {
+        if ((prev.get(medicoId)?.length ?? 0) > 0) return prev;
+        const next = new Map(prev);
+        next.set(medicoId, opcoes);
+        return next;
+      });
+      setProcPorMedico((prev) => {
+        const cur = prev.get(medicoId);
+        if (cur && cur.size >= ids.size) return prev;
+        const next = new Map(prev);
+        const merged = new Set(cur ?? []);
+        for (const id of ids) merged.add(id);
+        next.set(medicoId, merged);
+        return next;
+      });
+      // garante que os procedimentos apareçam em procedimentosList para
+      // o caminho `procedimentosList.filter(...)` (linha 1264) funcionar.
+      setProcedimentosList((prev) => {
+        const known = new Set(prev.map((p) => p.id));
+        const adicionar = opcoes.filter((o) => !known.has(o.id));
+        if (adicionar.length === 0) return prev;
+        return [...prev, ...adicionar];
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [form.medico_id, clinicaAtual?.clinica_id, procOpcoesPorMedico]);
+
   // Carrega contagem histórica de procedimentos (últimos 365 dias) para
   // ordenar as opções por popularidade no momento do agendamento.
   useEffect(() => {
@@ -1239,13 +1545,19 @@ function AgendaPage() {
     const opcoesCadastradas = procOpcoesPorMedico.get(medicoId);
     const filtrarPorAgenda = (lista: { id: string; nome: string }[]) => {
       if (!agendaId) return lista;
+      // Só aplica o filtro de agenda quando a agenda pertence ao médico selecionado.
+      const agendasDoMedico = agendasPorMedico.get(medicoId) ?? [];
+      if (!agendasDoMedico.some((a) => a.id === agendaId)) return lista;
       const idsAgenda = procIdsPorAgenda.get(agendaId);
       if (!idsAgenda || idsAgenda.size === 0) return lista;
       const nomesAgenda = new Set<string>();
       for (const p of procedimentosList) {
         if (idsAgenda.has(p.id)) nomesAgenda.add(normalizar(p.nome));
       }
-      return lista.filter((p) => idsAgenda.has(p.id) || nomesAgenda.has(normalizar(p.nome)));
+      const filtrada = lista.filter((p) => idsAgenda.has(p.id) || nomesAgenda.has(normalizar(p.nome)));
+      // Fallback: se o filtro zerar a lista mas o médico tem serviços
+      // cadastrados, mostra todos eles para não bloquear o agendamento.
+      return filtrada.length > 0 ? filtrada : lista;
     };
     if (opcoesCadastradas && opcoesCadastradas.length > 0) {
       // Preserva a ordem do cadastro (created_at asc) — Top 10 aparecem primeiro.
@@ -1266,11 +1578,9 @@ function AgendaPage() {
     const med = medicos.find((m) => m.id === medicoId);
     if (!med) return "";
     if (med.procedimento_padrao_em_branco) return "";
-    return (med.procedimento_padrao_id
-      ? med.procedimento_padrao_nome
-        ?? procedimentosList.find((p) => p.id === med.procedimento_padrao_id)?.nome
-      : null)
-      ?? med.especialidade_nome
+    if (!med.procedimento_padrao_id) return "";
+    return med.procedimento_padrao_nome
+      ?? procedimentosList.find((p) => p.id === med.procedimento_padrao_id)?.nome
       ?? "";
   };
 
@@ -1279,6 +1589,13 @@ function AgendaPage() {
     const med = medicoId ? medicos.find((m) => m.id === medicoId) : null;
     const padrao = procedimentoPadraoDoMedico(medicoId);
     if (padrao && (!atual || normalizar(atual) === normalizar(med?.especialidade_nome ?? ""))) return padrao;
+    return atual;
+  };
+
+  const procedimentoFormulario = (medicoId: string | null | undefined, procedimento: string | null | undefined) => {
+    const atual = procedimentoEfetivo(medicoId, procedimento);
+    const med = medicoId ? medicos.find((m) => m.id === medicoId) : null;
+    if (atual && med?.especialidade_nome && normalizar(atual) === normalizar(med.especialidade_nome)) return "";
     return atual;
   };
 
@@ -1398,6 +1715,7 @@ function AgendaPage() {
       toast.info("Há atendimentos já pagos na seleção. Desmarque-os antes de cobrar.");
       return;
     }
+    try {
     // Verificação fresca + carga de procedimentos em PARALELO (cache 60s)
     const [{ data: jaPagosLote }, procs] = await Promise.all([
       supabase
@@ -1453,6 +1771,10 @@ function AgendaPage() {
       })(),
     });
     setFormaPagOpen(true);
+    } catch (e: any) {
+      console.error("[cobrarSelecionados]", e);
+      mostrarErro(e);
+    }
   };
 
   const isManager = clinicaAtual?.role === "admin" || clinicaAtual?.role === "gestor";
@@ -1491,7 +1813,7 @@ function AgendaPage() {
         executado_em: nowIso,
       } as never)
       .in("id", validos.map(v => v.id));
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success(`${validos.length} atendimento(s) baixado(s) como Realizado.`);
     setSelecionados(new Set());
     await load();
@@ -1541,7 +1863,7 @@ function AgendaPage() {
       toast.success(temRepassePago ? "Atendimento reaberto e repasse estornado." : "Atendimento reaberto.");
       await load();
     } catch (err: any) {
-      toast.error(err?.message ?? "Falha ao reabrir atendimento.");
+      mostrarErro(err);
     }
   };
 
@@ -1558,7 +1880,7 @@ function AgendaPage() {
     }
     if (!confirm(`Excluir ${ids.length} horário(s)? Esta ação não pode ser desfeita.`)) return;
     const { error } = await supabase.from("agendamentos").delete().in("id", ids);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success(`${ids.length} horário(s) excluído(s).`);
     setSelecionados(new Set());
     await load();
@@ -1611,7 +1933,7 @@ function AgendaPage() {
       .select("id,paciente_id,paciente_nome,inicio,fim,medico_id,status,procedimento,observacoes,data_pagamento")
       .in("id", ids)
       .limit(1000);
-    if (eFontes) { toast.error(eFontes.message); return; }
+    if (eFontes) { mostrarErro(eFontes); return; }
     const fontes = ((fontesRaw ?? []) as Array<Agendamento>)
       .filter(a => a.status !== "realizado" && !isSlotLivre(a.paciente_nome))
       .sort((a, b) => new Date(a.inicio).getTime() - new Date(b.inicio).getTime());
@@ -1630,7 +1952,7 @@ function AgendaPage() {
       .lte("inicio", df.toISOString())
       .order("inicio", { ascending: true })
       .limit(1000);
-    if (eDest) { toast.error(eDest.message); return; }
+    if (eDest) { mostrarErro(eDest); return; }
     const destino = (destinoRaw ?? []) as Array<{
       id: string; paciente_id: string | null; paciente_nome: string;
       inicio: string; fim: string; medico_id: string | null; status: string;
@@ -1680,8 +2002,8 @@ function AgendaPage() {
           data_pagamento: origem.data_pagamento ?? null,
         } as never).eq("id", alvo.id),
       ]);
-      if (e1) { toast.error(`Falha em ${origem.paciente_nome}: ${e1.message}`); return false; }
-      if (e2) { toast.error(`Falha ao mover para destino: ${e2.message}`); return false; }
+      if (e1) { mostrarErro(e1, `mover ${origem.paciente_nome}`); return false; }
+      if (e2) { mostrarErro(e2, "falha ao mover para destino"); return false; }
       // 3) Transfere lançamentos financeiros
       await supabase.from("fin_lancamentos")
         .update({ agendamento_id: alvo.id } as never)
@@ -1743,10 +2065,8 @@ function AgendaPage() {
       : toLocalInput(end.toISOString());
     let procedimento = "";
     if (medicoFiltro) {
-      const med = medicos.find((m) => m.id === medicoFiltro);
       const padrao = procedimentoPadraoDoMedico(medicoFiltro);
       if (padrao) procedimento = padrao;
-      else if (med?.especialidade_nome) procedimento = med.especialidade_nome;
     }
     setForm({
       ...EMPTY,
@@ -1772,17 +2092,44 @@ function AgendaPage() {
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("numero", num)
         .maybeSingle();
-      if (error) { toast.error(error.message); return; }
+      if (error) { mostrarErro(error); return; }
       if (!orc) { toast.error(`Orçamento nº ${num} não encontrado.`); return; }
       if (orc.status === "cancelado") { toast.error("Orçamento cancelado."); return; }
       const { data: itens, error: e2 } = await supabase
         .from("orcamento_itens")
-        .select("descricao, procedimento_id")
+        .select("id, descricao, procedimento_id")
         .eq("orcamento_id", orc.id)
         .order("ordem");
-      if (e2) { toast.error(e2.message); return; }
-      const its = (itens ?? []) as { descricao: string; procedimento_id: string | null }[];
-      if (its.length === 0) { toast.error("Orçamento sem itens."); return; }
+      if (e2) { mostrarErro(e2); return; }
+      const itsAll = (itens ?? []) as { id: string; descricao: string; procedimento_id: string | null }[];
+      if (itsAll.length === 0) { toast.error("Orçamento sem itens."); return; }
+      // Filtra itens já consumidos por agendamentos ativos. Permite agendar
+      // o restante quando o orçamento foi aproveitado em partes.
+      const { data: consumidosRows } = await supabase
+        .from("agendamento_orcamento_itens")
+        .select("orcamento_item_id, agendamento_id, agendamentos!inner(status)")
+        .eq("orcamento_id", orc.id);
+      const consumidos = new Set<string>(
+        ((consumidosRows ?? []) as Array<{ orcamento_item_id: string; agendamentos: { status: string } | null }>)
+          .filter((r) => r.agendamentos?.status !== "cancelado")
+          .map((r) => r.orcamento_item_id),
+      );
+      const editingItemIdsLiberar = editing?.id
+        ? new Set<string>(
+            ((consumidosRows ?? []) as Array<{ orcamento_item_id: string; agendamento_id: string }>)
+              .filter((r) => r.agendamento_id === editing.id)
+              .map((r) => r.orcamento_item_id),
+          )
+        : new Set<string>();
+      const its = itsAll.filter((i) => !consumidos.has(i.id) || editingItemIdsLiberar.has(i.id));
+      if (its.length === 0) {
+        toast.error(`Todos os ${itsAll.length} itens deste orçamento já foram agendados.`);
+        return;
+      }
+      const totalConsumidos = itsAll.length - its.length;
+      if (totalConsumidos > 0) {
+        toast.info(`${totalConsumidos} de ${itsAll.length} itens já agendados. Restam ${its.length} para agendar.`);
+      }
       const procIds = Array.from(new Set(its.map(i => i.procedimento_id).filter((x): x is string => !!x)));
       let procs: { id: string; grupo: string | null; tipo: string | null }[] = [];
       if (procIds.length) {
@@ -1790,7 +2137,7 @@ function AgendaPage() {
           .from("procedimentos")
           .select("id, grupo, tipo")
           .in("id", procIds);
-        if (e3) { toast.error(e3.message); return; }
+        if (e3) { mostrarErro(e3); return; }
         procs = (pdata ?? []) as { id: string; grupo: string | null; tipo: string | null }[];
       }
       const norm = (g: string | null | undefined) =>
@@ -1805,18 +2152,8 @@ function AgendaPage() {
         return g === "LABORATORIO" || t === "EXAME" || t === "LABORATORIO";
       };
       const todosLab = its.every(i => isLab(i.procedimento_id));
-      // Verifica se já existe agendamento ativo vinculado (mesma clínica)
-      const { data: jaAg } = await supabase
-        .from("agendamentos")
-        .select("id")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("orcamento_id", orc.id)
-        .neq("status", "cancelado")
-        .limit(1);
-      if (jaAg && jaAg.length > 0 && (!editing || editing.id !== jaAg[0].id)) {
-        toast.error("Este orçamento já está vinculado a outro agendamento.");
-        return;
-      }
+      // (Bloqueio antigo removido: agora permitimos agendamentos parciais,
+      // controlados via `agendamento_orcamento_itens`.)
       const nomes = its.map(i => i.descricao);
       const procStr = todosLab
         ? `LABORATÓRIO (${nomes.length} EXAMES): ${nomes.join(", ")}`
@@ -1854,6 +2191,7 @@ function AgendaPage() {
         const itensRicos: DividirItem[] = its.map(i => {
           const p = i.procedimento_id ? procPorId.get(i.procedimento_id) : null;
           return {
+            id: i.id,
             descricao: i.descricao,
             procedimento_id: i.procedimento_id,
             grupo: p?.grupo ?? null,
@@ -1875,6 +2213,9 @@ function AgendaPage() {
         setDividirOpen(true);
         return;
       }
+      // Fluxo de 1 grupo: registra os IDs restantes para gravar o vínculo
+      // após o save do agendamento.
+      setPendingOrcItemIds(its.map((i) => i.id));
       setForm(f => ({
         ...f,
         orcamento_id: orc.id,
@@ -1892,6 +2233,7 @@ function AgendaPage() {
 
   const limparOrcamento = () => {
     setForm(f => ({ ...f, orcamento_id: "", orcamento_numero: "", orcamento_itens: [] }));
+    setPendingOrcItemIds([]);
   };
 
   // Abre o diálogo de novo agendamento já com o nº de orçamento preenchido
@@ -1945,13 +2287,14 @@ function AgendaPage() {
       paciente_id: pacienteCopia?.id ?? "",
       medico_id: a.medico_id ?? "",
       inicio: toLocalInput(a.inicio), fim: toLocalInput(a.fim),
-      procedimento: procedimentoEfetivo(a.medico_id, a.procedimento) || "CONSULTA",
+      procedimento: procedimentoFormulario(a.medico_id, a.procedimento),
       status: "agendado",
       observacoes: a.observacoes ?? "",
       data_pagamento: a.data_pagamento ?? "",
       orcamento_id: "",
       orcamento_numero: "",
       orcamento_itens: [],
+      tipo_atendimento: (a.tipo_atendimento as TipoAtendimento | null) ?? "particular",
     });
     if (pacienteCopia) setPacienteCopia(null);
     setOpen(true);
@@ -1971,18 +2314,48 @@ function AgendaPage() {
         .order("ordem");
       itensOrc = ((its ?? []) as { descricao: string }[]).map((x) => x.descricao);
     }
+    // Se o agendamento veio sem paciente_id (ex.: criado a partir de um
+    // orçamento que também não tinha o vínculo), tenta resolver pelo nome
+    // dentro da clínica atual e backfilla o cadastro tanto no agendamento
+    // quanto no orçamento, evitando o aviso "Paciente não cadastrado".
+    let resolvedPacId: string = a.paciente_id ?? "";
+    let resolvedPacNome: string = a.paciente_nome;
+    if (!resolvedPacId && a.paciente_nome && clinicaAtual) {
+      const nomeBusca = a.paciente_nome.trim();
+      const { data: cands } = await supabase
+        .from("pacientes")
+        .select("id, nome")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("ativo", true)
+        .ilike("nome", nomeBusca)
+        .limit(5);
+      const lista = (cands ?? []) as { id: string; nome: string }[];
+      const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim().replace(/\s+/g, " ");
+      const alvo = norm(nomeBusca);
+      const exato = lista.find((p) => norm(p.nome) === alvo) ?? (lista.length === 1 ? lista[0] : null);
+      if (exato) {
+        resolvedPacId = exato.id;
+        resolvedPacNome = exato.nome;
+        // Backfill silencioso (não bloqueia a abertura do diálogo se falhar)
+        void supabase.from("agendamentos").update({ paciente_id: exato.id }).eq("id", a.id);
+        if (a.orcamento_id) {
+          void supabase.from("orcamentos").update({ paciente_id: exato.id }).eq("id", a.orcamento_id).is("paciente_id", null);
+        }
+      }
+    }
     setForm({
-      paciente_nome: a.paciente_nome,
-      paciente_id: a.paciente_id ?? "",
+      paciente_nome: resolvedPacNome,
+      paciente_id: resolvedPacId,
       medico_id: a.medico_id ?? "",
       inicio: toLocalInput(a.inicio), fim: toLocalInput(a.fim),
-      procedimento: procedimentoEfetivo(a.medico_id, a.procedimento),
+      procedimento: procedimentoFormulario(a.medico_id, a.procedimento),
       status: a.status,
       observacoes: a.observacoes ?? "",
       data_pagamento: a.data_pagamento ?? "",
       orcamento_id: a.orcamento_id ?? "",
       orcamento_numero: a.orcamento_numero ? String(a.orcamento_numero) : "",
       orcamento_itens: itensOrc,
+      tipo_atendimento: (a.tipo_atendimento as TipoAtendimento | null) ?? "particular",
     });
     setOpen(true);
   };
@@ -2061,8 +2434,9 @@ function AgendaPage() {
       return;
     }
     // Bloqueio por mensalidade vencida em contrato de cartão benefícios (titular ou dependente).
-    // Gestores/admin podem liberar via prompt; demais usuários ficam bloqueados.
-    if (form.paciente_id) {
+    // Só aplica quando o paciente vai usar o CONVÊNIO neste atendimento.
+    // Se escolheu Particular, o débito do cartão não bloqueia o agendamento.
+    if (form.paciente_id && form.tipo_atendimento === "convenio") {
       const { data: blk } = await supabase.rpc("paciente_cartao_inadimplente", {
         _paciente_id: form.paciente_id,
         _clinica_id: clinicaAtual.clinica_id,
@@ -2073,7 +2447,7 @@ function AgendaPage() {
           .slice(0, 5)
           .map((m) => `• ${m.convenio_nome ?? "Cartão"} — venc. ${m.vencimento?.split("-").reverse().join("/")} R$ ${Number(m.valor).toFixed(2)}`)
           .join("\n");
-        const msg = `Paciente com mensalidade(s) vencida(s) no cartão benefícios.\nTotal em aberto: R$ ${Number(info.total_aberto ?? 0).toFixed(2)}\n\n${linhas}\n\nAgendamento bloqueado até a regularização.`;
+        const msg = `Paciente com mensalidade(s) vencida(s) no cartão benefícios.\nTotal em aberto: R$ ${Number(info.total_aberto ?? 0).toFixed(2)}\n\n${linhas}\n\nAgendamento bloqueado até a regularização — ou troque o Tipo de atendimento para "Particular".`;
         toast.error(msg, { duration: 10000 });
         return;
       }
@@ -2088,21 +2462,46 @@ function AgendaPage() {
       enfermagem_recurso_id: ehRecurso ? form.medico_id : null,
       inicio: new Date(form.inicio).toISOString(),
       fim: new Date(form.fim).toISOString(),
-      procedimento: procedimentoEfetivo(form.medico_id, form.procedimento) || null,
+      procedimento: procedimentoFormulario(form.medico_id, form.procedimento) || null,
       status: form.status,
       observacoes: form.observacoes.trim() || null,
       data_pagamento: form.data_pagamento ? form.data_pagamento : null,
       orcamento_id: form.orcamento_id || null,
+      tipo_atendimento: form.tipo_atendimento,
     };
     let novoId: string | null = editing?.id ?? null;
     if (editing) {
       const { error } = await supabase.from("agendamentos").update(payload).eq("id", editing.id);
-      if (error) { setSaving(false); toast.error(error.message); return; }
+      if (error) { setSaving(false); mostrarErro(error); return; }
     } else {
       const { data: novo, error } = await supabase.from("agendamentos").insert(payload).select("id").single();
-      if (error || !novo) { setSaving(false); toast.error(error?.message ?? "Erro ao salvar"); return; }
+      if (error || !novo) { setSaving(false); mostrarErro(error); return; }
       novoId = novo.id;
     }
+    // Grava vínculos com itens do orçamento (consome itens individualmente
+    // para permitir agendamentos parciais futuros).
+    if (payload.orcamento_id && novoId && pendingOrcItemIds.length > 0) {
+      const vinculos = pendingOrcItemIds.map((itemId) => ({
+        clinica_id: clinicaAtual.clinica_id,
+        agendamento_id: novoId!,
+        orcamento_id: payload.orcamento_id!,
+        orcamento_item_id: itemId,
+      }));
+      // Em update, primeiro limpa vínculos antigos do agendamento.
+      if (editing) {
+        await supabase
+          .from("agendamento_orcamento_itens")
+          .delete()
+          .eq("agendamento_id", editing.id);
+      }
+      const { error: vErr } = await supabase
+        .from("agendamento_orcamento_itens")
+        .insert(vinculos as never);
+      if (vErr) {
+        mostrarErro(vErr, "agendamento salvo, mas vínculo com itens do orçamento falhou");
+      }
+    }
+    setPendingOrcItemIds([]);
     setSaving(false);
     toast.success("Salvo"); setOpen(false); await load();
     if (irParaPagamento && novoId) {
@@ -2113,6 +2512,8 @@ function AgendaPage() {
           pacienteId: payload.paciente_id,
           medicoId: payload.medico_id,
           procedimentoNome: payload.procedimento ?? "",
+          agendamentoId: novoId,
+          dataRef: payload.inicio ?? null,
         }),
       ]);
       const proc: any = await buscarProcedimentoPorNome(clinicaAtual.clinica_id, payload.procedimento ?? "CONSULTA", lista);
@@ -2128,10 +2529,16 @@ function AgendaPage() {
         { forma: "cartao_credito", label: "Cartão de Crédito", valor: vCredito },
       ];
       let descSuffix = "";
-      if (info) {
+      const opcoesOrc = payload.orcamento_id ? await opcoesPagamentoDeOrcamento(payload.orcamento_id) : null;
+      if (opcoesOrc) {
+        opcoes = opcoesOrc;
+      } else if (info) {
         if (!info.emDia) {
           toast.error(`Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.`);
           descSuffix = ` — ${info.convenioNome} EM ATRASO`;
+        } else if (info.bloquear) {
+          toast.error(info.avisoLimite ?? "Limite do convênio atingido — agendamento bloqueado.");
+          descSuffix = ` — ${info.convenioNome} BLOQUEADO`;
         } else if (info.desconto) {
           opcoes = opcoes.map((o) => ({ ...o, valor: aplicarDescontoPorForma(o.valor, o.forma, info.desconto!) }));
           const rotulo =
@@ -2143,7 +2550,11 @@ function AgendaPage() {
                   ? `R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} dinheiro / R$ ${Number(info.desconto.valorOutros).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} outros`
                   : `-R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
           descSuffix = ` — Convênio ${info.convenioNome} (${rotulo})`;
-          toast.success(`Desconto do convênio ${info.convenioNome} aplicado (${rotulo}).`);
+          if (info.avisoLimite) toast.warning(info.avisoLimite);
+          else toast.success(`Desconto do convênio ${info.convenioNome} aplicado (${rotulo}).`);
+        } else if (info.avisoLimite) {
+          toast.warning(info.avisoLimite);
+          descSuffix = ` — ${info.convenioNome} (limite atingido)`;
         } else {
           toast.info(`Cliente possui convênio ${info.convenioNome}, mas sem benefício para este procedimento.`);
         }
@@ -2182,7 +2593,7 @@ function AgendaPage() {
         orcamento_id: null,
       } as never)
       .eq("id", a.id);
-    if (error) toast.error(error.message);
+    if (error) mostrarErro(error);
     else { toast.success("Horário liberado."); await load(); }
   };
 
@@ -2231,7 +2642,7 @@ function AgendaPage() {
       }
     }
     const { error } = await supabase.from("agendamentos").update(payload).in("id", idsParaAtualizar);
-    if (error) toast.error(error.message); else {
+    if (error) mostrarErro(error); else {
       if (idsParaAtualizar.length > 1) toast.success(`${idsParaAtualizar.length} agendamentos do pacote cancelados.`);
       await load();
     }
@@ -2248,7 +2659,7 @@ function AgendaPage() {
         executado_em: new Date().toISOString(),
       } as never)
       .eq("id", a.id);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Atendimento iniciado e registrado");
     await load();
   };
@@ -2268,9 +2679,33 @@ function AgendaPage() {
         executado_em: new Date().toISOString(),
       } as never)
       .eq("id", a.id);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Atendimento concluído");
     await load();
+  };
+
+  // Lê os valores fechados de um orçamento e devolve as 4 opções de pagamento.
+  // Quando o orçamento tem `valores_pagamento` por forma, usa cada um;
+  // caso contrário aplica o (valor_total - desconto) em todas as formas.
+  const opcoesPagamentoDeOrcamento = async (orcamentoId: string): Promise<FormaOpcao[] | null> => {
+    const { data, error } = await supabase
+      .from("orcamentos")
+      .select("valor_total, desconto, valores_pagamento")
+      .eq("id", orcamentoId)
+      .maybeSingle();
+    if (error || !data) return null;
+    const totalLiquido = Math.max(0, Number(data.valor_total ?? 0) - Number(data.desconto ?? 0));
+    const vals = (data.valores_pagamento ?? {}) as Record<string, number> | null;
+    const pegar = (label: string) => {
+      const v = vals ? Number(vals[label] ?? 0) : 0;
+      return v > 0 ? v : totalLiquido;
+    };
+    return [
+      { forma: "dinheiro", label: "Dinheiro", valor: pegar("Dinheiro") },
+      { forma: "pix", label: "Pix", valor: pegar("Pix") },
+      { forma: "cartao_debito", label: "Cartão de Débito", valor: pegar("Cartão de Débito") },
+      { forma: "cartao_credito", label: "Cartão de Crédito", valor: pegar("Cartão de Crédito") },
+    ];
   };
 
   const cobrarAgendamento = async (a: Agendamento) => {
@@ -2279,6 +2714,11 @@ function AgendaPage() {
       toast.info("Este agendamento já foi pago.");
       return;
     }
+    try {
+    // Se o agendamento veio de um orçamento, usa SEMPRE os valores do orçamento
+    // (o procedimento pode ser texto livre tipo "LABORATÓRIO (4 EXAMES): ..."
+    // que não bate com a tabela de procedimentos e zeraria as opções).
+    const opcoesOrc = a.orcamento_id ? await opcoesPagamentoDeOrcamento(a.orcamento_id) : null;
     // Verificação fresca no banco: impede faturar duas vezes mesmo se o cache
     // local estiver desatualizado (ex.: outro usuário pagou em outra aba, ou
     // o pagamento foi transferido de uma ficha reagendada).
@@ -2300,6 +2740,8 @@ function AgendaPage() {
         pacienteId: a.paciente_id,
         medicoId: a.medico_id,
         procedimentoNome: a.procedimento ?? "",
+        agendamentoId: a.id,
+        dataRef: a.inicio ?? null,
       }),
     ]);
     if ((jaPagos ?? []).length > 0) {
@@ -2320,10 +2762,17 @@ function AgendaPage() {
       { forma: "cartao_credito", label: "Cartão de Crédito", valor: vCredito },
     ];
     let descSuffix = "";
-    if (info) {
+    if (opcoesOrc) {
+      // Valores do orçamento já consideram desconto/convênio definidos na hora
+      // de gerar o orçamento — não aplicamos nada por cima.
+      opcoes = opcoesOrc;
+    } else if (info) {
       if (!info.emDia) {
         toast.error(`Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.`);
         descSuffix = ` — ${info.convenioNome} EM ATRASO`;
+      } else if (info.bloquear) {
+        toast.error(info.avisoLimite ?? "Limite do convênio atingido — cobrança bloqueada.");
+        descSuffix = ` — ${info.convenioNome} BLOQUEADO`;
       } else if (info.desconto) {
         opcoes = opcoes.map((o) => ({ ...o, valor: aplicarDescontoPorForma(o.valor, o.forma, info.desconto!) }));
         const rotulo =
@@ -2335,7 +2784,11 @@ function AgendaPage() {
                 ? `R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} dinheiro / R$ ${Number(info.desconto.valorOutros).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} outros`
                 : `-R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
         descSuffix = ` — Convênio ${info.convenioNome} (${rotulo})`;
-        toast.success(`Desconto do convênio ${info.convenioNome} aplicado (${rotulo}).`);
+        if (info.avisoLimite) toast.warning(info.avisoLimite);
+        else toast.success(`Desconto do convênio ${info.convenioNome} aplicado (${rotulo}).`);
+      } else if (info.avisoLimite) {
+        toast.warning(info.avisoLimite);
+        descSuffix = ` — ${info.convenioNome} (limite atingido)`;
       } else {
         toast.info(`Cliente possui convênio ${info.convenioNome}, mas sem benefício para este procedimento.`);
       }
@@ -2350,6 +2803,10 @@ function AgendaPage() {
       especialidade: medicos.find((m) => m.id === a.medico_id)?.especialidade_nome ?? undefined,
     });
     setFormaPagOpen(true);
+    } catch (e: any) {
+      console.error("[cobrarAgendamento]", e);
+      mostrarErro(e);
+    }
   };
 
   const confirmarPresenca = async (a: Agendamento) => {
@@ -2357,7 +2814,7 @@ function AgendaPage() {
       .from("agendamentos")
       .update({ fluxo_etapa: "triagem", fluxo_atualizado_em: new Date().toISOString() } as never)
       .eq("id", a.id);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Presença confirmada — paciente liberado para a triagem");
     setEtapaMap((m) => { const n = new Map(m); n.set(a.id, "triagem"); return n; });
   };
@@ -2522,7 +2979,7 @@ function AgendaPage() {
         toast.warning("NFS-e enviada — acompanhe o status em Financeiro › NFS-e.");
       }
     } catch (err) {
-      toast.error("Falha ao emitir NFS-e: " + (err instanceof Error ? err.message : "erro"));
+      mostrarErro(err, "falha ao emitir NFS-e");
     }
   };
 
@@ -2540,7 +2997,7 @@ function AgendaPage() {
         usuarioId: user?.id ?? null,
       });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha ao imprimir GR");
+      mostrarErro(err);
     }
   };
 
@@ -2853,6 +3310,35 @@ function AgendaPage() {
                   />
                 )}
               </div>
+              {contratoPacienteInfo && (
+                <div className="space-y-1">
+                  <Label>Tipo de atendimento</Label>
+                  <Select
+                    value={form.tipo_atendimento}
+                    onValueChange={(v) => setForm((f) => ({ ...f, tipo_atendimento: v as TipoAtendimento }))}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="convenio">
+                        Convênio — {contratoPacienteInfo.convenioNome}
+                      </SelectItem>
+                      <SelectItem value="particular">Particular (paga valor cheio)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {contratoPacienteInfo.qtdAtrasadas > 0 && form.tipo_atendimento === "particular" && (
+                    <p className="text-xs rounded-md border border-amber-300 bg-amber-50 text-amber-900 px-2 py-1.5">
+                      Paciente tem <b>R$ {contratoPacienteInfo.totalAberto.toFixed(2)}</b> em aberto no cartão
+                      ({contratoPacienteInfo.qtdAtrasadas} parcela(s) vencida(s)). Este atendimento será cobrado como Particular.
+                    </p>
+                  )}
+                  {contratoPacienteInfo.qtdAtrasadas > 0 && form.tipo_atendimento === "convenio" && (
+                    <p className="text-xs rounded-md border border-destructive/40 bg-destructive/5 text-destructive px-2 py-1.5">
+                      Convênio bloqueado: paciente tem <b>R$ {contratoPacienteInfo.totalAberto.toFixed(2)}</b> em atraso.
+                      Para agendar, mude para <b>Particular</b> ou regularize o débito.
+                    </p>
+                  )}
+                </div>
+              )}
               <div className="space-y-1">
                 <Label>Médico ou Exame</Label>
                 <SearchableSelect
@@ -2950,8 +3436,12 @@ function AgendaPage() {
                       opts.unshift({ value: padrao, label: `${padrao} (principal)` });
                     }
                     // Se o valor atual não estiver na lista (ex.: procedimento legado), inclui também.
+                    // Exceção: não recria a especialidade do médico como se fosse serviço real
+                    // (ex.: agenda ENFERMAGEM gerando opção "ENFERMAGEM" sem existir no cadastro de serviços).
                     const atual = (form.procedimento ?? "").trim();
-                    if (atual && !opts.some((o) => normalizar(o.value) === normalizar(atual))) {
+                    const especialidadeMedico = medicos.find((m) => m.id === form.medico_id)?.especialidade_nome ?? "";
+                    const atualEhEspecialidadeSintetica = especialidadeMedico && normalizar(atual) === normalizar(especialidadeMedico);
+                    if (atual && !atualEhEspecialidadeSintetica && !opts.some((o) => normalizar(o.value) === normalizar(atual))) {
                       opts.push({ value: atual, label: atual });
                     }
                     // ── Top 10 por modalidade (USG/RX/TC/RM) com base no
@@ -3105,7 +3595,7 @@ function AgendaPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      disabled={saving}
+                      disabled={saving || !form.paciente_id}
                       onClick={(e) => { emitirNotaAposRef.current = false; submit(e as unknown as FormEvent, true); }}
                       className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
                       title="Salva, registra pagamento e imprime a GR em A4"
@@ -3115,7 +3605,7 @@ function AgendaPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      disabled={saving}
+                      disabled={saving || !form.paciente_id}
                       onClick={async (e) => {
                         e.preventDefault();
                         const escolhido = await pickEmitenteNfse();
@@ -3132,7 +3622,7 @@ function AgendaPage() {
                     >
                       Pagar/Imprimir/Nota
                     </Button>
-                    <Button type="submit" data-primary disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
+                    <Button type="submit" data-primary disabled={saving || !form.paciente_id} title={!form.paciente_id ? "Selecione um paciente cadastrado antes de salvar" : undefined}>{saving ? "Salvando…" : "Salvar"}</Button>
                   </>
                 )}
               </DialogFooter>
@@ -3222,7 +3712,7 @@ function AgendaPage() {
             }));
             const { error: errSombras } = await supabase.from("fin_lancamentos").insert(sombras);
             if (errSombras) {
-              toast.error("Pagamento salvo, mas falhou ao vincular itens extras: " + errSombras.message);
+              mostrarErro(errSombras, "pagamento salvo, mas falhou ao vincular itens extras");
             }
           }
           setPagosSet((prev) => {
@@ -3249,7 +3739,7 @@ function AgendaPage() {
                 .update({ fluxo_etapa: "triagem", fluxo_atualizado_em: new Date().toISOString() } as never)
                 .in("id", mesmoDia);
               if (errFluxo) {
-                toast.error("Pagamento salvo, mas falhou ao avançar o fluxo: " + errFluxo.message);
+                mostrarErro(errFluxo, "pagamento salvo, mas falhou ao avançar o fluxo");
               } else {
                 setEtapaMap((m) => {
                   const n = new Map(m);
@@ -3259,7 +3749,7 @@ function AgendaPage() {
               }
             }
           } catch (err) {
-            toast.error(err instanceof Error ? err.message : "Falha ao avançar o fluxo");
+            mostrarErro(err);
           }
           // limpa seleção após cobrança agrupada
           if (pagamentoExtraIds.length > 0) {
@@ -3281,7 +3771,7 @@ function AgendaPage() {
             });
             toast.success("Pagamento registrado e GR enviado para impressão.");
           } catch (err) {
-            toast.error(err instanceof Error ? err.message : "Falha ao imprimir GR");
+            mostrarErro(err);
           }
           setPagamentoAgId(null);
           setPagamentoExtraIds([]);
@@ -3338,7 +3828,7 @@ function AgendaPage() {
                 }
               }
             } catch (err) {
-              toast.error("Falha ao emitir NFS-e: " + (err instanceof Error ? err.message : "erro"));
+              mostrarErro(err, "falha ao emitir NFS-e");
               navigate({ to: "/app/financeiro/atendimentos" });
             }
           }

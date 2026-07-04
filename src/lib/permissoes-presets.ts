@@ -82,7 +82,7 @@ export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
     agenda: "read", clientes: "read", "consulta-rapida": "read",
     "atendimento-ia": "read", "perfil-proprio": "write",
     anamneses: "write", prontuarios: "read", estoque: "read",
-    documentos: "read", chat: "write",
+    documentos: "read", chat: "write", orcamentos: "write",
   },
 };
 

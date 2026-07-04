@@ -17,6 +17,36 @@ function authHeader(token: string) {
   return `Basic ${b64}`;
 }
 
+/**
+ * O Ambiente Nacional /v2/nfsen é assíncrono: o POST responde
+ * `processando_autorizacao` e o resultado real (autorizado / erro_autorizacao
+ * com códigos como E0014) só aparece via GET segundos depois. Esta função
+ * faz polling até obter status terminal ou timeout.
+ */
+async function pollFocusTerminal(
+  baseUrl: string,
+  ref: string,
+  token: string,
+  maxAttempts = 8,
+  intervalMs = 1500,
+): Promise<{ status?: string; erros?: Array<{ codigo?: string; mensagem?: string }>; mensagem?: string } & Record<string, unknown>> {
+  let last: Record<string, unknown> = {};
+  for (let i = 0; i < maxAttempts; i++) {
+    await new Promise((r) => setTimeout(r, intervalMs));
+    try {
+      const r = await fetch(`${baseUrl}/${encodeURIComponent(ref)}`, {
+        headers: { Authorization: authHeader(token) },
+      });
+      last = (await r.json().catch(() => ({}))) as Record<string, unknown>;
+      const s = (last as { status?: string }).status;
+      if (s && s !== "processando_autorizacao" && s !== "processando") return last as never;
+    } catch {
+      // ignora — tenta de novo
+    }
+  }
+  return last as never;
+}
+
 function only(s: string | null | undefined) {
   return (s ?? "").replace(/\D/g, "");
 }
@@ -241,11 +271,16 @@ export const emitirNfse = createServerFn({ method: "POST" })
       // (Operação sem Incidência).
       situacao_tributaria_pis_cofins: "08",
       // <totTrib>: ME/EPP optante do SN -> usar pTotTribSN (E0712 proíbe indTotTrib).
-      // Para Não Optante (cod=1) NÃO enviar indTotTrib nem pTotTribSN
-      // (E0713 rejeita ambos quando regime não é Simples Nacional).
+      // Para Não Optante (cod=1) o schema exige o bloco vTotTrib com os
+      // valores federais/estaduais/municipais (E0713 rejeita indTotTrib e
+      // pTotTribSN). Enviamos zeros quando não há cálculo IBPT disponível.
       ...(codigoOpcaoSimplesNacional !== 1
         ? { percentual_total_tributos_simples_nacional: +(aliquota * 100).toFixed(2) }
-        : {}),
+        : {
+            valor_total_tributos_federais: 0,
+            valor_total_tributos_estaduais: 0,
+            valor_total_tributos_municipais: 0,
+          }),
       // E0166: para optante SN ME/EPP é obrigatório o regime de apuração SN.
       ...(codigoOpcaoSimplesNacional === 3 ? { regime_tributario_simples_nacional: 1 } : {}),
     };
@@ -293,7 +328,7 @@ export const emitirNfse = createServerFn({ method: "POST" })
     // incrementamos numero_dps e reenviamos até achar um número livre.
     const baseUrl = focusNfseBase(emitente);
     const isNacional = !!emitente.usar_ambiente_nacional;
-    const MAX_RPS_RETRIES = 200;
+    const MAX_RPS_RETRIES = 10;
 
     let currentRef = ref;
     let currentNumero = (payloadNacional as { numero_dps?: number }).numero_dps ?? (emitente.rps_proximo_numero ?? 1);
@@ -310,6 +345,16 @@ export const emitirNfse = createServerFn({ method: "POST" })
         body: JSON.stringify(payload),
       });
       body = (await resp.json().catch(() => ({}))) as typeof body;
+
+      // Endpoint Nacional é assíncrono — o POST retorna `processando_autorizacao`
+      // e o E0014 só aparece depois via GET. Sem polling aqui o retry nunca
+      // dispararia e a nota ficaria parada num número de DPS já usado.
+      if (
+        isNacional &&
+        (body?.status === "processando_autorizacao" || body?.status === "processando")
+      ) {
+        body = (await pollFocusTerminal(baseUrl, currentRef, token)) as typeof body;
+      }
 
       // Detecta E0014 — "DPS já existe" — vindo tanto em HTTP 4xx quanto em
       // resposta 2xx com status=erro_autorizacao.
@@ -593,7 +638,11 @@ export const reenviarNfse = createServerFn({ method: "POST" })
       situacao_tributaria_pis_cofins: "08",
       ...(codigoOpcaoSimplesNacional !== 1
         ? { percentual_total_tributos_simples_nacional: +(aliquota * 100).toFixed(2) }
-        : {}),
+        : {
+            valor_total_tributos_federais: 0,
+            valor_total_tributos_estaduais: 0,
+            valor_total_tributos_municipais: 0,
+          }),
       ...(codigoOpcaoSimplesNacional === 3 ? { regime_tributario_simples_nacional: 1 } : {}),
     };
 
@@ -613,7 +662,7 @@ export const reenviarNfse = createServerFn({ method: "POST" })
     // E0014 (DPS já existente) — incrementa numero_dps e tenta de novo.
     const baseUrl = focusNfseBase(emitente);
     const isNacional = !!emitente.usar_ambiente_nacional;
-    const MAX_RPS_RETRIES = 200;
+    const MAX_RPS_RETRIES = 10;
     let currentRef = ref;
     let currentNumero = (payloadNacional as { numero_dps?: number }).numero_dps ?? (emitente.rps_proximo_numero ?? 1);
     let resp: Response;
@@ -629,6 +678,14 @@ export const reenviarNfse = createServerFn({ method: "POST" })
         body: JSON.stringify(payload),
       });
       body = (await resp.json().catch(() => ({}))) as typeof body;
+      // /v2/nfsen é assíncrono: precisamos consultar o ref para descobrir
+      // se a prefeitura recusou com E0014.
+      if (
+        isNacional &&
+        (body?.status === "processando_autorizacao" || body?.status === "processando")
+      ) {
+        body = (await pollFocusTerminal(baseUrl, currentRef, token)) as typeof body;
+      }
       const erros = Array.isArray(body?.erros) ? body!.erros! : [];
       const e0014 = erros.some((e) => (e?.codigo ?? "").toUpperCase() === "E0014");
       if (!isNacional || !e0014 || attempts >= MAX_RPS_RETRIES) break;

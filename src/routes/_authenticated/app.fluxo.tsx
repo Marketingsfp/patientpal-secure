@@ -6,34 +6,40 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, CheckCircle2, Workflow, Bell, Settings2, AlertTriangle, Siren, CircleDot } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  CheckCircle2,
+  Workflow,
+  Bell,
+  Settings2,
+  AlertTriangle,
+  Siren,
+  CircleDot,
+  Clock,
+  User,
+  Stethoscope,
+  CalendarDays,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { PendenciasAlert } from "@/components/PendenciasAlert";
 
 export const Route = createFileRoute("/_authenticated/app/fluxo")({
   component: FluxoPage,
   head: () => ({ meta: [{ title: "Fluxo do paciente — ClinicaOS" }] }),
 });
 
-type Etapa =
-  | "aguardando_recepcao"
-  | "recepcao"
-  | "caixa"
-  | "triagem"
-  | "atendimento"
-  | "exame"
-  | "finalizado";
+type Etapa = "aguardando_recepcao" | "recepcao" | "caixa" | "triagem" | "atendimento" | "exame" | "finalizado";
 
-const ETAPAS: { id: Etapa; label: string; cor: string }[] = [
-  { id: "aguardando_recepcao", label: "Aguardando", cor: "bg-slate-500/15 text-slate-700 dark:text-slate-300" },
-  { id: "recepcao", label: "Recepção", cor: "bg-rose-500/15 text-rose-700 dark:text-rose-300" },
-  { id: "caixa", label: "Caixa", cor: "bg-amber-500/15 text-amber-700 dark:text-amber-300" },
-  { id: "triagem", label: "Triagem (enfermagem)", cor: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" },
-  { id: "atendimento", label: "Atendimento médico", cor: "bg-blue-500/15 text-blue-700 dark:text-blue-300" },
-  { id: "exame", label: "Exame", cor: "bg-violet-500/15 text-violet-700 dark:text-violet-300" },
-  { id: "finalizado", label: "Finalizado", cor: "bg-zinc-500/15 text-zinc-700 dark:text-zinc-300" },
+const ETAPAS: { id: Etapa; label: string; cor: string; corFundo: string; icon: any }[] = [
+  { id: "aguardando_recepcao", label: "Aguardando", cor: "text-slate-700", corFundo: "bg-slate-100", icon: CircleDot },
+  { id: "recepcao", label: "Recepção", cor: "text-rose-700", corFundo: "bg-rose-100", icon: User },
+  { id: "caixa", label: "Caixa", cor: "text-amber-700", corFundo: "bg-amber-100", icon: CircleDot },
+  { id: "triagem", label: "Triagem", cor: "text-emerald-700", corFundo: "bg-emerald-100", icon: Stethoscope },
+  { id: "atendimento", label: "Atendimento", cor: "text-blue-700", corFundo: "bg-blue-100", icon: User },
+  { id: "exame", label: "Exame", cor: "text-violet-700", corFundo: "bg-violet-100", icon: Stethoscope },
+  { id: "finalizado", label: "Finalizado", cor: "text-zinc-700", corFundo: "bg-zinc-100", icon: CheckCircle2 },
 ];
 
 const PRIORIDADES = {
@@ -42,18 +48,24 @@ const PRIORIDADES = {
     Icon: CircleDot,
     cor: "text-muted-foreground",
     badge: "bg-muted text-muted-foreground",
+    ordem: 0,
+    border: "",
   },
   prioritario: {
     label: "PRIORITÁRIO",
     Icon: AlertTriangle,
     cor: "text-amber-600",
-    badge: "bg-amber-100 text-amber-700",
+    badge: "bg-amber-100 text-amber-700 border-amber-300",
+    ordem: 1,
+    border: "border-l-4 border-l-amber-500",
   },
   urgente: {
     label: "URGENTE",
     Icon: Siren,
     cor: "text-rose-600",
-    badge: "bg-rose-100 text-rose-700",
+    badge: "bg-rose-100 text-rose-700 border-rose-300",
+    ordem: 2,
+    border: "border-l-4 border-l-rose-500",
   },
 } as const;
 
@@ -68,35 +80,54 @@ type Ag = {
   medicos?: { nome: string } | null;
 };
 
-function proxima(e: Etapa, alvo: "atendimento" | "exame"): Etapa | null {
-  const ordem: Etapa[] = ["aguardando_recepcao", "recepcao", "caixa", "triagem", alvo, "finalizado"];
-  const i = ordem.indexOf(e);
-  if (i < 0 || i >= ordem.length - 1) return null;
-  return ordem[i + 1];
-}
-function anterior(e: Etapa): Etapa | null {
+// CORREÇÃO: Função proxima com ordem correta
+function proxima(e: Etapa): Etapa | null {
   const ordem: Etapa[] = ["aguardando_recepcao", "recepcao", "caixa", "triagem", "atendimento", "finalizado"];
   const ordemExame: Etapa[] = ["aguardando_recepcao", "recepcao", "caixa", "triagem", "exame", "finalizado"];
-  const arr = e === "exame" ? ordemExame : ordem;
+
+  // Se for "atendimento" ou "exame", a próxima etapa é "finalizado"
+  if (e === "atendimento" || e === "exame") {
+    return "finalizado";
+  }
+
+  const i = ordem.indexOf(e);
+  const arr = ordem;
+  void ordemExame;
+  if (i < 0 || i >= arr.length - 1) return null;
+  return arr[i + 1];
+}
+
+function anterior(e: Etapa, isExame: boolean): Etapa | null {
+  const ordem: Etapa[] = ["aguardando_recepcao", "recepcao", "caixa", "triagem", "atendimento", "finalizado"];
+  const ordemExame: Etapa[] = ["aguardando_recepcao", "recepcao", "caixa", "triagem", "exame", "finalizado"];
+  const arr = isExame ? ordemExame : ordem;
   const i = arr.indexOf(e);
   if (i <= 0) return null;
   return arr[i - 1];
 }
+// E no botão: onClick={() => prev && setEtapa(a.id, anterior(a.fluxo_etapa, isExame))}
 
 function FluxoPage() {
   const { clinicaAtual } = useClinica();
   const [ags, setAgs] = useState<Ag[]>([]);
   const [loading, setLoading] = useState(false);
-  const [dataRef, setDataRef] = useState(() => new Date().toISOString().slice(0, 10));
+  const [dataRef, setDataRef] = useState(() => {
+    const tzOffset = new Date().getTimezoneOffset() * 60000;
+    return new Date(Date.now() - tzOffset).toISOString().slice(0, 10);
+  });
   const [fallbackAplicado, setFallbackAplicado] = useState(false);
   const [consultorio, setConsultorio] = useState<string>(() =>
-    typeof window !== "undefined" ? localStorage.getItem("fluxo_consultorio") ?? "1" : "1",
+    typeof window !== "undefined" ? (localStorage.getItem("fluxo_consultorio") ?? "1") : "1",
   );
   const [medicoChamada, setMedicoChamada] = useState<string>(() =>
-    typeof window !== "undefined" ? localStorage.getItem("fluxo_medico_chamada") ?? "" : "",
+    typeof window !== "undefined" ? (localStorage.getItem("fluxo_medico_chamada") ?? "") : "",
   );
-  useEffect(() => { localStorage.setItem("fluxo_consultorio", consultorio); }, [consultorio]);
-  useEffect(() => { localStorage.setItem("fluxo_medico_chamada", medicoChamada); }, [medicoChamada]);
+  useEffect(() => {
+    localStorage.setItem("fluxo_consultorio", consultorio);
+  }, [consultorio]);
+  useEffect(() => {
+    localStorage.setItem("fluxo_medico_chamada", medicoChamada);
+  }, [medicoChamada]);
 
   const carregar = useCallback(async () => {
     if (!clinicaAtual) return;
@@ -111,11 +142,13 @@ function FluxoPage() {
       .lte("inicio", fim)
       .order("inicio");
     setLoading(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
     const rows = (data ?? []) as unknown as Ag[];
     const reais = rows.filter((a) => !!a.paciente_id && (a.paciente_nome ?? "").trim().toUpperCase() !== "DISPONÍVEL");
     setAgs(reais);
-    // Fallback automático: se hoje está vazio, busca o dia mais recente (passado) com pacientes reais
     if (reais.length === 0 && !fallbackAplicado && dataRef === new Date().toISOString().slice(0, 10)) {
       const { data: ult } = await supabase
         .from("agendamentos")
@@ -141,7 +174,9 @@ function FluxoPage() {
     let timer: ReturnType<typeof setTimeout> | null = null;
     const debouncedReload = () => {
       if (timer) clearTimeout(timer);
-      timer = setTimeout(() => { void carregar(); }, 400);
+      timer = setTimeout(() => {
+        void carregar();
+      }, 400);
     };
     const ch = supabase
       .channel(`fluxo-${clinicaAtual.clinica_id}`)
@@ -151,7 +186,10 @@ function FluxoPage() {
         debouncedReload,
       )
       .subscribe();
-    return () => { if (timer) clearTimeout(timer); void supabase.removeChannel(ch); };
+    return () => {
+      if (timer) clearTimeout(timer);
+      void supabase.removeChannel(ch);
+    };
   }, [carregar, clinicaAtual]);
 
   async function setEtapa(id: string, etapa: Etapa) {
@@ -160,6 +198,10 @@ function FluxoPage() {
       .update({ fluxo_etapa: etapa, fluxo_atualizado_em: new Date().toISOString() } as never)
       .eq("id", id);
     if (error) toast.error(error.message);
+    else {
+      // Recarregar para atualizar a lista
+      await carregar();
+    }
   }
 
   async function ciclarPrioridade(a: Ag) {
@@ -170,14 +212,19 @@ function FluxoPage() {
       .update({ prioridade: prox } as never)
       .eq("id", a.id);
     if (error) toast.error(error.message);
-    else toast.success(`Prioridade: ${prox}`);
+    else {
+      toast.success(`Prioridade: ${prox}`);
+      await carregar();
+    }
   }
 
   async function chamarPaciente(a: Ag) {
     if (!clinicaAtual) return;
-    if (!consultorio.trim()) { toast.error("Defina o consultório (botão de configuração no topo)"); return; }
+    if (!consultorio.trim()) {
+      toast.error("Defina o consultório (botão de configuração no topo)");
+      return;
+    }
     const hoje = new Date().toISOString().slice(0, 10);
-    // Próximo número para tipo N hoje
     const { data: ult } = await supabase
       .from("senhas")
       .select("numero")
@@ -188,12 +235,7 @@ function FluxoPage() {
       .limit(1)
       .maybeSingle();
     const proximoNum = Math.min(9999, (ult?.numero ?? 0) + 1);
-    const nomeCurto = a.paciente_nome
-      .split(/\s+/)
-      .slice(0, 2)
-      .join(" ")
-      .toUpperCase()
-      .slice(0, 24);
+    const nomeCurto = a.paciente_nome.split(/\s+/).slice(0, 2).join(" ").toUpperCase().slice(0, 24);
     const medicoStr = (medicoChamada || a.medicos?.nome || "").trim();
     const guicheStr = `Consultório ${consultorio.trim()}${medicoStr ? ` · ${medicoStr}` : ""}`;
     const now = new Date().toISOString();
@@ -207,7 +249,10 @@ function FluxoPage() {
       guiche: guicheStr,
       chamada_em: now,
     } as never);
-    if (insErr) { toast.error(insErr.message); return; }
+    if (insErr) {
+      toast.error(insErr.message);
+      return;
+    }
     await setEtapa(a.id, "atendimento");
     toast.success(`Chamando ${nomeCurto} · ${guicheStr}`);
   }
@@ -215,25 +260,45 @@ function FluxoPage() {
   const colunas = useMemo(() => {
     const m = new Map<Etapa, Ag[]>();
     ETAPAS.forEach((e) => m.set(e.id, []));
-    for (const a of ags) m.get(a.fluxo_etapa)?.push(a);
+    for (const a of ags) {
+      const etapa = a.fluxo_etapa;
+      const lista = m.get(etapa);
+      if (lista) lista.push(a);
+    }
+    for (const [etapa, lista] of m) {
+      lista.sort((a, b) => {
+        const prioridadeA = a.prioridade ?? "normal";
+        const prioridadeB = b.prioridade ?? "normal";
+        const ordemA = PRIORIDADES[prioridadeA].ordem;
+        const ordemB = PRIORIDADES[prioridadeB].ordem;
+        return ordemB - ordemA;
+      });
+    }
     return m;
   }, [ags]);
 
   if (!clinicaAtual) return <p className="text-muted-foreground">Selecione uma clínica primeiro.</p>;
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold flex items-center gap-2"><Workflow className="h-6 w-6" /> Fluxo do paciente</h1>
-          <p className="text-xs text-muted-foreground">
-            Recepção → Caixa → Triagem (enfermagem) → Atendimento médico ou Exame. Avance o paciente em cada etapa.
-          </p>
-        </div>
+    <div className="space-y-3 max-w-full">
+      {/* Cabeçalho */}
+      <div className="flex items-center justify-between gap-2 flex-wrap bg-background sticky top-0 z-10 py-2 border-b">
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 rounded-md border bg-card px-1 py-0.5">
+          <Workflow className="h-5 w-5 text-primary" />
+          <div>
+            <h1 className="text-base font-semibold">Fluxo do paciente</h1>
+            <p className="text-xs text-muted-foreground hidden sm:block">
+              Recepção → Caixa → Triagem → Atendimento ou Exame → Finalizado
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {/* Seletor de data simplificado */}
+          <div className="flex items-center gap-1 rounded-md border bg-card px-1.5 py-1">
             <Button
-              variant="ghost" size="icon" className="h-7 w-7"
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
               onClick={() => {
                 const d = new Date(`${dataRef}T12:00:00`);
                 d.setDate(d.getDate() - 1);
@@ -242,16 +307,26 @@ function FluxoPage() {
               }}
               title="Dia anterior"
             >
-              <ChevronLeft className="h-4 w-4" />
+              <ChevronLeft className="h-3.5 w-3.5" />
             </Button>
-            <Input
-              type="date"
-              value={dataRef}
-              onChange={(e) => { setFallbackAplicado(true); setDataRef(e.target.value); }}
-              className="h-7 w-[140px] border-0 px-1 text-xs"
-            />
+
+            <div className="flex items-center gap-1 px-1">
+              <CalendarDays className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+              <Input
+                type="date"
+                value={dataRef}
+                onChange={(e) => {
+                  setFallbackAplicado(true);
+                  setDataRef(e.target.value);
+                }}
+                className="h-6 w-[100px] border-0 px-0.5 text-[10px] bg-transparent focus:ring-0 focus:outline-none"
+              />
+            </div>
+
             <Button
-              variant="ghost" size="icon" className="h-7 w-7"
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
               onClick={() => {
                 const d = new Date(`${dataRef}T12:00:00`);
                 d.setDate(d.getDate() + 1);
@@ -260,127 +335,186 @@ function FluxoPage() {
               }}
               title="Próximo dia"
             >
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="h-3.5 w-3.5" />
             </Button>
           </div>
+
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2">
-                <Settings2 className="h-4 w-4" /> Consultório {consultorio || "?"}
+              <Button variant="outline" size="sm" className="h-6 gap-1 text-[10px] px-2">
+                <Settings2 className="h-3 w-3" /> Sala {consultorio || "?"}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-72 space-y-3">
               <div className="space-y-1">
-                <Label className="text-xs">Meu consultório</Label>
-                <Input value={consultorio} onChange={(e) => setConsultorio(e.target.value.slice(0, 10))} placeholder="Ex.: 1, 2, A…" />
+                <Label className="text-xs font-medium">Sala/Consultório</Label>
+                <Input
+                  value={consultorio}
+                  onChange={(e) => setConsultorio(e.target.value.slice(0, 10))}
+                  placeholder="Ex.: 1, 2, A…"
+                />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Nome para a chamada (opcional)</Label>
-                <Input value={medicoChamada} onChange={(e) => setMedicoChamada(e.target.value.slice(0, 60))} placeholder="Ex.: Dr. João" />
+                <Label className="text-xs font-medium">Nome para chamada</Label>
+                <Input
+                  value={medicoChamada}
+                  onChange={(e) => setMedicoChamada(e.target.value.slice(0, 60))}
+                  placeholder="Ex.: Dr. João"
+                />
               </div>
-              <p className="text-[11px] text-muted-foreground">
-                Usado no botão <b>Chamar paciente</b> para exibir no painel/TV.
+              <p className="text-xs text-muted-foreground">
+                Usado no botão <span className="font-medium">Chamar paciente</span>
               </p>
             </PopoverContent>
           </Popover>
-          <Button variant="outline" onClick={carregar} disabled={loading}>{loading ? "Atualizando…" : "Atualizar"}</Button>
+
+          <Button variant="outline" onClick={carregar} disabled={loading} className="h-6 text-[10px] px-2.5 gap-1">
+            {loading ? "..." : "Atualizar"}
+          </Button>
         </div>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-2 snap-x">
+      {/* Colunas do fluxo - grid sem scroll */}
+      <div className="grid grid-cols-7 gap-3">
         {ETAPAS.map((col) => {
           const items = colunas.get(col.id) ?? [];
+          const Icon = col.icon;
+          const isFinalizado = col.id === "finalizado";
+
           return (
-            <div key={col.id} className="space-y-2 flex-1 min-w-[180px] snap-start">
-              <div className="flex items-center justify-between">
-                <Badge className={`${col.cor} border-0 text-[11px] px-1.5 py-0`}>{col.label}</Badge>
-                <span className="text-[11px] text-muted-foreground">{items.length}</span>
+            <div key={col.id} className="space-y-2 min-w-0">
+              {/* Cabeçalho da coluna */}
+              <div className={`flex items-center justify-between p-2 rounded ${col.corFundo}`}>
+                <div className="flex items-center gap-2 min-w-0">
+                  <Icon className={`h-4 w-4 ${col.cor} flex-shrink-0`} />
+                  <span className={`text-xs font-medium ${col.cor} truncate`}>{col.label}</span>
+                </div>
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 flex-shrink-0">
+                  {items.length}
+                </Badge>
               </div>
-              <div className="space-y-1.5 max-h-[78vh] overflow-auto pr-1">
-                {items.length === 0 && (
-                  <div className="text-[11px] text-muted-foreground text-center py-2 border border-dashed rounded">vazio</div>
+
+              {/* Cards */}
+              <div className="space-y-1.5">
+                {items.length === 0 && !isFinalizado && (
+                  <div className="text-[10px] text-muted-foreground text-center py-2 border border-dashed rounded">
+                    vazio
+                  </div>
+                )}
+                {items.length === 0 && isFinalizado && (
+                  <div className="text-[10px] text-muted-foreground text-center py-2 border border-dashed rounded">
+                    vazio
+                  </div>
                 )}
                 {items.map((a) => {
                   const h = new Date(a.inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
                   const isExame = /exame|raio|usg|ultra|tomo|ressona/i.test(a.procedimento ?? "");
-                  const next = proxima(a.fluxo_etapa, isExame ? "exame" : "atendimento");
-                  const prev = anterior(a.fluxo_etapa);
+                  const next = proxima(a.fluxo_etapa);
+                  const prev = anterior(a.fluxo_etapa, isExame);
+                  const prioridadeInfo = a.prioridade ? PRIORIDADES[a.prioridade] : PRIORIDADES.normal;
+                  const PrioridadeIcon = prioridadeInfo.Icon;
+
+                  // Verifica se é a última etapa (atendimento ou exame)
+                  const isUltimaEtapa = a.fluxo_etapa === "atendimento" || a.fluxo_etapa === "exame";
+
                   return (
-                    <Card key={a.id} className="p-2 text-xs space-y-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="font-medium leading-tight text-[12px] truncate">{a.paciente_nome}</div>
-                        <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">{h}</span>
+                    <Card
+                      key={a.id}
+                      className={`p-2.5 space-y-1.5 hover:shadow-sm transition-shadow ${prioridadeInfo.border} text-xs`}
+                    >
+                      {/* Nome e horário */}
+                      <div className="flex items-start justify-between gap-1">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <div className={`h-2 w-2 rounded-full ${prioridadeInfo.cor} flex-shrink-0`} />
+                          <span className="font-medium text-xs truncate">{a.paciente_nome}</span>
+                        </div>
+                        <span className="text-[10px] text-muted-foreground flex-shrink-0">{h}</span>
                       </div>
+
+                      {/* Prioridade */}
                       {a.prioridade && a.prioridade !== "normal" && (
-                        (() => {
-                          const p = PRIORIDADES[a.prioridade];
-                          const Ico = p.Icon;
-                          return (
-                            <Badge className={`border-0 text-[10px] px-1.5 py-0 gap-1 ${p.badge}`}>
-                              <Ico className="h-3 w-3" />
-                              {p.label}
-                            </Badge>
-                          );
-                        })()
+                        <Badge className={`border text-[9px] gap-0.5 px-1.5 py-0 ${prioridadeInfo.badge}`}>
+                          <PrioridadeIcon className="h-3 w-3" />
+                          {prioridadeInfo.label}
+                        </Badge>
                       )}
-                      <div className="text-[11px] text-muted-foreground line-clamp-1">
-                        {a.procedimento ?? "—"}{a.medicos?.nome ? ` · ${a.medicos.nome}` : ""}
+
+                      {/* Procedimento */}
+                      <div className="text-[10px] text-muted-foreground truncate">
+                        {a.procedimento ?? "—"}
+                        {a.medicos?.nome && <span className="ml-1">· {a.medicos.nome}</span>}
                       </div>
-                      <div className="flex items-center gap-0.5 pt-0.5">
+
+                      {/* Ações */}
+                      <div className="flex items-center gap-0.5 pt-1 flex-wrap">
                         <Button
                           size="sm"
                           variant="ghost"
                           className="h-6 px-1.5"
                           disabled={!prev}
                           onClick={() => prev && setEtapa(a.id, prev)}
-                          title="Voltar etapa"
+                          title="Voltar"
                         >
-                          <ChevronLeft className="h-3 w-3" />
+                          <ChevronLeft className="h-3.5 w-3.5" />
                         </Button>
-                        {(() => {
-                          const p = PRIORIDADES[a.prioridade ?? "normal"];
-                          const Ico = p.Icon;
-                          return (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-6 px-1.5"
-                              onClick={() => ciclarPrioridade(a)}
-                              title={`Prioridade: ${p.label} (clique para alternar)`}
-                            >
-                              <Ico className={`h-3 w-3 ${p.cor}`} />
-                            </Button>
-                          );
-                        })()}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 px-1.5"
+                          onClick={() => ciclarPrioridade(a)}
+                          title="Prioridade"
+                        >
+                          <PrioridadeIcon className={`h-3.5 w-3.5 ${prioridadeInfo.cor}`} />
+                        </Button>
+
                         {col.id === "triagem" && (
                           <>
-                            <Button size="sm" className="h-6 px-1.5 text-[11px] flex-1" onClick={() => chamarPaciente(a)} title="Chamar no painel e mover para Atendimento">
-                              <Bell className="h-3 w-3 mr-1" /> Chamar
+                            <Button
+                              size="sm"
+                              className="h-6 px-1.5 text-[9px] gap-1 bg-blue-600 hover:bg-blue-700 text-white flex-1 min-w-[40px]"
+                              onClick={() => chamarPaciente(a)}
+                            >
+                              <Bell className="h-3 w-3" /> Chamar
                             </Button>
                             {isExame && (
-                              <Button size="sm" variant="outline" className="h-6 px-1.5 text-[11px] flex-1" onClick={() => setEtapa(a.id, "exame")}>
-                                <ChevronRight className="h-3 w-3 mr-1" /> Exame
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-6 px-1.5 text-[9px] border-violet-400 text-violet-700 hover:bg-violet-50 flex-1 min-w-[35px]"
+                                onClick={() => setEtapa(a.id, "exame")}
+                              >
+                                Exame
                               </Button>
                             )}
                           </>
                         )}
-                        {col.id !== "triagem" && (
+
+                        {col.id !== "triagem" && col.id !== "finalizado" && (
                           <>
                             {col.id === "atendimento" && (
-                              <Button size="sm" variant="outline" className="h-6 px-1.5 text-[11px]" onClick={() => chamarPaciente(a)} title="Rechamar no painel">
-                                <Bell className="h-3 w-3" />
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 px-1.5"
+                                onClick={() => chamarPaciente(a)}
+                                title="Rechamar"
+                              >
+                                <Bell className="h-3.5 w-3.5" />
                               </Button>
                             )}
                             <Button
                               size="sm"
-                              className="h-6 px-1.5 text-[11px] flex-1"
+                              className={`h-6 px-1.5 flex-1 min-w-[30px] ${isUltimaEtapa ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"}`}
                               disabled={!next}
                               onClick={() => next && setEtapa(a.id, next)}
+                              title={isUltimaEtapa ? "Finalizar" : "Avançar"}
                             >
-                              {col.id === "atendimento" || col.id === "exame" ? (
-                                <><CheckCircle2 className="h-3 w-3 mr-1" /> Finalizar</>
+                              {isUltimaEtapa ? (
+                                <>
+                                  <CheckCircle2 className="h-3 w-3" /> Fim
+                                </>
                               ) : (
-                                <>Avançar <ChevronRight className="h-3 w-3 ml-1" /></>
+                                <ChevronRight className="h-3.5 w-3.5" />
                               )}
                             </Button>
                           </>

@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Pencil, Trash2, Gift, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Card, CardContent } from "@/components/ui/card";
@@ -88,8 +89,8 @@ function BeneficiosPage() {
       allProcs.push(...page);
       if (page.length < PAGE) break;
     }
-    if (cs.error) toast.error(cs.error.message);
-    if (bs.error) toast.error(bs.error.message);
+    if (cs.error) mostrarErro(cs.error);
+    if (bs.error) mostrarErro(bs.error);
     setConvenios((cs.data ?? []) as Convenio[]);
     setRows((bs.data ?? []) as Beneficio[]);
     setProcedimentos(allProcs);
@@ -172,7 +173,7 @@ function BeneficiosPage() {
       ? await supabase.from("cb_beneficios").update(payload).eq("id", editing.id)
       : await supabase.from("cb_beneficios").insert(payload);
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success(editing ? "Benefício atualizado." : "Benefício criado.");
     setView("list");
     load();
@@ -181,7 +182,7 @@ function BeneficiosPage() {
   const confirmDelete = async () => {
     if (!toDelete) return;
     const { error } = await supabase.from("cb_beneficios").delete().eq("id", toDelete.id);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Benefício excluído.");
     setToDelete(null);
     load();

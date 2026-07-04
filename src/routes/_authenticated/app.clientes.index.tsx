@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { Plus, Search, Pencil, Users, Download } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { exportToExcel } from "@/lib/export-csv";
@@ -98,7 +99,7 @@ function ClientesPage() {
       if (requestId !== loadSeq.current) return;
       setLoading(false);
       if (error) { toast.error("Não foi possível concluir esta busca. Tente novamente com mais letras do nome."); return; }
-      if (countError) { toast.error(countError.message); } else { setTotalPacientes(count ?? 0); }
+      if (countError) { mostrarErro(countError); } else { setTotalPacientes(count ?? 0); }
       setItems((data ?? []) as any);
     } catch {
       if (requestId !== loadSeq.current) return;
@@ -156,7 +157,7 @@ function ClientesPage() {
                 .select("nome,cpf,telefone,email,data_nascimento,cidade,estado,bairro,logradouro,numero,cep,ativo")
                 .eq("clinica_id", clinicaAtual.clinica_id)
                 .order("nome");
-              if (error) { toast.error(error.message); return; }
+              if (error) { mostrarErro(error); return; }
               if (!data?.length) { toast.info("Sem dados para exportar."); return; }
               exportToExcel(
                 data.map((p: any) => ({

@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Brain, Sparkles, FileHeart, Stethoscope, Save, Loader2, History, Wand2, ArrowLeft, HeartPulse, CheckCircle2, Printer } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,11 +13,14 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { VoiceInput } from "@/components/voice-input";
 import { Cid10Picker } from "@/components/cid10-picker";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import {
   gerarAnamneseEstruturada,
   sugerirCondutaClinica,
   resumirHistoricoPaciente,
 } from "@/lib/atendimento-ai.functions";
+import { agendamentoStatusPagamento, type StatusPagamento } from "@/lib/pagamento-status";
+import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 
 export const Route = createFileRoute("/_authenticated/app/atendimento-ia/$agendamentoId")({
   component: AtendimentoEditorPage,
@@ -79,6 +82,7 @@ function AtendimentoEditorPage() {
   const [medico, setMedico] = useState<Medico | null>(null);
   const [modelo, setModelo] = useState<Modelo | null>(null);
   const [triagem, setTriagem] = useState<Triagem | null>(null);
+  const [pagamento, setPagamento] = useState<StatusPagamento | null>(null);
 
   const [transcricao, setTranscricao] = useState("");
   const [soap, setSoap] = useState<Soap>(EMPTY);
@@ -88,19 +92,20 @@ function AtendimentoEditorPage() {
   const [loading, setLoading] = useState<"estruturar" | "sugerir" | "resumir" | "salvar" | null>(null);
   const [salvo, setSalvo] = useState<{ valorMedico: number } | null>(null);
 
-  // Carrega agendamento + médico + modelo
-  useEffect(() => {
+  // Carrega agendamento + médico + pagamento (usado no mount e no realtime).
+  const carregarAgendamento = useCallback(async () => {
     if (!clinicaAtual || !agendamentoId) return;
-    let cancel = false;
-    (async () => {
-      const { data: ag, error } = await supabase
+    const { data: ag, error } = await supabase
         .from("agendamentos")
         .select("id, paciente_id, paciente_nome, medico_id, procedimento, fluxo_etapa")
         .eq("id", agendamentoId)
         .maybeSingle();
-      if (cancel) return;
       if (error || !ag) { toast.error("Agendamento não encontrado"); navigate({ to: "/app/atendimento-ia" }); return; }
       setAgendamento(ag as never);
+
+      // Pagamento ANTES da consulta — bloqueia avanço enquanto pendente.
+      const status = await agendamentoStatusPagamento(ag.id);
+      setPagamento(status);
 
       if (ag.medico_id) {
         const { data: med } = await supabase
@@ -108,7 +113,7 @@ function AtendimentoEditorPage() {
           .select("id, nome, email, user_id, especialidade_id, especialidades:especialidades!medicos_especialidade_id_fkey(nome)")
           .eq("id", ag.medico_id)
           .maybeSingle();
-        if (!cancel && med) {
+        if (med) {
           let sens: any = {};
           try {
             const { data: s } = await supabase.rpc("medico_dados_sensiveis", { _medico_id: ag.medico_id });
@@ -118,15 +123,17 @@ function AtendimentoEditorPage() {
         }
       }
 
-      // move para "atendimento" se ainda não estiver
-      if (ag.fluxo_etapa !== "atendimento") {
+      // move para "atendimento" se ainda não estiver (apenas se já estiver pago)
+      if (status.pago && ag.fluxo_etapa !== "atendimento") {
         void supabase.from("agendamentos")
           .update({ fluxo_etapa: "atendimento", fluxo_atualizado_em: new Date().toISOString() } as never)
           .eq("id", ag.id);
       }
-    })();
-    return () => { cancel = true; };
-  }, [agendamentoId, clinicaAtual?.clinica_id]);
+  }, [agendamentoId, clinicaAtual?.clinica_id, navigate]);
+
+  useEffect(() => {
+    void carregarAgendamento();
+  }, [carregarAgendamento]);
 
   // Carrega modelo a partir da especialidade
   useEffect(() => {
@@ -145,22 +152,34 @@ function AtendimentoEditorPage() {
     })();
   }, [clinicaAtual?.clinica_id, medico?.especialidades?.nome]);
 
-  // Carrega triagem
-  useEffect(() => {
+  // Carrega triagem (usado no mount e no realtime).
+  const carregarTriagem = useCallback(async () => {
     if (!agendamentoId) return;
-    let cancel = false;
-    (async () => {
-      const { data } = await supabase
+    const { data } = await supabase
         .from("triagens_enfermagem")
         .select("id, created_at, enfermeira_nome, peso_kg, altura_cm, imc, pa_sistolica, pa_diastolica, freq_cardiaca, temperatura, saturacao, glicemia, queixa_principal, doencas, medicamentos, alergias, observacoes")
         .eq("agendamento_id", agendamentoId)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (!cancel) setTriagem((data as unknown as Triagem) ?? null);
-    })();
-    return () => { cancel = true; };
+    setTriagem((data as unknown as Triagem) ?? null);
   }, [agendamentoId]);
+
+  useEffect(() => {
+    void carregarTriagem();
+  }, [carregarTriagem]);
+
+  // Realtime: pagamento (fin_lancamentos / orçamento), triagem e o próprio
+  // agendamento (etapa/status). Recarrega ao vivo enquanto o médico atende.
+  const recarregarAoVivo = useCallback(() => {
+    void carregarAgendamento();
+    void carregarTriagem();
+  }, [carregarAgendamento, carregarTriagem]);
+  useRealtimeRefresh(
+    ["agendamentos", "triagens_enfermagem", "fin_lancamentos", "agendamento_orcamento_itens"],
+    recarregarAoVivo,
+    Boolean(agendamentoId && clinicaAtual?.clinica_id),
+  );
 
   function aplicarTriagemNoSoap(t: Triagem) {
     const linhas: string[] = [];
@@ -220,7 +239,7 @@ function AtendimentoEditorPage() {
         prescricao: out.prescricao || s.prescricao,
       }));
       toast.success("Anamnese estruturada");
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Falha"); }
+    } catch (e) { mostrarErro(e); }
     finally { setLoading(null); }
   }
 
@@ -230,7 +249,7 @@ function AtendimentoEditorPage() {
       const out = await sugerir({ data: { ...soap, especialidade } });
       setSugestoes(out);
       toast.success("Sugestões geradas");
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Falha"); }
+    } catch (e) { mostrarErro(e); }
     finally { setLoading(null); }
   }
 
@@ -242,12 +261,16 @@ function AtendimentoEditorPage() {
       setResumo(out.resumo);
       setResumoOpen(true);
       if (out.total === 0) toast.info("Sem prontuários anteriores");
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Falha"); }
+    } catch (e) { mostrarErro(e); }
     finally { setLoading(null); }
   }
 
   async function handleSalvar() {
     if (!clinicaAtual || !pacienteId) { toast.error("Paciente não identificado"); return; }
+    if (pagamento && !pagamento.pago) {
+      toast.error("Pagamento pendente — finalize no caixa antes de salvar o prontuário.");
+      return;
+    }
     setLoading("salvar");
     try {
       const cid = clinicaAtual.clinica_id;
@@ -316,7 +339,7 @@ function AtendimentoEditorPage() {
         ? `Prontuário salvo · Repasse médico: R$ ${valorMedico.toFixed(2)}`
         : "Prontuário salvo");
       setSalvo({ valorMedico });
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Falha ao salvar"); }
+    } catch (e) { mostrarErro(e); }
     finally { setLoading(null); }
   }
 
@@ -330,7 +353,9 @@ function AtendimentoEditorPage() {
     const clinicaNome = clinicaAtual?.clinica?.nome ?? "";
     const dataStr = new Date().toLocaleDateString("pt-BR");
     const horaStr = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${tipo} — ${pacienteNome}</title>
+    const esc = (v: unknown) =>
+      String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(tipo)} — ${esc(pacienteNome)}</title>
 <style>
   @page { size: A4; margin: 20mm; }
   * { box-sizing: border-box; }
@@ -349,19 +374,19 @@ function AtendimentoEditorPage() {
   .rodape { margin-top: 24px; text-align: center; font-size: 9pt; color: #666; }
 </style></head><body>
   <div class="header">
-    <h1>${clinicaNome || "Clínica"}</h1>
+    <h1>${esc(clinicaNome || "Clínica")}</h1>
     ${clinicaNome ? '<div class="sub">Documento médico</div>' : ""}
   </div>
-  <div class="titulo">${tipo}</div>
+  <div class="titulo">${esc(tipo)}</div>
   <div class="meta">
-    <div>Paciente: <b>${pacienteNome}</b></div>
+    <div>Paciente: <b>${esc(pacienteNome)}</b></div>
     <div>Data: <b>${dataStr} ${horaStr}</b></div>
   </div>
-  <div class="conteudo">${conteudo.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]!))}</div>
+  <div class="conteudo">${esc(conteudo)}</div>
   <div class="assinatura">
     <div class="linha"></div>
-    <div class="nome">${medico?.nome ?? ""}</div>
-    ${especialidadeMedico ? `<div class="esp">${especialidadeMedico}</div>` : ""}
+    <div class="nome">${esc(medico?.nome ?? "")}</div>
+    ${especialidadeMedico ? `<div class="esp">${esc(especialidadeMedico)}</div>` : ""}
   </div>
   <div class="rodape">Emitido em ${dataStr} ${horaStr}</div>
   <script>window.onload = () => { window.print(); setTimeout(() => window.close(), 500); };</script>
@@ -393,6 +418,30 @@ function AtendimentoEditorPage() {
 
   return (
     <div className="space-y-4 p-1">
+      {pagamento && !pagamento.pago && (
+        <Card className="p-4 border-amber-400 bg-amber-50/60 dark:bg-amber-950/20">
+          <div className="flex items-start gap-3">
+            <HeartPulse className="h-5 w-5 text-amber-600 mt-0.5" />
+            <div className="flex-1">
+              <div className="font-semibold text-amber-900 dark:text-amber-200">
+                Pagamento pendente — consulta requer pagamento antecipado
+              </div>
+              <p className="text-sm text-amber-800/80 dark:text-amber-200/80">
+                Envie o paciente ao caixa antes de iniciar o atendimento.
+                O prontuário fica disponível somente após a confirmação do pagamento.
+              </p>
+              <div className="mt-2 flex gap-2">
+                <Button size="sm" asChild>
+                  <Link to="/app/caixa">Abrir caixa</Link>
+                </Button>
+                <Button size="sm" variant="outline" asChild>
+                  <Link to="/app/atendimento-ia">Voltar para fila</Link>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
           <Brain className="h-6 w-6 text-primary" />
@@ -610,7 +659,12 @@ function AtendimentoEditorPage() {
         <Button variant="outline" size="lg" onClick={() => imprimirDocumento("Prescrição")} disabled={!soap.prescricao.trim()}>
           <Printer className="h-4 w-4" /> Imprimir prescrição
         </Button>
-        <Button size="lg" onClick={handleSalvar} disabled={loading === "salvar" || !pacienteId}>
+        <Button
+          size="lg"
+          onClick={handleSalvar}
+          disabled={loading === "salvar" || !pacienteId || (pagamento ? !pagamento.pago : false)}
+          title={pagamento && !pagamento.pago ? "Pagamento pendente" : undefined}
+        >
           {loading === "salvar" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           Salvar prontuário
         </Button>

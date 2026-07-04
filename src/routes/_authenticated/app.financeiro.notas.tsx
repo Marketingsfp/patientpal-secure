@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { Plus, FileText, Pencil, Trash2, ExternalLink, Send, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useServerFn } from "@tanstack/react-start";
@@ -63,7 +64,7 @@ function Page() {
     const { data, error } = await supabase.from("fin_notas_pacientes")
       .select("id, numero, serie, data_emissao, valor, status, url_pdf, observacoes, paciente_id")
       .eq("clinica_id", clinicaAtual.clinica_id).order("data_emissao", { ascending: false }).limit(200);
-    if (error) toast.error(error.message); else setItems((data ?? []) as Nota[]);
+    if (error) mostrarErro(error); else setItems((data ?? []) as Nota[]);
     setLoading(false);
   };
   const loadPac = async () => {
@@ -102,14 +103,14 @@ function Page() {
       ? await supabase.from("fin_notas_pacientes").update(payload).eq("id", editing.id)
       : await supabase.from("fin_notas_pacientes").insert(payload);
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Salvo"); setOpen(false); await load();
   };
 
   const remove = async (n: Nota) => {
     if (!confirm(`Excluir nota ${n.numero ?? ""}?`)) return;
     const { error } = await supabase.from("fin_notas_pacientes").delete().eq("id", n.id);
-    if (error) toast.error(error.message); else { toast.success("Removida"); await load(); }
+    if (error) mostrarErro(error); else { toast.success("Removida"); await load(); }
   };
 
   const openEmit = async (n: Nota) => {
@@ -174,7 +175,7 @@ function Page() {
       setEmitDialog({ open: false, nota: null });
       await load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Falha ao emitir");
+      mostrarErro(e);
     } finally { setEmitting(false); }
   };
 

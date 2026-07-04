@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Plus, Trash2, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
 import { cadastrarUsuario, getFuncionarioLogin, definirSenhaFuncionario } from "@/lib/equipe.functions";
@@ -516,7 +517,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         .update(payload)
         .eq("id", editId)
         .select("id");
-      if (error) { setSaving(false); toast.error(error.message); return; }
+      if (error) { setSaving(false); mostrarErro(error); return; }
       if (!upd || upd.length === 0) {
         setSaving(false);
         toast.error(
@@ -525,12 +526,12 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         return;
       }
       const { error: delEsp } = await supabase.from("medico_especialidades").delete().eq("medico_id", editId);
-      if (delEsp) { setSaving(false); toast.error(`Erro ao limpar especialidades: ${delEsp.message}`); return; }
+      if (delEsp) { setSaving(false); mostrarErro(delEsp, "erro ao limpar especialidades"); return; }
       const { error: delProc } = await supabase.from("medico_procedimentos").delete().eq("medico_id", editId);
-      if (delProc) { setSaving(false); toast.error(`Erro ao limpar procedimentos: ${delProc.message}`); return; }
+      if (delProc) { setSaving(false); mostrarErro(delProc, "erro ao limpar procedimentos"); return; }
     } else {
       const { data: novo, error } = await supabase.from("medicos").insert(payload).select("id").single();
-      if (error || !novo) { setSaving(false); toast.error(error?.message ?? "Erro"); return; }
+      if (error || !novo) { setSaving(false); mostrarErro(error); return; }
       medicoId = novo.id;
       // C-2: Cria agenda padrão imediatamente para o novo médico,
       // garantindo que disponibilidades possam ser cadastradas sem violar a FK.
@@ -557,7 +558,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
           rqe_numero: er.tem_rqe ? er.rqe_numero.trim() || null : null,
         }));
       const { error: e2 } = await supabase.from("medico_especialidades").insert(rows);
-      if (e2) { setSaving(false); toast.error(e2.message); return; }
+      if (e2) { setSaving(false); mostrarErro(e2); return; }
     }
     const itensUnicos = Array.from(new Set(form.procedimentos.filter((x) => !!x)));
     if (medicoId && itensUnicos.length) {
@@ -570,7 +571,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
           especialidade_id: x.eid,
         }));
       const { error: ep } = await supabase.from("medico_procedimentos").insert(procRows);
-      if (ep) { setSaving(false); toast.error(ep.message); return; }
+      if (ep) { setSaving(false); mostrarErro(ep); return; }
     }
     if (medicoId) {
       await supabase.from("medico_convenios").delete().eq("medico_id", medicoId);
@@ -586,7 +587,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         }));
       if (convRows.length) {
         const { error: e3 } = await supabase.from("medico_convenios").insert(convRows);
-        if (e3) { setSaving(false); toast.error(e3.message); return; }
+        if (e3) { setSaving(false); mostrarErro(e3); return; }
       }
     }
     toast.success(editId ? "Médico atualizado!" : "Médico cadastrado!");
@@ -652,7 +653,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         });
         toast.success("Usuário do sistema criado e vinculado à equipe!");
       } catch (err: any) {
-        toast.error(`Médico salvo, mas erro ao criar usuário: ${err?.message ?? err}`);
+        mostrarErro(err, "médico salvo, mas erro ao criar usuário");
       }
     } else if (form.criarUsuario) {
       toast.warning("Informe e-mail e senha (mín. 6 caracteres) para criar o usuário.");

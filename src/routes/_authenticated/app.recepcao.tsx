@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { Bell, Check, X, ExternalLink } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/recepcao")({
@@ -96,7 +97,7 @@ function RecepcaoPage() {
       _guiche: guiche.trim(),
     });
     setBusy(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { mostrarErro(error); return; }
     if (!data) { toast.info("Não há senhas na fila"); return; }
     const row = Array.isArray(data) ? data[0] : data;
     toast.success(`Chamada ${row.codigo} no guichê ${guiche}`);
@@ -108,7 +109,7 @@ function RecepcaoPage() {
       ? { status, atendida_em: now }
       : { status, cancelada_em: now };
     const { error } = await supabase.from("senhas").update(patch).eq("id", id);
-    if (error) toast.error(error.message);
+    if (error) mostrarErro(error);
   }
 
   if (!clinicaAtual) return <div>Selecione uma clínica.</div>;

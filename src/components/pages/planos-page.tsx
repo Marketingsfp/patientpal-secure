@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { CreditCard, Plus, Save, Trash2, Pencil } from "lucide-react";
 import { toast } from "sonner";
+import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Button } from "@/components/ui/button";
@@ -45,7 +46,7 @@ export function PlanosPage() {
       .select("*")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("nome");
-    if (error) toast.error(error.message);
+    if (error) mostrarErro(error);
     setList((data ?? []) as Plano[]);
     setLoading(false);
   };
@@ -62,7 +63,7 @@ export function PlanosPage() {
       max_dependentes: 0, max_agregados: 0,
       fidelidade_meses: 6, vigencia_meses: 12, num_parcelas: 12,
     }).select().single();
-    if (error) return toast.error(error.message);
+    if (error) return mostrarErro(error);
     toast.success("Plano criado");
     await load();
     if (data) setEditing(data as Plano);
@@ -71,7 +72,7 @@ export function PlanosPage() {
   const salvar = async (p: Plano) => {
     const { id, ...rest } = p;
     const { error } = await supabase.from("planos_assinatura").update(rest).eq("id", id);
-    if (error) return toast.error(error.message);
+    if (error) return mostrarErro(error);
     toast.success("Plano salvo");
     setEditing(null);
     load();
@@ -80,7 +81,7 @@ export function PlanosPage() {
   const excluir = async (id: string) => {
     if (!confirm("Excluir este plano?")) return;
     const { error } = await supabase.from("planos_assinatura").delete().eq("id", id);
-    if (error) return toast.error(error.message);
+    if (error) return mostrarErro(error);
     toast.success("Excluído");
     load();
   };
