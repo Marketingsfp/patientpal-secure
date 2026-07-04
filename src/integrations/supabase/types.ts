@@ -335,6 +335,7 @@ export type Database = {
           medico_id: string | null
           observacoes: string | null
           orcamento_id: string | null
+          orcamento_item_id: string | null
           paciente_id: string | null
           paciente_nome: string
           pacote_id: string | null
@@ -364,6 +365,7 @@ export type Database = {
           medico_id?: string | null
           observacoes?: string | null
           orcamento_id?: string | null
+          orcamento_item_id?: string | null
           paciente_id?: string | null
           paciente_nome: string
           pacote_id?: string | null
@@ -393,6 +395,7 @@ export type Database = {
           medico_id?: string | null
           observacoes?: string | null
           orcamento_id?: string | null
+          orcamento_item_id?: string | null
           paciente_id?: string | null
           paciente_nome?: string
           pacote_id?: string | null
@@ -431,6 +434,13 @@ export type Database = {
             columns: ["orcamento_id"]
             isOneToOne: false
             referencedRelation: "orcamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agendamentos_orcamento_item_id_fkey"
+            columns: ["orcamento_item_id"]
+            isOneToOne: false
+            referencedRelation: "orcamento_itens"
             referencedColumns: ["id"]
           },
         ]
@@ -3131,6 +3141,7 @@ export type Database = {
           medico_id: string | null
           medico_laudador_id: string | null
           observacoes: string | null
+          orcamento_item_id: string | null
           paciente_id: string | null
           procedimento: string | null
           repasse_conta_id: string | null
@@ -3160,6 +3171,7 @@ export type Database = {
           medico_id?: string | null
           medico_laudador_id?: string | null
           observacoes?: string | null
+          orcamento_item_id?: string | null
           paciente_id?: string | null
           procedimento?: string | null
           repasse_conta_id?: string | null
@@ -3189,6 +3201,7 @@ export type Database = {
           medico_id?: string | null
           medico_laudador_id?: string | null
           observacoes?: string | null
+          orcamento_item_id?: string | null
           paciente_id?: string | null
           procedimento?: string | null
           repasse_conta_id?: string | null
@@ -3238,6 +3251,13 @@ export type Database = {
             columns: ["medico_laudador_id"]
             isOneToOne: false
             referencedRelation: "medicos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fin_atendimentos_orcamento_item_id_fkey"
+            columns: ["orcamento_item_id"]
+            isOneToOne: false
+            referencedRelation: "orcamento_itens"
             referencedColumns: ["id"]
           },
           {
@@ -4609,9 +4629,11 @@ export type Database = {
           cor: string | null
           created_at: string
           id: string
-          medico_id: string
+          medico_id: string | null
           nome: string
           ordem: number
+          sala: string | null
+          tipo_recurso: string | null
           updated_at: string
         }
         Insert: {
@@ -4620,9 +4642,11 @@ export type Database = {
           cor?: string | null
           created_at?: string
           id?: string
-          medico_id: string
+          medico_id?: string | null
           nome: string
           ordem?: number
+          sala?: string | null
+          tipo_recurso?: string | null
           updated_at?: string
         }
         Update: {
@@ -4631,9 +4655,11 @@ export type Database = {
           cor?: string | null
           created_at?: string
           id?: string
-          medico_id?: string
+          medico_id?: string | null
           nome?: string
           ordem?: number
+          sala?: string | null
+          tipo_recurso?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -5720,42 +5746,74 @@ export type Database = {
       }
       orcamento_itens: {
         Row: {
+          agendamento_id: string | null
           created_at: string
           descricao: string
+          fin_atendimento_id: string | null
           id: string
+          motivo_nao_aplicavel: string | null
           orcamento_id: string
           ordem: number
           procedimento_id: string | null
           quantidade: number
+          status_alterado_em: string | null
+          status_alterado_por: string | null
+          status_item: string
           valor_total: number
           valor_unitario: number
           valores_formas: Json | null
         }
         Insert: {
+          agendamento_id?: string | null
           created_at?: string
           descricao: string
+          fin_atendimento_id?: string | null
           id?: string
+          motivo_nao_aplicavel?: string | null
           orcamento_id: string
           ordem?: number
           procedimento_id?: string | null
           quantidade?: number
+          status_alterado_em?: string | null
+          status_alterado_por?: string | null
+          status_item?: string
           valor_total?: number
           valor_unitario?: number
           valores_formas?: Json | null
         }
         Update: {
+          agendamento_id?: string | null
           created_at?: string
           descricao?: string
+          fin_atendimento_id?: string | null
           id?: string
+          motivo_nao_aplicavel?: string | null
           orcamento_id?: string
           ordem?: number
           procedimento_id?: string | null
           quantidade?: number
+          status_alterado_em?: string | null
+          status_alterado_por?: string | null
+          status_item?: string
           valor_total?: number
           valor_unitario?: number
           valores_formas?: Json | null
         }
         Relationships: [
+          {
+            foreignKeyName: "orcamento_itens_agendamento_id_fkey"
+            columns: ["agendamento_id"]
+            isOneToOne: false
+            referencedRelation: "agendamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orcamento_itens_fin_atendimento_id_fkey"
+            columns: ["fin_atendimento_id"]
+            isOneToOne: false
+            referencedRelation: "fin_atendimentos"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "orcamento_itens_orcamento_id_fkey"
             columns: ["orcamento_id"]
@@ -6520,7 +6578,11 @@ export type Database = {
           observacoes: string | null
           preparo: string | null
           requer_laudo: boolean
+          requer_medico: boolean
+          requer_sala: boolean
           tipo: string
+          tipo_destino: string | null
+          tipo_recurso: string | null
           updated_at: string
           valor_cartao: number
           valor_cartao_consulta: number
@@ -6544,7 +6606,11 @@ export type Database = {
           observacoes?: string | null
           preparo?: string | null
           requer_laudo?: boolean
+          requer_medico?: boolean
+          requer_sala?: boolean
           tipo?: string
+          tipo_destino?: string | null
+          tipo_recurso?: string | null
           updated_at?: string
           valor_cartao?: number
           valor_cartao_consulta?: number
@@ -6568,7 +6634,11 @@ export type Database = {
           observacoes?: string | null
           preparo?: string | null
           requer_laudo?: boolean
+          requer_medico?: boolean
+          requer_sala?: boolean
           tipo?: string
+          tipo_destino?: string | null
+          tipo_recurso?: string | null
           updated_at?: string
           valor_cartao?: number
           valor_cartao_consulta?: number
