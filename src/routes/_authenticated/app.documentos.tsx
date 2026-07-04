@@ -9,6 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SimpleCrud } from "@/components/simple-crud/SimpleCrud";
+import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
+import { PacienteNomeCell, cachePacienteNome } from "@/components/paciente-nome";
 
 export const Route = createFileRoute("/_authenticated/app/documentos")({
   component: DocumentosPage,
@@ -22,20 +24,17 @@ interface Form { titulo: string; tipo: Tipo; conteudo: string; assinado: boolean
 
 function DocumentosPage() {
   const { clinicaAtual } = useClinica();
-  const [pacientes, setPacientes] = useState<{ id: string; nome: string }[]>([]);
   const [medicos, setMedicos] = useState<{ id: string; nome: string }[]>([]);
   const [modelos, setModelos] = useState<{ id: string; nome: string; tipo: Tipo; conteudo: string }[]>([]);
+  const [pacienteSel, setPacienteSel] = useState<PatientOption | null>(null);
   useEffect(() => { (async () => {
     if (!clinicaAtual) return;
-    const [p, m, md] = await Promise.all([
-      supabase.from("pacientes").select("id, nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
+    const [m, md] = await Promise.all([
       supabase.from("medicos").select("id, nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("modelos_documentos").select("id, nome, tipo, conteudo").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
     ]);
-    setPacientes(p.data ?? []); setMedicos(m.data ?? []); setModelos((md.data ?? []) as never);
+    setMedicos(m.data ?? []); setModelos((md.data ?? []) as never);
   })(); }, [clinicaAtual?.clinica_id]);
-
-  const pacNome = (id: string | null) => id ? (pacientes.find(p => p.id === id)?.nome ?? "—") : "—";
 
   return (
     <SimpleCrud<Row, Form>
@@ -48,7 +47,7 @@ function DocumentosPage() {
       columns={[
         { key: "tit", header: "Título", render: r => <span className="font-medium">{r.titulo}</span> },
         { key: "tipo", header: "Tipo", className: "w-32", render: r => <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">{TIPO_LABEL[r.tipo]}</span> },
-        { key: "pac", header: "Paciente", render: r => pacNome(r.paciente_id) },
+        { key: "pac", header: "Paciente", render: r => <PacienteNomeCell id={r.paciente_id} /> },
         { key: "ass", header: "Assinado", className: "w-28", render: r => r.assinado ? <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Sim</span> : <span className="text-xs text-muted-foreground">Não</span> },
       ]}
       emptyForm={{ titulo: "", tipo: "outro", conteudo: "", assinado: false, paciente_id: null, medico_id: null, modelo_id: null }}
@@ -81,10 +80,15 @@ function DocumentosPage() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1"><Label>Paciente</Label>
-              <Select value={f.paciente_id ?? ""} onValueChange={v => set({ ...f, paciente_id: v || null })}>
-                <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
-                <SelectContent>{pacientes.map(p => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}</SelectContent>
-              </Select>
+              <PatientSearchInput
+                value={pacienteSel && pacienteSel.id === f.paciente_id ? pacienteSel : (f.paciente_id ? { id: f.paciente_id, nome: "", cpf: null, telefone: null, data_nascimento: null, clinica_id: clinicaAtual?.clinica_id ?? "" } : null)}
+                onSelect={(p) => {
+                  setPacienteSel(p);
+                  if (p) cachePacienteNome(p.id, p.nome);
+                  set({ ...f, paciente_id: p?.id ?? null });
+                }}
+                placeholder="Digite nome, CPF, pasta ou nascimento…"
+              />
             </div>
             <div className="space-y-1"><Label>Profissional</Label>
               <Select value={f.medico_id ?? ""} onValueChange={v => set({ ...f, medico_id: v || null })}>
