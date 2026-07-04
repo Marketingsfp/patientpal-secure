@@ -568,7 +568,7 @@ function NovoOrcamentoDialog({
       }
       return [...cur, f];
     });
-    setValoresPagamento({});
+    // Não limpa `valoresPagamento`: usuário pode desmarcar/remarcar sem perder valores digitados.
   };
 
   // Quando o usuário troca/adiciona uma forma de pagamento DEPOIS de já ter
@@ -677,6 +677,12 @@ function NovoOrcamentoDialog({
     }
     if (Number(desconto) < 0) return toast.error("Desconto não pode ser negativo");
     if (Number(desconto) > subtotal) return toast.error("Desconto não pode ser maior que o subtotal");
+    if (!Number.isFinite(Number(validade)) || Number(validade) < 1) {
+      return toast.error("Validade deve ser de pelo menos 1 dia");
+    }
+    if ((observacoes ?? "").length > 1000) {
+      return toast.error("Observações não podem exceder 1000 caracteres");
+    }
     const valoresPag: Record<string, number> | null =
       formasPagamento.length > 1 ? { ...totaisPorForma } : null;
     setSaving(true);
