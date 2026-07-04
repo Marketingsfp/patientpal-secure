@@ -23,6 +23,11 @@ Permissões, Autenticação). Rodadas 2 a 16 pendentes — ver
    - [4.1 Multi-clínica & Membership](#41-módulo-multi-clínica--membership)
    - [4.2 Permissões & Perfis de acesso](#42-módulo-permissões--perfis-de-acesso)
    - [4.3 Autenticação & Sessão](#43-módulo-autenticação--sessão)
+   - [4.4 Pacientes](#44-módulo-pacientes) *(R2)*
+   - [4.5 Duplicados de pacientes](#45-módulo-duplicados-de-pacientes) *(R2)*
+   - [4.6 Biometria facial de pacientes](#46-módulo-biometria-facial-de-pacientes) *(R2)*
+   - [4.7 Dependentes de contrato](#47-módulo-dependentes-de-contrato) *(R2)*
+   - [4.8 LGPD](#48-módulo-lgpd) *(R2)*
 5. [Seções de fechamento](#5-seções-de-fechamento)
    - Regras confirmadas pelo código
    - Regras inferidas do histórico de prompts
