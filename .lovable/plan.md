@@ -1,3 +1,13 @@
+
+## P1-BUSCA-002 — Prontuários/Documentos: `<select>` com 242k pacientes
+
+**Evidência:** `src/routes/_authenticated/app.prontuarios.tsx:39` e `src/routes/_authenticated/app.documentos.tsx:31` fazem `select("id,nome").order("nome")` sem filtro/limite. pg_stat_statements: 620 chamadas × 213ms = 132s totais. Trava o browser ao renderizar select nativo com 242k options.
+
+**Correção proposta:** substituir `<select>` por `PatientSearchInput` (RPC-otimizado, já existe no projeto). Autocomplete server-side com debounce.
+
+**Risco:** baixo. Só afeta essas duas telas. Manter mesma prop de callback.
+
+**Prioridade:** próxima etapa (após A3).
 # Auditoria e Agendamento Express
 
 ## Escopo em 2 frentes
