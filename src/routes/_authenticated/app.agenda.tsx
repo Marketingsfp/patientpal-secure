@@ -3151,6 +3151,7 @@ function AgendaPage() {
           <p className="text-sm text-muted-foreground">Filtre e gerencie os agendamentos da clínica.</p>
         </div>
         <div className="flex gap-1.5">
+          <TurboModeToggle />
           <div className="inline-flex rounded-full border bg-card p-0.5">
             <button
               type="button"
