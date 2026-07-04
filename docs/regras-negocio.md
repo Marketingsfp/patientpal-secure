@@ -251,6 +251,11 @@ Controlar quais **módulos** (menus/rotas) o usuário enxerga e com qual **níve
 - `FUN-028` ✅ RPCs de permissão em banco: `has_role(_user_id, _role app_role)`, `has_role_global(...)`, `is_member(...)`, `can_manage_clinica(_user_id, _clinica_id)`, `user_is_any_manager(...)`. Todas `SECURITY DEFINER`.
 - `FUN-029` ❓ `role_permissions` e `permissions` (2 tabelas antigas) coexistem com `perfil_permissoes` — **PRECISA VALIDAR** se são vestígio ou uso real.
 - `FUN-030` 🟡 Chave textual `clinica_memberships.role` **deveria** casar com `perfis_acesso.chave`, mas não há FK no banco (**PRECISA VALIDAR**).
+- `FUN-031` 🔴 **Enum `app_role` NÃO inclui `caixa`** — valor existe nos presets do front-end (`PerfilKey`) e é auto-upsertado em `perfis_acesso`, mas `INSERT` em `clinica_memberships` com `role='caixa'` **é rejeitado pelo Postgres** (erro de tipo). Ver `migration 20260516181120:7` vs `permissoes-presets.ts:10`.
+- `FUN-032` 🔴 **Dois sistemas de role paralelos**: `clinica_memberships.role : app_role` (usado) vs `user_roles.role : app_role_global` (nunca consultado pelo front). Enums divergem: `enfermeiro` vs `enfermagem`, `financeiro` vs `tesouraria`/`marketing`. Ver `migration 20260520175438`.
+- `FUN-033` 🔴 Objetos `PRESETS` **duplicados** em `src/lib/permissoes-presets.ts` e `src/routes/_authenticated/app.perfis.tsx:179-227` — divergem: a rota tem `recepcao.anamneses='write'` e `documentos='read'`, mas o runtime usa o do `.ts` (que tem `caixa='write'` e não tem `anamneses`).
+- `FUN-034` 🔴 **`modoTodas` × permissões**: `usePermissoes` só olha `clinicaAtual.role`. Se usuário é `medico` em A e `admin` em B, com B ativo e `modoTodas=true`, ele vê menu de admin operando dados de A.
+- `FUN-035` ✅ Permissão de módulo **filtra menu, não rota**: `AppShell.leafAllowed()` só esconde item; URL colada continua carregando (proteção fica só na RLS).
 
 #### Validações
 - Se `role` não bater com nenhum preset **e** não houver `perfis_acesso` → menu fica vazio (usuário efetivamente bloqueado). Não vi mensagem de UX explicando.
