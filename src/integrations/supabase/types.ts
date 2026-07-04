@@ -2233,6 +2233,7 @@ export type Database = {
       clinicas: {
         Row: {
           ativo: boolean
+          base_importada: boolean
           branding: Json
           cep: string | null
           cidade: string | null
@@ -2252,6 +2253,7 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean
+          base_importada?: boolean
           branding?: Json
           cep?: string | null
           cidade?: string | null
@@ -2271,6 +2273,7 @@ export type Database = {
         }
         Update: {
           ativo?: boolean
+          base_importada?: boolean
           branding?: Json
           cep?: string | null
           cidade?: string | null
@@ -7365,6 +7368,25 @@ export type Database = {
         Returns: string
       }
       atend_gerar_protocolo: { Args: { _clinica_id: string }; Returns: string }
+      buscar_paciente_contato: {
+        Args: {
+          _clinica_id: string
+          _cpf?: string
+          _nome?: string
+          _telefone?: string
+        }
+        Returns: {
+          associado: boolean
+          contrato_id: string
+          convenio_id: string
+          convenio_nome: string
+          cpf: string
+          data_nascimento: string
+          id: string
+          nome: string
+          telefone: string
+        }[]
+      }
       buscar_pacientes: {
         Args: { _clinica_id: string; _limit?: number; _termo: string }
         Returns: {

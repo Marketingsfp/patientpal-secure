@@ -90,7 +90,7 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
               // Modo híbrido: Nina responde fora do horário humano (apenas texto)
               if (tipo === "text" && body && !dentroHorarioAtendimento(cfg)) {
                 try {
-                  const reply = await gerarRespostaNina(params.clinicaId, body);
+                  const reply = await gerarRespostaNina(params.clinicaId, body, from);
                   if (reply) {
                     const { wa_message_id: outId } = await metaSendText(
                       cfg.phone_number_id,

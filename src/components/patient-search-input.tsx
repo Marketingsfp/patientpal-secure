@@ -15,6 +15,8 @@ export interface PatientOption {
   clinica_id: string;
   codigo_prontuario?: string | null;
   numero_pasta?: string | null;
+  /** Preenchido quando o paciente tem contrato ativo de convênio. */
+  associado_convenio?: string | null;
 }
 
 interface PatientSearchInputProps {
@@ -85,6 +87,7 @@ export function PatientSearchInput({
   const [options, setOptions] = useState<PatientOption[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [associadosMap, setAssociadosMap] = useState<Map<string, string>>(new Map());
   const containerRef = useRef<HTMLDivElement>(null);
   const reqIdRef = useRef(0);
   const cacheRef = useRef<Map<string, PatientOption[]>>(new Map());
@@ -160,6 +163,25 @@ export function PatientSearchInput({
       cacheRef.current.set(cacheKey, rows);
       setOptions(rows);
       setLoading(false);
+      // Consulta em lote se algum dos resultados é associado (contrato ativo)
+      if (rows.length > 0) {
+        void supabase
+          .from("contratos_assinatura")
+          .select("paciente_id, cb_convenios(nome)")
+          .in("paciente_id", rows.map((r) => r.id))
+          .eq("status", "ativo")
+          .then(({ data }) => {
+            if (myReq !== reqIdRef.current) return;
+            const map = new Map<string, string>();
+            for (const c of (data ?? []) as Array<{ paciente_id: string; cb_convenios?: { nome?: string } | null }>) {
+              const nome = c.cb_convenios?.nome ?? "Convênio";
+              if (c.paciente_id) map.set(c.paciente_id, nome);
+            }
+            setAssociadosMap(map);
+          });
+      } else {
+        setAssociadosMap(new Map());
+      }
     }, 150);
     return () => clearTimeout(handle);
   }, [query, open, scope]);
@@ -251,6 +273,11 @@ export function PatientSearchInput({
                   {p.numero_pasta && (
                     <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-muted">
                       Pasta {p.numero_pasta}
+                    </span>
+                  )}
+                  {associadosMap.get(p.id) && (
+                    <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">
+                      Associado — {associadosMap.get(p.id)}
                     </span>
                   )}
                   <span className="text-xs text-muted-foreground">

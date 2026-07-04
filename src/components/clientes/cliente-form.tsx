@@ -131,6 +131,22 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
   const [saving, setSaving] = useState(false);
   const [cepLoading, setCepLoading] = useState(false);
 
+  // Aviso: base da unidade ainda não importada (só quando cadastrando novo)
+  const [baseImportada, setBaseImportada] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (editing) { setBaseImportada(null); return; }
+    let cancel = false;
+    void supabase
+      .from("clinicas")
+      .select("base_importada")
+      .eq("id", clinicaId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancel) setBaseImportada((data as any)?.base_importada ?? true);
+      });
+    return () => { cancel = true; };
+  }, [clinicaId, editing]);
+
   // Biometria
   const [hasBiometria, setHasBiometria] = useState(false);
   const [bioLoading, setBioLoading] = useState(false);
@@ -786,6 +802,13 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
   return (
     <>
       <form onSubmit={onSubmit} className="space-y-4">
+        {!editing && baseImportada === false && (
+          <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 px-3 py-2 text-sm text-amber-900 dark:text-amber-200">
+            <strong>Atenção:</strong> a base de pacientes desta unidade ainda não foi importada.
+            Antes de cadastrar, verifique se o paciente já não existe (CPF, telefone ou nome)
+            ou encaminhe para uma atendente. Você pode continuar o cadastro manual mesmo assim.
+          </div>
+        )}
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="grid grid-cols-7 w-full">
             <TabsTrigger value="dados">Dados</TabsTrigger>
