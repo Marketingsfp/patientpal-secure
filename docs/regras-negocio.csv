@@ -33,3 +33,54 @@ AUT-004,Autenticacao,Novo usuario precisa ser adicionado a uma clinica manualmen
 AUT-005,Autenticacao,Provedores OAuth (Google) podem estar habilitados,Login,-,-,/login,-,inferencia,baixo,Google login esta habilitado neste projeto?
 AUT-006,Autenticacao,Rotas de paciente autenticam por token unico (nao por Supabase Auth),Acesso paciente,token na URL,Acesso a /p/$token /checkin/$token,-,-,codigo,alto,
 AUT-007,Autenticacao,Politica de confirmacao de email,Signup,-,-,-,-,inferencia,baixo,Email tem que ser confirmado antes de logar?
+PAC-001,Pacientes,CPF unico por clinica (index parcial WHERE cpf IS NOT NULL AND cpf <> ''),INSERT/UPDATE em pacientes,cpf digits,Rejeita duplicata,/app/clientes,idx_pacientes_clinica_cpf_unique,banco,alto,
+PAC-002,Pacientes,Nome armazenado sempre em UPPERCASE,INSERT/UPDATE em pacientes,nome,upper(nome),/app/clientes,trigger uc_pacientes_nome,banco,alto,
+PAC-003,Pacientes,Limite de tamanho de nome DIVERGE: front 120 x banco 200,Ao salvar,nome > 120 chars,Front bloqueia; API direta aceita,/app/clientes,pacientes_nome_chk vs form,codigo+banco,alto,Padronizar em 120 no front e no CHECK.
+PAC-004,Pacientes,Nome exige ao menos uma letra e nao aceita <>,Validacao form,-,Rejeita,/app/clientes,-,codigo,alto,
+PAC-005,Pacientes,Data de nascimento entre 1900 e hoje (max 120 anos),Validacao form,data,Rejeita,/app/clientes,-,codigo,alto,
+PAC-006,Pacientes,Email validado por regex JS (sem HTML5 tooltip),Validacao form,email,Rejeita,/app/clientes,-,codigo,alto,
+PAC-007,Pacientes,Telefone obrigatorio em novos cadastros com >=10 digitos,INSERT em pacientes,telefone,Trigger levanta se <10,-,pacientes_require_telefone_bi,banco,alto,
+PAC-008,Pacientes,Form nao checa numero de digitos - erro so aparece no submit,Salvar novo paciente,telefone com <10 digitos,Erro do Postgres na UI,/app/clientes,cliente-form.tsx:708,codigo,alto,Adicionar validacao no front para nao repassar erro cru.
+PAC-009,Pacientes,CPF validado pelo algoritmo da Receita Federal,Validacao form,cpf,Rejeita se DV invalido,/app/clientes,src/lib/cpf.ts,codigo,alto,
+PAC-010,Pacientes,CPF armazenado apenas como digitos,Ao salvar,cpf formatado,cpf digits,/app/clientes,cpf/cpf_digits,codigo+banco,alto,
+PAC-011,Pacientes,codigo_prontuario e gerado automaticamente por clinica (5 digitos zero padded),INSERT em pacientes,-,proximo numero sequencial,/app/clientes,trg_pacientes_set_codigo_prontuario,banco,alto,
+PAC-012,Pacientes,Bloco responsavel e sugerido quando idade <18 ou >=70,Preenchendo cadastro,data_nascimento,UI sugere bloco,/app/clientes,-,codigo,alto,Regra de negocio ou apenas UX?
+PAC-013,Pacientes,Foto vai em bucket pacientes-fotos no path {clinicaId}/{pacienteId}.{ext},Upload de foto,arquivo,path no storage,/app/clientes,pacientes.foto_url,codigo,alto,
+PAC-014,Pacientes,buscar_pacientes_global retorna match_score e cadastro_incompleto,Busca unificada,termo,ranking + flag,-,rpc,banco,alto,
+PAC-015,Pacientes,buscar_pacientes_global valida auth.uid() e filtra por membership,Busca unificada,clinica_ids,ignora nao permitidas,-,rpc,banco,alto,
+PAC-016,Pacientes,paciente_pendencias_cadastro exige telefone>=10 cpf=11 nascimento endereco email para nfse_ok,Ao abrir resumo,paciente_id,faltantes[] + nfse_ok,-,rpc,banco,alto,
+PAC-017,Pacientes,SEGURANCA: paciente_pendencias_cadastro sem clinica_id nem membership,Consulta pendencias,paciente_id,Vazamento cross-clinica,-,rpc,banco,alto,Adicionar _clinica_id + is_member.
+PAC-018,Pacientes,SEGURANCA: buscar_paciente_contato e TO anon retornando PII completa,Busca publica,cpf/telefone/nome,PII vazada,-,rpc,banco,alto,Revogar anon ou exigir token de sessao/mascaramento.
+PAC-019,Pacientes,SEGURANCA: paciente_cartao_inadimplente e TO anon sem auth,Consulta financeira publica,-,Inadimplencia vazada,-,rpc,banco,alto,Revogar anon e exigir _clinica_id.
+PAC-020,Pacientes,Triggers ensure_paciente_* inserem sem telefone quebrando o trigger de telefone obrigatorio,Criar medico/funcionario/membro,-,INSERT falha silencioso,/app/equipe /app/medicos,ensure_paciente_para_*,banco,alto,Relaxar trigger de telefone para chamadas SECURITY DEFINER OU preencher placeholder.
+PAC-021,Pacientes,Portal /paciente/perfil faz update sem clinica_id,Paciente edita seus dados,session.email,RLS bloqueia silenciosamente,/paciente/perfil,paciente.perfil.tsx:48-64,codigo,alto,Adicionar clinica_id e retornar erro ao usuario.
+PAC-022,Pacientes,Duas constraints unique de CPF coexistem (inline e parcial),Ao inserir CPF duplicado,-,Erros diferentes conforme constraint,/app/clientes,-,banco,alto,Remover a inline manter apenas o index parcial.
+PAC-023,Pacientes,Excesso de indices redundantes em cpf_digits,-,-,Write amplification,-,-,banco,alto,Consolidar em 1 btree + 1 gin trigram.
+PAC-024,Pacientes,face_descriptor (coluna) e legado - novos cadastros vao para paciente_biometria,Cadastro biometrico,-,pacientes_face_lista nao ve novos,-,-,codigo+banco,alto,Fazer pacientes_face_lista ler paciente_biometria.
+PAC-025,Pacientes,buscar_pacientes retorna SETOF pacientes expondo todas as colunas,Lista de pacientes,termo,Dados extras (nao vazamento),/app/clientes,rpc,banco,medio,
+PAC-026,Pacientes,Coluna prontuarios_anteriores nunca aparece na UI,-,-,Legado,-,pacientes.prontuarios_anteriores,inferencia,baixo,Ainda e preenchida em algum fluxo?
+PAC-027,Pacientes,Coluna legacy_id parece so import Menino Jesus,-,-,Legado,-,pacientes.legacy_id,inferencia,baixo,Confirmar se e so import.
+PAC-040,Duplicados,Detecta duplicados por cpf telefone e nome+dn,Ao abrir tela,clinica_ids,Grupos suspeitos,/app/clientes/duplicados,listar_duplicados_pacientes,codigo+banco,alto,
+PAC-041,Duplicados,Limite maximo 1000 default 200,Consulta,-,capado,/app/clientes/duplicados,rpc,banco,alto,
+PAC-042,Duplicados,Valida membership em cada clinica,Consulta,clinica_ids,filtro,/app/clientes/duplicados,rpc,banco,alto,
+PAC-043,Duplicados,Sem merge automatico - resolucao manual,-,-,Gestor edita/desativa manualmente,/app/clientes/duplicados,-,codigo,alto,Precisa de fluxo de merge? Como preservar historico?
+PAC-044,Duplicados,Como resolver sem quebrar FK de historico,-,-,-,-,-,inferencia,baixo,Precisa de procedimento operacional documentado.
+PAC-060,Biometria,Descriptor 128 floats face-api.js,Cadastro biometrico,foto,array 128,-,paciente_biometria.descriptor,codigo,alto,
+PAC-061,Biometria,paciente_biometria exige consentimento_em e permite revogado_em,Cadastro,-,-,/app/clientes,paciente_biometria,banco,alto,
+PAC-062,Biometria,RLS is_member para RW; can_manage_clinica para DELETE,-,-,-,-,-,banco,alto,
+PAC-063,Biometria,CONFLITO: writes em paciente_biometria mas reads em pacientes.face_descriptor,Identify facial,-,Novos cadastros nao reconhecidos,/checkin,-,codigo+banco,alto,Migrar pacientes_face_lista para ler paciente_biometria.
+PAC-064,Biometria,pacientes_face_lista revogada de anon,Chamada RPC,-,So authenticated,-,rpc,banco,alto,
+PAC-065,Biometria,FaceIdentifyDialog: distancia euclidiana 10 tentativas @ 400ms,Identify,-,match ou timeout,-,-,codigo,alto,
+PAC-066,Biometria,FACE_MATCH_THRESHOLD e politica de fallback,-,-,-,-,-,inferencia,baixo,Qual o valor e o que fazer se nao reconhecer?
+PAC-080,Dependentes,contrato_id (FK cascade) tem N dependentes,-,-,-,-,contrato_dependentes,banco,alto,
+PAC-081,Dependentes,Campos: paciente_id nome parentesco tipo incluido_em excluido_em ativo,-,-,-,-,contrato_dependentes,banco,alto,
+PAC-082,Dependentes,SEGURANCA: paciente_id sem FK para pacientes,-,-,Registros orfaos possiveis,-,contrato_dependentes.paciente_id,banco,alto,Adicionar FK ON DELETE RESTRICT.
+PAC-083,Dependentes,RLS via subquery em contratos_assinatura.clinica_id,-,-,-,-,-,banco,alto,
+PAC-084,Dependentes,Regra: dependente conta como paciente para o convenio,-,-,-,-,-,inferencia,baixo,Como e cobrado?
+LGP-001,LGPD,Consentimento tem tipo versao aceito ip user_agent,-,-,-,-,lgpd_consentimentos,banco,alto,
+LGP-002,LGPD,RLS consentimentos: SELECT proprio user OU manager; INSERT proprio user OU member,-,-,-,-,lgpd_consentimentos,banco,alto,
+LGP-003,LGPD,Solicitacoes: tipo descricao status resposta respondido_em/por,-,-,-,-,lgpd_solicitacoes,banco,alto,
+LGP-004,LGPD,SEGURANCA: INSERT em lgpd_solicitacoes aceita qualquer authenticated sem escopo,-,-,-,-,lgpd_solicitacoes,banco,alto,Trocar WITH CHECK por user_id=auth.uid() AND is_member.
+LGP-005,LGPD,respondido_por sem FK para auth.users,-,-,-,-,lgpd_solicitacoes.respondido_por,banco,medio,
+LGP-006,LGPD,SLA de resposta,-,-,-,-,-,inferencia,baixo,LGPD exige 15 dias - implementar?
+LGP-007,LGPD,pacientes.consentimento_lgpd_em e lgpd_consentimentos - qual e a fonte de verdade,-,-,-,-,-,inferencia,baixo,Precisa decidir e alinhar.

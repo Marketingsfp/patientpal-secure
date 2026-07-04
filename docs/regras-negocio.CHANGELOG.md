@@ -1,5 +1,48 @@
 # Changelog — Regras de Negócio
 
+## v0.2 — Rodada 2 (Pacientes)
+
+**Data:** 2026-07-04
+**Escopo:** módulos Pacientes, Duplicados, Biometria, Dependentes, LGPD.
+**Auditoria SQL:** subagent `sub_fvd6gnek` (33 colunas de `pacientes`, 25+ índices, 5 triggers, 14 RPCs, políticas RLS de todas as tabelas correlatas).
+
+### Módulos cobertos
+- ✅ Pacientes (`PAC-001`..`PAC-027`)
+- ✅ Duplicados (`PAC-040`..`PAC-044`)
+- ✅ Biometria facial (`PAC-060`..`PAC-066`)
+- ✅ Dependentes (`PAC-080`..`PAC-084`)
+- ✅ LGPD (`LGP-001`..`LGP-007`)
+
+### Achados críticos novos
+- 🔴 **PAC-017** — `paciente_pendencias_cadastro` sem `clinica_id` nem `is_member` → vazamento cross-clínica.
+- 🔴 **PAC-018** — `buscar_paciente_contato` GRANT `TO anon` retornando PII completa.
+- 🔴 **PAC-019** — `paciente_cartao_inadimplente` GRANT `TO anon` retornando inadimplência.
+- 🔴 **PAC-020** — triggers `ensure_paciente_*` falham silenciosamente (telefone obrigatório).
+- 🔴 **PAC-021** — `/paciente/perfil` faz `.update()` sem `clinica_id`.
+- 🔴 **PAC-063** — biometria facial gravada em uma tabela e lida da outra (identify quebrado).
+- 🔴 **PAC-082** — `contrato_dependentes.paciente_id` sem FK.
+- 🔴 **LGP-004** — `lgpd_solicitacoes` INSERT permite qualquer autenticado.
+- 🟠 **PAC-003** — nome tem limite diferente no front (120) e no banco (200).
+- 🟠 **PAC-022** — duas constraints CPF coexistem.
+- 🟠 **PAC-023** — bloat de índices em `cpf_digits`.
+- 🟠 **PAC-024** — face descriptor com storage duplicado.
+
+### Métricas atualizadas
+- Regras documentadas nesta rodada: **48** (PAC + LGP).
+- Total do documento: **83** regras.
+- Perguntas para a clínica adicionadas: **7** (total: **20**).
+- 🔴 Achados de segurança acumulados: **13** (5 fundação + 8 pacientes/LGPD).
+- Cobertura estimada: ~18% do total esperado.
+
+### Não coberto ainda (para R3)
+- `src/routes/_authenticated/app.agenda.tsx`, `app.agenda.express.tsx`
+- `src/routes/_authenticated/app.disponibilidades.tsx`
+- `src/components/agenda/*`, `src/components/medicos/EncerrarExpedienteButton.tsx`
+- RPCs `get_horarios_disponiveis`, `top_procedimentos_agendamento`, `procedimentos_popularidade`
+- Tabelas `agendamentos`, `medico_disponibilidades`, `medico_agendas`, `medico_expediente_encerramento`, `agendamento_orcamento_itens`
+
+---
+
 ## v0.1.1 — Rodada 1 (Fundação) — revisão com auditoria SQL
 
 **Data:** 2026-07-04
