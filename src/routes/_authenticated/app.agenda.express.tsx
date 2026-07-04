@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
+import { PatientQuickCompleteSheet } from "@/components/patient-quick-complete-sheet";
+import { ProcedimentoPicker, type ProcedimentoOption } from "@/components/agenda/procedimento-picker";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -97,6 +99,13 @@ function AgendaExpressPage() {
   const [carregandoSlots, setCarregandoSlots] = useState(false);
   const [slotSelecionado, setSlotSelecionado] = useState<Slot | null>(null);
   const [confirmando, setConfirmando] = useState(false);
+
+  // Procedimento opcional (útil p/ Ultrassom, Raio-X, Laboratório etc.)
+  const [procedimento, setProcedimento] = useState<ProcedimentoOption | null>(null);
+
+  // Sheet de cadastro incompleto
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [pacienteBumpKey, setPacienteBumpKey] = useState(0);
 
   // Base importada?
   useEffect(() => {
@@ -214,7 +223,7 @@ function AgendaExpressPage() {
         agenda_id: slotSelecionado.agenda_id ?? undefined,
         inicio: slotSelecionado.inicio,
         fim: slotSelecionado.fim,
-        procedimento: ultimo?.procedimento ?? undefined,
+        procedimento: procedimento?.nome ?? ultimo?.procedimento ?? undefined,
         tipo_atendimento: tipo,
         status: "agendado",
       });
@@ -300,6 +309,17 @@ function AgendaExpressPage() {
                 <div className="text-xs text-muted-foreground">
                   {paciente.telefone ?? "sem telefone"} · {paciente.cpf ?? "sem CPF"}
                 </div>
+
+                {paciente.cadastro_incompleto && (
+                  <div className="mt-2 flex items-center justify-between gap-2 rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-2">
+                    <div className="text-xs text-amber-800 dark:text-amber-300">
+                      ⚠ Cadastro incompleto — complete agora para não perder tempo depois.
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => setSheetOpen(true)}>
+                      Completar
+                    </Button>
+                  </div>
+                )}
 
                 {ultimo?.medico_id && (
                   <div className="pt-2 flex flex-wrap gap-2">
@@ -388,6 +408,21 @@ function AgendaExpressPage() {
                 <span className="text-sm text-muted-foreground">Nenhuma especialidade com médico ativo.</span>
               )}
             </div>
+
+            {clinicaId && especialidadeId && (
+              <div className="pt-2">
+                <div className="text-xs font-semibold uppercase text-muted-foreground mb-1">
+                  Procedimento / exame (opcional)
+                </div>
+                <ProcedimentoPicker
+                  clinicaId={clinicaId}
+                  especialidadeId={especialidadeId}
+                  value={procedimento}
+                  onSelect={setProcedimento}
+                  placeholder="Buscar exame por nome ou código…"
+                />
+              </div>
+            )}
 
             <div className="flex justify-between pt-2">
               <Button variant="ghost" onClick={() => setStep(1)}>
@@ -481,8 +516,22 @@ function AgendaExpressPage() {
               {especialidadeNome && (
                 <div><span className="text-muted-foreground">Especialidade:</span> {especialidadeNome}</div>
               )}
+              {procedimento && (
+                <div><span className="text-muted-foreground">Procedimento:</span> {procedimento.nome}</div>
+              )}
               <div><span className="text-muted-foreground">Quando:</span> {fmtDia(slotSelecionado.inicio)} · {fmtHora(slotSelecionado.inicio)}</div>
             </div>
+
+            {paciente.cadastro_incompleto && (
+              <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-2 text-xs flex items-center justify-between gap-2">
+                <span className="text-amber-800 dark:text-amber-300">
+                  ⚠ Cadastro incompleto — dados obrigatórios para NFS-e podem estar faltando.
+                </span>
+                <Button size="sm" variant="outline" onClick={() => setSheetOpen(true)}>
+                  Completar
+                </Button>
+              </div>
+            )}
 
             <div className="flex justify-between pt-2">
               <Button variant="ghost" onClick={() => setStep(3)}>
@@ -509,6 +558,17 @@ function AgendaExpressPage() {
           </CardContent>
         </Card>
       )}
+
+      <PatientQuickCompleteSheet
+        pacienteId={paciente?.id ?? null}
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        requireNfse
+        onSaved={() => {
+          setPacienteBumpKey(k => k + 1);
+          if (paciente) setPaciente({ ...paciente, cadastro_incompleto: false });
+        }}
+      />
     </div>
   );
 }
