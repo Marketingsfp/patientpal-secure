@@ -1510,43 +1510,39 @@ function Page() {
       <Card>
         <CardContent className="p-0 overflow-x-auto relative">
           {loading ? (
-            <div className="py-12 text-center text-muted-foreground">Carregando...</div>
-          ) : filteredItems.length === 0 ? (
-            <div className="py-12 text-center text-muted-foreground">
-              <Stethoscope className="h-10 w-10 mx-auto mb-2 text-muted-foreground/50" />
-              Nenhum atendimento no período/filtro selecionado.
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/50">
-                  {!isMedicoOnly && (
-                    <TableHead className="w-8 px-2">
-                      <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
-                    </TableHead>
-                  )}
-                  <TableHead className="text-[11px] font-medium px-2 whitespace-nowrap">Data</TableHead>
-                  <TableHead className="text-[11px] font-medium px-2 w-[15%]">Médico</TableHead>
-                  <TableHead className="text-[11px] font-medium px-2 w-[15%]">Paciente</TableHead>
-                  <TableHead className="text-[11px] font-medium px-2 w-[20%]">Serviço</TableHead>
-                  {!isMedicoOnly && <TableHead className="text-right text-[11px] font-medium px-2">Total</TableHead>}
-                  <TableHead className="text-right text-[11px] font-medium px-2">
-                    {isMedicoOnly ? "Repasse" : "Médico"}
-                  </TableHead>
-                  {!isMedicoOnly && <TableHead className="text-right text-[11px] font-medium px-2">Clínica</TableHead>}
-                  <TableHead className="text-center text-[11px] font-medium px-2">Status</TableHead>
-                  <TableHead className="text-center text-[11px] font-medium px-2">Pgto</TableHead>
-                  <TableHead className="text-center text-[11px] font-medium px-2">Laudo</TableHead>
-
-                  {/* Coluna de Cabeçalho Fixa na Direita (Sticky) */}
-                  {!isMedicoOnly && (
-                    <TableHead className="text- text-[11px] font-medium px-2 sticky right-0 bg-muted z-10 border-l shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.05)]">
-                      Ações
-                    </TableHead>
-                  )}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+      <div className="py-12 text-center text-muted-foreground">Carregando...</div>
+    ) : filteredItems.length === 0 ? (
+      <div className="py-12 text-center text-muted-foreground">
+        <Stethoscope className="h-10 w-10 mx-auto mb-2 text-muted-foreground/50" />
+        Nenhum atendimento no período/filtro selecionado.
+      </div>
+    ) : 
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-muted/50">
+            {!isMedicoOnly && (
+              <TableHead className="w-8 px-2">
+                <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
+              </TableHead>
+            )}
+            <TableHead className="text-[11px] font-medium px-2 whitespace-nowrap">Data</TableHead>
+            <TableHead className="text-[11px] font-medium px-2">Médico</TableHead>
+            <TableHead className="text-[11px] font-medium px-2">Paciente</TableHead>
+            <TableHead className="text-[11px] font-medium px-2">Serviço</TableHead>
+            {!isMedicoOnly && <TableHead className="text-right text-[11px] font-medium px-2">Total</TableHead>}
+            <TableHead className="text-right text-[11px] font-medium px-2">{isMedicoOnly ? "Repasse" : "Médico"}</TableHead>
+            {!isMedicoOnly && <TableHead className="text-right text-[11px] font-medium px-2">Clínica</TableHead>}
+            <TableHead className="text-center text-[11px] font-medium px-2">Status</TableHead>
+            <TableHead className="text-center text-[11px] font-medium px-2">Pgto</TableHead>
+            <TableHead className="text-center text-[11px] font-medium px-2">Laudo</TableHead>
+            {!isMedicoOnly && (
+              <TableHead className="text-center text-[11px] font-medium px-2">
+                Ações
+              </TableHead>
+            )}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
                 {filteredItems.map((a, idx) => {
                   const medicoNome = a.medico_id ? (medMap.get(a.medico_id) ?? "—") : "—";
                   const pacienteNome =
