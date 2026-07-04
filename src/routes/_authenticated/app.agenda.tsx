@@ -3153,6 +3153,11 @@ function AgendaPage() {
             </button>
           </div>
           <EncerrarExpedienteButton />
+          <Button asChild variant="default" size="sm" className="h-7 text-[11px] px-2" title="Agendamento rápido em 4 passos">
+            <Link to="/app/agenda/express">
+              <Clock className="h-3 w-3 mr-1.5" /> Agenda Express
+            </Link>
+          </Button>
           <Button asChild variant="outline" size="sm" className="h-7 text-[11px] px-2" title="Cadastrar horários semanais e gerar slots da agenda">
             <Link to="/app/disponibilidades">
               <Clock className="h-3 w-3 mr-1.5" /> Criar/gerar horários
