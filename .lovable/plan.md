@@ -1,65 +1,70 @@
-## Objetivo
+# Auditoria e Agendamento Express
 
-Antes de pedir dados, o sistema (Nina no WhatsApp + telas internas de cadastro/agendamento) deve **verificar se o paciente já existe**, tratar corretamente **associados** (Cartão Benefícios) e respeitar o **status de importação de base** por unidade.
+## Escopo em 2 frentes
 
-## Unidades (mapeadas no banco)
+### 1. Auditoria (leitura, sem mudar código)
+Rodo verificações reais nas 3 unidades e entrego um **relatório curto** ao final com o que está OK e o que precisa correção:
 
-- **POLICLINICA MENINO JESUS** — 242.311 pacientes → base **importada**
-- **POLICLINICA SAO FRANCISCO DE PAULA** — 79 pacientes → base **ainda não importada**
-- **CLINICA CONSULTA HOJE** — 9 pacientes → base **ainda não importada**
+- **Login/permissões da usuária**: consultar `profiles`, `user_roles`, `clinica_memberships` e listar módulos visíveis por unidade.
+- **Fluxo atual de agendamento**: contar cliques/campos reais em `app.agenda.tsx` e no `PatientSearchInput` hoje, medir tempo de carregamento de horários (query `medico_disponibilidades` + `agendamentos`).
+- **Identificação de associado**: rodar `buscar_paciente_contato()` (função criada na última migration) contra pacientes reais da Menino Jesus com contrato ativo em `contratos_assinatura` e confirmar que retorna `associado=true` + convênio.
+- **Base importada por unidade**: confirmar flag `base_importada` (Menino Jesus=true, SFP=false, Consulta Hoje=false).
 
-Como isso pode mudar, vamos criar uma flag `base_importada` em `clinicas` (default = calculada por contagem, mas configurável manualmente).
+Não vou executar Playwright end-to-end autenticado — nesse projeto a auditoria funcional roda por queries + inspeção de código; sinalizo se algum teste exigir sessão real.
 
-## Regras a implementar
+### 2. Implementação — "Agendamento Express"
+Uma tela nova, focada em recepção de alto volume:
 
-1. **Buscar antes de perguntar**: dado CPF, telefone ou nome, buscar em `pacientes` (dentro do escopo da clínica atual).
-2. **Se encontrado + associado ativo** (existe registro em `contratos_assinatura` com `status = 'ativo'` para o `paciente_id`, dentro da vigência): informar o vínculo, aplicar regras/valores do convênio (não tratar como particular).
-3. **Se não encontrado** e a clínica for **Menino Jesus** (base importada): pedir apenas os campos essenciais para cadastro/agendamento.
-4. **Se não encontrado** e a clínica for **SFP ou Consulta Hoje** (base não importada): informar "Os dados desta unidade ainda não estão disponíveis" e oferecer encaminhamento para atendente humano.
-5. **Só pedir dados completos** (endereço, contato completo etc.) quando houver **intenção clara** de agendamento, cadastro ou atualização — não em consultas informativas.
+**Fluxo (4 cliques no caso feliz):**
+```
+[1] Digitar CPF/telefone/nome (autocomplete instantâneo)
+      → badge "Particular" | "Associado — <convênio>" | "Não encontrado" | "Base não importada"
+[2] Escolher especialidade (chips, sem dropdown)
+[3] Escolher profissional  OU  botão "Próximo horário disponível"
+[4] Escolher horário (grid pré-carregado) → confirma
+```
 
-## Implementação
+**Regras aplicadas no fluxo:**
+- Paciente encontrado → **não abre formulário**, só mostra nome+telefone e segue.
+- Paciente novo → **mini-cadastro**: nome, telefone, CPF (opcional), data nasc. Sem endereço, sem documentos.
+- Associado detectado → aplica regras de `cb_convenio_regras` automaticamente, valor exibido já com desconto, badge verde. Bloqueia cobrança como particular.
+- Unidade com `base_importada=false` e paciente não encontrado → banner amarelo "Base desta unidade ainda não importada" + botão "Cadastrar mesmo assim" + botão "Encaminhar para atendente".
+- Botões de atalho quando paciente já tem histórico:
+  - **"Agendar novamente"** (mesmo médico + mesma especialidade da última consulta)
+  - **"Mesmo médico da última consulta"**
+  - **"Próximo horário disponível"** (varre `medico_disponibilidades` da especialidade)
 
-### 1. Banco (uma migração)
+**Performance:**
+- Horários dos próximos 7 dias pré-carregados em uma única RPC (`get_horarios_disponiveis(clinica_id, especialidade_id, dias)`) já ordenada.
+- Autocomplete de paciente com debounce 200ms + índice em `pacientes(cpf, telefone, nome_normalizado)` se faltar.
+- React Query com `staleTime` alto na lista de especialidades/profissionais (mudam pouco).
 
-- Adicionar coluna `clinicas.base_importada boolean default false`.
-- Setear `true` para Menino Jesus; `false` para as outras duas.
-- Nova função SQL `buscar_paciente_contato(_clinica_id, _cpf, _telefone, _nome)` retornando `{ id, nome, cpf, telefone, associado, convenio_nome, convenio_id }` — usa `contratos_assinatura` para calcular `associado`. `SECURITY DEFINER`, `GRANT EXECUTE` para `authenticated` e `anon` (a webhook do WhatsApp usa admin client, mas mantemos coerente).
+## Arquivos
 
-### 2. Backend Nina — WhatsApp (`src/lib/whatsapp.server.ts`)
+**Migration (`..._agendamento_express.sql`)**
+- RPC `get_horarios_disponiveis(clinica_id uuid, especialidade_id uuid, dias int)` — retorna slots livres já filtrados.
+- RPC `get_ultimo_agendamento_paciente(paciente_id uuid)` — para "Agendar novamente".
+- Índices que faltarem em `pacientes(cpf)`, `pacientes(telefone)`, `agendamentos(paciente_id, data_hora desc)`.
 
-- Nova função `identificarPacientePorMensagem(clinicaId, mensagem, telefoneRemetente)`:
-  - Extrai CPF (regex), telefone (E.164/BR), nome candidato.
-  - Prioridade: telefone do remetente → CPF citado → nome citado.
-  - Chama `buscar_paciente_contato`.
-- Em `gerarRespostaNina`:
-  - Sempre carregar `base_importada` e o resultado da identificação.
-  - Injetar no `systemPrompt` um bloco `CONTEXTO DO REMETENTE:` com:
-    - status "identificado / não identificado"
-    - se identificado + associado: nome do convênio, orientação de aplicar regra de associado (não particular)
-    - se `base_importada = false` e não identificado: instrução para responder "Base ainda não disponível — vou te encaminhar para uma atendente" e não pedir cadastro
-    - Regra: só solicitar dados completos após intenção explícita de agendar/cadastrar/atualizar.
+**Frontend (novos)**
+- `src/routes/_authenticated/app.agenda.express.tsx` — a tela nova, rota `/app/agenda/express`.
+- `src/components/agenda/ExpressPatientStep.tsx`
+- `src/components/agenda/ExpressEspecialidadeStep.tsx`
+- `src/components/agenda/ExpressHorarioStep.tsx`
+- `src/components/agenda/ExpressConfirmar.tsx`
+- `src/lib/agenda-express.functions.ts` — server fns: buscar paciente (reusa `buscar_paciente_contato`), listar especialidades da unidade, buscar horários, criar agendamento, último agendamento.
 
-### 3. UI interna — cadastro/agendamento
+**Frontend (editados)**
+- `src/routes/_authenticated/app.agenda.tsx` — adiciona botão "⚡ Agendamento Express" no topo.
+- Menu lateral — link para a nova rota.
 
-- No `PatientSearchInput` já existe busca por nome/CPF; adicionar:
-  - Badge visual **"Associado — <convênio>"** no resultado quando o paciente tiver contrato ativo (nova consulta leve em `contratos_assinatura`, ou usar a nova RPC).
-- No fluxo "novo paciente" (usado em `agendamentos` e `clientes`):
-  - Antes de mostrar formulário completo, exibir passo curto "Verificar duplicidade" pedindo CPF **ou** telefone **ou** nome.
-  - Se a clínica atual tem `base_importada = false` e a busca não retornar nada, mostrar aviso: *"Base desta unidade ainda não foi importada. Encaminhe para atendente para cadastro manual."* + botão "Cadastrar mesmo assim" (para casos manuais dos operadores).
-  - Se encontrado + associado: preencher automaticamente e aplicar regras de associado no orçamento (integração com `cb-regras`).
+**Não vou tocar (fora de escopo aqui)**
+- Reescrever o `app.agenda.tsx` atual (fica como agenda "completa" para casos avançados).
+- Importar as bases de SFP e Consulta Hoje (operacional).
+- Módulos financeiros, prontuário, enfermagem.
 
-### 4. Onde os componentes vivem
+## Fora do escopo declarado
+- Testes E2E automatizados com login real (Playwright autenticado não está configurado aqui). Entrego os cenários como checklist manual + queries SQL de verificação.
 
-- `supabase/migrations/<timestamp>_paciente_lookup.sql` — coluna + função SQL.
-- `src/lib/whatsapp.server.ts` — helper + integração no prompt.
-- `src/lib/paciente-lookup.functions.ts` (novo) — server fn `buscarPacienteContato` usada pelas telas internas.
-- `src/components/patient-search-input.tsx` — badge "Associado".
-- `src/components/clientes/cliente-form.tsx` — passo prévio de verificação de duplicidade + aviso de base não importada.
-- `src/routes/_authenticated/app.agenda.tsx` (fluxo "novo paciente") — reutilizar o mesmo componente de verificação.
-
-## Fora de escopo (fica para depois)
-
-- Importar de fato as bases de SFP e Consulta Hoje (é operacional, não código).
-- Ajustar a versão interna da Nina (`chatNina`) — as regras são para paciente externo; a Nina interna já responde para equipe.
-- Transferência automática para atendente humano — hoje a Nina só orienta a aguardar; manteremos essa orientação.
+## Confirmações antes de codar
+Só duas para não travar o fluxo:
