@@ -161,8 +161,8 @@ function AgendaExpressPage() {
     setSlots([]);
     const { data, error } = await supabase.rpc("get_horarios_disponiveis", {
       _clinica_id: clinicaId,
-      _especialidade_id: opts.espId ?? especialidadeId,
-      _medico_id: opts.medicoId ?? medicoId,
+      _especialidade_id: (opts.espId ?? especialidadeId) ?? undefined,
+      _medico_id: (opts.medicoId ?? medicoId) ?? undefined,
       _dias: 7,
       _limite: 80,
     });
@@ -211,10 +211,10 @@ function AgendaExpressPage() {
         paciente_id: paciente.id,
         paciente_nome: paciente.nome,
         medico_id: slotSelecionado.medico_id,
-        agenda_id: slotSelecionado.agenda_id,
+        agenda_id: slotSelecionado.agenda_id ?? undefined,
         inicio: slotSelecionado.inicio,
         fim: slotSelecionado.fim,
-        procedimento: ultimo?.procedimento ?? null,
+        procedimento: ultimo?.procedimento ?? undefined,
         tipo_atendimento: tipo,
         status: "agendado",
       });
