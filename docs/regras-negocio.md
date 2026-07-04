@@ -8,6 +8,10 @@
 Permissões, Autenticação). Rodadas 2 a 16 pendentes — ver
 `docs/regras-negocio.CHANGELOG.md`.
 
+> ⚠️ **Achados críticos nesta rodada** — auditoria SQL profunda revelou 6
+> conflitos de segurança/consistência (§5.4 e §5.6). Recomendo tratar antes
+> de qualquer nova feature em Recepção ou Caixa.
+
 ---
 
 ## Sumário
