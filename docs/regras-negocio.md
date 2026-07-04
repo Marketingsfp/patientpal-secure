@@ -518,11 +518,15 @@ Identificar pacientes por foto no check-in / totem.
 ### 5.1 ✅ Regras confirmadas pelo código
 FUN-001..FUN-007, FUN-020..FUN-028, FUN-035, AUT-001, AUT-002, AUT-003, AUT-006.
 
+**R2:** PAC-001, PAC-002, PAC-004..PAC-007, PAC-009..PAC-016, PAC-025, PAC-040..PAC-042, PAC-060..PAC-062, PAC-064, PAC-065, PAC-080, PAC-081, PAC-083, LGP-001..LGP-003.
+
 ### 5.2 🟡 Regras inferidas do histórico de prompts
 AUT-004, FUN-030.
 
 ### 5.3 🟠 Regras incompletas
 FUN-008 (branding sem UI), FUN-010 (base_importada só cliente), FUN-029 (tabelas antigas coexistindo), FUN-035 (gating só de menu).
+
+**R2:** PAC-008 (front não checa 10 dígitos), PAC-021 (portal paciente sem clinica_id), PAC-022 (2 constraints CPF), PAC-023 (bloat índices), PAC-024 (face storage duplicado), PAC-043 (sem merge duplicados), LGP-005 (respondido_por sem FK).
 
 ### 5.4 🔴 Regras conflitantes
 - **FUN-009** — self-insert em `clinica_memberships` (bug de segurança).
@@ -531,6 +535,14 @@ FUN-008 (branding sem UI), FUN-010 (base_importada só cliente), FUN-029 (tabela
 - **FUN-032** — `app_role` × `app_role_global` (dois sistemas paralelos).
 - **FUN-033** — PRESETS duplicados divergentes.
 - **FUN-034** — vazamento de permissão em `modoTodas`.
+- **PAC-003** — nome tem limite diferente no front (120) e no banco (200).
+- **PAC-017** — `paciente_pendencias_cadastro` sem membership check (cross-clínica).
+- **PAC-018** — `buscar_paciente_contato` `TO anon` vaza PII.
+- **PAC-019** — `paciente_cartao_inadimplente` `TO anon` vaza inadimplência.
+- **PAC-020** — triggers `ensure_paciente_*` falham silenciosamente sem telefone.
+- **PAC-063** — face descriptor grava numa tabela e lê da outra (identify quebrado).
+- **PAC-082** — `contrato_dependentes.paciente_id` sem FK.
+- **LGP-004** — INSERT em `lgpd_solicitacoes` sem escopo de clínica.
 
 ### 5.5 ❓ Regras a validar com a clínica
 - Semântica de `unidades` — sub-clínica ou consultório?
@@ -543,6 +555,13 @@ FUN-008 (branding sem UI), FUN-010 (base_importada só cliente), FUN-029 (tabela
 - Enum `app_role` vs. `clinica_memberships.role` — qual manda?
 - Existe guard de rota (não só menu) por módulo?
 - `user_roles` / `app_role_global` — remover ou passar a usar?
+- Como resolver duplicidade sem perder histórico (agendamentos apontam para paciente_id)?
+- `pacientes.prontuarios_anteriores` ainda é preenchida em algum fluxo?
+- `pacientes.legacy_id` — só importação Menino Jesus?
+- `FACE_MATCH_THRESHOLD` — valor e política de fallback?
+- "Dependente conta como paciente para o convênio" — como cobrar?
+- SLA de resposta a `lgpd_solicitacoes` (LGPD exige 15 dias)?
+- `pacientes.consentimento_lgpd_em` × `lgpd_consentimentos` — qual é fonte de verdade?
 
 ### 5.6 🔴 Achados de segurança (tratar antes de novas features)
 
@@ -553,7 +572,16 @@ FUN-008 (branding sem UI), FUN-010 (base_importada só cliente), FUN-029 (tabela
 | FUN-034  | Menu incorreto em modo agregado                                             | Calcular `allowed` como interseção OU exigir clínica única antes de operar em `modoTodas`  |
 | FUN-035  | Rotas diretas ignoram permissão                                             | Adicionar `beforeLoad` gate por módulo em `_authenticated`                                 |
 | FUN-010  | `base_importada` não protege chamadas diretas                               | Reforçar via RLS: policy que bloqueia `SELECT/INSERT` quando `base_importada=false` para não-admin |
+| PAC-017  | `paciente_pendencias_cadastro` vaza pendências cross-clínica                | Adicionar param `_clinica_id` + `is_member` check                                          |
+| PAC-018  | `buscar_paciente_contato` (anon) vaza PII de qualquer clínica               | Revogar `TO anon`; se necessário no totem, exigir token de sessão de check-in ou mascarar CPF |
+| PAC-019  | `paciente_cartao_inadimplente` (anon) vaza inadimplência                    | Revogar `TO anon`; tornar `_clinica_id` obrigatório                                        |
+| PAC-020  | Triggers ensure_* falham silenciosamente sem telefone                       | Relaxar `pacientes_require_telefone_bi` para INSERT vindo dos triggers OU passar a preencher placeholder ao criar |
+| PAC-063  | Facial identify quebrado após migração de storage                           | Fazer `pacientes_face_lista` ler `paciente_biometria`; ou back-fill da coluna              |
+| PAC-082  | Dependentes órfãos                                                          | Adicionar FK `paciente_id → pacientes(id) ON DELETE RESTRICT`                              |
+| LGP-004  | `lgpd_solicitacoes` aceita insert sem escopo de clínica                     | Trocar WITH CHECK por `user_id = auth.uid() AND is_member(auth.uid(), clinica_id)`         |
+| PAC-022  | Duas constraints CPF divergentes                                            | Remover `UNIQUE(clinica_id, cpf)` inline; deixar apenas o index parcial                    |
+| PAC-023  | Bloat de índices em `cpf_digits`                                            | Consolidar em 1 btree + 1 gin trigram; remover os demais                                   |
 
 ---
 
-_Próxima rodada: **R2 — Pacientes** (cadastro, duplicados, dependentes, LGPD, biometria facial)._
+_Próxima rodada: **R3 — Agenda** (principal, Express, disponibilidades, encerramento de expediente, `get_horarios_disponiveis`, `top_procedimentos_agendamento`)._
