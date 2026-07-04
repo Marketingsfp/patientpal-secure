@@ -3695,6 +3695,13 @@ function AgendaPage() {
         </div>
       </div>
 
+      <PatientQuickCompleteSheet
+        pacienteId={form.paciente_id || null}
+        open={quickCompleteOpen}
+        onOpenChange={setQuickCompleteOpen}
+        requireNfse
+      />
+
       <Dialog open={formaPagOpen} onOpenChange={setFormaPagOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
