@@ -248,23 +248,37 @@ export function PatientSearchInput({
                       Pasta {p.numero_pasta}
                     </span>
                   )}
-                  {associadosMap.get(p.id) && (
+                  {p.associado_convenio ? (
                     <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">
-                      Associado — {associadosMap.get(p.id)}
+                      Associado — {p.associado_convenio}
+                    </span>
+                  ) : (
+                    <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                      Particular
                     </span>
                   )}
                   <span className="text-xs text-muted-foreground">
-                    CPF: {p.cpf ?? "—"}
+                    CPF: {formatCPFMasked(p.cpf) ?? "—"}
                   </span>
                   <span className="text-xs text-muted-foreground">
                     Nasc.: {p.data_nascimento
                       ? p.data_nascimento.split("-").reverse().join("/")
                       : "—"}
                   </span>
+                  {p.ultima_consulta && (
+                    <span className="text-xs text-muted-foreground">
+                      Última: {p.ultima_consulta.split("-").reverse().join("/")}
+                    </span>
+                  )}
                 </div>
                 {p.telefone && (
                   <div className="text-xs text-muted-foreground truncate">
-                    {p.telefone}
+                    {formatTelMasked(p.telefone)}
+                  </div>
+                )}
+                {p.cadastro_incompleto && (
+                  <div className="text-[11px] mt-0.5 text-amber-700 dark:text-amber-400">
+                    ⚠ Cadastro incompleto — clique para completar
                   </div>
                 )}
               </div>
@@ -274,4 +288,20 @@ export function PatientSearchInput({
       )}
     </div>
   );
+}
+
+// Máscaras apenas para exibição — os dados são armazenados sem formatação.
+function formatCPFMasked(cpf: string | null | undefined): string | null {
+  if (!cpf) return null;
+  const d = cpf.replace(/\D/g, "");
+  if (d.length !== 11) return cpf;
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+}
+
+function formatTelMasked(tel: string | null | undefined): string {
+  if (!tel) return "";
+  const d = tel.replace(/\D/g, "");
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return tel;
 }
