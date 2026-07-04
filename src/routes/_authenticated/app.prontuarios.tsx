@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SimpleCrud } from "@/components/simple-crud/SimpleCrud";
 import { VoiceInput } from "@/components/voice-input";
 import { Cid10Picker } from "@/components/cid10-picker";
+import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
+import { PacienteNomeCell, cachePacienteNome } from "@/components/paciente-nome";
 
 export const Route = createFileRoute("/_authenticated/app/prontuarios")({
   component: ProntuariosPage,
@@ -31,18 +33,18 @@ const EMPTY: Form = {
 
 function ProntuariosPage() {
   const { clinicaAtual } = useClinica();
-  const [pacientes, setPacientes] = useState<{ id: string; nome: string }[]>([]);
   const [medicos, setMedicos] = useState<{ id: string; nome: string }[]>([]);
+  const [pacienteSel, setPacienteSel] = useState<PatientOption | null>(null);
   useEffect(() => { (async () => {
     if (!clinicaAtual) return;
-    const [p, m] = await Promise.all([
-      supabase.from("pacientes").select("id, nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
-      supabase.from("medicos").select("id, nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
-    ]);
-    setPacientes(p.data ?? []); setMedicos(m.data ?? []);
+    const m = await supabase.from("medicos")
+      .select("id, nome")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("ativo", true)
+      .order("nome");
+    setMedicos(m.data ?? []);
   })(); }, [clinicaAtual?.clinica_id]);
 
-  const pacNome = (id: string) => pacientes.find(p => p.id === id)?.nome ?? "—";
   const medNome = (id: string | null) => id ? (medicos.find(m => m.id === id)?.nome ?? "—") : "—";
 
   return (
@@ -55,7 +57,7 @@ function ProntuariosPage() {
       orderBy={{ column: "data", ascending: false }}
       columns={[
         { key: "data", header: "Data", render: r => new Date(r.data).toLocaleString("pt-BR") },
-        { key: "pac", header: "Paciente", render: r => pacNome(r.paciente_id) },
+        { key: "pac", header: "Paciente", render: r => <PacienteNomeCell id={r.paciente_id} /> },
         { key: "med", header: "Profissional", render: r => medNome(r.medico_id) },
         { key: "queixa", header: "Queixa principal", render: r => <span className="text-sm text-muted-foreground line-clamp-1">{r.queixa_principal ?? "—"}</span> },
       ]}
@@ -77,10 +79,15 @@ function ProntuariosPage() {
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1 col-span-2">
               <Label>Paciente *</Label>
-              <Select value={f.paciente_id} onValueChange={v => set({ ...f, paciente_id: v })}>
-                <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
-                <SelectContent>{pacientes.map(p => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}</SelectContent>
-              </Select>
+              <PatientSearchInput
+                value={pacienteSel && pacienteSel.id === f.paciente_id ? pacienteSel : (f.paciente_id ? { id: f.paciente_id, nome: "", cpf: null, telefone: null, data_nascimento: null, clinica_id: clinicaAtual?.clinica_id ?? "" } : null)}
+                onSelect={(p) => {
+                  setPacienteSel(p);
+                  if (p) cachePacienteNome(p.id, p.nome);
+                  set({ ...f, paciente_id: p?.id ?? "" });
+                }}
+                placeholder="Digite nome, CPF, pasta ou nascimento…"
+              />
             </div>
             <div className="space-y-1">
               <Label>Data</Label>
