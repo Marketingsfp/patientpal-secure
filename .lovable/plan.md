@@ -1,161 +1,219 @@
 
-# Fase 3 — Conversão de Orçamento
+# Fase 3 (revisada) — Conversão item-a-item de orçamentos mistos
 
-Objetivo: transformar um orçamento em **venda direta (balcão)** ou em **agendamento**, marcando `status='convertido'`, sem duplicar cobrança e sem quebrar Agenda/Caixa/Financeiro/NFS-e/Relatórios.
+Regra nova: cada item do orçamento é convertido **individualmente**, para o destino correto (venda, agenda médica, agenda de exame/equipamento, fluxo de laboratório) ou marcado como "não aplicável". O orçamento só vira `convertido` quando **todos** os itens tiverem destino final.
 
 ---
 
 ## Análise dos 4 eixos
 
-**💰 Financeiro**
-- Evita perda: bloqueio de conversão duplicada, exigência de caixa aberto para venda balcão, validação de valores > 0 e desconto ≤ subtotal (regra da Fase 1 herdada).
-- Ganho: registra a venda direto no `fin_atendimentos` (já é o caminho que gera repasse, comissão e alimenta relatórios), sem o operador digitar tudo de novo.
-
-**⏱️ Operacional**
-- Recepção deixa de: abrir novo atendimento → digitar paciente → digitar procedimento → digitar valor → digitar forma de pagamento. Passa a: clicar "Registrar venda" no orçamento e confirmar.
-- Estimativa: economia de ~40 s por venda balcão; ~15 s por agendamento a partir de orçamento (fluxo já existe parcialmente hoje via `/app/orcamentos-agenda`, será só reaproveitado).
-
-**😊 Experiência do paciente**
-- Menos espera na recepção; menos "pode confirmar seu nome de novo?"; recibo/NFS-e podem ser emitidos direto do atendimento criado (fluxo já existente do módulo Financeiro).
-
-**🛡️ Segurança e Auditoria**
-- Toda conversão passa por RPC/`createServerFn` (não por SQL solto no cliente) → validação server-side.
-- `status='convertido'` fica protegido pelo trigger da Fase 2 (só admin/gestor edita).
-- Histórico de conversão fica em `audit_log` (UPDATE do orçamento + INSERT em `fin_atendimentos`/`agendamentos`) e visível na aba Histórico.
+- 💰 **Financeiro**: cada item vira 1 `fin_atendimentos` (mantido) → preserva comissões/repasse/relatórios por procedimento. Bloqueio server-side evita duplicidade.
+- ⏱️ **Operacional**: uma única tela "Converter orçamento" com todos os itens e o destino sugerido para cada um; recepção resolve pacote misto (consulta + MAPA + US + laboratório) em uma passagem, sem trocar de módulo.
+- 😊 **Paciente**: sai da recepção com todos os agendamentos marcados e recibo/venda dos itens de balcão emitidos, sem retornar depois para "marcar o MAPA".
+- 🛡️ **Segurança**: validação por tipo de procedimento (impede MAPA em agenda de consulta, US sem sala, consulta sem médico); toda ação passa por RPC/`createServerFn`; audit da Fase 2 grava cada transição.
 
 ---
 
-## O que fazer (por tópico do usuário)
+## Modelagem
 
-### 1. Converter orçamento em venda (balcão)
-- Novo botão "Registrar venda" no card/linha do orçamento (recepção + admin/gestor).
-- RPC `converter_orcamento_venda(p_orcamento_id, p_caixa_sessao_id)`:
-  - checa `status IN ('aberto','aprovado')` (senão bloqueia);
-  - checa `caixa_sessao_id` pertence à clínica, ao usuário, e está `status='aberta'`;
-  - insere 1 registro em `fin_atendimentos` por item do orçamento (ou 1 consolidado, ver decisão abaixo);
-  - insere movimento em `caixa_movimentos` (mesma forma que uma venda comum já faz);
-  - atualiza `orcamentos.status='convertido'` na mesma transação;
-  - retorna `atendimento_ids[]` para o cliente decidir se abre a tela de recibo/NFS-e.
-- Decisão a confirmar: **1 atendimento por item** (o padrão do módulo, permite comissões diferentes por procedimento) **ou 1 atendimento consolidado**. Proposta: 1 por item (alinhado ao Financeiro; a UX no orçamento já mostra o item, e é assim que Comissões/Repasse esperam).
+### 1. Classificar procedimento por destino
 
-### 2. Converter orçamento em agendamento
-- Já existe fluxo via `/app/orcamentos-agenda` + `agendamento_orcamento_itens`. Vou apenas reaproveitar e:
-  - marcar `orcamentos.status='convertido'` **somente quando todos os itens tiverem sido agendados** (evitar marcar convertido em conversão parcial — hoje o "usados/total" no card já monitora isso).
-  - Alternativa: manter `status='aberto'` até o último item ser agendado, então trigger `AFTER INSERT` em `agendamento_orcamento_itens` fecha o orçamento.
-- Nada muda no fluxo do lado da Agenda; só adiciona o gatilho de fechamento.
+Nova coluna em `procedimentos`:
 
-### 3. Exigir caixa aberto para venda
-- Antes de mostrar o botão "Registrar venda", front consulta hook `useCaixaAtivo(clinicaId, userId)` (já existente ou a criar) que busca `caixa_sessoes WHERE status='aberta' AND user_id=auth.uid()`.
-- Sem sessão → botão desabilitado com tooltip "Abra o caixa em Financeiro → Caixa antes de registrar vendas".
-- Redundância server-side na RPC (validação dupla — nunca confiar só no front).
+```
+tipo_destino text check (tipo_destino in (
+  'consulta',            -- agenda médica
+  'exame_equipamento',   -- MAPA, Holter, US, ECG etc.
+  'laboratorio',         -- coleta/laboratório
+  'procedimento_medico', -- pequenos procedimentos que exigem médico
+  'venda_balcao'         -- itens sem agendamento (produto, kit)
+))
+requer_medico boolean default false
+requer_sala boolean default false          -- sala/equipamento (US, MAPA, Holter)
+tipo_recurso text                          -- 'mapa','holter','us','sala_us_1' etc. (livre)
+```
 
-### 4. Marcar status como CONVERTIDO
-- Somente pela RPC (venda) ou pela trigger de fechamento (agendamento total). Nunca por UPDATE direto.
-- Trigger de bloqueio da Fase 2 já protege alteração posterior.
+Backfill inicial pelo `grupo`/`nome` (heurística), com tela de revisão em Configurações → Procedimentos (fora do escopo desta migration; migration apenas cria as colunas e um backfill best-effort).
 
-### 5. Impedir conversão duplicada
-- Na RPC: `SELECT ... FOR UPDATE` do orçamento + `RAISE EXCEPTION` se `status='convertido'` ou se já existe `fin_atendimentos` vinculado.
-- Nova coluna opcional `fin_atendimentos.orcamento_item_id uuid REFERENCES orcamento_itens(id)` com `UNIQUE` para garantir 1:1 por item.
+### 2. Status do item + status do orçamento
 
-### 6. Preservar histórico
-- Nada extra: a Fase 2 já grava tudo. A RPC roda como o usuário logado, então `audit_log` recebe UPDATE do orçamento (dados_antes com status aberto, dados_depois com convertido) e INSERT de cada atendimento.
-- Aba "Histórico" (Admin/Gestor) mostra a conversão como um evento normal.
+Nova coluna em `orcamento_itens`:
 
-### 7. Tratar orçamento vencido
-- `vencido = created_at + validade_dias*'1 day' < now()`.
-- Comportamento: **permitido converter, mas exige confirmação**: modal "Este orçamento está vencido há X dias. Deseja atualizar valores e converter?" com opção "Reajustar preços agora" ou "Manter valores originais". Não bloquear — bloquear perde venda.
+```
+status_item text default 'pendente' check (status_item in (
+  'pendente','agendado','vendido','nao_aplicavel','cancelado'
+))
+agendamento_id uuid references agendamentos(id) on delete set null
+fin_atendimento_id uuid references fin_atendimentos(id) on delete set null
+status_alterado_por uuid, status_alterado_em timestamptz,
+motivo_nao_aplicavel text
+```
 
-### 8. Tratar orçamento com cadastro incompleto
-- Se `paciente_id IS NULL` (paciente digitado só como texto): antes de converter, obriga vinculação a paciente real (abre `PatientSearchInput` + "Criar novo paciente"). Sem paciente real, `fin_atendimentos.paciente_id` fica NULL, o que quebra relatórios por paciente e emissão de NFS-e.
-- Se `medico_id IS NULL`: aceita apenas para venda balcão de itens que não exigem médico (ex.: laboratório sem médico solicitante já é permitido). Para agendamento, exige médico.
+Ampliar `orcamentos.status` para o enum textual:
 
-### 9. Valores, descontos e formas de pagamento
-- Snapshot: a RPC copia `valor_total`, `desconto`, `forma_pagamento`, `valores_pagamento` do orçamento para o atendimento e para o movimento de caixa **no momento da conversão**. Alterações posteriores no orçamento (bloqueadas para não-admin pela Fase 2) não retro-afetam a venda.
-- Se houver múltiplas formas: gera 1 `caixa_movimentos` por forma (mesma regra já usada em vendas normais).
-- Recalcula `valor_medico`/`valor_clinica` via `procedimento_split_regras` no momento da conversão (mesma função que o módulo Financeiro já usa; **não** copia split "congelado" do orçamento, que não existe).
+```
+'aberto' | 'parcialmente_agendado' | 'convertido' | 'cancelado'
+```
 
-### 10. Impacto por módulo
+(hoje aceita `aberto|aprovado|convertido|cancelado` — `aprovado` vira alias legado; migração converte).
+
+### 3. Trigger de recomputo do status do orçamento
+
+`fn_orcamento_recalcula_status()` roda `AFTER INSERT/UPDATE/DELETE` em `orcamento_itens`:
+
+```
+total       = count(itens)
+resolvidos  = count(itens em ('agendado','vendido','nao_aplicavel','cancelado'))
+com_dest    = count(itens em ('agendado','vendido'))
+
+status =
+  cancelado           se todos itens cancelados
+  convertido          se resolvidos = total e com_dest > 0
+  parcialmente_agendado se com_dest > 0 e resolvidos < total (ou algum nao_aplicavel/cancelado misto)
+  aberto              caso contrário
+```
+
+Somente ADMIN/GESTOR podem marcar `nao_aplicavel`/`cancelado` (checado por `has_role` na RPC dedicada; a trigger da Fase 2 continua bloqueando edição pós-convertido).
+
+### 4. RPCs (SECURITY INVOKER)
+
+- `converter_item_venda(p_item_id, p_caixa_sessao_id)` — só para `tipo_destino='venda_balcao'` ou fallback confirmado; cria `fin_atendimentos` + `caixa_movimentos`; grava `fin_atendimento_id` + `status_item='vendido'`. Exige caixa aberta.
+- `converter_item_agendamento(p_item_id, p_agenda_payload jsonb)` — payload: `{ medico_id?, agenda_id?, enfermagem_recurso_id?, inicio, fim, tipo_atendimento, observacoes }`. Valida por `tipo_destino`:
+  - `consulta` / `procedimento_medico` → exige `medico_id`
+  - `exame_equipamento` → exige `enfermagem_recurso_id` OU `agenda_id` marcada como recurso; bloqueia se `medico_agendas.tipo_recurso` não bater com o do procedimento
+  - `laboratorio` → aceita `agenda_id` de laboratório ou insere direto em fluxo lab (sem agendamento) marcando `agendamento_id=null` + `status_item='agendado'` com flag
+  - `us` → exige `medico_id` E `enfermagem_recurso_id` (sala)
+  - Cria `agendamentos` com `orcamento_id` + novo campo `agendamento.orcamento_item_id` (UNIQUE).
+- `marcar_item_nao_aplicavel(p_item_id, p_motivo)` — restrito a ADMIN/GESTOR; grava motivo + status.
+- `cancelar_item(p_item_id, p_motivo)` — idem.
+
+Todas gravam em `audit_log` via trigger da Fase 2. Todas usam `SELECT ... FOR UPDATE` do item + UNIQUE em `orcamento_itens.fin_atendimento_id` e em `orcamento_itens.agendamento_id` para evitar duplicidade.
+
+### 5. Enriquecer `medico_agendas` para recursos
+
+`medico_agendas` hoje é usada como calendário do médico. Adicionar:
+
+```
+tipo_recurso text        -- 'consulta','mapa','holter','us','ecg','laboratorio', null = consulta
+sala text                -- descritivo
+```
+
+Assim uma "agenda do MAPA" existe sem médico titular, e o filtro por `tipo_recurso` casa com `procedimentos.tipo_recurso`. (`enfermagem_recursos` continua sendo o cadastro de equipamentos usado pelo módulo enfermagem — pode conviver.)
+
+### 6. UI: tela "Converter orçamento"
+
+Rota: mesma `app.orcamentos` abre um dialog fullscreen `ConversaoOrcamentoDialog`.
+
+Layout: tabela com uma linha por item. Colunas:
+
+```
+Item | Tipo | Destino sugerido | Ação (Vender / Agendar / Não aplicável) | Status
+```
+
+Ao clicar "Agendar" abre um subformulário contextual conforme `tipo_destino`:
+- consulta → seletor de médico + `medico_agendas` compatíveis + slot;
+- exame_equipamento → seletor de recurso/agenda com `tipo_recurso` filtrado + slot;
+- us → médico + sala + slot;
+- laboratorio → destino "lab" (sem slot) ou agenda de coleta;
+- venda_balcao → "Registrar venda" (exige caixa aberto).
+
+Feedback em tempo real: quantos itens resolvidos / total; o botão "Finalizar" só marca `convertido` implicitamente via trigger — não há update manual de status.
+
+Botão "Marcar não aplicável" só aparece para ADMIN/GESTOR (`usePermissoes`).
+
+Sem caixa aberto: ações de venda ficam desabilitadas com tooltip.
+
+### 7. Bloqueios server-side (defesa em profundidade)
+
+Trigger `fn_agendamento_valida_destino()` `BEFORE INSERT` em `agendamentos`:
+- se `orcamento_item_id` presente, carrega `procedimentos.tipo_destino` do item e rejeita combinações inválidas (MAPA sem recurso, consulta sem médico, US sem sala, tipo do recurso ≠ tipo do procedimento).
+
+Mesma validação replicada dentro da RPC (mensagem PT-BR amigável); trigger é rede de segurança para inserts diretos (importações, scripts).
+
+---
+
+## Impacto por módulo
 
 | Módulo | Impacto | Risco |
 |---|---|---|
-| **Agenda** | Nenhum quebra; trigger nova em `agendamento_orcamento_itens` só marca orçamento como convertido quando 100% dos itens forem agendados | 🟢 Baixo |
-| **Caixa** | Passa a receber movimentos originados de conversão; mesmo formato dos movimentos manuais | 🟢 Baixo |
-| **Financeiro** | Recebe novos `fin_atendimentos` — mesmos campos que o fluxo manual, nada muda para relatórios/repasse/comissão | 🟢 Baixo |
-| **NFS-e** | Nenhum acoplamento novo — segue emitindo a partir de `fin_atendimentos`, como já faz | 🟢 Baixo |
-| **Relatórios / BI** | Ganha volume (venda balcão que hoje não é registrada) → gráficos podem subir; comunicar antes | 🟡 Médio (métrica, não bug) |
-| **Orçamentos** | Trigger nova de fechamento automático + coluna `fin_atendimentos.orcamento_item_id` | 🟢 Baixo |
+| Orçamentos | Novos campos + tela nova + status ampliado | 🟡 Médio (contrato do status muda) |
+| Agenda | Nova coluna `orcamento_item_id`, trigger de validação, `medico_agendas.tipo_recurso` | 🟡 Médio |
+| Caixa | Igual à Fase 3 anterior | 🟢 Baixo |
+| Financeiro | Igual à Fase 3 anterior; ganha `fin_atendimentos.orcamento_item_id` | 🟢 Baixo |
+| Enfermagem/Recursos | Passa a receber agendamentos de MAPA/Holter/US originados do orçamento | 🟡 Médio (validar fluxo existente) |
+| NFS-e / Relatórios | Nenhum | 🟢 Baixo |
+
+Legado: qualquer código que filtra `orcamentos.status = 'aprovado'` precisa aceitar `parcialmente_agendado`. Vou grepar e ajustar como parte da migration (função utilitária no front).
 
 ---
 
-## Riscos e mitigação
+## Riscos e mitigações
 
 | Risco | Mitigação |
 |---|---|
-| Conversão duplicada por double-click | `SELECT ... FOR UPDATE` + UNIQUE em `fin_atendimentos.orcamento_item_id` |
-| Perda financeira: converter sem caixa aberto | Validação dupla (front + RPC) |
-| Venda balcão sem paciente cadastrado quebra NFS-e | Obriga vinculação antes de converter |
-| Orçamento vencido convertido com preço defasado | Modal de confirmação + opção de reajustar |
-| `atualizado_por` da Fase 2 gravado como `auth.uid()` da RPC parece "conversão automática" | RPC SECURITY INVOKER (roda como usuário real); auditoria mostra o operador correto |
-| Alteração de fluxo pode quebrar Financeiro | Não altera nenhum código do módulo Financeiro — apenas insere nas tabelas dele com o mesmo shape do fluxo manual |
+| Item classificado errado (MAPA marcado como consulta no cadastro) | Backfill best-effort + revisão obrigatória em Configurações antes de a tela aceitar aquela categoria; RPC rejeita `tipo_destino IS NULL` com "classifique este procedimento antes de converter" |
+| Duas recepcionistas convertendo o mesmo item | `SELECT ... FOR UPDATE` + UNIQUE em `agendamento_id`/`fin_atendimento_id` do item |
+| Recepção esquece de agendar 1 item e marca todo mundo como não aplicável | Só ADMIN/GESTOR marca "não aplicável"; audit_log guarda motivo + autor |
+| Status `parcialmente_agendado` quebra relatórios/filtros existentes | Migration inclui alias no front (`aprovado` legado → tratado como aberto) e busca por todos os pontos de filtro |
+| Trigger de validação bloqueia agendamento manual legítimo | Só valida quando `orcamento_item_id IS NOT NULL`; agenda manual sem orçamento passa igual |
 
 ---
 
-## Testes (mesmo padrão da Fase 2)
+## Testes (padrão Fase 2 — bloco transacional, prefixo `[TESTE-FASE3-MIX]`, cleanup + count antes/depois)
 
-Bloco `DO` transacional com dados prefixados `[TESTE-FASE3]` e cleanup no final. Comparação de contagens antes/depois — falha ⇒ rollback.
+1. Criar orçamento com 4 itens: consulta, MAPA, ultrassom, produto balcão.
+2. Converter só a consulta → orçamento vira `parcialmente_agendado`.
+3. Tentar agendar MAPA em agenda de consulta → rejeita.
+4. Agendar MAPA em recurso correto → ok, ainda `parcialmente_agendado`.
+5. Agendar US sem sala → rejeita; com sala → ok.
+6. Vender item balcão sem caixa aberto → rejeita; com caixa → ok.
+7. Após todos resolvidos → orçamento vira `convertido` automaticamente pela trigger.
+8. Recepção tenta marcar item como "não aplicável" → rejeita; admin marca → ok e recomputa status.
+9. Tentar editar orçamento convertido como recepção → bloqueio da Fase 2 continua ativo, gravado em audit.
+10. Testar orçamento vencido (mesma regra da versão anterior: confirmação, não bloqueio).
+11. Cleanup e comparação de contagens em todas as tabelas afetadas.
 
-1. Criar orçamento de teste + item.
-2. Tentar converter sem caixa aberto → deve bloquear.
-3. Abrir sessão de caixa de teste.
-4. Converter → verificar: `orcamentos.status='convertido'`, `fin_atendimentos` novo, `caixa_movimentos` novo, `audit_log` com UPDATE.
-5. Tentar converter de novo o mesmo orçamento → deve bloquear (status + UNIQUE).
-6. Criar 2º orçamento de teste, converter em agendamento (via fluxo existente).
-7. Verificar trigger de fechamento: só marca convertido quando último item é agendado.
-8. Testar orçamento vencido: RPC aceita, retorna aviso.
-9. Testar orçamento sem `paciente_id`: RPC rejeita com mensagem clara.
-10. Cleanup: deleta `fin_atendimentos`, `caixa_movimentos`, `caixa_sessoes`, `agendamento_orcamento_itens`, `agendamentos`, `orcamentos` e `audit_log` de teste; compara contagens.
-
-**Nenhum orçamento real, atendimento real ou movimento de caixa real será tocado** — todos os inserts são prefixados/tageados e o cleanup é validado por contagem antes de commitar.
+Nenhum dado real é tocado.
 
 ---
 
 ## Rollback
 
-Migration única e reversível:
-
 ```sql
--- Rollback
-DROP FUNCTION IF EXISTS public.converter_orcamento_venda(uuid, uuid);
-DROP TRIGGER IF EXISTS trg_orcamento_fechamento_por_agendamento ON public.agendamento_orcamento_itens;
-DROP FUNCTION IF EXISTS public.fn_orcamento_fechamento_por_agendamento();
-ALTER TABLE public.fin_atendimentos DROP COLUMN IF EXISTS orcamento_item_id;
+DROP TRIGGER IF EXISTS trg_orcamento_recalc_status ON public.orcamento_itens;
+DROP FUNCTION IF EXISTS public.fn_orcamento_recalcula_status();
+DROP TRIGGER IF EXISTS trg_agendamento_valida_destino ON public.agendamentos;
+DROP FUNCTION IF EXISTS public.fn_agendamento_valida_destino();
+DROP FUNCTION IF EXISTS public.converter_item_venda(uuid,uuid);
+DROP FUNCTION IF EXISTS public.converter_item_agendamento(uuid,jsonb);
+DROP FUNCTION IF EXISTS public.marcar_item_nao_aplicavel(uuid,text);
+DROP FUNCTION IF EXISTS public.cancelar_item(uuid,text);
+ALTER TABLE public.agendamentos DROP COLUMN IF EXISTS orcamento_item_id;
+ALTER TABLE public.medico_agendas DROP COLUMN IF EXISTS tipo_recurso, DROP COLUMN IF EXISTS sala;
+ALTER TABLE public.orcamento_itens
+  DROP COLUMN IF EXISTS status_item,
+  DROP COLUMN IF EXISTS agendamento_id,
+  DROP COLUMN IF EXISTS fin_atendimento_id,
+  DROP COLUMN IF EXISTS status_alterado_por,
+  DROP COLUMN IF EXISTS status_alterado_em,
+  DROP COLUMN IF EXISTS motivo_nao_aplicavel;
+ALTER TABLE public.procedimentos
+  DROP COLUMN IF EXISTS tipo_destino,
+  DROP COLUMN IF EXISTS requer_medico,
+  DROP COLUMN IF EXISTS requer_sala,
+  DROP COLUMN IF EXISTS tipo_recurso;
+-- status do orçamento volta ao check original
 ```
 
-Front-end: rollback via revert do commit (botões novos + hooks; sem mudança em código existente).
-
----
-
-## Detalhes técnicos (referência)
-
-- **Migration:**
-  - `ALTER TABLE fin_atendimentos ADD COLUMN orcamento_item_id uuid REFERENCES orcamento_itens(id) ON DELETE SET NULL`
-  - `CREATE UNIQUE INDEX ... ON fin_atendimentos(orcamento_item_id) WHERE orcamento_item_id IS NOT NULL`
-  - `CREATE FUNCTION converter_orcamento_venda(p_orcamento_id uuid, p_caixa_sessao_id uuid) RETURNS TABLE(atendimento_id uuid) SECURITY INVOKER`
-  - `CREATE FUNCTION fn_orcamento_fechamento_por_agendamento() + trigger AFTER INSERT em agendamento_orcamento_itens`
-- **Server function:** `src/lib/orcamento-conversao.functions.ts` com `createServerFn` chamando a RPC via `requireSupabaseAuth` (respeita RLS do usuário).
-- **UI:**
-  - Botão "Registrar venda" na linha do orçamento (Recepção+); desabilitado sem caixa aberto.
-  - Modal com resumo: paciente, itens, forma de pagamento, valor final, sessão de caixa que receberá.
-  - Após sucesso: toast + navegação opcional para `/app/financeiro/atendimentos?ids=...`.
-- **Hook:** `useCaixaAtivo` já é reaproveitado (verificar; senão, criar em `src/hooks/`).
-- **Sem mudança** em: `app.caixa.tsx`, `app.financeiro.*`, `app.agenda.express.tsx`, NFS-e, comissões, splits.
+Front-end: revert do commit da tela `ConversaoOrcamentoDialog`.
 
 ---
 
 ## Decisões que preciso confirmar antes de codar
 
-1. **1 `fin_atendimentos` por item do orçamento** (proposto) ou 1 consolidado? Proposta: 1 por item (alinhado a Financeiro/Comissões).
-2. **Orçamento vencido:** permitir conversão com confirmação (proposto) ou bloquear?
-3. **Conversão parcial em agendamento:** marcar convertido só quando 100% dos itens estiverem agendados (proposto)?
+1. **Laboratório sem agenda**: aceita marcar item como `agendado` apontando para "fluxo lab" (sem `agendamentos` real) — ou você prefere que sempre gere um `agendamentos` mesmo para coleta? Proposta: sem agendamento real, só flag + `fin_atendimentos` gerado no momento da coleta (fluxo lab existente).
+2. **Backfill de `tipo_destino`**: rodo heurística por nome (MAPA/HOLTER/US/LAB/CONSULTA) e deixo o resto como `NULL` obrigando classificação manual — ou marco tudo como `consulta` para não travar? Proposta: heurística + NULL para o resto (força qualidade de dado).
+3. **`medico_agendas.tipo_recurso`**: crio novo cadastro de "agenda de equipamento" reaproveitando `medico_agendas` (com `medico_id` NULL permitido) ou uso `enfermagem_recursos` como fonte única de recursos? Proposta: reaproveitar `medico_agendas` com `medico_id` nullable + `tipo_recurso`, mantendo `enfermagem_recursos` só para o módulo enfermagem, para não fragmentar cadastro de agenda.
+4. **Status legado `aprovado`**: converter para `aberto` na migration (proposto) ou preservar como alias?
 
-Aprovando estas 3 decisões + o plano, abro a migration e sigo o mesmo protocolo da Fase 2 (mostrar SQL → aprovação → teste transacional → relatório antes/depois).
+Aprovando o plano + as 4 decisões, abro a migration seguindo o mesmo protocolo da Fase 2 (SQL para revisão → aprovação → teste transacional → relatório antes/depois).
