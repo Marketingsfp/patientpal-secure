@@ -510,7 +510,7 @@ function ProcedimentosPage() {
       for (const c of convenios) {
         if (formConvManual[c.id]) continue;
         const regrasDoConv = regras.filter(r => r.convenio_id === c.id);
-        const r = findRegra(regrasDoConv, espId, form.tipo);
+        const r = findRegra(regrasDoConv, espId, form.tipo, editing?.id ?? null);
         const calc = computeValor(r, baseDin, baseOut);
         if (calc) {
           next[c.id] = { dinheiro: calc.dinheiro.toFixed(2), outros: calc.outros.toFixed(2) };
@@ -583,7 +583,7 @@ function ProcedimentosPage() {
     const espId = p.grupo
       ? (especialidades.find(e => especialidadeKey(e.nome) === especialidadeKey(p.grupo))?.id ?? null)
       : null;
-    const regra = findRegra(regras.filter(r => r.convenio_id === c.id), espId, p.tipo);
+    const regra = findRegra(regras.filter(r => r.convenio_id === c.id), espId, p.tipo, p.id);
     const calculado = computeValor(
       regra,
       Number(p.valor_dinheiro ?? p.valor_dinheiro_pix ?? p.valor_padrao ?? 0),
