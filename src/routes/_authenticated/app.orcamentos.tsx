@@ -862,7 +862,19 @@ function NovoOrcamentoDialog({
                 </p>
               )}
             </div>
-            <div className="space-y-1"><Label>Validade (dias)</Label><Input type="number" min={1} value={validade} onChange={(e) => setValidade(Number(e.target.value) || 30)} /></div>
+            <div className="space-y-1">
+              <Label>Validade (dias)</Label>
+              <Input
+                type="number"
+                min={1}
+                step={1}
+                value={validade}
+                onChange={(e) => {
+                  const n = Math.floor(Number(e.target.value));
+                  setValidade(Number.isFinite(n) && n >= 1 ? n : 1);
+                }}
+              />
+            </div>
           </div>
 
           <div className="space-y-2 border-t pt-3">
