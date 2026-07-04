@@ -343,6 +343,174 @@ RLS em `profiles`: 6 policies (detalhamento em R16).
 
 ---
 
+## 4bis. Fichas de módulo — Rodada 2 (Pacientes)
+
+### 4.4 Módulo: Pacientes
+
+**Prefixo CSV:** `PAC` · **Fontes:** tabela `pacientes` (33 col + geradas), `src/components/clientes/cliente-form.tsx`, `src/routes/_authenticated/app.clientes.*.tsx`, RPCs `buscar_pacientes_global`, `buscar_pacientes_agenda`, `buscar_pacientes`, `buscar_paciente_contato`, `paciente_resumo_recepcao`, `paciente_pendencias_cadastro`, `get_ultimo_agendamento_paciente`, `pendencias_paciente`, `paciente_cartao_inadimplente`.
+
+#### Objetivo
+Cadastrar e manter a base de pacientes de cada clínica, com dedup por CPF e por telefone, código de prontuário automático, integração com convênio (cartão benefícios), endereço para NFS-e e biometria facial.
+
+#### Usuários envolvidos
+Recepção (`write`), Caixa (`read`), Médico (`read`), Enfermagem (`read`), Gestor (`write`), Financeiro (`read`).
+
+#### Telas relacionadas
+- `/app/clientes` — lista + criação.
+- `/app/clientes/$pacienteId/editar` — edição completa (form + convênio + atendimentos + cartões).
+- `PatientSearchInput` — busca unificada dentro da Agenda/Express/Caixa.
+- `PatientQuickCompleteSheet` — completar dados obrigatórios sem sair da tela ativa.
+- `/paciente/perfil` — portal do próprio paciente (self-service).
+- `/totem`, `/checkin/$token` — busca pública (RPC `anon`).
+
+#### Tabelas
+`pacientes` (33 col), `paciente_biometria`, `contrato_dependentes`, `contratos_assinatura`, `agendamentos`, `fin_lancamentos`, `contrato_mensalidades`, `agendamento_orcamento_itens`.
+
+#### Campos importantes
+- `cpf` + geração `cpf_digits` (regex `\D`→'', STORED).
+- `codigo_prontuario` — auto (`trg_pacientes_set_codigo_prontuario`), 5 dígitos zero-padded, único por clínica.
+- `nome` — armazenado UPPERCASE (`uc_pacientes_nome`), CHECK 2..200.
+- `telefone` — obrigatório em novos cadastros (`pacientes_require_telefone_bi`, ≥10 dígitos), com bypass legado quando OLD também era vazio.
+- `sexo` — enum textual: masculino | feminino | outro | nao_informar (default).
+- `face_descriptor` (legado, na tabela) × `paciente_biometria.descriptor` (jsonb, novo).
+- Consentimento LGPD: `consentimento_lgpd_em` + tabela `lgpd_consentimentos`.
+- Responsável: campos `responsavel_*` (nome, cpf, telefone, parentesco).
+
+#### Fluxo principal
+1. **Buscar** via `PatientSearchInput` → RPC `buscar_pacientes_global` (debounce 150ms, cache LRU 50).
+2. Se não achar → **Novo cadastro** (dialog com `ClienteForm`).
+3. Trigger insere `codigo_prontuario`, uppercase no nome, valida telefone.
+4. `paciente_resumo_recepcao` chamado ao selecionar um paciente na Agenda → mostra convênio, última consulta, pendências, faltantes para NFS-e.
+5. Se `cadastro_incompleto` for true → botão "Completar cadastro" abre `PatientQuickCompleteSheet`.
+
+#### Regras
+- `PAC-001` ✅ CPF é **único por clínica** — index parcial `idx_pacientes_clinica_cpf_unique (clinica_id, cpf) WHERE cpf IS NOT NULL AND cpf <> ''` (migration 20260702200421). CPF nulo/vazio é permitido em duplicidade.
+- `PAC-002` ✅ Nome sempre em UPPERCASE — trigger `uc_pacientes_nome`.
+- `PAC-003` 🔴 Nome tem **duas regras conflitantes de tamanho**: front-end permite até 120 (`cliente-form.tsx:703`); DB permite até 200 (`pacientes_nome_chk`). Chamada direta API aceita nome de 121-200.
+- `PAC-004` ✅ Nome exige ao menos uma letra (`\p{L}`), rejeita `<>` — `cliente-form.tsx:704-707`.
+- `PAC-005` ✅ Data nascimento entre 1900 e hoje, no máx 120 anos — `cliente-form.tsx:709-717`.
+- `PAC-006` ✅ E-mail validado por regex JS (sem tooltip HTML5) — `cliente-form.tsx:720`.
+- `PAC-007` ✅ Telefone é **obrigatório** em novo cadastro (≥10 dígitos) — trigger `pacientes_require_telefone_bi`.
+- `PAC-008` 🟠 Telefone é obrigatório no back mas o form apenas checa truthy — cadastros com telefone < 10 dígitos falham só quando o INSERT chega ao Postgres (mensagem de erro pouco amigável).
+- `PAC-009` ✅ CPF validado pelo algoritmo da Receita Federal (`src/lib/cpf.ts`) antes do submit.
+- `PAC-010` ✅ CPF armazenado só como dígitos (`somenteDigitos(form.cpf)` no submit + `cpf_digits` gerada).
+- `PAC-011` ✅ `codigo_prontuario` é gerado automaticamente por clínica com advisory lock (5 dígitos, único, sequencial).
+- `PAC-012` ✅ Bloco "responsável" é sugerido quando idade < 18 ou ≥ 70 (`cliente-form.tsx:685`).
+- `PAC-013` ✅ Foto vai em bucket `pacientes-fotos` no path `{clinicaId}/{pacienteId}.{ext}`.
+- `PAC-014` ✅ RPC `buscar_pacientes_global` retorna `match_score` (CPF exato=100, prontuário=95, código antigo=90, pasta=88, telefone=85, nascimento=82, dia/mês=78, nome prefix=60, contém=40, CPF parcial=20) e `cadastro_incompleto` (telefone OR cpf OR nascimento faltando).
+- `PAC-015` ✅ RPC `buscar_pacientes_global` valida `auth.uid()` + membership; filtra `_clinica_ids` para os permitidos.
+- `PAC-016` ✅ RPC `paciente_pendencias_cadastro` checa: telefone ≥10, CPF=11, nascimento, endereço completo (cep 8, logradouro, número, bairro, cidade, estado), email. `nfse_ok` = todos true.
+- `PAC-017` 🔴 **BUG segurança** — `paciente_pendencias_cadastro` **não recebe `clinica_id` nem checa membership**. Qualquer autenticado que saiba o UUID consulta pendências de qualquer clínica.
+- `PAC-018` 🔴 **BUG segurança** — `buscar_paciente_contato` é `GRANT ... TO anon` e retorna PII (nome/CPF/telefone/nascimento + convênio) sem `auth.uid()`. Sem rate-limit no banco. (Usado no totem público — precisa mascaramento).
+- `PAC-019` 🔴 **BUG segurança** — `paciente_cartao_inadimplente` também `TO anon` e sem auth check; `_clinica_id` é opcional, permitindo consulta cross-clínica de inadimplência financeira.
+- `PAC-020` 🔴 **Triggers `ensure_paciente_*` (membro/médico/funcionário) inserem paciente sem telefone**, mas o trigger `pacientes_require_telefone_bi` valida INSERT sempre — o `INSERT` **falha silenciosamente** quando o registro-origem não tem telefone. Não vi UI que reporte esse erro.
+- `PAC-021` 🟠 `/paciente/perfil` faz `.ilike("email", session.email)` **sem `clinica_id`** e depois `.update()`. RLS bloqueia (paciente não é membro), mas UI não trata o erro → paciente "salva" e nada acontece.
+- `PAC-022` 🟠 Constraint `UNIQUE(clinica_id, cpf)` inline coexiste com o index parcial → **duas constraints** sobre CPF, mensagens de erro diferentes conforme a que dispara.
+- `PAC-023` 🟠 Bloat de índices: >5 índices redundantes sobre `cpf_digits` (write amplification, ganho de leitura marginal).
+- `PAC-024` 🟠 `pacientes.face_descriptor` (coluna) é legado — writes vão para `paciente_biometria` (`cliente-form.tsx:657`), mas `pacientes_face_lista` ainda lê a coluna. Novo cadastro biométrico **não** é encontrado por facial identify.
+- `PAC-025` ✅ RPC `buscar_pacientes` (usada em `/app/clientes` list) retorna `SETOF pacientes` — expõe todas as colunas, incluindo `face_descriptor`, `cpf_digits`, `legacy_id` (não é vazamento, só ruído).
+- `PAC-026` ❓ Coluna `prontuarios_anteriores` (texto livre) nunca é exibida na UI nem consultada por RPC. **PRECISA VALIDAR** se ainda é preenchida em algum fluxo (import legado?).
+- `PAC-027` ❓ Coluna `legacy_id` + index `idx_pacientes_legacy_id` — usada só na importação Menino Jesus? **PRECISA VALIDAR**.
+
+#### Validações
+Front (`cliente-form.tsx`): nome, telefone (truthy), nascimento, email regex, CPF válido, CPF duplicado (pré-check race-suscetível).
+Banco: CHECK (nome 2..200, cpf 11..14, telefone ≤30, sexo enum), triggers (telefone ≥10, uppercase nome, código prontuário), UNIQUE (cpf por clínica, codigo_prontuario por clínica).
+
+#### Status possíveis
+`ativo` ∈ {true, false} (soft-delete).
+
+#### Permissões
+RLS: SELECT/INSERT/UPDATE = `is_member`; DELETE = `can_manage_clinica`. Front-end filtra pelo módulo `clientes` (preset recepção/gestor tem write; caixa/médico/enfermagem tem read).
+
+#### Exceções
+- Trigger de telefone tem **bypass legado**: UPDATE que já vinha com telefone vazio passa (import de dados antigos sem quebrar).
+- Se CPF duplicado for detectado pelo pré-check, form mostra mensagem e não envia; se escapar pela race, o Postgres retorna violação de índice único.
+
+#### Integrações
+- **Agenda / Express** — busca via `buscar_pacientes_global`, resumo via `paciente_resumo_recepcao`.
+- **Caixa** — `buscar_paciente_contato` (anon, público).
+- **NFS-e** — `paciente_pendencias_cadastro.nfse_ok` bloqueia emissão (validar em R7).
+- **Cartão Benefícios** — `paciente_cartao_inadimplente`, `contratos_assinatura` (`associado` badge).
+- **Prontuário / Anamnese** — usa `paciente_id`.
+- **Autoatendimento / Totem** — depende das RPCs `anon`.
+
+#### Pontos incompletos / confusos
+- 🔴 Três RPCs com vazamento de dados (PAC-017/018/019).
+- 🔴 Triggers `ensure_paciente_*` quebradas (PAC-020).
+- 🟠 Face descriptor com dois storages divergentes (PAC-024).
+- 🟠 Duplicate CPF constraints (PAC-022).
+- 🟠 Portal do paciente sem clinica_id (PAC-021).
+- ❓ Rotina `_mj_apply_batch` ainda `GRANT ... TO authenticated` — qualquer autenticado pode invocar rotina de importação Menino Jesus (ver R16).
+
+---
+
+### 4.5 Módulo: Duplicados de pacientes
+
+**Prefixo CSV:** `PAC` · **Fontes:** `/app/clientes/duplicados`, RPC `listar_duplicados_pacientes`, view `v_pacientes_duplicados_suspeitos`.
+
+#### Objetivo
+Detectar cadastros suspeitos de duplicação para revisão manual do gestor.
+
+#### Fluxo
+1. Rota `/app/clientes/duplicados` chama `listar_duplicados_pacientes(clinicaIds, tipo, 200)`.
+2. Retorna grupos por chave (cpf | telefone | nome+dn) com array de `ids` e detalhes JSON.
+3. Gestor **resolve manualmente** — não há botão de merge automático.
+
+#### Regras
+- `PAC-040` ✅ Tipos de detecção: `cpf`, `telefone`, `nome_dn` (nome + data nascimento).
+- `PAC-041` ✅ Limite máx 1000; default 200.
+- `PAC-042` ✅ Valida membership em cada `clinica_id` do array.
+- `PAC-043` 🟠 **Sem merge automático nem UI de resolução** — só listagem. Resolução requer edição/desativação manual.
+- `PAC-044` ❓ Como resolver duplicidade sem perder histórico (agendamentos, prontuários apontam para paciente_id)? **PRECISA VALIDAR** o procedimento operacional.
+
+---
+
+### 4.6 Módulo: Biometria facial de pacientes
+
+**Prefixo CSV:** `PAC` · **Fontes:** tabela `paciente_biometria`, coluna `pacientes.face_descriptor`, `src/components/face/*`, RPC `pacientes_face_lista`.
+
+#### Objetivo
+Identificar pacientes por foto no check-in / totem.
+
+#### Regras
+- `PAC-060` ✅ Descriptor de 128 floats (face-api.js).
+- `PAC-061` ✅ `paciente_biometria` guarda `descriptor jsonb`, `consentimento_em` obrigatório, `revogado_em` (soft-delete).
+- `PAC-062` ✅ RLS: SELECT/INSERT/UPDATE = is_member; DELETE = can_manage_clinica.
+- `PAC-063` 🔴 **Divergência de storage**: `FaceCaptureDialog` grava em `paciente_biometria`, mas `pacientes_face_lista` (usado por `FaceIdentifyDialog`) **lê a coluna legada** `pacientes.face_descriptor`. Novos cadastros biométricos **não são reconhecidos**.
+- `PAC-064` ✅ `pacientes_face_lista` foi revogada de `anon` (`20260518031606`) — só `authenticated`.
+- `PAC-065` ✅ `FaceIdentifyDialog`: distância euclidiana, 10 tentativas @ 400ms.
+- `PAC-066` ❓ `FACE_MATCH_THRESHOLD` — valor exato e política de "não reconheceu" (fallback para busca por CPF?) **PRECISA VALIDAR**.
+
+---
+
+### 4.7 Módulo: Dependentes de contrato
+
+**Prefixo CSV:** `PAC` · **Fonte:** tabela `contrato_dependentes` (usada por Cartão Benefícios).
+
+#### Regras
+- `PAC-080` ✅ Um `contrato_id` (FK cascade) tem N dependentes.
+- `PAC-081` ✅ Campos: `paciente_id` (uuid), `paciente_nome` (denormalizado), `parentesco`, `tipo` (default 'dependente'), `incluido_em`, `excluido_em`, `ativo`.
+- `PAC-082` 🔴 **`paciente_id` NÃO tem FK** para `pacientes.id` — dependente pode apontar para paciente inexistente/deletado (registro órfão).
+- `PAC-083` ✅ RLS via subquery em `contratos_assinatura.clinica_id`.
+- `PAC-084` ❓ Regra "dependente conta como paciente para efeito de convênio" — **PRECISA VALIDAR** em R8.
+
+---
+
+### 4.8 Módulo: LGPD
+
+**Prefixo CSV:** `LGP` · **Fontes:** `lgpd_consentimentos`, `lgpd_solicitacoes`, `/app/lgpd`.
+
+#### Regras
+- `LGP-001` ✅ `lgpd_consentimentos`: `tipo`, `versao` (default 1.0), `aceito` (default true), `ip`, `user_agent`. Vincula por `user_id` (staff) OU `paciente_id`.
+- `LGP-002` ✅ RLS consentimentos: SELECT = próprio user_id OR clinic manager; INSERT = próprio user_id OR clinic member.
+- `LGP-003` ✅ `lgpd_solicitacoes` (`tipo`, `descricao`, `status` default 'pendente', `resposta`, `respondido_em`, `respondido_por`).
+- `LGP-004` 🔴 `lgpd_solicitacoes` INSERT policy é **`WITH CHECK (user_id = auth.uid() OR auth.uid() IS NOT NULL)`** — a segunda cláusula torna a policy equivalente a "qualquer autenticado", sem escopo de clínica.
+- `LGP-005` 🟠 `respondido_por` não tem FK para `auth.users` — pode apontar para user inexistente.
+- `LGP-006` ❓ Prazos/SLA de resposta a solicitações — **PRECISA VALIDAR** (LGPD exige 15 dias).
+- `LGP-007` ❓ `pacientes.consentimento_lgpd_em` no cadastro versus tabela `lgpd_consentimentos` — dois lugares para o mesmo dado. **PRECISA VALIDAR** qual é fonte de verdade.
+
+---
+
 ## 5. Seções de fechamento
 
 > Cada rodada acrescenta itens aqui. Nesta versão, apenas Rodada 1.
