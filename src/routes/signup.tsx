@@ -99,7 +99,7 @@ function SignupPage() {
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <Activity className="h-5 w-5" />
             </div>
-            <span className="text-xl font-semibold">ClinicaOS</span>
+            <span className="text-xl font-semibold">Clinica total</span>
           </Link>
           <div className="rounded-2xl border border-border/70 bg-card p-8 shadow-xl shadow-primary/5">
             <div className="mb-6">
