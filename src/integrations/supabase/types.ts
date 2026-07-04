@@ -4822,6 +4822,51 @@ export type Database = {
           },
         ]
       }
+      medico_expediente_encerramento: {
+        Row: {
+          clinica_id: string
+          data: string
+          encerrado_em: string
+          encerrado_por: string | null
+          id: string
+          medico_id: string
+          motivo: string | null
+        }
+        Insert: {
+          clinica_id: string
+          data?: string
+          encerrado_em?: string
+          encerrado_por?: string | null
+          id?: string
+          medico_id: string
+          motivo?: string | null
+        }
+        Update: {
+          clinica_id?: string
+          data?: string
+          encerrado_em?: string
+          encerrado_por?: string | null
+          id?: string
+          medico_id?: string
+          motivo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medico_expediente_encerramento_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medico_expediente_encerramento_medico_id_fkey"
+            columns: ["medico_id"]
+            isOneToOne: false
+            referencedRelation: "medicos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       medico_procedimentos: {
         Row: {
           created_at: string
