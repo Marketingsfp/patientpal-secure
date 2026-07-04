@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
+import { PacienteResumoBar } from "@/components/agenda/paciente-resumo-bar";
+import { TurboModeToggle } from "@/components/agenda/turbo-mode-toggle";
 import { PatientQuickCompleteSheet } from "@/components/patient-quick-complete-sheet";
 import { ProcedimentoPicker, type ProcedimentoOption } from "@/components/agenda/procedimento-picker";
 import { Button } from "@/components/ui/button";
@@ -246,6 +248,7 @@ function AgendaExpressPage() {
           <p className="text-sm text-muted-foreground">4 passos, poucos cliques.</p>
         </div>
         <Button variant="ghost" asChild><Link to="/app/agenda">Agenda completa</Link></Button>
+        <TurboModeToggle />
       </header>
 
       {/* Stepper */}
