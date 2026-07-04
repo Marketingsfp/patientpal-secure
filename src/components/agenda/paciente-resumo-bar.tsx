@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, CalendarClock, Copy, FileText, MessageCircle, Phone, Stethoscope, User, Wallet } from "lucide-react";
-import { formatarBRL } from "@/lib/financeiro/format";
+import { brl } from "@/lib/financeiro/format";
 import { toast } from "sonner";
 
 type Resumo = {
@@ -113,7 +113,7 @@ export function PacienteResumoBar({
 
       {temPendencia && (
         <Badge variant="destructive" className="h-4 px-1.5 text-[10px] gap-1">
-          <Wallet className="h-3 w-3" /> Pendência {formatarBRL(data.pendencia_valor ?? 0)}
+          <Wallet className="h-3 w-3" /> Pendência {brl(data.pendencia_valor ?? 0)}
         </Badge>
       )}
 
