@@ -272,6 +272,8 @@ function AtendimentoIaPage() {
                       : it.prioridade === "prioritario"
                       ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200"
                       : "";
+                    const temRegistroTriagem = Boolean(triagens[it.id]);
+                    const triagemFeita = temRegistroTriagem || it.fluxo_etapa === "atendimento";
                     return (
                       <TableRow key={it.id}>
                         <TableCell className="tabular-nums text-xs text-muted-foreground">{idx + 1}</TableCell>
@@ -281,8 +283,11 @@ function AtendimentoIaPage() {
                           {it.procedimento ?? "—"} · {it.fluxo_etapa.replace("_", " ")}
                         </TableCell>
                         <TableCell className="text-center">
-                          {triagens[it.id] ? (
-                            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300" title="Triagem realizada">
+                          {triagemFeita ? (
+                            <span
+                              className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                              title={temRegistroTriagem ? "Triagem realizada" : "Paciente avançou no fluxo (sem registro formal de triagem)"}
+                            >
                               <Check className="h-3.5 w-3.5" />
                             </span>
                           ) : (
@@ -308,7 +313,15 @@ function AtendimentoIaPage() {
                             <HoverCardContent align="start" className="w-80 text-xs space-y-2">
                               {(() => {
                                 const t = triagens[it.id];
-                                if (!t) return <div className="text-muted-foreground">Paciente ainda não passou pela triagem.</div>;
+                                if (!t) {
+                                  return (
+                                    <div className="text-muted-foreground">
+                                      {it.fluxo_etapa === "atendimento"
+                                        ? "Paciente avançou no fluxo sem registro formal de triagem no sistema."
+                                        : "Paciente ainda não passou pela triagem."}
+                                    </div>
+                                  );
+                                }
                                 const sv: string[] = [];
                                 if (t.pa_sistolica && t.pa_diastolica) sv.push(`PA ${t.pa_sistolica}/${t.pa_diastolica}`);
                                 if (t.freq_cardiaca) sv.push(`FC ${t.freq_cardiaca}`);
