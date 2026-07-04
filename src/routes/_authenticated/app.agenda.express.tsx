@@ -105,7 +105,6 @@ function AgendaExpressPage() {
 
   // Sheet de cadastro incompleto
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [pacienteBumpKey, setPacienteBumpKey] = useState(0);
 
   // Base importada?
   useEffect(() => {
@@ -565,7 +564,6 @@ function AgendaExpressPage() {
         onOpenChange={setSheetOpen}
         requireNfse
         onSaved={() => {
-          setPacienteBumpKey(k => k + 1);
           if (paciente) setPaciente({ ...paciente, cadastro_incompleto: false });
         }}
       />
