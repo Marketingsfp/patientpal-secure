@@ -177,6 +177,9 @@ Todos. Admin cria clínicas; gestores gerenciam membros; recepção/caixa/médic
 - `FUN-006` ✅ Cache de memberships em `localStorage["clinica_memberships_cache_v1"]` reduz flicker na navegação.
 - `FUN-007` ✅ RPC `criar_clinica_com_admin(nome, cnpj, telefone, cidade, estado)` cria a clínica **e** já cria membership `role='admin'` para o `auth.uid()`.
 - `FUN-008` 🟠 `branding` é lido em várias telas (`app.index.tsx`, `AppShell`), mas não vi UI de edição em `app.clinicas.tsx` — **PRECISA VALIDAR** se é editado só via SQL/admin.
+- `FUN-009` 🔴 **BUG de segurança** — policy `memberships_self_insert_first` permite `INSERT` com `WITH CHECK (user_id = auth.uid() OR can_manage_clinica(...))`. Qualquer autenticado consegue **se auto-inscrever em qualquer clínica com qualquer role** (`migration 20260516181120:182-183`).
+- `FUN-010` 🟠 `base_importada` é **puramente cliente** — não há RLS nem função SQL que a considere. Chamada direta ao Postgres passa por cima da regra `FUN-004`.
+- `FUN-011` 🔴 `/app/clinicas` redireciona incondicionalmente para `/app/unidades` (rota morta). A chave `clinicas` em `TODOS_MODULOS` aponta pra lugar nenhum (`app.clinicas.tsx:1-6`).
 
 #### Validações
 - Membership ativo obrigatório para renderizar `_authenticated` — enforced por RLS + pela query em `use-clinica.tsx`.
