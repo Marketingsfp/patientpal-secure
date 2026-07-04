@@ -1,36 +1,31 @@
-## Diagnóstico
+## Objetivo
 
-O agendamento da **PAULA DSA SILVA THOMAZ** está vinculado ao médico **"BENITES"** (`03b2ee8d…`, atualmente **inativo**). Existe outro cadastro parecido, **ADRIAN ANDRES JARA BENITEZ** (ativo).
+Criar 10 agendamentos de teste, todos posicionados na coluna **"Atendimento"** do Fluxo do paciente, distribuídos entre médicos variados. Em seguida, validar que os mesmos pacientes aparecem corretamente na aba **Atendimento médico** ao selecionar cada profissional.
 
-- **Fluxo do paciente**: mostra a Paula normalmente (não filtra por status do médico).
-- **Atendimento médico**: só carrega médicos ativos, então "BENITES" some do seletor e a Paula fica invisível na fila.
-- **Agenda**: já filtra `ativo = true` ao listar médicos, então médico inativo já não aparece para novos agendamentos — nenhuma mudança necessária ali.
+## Escopo dos dados
 
-Regra confirmada com o usuário: médico inativo **não deve** ser opção em novos agendamentos (já é o comportamento atual), mas pacientes já agendados com ele precisam continuar visíveis para atendimento até serem finalizados.
+- **Clínica**: `7570ddde-8c1c-4b55-ba72-cf12b2a6c940` (a mesma dos testes anteriores).
+- **Data**: hoje (04/07/2026), horários entre 08:00 e 17:00 em `America/Sao_Paulo`.
+- **Médicos**: até 10 médicos ativos distintos da clínica (se houver menos que 10 ativos, distribuir em rodízio).
+- **Pacientes**: reutilizar pacientes reais existentes da clínica (evita passar por filtros de `paciente_nome != 'DISPONIVEL'`).
+- **Estado**: `fluxo_etapa = 'atendimento'`, `status = 'confirmado'`, `prioridade` variada (~70% normal, 20% prioritario, 10% urgente).
+- **Marcação**: prefixo `[TESTE FLUXO 2]` em `procedimento` para permitir remoção fácil depois.
 
-## Mudanças
+## Passos
 
-Somente frontend, arquivo `src/routes/_authenticated/app.atendimento-ia.index.tsx`:
-
-1. **Carregar médicos em duas etapas**:
-   - Buscar médicos ativos da clínica (como hoje).
-   - Buscar `medico_id` distintos de agendamentos do dia nas etapas `aguardando_recepcao` → `atendimento` (com `paciente_id` não nulo e `paciente_nome != 'DISPONIVEL'`).
-   - Para IDs que aparecem no fluxo mas não estão na lista de ativos, buscar seus dados e mesclar no array `medicos`, marcando como inativo.
-
-2. **Exibir sufixo `(inativo)`** no seletor para esses médicos, deixando claro que é cadastro fora de uso mas com paciente pendente.
-
-3. **Manter a auto-seleção** existente (médico logado → médico com fila pendente → primeiro da lista), agora considerando também os inativos com fila. Assim a Paula aparece automaticamente ao abrir a página.
-
-4. **Auditoria rápida do agendamento existente**: sem mudanças de dados. O agendamento da Paula continua atribuído ao "BENITES" — a limpeza dos cadastros duplicados fica para uma ação separada, se você quiser.
+1. Consultar `medicos` ativos e `pacientes` da clínica para montar as combinações.
+2. Inserir os 10 agendamentos via `INSERT` único.
+3. Validar por query: agrupar os agendamentos criados por `medico_id` e confirmar que cada um tem pelo menos 1 registro na etapa `atendimento`.
+4. Abrir a preview na aba **Atendimento médico** com Playwright, iterar pelos médicos que receberam pacientes de teste, screenshotar a fila e conferir visualmente que os pacientes aparecem.
+5. Reportar o resultado (médicos ok / eventuais faltas) e listar os IDs criados para remoção futura.
 
 ## Fora do escopo
 
-- Aba **Agenda** — já filtra médicos inativos corretamente.
-- Não alteramos dados (não reatribui Paula, não mescla cadastros, não reativa "BENITES").
-- Não mexemos no Fluxo do paciente.
+- Não altero código.
+- Não crio senhas, pagamentos, triagens ou movimentos financeiros.
+- Não removo os dados de teste anteriores (`[TESTE FLUXO]`).
+- Não mexo em RLS/schema.
 
-## Resultado esperado
+## Reversão
 
-- Aba **Atendimento médico**: seletor mostra `BENITES (inativo)` junto aos demais; ao selecioná-lo (ou automaticamente) a **PAULA DSA SILVA THOMAZ** aparece pronta para atender.
-- Aba **Agenda**: continua bloqueando médicos inativos para novos agendamentos (comportamento já existente, apenas confirmado).
-- Nenhum paciente do Fluxo fica órfão na aba Atendimento médico.
+Todos os 10 registros carregam `procedimento` iniciado por `[TESTE FLUXO 2]`, então uma remoção posterior é feita com `DELETE FROM agendamentos WHERE procedimento LIKE '[TESTE FLUXO 2]%'`.
