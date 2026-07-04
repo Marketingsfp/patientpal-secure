@@ -25,6 +25,7 @@ type Medico = {
   user_id: string | null;
   especialidade_id: string | null;
   especialidades?: { nome: string } | null;
+  ativo?: boolean;
 };
 type FilaItem = {
   id: string;
@@ -72,7 +73,7 @@ function AtendimentoIaPage() {
       const cid = clinicaAtual.clinica_id;
       const { data, error } = await supabase
         .from("medicos")
-        .select("id, nome, email, user_id, especialidade_id, especialidades:especialidades!medicos_especialidade_id_fkey(nome)")
+        .select("id, nome, email, user_id, especialidade_id, ativo, especialidades:especialidades!medicos_especialidade_id_fkey(nome)")
         .eq("clinica_id", cid)
         .eq("ativo", true)
         .order("nome");
@@ -81,7 +82,36 @@ function AtendimentoIaPage() {
         setMedicos([]);
         return;
       }
-      const meds = (data ?? []) as unknown as Medico[];
+      const ativos = ((data ?? []) as unknown as Medico[]).map((m) => ({ ...m, ativo: true }));
+
+      // Inclui médicos inativos que ainda têm pacientes na fila do dia,
+      // para que nenhum atendimento em andamento fique órfão.
+      const hoje = new Date().toISOString().slice(0, 10);
+      const { data: pendAll } = await supabase
+        .from("agendamentos")
+        .select("medico_id, paciente_id, paciente_nome, fluxo_etapa")
+        .eq("clinica_id", cid)
+        .in("fluxo_etapa", ["aguardando_recepcao", "recepcao", "caixa", "triagem", "atendimento"])
+        .gte("inicio", `${hoje}T00:00:00`)
+        .lte("inicio", `${hoje}T23:59:59`);
+      const idsAtivos = new Set(ativos.map((m) => m.id));
+      const idsExtras = Array.from(
+        new Set(
+          ((pendAll ?? []) as Array<{ medico_id: string | null; paciente_id: string | null; paciente_nome: string | null }>)
+            .filter((r) => r.medico_id && r.paciente_id && (r.paciente_nome ?? "").toUpperCase() !== "DISPONIVEL" && (r.paciente_nome ?? "").toUpperCase() !== "DISPONÍVEL")
+            .map((r) => r.medico_id as string)
+            .filter((id) => !idsAtivos.has(id)),
+        ),
+      );
+      let inativos: Medico[] = [];
+      if (idsExtras.length > 0) {
+        const { data: extras } = await supabase
+          .from("medicos")
+          .select("id, nome, email, user_id, especialidade_id, ativo, especialidades:especialidades!medicos_especialidade_id_fkey(nome)")
+          .in("id", idsExtras);
+        inativos = ((extras ?? []) as unknown as Medico[]).map((m) => ({ ...m, ativo: false }));
+      }
+      const meds = [...ativos, ...inativos].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
       setMedicos(meds);
       const emailLogado = user?.email?.toLowerCase() ?? null;
       const meu = user?.id
@@ -90,17 +120,9 @@ function AtendimentoIaPage() {
         : null;
       if (meu) setMedicoId(meu.id);
       else if (meds.length && !medicoId) {
-        const hoje = new Date().toISOString().slice(0, 10);
-        const { data: pend } = await supabase
-          .from("agendamentos")
-          .select("medico_id")
-          .eq("clinica_id", cid)
-          .in("fluxo_etapa", ["triagem", "atendimento"])
-          .gte("inicio", `${hoje}T00:00:00`)
-          .lte("inicio", `${hoje}T23:59:59`)
-          .order("inicio")
-          .limit(1);
-        const comFila = pend?.[0]?.medico_id as string | undefined;
+        const comFila = ((pendAll ?? []) as Array<{ medico_id: string | null; fluxo_etapa: string }>)
+          .find((r) => r.medico_id && (r.fluxo_etapa === "triagem" || r.fluxo_etapa === "atendimento"))
+          ?.medico_id as string | undefined;
         const escolhido = comFila && meds.find((x) => x.id === comFila) ? comFila : meds[0].id;
         setMedicoId(escolhido);
       }
@@ -204,7 +226,10 @@ function AtendimentoIaPage() {
             </div>
           ) : (
             <SearchableSelect
-              options={medicos.map((m) => ({ value: m.id, label: m.nome.toUpperCase() }))}
+              options={medicos.map((m) => ({
+                value: m.id,
+                label: `${m.nome.toUpperCase()}${m.ativo === false ? " (INATIVO)" : ""}`,
+              }))}
               value={medicoId}
               onChange={setMedicoId}
               placeholder="Selecione…"
