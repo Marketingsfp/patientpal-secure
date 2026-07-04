@@ -224,9 +224,9 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         let best: ReturnType<typeof computeValor> = null;
         let bestScore = -1;
         for (const eid of possibleEspIds) {
-          const r = findRegra(regras, eid, tipo);
+          const r = findRegra(regras, eid, tipo, p.id);
           if (!r) continue;
-          const sc = (r.especialidade_id ? 10 : 0) + (r.tipo ? 5 : 0) + (r.prioridade || 0) * 0.01;
+          const sc = (r.procedimento_id ? 100 : 0) + (r.especialidade_id ? 10 : 0) + (r.tipo ? 5 : 0) + (r.prioridade || 0) * 0.01;
           if (sc > bestScore) {
             const v = computeValor(r, baseDin, baseOut);
             if (v) { best = v; bestScore = sc; }
