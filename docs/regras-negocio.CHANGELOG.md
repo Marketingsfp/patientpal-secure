@@ -1,5 +1,27 @@
 # Changelog — Regras de Negócio
 
+## v0.1.1 — Rodada 1 (Fundação) — revisão com auditoria SQL
+
+**Data:** 2026-07-04
+**Origem:** relatório do subagent `sub_203rkpz4` (leitura profunda de migrations, RLS, enums).
+
+### Achados críticos incorporados
+- **FUN-009** 🔴 self-insert em `clinica_memberships` (elevação de privilégio)
+- **FUN-010** 🟠 `base_importada` só cliente
+- **FUN-011** 🔴 `/app/clinicas` é rota morta
+- **FUN-031** 🔴 enum `app_role` sem `caixa`
+- **FUN-032** 🔴 `user_roles` / `app_role_global` órfãos
+- **FUN-033** 🔴 PRESETS duplicados divergentes
+- **FUN-034** 🔴 permissão errada em `modoTodas`
+- **FUN-035** ✅ menu filtra mas rota não
+
+### Métricas atualizadas
+- Regras documentadas: **35** (25 ✅ · 2 🟡 · 3 🟠 · 6 🔴 · 4 baixa confiança).
+- Perguntas para a clínica: **13**.
+- Nova seção **§5.6 Achados de segurança** com plano de correção.
+
+---
+
 ## v0.1 — Rodada 1 (Fundação)
 
 **Data:** 2026-07-04
