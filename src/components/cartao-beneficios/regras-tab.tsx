@@ -284,7 +284,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         <div>
           <div className="font-medium">Regras de preço automáticas</div>
           <p className="text-sm text-muted-foreground">
-            Cadastre regras por especialidade e/ou tipo. A regra mais específica e de maior prioridade vence. Ao cadastrar um serviço, o valor deste convênio será preenchido automaticamente.
+            Cadastre regras por serviço específico, especialidade e/ou tipo. A regra mais específica e de maior prioridade vence (serviço &gt; especialidade+tipo &gt; especialidade &gt; tipo). Ao cadastrar um serviço, o valor deste convênio será preenchido automaticamente.
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
@@ -447,7 +447,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
 
       <div className="flex items-center justify-between gap-3 pt-2">
         <p className="text-xs text-muted-foreground">
-          Dica: prioridade maior vence em caso de empate. Especialidade + categoria é mais específico que só categoria.
+          Dica: prioridade maior vence em caso de empate. Regras por serviço específico sempre vencem regras por especialidade/categoria.
         </p>
         <Button size="sm" onClick={salvar} disabled={loading}>
           {loading ? "Salvando…" : "Salvar regras"}
