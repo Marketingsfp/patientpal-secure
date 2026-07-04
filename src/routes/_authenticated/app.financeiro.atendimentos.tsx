@@ -1516,7 +1516,7 @@ function Page() {
         <Stethoscope className="h-10 w-10 mx-auto mb-2 text-muted-foreground/50" />
         Nenhum atendimento no período/filtro selecionado.
       </div>
-    ) : 
+    ) : (
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/50">
