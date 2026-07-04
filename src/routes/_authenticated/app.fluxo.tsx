@@ -76,7 +76,8 @@ function proxima(e: Etapa): Etapa | null {
     return "finalizado";
   }
   
-  const arr = e === "exame" ? ordemExame : ordem;
+  const arr = ordem;
+  void ordemExame;
   const i = arr.indexOf(e);
   if (i < 0 || i >= arr.length - 1) return null;
   return arr[i + 1];
@@ -376,7 +377,7 @@ function FluxoPage() {
                   const h = new Date(a.inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
                   const isExame = /exame|raio|usg|ultra|tomo|ressona/i.test(a.procedimento ?? "");
                   const next = proxima(a.fluxo_etapa);
-                  const prev = anterior(a.fluxo_etapa);
+                  const prev = anterior(a.fluxo_etapa, isExame);
                   const prioridadeInfo = a.prioridade ? PRIORIDADES[a.prioridade] : PRIORIDADES.normal;
                   const PrioridadeIcon = prioridadeInfo.Icon;
                   
