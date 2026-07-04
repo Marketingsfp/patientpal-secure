@@ -2356,13 +2356,20 @@ function AgendaPage() {
     let resolvedPacId: string = a.paciente_id ?? "";
     let resolvedPacNome: string = a.paciente_nome;
     if (!resolvedPacId && a.paciente_nome && clinicaAtual) {
-      const nomeBusca = a.paciente_nome.trim();
+      // A1 — normaliza o nome antes de bater no banco e usa igualdade,
+      // aproveitando o índice btree em (clinica_id, ativo, nome). Elimina
+      // o ilike que forçava seq scan em 242k linhas na Menino Jesus.
+      const nomeBusca = a.paciente_nome
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toUpperCase()
+        .trim();
       const { data: cands } = await supabase
         .from("pacientes")
         .select("id, nome")
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("ativo", true)
-        .ilike("nome", nomeBusca)
+        .eq("nome", nomeBusca)
         .limit(5);
       const lista = (cands ?? []) as { id: string; nome: string }[];
       const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim().replace(/\s+/g, " ");
