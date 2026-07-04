@@ -1,55 +1,40 @@
-# Plano — Teste de estresse do módulo CRM
-
 ## Objetivo
-Executar 20 simulações variadas de cadastro na aba **CRM** (`/app/crm`), identificar bugs, erros de validação, comportamentos inesperados de UI/UX e persistência, e entregar relatório em Excel.
+Permitir que uma regra de preço de convênio se aplique a **um serviço específico** (ex.: "Preventivo"), além das opções atuais por especialidade e/ou tipo (consulta/exame/procedimento).
 
-## Escopo dos 20 cadastros
+## Como vai funcionar (visão do usuário)
+Na aba **Regras de Preço** do convênio, cada linha ganha uma nova coluna **Serviço**, ao lado de *Especialidade* e *Categoria*. O usuário pode escolher:
 
-Distribuição planejada (mix de casos válidos e de borda para expor bugs):
+- **Qualquer serviço** (comportamento atual — vale por especialidade/tipo)
+- **Um serviço específico** da lista de procedimentos da clínica (ex.: PREVENTIVO, ULTRASSOM MORFOLÓGICO, etc.)
 
-**Casos "felizes" (10)** — variando origens, status e valores:
-1. Lead Instagram, aberta, R$ 1.500 — telefone + email
-2. Lead Facebook, ganha, R$ 8.900
-3. Lead Google Ads, perdida, R$ 3.200
-4. Lead indicação, aberta, R$ 15.000 (valor alto)
-5. Lead WhatsApp, ganha, R$ 450
-6. Lead site, aberta, R$ 0 (valor zerado)
-7. Lead evento, ganha, R$ 22.500
-8. Lead TikTok, perdida, R$ 780
-9. Lead LinkedIn, aberta, R$ 5.400
-10. Lead orgânico, ganha, R$ 12.000
+Regra de precedência (mais específica vence, mantendo prioridade como desempate):
 
-**Casos de borda / validação (10)**:
-11. Nome com acentos e caracteres especiais (`João D'Ávila-Süß`)
-12. Nome muito longo (200+ caracteres)
-13. Email inválido (`abc@`, sem TLD)
-14. Telefone com formatação livre (`+55 (11) 9 8888-7777`)
-15. Telefone só com letras (`abcdef`)
-16. Valor negativo (`-500`)
-17. Valor com casas decimais quebradas (`R$ 1.234,567`)
-18. Campos opcionais todos vazios (só nome + status)
-19. Nome em branco (deve falhar — required)
-20. Observações longas (2000+ caracteres) + emojis
+```
+serviço específico  >  especialidade + tipo  >  especialidade  >  tipo  >  genérica
+```
 
-## Etapas de execução
+Ou seja: se existir uma regra para o serviço "Preventivo", ela é aplicada mesmo que haja outra regra genérica de "consulta" ou da especialidade dele.
 
-1. **Ler o código do CRM** (`app.crm.tsx`, `SimpleCrud.tsx`, `CurrencyInput`) para entender validações existentes.
-2. **Rodar Playwright headless** em `http://localhost:8080/app/crm` com sessão Supabase injetada:
-   - Para cada cenário: abrir "Novo", preencher, submeter, capturar screenshot, ler toast/erro, verificar se a linha aparece na tabela.
-   - Registrar comportamento observado (sucesso, erro, silêncio, crash).
-3. **Verificar no banco** (`crm_oportunidades`) se cada registro foi persistido conforme esperado (valor, status, telefone/email null vs string vazia, sanitização).
-4. **Testar interações pós-cadastro**: busca por nome/telefone/email, editar um registro, excluir, exportar (se houver).
-5. **Consolidar achados** por categoria: validação, UX, persistência, formatação, acessibilidade, erros de console/rede.
-6. **Gerar `relatorio-bugs-crm-2026-07-04.xlsx`** em `/mnt/documents/` com abas:
-   - **Resumo** (total testes, ok, falhas, bugs críticos/médios/baixos)
-   - **Cenários** (nº, descrição, entrada, resultado esperado, resultado obtido, status)
-   - **Bugs** (id, severidade, título, passos, evidência/screenshot, sugestão de correção)
-   - **Console/Rede** (erros capturados durante os testes)
-7. **Limpeza**: deletar leads de teste ao final (prefixo `[TESTE CRM]` nos nomes) para não poluir o CRM real.
+Ao escolher um serviço, os campos *Especialidade* e *Categoria* ficam desabilitados (o serviço já os determina), evitando conflito.
 
-## O que NÃO será feito
-- Nenhuma alteração de código, schema ou RLS nesta rodada — apenas diagnóstico.
-- Correções de bugs virão em um próximo passo, após você aprovar quais priorizar com base no relatório.
+## Onde muda
 
-## Entregável
-Arquivo `relatorio-bugs-crm-2026-07-04.xlsx` em `/mnt/documents/` + resumo em chat com os principais achados.
+1. **Banco** — nova coluna `procedimento_id uuid` em `public.cb_convenio_regras` (nullable, FK para `procedimentos(id)` com `ON DELETE CASCADE`, índice para lookup rápido).
+2. **`src/lib/cb-regras.ts`** — adicionar `procedimento_id` na interface `CbRegra`; `findRegra` passa a receber `procedimentoId` e prioriza match por serviço; score de especificidade ganha peso alto para `procedimento_id`.
+3. **`src/components/cartao-beneficios/regras-tab.tsx`** — nova coluna Serviço com autocomplete de procedimentos da clínica; ao selecionar serviço, trava especialidade/categoria; salva/carrega `procedimento_id`.
+4. **Callers de `findRegra`** — passar o `procedimento_id` quando disponível:
+   - `src/routes/_authenticated/app.caixa.tsx` (ao adicionar item ao caixa)
+   - `src/routes/_authenticated/app.procedimentos.tsx` (preview de valores por convênio e recálculo)
+   - `src/components/cartao-beneficios/regras-tab.tsx` (coluna "Exemplo")
+
+## Detalhes técnicos
+- Migration: `ALTER TABLE public.cb_convenio_regras ADD COLUMN procedimento_id uuid REFERENCES public.procedimentos(id) ON DELETE CASCADE;` + índice parcial `WHERE procedimento_id IS NOT NULL`. RLS/GRANTS já existentes cobrem a nova coluna.
+- `findRegra(regras, especialidadeId, tipo, procedimentoId?)`:
+  - filtro: se `r.procedimento_id` estiver setado, só bate quando `procedimentoId === r.procedimento_id`; caso contrário mantém regra atual (esp/tipo).
+  - score: `procedimento_id ? 100 : 0` + `especialidade_id ? 10 : 0` + `tipo ? 5 : 0` + `prioridade * 0.01`.
+- UI: reutilizar o padrão de select já usado para especialidade; carregar `procedimentos` da clínica no `load()` da aba.
+- Sem migração de dados: regras existentes permanecem com `procedimento_id = null` (comportamento inalterado).
+
+## Fora de escopo
+- Regras por combinações (serviço + convênio + faixa) além do que já existe.
+- Alterar o cálculo em telas que não usam `findRegra` hoje.
