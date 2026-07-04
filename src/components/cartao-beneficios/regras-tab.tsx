@@ -43,22 +43,39 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
   const load = async () => {
     if (!convenioId) return;
     setLoading(true);
-    const [{ data: r, error: e1 }, { data: e, error: e2 }, { data: p, error: e3 }] = await Promise.all([
+    const [{ data: r, error: e1 }, { data: e, error: e2 }] = await Promise.all([
       (supabase as any)
         .from("cb_convenio_regras")
         .select("id,convenio_id,especialidade_id,procedimento_id,tipo,modo,valor,percentual,prioridade,ativo,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor,carencia_mensalidades,gratuito")
         .eq("convenio_id", convenioId)
         .order("prioridade", { ascending: false }),
       supabase.from("especialidades").select("id,nome").eq("ativo", true).order("nome"),
-      supabase.from("procedimentos").select("id,nome,codigo").eq("clinica_id", clinicaId).eq("ativo", true).order("nome"),
     ]);
+    // Paginar procedimentos — PostgREST corta em db-max-rows=1000, o que
+    // ocultava serviços (ex.: "Preventivo") em clínicas com catálogo grande.
+    const PAGE = 1000;
+    const allProcs: ProcOpt[] = [];
+    let e3: any = null;
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await supabase
+        .from("procedimentos")
+        .select("id,nome,codigo")
+        .eq("clinica_id", clinicaId)
+        .eq("ativo", true)
+        .order("nome")
+        .range(from, from + PAGE - 1);
+      if (error) { e3 = error; break; }
+      const page = (data ?? []) as ProcOpt[];
+      allProcs.push(...page);
+      if (page.length < PAGE) break;
+    }
     setLoading(false);
     if (e1) { mostrarErro(e1); return; }
     if (e2) { mostrarErro(e2); return; }
     if (e3) { mostrarErro(e3); return; }
     setRegras((r ?? []) as CbRegra[]);
     setEspecialidades((e ?? []) as EspOpt[]);
-    setProcedimentos((p ?? []) as ProcOpt[]);
+    setProcedimentos(allProcs);
   };
 
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, [convenioId]);
@@ -302,9 +319,9 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         <Table className="min-w-[1400px]">
           <TableHeader>
             <TableRow>
-              <TableHead className="min-w-[220px]">Serviço</TableHead>
               <TableHead className="min-w-[200px]">Especialidade</TableHead>
               <TableHead>Categoria</TableHead>
+              <TableHead className="min-w-[220px]">Serviço</TableHead>
               <TableHead>Modo</TableHead>
               <TableHead className="text-right">Valor / %</TableHead>
               <TableHead className="w-20">Prioridade</TableHead>
@@ -322,18 +339,6 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
               <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-6">Nenhuma regra. Clique em "Adicionar regra".</TableCell></TableRow>
             ) : regras.map((r, idx) => (
               <TableRow key={r.id}>
-                <TableCell>
-                  <SearchableSelect
-                    options={procOpts}
-                    value={r.procedimento_id ?? "__any__"}
-                    onChange={(v) => update(idx, {
-                      procedimento_id: v === "__any__" ? null : v,
-                      // limpar filtros por especialidade/tipo quando escolhe serviço
-                      ...(v !== "__any__" ? { especialidade_id: null, tipo: null } : {}),
-                    })}
-                    placeholder="Qualquer serviço"
-                  />
-                </TableCell>
                 <TableCell>
                   <SearchableSelect
                     options={espOpts}
@@ -355,6 +360,18 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                       {TIPOS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                </TableCell>
+                <TableCell>
+                  <SearchableSelect
+                    options={procOpts}
+                    value={r.procedimento_id ?? "__any__"}
+                    onChange={(v) => update(idx, {
+                      procedimento_id: v === "__any__" ? null : v,
+                      // limpar filtros por especialidade/tipo quando escolhe serviço
+                      ...(v !== "__any__" ? { especialidade_id: null, tipo: null } : {}),
+                    })}
+                    placeholder="Qualquer serviço"
+                  />
                 </TableCell>
                 <TableCell>
                   <Select value={r.modo} onValueChange={(v) => update(idx, { modo: v })}>
