@@ -2202,7 +2202,10 @@ function AgendaPage() {
           .select("id, nome")
           .eq("clinica_id", clinicaAtual.clinica_id)
           .eq("ativo", true)
-          .ilike("nome", nomeNorm)
+          // A1 — usa igualdade + índice btree em (clinica_id, ativo, nome)
+          // em vez de ilike, que forçava seq scan em 242k linhas (~6s).
+          // Os nomes são normalizados pela trigger uppercase_text_fields.
+          .eq("nome", nomeNorm)
           .limit(2);
         if (pac && pac.length === 1) {
           pacId = pac[0].id;
