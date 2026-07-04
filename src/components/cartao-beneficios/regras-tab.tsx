@@ -299,9 +299,10 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
       </div>
 
       <div className="border rounded-md overflow-x-auto max-w-full">
-        <Table className="min-w-[1200px]">
+        <Table className="min-w-[1400px]">
           <TableHeader>
             <TableRow>
+              <TableHead className="min-w-[220px]">Serviço</TableHead>
               <TableHead className="min-w-[200px]">Especialidade</TableHead>
               <TableHead>Categoria</TableHead>
               <TableHead>Modo</TableHead>
@@ -316,21 +317,38 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-6">Carregando…</TableCell></TableRow>
+              <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-6">Carregando…</TableCell></TableRow>
             ) : regras.length === 0 ? (
-              <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-6">Nenhuma regra. Clique em "Adicionar regra".</TableCell></TableRow>
+              <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-6">Nenhuma regra. Clique em "Adicionar regra".</TableCell></TableRow>
             ) : regras.map((r, idx) => (
               <TableRow key={r.id}>
+                <TableCell>
+                  <SearchableSelect
+                    options={procOpts}
+                    value={r.procedimento_id ?? "__any__"}
+                    onChange={(v) => update(idx, {
+                      procedimento_id: v === "__any__" ? null : v,
+                      // limpar filtros por especialidade/tipo quando escolhe serviço
+                      ...(v !== "__any__" ? { especialidade_id: null, tipo: null } : {}),
+                    })}
+                    placeholder="Qualquer serviço"
+                  />
+                </TableCell>
                 <TableCell>
                   <SearchableSelect
                     options={espOpts}
                     value={r.especialidade_id ?? "__any__"}
                     onChange={(v) => update(idx, { especialidade_id: v === "__any__" ? null : v })}
                     placeholder="Qualquer"
+                    disabled={!!r.procedimento_id}
                   />
                 </TableCell>
                 <TableCell>
-                  <Select value={r.tipo ?? "__any__"} onValueChange={(v) => update(idx, { tipo: v === "__any__" ? null : v })}>
+                  <Select
+                    value={r.tipo ?? "__any__"}
+                    onValueChange={(v) => update(idx, { tipo: v === "__any__" ? null : v })}
+                    disabled={!!r.procedimento_id}
+                  >
                     <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__any__">Qualquer</SelectItem>
