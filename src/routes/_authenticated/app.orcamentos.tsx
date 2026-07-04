@@ -185,6 +185,8 @@ function OrcamentosPage() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
+  const [historicoId, setHistoricoId] = useState<string | null>(null);
+  const podeVerHistorico = clinicaAtual?.role === "admin" || clinicaAtual?.role === "gestor";
   const [filtroRealizacao, setFiltroRealizacao] = useState<"todos" | "realizados" | "nao_realizados">("todos");
   const [periodo, setPeriodo] = useState<"hoje" | "semana" | "quinzena" | "mes" | "personalizado" | "todos">("todos");
   const hojeIso = new Date().toISOString().slice(0, 10);
@@ -494,6 +496,11 @@ function OrcamentosPage() {
                       <Calendar className="h-4 w-4 text-emerald-600" />
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => imprimir(o.id)} title="Imprimir"><Printer className="h-4 w-4" /></Button>
+                    {podeVerHistorico && (
+                      <Button size="sm" variant="ghost" onClick={() => setHistoricoId(o.id)} title="Histórico">
+                        <History className="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                    )}
                     <Button size="sm" variant="ghost" onClick={() => remover(o.id)} title="Excluir"><Trash2 className="h-4 w-4 text-destructive" /></Button>
                   </div>
                 </td>
