@@ -1,97 +1,236 @@
+# Plano — RPC `fila_caixa_hoje` (P1-CAIXA-001 etapa 3) + usuário de teste recepção
 
-## P1-CAIXA-001 — /app/caixa lento (5.7s) e HTTP 400
+## 1. Objetivo
 
-**Evidência (Playwright A3):** `/app/caixa` demorou 5762ms com 2× `Failed to load resource: 400`. Rotas vizinhas carregam em 1-2s.
+Substituir as 7 requests em cascata do `loadFilaCaixa` por uma única RPC no banco, mantendo 100% da semântica atual (mesmos valores, mesmo `ja_pago`, mesmos descontos). Meta: **< 700ms** no warm (hoje: 2,35s).
 
-**A investigar:**
-- Qual endpoint devolve 400 (verificar Network tab / logs).
-- Query bloqueante no mount que puxa dados sem paginação (candidatos: `caixa_movimentos`, `caixa_sessoes`).
-- Possível `.order()` sem índice + `select *` amplo.
+Sem mudanças de schema. Apenas 1 função nova, `SECURITY INVOKER` (respeita RLS).
 
-**Impacto:** Caixa é usada dezenas de vezes por dia pela recepção; 5.7s por abertura = perda direta de produtividade.
+## 2. Tabelas consultadas (somente leitura)
 
-**Prioridade:** ALTA (após P1-BUSCA-002).
+| Tabela | Uso |
+|---|---|
+| `agendamentos` | fila do dia (`fluxo_etapa in (...)`, `inicio` entre 00:00 e 23:59) |
+| `medicos` | nome do médico |
+| `procedimentos` | valores padrão (`valor_dinheiro`, `valor_cartao_credito`, `valor_padrao`) |
+| `contratos_assinatura` | convênio ativo do paciente |
+| `cb_convenio_regras` | regras de desconto (percentual/valor fixo) |
+| `procedimento_cb_convenio_valores` | valor fixo por procedimento × convênio |
+| `procedimento_especialidades` | especialidade do procedimento (para casar regra) |
+| `fin_lancamentos` | marca `ja_pago` (`tipo='receita' and agendamento_id in fila`) |
 
-## P2-MAP-PAINEL — CORRIGIDO ✅
+Nenhuma escrita. Nenhum `DELETE`/`UPDATE`.
 
-Mapa `/app/painel → "dashboard"` corrigido para `"painel"` em `src/components/app-shell.tsx`. Recepção agora vê o item Dashboard.
+## 3. Assinatura e campos retornados
 
-## P1-BUSCA-002 — Prontuários/Documentos: `<select>` com 242k pacientes
-
-**Evidência:** `src/routes/_authenticated/app.prontuarios.tsx:39` e `src/routes/_authenticated/app.documentos.tsx:31` fazem `select("id,nome").order("nome")` sem filtro/limite. pg_stat_statements: 620 chamadas × 213ms = 132s totais. Trava o browser ao renderizar select nativo com 242k options.
-
-**Correção proposta:** substituir `<select>` por `PatientSearchInput` (RPC-otimizado, já existe no projeto). Autocomplete server-side com debounce.
-
-**Risco:** baixo. Só afeta essas duas telas. Manter mesma prop de callback.
-
-**Prioridade:** próxima etapa (após A3).
-# Auditoria e Agendamento Express
-
-## Escopo em 2 frentes
-
-### 1. Auditoria (leitura, sem mudar código)
-Rodo verificações reais nas 3 unidades e entrego um **relatório curto** ao final com o que está OK e o que precisa correção:
-
-- **Login/permissões da usuária**: consultar `profiles`, `user_roles`, `clinica_memberships` e listar módulos visíveis por unidade.
-- **Fluxo atual de agendamento**: contar cliques/campos reais em `app.agenda.tsx` e no `PatientSearchInput` hoje, medir tempo de carregamento de horários (query `medico_disponibilidades` + `agendamentos`).
-- **Identificação de associado**: rodar `buscar_paciente_contato()` (função criada na última migration) contra pacientes reais da Menino Jesus com contrato ativo em `contratos_assinatura` e confirmar que retorna `associado=true` + convênio.
-- **Base importada por unidade**: confirmar flag `base_importada` (Menino Jesus=true, SFP=false, Consulta Hoje=false).
-
-Não vou executar Playwright end-to-end autenticado — nesse projeto a auditoria funcional roda por queries + inspeção de código; sinalizo se algum teste exigir sessão real.
-
-### 2. Implementação — "Agendamento Express"
-Uma tela nova, focada em recepção de alto volume:
-
-**Fluxo (4 cliques no caso feliz):**
-```
-[1] Digitar CPF/telefone/nome (autocomplete instantâneo)
-      → badge "Particular" | "Associado — <convênio>" | "Não encontrado" | "Base não importada"
-[2] Escolher especialidade (chips, sem dropdown)
-[3] Escolher profissional  OU  botão "Próximo horário disponível"
-[4] Escolher horário (grid pré-carregado) → confirma
+```sql
+create or replace function public.fila_caixa_hoje(
+  _clinica_id uuid,
+  _data date default current_date
+) returns table (
+  id                uuid,
+  paciente_id       uuid,
+  paciente_nome     text,
+  procedimento      text,      -- já com sufixo "(valor convênio)" / "(-20%)" quando aplicável
+  inicio            timestamptz,
+  medico_nome       text,
+  valor             numeric,   -- dinheiro (já com desconto do convênio se houver)
+  valor_cartao      numeric,   -- cartão (idem)
+  ja_pago           boolean,
+  desconto_origem   text       -- diagnóstico: 'particular' | 'convenio_valor_fixo' | 'convenio_regra' | null
+)
+language sql
+stable
+security invoker
+set search_path = public
 ```
 
-**Regras aplicadas no fluxo:**
-- Paciente encontrado → **não abre formulário**, só mostra nome+telefone e segue.
-- Paciente novo → **mini-cadastro**: nome, telefone, CPF (opcional), data nasc. Sem endereço, sem documentos.
-- Associado detectado → aplica regras de `cb_convenio_regras` automaticamente, valor exibido já com desconto, badge verde. Bloqueia cobrança como particular.
-- Unidade com `base_importada=false` e paciente não encontrado → banner amarelo "Base desta unidade ainda não importada" + botão "Cadastrar mesmo assim" + botão "Encaminhar para atendente".
-- Botões de atalho quando paciente já tem histórico:
-  - **"Agendar novamente"** (mesmo médico + mesma especialidade da última consulta)
-  - **"Mesmo médico da última consulta"**
-  - **"Próximo horário disponível"** (varre `medico_disponibilidades` da especialidade)
+O front recebe exatamente o mesmo shape do `FilaItem` atual — só troca 7 queries por 1 `.rpc()`.
 
-**Performance:**
-- Horários dos próximos 7 dias pré-carregados em uma única RPC (`get_horarios_disponiveis(clinica_id, especialidade_id, dias)`) já ordenada.
-- Autocomplete de paciente com debounce 200ms + índice em `pacientes(cpf, telefone, nome_normalizado)` se faltar.
-- React Query com `staleTime` alto na lista de especialidades/profissionais (mudam pouco).
+## 4. Regras de cálculo (espelham 100% o código atual em `app.caixa.tsx:387-413`)
 
-## Arquivos
+Prioridade, por linha da fila:
 
-**Migration (`..._agendamento_express.sql`)**
-- RPC `get_horarios_disponiveis(clinica_id uuid, especialidade_id uuid, dias int)` — retorna slots livres já filtrados.
-- RPC `get_ultimo_agendamento_paciente(paciente_id uuid)` — para "Agendar novamente".
-- Índices que faltarem em `pacientes(cpf)`, `pacientes(telefone)`, `agendamentos(paciente_id, data_hora desc)`.
+1. **Particular (base)**: `valor_dinheiro ?? valor_padrao`; cartão = `valor_cartao_credito ?? valor_padrao ?? dinheiro`.
+2. **Sem convênio ativo** (nenhum `contratos_assinatura.status='ativo'` para o paciente) → mantém particular. `desconto_origem = 'particular'`.
+3. **Convênio ativo + valor fixo específico** (`procedimento_cb_convenio_valores.valor_dinheiro > 0` para o par proc×convênio) → aplica esse valor em dinheiro e cartão. Sufixo `(valor convênio)`. `desconto_origem = 'convenio_valor_fixo'`.
+4. **Convênio ativo + regra** (`cb_convenio_regras` `ativo=true`, casando por `especialidade_id` do procedimento e `tipo` em `['consulta','exame','procedimento']` na ordem, ordenado por `prioridade`):
+   - `modo='percentual'` → aplica `(1 - percentual/100)` em dinheiro e cartão. Sufixo `-N%`.
+   - `modo='valor_fixo'` → substitui pelo `valor`. Sufixo `R$ X,XX`.
+   - `desconto_origem = 'convenio_regra'`.
+5. **Sem regra casável** → mantém particular.
 
-**Frontend (novos)**
-- `src/routes/_authenticated/app.agenda.express.tsx` — a tela nova, rota `/app/agenda/express`.
-- `src/components/agenda/ExpressPatientStep.tsx`
-- `src/components/agenda/ExpressEspecialidadeStep.tsx`
-- `src/components/agenda/ExpressHorarioStep.tsx`
-- `src/components/agenda/ExpressConfirmar.tsx`
-- `src/lib/agenda-express.functions.ts` — server fns: buscar paciente (reusa `buscar_paciente_contato`), listar especialidades da unidade, buscar horários, criar agendamento, último agendamento.
+Regra "associado": hoje é **derivada automaticamente** pela presença de `contratos_assinatura` ativo — não há flag separada. A RPC preserva esse comportamento.
 
-**Frontend (editados)**
-- `src/routes/_authenticated/app.agenda.tsx` — adiciona botão "⚡ Agendamento Express" no topo.
-- Menu lateral — link para a nova rota.
+## 5. Regra de `ja_pago`
 
-**Não vou tocar (fora de escopo aqui)**
-- Reescrever o `app.agenda.tsx` atual (fica como agenda "completa" para casos avançados).
-- Importar as bases de SFP e Consulta Hoje (operacional).
-- Módulos financeiros, prontuário, enfermagem.
+```sql
+exists (
+  select 1 from fin_lancamentos l
+  where l.agendamento_id = a.id
+    and l.clinica_id     = _clinica_id
+    and l.tipo           = 'receita'
+)
+```
 
-## Fora do escopo declarado
-- Testes E2E automatizados com login real (Playwright autenticado não está configurado aqui). Entrego os cenários como checklist manual + queries SQL de verificação.
+Idêntico ao atual. **Sem** filtro de data em `fin_lancamentos` — pagamento pode ter sido lançado antes do dia do atendimento (ex.: pré-pago). Mantém a proteção contra cobrança duplicada.
 
-## Confirmações antes de codar
-Só duas para não travar o fluxo:
+## 6. Segurança / RLS
+
+- `SECURITY INVOKER` + `search_path = public`: a RPC executa como o usuário logado; as policies existentes de cada tabela continuam aplicadas.
+- `GRANT EXECUTE ON FUNCTION public.fila_caixa_hoje(uuid, date) TO authenticated;`
+- Sem `GRANT` para `anon`.
+- Recepção só verá linhas das clínicas em que tem `clinica_memberships` (policies já garantem).
+
+## 7. Migration proposta (esboço)
+
+```sql
+create or replace function public.fila_caixa_hoje(
+  _clinica_id uuid,
+  _data date default current_date
+) returns table (...campos acima...)
+language plpgsql stable security invoker set search_path = public
+as $$
+begin
+  return query
+  with fila as (
+    select a.id, a.paciente_id, a.paciente_nome, a.procedimento,
+           a.inicio, m.nome as medico_nome
+    from agendamentos a
+    left join medicos m on m.id = a.medico_id
+    where a.clinica_id = _clinica_id
+      and a.fluxo_etapa in ('aguardando_recepcao','recepcao','caixa')
+      and a.inicio >= _data::timestamp
+      and a.inicio <  (_data + 1)::timestamp
+  ),
+  base as (
+    select f.*,
+           p.id  as procedimento_id,
+           coalesce(p.valor_dinheiro, p.valor_padrao, 0)          as base_dinheiro,
+           coalesce(p.valor_cartao_credito, p.valor_padrao,
+                    p.valor_dinheiro, 0)                          as base_cartao
+    from fila f
+    left join procedimentos p
+      on p.clinica_id = _clinica_id and upper(p.nome) = upper(f.procedimento)
+  ),
+  conv as (
+    select distinct on (c.paciente_id) c.paciente_id, c.convenio_id
+    from contratos_assinatura c
+    where c.clinica_id = _clinica_id and c.status = 'ativo'
+      and c.paciente_id in (select paciente_id from base where paciente_id is not null)
+    order by c.paciente_id, c.created_at desc nulls last
+  ),
+  fixo as (
+    select b.id, v.valor_dinheiro
+    from base b
+    join conv cv on cv.paciente_id = b.paciente_id
+    join procedimento_cb_convenio_valores v
+      on v.procedimento_id = b.procedimento_id
+     and v.convenio_id     = cv.convenio_id
+    where v.valor_dinheiro > 0
+  ),
+  regra as (
+    -- resolve regra por especialidade+tipo com order by prioridade
+    -- (detalhe implementado dentro do CTE, mesma ordem 'consulta','exame','procedimento')
+    ...
+  ),
+  calc as (
+    select b.*,
+           coalesce(fx.valor_dinheiro, rg.dinheiro, b.base_dinheiro) as valor,
+           coalesce(fx.valor_dinheiro, rg.cartao,   b.base_cartao)   as valor_cartao,
+           case when fx.id is not null then '(valor convênio)'
+                when rg.id is not null then rg.sufixo end            as sufixo,
+           case when fx.id is not null then 'convenio_valor_fixo'
+                when rg.id is not null then 'convenio_regra'
+                else 'particular' end                                as desconto_origem
+    from base b
+    left join fixo fx on fx.id = b.id
+    left join regra rg on rg.id = b.id
+  )
+  select c.id, c.paciente_id, c.paciente_nome,
+         case when c.sufixo is not null
+              then c.procedimento || ' ' || c.sufixo
+              else c.procedimento end,
+         c.inicio, c.medico_nome, c.valor, c.valor_cartao,
+         exists(
+           select 1 from fin_lancamentos l
+           where l.agendamento_id = c.id
+             and l.clinica_id = _clinica_id
+             and l.tipo = 'receita'
+         ) as ja_pago,
+         c.desconto_origem
+  from calc c
+  order by c.inicio;
+end $$;
+
+grant execute on function public.fila_caixa_hoje(uuid, date) to authenticated;
+```
+
+CTE `regra` fica com a lógica de prioridade — vou codificar por completo na migration real. Aqui foi resumido para o plano.
+
+## 8. Front-end (após a migration aprovada, em edit separado)
+
+Em `src/routes/_authenticated/app.caixa.tsx`, o `loadFilaCaixa` inteiro (linhas ~310–442) vira:
+
+```ts
+const { data, error } = await supabase.rpc('fila_caixa_hoje', {
+  _clinica_id: clinicaAtual.clinica_id,
+});
+if (error) { console.error(error); return; }
+setFilaCaixa((data ?? []) as FilaItem[]);
+```
+
+Todo o resto (mapas, joins em JS, chunking do `in()`) é removido.
+
+## 9. Plano de rollback
+
+- **Nível 1 (instantâneo, sem deploy):** `drop function public.fila_caixa_hoje;` — a UI passa a receber erro, mas o front pode ser revertido para o caminho antigo com um `git revert` do commit do frontend.
+- **Nível 2 (feature flag):** manter os dois caminhos por 1 sprint atrás de um `useCaixaRpc` (localStorage/env). Se preferir isso, digo — não está no escopo default para manter simples.
+- Migration é aditiva (só cria função). Nenhum dado ou coluna é alterado — rollback é `drop function`.
+
+## 10. Testes antes/depois
+
+**Antes de aplicar:**
+1. Snapshot da fila atual como admin em MJ: nome, procedimento, valor, valor_cartao, ja_pago para todas as linhas de hoje → salvo em JSON.
+2. Mesma consulta usando a nova RPC via `supabase--read_query`: `select * from fila_caixa_hoje('<clinica_id>')`.
+3. Diff campo a campo. **Critério de aceite: zero divergência.**
+
+**Depois de aplicar no frontend:**
+4. Playwright como admin: carrega `/app/caixa` warm → mede tempo, conta requests supabase (esperado: cai de 28 → ~5), verifica 0 HTTP 400, 0 erros de console.
+5. Playwright como `recepcao@teste.local`: mesmo teste; verifica que a fila aparece e o botão "Cobrar" continua bloqueado nos `ja_pago`.
+6. Teste manual proposto pelo usuário (você): cobrar 1 agendamento de teste e confirmar que ele passa a `ja_pago=true` na próxima carga.
+
+## 11. Riscos
+
+| Risco | Probabilidade | Mitigação |
+|---|---|---|
+| Divergência de valor vs. cálculo antigo | Média | Diff obrigatório na etapa 10.3 antes de trocar o front |
+| Cobrança duplicada por `ja_pago` errado | **Baixa** | Regra idêntica ao código atual; teste 10.5 |
+| Regra de convênio casando em ordem diferente | Média | CTE `regra` replica exatamente o loop `['consulta','exame','procedimento']` + `prioridade` |
+| Timeout em clínicas grandes | Baixa | Filtro por `_clinica_id` + `inicio` do dia (índices já existem) |
+| Afetar Agenda | **Nenhum** | Agenda não usa essa RPC |
+| Afetar Caixa (movimentos/sessões) | **Nenhum** | RPC só lê agendamentos+valores; não toca `caixa_sessoes`/`caixa_movimentos` |
+
+## 12. Usuário de teste `recepcao@teste.local`
+
+**Não posso criar usuários via SQL** — a tabela `auth.users` é gerenciada pelo Supabase Auth e o service role key não é acessível no Lovable Cloud. Duas opções:
+
+**Opção A (recomendada, você faz em 30s):** crie você mesmo em **Backend → Users → Add user**:
+- Email: `recepcao@teste.local`
+- Senha temporária: `Recep@2026!` (ou outra que preferir)
+- Auto-confirm: ✅
+- Depois eu rodo (via migration na próxima etapa) o INSERT em `user_roles` + `clinica_memberships` + `perfis_acesso` de recepção para a clínica MJ, para o novo usuário.
+
+**Opção B:** crio um `createServerFn` administrativo (`supabaseAdmin.auth.admin.createUser`) protegido por `requireSupabaseAuth` + checagem de admin. Você chama uma vez pelo console do navegador logada como admin. Mais trabalho, mesmo resultado.
+
+Diga qual prefere. Depois de testar, você desativa em **Backend → Users** (botão Ban/Delete).
+
+## 13. Ordem de execução (após sua aprovação)
+
+1. Você cria o usuário (opção A) OU aprova opção B.
+2. Rodo a migration da RPC (aditiva, revisível).
+3. Faço o diff etapa 10.1–10.3 e mostro o resultado.
+4. **Só troco o frontend após seu ok no diff.**
+5. Rodo testes 10.4–10.5 e reporto tempos.
+
+Aguardando aprovação para prosseguir.
