@@ -286,6 +286,7 @@ function AgendaExpressPage() {
           <CardContent className="space-y-3">
             <PatientSearchInput
               autoFocus
+              clinicaIdsOverride={clinicaId ? [clinicaId] : undefined}
               value={paciente}
               onSelect={(p) => { setPaciente(p); if (!p) setStatus({ kind: "vazio" }); }}
               placeholder="CPF, telefone ou nome"
