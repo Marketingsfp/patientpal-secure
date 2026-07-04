@@ -1,4 +1,21 @@
 
+## P1-CAIXA-001 — /app/caixa lento (5.7s) e HTTP 400
+
+**Evidência (Playwright A3):** `/app/caixa` demorou 5762ms com 2× `Failed to load resource: 400`. Rotas vizinhas carregam em 1-2s.
+
+**A investigar:**
+- Qual endpoint devolve 400 (verificar Network tab / logs).
+- Query bloqueante no mount que puxa dados sem paginação (candidatos: `caixa_movimentos`, `caixa_sessoes`).
+- Possível `.order()` sem índice + `select *` amplo.
+
+**Impacto:** Caixa é usada dezenas de vezes por dia pela recepção; 5.7s por abertura = perda direta de produtividade.
+
+**Prioridade:** ALTA (após P1-BUSCA-002).
+
+## P2-MAP-PAINEL — CORRIGIDO ✅
+
+Mapa `/app/painel → "dashboard"` corrigido para `"painel"` em `src/components/app-shell.tsx`. Recepção agora vê o item Dashboard.
+
 ## P1-BUSCA-002 — Prontuários/Documentos: `<select>` com 242k pacientes
 
 **Evidência:** `src/routes/_authenticated/app.prontuarios.tsx:39` e `src/routes/_authenticated/app.documentos.tsx:31` fazem `select("id,nome").order("nome")` sem filtro/limite. pg_stat_statements: 620 chamadas × 213ms = 132s totais. Trava o browser ao renderizar select nativo com 242k options.
