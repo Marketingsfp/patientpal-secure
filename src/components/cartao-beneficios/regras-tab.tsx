@@ -66,7 +66,6 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
   const addRegra = () => {
     if (!convenioId) return;
     setRegras(prev => [
-      ...prev,
       {
         id: `new-${crypto.randomUUID()}`,
         convenio_id: convenioId,
@@ -86,6 +85,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         carencia_mensalidades: 0,
         gratuito: false,
       },
+      ...prev,
     ]);
   };
 
