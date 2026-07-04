@@ -159,13 +159,79 @@ export function dentroHorarioAtendimento(cfg: WhatsAppConfigRow, now: Date = new
  * Gera resposta automática da Nina usando o mesmo gateway de IA da chatNina,
  * porém sem exigir sessão de usuário (chamado a partir do webhook).
  */
-export async function gerarRespostaNina(clinicaId: string, mensagemPaciente: string): Promise<string> {
+/**
+ * Extrai possíveis identificadores (CPF, telefone, nome) do texto do paciente.
+ * Usado para tentar reconhecê-lo antes de pedir dados.
+ */
+function extrairIdentificadores(mensagem: string): {
+  cpf: string | null;
+  telefone: string | null;
+  nome: string | null;
+} {
+  const texto = mensagem ?? "";
+  const cpfMatch = texto.match(/\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/);
+  const cpfDigits = cpfMatch ? cpfMatch[0].replace(/\D/g, "") : "";
+  // Telefone: 10 ou 11 dígitos consecutivos (com ou sem máscara/DDI)
+  const telMatch = texto.replace(/\D/g, "").match(/\d{10,13}/);
+  const telDigits = telMatch && telMatch[0].length !== 11 || !cpfDigits ? telMatch?.[0] ?? "" : "";
+  // Nome candidato: sequência de 2+ palavras alfabéticas iniciando com maiúsculas
+  // (regex simples — a IA fará o resto)
+  const nomeMatch = texto.match(/\b([A-ZÁÉÍÓÚÂÊÔÃÕÇ][a-záéíóúâêôãõç]+(?:\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ][a-záéíóúâêôãõç]+){1,4})\b/);
+  return {
+    cpf: cpfDigits.length === 11 ? cpfDigits : null,
+    telefone: telDigits && telDigits.length >= 10 ? telDigits : null,
+    nome: nomeMatch ? nomeMatch[1] : null,
+  };
+}
+
+/** Normaliza telefone do remetente WhatsApp para os últimos 10-11 dígitos (formato BR). */
+function normalizarTelefoneRemetente(from: string | null | undefined): string | null {
+  const d = String(from ?? "").replace(/\D/g, "");
+  if (!d) return null;
+  // Remove DDI 55 se presente e retorna os últimos 11 dígitos
+  const semDdi = d.startsWith("55") && d.length > 11 ? d.slice(2) : d;
+  return semDdi.slice(-11);
+}
+
+async function identificarPaciente(
+  clinicaId: string,
+  mensagem: string,
+  telefoneRemetente: string | null,
+) {
+  const ids = extrairIdentificadores(mensagem);
+  const telBusca = telefoneRemetente ?? ids.telefone;
+  if (!ids.cpf && !telBusca && !ids.nome) return null;
+
+  const { data, error } = await supabaseAdmin.rpc("buscar_paciente_contato", {
+    _clinica_id: clinicaId,
+    _cpf: ids.cpf,
+    _telefone: telBusca,
+    _nome: ids.nome,
+  });
+  if (error) {
+    console.error("[Nina] buscar_paciente_contato error", error);
+    return null;
+  }
+  const rows = (data ?? []) as Array<{
+    id: string;
+    nome: string;
+    associado: boolean;
+    convenio_nome: string | null;
+  }>;
+  return rows[0] ?? null;
+}
+
+export async function gerarRespostaNina(
+  clinicaId: string,
+  mensagemPaciente: string,
+  telefoneRemetente?: string | null,
+): Promise<string> {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY ausente");
 
   const DIAS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
-  const [medR, dispR, procR] = await Promise.all([
+  const [medR, dispR, procR, cliR, pacienteInfo] = await Promise.all([
     supabaseAdmin
       .from("medicos")
       .select("id, nome")
@@ -181,7 +247,16 @@ export async function gerarRespostaNina(clinicaId: string, mensagemPaciente: str
       .select("nome, grupo, valor_dinheiro_pix, valor_cartao, preparo")
       .eq("clinica_id", clinicaId)
       .eq("ativo", true),
+    supabaseAdmin
+      .from("clinicas")
+      .select("nome, base_importada")
+      .eq("id", clinicaId)
+      .maybeSingle(),
+    identificarPaciente(clinicaId, mensagemPaciente, normalizarTelefoneRemetente(telefoneRemetente ?? null)),
   ]);
+
+  const baseImportada = (cliR.data as any)?.base_importada === true;
+  const nomeUnidade = (cliR.data as any)?.nome ?? "esta unidade";
 
   const { data: agendasData } = await supabaseAdmin
     .from("medico_agendas")
@@ -264,6 +339,15 @@ export async function gerarRespostaNina(clinicaId: string, mensagemPaciente: str
     )
     .join("\n");
 
+  // Bloco de contexto do remetente + regras condicionais
+  const contextoRemetente = pacienteInfo
+    ? pacienteInfo.associado
+      ? `IDENTIFICAÇÃO: Este paciente JÁ ESTÁ CADASTRADO como "${pacienteInfo.nome}" e é ASSOCIADO ao convênio "${pacienteInfo.convenio_nome ?? "Cartão Benefícios"}". Trate-o como ASSOCIADO — NÃO ofereça valores de particular. Cite o vínculo com naturalidade ("vi aqui que você é associado(a) do ${pacienteInfo.convenio_nome ?? "nosso convênio"}") e aplique as regras/valores do convênio quando falar de exames/consultas. NÃO peça dados de cadastro; ele já está na base.`
+      : `IDENTIFICAÇÃO: Encontrei um cadastro compatível ("${pacienteInfo.nome}"), sem contrato de associado ativo. Confirme o nome com a pessoa antes de continuar e trate como paciente particular. Não peça dados que já constam no cadastro.`
+    : baseImportada
+      ? `IDENTIFICAÇÃO: Não localizei este contato/CPF/nome na base de ${nomeUnidade}. Trate como paciente novo. NÃO peça dados completos agora — pergunte primeiro se a pessoa deseja agendar/se cadastrar. Só peça dados (nome completo, CPF, nascimento, telefone) quando houver intenção CLARA de agendamento, cadastro ou atualização.`
+      : `IDENTIFICAÇÃO: A base de pacientes da unidade "${nomeUnidade}" AINDA NÃO FOI IMPORTADA no sistema. Se a pessoa quiser confirmar cadastro, agendamento ou histórico, responda com educação: "Os dados desta unidade ainda não estão disponíveis no meu sistema — vou te encaminhar para uma atendente humana." NÃO peça CPF, nome completo ou dados cadastrais. Você pode responder normalmente sobre horários de médicos, preços de tabela e informações públicas.`;
+
   const systemPrompt = `Você é a Nina, assistente virtual da clínica respondendo a PACIENTES via WhatsApp. Responda em português do Brasil, de forma curta (no máximo 4 frases), direta, cordial e acolhedora com TODOS.
 
 NUNCA mencione, cite ou inclua o CRM dos médicos nas respostas. Use apenas o nome do médico.
@@ -273,6 +357,12 @@ SUA FUNÇÃO COM PACIENTES é EXCLUSIVAMENTE:
 - Informar preços de tabela dos procedimentos/exames e o preparo quando houver.
 - Orientar sobre agendamento (encaminhar para a recepção quando precisar confirmar/marcar).
 - Ser cordial, simpática e prestativa em qualquer interação.
+
+${contextoRemetente}
+
+REGRA DE OURO — PEDIDO DE DADOS:
+- Só solicite dados pessoais (nome completo, CPF, nascimento, telefone, endereço) quando a pessoa demonstrar intenção clara de agendar, se cadastrar ou atualizar cadastro.
+- Nunca peça todos os dados de uma vez em uma conversa informativa.
 
 REGRAS DE PRIVACIDADE — NÃO PODEM SER QUEBRADAS:
 1. Trate quem escreve como pessoa externa. NUNCA confirme nem negue se ela ou outra pessoa é paciente da clínica.
