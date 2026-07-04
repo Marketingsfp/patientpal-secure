@@ -32,6 +32,9 @@ import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import { ProcedimentoCell } from "@/components/agenda/procedimento-cell";
 import { PatientSearchInput } from "@/components/patient-search-input";
 import { PacienteQuickActions } from "@/components/agenda/paciente-quick-actions";
+import { PacienteResumoBar } from "@/components/agenda/paciente-resumo-bar";
+import { PatientQuickCompleteSheet } from "@/components/patient-quick-complete-sheet";
+import { TurboModeToggle } from "@/components/agenda/turbo-mode-toggle";
 import { DividirOrcamentoDialog, type DividirItem } from "@/components/agenda/dividir-orcamento-dialog";
 import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
 import {
