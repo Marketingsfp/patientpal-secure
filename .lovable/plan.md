@@ -1,167 +1,72 @@
-# P4-AGENDAMENTO-FLUXO (revisado)
+# Documentação de Regras de Negócio — Plano
 
-Fluxo de agendamento para recepção de alto volume. Foco: teclado > mouse, menos cliques, sem quebrar regra de negócio.
+## Objetivo
+Extrair e documentar TODA a regra de negócio do sistema, cruzando: código (routes, components, functions), banco (tabelas, RPCs, policies, triggers), migrations e histórico de prompts. Nada será inventado — o que não estiver 100% no código vira **PRECISA VALIDAR**.
 
-## Escopo consolidado
+## Entregáveis
+1. `docs/regras-negocio.md` — documento único, navegável por âncoras, com:
+   - Visão geral do sistema
+   - Índice de módulos
+   - Ficha por módulo (13 seções fixas: objetivo, usuários, telas, tabelas, campos, fluxo, regras, validações, status, permissões, exceções, integrações, pontos incompletos)
+   - Seções finais: Regras confirmadas / Inferidas / Incompletas / Conflitantes / A validar
+2. `docs/regras-negocio.csv` — tabela mestre com colunas:
+   `id, modulo, regra, quando_aplicada, entrada, resultado, tela, tabela_campo, fonte, confianca, duvida_para_clinica`
+3. `docs/regras-negocio.CHANGELOG.md` — o que foi coberto em cada rodada, o que falta.
 
-### 1. Modo Recepção Turbo (teclado-first)
+## Método
+Investigação read-only usando subagents em paralelo, sem alterar código. Fontes por ordem de prioridade:
+1. Migrations SQL (`supabase/migrations/*`) — verdade estrutural
+2. RPCs `security definer` (buscar_pacientes_global, paciente_resumo_recepcao, has_role, etc.)
+3. Componentes de fluxo (`src/routes/_authenticated/app.*`, `src/components/agenda|clientes|financeiro|nfse|cartao-beneficios|...`)
+4. Helpers (`src/lib/*.ts`, ex.: `print-gr.ts`, `cb-regras.ts`, `pagamento-status.ts`, `permissoes-presets.ts`)
+5. Memórias (`mem://features/*`)
+6. Histórico de prompts (via `chat_search`) — sempre marcar como "inferido"
 
-Ativação: toggle "Modo Turbo" na barra superior da Agenda + persistência em `localStorage`. Quando ativo, aplica atalhos globais e comportamento "Enter avança / Shift+Enter volta" em todos os diálogos de agendamento/caixa.
+## Escopo — 15 módulos (rodadas)
+Cada rodada = 2-3 módulos, ficha completa + linhas do CSV. Sequência:
 
-Atalhos globais (via `KeyboardShortcuts` estendido):
+- **R1 — Fundação:** Multi-clínica & Membership, Permissões/Perfis, Autenticação
+- **R2 — Cadastro:** Pacientes (particular/associado), Duplicados, Dependentes, LGPD
+- **R3 — Agenda:** Agenda principal, Agenda Express, Disponibilidades, Encerramento de expediente
+- **R4 — Recepção:** Recepção, Check-in, Fluxo do paciente, Painel de senhas, Totem
+- **R5 — Caixa & Pagamentos:** Caixa, Sessões, Splits, Estornos, Boletos
+- **R6 — Financeiro:** Lançamentos, Contas, Categorias, Empresas, Atendimentos, Notas paciente, Regras IA, Alertas
+- **R7 — NFS-e:** Emitentes, Emissão, Retentativa, Webhook FocusNFE, Bloqueios de dados obrigatórios
+- **R8 — Cartão Benefícios:** Convênios, Regras (carência, gratuito, faixas), Contratos, Mensalidades, Dependentes, Repasse (mem cartão-consulta)
+- **R9 — Orçamentos & Contratos:** Orçamentos, Itens, Divisão, Contratos de assinatura
+- **R10 — Clínico:** Prontuários, Anamneses, Modelos, Odontologia, Exames-resultados
+- **R11 — Médicos & Prestadores:** Médicos, Especialidades, Convênios, Procedimentos, Agendas, Repasses, Prestadores
+- **R12 — Enfermagem:** Triagem, Alertas, Recursos, Disponibilidades
+- **R13 — Comunicação:** WhatsApp (config, mensagens, templates, bots), Chat interno, Atendimento IA, Nina
+- **R14 — Marketing & CRM:** Leads, Campanhas, Envios, Landing, Segmentos, CRM/oportunidades
+- **R15 — Gestão de Pessoas:** RH (ponto, contratos, férias, holerites, banco horas), LMS (cursos, trilhas, certificados), Cargos, Setores
+- **R16 — Transversal:** Auditoria, Documentos emitidos, Integrações/secrets, Estoque, Relatórios/BI, Modo Turbo/atalhos
 
-| Tecla | Ação | Onde |
-|---|---|---|
-| F2 | Buscar paciente (foca `[data-quick-search]`) | Global |
-| F3 | Novo agendamento (encaixe) | Agenda / Express |
-| F4 | Repetir último agendamento do paciente selecionado | Agenda / Express |
-| F5 | Atualizar agenda (invalida query) | Agenda |
-| F6 | Próximo horário disponível | Diálogo agendamento |
-| F7 | Ir para Agenda Express | Global |
-| F8 | Ir para Agenda | Global |
-| F9 | Ir para Caixa | Global |
-| Ctrl+F | Buscar paciente | Global (não conflita com find nativo dentro de input) |
-| Ctrl+S | Salvar (dispara `[data-primary]`) | Diálogos |
-| Ctrl+Enter | Salvar + Receber | Diálogo agendamento |
-| Ctrl+Shift+Enter | Salvar + Receber + Emitir NFS-e | Diálogo agendamento |
-| Esc | Fechar diálogo (nativo) | Global |
-| Enter | Avança para o próximo campo `[data-turbo-field]` | Formulários |
-| Shift+Enter | Volta para o campo anterior | Formulários |
+Total esperado: **250-400 regras** no CSV.
 
-Viabilidade: F5 do browser será interceptada só quando a Agenda estiver em foco e não houver input focado — em qualquer input, deixamos o F5 do navegador funcionar (evita quebrar o F5 que o usuário usa hoje para validar). Ctrl+F: interceptado só fora de input; dentro de input o find nativo prevalece.
+## Convenções da tabela
+- **id:** `MOD-000` (ex.: `AGE-014`, `NFS-007`)
+- **fonte:** `codigo` | `banco` | `migration` | `prompt` | `mem` | `inferencia`
+- **confianca:** `alto` (código + banco concordam) | `medio` (só código OU só banco) | `baixo` (só prompt/inferência)
+- Qualquer regra com confiança `baixo` ou `medio` recebe texto em `duvida_para_clinica`
 
-### 2. Barra de Resumo do Paciente (`PacienteResumoBar`)
+## Separação obrigatória no final do MD
+- ✅ **Confirmadas pelo código** (código + migration coincidem)
+- 🟡 **Inferidas do histórico de prompts** (não visível no código atual)
+- 🟠 **Incompletas** (regra existe mas fluxo/UI não fecha — ex.: PatientQuickCompleteSheet, `paciente_pendencias_cadastro`)
+- 🔴 **Conflitantes** (código diz A, prompt/mem diz B — ex.: telefone obrigatório vs. cadastro rápido)
+- ❓ **A validar com a clínica** (regras de negócio "de vida real" não representadas em código)
 
-Componente único que aparece no topo do diálogo de agendamento assim que um paciente é selecionado. Nenhuma navegação necessária.
+## Riscos & limites
+- Chat history é grande — usarei `chat_search` cirúrgico, não sweep completo.
+- Não altero código, migrations, tipos, `.env`, `client.ts` — é auditoria pura.
+- RPCs `security definer` serão inspecionadas por `supabase.read_query` no `pg_proc` quando necessário.
+- Cada rodada gera 1 commit lógico de docs; posso pausar/retomar entre rodadas.
 
-Dados exibidos em uma linha compacta (com badges e ícones):
+## Execução proposta
+Ao aprovar:
+1. Rodada 1 (Fundação) + esqueleto do MD/CSV + Visão geral — entrego para revisão
+2. Você valida o formato antes de eu prosseguir com R2-R16
+3. Depois avanço 2-3 rodadas por turno
 
-- Tipo: Particular / Associado (cor)
-- Convênio (se houver) + Empresa
-- Última consulta (data + médico + especialidade)
-- Último exame (nome + data)
-- Pendência financeira (badge vermelho com valor em aberto)
-- Cadastro incompleto (badge amarelo → abre `PatientQuickCompleteSheet`)
-- WhatsApp válido (ícone verde/cinza)
-- Idade + telefone principal (clique = copia)
-
-Fonte: nova RPC `paciente_resumo_recepcao(_paciente_id, _clinica_id)` que junta `pacientes`, `agendamentos`, `contratos_assinatura`, `cb_convenios`, `fin_atendimentos` (saldo em aberto) em uma única chamada — evita cascata de queries. `staleTime` 60s.
-
-### 3. Agendamento Inteligente (sugestões automáticas)
-
-Baseado em `paciente_resumo_recepcao` + `top_procedimentos_agendamento`:
-
-- **Médico sugerido**: se ≥2 dos últimos 5 atendimentos do paciente foram com o mesmo médico ativo, pré-seleciona esse médico. Badge "Sugerido pelo histórico".
-- **Procedimento auto**: se o médico selecionado tem apenas 1 procedimento em `medico_procedimentos` (ativo), preenche sozinho.
-- **Horário auto**: se, no dia/turno escolhido, existir apenas 1 slot livre em `medico_disponibilidades`, sugere e pré-seleciona.
-- Todas as sugestões são reversíveis (nunca bloqueiam) e mostram "por quê" ao passar o mouse.
-
-### 4. Agendamento de Exames
-
-Já entregue como base (`ProcedimentoPicker`). Extensões:
-
-- Chips de categoria persistentes (Ultrassom, Raio-X, Laboratório, Cardio, Imagem, Endo, etc.) — derivados de `procedimentos.categoria`.
-- Seleção múltipla ("Adicionar mais um exame") reaproveitando `agendamento_orcamento_itens` — o agendamento vira multi-exame na mesma janela.
-- Filtro inteligente: match por nome, sinônimo, código TUSS e também por categoria digitada (ex.: "US abd" → Ultrassom Abdome).
-
-### 5. Cadastro e NFS-e
-
-- Telefone permanece obrigatório (trigger já em produção).
-- Ao clicar em "Salvar + Emitir Nota" (Ctrl+Shift+Enter), verifica `paciente_pendencias_cadastro`. Se faltar CPF, CEP, logradouro, número, bairro, cidade ou UF → abre `PatientQuickCompleteSheet` automaticamente com foco no primeiro campo faltante. Ao completar, retoma a emissão sem perder o estado do agendamento.
-- Aviso amarelo permanente no diálogo quando `nfse_ok=false`, com CTA "Completar agora".
-
-### 6. Limpeza da Recepção (esconder botões < 5%)
-
-Análise dos botões atuais no diálogo "Novo agendamento" e barra da Agenda. Serão movidos para um menu "⋯ Mais opções":
-
-- "Reagendar em lote"
-- "Duplicar agendamento" (raro)
-- "Bloquear horário" (usado por médico, não recepção)
-- "Exportar agenda"
-- "Configurar coluna"
-- Campo "Nº do orçamento" (some do formulário principal; volta em Mais opções)
-- Campo "Observações internas" (colapsado por padrão)
-- "Status" no diálogo de criação (novo sempre = "Agendado")
-
-Tudo permanece funcional — só sai da área de foco visual da recepção.
-
-### 7. Métricas ANTES/DEPOIS
-
-Cada fase termina com uma tabela medida em Playwright (script `/tmp/browser/agenda-metrics/`):
-
-| Métrica | Como medimos |
-|---|---|
-| Tempo de abertura do diálogo | `performance.now()` antes/depois do clique em "Novo" |
-| Tempo de busca (paciente) | `t0` = keydown, `t1` = resultado renderizado |
-| Tempo para salvar | `t0` = Ctrl+S, `t1` = toast de sucesso |
-| Cliques por agendamento | contador manual sobre um cenário-referência: paciente conhecido, especialidade padrão, horário livre |
-
-Cenário-referência (paciente MICHELLE, clínica Menino Jesus, consulta comum): baseline atual = 10-11 cliques, ~23s. Meta Fase 1: 5-6 cliques, ≤12s. Meta Fase 3: 3-4 cliques, ≤8s.
-
-## Fases
-
-### Fase 1 — Turbo + Resumo + Sugestões básicas (executar agora)
-
-1. RPC `paciente_resumo_recepcao` (leitura, security definer, escopo por clínica).
-2. Estender `KeyboardShortcuts` com F2-F9, Ctrl+S, Ctrl+Enter, Ctrl+Shift+Enter, Enter/Shift+Enter em `[data-turbo-field]`.
-3. Toggle "Modo Turbo" na barra da Agenda (persiste em `localStorage`).
-4. `PacienteResumoBar` (componente novo) — integrado no diálogo da Agenda e Agenda Express.
-5. Integrar `PatientQuickCompleteSheet` no diálogo da Agenda principal (hoje só está no Express).
-6. "Próximo horário disponível" (F6) usando `medico_disponibilidades`.
-7. "Auto-select procedimento único" (quando médico tem 1 só).
-8. Esconder botões < 5% em "Mais opções".
-9. Script Playwright de métricas + tabela ANTES/DEPOIS.
-
-### Fase 2 — Repetir + Médico sugerido + Multi-exame
-
-1. F4 "Repetir último agendamento" (reusa último `agendamentos` do paciente).
-2. Médico sugerido (regra dos ≥2/5 últimos).
-3. Seleção múltipla de exames no mesmo agendamento (via `agendamento_orcamento_itens`).
-4. Chips de categoria no `ProcedimentoPicker`.
-5. Ctrl+Enter "Salvar + Receber" (abre Caixa pré-preenchido).
-
-### Fase 3 — NFS-e automática + limpeza fina
-
-1. Ctrl+Shift+Enter "Salvar + Receber + Emitir NFS-e" com auto-abertura do `PatientQuickCompleteSheet` quando faltar dado obrigatório.
-2. Aviso NFS-e no Caixa antes de emissão.
-3. Ajustes finos de layout do diálogo com base nas métricas medidas.
-
-## Riscos e mitigações
-
-| Risco | Mitigação |
-|---|---|
-| F5 interceptado quebra reflexo do usuário | Só intercepta quando não há input focado e a Agenda está no viewport |
-| Ctrl+F conflita com find nativo | Só fora de input; dentro de input, browser vence |
-| Sugestão de médico "errada" | Nunca bloqueia; sempre reversível; badge explica motivo |
-| Auto-select de procedimento único | Só quando `medico_procedimentos` tem exatamente 1 ativo |
-| RPC `paciente_resumo_recepcao` pesada | Índices já existem em `agendamentos(paciente_id, inicio)` e `fin_atendimentos(paciente_id)`; janela: últimos 12 meses |
-| Modo Turbo ativo por engano | Toggle visível + tour de 3 passos na primeira ativação |
-| Esconder botões atuais | Não removidos — só movidos para "Mais opções"; nada perde função |
-
-## Regras de negócio preservadas
-
-- Telefone obrigatório (trigger `pacientes_require_telefone_bi`) mantido.
-- Busca unificada `buscar_pacientes_global` — não muda.
-- Convênios / particulares / associados — leitura apenas.
-- NFS-e — regras atuais mantidas; só facilitamos o preenchimento.
-- Permissões e escopo por `clinica_id` — todas as RPCs `security definer` filtram por `has_clinica_access(auth.uid(), _clinica_id)`.
-- Agenda Express, Caixa, Check-in, Orçamentos, Prontuários, Documentos, Pacientes: fluxos atuais intactos; apenas Turbo + PacienteResumoBar são adicionados onde faz sentido.
-
-## Telas afetadas na Fase 1
-
-- `src/components/keyboard-shortcuts.tsx` (extensão)
-- `src/routes/_authenticated/app.agenda.tsx` (Modo Turbo + Resumo + Sheet + Mais opções)
-- `src/routes/_authenticated/app.agenda.express.tsx` (Resumo + Enter/Shift+Enter)
-- Novos:
-  - `src/components/agenda/paciente-resumo-bar.tsx`
-  - `src/components/agenda/turbo-mode-toggle.tsx`
-  - `src/lib/turbo-mode.ts` (state + hook)
-  - Migração: RPC `paciente_resumo_recepcao`
-
-## Fora de escopo (futuro)
-
-- Histórico de buscas por usuário/dia (`P3-BUSCA-HISTORICO`).
-- Unificar `/app/clientes` na RPC global (`P2-CLIENTES-LIST-UNIFY`).
-- Bloqueio duro de emissão NFS-e (hoje só avisamos).
-
-Iniciando Fase 1 assim que aprovar.
+Nenhuma linha de código de aplicação será tocada. Só criação de arquivos em `docs/`.

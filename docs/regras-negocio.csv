@@ -1,0 +1,35 @@
+id,modulo,regra,quando_aplicada,entrada,resultado,tela,tabela_campo,fonte,confianca,duvida_para_clinica
+FUN-001,Multi-clinica,Um usuario pode ter N memberships; par (user_id, clinica_id) e unico,Ao criar/editar clinica_memberships,user_id + clinica_id,Insere ou rejeita duplicata,/app,clinica_memberships,codigo+banco,alto,
+FUN-002,Multi-clinica,Membership com ativo=false nao aparece no seletor,Ao carregar clinicas do usuario,ativo=false,Filtrado no client,AppShell,clinica_memberships.ativo,codigo,alto,
+FUN-003,Multi-clinica,clinicaAtual e persistido em localStorage,Ao selecionar clinica,clinica_id,localStorage[clinica_atual_id]=id,AppShell,-,codigo,alto,
+FUN-004,Multi-clinica,Clinica nao operacional (base_importada=false e sem medicos) fica oculta para nao-admin,Ao listar memberships,role != admin + base_importada=false + 0 medicos ativos,Clinica removida do seletor,AppShell,clinicas.base_importada,codigo,alto,Confirmar o criterio "0 medicos ativos" cobre todos os cenarios?
+FUN-005,Multi-clinica,Admin sempre ve todas as clinicas onde tem membership,Ao listar memberships,role=admin,Nao aplica filtro base_importada,AppShell,clinica_memberships.role,codigo,alto,
+FUN-006,Multi-clinica,Cache de memberships em localStorage acelera trocas,Ao carregar app,userId,localStorage[clinica_memberships_cache_v1],AppShell,-,codigo,alto,
+FUN-007,Multi-clinica,criar_clinica_com_admin cria clinica e ja atribui admin ao criador,Ao criar clinica,nome+cnpj+telefone+cidade+estado,Nova clinica + membership admin do auth.uid(),/app/clinicas,clinicas + clinica_memberships,banco,alto,
+FUN-008,Multi-clinica,Branding (logo/cores) e usado na UI,Ao renderizar cabecalho,clinicas.branding JSON,Header customizado por clinica,/app,clinicas.branding,codigo,medio,Existe UI para editar branding ou so via SQL?
+FUN-009,Multi-clinica,SEGURANCA: policy memberships_self_insert_first permite qualquer autenticado se auto-inscrever com qualquer role em qualquer clinica,INSERT em clinica_memberships,user_id=auth.uid(),Elevacao de privilegio silenciosa,-,clinica_memberships (RLS),migration+banco,alto,Trocar por fluxo de convite - qual UX voces querem?
+FUN-010,Multi-clinica,base_importada e checado APENAS no cliente,Filtro de memberships,base_importada=false,Escondido no seletor mas API direta funciona,AppShell,clinicas.base_importada,codigo,alto,Deve virar policy RLS?
+FUN-011,Multi-clinica,/app/clinicas e rota morta que redireciona para /app/unidades,Ao navegar,-,Redirect /app/unidades,/app/clinicas,-,codigo,alto,Remover a chave clinicas do menu ou reativar a tela?
+FUN-020,Permissoes,Admin nunca e filtrado por modulo,Ao montar menu,role=admin,allowed=null (mostra tudo),AppShell,clinica_memberships.role,codigo,alto,
+FUN-021,Permissoes,Roles conhecidas: admin, gestor, medico, recepcao, caixa, financeiro, enfermeiro,Configuracao de perfil,role string,Preset aplicado,/app/perfis,perfis_acesso.chave,codigo,alto,Existem outras roles em uso real (ex.: dentista, laudador)?
+FUN-022,Permissoes,Sem perfil_permissoes cai no preset da role,Ao renderizar menu,role sem overrides,Preset padrao aplicado,AppShell,perfil_permissoes,codigo,alto,
+FUN-023,Permissoes,TODOS_MODULOS lista os 57 modulos filtraveis,Ao editar perfil,-,Menu de configuracao,/app/perfis,-,codigo,alto,
+FUN-024,Permissoes,Roles ficam SEMPRE em user_roles (nunca em profiles),Design de schema,-,Sem escalada de privilegio,-,user_roles,mem+codigo,alto,
+FUN-025,Permissoes,Preset recepcao: write em agenda/recepcao/clientes/fluxo/orcamentos/checkin/painel/chat/caixa,Login como recepcao,role=recepcao,Menu correspondente,AppShell,-,codigo,alto,Recepcao realmente deve ter write em caixa ou so read?
+FUN-026,Permissoes,Preset caixa NAO tem write em nfse,Login como caixa,role=caixa,Menu correspondente,AppShell,-,codigo,alto,Caixa deve poder EMITIR NFS-e ou so financeiro emite?
+FUN-027,Permissoes,Preset medico nao tem acesso a caixa/financeiro,Login como medico,role=medico,Menu correspondente,AppShell,-,codigo,alto,
+FUN-028,Permissoes,RPCs de auth (has_role/is_member/can_manage_clinica) sao SECURITY DEFINER,Uso em policies,-,Sem recursao RLS,-,pg_proc,banco,alto,
+FUN-029,Permissoes,Tabelas antigas role_permissions e permissions coexistem com perfil_permissoes,-,-,Duplicacao,-,role_permissions/permissions,banco,baixo,Sao legado e podem ser removidas?
+FUN-030,Permissoes,clinica_memberships.role deve casar com perfis_acesso.chave,Configuracao,role string,Filtro do menu funciona,/app/perfis,-,inferencia,baixo,Deve existir FK? Como e garantida consistencia?
+FUN-031,Permissoes,Enum app_role NAO inclui 'caixa' - INSERT com role=caixa falha,Ao adicionar membro caixa,role=caixa,Erro de tipo Postgres,/app/equipe,clinica_memberships.role (enum app_role),banco+codigo,alto,Adicionar caixa ao enum app_role - confirmar todas as roles esperadas.
+FUN-032,Permissoes,Dois sistemas de role paralelos: app_role (clinica_memberships) e app_role_global (user_roles),-,-,user_roles nunca consultado pelo front,-,user_roles/app_role_global,banco,alto,user_roles/app_role_global e legado ou uso futuro? Remover ou adotar?
+FUN-033,Permissoes,PRESETS duplicados em permissoes-presets.ts e app.perfis.tsx com diferencas,Edicao de perfis,-,Divergencia silenciosa,/app/perfis,-,codigo,alto,Consolidar em um unico local (permissoes-presets.ts) e remover o duplicado da rota.
+FUN-034,Permissoes,modoTodas usa apenas clinicaAtual.role para permissao,Ao operar em modo agregado,role em clinica A != role em clinica B,Menu pode mostrar admin operando dados alheios,AppShell,-,codigo,alto,Definir se e intersecao das roles ou exigir role consistente.
+FUN-035,Permissoes,Permissao filtra menu mas nao gateia rota,Acesso via URL direta,URL colada,Rota carrega mesmo sem menu,-,-,codigo,alto,Adicionar beforeLoad guard em _authenticated?
+AUT-001,Autenticacao,Rota _authenticated roda ssr=false,-,-,Sessao vive em localStorage,-,-,codigo,alto,
+AUT-002,Autenticacao,Sem sessao Supabase em /app/* redireciona para /login,Ao entrar em /app,session=null,redirect /login,-,-,codigo,alto,
+AUT-003,Autenticacao,Signup cria linha em profiles via trigger handle_new_user,Ao signup,new auth.users,Insert em profiles,/signup,profiles,banco,alto,Confirmar campos preenchidos pelo trigger.
+AUT-004,Autenticacao,Novo usuario precisa ser adicionado a uma clinica manualmente,Pos-signup,-,Usuario sem menu ate ser adicionado,-,clinica_memberships,inferencia,baixo,Existe onboarding ou UI para "aceitar convite"?
+AUT-005,Autenticacao,Provedores OAuth (Google) podem estar habilitados,Login,-,-,/login,-,inferencia,baixo,Google login esta habilitado neste projeto?
+AUT-006,Autenticacao,Rotas de paciente autenticam por token unico (nao por Supabase Auth),Acesso paciente,token na URL,Acesso a /p/$token /checkin/$token,-,-,codigo,alto,
+AUT-007,Autenticacao,Politica de confirmacao de email,Signup,-,-,-,-,inferencia,baixo,Email tem que ser confirmado antes de logar?
