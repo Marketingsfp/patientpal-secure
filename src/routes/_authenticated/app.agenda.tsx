@@ -32,6 +32,9 @@ import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import { ProcedimentoCell } from "@/components/agenda/procedimento-cell";
 import { PatientSearchInput } from "@/components/patient-search-input";
 import { PacienteQuickActions } from "@/components/agenda/paciente-quick-actions";
+import { PacienteResumoBar } from "@/components/agenda/paciente-resumo-bar";
+import { PatientQuickCompleteSheet } from "@/components/patient-quick-complete-sheet";
+import { TurboModeToggle } from "@/components/agenda/turbo-mode-toggle";
 import { DividirOrcamentoDialog, type DividirItem } from "@/components/agenda/dividir-orcamento-dialog";
 import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
 import {
@@ -688,6 +691,8 @@ function AgendaPage() {
   // IDs dos itens do orçamento que serão consumidos pelo agendamento atual
   // (fluxo de 1 grupo). Gravados em `agendamento_orcamento_itens` após o save.
   const [pendingOrcItemIds, setPendingOrcItemIds] = useState<string[]>([]);
+  // Modo Turbo: sheet "Completar cadastro" acionado pela PacienteResumoBar
+  const [quickCompleteOpen, setQuickCompleteOpen] = useState(false);
   // Informações do contrato ativo de cartão benefícios do paciente selecionado no modal.
   // Usado para mostrar o seletor "Tipo de atendimento" (Convênio × Particular) e alertar sobre mensalidade em atraso.
   const [contratoPacienteInfo, setContratoPacienteInfo] = useState<
@@ -3146,6 +3151,7 @@ function AgendaPage() {
           <p className="text-sm text-muted-foreground">Filtre e gerencie os agendamentos da clínica.</p>
         </div>
         <div className="flex gap-1.5">
+          <TurboModeToggle />
           <div className="inline-flex rounded-full border bg-card p-0.5">
             <button
               type="button"
@@ -3248,7 +3254,7 @@ function AgendaPage() {
           </Button>
           <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button size="sm" onClick={openNew} disabled={!clinicaAtual} className="h-7 text-[11px] px-2 bg-primary hover:bg-primary/90 text-primary-foreground">
+            <Button size="sm" data-turbo-novo onClick={openNew} disabled={!clinicaAtual} className="h-7 text-[11px] px-2 bg-primary hover:bg-primary/90 text-primary-foreground">
               <Plus className="h-3 w-3 mr-1.5" /> Adicionar Encaixe
             </Button>
           </DialogTrigger>
@@ -3352,11 +3358,19 @@ function AgendaPage() {
                   </p>
                 )}
                 {form.paciente_id && clinicaAtual && (
-                  <PacienteQuickActions
-                    key={form.paciente_id}
-                    pacienteId={form.paciente_id}
-                    clinicaId={clinicaAtual.clinica_id}
-                  />
+                  <>
+                    <PacienteResumoBar
+                      key={`resumo-${form.paciente_id}`}
+                      pacienteId={form.paciente_id}
+                      clinicaId={clinicaAtual.clinica_id}
+                      onCompletarCadastro={() => setQuickCompleteOpen(true)}
+                    />
+                    <PacienteQuickActions
+                      key={form.paciente_id}
+                      pacienteId={form.paciente_id}
+                      clinicaId={clinicaAtual.clinica_id}
+                    />
+                  </>
                 )}
               </div>
               {contratoPacienteInfo && (
@@ -3680,6 +3694,13 @@ function AgendaPage() {
           </Dialog>
         </div>
       </div>
+
+      <PatientQuickCompleteSheet
+        pacienteId={form.paciente_id || null}
+        open={quickCompleteOpen}
+        onOpenChange={setQuickCompleteOpen}
+        requireNfse
+      />
 
       <Dialog open={formaPagOpen} onOpenChange={setFormaPagOpen}>
         <DialogContent className="max-w-sm">

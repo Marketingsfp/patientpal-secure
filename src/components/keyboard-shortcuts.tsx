@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { getTurboMode, isTypingTarget } from "@/lib/turbo-mode";
 
 /**
  * Atalhos globais de teclado para reduzir o uso do mouse.
@@ -18,12 +19,21 @@ export function KeyboardShortcuts() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const isTyping = (el: EventTarget | null) => {
-      if (!(el instanceof HTMLElement)) return false;
-      const tag = el.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
-      if (el.isContentEditable) return true;
-      return false;
+    const isTyping = isTypingTarget;
+
+    const focusQuickSearch = () => {
+      const target = document.querySelector<HTMLElement>("[data-quick-search]");
+      if (!target) return false;
+      target.focus();
+      if (target instanceof HTMLInputElement) target.select();
+      return true;
+    };
+
+    const clickByAttr = (attr: string) => {
+      const btn = document.querySelector<HTMLButtonElement>(`button[${attr}]:not([disabled])`);
+      if (!btn) return false;
+      btn.click();
+      return true;
     };
 
     const onKey = (e: KeyboardEvent) => {
@@ -36,13 +46,103 @@ export function KeyboardShortcuts() {
 
       // "/" foca o primeiro campo de busca rápida disponível
       if (e.key === "/" && !isTyping(e.target)) {
-        const target = document.querySelector<HTMLElement>("[data-quick-search]");
-        if (target) {
-          e.preventDefault();
-          target.focus();
-          if (target instanceof HTMLInputElement) target.select();
-        }
+        if (focusQuickSearch()) e.preventDefault();
         return;
+      }
+
+      // ===== MODO TURBO (F-keys, Ctrl+S, Ctrl+Enter) =====
+      const turbo = getTurboMode();
+      if (turbo) {
+        // F2 → buscar paciente (mesmo dentro de input)
+        if (e.key === "F2") {
+          if (focusQuickSearch()) e.preventDefault();
+          return;
+        }
+        // F3 → novo agendamento (encaixe)
+        if (e.key === "F3" && !isTyping(e.target)) {
+          if (clickByAttr("data-turbo-novo")) e.preventDefault();
+          return;
+        }
+        // F4 → repetir último (a implementar na Fase 2)
+        if (e.key === "F4" && !isTyping(e.target)) {
+          if (clickByAttr("data-turbo-repetir")) e.preventDefault();
+          return;
+        }
+        // F5 → atualizar agenda (só fora de input; deixa F5 do browser em inputs)
+        if (e.key === "F5" && !isTyping(e.target)) {
+          if (clickByAttr("data-turbo-refresh")) e.preventDefault();
+          return;
+        }
+        // F6 → próximo horário
+        if (e.key === "F6") {
+          if (clickByAttr("data-turbo-proximo")) e.preventDefault();
+          return;
+        }
+        // F7 → Agenda Express
+        if (e.key === "F7") {
+          e.preventDefault();
+          navigate({ to: "/app/agenda/express" });
+          return;
+        }
+        // F8 → Agenda
+        if (e.key === "F8") {
+          e.preventDefault();
+          navigate({ to: "/app/agenda" });
+          return;
+        }
+        // F9 → Caixa
+        if (e.key === "F9") {
+          e.preventDefault();
+          navigate({ to: "/app/caixa" });
+          return;
+        }
+        // Ctrl+F → buscar paciente (só fora de input)
+        if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "f" && !isTyping(e.target)) {
+          if (focusQuickSearch()) e.preventDefault();
+          return;
+        }
+        // Ctrl+S → salvar (dispara data-primary do diálogo mais próximo)
+        if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "s") {
+          const dialog = (e.target as HTMLElement | null)?.closest('[role="dialog"]');
+          const primary = (dialog ?? document).querySelector<HTMLButtonElement>(
+            "button[data-primary]:not([disabled])"
+          );
+          if (primary) {
+            e.preventDefault();
+            primary.click();
+            return;
+          }
+        }
+        // Ctrl+Enter → salvar + receber
+        if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === "Enter") {
+          if (clickByAttr("data-turbo-salvar-receber")) e.preventDefault();
+          return;
+        }
+        // Ctrl+Shift+Enter → salvar + receber + emitir NFS-e
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "Enter") {
+          if (clickByAttr("data-turbo-salvar-receber-nfse")) e.preventDefault();
+          return;
+        }
+        // Enter / Shift+Enter → navegar entre [data-turbo-field]
+        if ((e.key === "Enter") && (e.target instanceof HTMLElement) && e.target.hasAttribute("data-turbo-field")) {
+          // se o input está dentro de um combobox aberto, deixa o Enter selecionar
+          const inCombobox = e.target.closest('[role="combobox"], [role="listbox"], [aria-expanded="true"]');
+          if (!inCombobox) {
+            const fields = Array.from(
+              document.querySelectorAll<HTMLElement>("[data-turbo-field]:not([disabled])")
+            );
+            const idx = fields.indexOf(e.target);
+            if (idx >= 0) {
+              const next = e.shiftKey ? fields[idx - 1] : fields[idx + 1];
+              if (next) {
+                e.preventDefault();
+                next.focus();
+                if (next instanceof HTMLInputElement) next.select();
+                return;
+              }
+            }
+          }
+        }
       }
 
       // Alt+1..9 → atalho para itens do menu lateral
