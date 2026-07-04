@@ -7585,6 +7585,39 @@ export type Database = {
           total: number
         }[]
       }
+      get_horarios_disponiveis: {
+        Args: {
+          _clinica_id: string
+          _dias?: number
+          _especialidade_id?: string
+          _limite?: number
+          _medico_id?: string
+        }
+        Returns: {
+          agenda_id: string
+          agenda_nome: string
+          capacidade: number
+          especialidade_id: string
+          especialidade_nome: string
+          fim: string
+          inicio: string
+          medico_id: string
+          medico_nome: string
+          ocupados: number
+        }[]
+      }
+      get_ultimo_agendamento_paciente: {
+        Args: { _paciente_id: string }
+        Returns: {
+          clinica_id: string
+          especialidade_id: string
+          especialidade_nome: string
+          inicio: string
+          medico_id: string
+          medico_nome: string
+          procedimento: string
+        }[]
+      }
       has_role: {
         Args: {
           _clinica_id: string
