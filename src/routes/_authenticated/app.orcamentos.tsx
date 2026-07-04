@@ -568,7 +568,7 @@ function NovoOrcamentoDialog({
       }
       return [...cur, f];
     });
-    setValoresPagamento({});
+    // Não limpa `valoresPagamento`: usuário pode desmarcar/remarcar sem perder valores digitados.
   };
 
   // Quando o usuário troca/adiciona uma forma de pagamento DEPOIS de já ter
@@ -677,6 +677,12 @@ function NovoOrcamentoDialog({
     }
     if (Number(desconto) < 0) return toast.error("Desconto não pode ser negativo");
     if (Number(desconto) > subtotal) return toast.error("Desconto não pode ser maior que o subtotal");
+    if (!Number.isFinite(Number(validade)) || Number(validade) < 1) {
+      return toast.error("Validade deve ser de pelo menos 1 dia");
+    }
+    if ((observacoes ?? "").length > 1000) {
+      return toast.error("Observações não podem exceder 1000 caracteres");
+    }
     const valoresPag: Record<string, number> | null =
       formasPagamento.length > 1 ? { ...totaisPorForma } : null;
     setSaving(true);
@@ -832,13 +838,19 @@ function NovoOrcamentoDialog({
               <div className="flex flex-wrap gap-2 rounded-md border p-2">
                 {FORMAS.map((f) => {
                   const checked = formasPagamento.includes(f);
+                  const disabled = !checked && formasPagamento.length >= 2;
                   return (
                     <label key={f}
-                      className={`flex items-center gap-2 px-2 py-1 rounded-md text-sm cursor-pointer border ${
-                        checked ? "bg-primary/10 border-primary/40" : "border-border hover:bg-muted/40"
+                      className={`flex items-center gap-2 px-2 py-1 rounded-md text-sm border ${
+                        checked
+                          ? "bg-primary/10 border-primary/40 cursor-pointer"
+                          : disabled
+                            ? "border-border opacity-40 cursor-not-allowed"
+                            : "border-border hover:bg-muted/40 cursor-pointer"
                       }`}
+                      title={disabled ? "Máximo de 2 formas de pagamento" : undefined}
                     >
-                      <Checkbox checked={checked} onCheckedChange={() => toggleForma(f)} />
+                      <Checkbox checked={checked} disabled={disabled} onCheckedChange={() => !disabled && toggleForma(f)} />
                       {f}
                     </label>
                   );
@@ -850,7 +862,19 @@ function NovoOrcamentoDialog({
                 </p>
               )}
             </div>
-            <div className="space-y-1"><Label>Validade (dias)</Label><Input type="number" min={1} value={validade} onChange={(e) => setValidade(Number(e.target.value) || 30)} /></div>
+            <div className="space-y-1">
+              <Label>Validade (dias)</Label>
+              <Input
+                type="number"
+                min={1}
+                step={1}
+                value={validade}
+                onChange={(e) => {
+                  const n = Math.floor(Number(e.target.value));
+                  setValidade(Number.isFinite(n) && n >= 1 ? n : 1);
+                }}
+              />
+            </div>
           </div>
 
           <div className="space-y-2 border-t pt-3">
@@ -947,13 +971,36 @@ function NovoOrcamentoDialog({
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 border-t pt-3 pb-8">
-            <div className="space-y-1"><Label>Observações</Label><Textarea rows={3} value={observacoes} onChange={(e) => setObservacoes(e.target.value)} /></div>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <Label>Observações</Label>
+                <span className={`text-[11px] ${observacoes.length > 1000 ? "text-destructive" : "text-muted-foreground"}`}>
+                  {observacoes.length} / 1000
+                </span>
+              </div>
+              <Textarea
+                rows={3}
+                maxLength={1000}
+                value={observacoes}
+                onChange={(e) => setObservacoes(e.target.value.slice(0, 1000))}
+              />
+            </div>
             <div className="space-y-2">
               <div className="flex justify-between text-sm"><span>Subtotal</span><span className="font-medium">{BRL(subtotal)}</span></div>
               <div className="flex justify-between items-center gap-2 text-sm">
                 <span>Desconto</span>
-                <CurrencyInput className="w-32 text-right" value={String(desconto ?? "")} onChange={(v) => setDesconto(Number(v) || 0)} />
+                <CurrencyInput
+                  className={`w-32 text-right ${Number(desconto) > subtotal || Number(desconto) < 0 ? "border-destructive" : ""}`}
+                  value={String(desconto ?? "")}
+                  onChange={(v) => {
+                    const n = Math.max(0, Number(v) || 0);
+                    setDesconto(n);
+                  }}
+                />
               </div>
+              {Number(desconto) > subtotal && (
+                <p className="text-xs text-destructive text-right">Desconto não pode ser maior que o subtotal ({BRL(subtotal)}).</p>
+              )}
               <div className="flex justify-between text-lg font-bold border-t pt-2"><span>Total</span><span className="text-primary">{BRL(total)}</span></div>
               {formasPagamento.length > 1 && (
                 <div className="space-y-1 border-t pt-2">

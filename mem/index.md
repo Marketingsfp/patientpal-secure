@@ -1,10 +1,14 @@
 # Project Memory
 
 ## Core
-Sistema clínico multi-clínica (agenda, prontuário, NFS-e, financeiro, cartão convênio). PT-BR em toda UI.
-CPF é único por clínica em pacientes (índice parcial idx_pacientes_clinica_cpf_unique — CPFs em branco permitidos).
-Validações do cadastro de cliente: nome exige letra + máx 120, data de nascimento entre 1900 e hoje, e-mail regex JS (sem tooltip HTML5).
+ClinicaOS: sistema premium para clínicas. Cada mudança avaliada em 4 eixos: 💰 Financeiro, ⏱️ Operacional, 😊 Experiência do paciente, 🛡️ Segurança/Auditoria.
+Nunca introduzir regra que possa causar perda financeira sem bloqueio ou alerta (desconto excessivo, valor negativo, edição de orçamento convertido, cobrança duplicada, atendimento sem tabela, NFS-e com cadastro incompleto, paciente associado tratado como particular, procedimento sem preço).
+Edição de orçamento convertido só para admin/gerente, sempre com log completo (usuário, data/hora, IP, campo, valor antes/depois).
+Reutilizar componentes, busca de pacientes, padrões visuais e RPCs existentes. Nunca duplicar lógica entre módulos.
+Antes de implementar uma feature, declarar: impacto financeiro, operacional, experiência, risco técnico, risco de negócio, tempo estimado, ganho esperado.
+Prioridade máxima: reduzir cliques/tempo da recepção, evitar retrabalho e informações repetidas ao paciente.
 
 ## Memories
-- [Repasse cartão consulta](mem://features/repasse-cartao-consulta) — Fórmula de repasse ao médico em atendimentos pagos com Cartão Consulta
-- [Testes pendentes de clientes](mem://tests/clientes-pendentes) — Cenários do formulário /app/clientes que ficaram sem cobertura por timeout do Playwright
+- [Governança de mudanças](mem://preferences/governanca) — Framework dos 4 eixos + checklist pré-implementação
+- [Repasse cartão consulta](mem://features/repasse-cartao-consulta) — Regras de repasse
+- [Testes clientes pendentes](mem://tests/clientes-pendentes) — Notas de teste
