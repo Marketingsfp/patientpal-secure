@@ -7540,6 +7540,21 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      fila_caixa_hoje: {
+        Args: { _clinica_id: string; _data?: string }
+        Returns: {
+          desconto_origem: string
+          id: string
+          inicio: string
+          ja_pago: boolean
+          medico_nome: string
+          paciente_id: string
+          paciente_nome: string
+          procedimento: string
+          valor: number
+          valor_cartao: number
+        }[]
+      }
       fin_atendimentos_matriz: {
         Args: { _clinica: string }
         Returns: {
