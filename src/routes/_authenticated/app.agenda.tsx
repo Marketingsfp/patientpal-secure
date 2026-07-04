@@ -3358,11 +3358,19 @@ function AgendaPage() {
                   </p>
                 )}
                 {form.paciente_id && clinicaAtual && (
-                  <PacienteQuickActions
-                    key={form.paciente_id}
-                    pacienteId={form.paciente_id}
-                    clinicaId={clinicaAtual.clinica_id}
-                  />
+                  <>
+                    <PacienteResumoBar
+                      key={`resumo-${form.paciente_id}`}
+                      pacienteId={form.paciente_id}
+                      clinicaId={clinicaAtual.clinica_id}
+                      onCompletarCadastro={() => setQuickCompleteOpen(true)}
+                    />
+                    <PacienteQuickActions
+                      key={form.paciente_id}
+                      pacienteId={form.paciente_id}
+                      clinicaId={clinicaAtual.clinica_id}
+                    />
+                  </>
                 )}
               </div>
               {contratoPacienteInfo && (
