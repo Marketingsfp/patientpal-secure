@@ -417,7 +417,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                   >
                     <Timer className="h-3.5 w-3.5 mr-1" />
                     {r.limite_qtd
-                      ? `${r.limite_qtd}/${r.limite_periodo ?? "dia"} ${r.limite_escopo === "paciente" ? "paciente" : "contrato"}`
+                      ? `${r.limite_qtd}/${r.limite_periodo ?? "dia"} ${r.limite_escopo === "paciente" ? "paciente" : r.limite_escopo === "titular_ou_dependente" ? "titular-ou-dep" : "contrato"}`
                       : "Sem limite"}
                   </Button>
                 </TableCell>
@@ -506,7 +506,7 @@ function LimiteDialog({
         <DialogHeader>
           <DialogTitle>Limite de uso desta regra</DialogTitle>
           <DialogDescription>
-            Ex.: "1 consulta por dia por contrato". Vazio = sem limite. Após salvar as regras, o limite passa a valer na agenda.
+            Ex.: "1 consulta por contrato" ou "1 consulta por dia por contrato". Vazio = sem limite. Após salvar as regras, o limite passa a valer na agenda.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
@@ -532,6 +532,7 @@ function LimiteDialog({
                   <SelectItem value="dia">Por dia</SelectItem>
                   <SelectItem value="semana">Por semana</SelectItem>
                   <SelectItem value="mes">Por mês</SelectItem>
+                  <SelectItem value="contrato">Por contrato</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -546,6 +547,7 @@ function LimiteDialog({
                 <SelectContent>
                   <SelectItem value="contrato">Contrato (titular + deps)</SelectItem>
                   <SelectItem value="paciente">Por paciente</SelectItem>
+                  <SelectItem value="titular_ou_dependente">Titular ou dependente (exclusivo)</SelectItem>
                 </SelectContent>
               </Select>
             </div>

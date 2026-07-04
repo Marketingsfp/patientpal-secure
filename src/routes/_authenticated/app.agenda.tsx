@@ -426,15 +426,32 @@ async function obterInfoConvenioPaciente(params: {
   let bloquear = false;
   if (beneficioEscolhido && beneficioEscolhido.limite_qtd && emDia) {
     const dataBase = dataRef ? new Date(dataRef) : new Date();
-    const inicioDia = new Date(dataBase); inicioDia.setHours(0, 0, 0, 0);
-    const fimDia = new Date(dataBase); fimDia.setHours(23, 59, 59, 999);
+    const periodo = (beneficioEscolhido.limite_periodo ?? "dia") as string;
+    // Janela do período (dia/semana/mes) ou histórico completo (contrato).
+    let janelaInicio: Date | null = null;
+    let janelaFim: Date | null = null;
+    if (periodo === "semana") {
+      const d = new Date(dataBase);
+      const dow = (d.getDay() + 6) % 7; // 0 = segunda
+      janelaInicio = new Date(d); janelaInicio.setDate(d.getDate() - dow); janelaInicio.setHours(0, 0, 0, 0);
+      janelaFim = new Date(janelaInicio); janelaFim.setDate(janelaInicio.getDate() + 6); janelaFim.setHours(23, 59, 59, 999);
+    } else if (periodo === "mes") {
+      janelaInicio = new Date(dataBase.getFullYear(), dataBase.getMonth(), 1, 0, 0, 0, 0);
+      janelaFim = new Date(dataBase.getFullYear(), dataBase.getMonth() + 1, 0, 23, 59, 59, 999);
+    } else if (periodo === "contrato") {
+      janelaInicio = null; janelaFim = null;
+    } else {
+      janelaInicio = new Date(dataBase); janelaInicio.setHours(0, 0, 0, 0);
+      janelaFim = new Date(dataBase); janelaFim.setHours(23, 59, 59, 999);
+    }
 
     // Pacientes que compartilham a cota do contrato
     let pacientesCota: string[] = [];
-    if (beneficioEscolhido.limite_escopo === "paciente") {
+    const escopoLim = beneficioEscolhido.limite_escopo as string | null;
+    if (escopoLim === "paciente") {
       pacientesCota = [pacienteId];
     } else {
-      // titular + dependentes ativos do contrato
+      // titular + dependentes ativos do contrato (contrato ou titular_ou_dependente)
       pacientesCota = [contrato.id ? "" : ""]; // placeholder, substituído abaixo
       const { data: tit } = await supabase
         .from("contratos_assinatura")
@@ -453,23 +470,21 @@ async function obterInfoConvenioPaciente(params: {
     }
 
     if (pacientesCota.length > 0) {
-      // Conta agendamentos do dia, dos pacientes da cota, cujo médico tem a
-      // mesma especialidade do benefício, e que não estejam cancelados.
-      // Exclui o próprio agendamento (caso já esteja salvo).
       let q = supabase
         .from("agendamentos")
-        .select("id,medico_id,procedimento", { count: "exact" })
+        .select("id,medico_id,procedimento,paciente_id", { count: "exact" })
         .eq("clinica_id", clinicaId)
         .in("paciente_id", pacientesCota)
-        .gte("inicio", inicioDia.toISOString())
-        .lte("inicio", fimDia.toISOString())
         .neq("status", "cancelado");
+      if (janelaInicio) q = q.gte("inicio", janelaInicio.toISOString());
+      if (janelaFim) q = q.lte("inicio", janelaFim.toISOString());
       if (agendamentoId) q = q.neq("id", agendamentoId);
       const { data: agsDia } = await q;
 
       // Se o benefício é por especialidade, filtra pelos agendamentos cujo
       // médico tem a mesma especialidade.
       let usados = 0;
+      let agsFiltrados: Array<{ medico_id: string | null; paciente_id?: string | null }> = [];
       if (beneficioEscolhido.escopo === "especialidade" && beneficioEscolhido.especialidade_id) {
         const medicoIds = Array.from(new Set(((agsDia ?? []) as Array<{ medico_id: string | null }>).map((a) => a.medico_id).filter((x): x is string => !!x)));
         if (medicoIds.length) {
@@ -492,26 +507,42 @@ async function obterInfoConvenioPaciente(params: {
             if (m.especialidade_id) s.add(m.especialidade_id);
             espByMed.set(m.medico_id, s);
           });
-          usados = ((agsDia ?? []) as Array<{ medico_id: string | null }>).filter((a) => {
+          agsFiltrados = ((agsDia ?? []) as Array<{ medico_id: string | null; paciente_id?: string | null }>).filter((a) => {
             if (!a.medico_id) return false;
             const s = espByMed.get(a.medico_id);
             return s ? s.has(beneficioEscolhido.especialidade_id) : false;
-          }).length;
+          });
+          usados = agsFiltrados.length;
         }
       } else {
-        usados = (agsDia ?? []).length;
+        agsFiltrados = (agsDia ?? []) as Array<{ medico_id: string | null; paciente_id?: string | null }>;
+        usados = agsFiltrados.length;
       }
 
-      if (usados >= Number(beneficioEscolhido.limite_qtd)) {
+      // Escopo "titular ou dependente (exclusivo)": se qualquer OUTRO paciente
+      // do contrato já consumiu na janela, a cota é considerada esgotada.
+      let esgotadoExclusivo = false;
+      if (escopoLim === "titular_ou_dependente") {
+        esgotadoExclusivo = agsFiltrados.some((a) => a.paciente_id && a.paciente_id !== pacienteId);
+      }
+
+      if (usados >= Number(beneficioEscolhido.limite_qtd) || esgotadoExclusivo) {
         const modo = beneficioEscolhido.excedente_modo;
-        const escopoTxt = beneficioEscolhido.limite_escopo === "paciente" ? "paciente" : "contrato";
+        const escopoTxt = escopoLim === "paciente"
+          ? "paciente"
+          : escopoLim === "titular_ou_dependente"
+            ? "titular-ou-dependente"
+            : "contrato";
+        const periodoTxt = periodo === "semana" ? "semana" : periodo === "mes" ? "mês" : periodo === "contrato" ? "contrato" : "dia";
         if (modo === "bloquear") {
           bloquear = true;
           desconto = null;
-          avisoLimite = `Limite de ${beneficioEscolhido.limite_qtd}/dia por ${escopoTxt} atingido — agendamento bloqueado pelo convênio.`;
+          avisoLimite = esgotadoExclusivo
+            ? `Cota exclusiva já usada por outro membro do contrato — agendamento bloqueado pelo convênio.`
+            : `Limite de ${beneficioEscolhido.limite_qtd}/${periodoTxt} por ${escopoTxt} atingido — agendamento bloqueado pelo convênio.`;
         } else if (modo === "particular") {
           desconto = null;
-          avisoLimite = `Limite de ${beneficioEscolhido.limite_qtd}/dia por ${escopoTxt} atingido — cobrando valor particular cheio.`;
+          avisoLimite = `Limite de ${beneficioEscolhido.limite_qtd}/${periodoTxt} por ${escopoTxt} atingido — cobrando valor particular cheio.`;
         } else if (modo === "valor_fixo") {
           const v = Number(beneficioEscolhido.excedente_valor) || 0;
           desconto = { tipo: "valor_fixo", valor: v, valorOutros: v };
@@ -520,7 +551,7 @@ async function obterInfoConvenioPaciente(params: {
           const pct = Number(beneficioEscolhido.excedente_percentual) || 0;
           // pct = desconto sobre o particular; ex.: 50 → paga 50% do particular
           desconto = { tipo: "percentual", valor: pct };
-          avisoLimite = `Limite de ${beneficioEscolhido.limite_qtd}/dia por ${escopoTxt} atingido — cobrando ${100 - pct}% do valor particular.`;
+          avisoLimite = `Limite de ${beneficioEscolhido.limite_qtd}/${periodoTxt} por ${escopoTxt} atingido — cobrando ${100 - pct}% do valor particular.`;
         }
       }
     }
