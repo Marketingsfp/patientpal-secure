@@ -415,12 +415,29 @@ function Page() {
     const ids = rows.map((r) => r.id);
     const pagos = new Set<string>();
     if (ids.length) {
-      const { data: lancs } = await supabase
-        .from("fin_lancamentos").select("agendamento_id")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("tipo", "receita")
-        .in("agendamento_id", ids);
-      (lancs ?? []).forEach((l) => { if (l.agendamento_id) pagos.add(l.agendamento_id); });
+      // P1-CAIXA-001: evita URL gigante do `in(agendamento_id, ...)`
+      // (HTTP 400 quando há muitos agendamentos no dia). Quebramos em lotes
+      // pequenos e disparamos em paralelo. Como a fila só contém agendamentos
+      // de hoje, o total de lotes é sempre baixo.
+      const CHUNK = 80;
+      const batches: string[][] = [];
+      for (let i = 0; i < ids.length; i += CHUNK) batches.push(ids.slice(i, i + CHUNK));
+      const results = await Promise.all(
+        batches.map((batch) =>
+          supabase
+            .from("fin_lancamentos").select("agendamento_id")
+            .eq("clinica_id", clinicaAtual.clinica_id)
+            .eq("tipo", "receita")
+            .in("agendamento_id", batch),
+        ),
+      );
+      for (const { data: lancs, error } of results) {
+        if (error) {
+          console.error("[caixa] fin_lancamentos batch error", error);
+          continue;
+        }
+        (lancs ?? []).forEach((l) => { if (l.agendamento_id) pagos.add(l.agendamento_id); });
+      }
     }
     setFilaCaixa(rows.map((r) => {
       const desc = aplicarDesconto(r.procedimento, r.paciente_id);
