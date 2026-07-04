@@ -296,10 +296,8 @@ function AgendaExpressPage() {
               enableVoice
             />
 
-            {paciente && (
-              paciente.id && clinicaId ? (
-                <PacienteResumoBar pacienteId={paciente.id} clinicaId={clinicaId} />
-              ) : null
+            {paciente?.id && clinicaId && paciente.id !== "__pendente__" && (
+              <PacienteResumoBar pacienteId={paciente.id} clinicaId={clinicaId} />
             )}
             {paciente && (
               <div className="rounded-md border p-3 text-sm space-y-1">
