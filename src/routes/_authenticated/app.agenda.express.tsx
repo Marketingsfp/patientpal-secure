@@ -185,6 +185,7 @@ function AgendaExpressPage() {
   async function criarPacienteRapido() {
     if (!clinicaId) return;
     if (novoNome.trim().length < 3) { toast.error("Informe o nome"); return; }
+    if (somenteDigitos(novoTelefone).length < 10) { toast.error("Telefone é obrigatório (DDD + número)"); return; }
     if (novoCpf && !isCPFValido(novoCpf)) { toast.error("CPF inválido"); return; }
     setCriandoPaciente(true);
     try {
@@ -353,7 +354,7 @@ function AgendaExpressPage() {
                     <Input value={novoNome} onChange={(e) => setNovoNome(e.target.value)} />
                   </div>
                   <div>
-                    <Label>Telefone</Label>
+                    <Label>Telefone *</Label>
                     <Input value={novoTelefone} onChange={(e) => setNovoTelefone(e.target.value)} />
                   </div>
                   <div>
