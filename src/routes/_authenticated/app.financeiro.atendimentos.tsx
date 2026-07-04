@@ -161,25 +161,27 @@ function Page() {
       const p = pac as PacFull;
       const valor = Number(a.valor_total) || 0;
       if (valor <= 0) throw new Error("Valor do atendimento é zero");
-      const res = await emitirNfseFn({ data: {
-        emitenteId,
-        pacienteId: p.id,
-        agendamentoId: a.agendamento_id ?? undefined,
-        pagamentoId: a.id ?? undefined,
-        valorServicos: valor,
-        descricaoServicos: nfseDesc || "Serviços prestados",
-        tomador: {
-          nome: p.nome,
-          cpfCnpj: p.cpf ?? undefined,
-          email: p.email ?? undefined,
-          cep: p.cep ?? undefined,
-          logradouro: p.logradouro ?? undefined,
-          numero: p.numero ?? undefined,
-          bairro: p.bairro ?? undefined,
-          municipio: p.cidade ?? undefined,
-          uf: p.estado ?? undefined,
-        },
-      } });
+      const res = await emitirNfseFn({
+        data: {
+          emitenteId,
+          pacienteId: p.id,
+          agendamentoId: a.agendamento_id ?? undefined,
+          pagamentoId: a.id ?? undefined,
+          valorServicos: valor,
+          descricaoServicos: nfseDesc || "Serviços prestados",
+          tomador: {
+            nome: p.nome,
+            cpfCnpj: p.cpf ?? undefined,
+            email: p.email ?? undefined,
+            cep: p.cep ?? undefined,
+            logradouro: p.logradouro ?? undefined,
+            numero: p.numero ?? undefined,
+            bairro: p.bairro ?? undefined,
+            municipio: p.cidade ?? undefined,
+            uf: p.estado ?? undefined,
+          },
+        }
+      });
       const nfseId = (res as { id?: string })?.id;
       toast.success("NFS-e enviada. Consultando status...");
       if (nfseId) {
@@ -568,6 +570,8 @@ function Page() {
         .in("medico_id", ids)
         .eq("ativo", true);
       setConvenios((cv ?? []) as Convenio[]);
+    } else {
+      setConvenios([]);
     }
     setOptsReady(true);
   };
@@ -590,11 +594,13 @@ function Page() {
   }, [form.valor_total, form.medico_id, medicos]);
 
   const openNew = () => { setEditing(null); setForm(EMPTY); setOpen(true); };
-  const openEdit = (a: Atend) => { setEditing(a); setForm({
-    data: a.data, medico_id: a.medico_id ?? "", paciente_id: a.paciente_id ?? "",
-    procedimento: a.procedimento ?? "", valor_total: String(a.valor_total),
-    forma_pagamento: a.forma_pagamento ?? "", status: a.status,
-  }); setOpen(true); };
+  const openEdit = (a: Atend) => {
+    setEditing(a); setForm({
+      data: a.data, medico_id: a.medico_id ?? "", paciente_id: a.paciente_id ?? "",
+      procedimento: a.procedimento ?? "", valor_total: String(a.valor_total),
+      forma_pagamento: a.forma_pagamento ?? "", status: a.status,
+    }); setOpen(true);
+  };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -616,10 +622,38 @@ function Page() {
   };
 
   const remove = async (a: Atend) => {
-    if (!confirm("Excluir atendimento?")) return;
-    const { error } = await supabase.from("fin_atendimentos").delete().eq("id", a.id);
-    if (error) mostrarErro(error); else { toast.success("Removido"); await load(); }
-  };
+  if (!confirm("Excluir atendimento?")) return;
+  
+  try {
+    let error;
+    
+    if (a.origem === "agenda") {
+      // Para atendimentos da agenda, exclui da tabela fin_lancamentos
+      const { error: e } = await supabase
+        .from("fin_lancamentos")
+        .delete()
+        .eq("id", a.id);
+      error = e;
+    } else {
+      // Para atendimentos manuais, exclui da tabela fin_atendimentos
+      const { error: e } = await supabase
+        .from("fin_atendimentos")
+        .delete()
+        .eq("id", a.id);
+      error = e;
+    }
+    
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
+    
+    toast.success("Atendimento removido com sucesso");
+    await load();
+  } catch (err) {
+    mostrarErro(err);
+  }
+};
 
   const estornar = async (a: Atend) => {
     if (a.repasse_pago) {
@@ -679,16 +713,16 @@ function Page() {
     await load();
   };
 
-  const medMap = new Map(medicos.map((m) => [m.id, m.nome]));
-  const pacMap = new Map(pacientes.map((p) => [p.id, p.nome]));
+  const medMap = useMemo(() => new Map(medicos.map((m) => [m.id, m.nome])), [medicos]);
+  const pacMap = useMemo(() => new Map(pacientes.map((p) => [p.id, p.nome])), [pacientes]);
   const filteredItems = useMemo(() => {
     const q = norm(fPaciente.trim());
     const base = !q
       ? items
       : items.filter((a) => {
-          const nome = (a.paciente_id ? pacMap.get(a.paciente_id) : null) ?? a.paciente_nome_extra ?? "";
-          return norm(nome).includes(q);
-        });
+        const nome = (a.paciente_id ? pacMap.get(a.paciente_id) : null) ?? a.paciente_nome_extra ?? "";
+        return norm(nome).includes(q);
+      });
     const baseTipo = fTipo === "todos"
       ? base
       : fTipo === "medico"
@@ -908,138 +942,138 @@ function Page() {
         <div><h1 className="text-lg font-semibold leading-tight">Atendimentos</h1>
           <p className="text-xs text-muted-foreground">{isMedicoOnly ? "Seus atendimentos e o repasse devido por serviço" : "Serviços realizados com repasse automático (inclui pagamentos da agenda)"}</p></div>
         <div className="flex gap-2">
-        <Button
-          variant="outline"
-          onClick={() => {
-            if (!filteredItems.length) { toast.info("Sem dados para exportar."); return; }
-            exportToExcel(
-              filteredItems.map((a) => ({
-                data: new Date(a.data).toLocaleDateString("pt-BR"),
-                medico: a.medico_id ? medMap.get(a.medico_id) ?? "" : "",
-                paciente: a.paciente_id ? pacMap.get(a.paciente_id) ?? "" : "",
-                procedimento: a.procedimento ?? "",
-                valor_total: Number(a.valor_total).toFixed(2),
-                valor_medico: Number(a.valor_medico).toFixed(2),
-                valor_clinica: Number(a.valor_clinica).toFixed(2),
-                forma_pagamento: a.forma_pagamento ?? "",
-                status: a.status,
-              })),
-              `atendimentos-${new Date().toISOString().slice(0, 10)}`,
-              isMedicoOnly ? [
-                { key: "data", label: "Data" },
-                { key: "paciente", label: "Paciente" },
-                { key: "procedimento", label: "Serviço" },
-                { key: "valor_medico", label: "Repasse (R$)" },
-                { key: "status", label: "Status" },
-              ] : [
-                { key: "data", label: "Data" },
-                { key: "medico", label: "Médico" },
-                { key: "paciente", label: "Paciente" },
-                { key: "procedimento", label: "Serviço" },
-                { key: "valor_total", label: "Valor total (R$)" },
-                { key: "valor_medico", label: "Repasse médico (R$)" },
-                { key: "valor_clinica", label: "Clínica (R$)" },
-                { key: "forma_pagamento", label: "Forma pagamento" },
-                { key: "status", label: "Status" },
-              ],
-            );
-          }}
-        >
-          <Download className="h-4 w-4 mr-2" />Exportar Excel
-        </Button>
-        {!isMedicoOnly && (
-          <Button onClick={openPay} disabled={!selectedItems.length}>
-            <Wallet className="h-4 w-4 mr-2" />Pagar repasse{selectedItems.length ? ` (${selectedItems.length} • ${fmt(selectedTotal)})` : ""}
+          <Button
+            variant="outline"
+            onClick={() => {
+              if (!filteredItems.length) { toast.info("Sem dados para exportar."); return; }
+              exportToExcel(
+                filteredItems.map((a) => ({
+                  data: new Date(a.data).toLocaleDateString("pt-BR"),
+                  medico: a.medico_id ? medMap.get(a.medico_id) ?? "" : "",
+                  paciente: a.paciente_id ? pacMap.get(a.paciente_id) ?? "" : "",
+                  procedimento: a.procedimento ?? "",
+                  valor_total: Number(a.valor_total).toFixed(2),
+                  valor_medico: Number(a.valor_medico).toFixed(2),
+                  valor_clinica: Number(a.valor_clinica).toFixed(2),
+                  forma_pagamento: a.forma_pagamento ?? "",
+                  status: a.status,
+                })),
+                `atendimentos-${new Date().toISOString().slice(0, 10)}`,
+                isMedicoOnly ? [
+                  { key: "data", label: "Data" },
+                  { key: "paciente", label: "Paciente" },
+                  { key: "procedimento", label: "Serviço" },
+                  { key: "valor_medico", label: "Repasse (R$)" },
+                  { key: "status", label: "Status" },
+                ] : [
+                  { key: "data", label: "Data" },
+                  { key: "medico", label: "Médico" },
+                  { key: "paciente", label: "Paciente" },
+                  { key: "procedimento", label: "Serviço" },
+                  { key: "valor_total", label: "Valor total (R$)" },
+                  { key: "valor_medico", label: "Repasse médico (R$)" },
+                  { key: "valor_clinica", label: "Clínica (R$)" },
+                  { key: "forma_pagamento", label: "Forma pagamento" },
+                  { key: "status", label: "Status" },
+                ],
+              );
+            }}
+          >
+            <Download className="h-4 w-4 mr-2" />Exportar Excel
           </Button>
-        )}
-        <Dialog open={open} onOpenChange={setOpen}>
           {!isMedicoOnly && (
-            <DialogTrigger asChild><Button onClick={openNew} disabled={!clinicaAtual}><Plus className="h-4 w-4 mr-2" />Novo atendimento</Button></DialogTrigger>
+            <Button onClick={openPay} disabled={!selectedItems.length}>
+              <Wallet className="h-4 w-4 mr-2" />Pagar repasse{selectedItems.length ? ` (${selectedItems.length} • ${fmt(selectedTotal)})` : ""}
+            </Button>
           )}
-          <DialogContent className="max-w-lg">
-            <DialogHeader><DialogTitle>{editing ? "Editar" : "Novo"} atendimento</DialogTitle></DialogHeader>
-            <form onSubmit={submit} className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2"><Label>Data</Label>
-                  <Input type="date" required value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} /></div>
-                <div className="space-y-2"><Label>Status</Label>
-                  <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+          <Dialog open={open} onOpenChange={setOpen}>
+            {!isMedicoOnly && (
+              <DialogTrigger asChild><Button onClick={openNew} disabled={!clinicaAtual}><Plus className="h-4 w-4 mr-2" />Novo atendimento</Button></DialogTrigger>
+            )}
+            <DialogContent className="max-w-lg">
+              <DialogHeader><DialogTitle>{editing ? "Editar" : "Novo"} atendimento</DialogTitle></DialogHeader>
+              <form onSubmit={submit} className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2"><Label>Data</Label>
+                    <Input type="date" required value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} /></div>
+                  <div className="space-y-2"><Label>Status</Label>
+                    <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="realizado">Realizado</SelectItem>
+                        <SelectItem value="agendado">Agendado</SelectItem>
+                        <SelectItem value="cancelado">Cancelado</SelectItem>
+                      </SelectContent>
+                    </Select></div>
+                </div>
+                <div className="space-y-2"><Label>Médico</Label>
+                  <Select value={form.medico_id || "none"} onValueChange={(v) => setForm({ ...form, medico_id: v === "none" ? "" : v })}>
+                    <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="realizado">Realizado</SelectItem>
-                      <SelectItem value="agendado">Agendado</SelectItem>
-                      <SelectItem value="cancelado">Cancelado</SelectItem>
+                      <SelectItem value="none">—</SelectItem>
+                      {medicos.map((m) => <SelectItem key={m.id} value={m.id} className="uppercase">{m.nome}</SelectItem>)}
                     </SelectContent>
                   </Select></div>
-              </div>
-              <div className="space-y-2"><Label>Médico</Label>
-                <Select value={form.medico_id || "none"} onValueChange={(v) => setForm({ ...form, medico_id: v === "none" ? "" : v })}>
-                  <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">—</SelectItem>
-                    {medicos.map((m) => <SelectItem key={m.id} value={m.id} className="uppercase">{m.nome}</SelectItem>)}
-                  </SelectContent>
-                </Select></div>
-              <div className="space-y-2"><Label>Paciente</Label>
-                <Select value={form.paciente_id || "none"} onValueChange={(v) => setForm({ ...form, paciente_id: v === "none" ? "" : v })}>
-                  <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">—</SelectItem>
-                    {pacientes.map((p) => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}
-                  </SelectContent>
-                </Select></div>
-              <div className="space-y-2"><Label>Serviço</Label>
-                <Input value={form.procedimento} onChange={(e) => setForm({ ...form, procedimento: e.target.value })} /></div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2"><Label>Valor total *</Label>
-                  <CurrencyInput value={form.valor_total} onChange={(v) => setForm({ ...form, valor_total: v })} /></div>
-                <div className="space-y-2"><Label>Forma de pagamento</Label>
-                  <Input value={form.forma_pagamento} onChange={(e) => setForm({ ...form, forma_pagamento: e.target.value })} /></div>
-              </div>
-              <div className="bg-muted rounded-md p-3 text-sm flex justify-between">
-                <span>Repasse médico: <strong>{fmt(calc.medico)}</strong></span>
-                <span>Clínica: <strong>{fmt(calc.clinica)}</strong></span>
-              </div>
-              <DialogFooter><Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button></DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+                <div className="space-y-2"><Label>Paciente</Label>
+                  <Select value={form.paciente_id || "none"} onValueChange={(v) => setForm({ ...form, paciente_id: v === "none" ? "" : v })}>
+                    <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">—</SelectItem>
+                      {pacientes.map((p) => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}
+                    </SelectContent>
+                  </Select></div>
+                <div className="space-y-2"><Label>Serviço</Label>
+                  <Input value={form.procedimento} onChange={(e) => setForm({ ...form, procedimento: e.target.value })} /></div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2"><Label>Valor total *</Label>
+                    <CurrencyInput value={form.valor_total} onChange={(v) => setForm({ ...form, valor_total: v })} /></div>
+                  <div className="space-y-2"><Label>Forma de pagamento</Label>
+                    <Input value={form.forma_pagamento} onChange={(e) => setForm({ ...form, forma_pagamento: e.target.value })} /></div>
+                </div>
+                <div className="bg-muted rounded-md p-3 text-sm flex justify-between">
+                  <span>Repasse médico: <strong>{fmt(calc.medico)}</strong></span>
+                  <span>Clínica: <strong>{fmt(calc.clinica)}</strong></span>
+                </div>
+                <DialogFooter><Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button></DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
       {/* Filtros */}
       <Card>
-        <CardContent className="p-2">
-          <div className="grid grid-cols-1 md:grid-cols-8 gap-2 items-end">
-            <div className="space-y-1">
-              <Label className="text-[10px] flex items-center gap-1"><Filter className="h-3 w-3" />Médico</Label>
+        <CardContent className="p-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-8 gap-3 items-end">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium flex items-center gap-1"><Filter className="h-3.5 w-3.5" />Médico</Label>
               <MedicoCombobox
                 value={fMedico}
                 onChange={(v) => { if (!isMedicoOnly) setFMedico(v); }}
                 medicos={isMedicoOnly ? medicos.filter((m) => m.id === medicoLogadoId) : medicos}
               />
             </div>
-            <div className="space-y-1">
-              <Label className="text-[10px]">Paciente</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Paciente</Label>
               <Input
-                className="h-8"
+                className="h-9"
                 placeholder="Buscar por nome..."
                 value={fPaciente}
                 onChange={(e) => setFPaciente(e.target.value)}
               />
             </div>
-            <div className="space-y-1">
-              <Label className="text-[10px]">De</Label>
-              <Input type="date" className="h-8" value={fIni} onChange={(e) => setFIni(e.target.value)} />
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">De</Label>
+              <Input type="date" className="h-9" value={fIni} onChange={(e) => setFIni(e.target.value)} />
             </div>
-            <div className="space-y-1">
-              <Label className="text-[10px]">Até</Label>
-              <Input type="date" className="h-8" value={fFim} onChange={(e) => setFFim(e.target.value)} />
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Até</Label>
+              <Input type="date" className="h-9" value={fFim} onChange={(e) => setFFim(e.target.value)} />
             </div>
-            <div className="space-y-1">
-              <Label className="text-[10px]">Status repasse</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Status repasse</Label>
               <Select value={fStatus} onValueChange={(v) => setFStatus(v as "todos" | "aberto" | "pago")}>
-                <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="aberto">A receber</SelectItem>
                   <SelectItem value="pago">Pagos</SelectItem>
@@ -1047,10 +1081,10 @@ function Page() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1">
-              <Label className="text-[10px]">Tipo</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Tipo</Label>
               <Select value={fTipo} onValueChange={(v) => setFTipo(v as "todos" | "medico" | "clinica")}>
-                <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos</SelectItem>
                   <SelectItem value="medico">Apenas médico (com repasse)</SelectItem>
@@ -1058,10 +1092,10 @@ function Page() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1">
-              <Label className="text-[10px]">Ordenar por</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Ordenar por</Label>
               <Select value={fOrdem} onValueChange={(v) => setFOrdem(v as typeof fOrdem)}>
-                <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="data_desc">Data (mais recente)</SelectItem>
                   <SelectItem value="data_asc">Data (mais antiga)</SelectItem>
@@ -1071,26 +1105,36 @@ function Page() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Cards de valores - mais compactos e próximos */}
             {isMedicoOnly ? (
-              <div className="grid grid-cols-2 gap-1">
-                <div className="rounded-md border px-2 py-1 bg-primary/5 text-center">
-                  <div className="text-[9px] text-muted-foreground uppercase leading-tight">A receber</div>
-                  <div className="text-sm font-semibold text-primary leading-tight">{fmt(totais.aReceber)}</div>
+              <div className="flex gap-1.5 min-w-[140px]">
+                <div className="flex-1 rounded-lg border-2 px-2 py-1 bg-primary/10 text-center h-9 flex items-center justify-center">
+                  <div>
+                    <div className="text-[8px] text-muted-foreground uppercase leading-tight">A receber</div>
+                    <div className="text-xs font-bold text-primary leading-tight">{fmt(totais.aReceber)}</div>
+                  </div>
                 </div>
-                <div className="rounded-md border px-2 py-1 text-center">
-                  <div className="text-[9px] text-muted-foreground uppercase leading-tight">Recebido</div>
-                  <div className="text-sm font-semibold leading-tight">{fmt(totais.pago)}</div>
+                <div className="flex-1 rounded-lg border-2 px-2 py-1 text-center h-9 flex items-center justify-center">
+                  <div>
+                    <div className="text-[8px] text-muted-foreground uppercase leading-tight">Recebido</div>
+                    <div className="text-xs font-bold leading-tight">{fmt(totais.pago)}</div>
+                  </div>
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-2 text-center">
-                <div className="rounded-md border p-2 bg-amber-500/5">
-                  <div className="text-[10px] text-muted-foreground uppercase">A pagar</div>
-                  <div className="text-sm font-semibold text-amber-600">{fmt(totais.aReceber)}</div>
+              <div className="flex gap-1.5 min-w-[140px]">
+                <div className="flex-1 rounded-lg border-2 px-2 py-1 bg-amber-500/10 text-center h-9 flex items-center justify-center">
+                  <div>
+                    <div className="text-[8px] text-muted-foreground uppercase leading-tight">A pagar</div>
+                    <div className="text-xs font-bold text-amber-600 leading-tight">{fmt(totais.aReceber)}</div>
+                  </div>
                 </div>
-                <div className="rounded-md border p-2 bg-emerald-500/5">
-                  <div className="text-[10px] text-muted-foreground uppercase">Pago</div>
-                  <div className="text-sm font-semibold text-emerald-600">{fmt(totais.pago)}</div>
+                <div className="flex-1 rounded-lg border-2 px-2 py-1 bg-emerald-500/10 text-center h-9 flex items-center justify-center">
+                  <div>
+                    <div className="text-[8px] text-muted-foreground uppercase leading-tight">Pago</div>
+                    <div className="text-xs font-bold text-emerald-600 leading-tight">{fmt(totais.pago)}</div>
+                  </div>
                 </div>
               </div>
             )}
@@ -1098,117 +1142,118 @@ function Page() {
         </CardContent>
       </Card>
 
-      <Card><CardContent className="p-0">
-        {loading ? <div className="py-12 text-center text-muted-foreground">Carregando...</div>
-          : filteredItems.length === 0 ? <div className="py-12 text-center text-muted-foreground"><Stethoscope className="h-10 w-10 mx-auto mb-2 text-muted-foreground/50" />Nenhum atendimento no período/filtro selecionado.</div>
-          : <Table>
-            <TableHeader><TableRow>
-              {!isMedicoOnly && (
-                <TableHead className="w-8">
-                  <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
-                </TableHead>
-              )}
-              <TableHead>Data</TableHead><TableHead>Médico</TableHead><TableHead>Paciente</TableHead>
-              <TableHead>Serviço</TableHead>
-              {!isMedicoOnly && <TableHead className="text-right">Total</TableHead>}
-              <TableHead className="text-right">{isMedicoOnly ? "Repasse" : "Médico"}</TableHead>
-              {!isMedicoOnly && <TableHead className="text-right">Clínica</TableHead>}
-              <TableHead className="text-center">Status</TableHead>
-              <TableHead className="text-center">Pgto</TableHead>
-              <TableHead className="text-center">Laudo</TableHead>
-              {!isMedicoOnly && <TableHead className="w-24"></TableHead>}
-            </TableRow></TableHeader>
-            <TableBody>{filteredItems.map((a) => (
-              <TableRow key={`${a.origem}:${a.id}`}>
+      <Card>
+        <CardContent className="p-0 overflow-x-auto relative">
+  {loading ? <div className="py-12 text-center text-muted-foreground">Carregando...</div>
+    : filteredItems.length === 0 ? <div className="py-12 text-center text-muted-foreground"><Stethoscope className="h-10 w-10 mx-auto mb-2 text-muted-foreground/50" />Nenhum atendimento no período/filtro selecionado.</div>
+      : <Table>
+        <TableHeader>
+          <TableRow className="bg-muted/50">
+            {!isMedicoOnly && <TableHead className="w-8 px-2"><Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" /></TableHead>}
+            <TableHead className="text-[11px] font-medium px-2 whitespace-nowrap">Data</TableHead>
+            <TableHead className="text-[11px] font-medium px-2 w-[15%]">Médico</TableHead>
+            <TableHead className="text-[11px] font-medium px-2 w-[15%]">Paciente</TableHead>
+            <TableHead className="text-[11px] font-medium px-2 w-[20%]">Serviço</TableHead>
+            {!isMedicoOnly && <TableHead className="text-right text-[11px] font-medium px-2">Total</TableHead>}
+            <TableHead className="text-right text-[11px] font-medium px-2">{isMedicoOnly ? "Repasse" : "Médico"}</TableHead>
+            {!isMedicoOnly && <TableHead className="text-right text-[11px] font-medium px-2">Clínica</TableHead>}
+            <TableHead className="text-center text-[11px] font-medium px-2">Status</TableHead>
+            <TableHead className="text-center text-[11px] font-medium px-2">Pgto</TableHead>
+            <TableHead className="text-center text-[11px] font-medium px-2">Laudo</TableHead>
+
+            {/* Coluna de Cabeçalho Fixa na Direita (Sticky) */}
+            {!isMedicoOnly && (
+              <TableHead className="text- text-[11px] font-medium px-2 sticky right-0 bg-muted z-10 border-l shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.05)]">
+                Ações
+              </TableHead>
+            )}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {filteredItems.map((a, idx) => {
+            const medicoNome = a.medico_id ? medMap.get(a.medico_id) ?? "—" : "—";
+            const pacienteNome = (a.paciente_id ? pacMap.get(a.paciente_id) : null) ?? a.paciente_nome_extra ?? "—";
+            const procedimentoNome = a.procedimento ?? "—";
+
+            // Define as cores das linhas para o efeito zebrado acompanhar a coluna fixa
+            const rowBg = idx % 2 === 0 ? "bg-background" : "bg-slate-50 dark:bg-slate-900/40";
+
+            return (
+              <TableRow key={`${a.origem}:${a.id}`} className={cn("hover:bg-muted/30 transition-colors", rowBg)}>
                 {!isMedicoOnly && (
-                  <TableCell>
+                  <TableCell className="px-2">
                     {!a.repasse_pago && (a.valor_medico ?? 0) > 0 ? (
-                      isAtendido(a) ? (
-                        <Checkbox checked={sel.has(`${a.origem}:${a.id}`)} onCheckedChange={() => toggleOne(a)} aria-label="Selecionar" />
-                      ) : (
-                        <span title="Aguardando o atendimento ser marcado como realizado" className="text-[10px] text-amber-600">⏳</span>
-                      )
+                      isAtendido(a) ? <Checkbox checked={sel.has(`${a.origem}:${a.id}`)} onCheckedChange={() => toggleOne(a)} aria-label="Selecionar" className="h-4 w-4" />
+                        : <span title="Aguardando atendimento" className="text-[10px] text-amber-600">⏳</span>
                     ) : null}
                   </TableCell>
                 )}
-                <TableCell className="text-sm">{new Date(a.data).toLocaleDateString("pt-BR")}</TableCell>
-                <TableCell className="text-sm">{a.medico_id ? medMap.get(a.medico_id) ?? "—" : "—"}</TableCell>
-                <TableCell className="text-sm">{(a.paciente_id ? pacMap.get(a.paciente_id) : null) ?? a.paciente_nome_extra ?? "—"}</TableCell>
-                <TableCell className="text-sm">{a.procedimento ?? "—"}</TableCell>
-                {!isMedicoOnly && <TableCell className="text-right font-medium">{fmt(Number(a.valor_total))}</TableCell>}
-                <TableCell className="text-right font-semibold text-primary">{fmt(Number(a.valor_medico))}</TableCell>
-                {!isMedicoOnly && <TableCell className="text-right text-muted-foreground">{fmt(Number(a.valor_clinica))}</TableCell>}
-                <TableCell className="text-center">
+                <TableCell className="text-xs whitespace-nowrap px-2">{new Date(a.data).toLocaleDateString("pt-BR")}</TableCell>
+
+                {/* Larguras baseadas em % e truncate para textos longos não quebrarem o layout */}
+                <TableCell className="text-xs max-w-[120px] truncate px-2" title={medicoNome}>{medicoNome}</TableCell>
+                <TableCell className="text-xs font-medium max-w-[120px] truncate px-2" title={pacienteNome}>{pacienteNome}</TableCell>
+                <TableCell className="text-xs text-muted-foreground max-w-[160px] truncate px-2" title={procedimentoNome}>{procedimentoNome}</TableCell>
+
+                {!isMedicoOnly && <TableCell className="text-xs text-right font-medium whitespace-nowrap px-2">{fmt(Number(a.valor_total))}</TableCell>}
+                <TableCell className="text-xs text-right font-semibold text-primary whitespace-nowrap px-2">{fmt(Number(a.valor_medico))}</TableCell>
+                {!isMedicoOnly && <TableCell className="text-xs text-right text-muted-foreground whitespace-nowrap px-2">{fmt(Number(a.valor_clinica))}</TableCell>}
+                <TableCell className="text-center px-2">
                   {a.repasse_pago ? (
-                    <Badge variant="outline" className="bg-emerald-500/10 text-emerald-700 border-emerald-500/30">
-                      <CheckCircle2 className="h-3 w-3 mr-1" />
-                      Pago{a.repasse_pago_em ? ` ${new Date(a.repasse_pago_em).toLocaleDateString("pt-BR")}` : ""}
+                    <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-700 border-emerald-500/30 whitespace-nowrap px-1.5 py-0">
+                      <CheckCircle2 className="h-3 w-3 mr-0.5 inline" />Pago
                     </Badge>
                   ) : (
-                    <Badge variant="outline" className="bg-amber-500/10 text-amber-700 border-amber-500/30">
-                      <Clock className="h-3 w-3 mr-1" />A receber
+                    <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-700 border-amber-500/30 whitespace-nowrap px-1.5 py-0">
+                      <Clock className="h-3 w-3 mr-0.5 inline" />A receber
                     </Badge>
                   )}
                 </TableCell>
-                <TableCell className="text-center">
-                  <div className="flex justify-center" title={a.forma_pagamento ?? "Sem forma de pagamento"}>
-                    <FormaPagamentoIcon forma={a.forma_pagamento} />
-                  </div>
-                </TableCell>
-                <TableCell className="text-center">
+                <TableCell className="text-center px-2"><div className="flex justify-center"><FormaPagamentoIcon forma={a.forma_pagamento} /></div></TableCell>
+                <TableCell className="text-center px-2">
                   {(() => {
                     const procKey = a.procedimento ? norm(a.procedimento) : "";
                     const exigeLaudo = procKey && procLaudo.get(procKey);
-                    if (a.laudo_status === "emitido") {
-                      return (
-                        <Badge variant="outline" className="bg-sky-500/10 text-sky-700 border-sky-500/30">
-                          <CheckCircle2 className="h-3 w-3 mr-1" />Emitido
-                        </Badge>
-                      );
-                    }
-                    if (!exigeLaudo) return <span className="text-muted-foreground text-xs">—</span>;
-                    if (!podeEstornar) {
-                      return <span className="text-amber-600 text-xs">Pendente</span>;
-                    }
-                    return (
-                      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => openLaudo(a)}>
-                        Marcar laudo
-                      </Button>
-                    );
+                    if (a.laudo_status === "emitido") return <Badge variant="outline" className="text-[10px] bg-sky-500/10 text-sky-700 border-sky-500/30 whitespace-nowrap px-1.5 py-0"><CheckCircle2 className="h-3 w-3 mr-0.5 inline" />Emitido</Badge>;
+                    if (!exigeLaudo) return <span className="text-muted-foreground text-[10px]">—</span>;
+                    if (!podeEstornar) return <span className="text-amber-600 text-[10px]">Pendente</span>;
+                    return <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" onClick={() => openLaudo(a)}>Laudar</Button>;
                   })()}
                 </TableCell>
+
+                {/* Célula de Ações Fixa na Direita com sombra lateral */}
                 {!isMedicoOnly && (
-                  <TableCell className="text-right">
+                  <TableCell className={cn(
+                    "text-right px-2 sticky right-0 z-10 border-l shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.05)]",
+                    rowBg // Usa a mesma cor zebrada da linha para o fundo do bloco fixo
+                  )}>
                     {a.origem === "agenda" ? (
-                      <div className="flex items-center justify-end gap-1">
-                        <span className="text-[10px] text-muted-foreground uppercase">Agenda</span>
-                        <Button variant="ghost" size="icon" title="Emitir NFS-e" onClick={() => openEmitNfse(a)} disabled={!a.paciente_id}>
-                          <Send className="h-3.5 w-3.5" />
-                        </Button>
+                      <div className="flex items-center justify-end gap-0.5">
+                        <span className="text-[9px] text-muted-foreground uppercase mr-1">Agenda</span>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" title="Emitir NFS-e" onClick={() => openEmitNfse(a)} disabled={!a.paciente_id}><Send className="h-3.5 w-3.5" /></Button>
                         {podeEstornar && !a.repasse_pago && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            title="Estornar atendimento (volta para Agendado)"
-                            onClick={() => estornar(a)}
-                          >
-                            <Undo2 className="h-3.5 w-3.5 text-amber-600" />
-                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" title="Estornar" onClick={() => estornar(a)}><Undo2 className="h-3.5 w-3.5 text-amber-600" /></Button>
                         )}
+                        {/* Botão de excluir para agenda */}
+                        <Button variant="ghost" size="icon" className="h-7 w-7" title="Excluir" onClick={() => remove(a)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
                       </div>
-                    ) : (<>
-                      <Button variant="ghost" size="icon" title="Emitir NFS-e" onClick={() => openEmitNfse(a)} disabled={!a.paciente_id}>
-                        <Send className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(a)}><Pencil className="h-3.5 w-3.5" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => remove(a)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
-                    </>)}
+                    ) : (
+                      <div className="flex items-center justify-end gap-0.5">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" title="Emitir NFS-e" onClick={() => openEmitNfse(a)} disabled={!a.paciente_id}><Send className="h-3.5 w-3.5" /></Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(a)}><Pencil className="h-3.5 w-3.5" /></Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => remove(a)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                      </div>
+                    )}
                   </TableCell>
                 )}
-              </TableRow>))}
-            </TableBody>
-          </Table>}
-      </CardContent></Card>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+  }
+</CardContent>
+      </Card>
 
       {/* Diálogo pagar repasse */}
       <Dialog open={payOpen} onOpenChange={setPayOpen}>
@@ -1292,7 +1337,7 @@ function Page() {
       </Dialog>
 
       {/* Diálogo: emitir NFS-e */}
-      <Dialog open={nfseDialog.open} onOpenChange={(o) => setNfseDialog({ open: o, atend: o ? nfseDialog.atend : null })}>
+      <Dialog open={nfseDialog.open} onOpenChange={(o) => setNfseDialog((prev) => ({ open: o, atend: o ? prev.atend : null }))}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>Emitir NFS-e</DialogTitle></DialogHeader>
           <div className="space-y-3">

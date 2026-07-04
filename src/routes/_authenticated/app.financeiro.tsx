@@ -35,9 +35,9 @@ function FinLayout() {
     ? subnav.filter((i) => i.to === "/app/financeiro/atendimentos").map((i) => ({ ...i, label: "Repasse" }))
     : subnav;
   return (
-    <div className="flex gap-6 -m-6 min-h-[calc(100vh-4rem)]">
-      <aside className="w-60 bg-card border-r border-border p-3 shrink-0 overflow-y-auto">
-        <p className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+    <div className="flex gap-3 -m-4 h-[calc(100vh-4rem)]">
+      <aside className="w-48 bg-card border-r border-border p-3 shrink-0 overflow-y-auto h-full">
+        <p className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Financeiro
         </p>
         <nav className="space-y-0.5">
@@ -49,7 +49,7 @@ function FinLayout() {
               <Link
                 key={item.to}
                 to={item.to}
-                className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${
+                className={`flex items-center gap-2 rounded-md px-2.5 py-2 text-sm transition-colors ${
                   active
                     ? "bg-primary/10 text-primary font-medium"
                     : "text-foreground/70 hover:bg-muted hover:text-foreground"
@@ -62,7 +62,7 @@ function FinLayout() {
           })}
         </nav>
       </aside>
-      <div className="flex-1 p-6 overflow-auto min-w-0">
+      <div className="flex-1 p-3 overflow-auto min-w-0 h-full">
         <Outlet />
       </div>
     </div>
