@@ -130,8 +130,8 @@ function AgendaExpressPage() {
     (async () => {
       const { data } = await supabase.rpc("buscar_paciente_contato", {
         _clinica_id: clinicaId,
-        _cpf: paciente.cpf ?? null,
-        _telefone: paciente.telefone ?? null,
+        _cpf: paciente.cpf ?? undefined,
+        _telefone: paciente.telefone ?? undefined,
         _nome: paciente.nome,
       });
       const row = Array.isArray(data) ? data[0] : null;
