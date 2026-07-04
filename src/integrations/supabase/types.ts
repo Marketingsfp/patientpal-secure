@@ -7763,6 +7763,28 @@ export type Database = {
           nfse_ok: boolean
         }[]
       }
+      paciente_resumo_recepcao: {
+        Args: { _clinica_id: string; _paciente_id: string }
+        Returns: {
+          cadastro_incompleto: boolean
+          convenio_nome: string
+          empresa_nome: string
+          faltantes: string[]
+          idade: number
+          nome: string
+          paciente_id: string
+          pendencia_qtd: number
+          pendencia_valor: number
+          telefone: string
+          tipo: string
+          ultima_consulta_data: string
+          ultima_consulta_especialidade: string
+          ultima_consulta_medico: string
+          ultimo_exame_data: string
+          ultimo_exame_nome: string
+          whatsapp_valido: boolean
+        }[]
+      }
       pacientes_face_lista: {
         Args: { _clinica_id: string }
         Returns: {
