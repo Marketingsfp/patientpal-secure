@@ -55,7 +55,7 @@ function DuplicadosPage() {
     supabase
       .rpc("listar_duplicados_pacientes", {
         _clinica_ids: clinicaIds,
-        _tipo: tipo || null,
+        _tipo: tipo || undefined,
         _limite: 200,
       })
       .then(({ data, error }) => {
