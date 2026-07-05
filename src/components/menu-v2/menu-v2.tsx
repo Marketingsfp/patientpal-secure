@@ -1,0 +1,276 @@
+import { useMemo, useState } from "react";
+import { Link, useRouterState } from "@tanstack/react-router";
+import {
+  ChevronDown, ChevronRight, Star, Heart, Clock, Search as SearchIcon,
+  Pin, X,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { CENTROS, PERFIL_DEFAULTS, findItem, type Centro, type MenuItem, type PerfilKey } from "./menu-catalog";
+import { useMenuPrefs } from "@/hooks/use-menu-prefs";
+
+const MAX_INLINE = 6;
+
+function IconBtn({
+  active, onClick, title, children,
+}: { active?: boolean; onClick: () => void; title: string; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClick(); }}
+      title={title}
+      className={cn(
+        "opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity",
+        "text-muted-foreground hover:text-foreground p-1 rounded",
+        active && "opacity-100 text-primary hover:text-primary",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function Row({
+  item, active, pinned, favorited, onTogglePin, onToggleFav,
+}: {
+  item: MenuItem; active: boolean; pinned: boolean; favorited: boolean;
+  onTogglePin: () => void; onToggleFav: () => void;
+}) {
+  const Icon = item.icon;
+  return (
+    <div
+      className={cn(
+        "group flex items-center gap-2 pl-3 pr-2 h-9 rounded-md text-sm transition-colors",
+        "hover:bg-sidebar-accent",
+        active && "bg-sidebar-accent border-l-2 border-primary",
+      )}
+    >
+      <Link to={item.path} className="flex items-center gap-2 flex-1 min-w-0">
+        <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <span className="truncate">{item.label}</span>
+      </Link>
+      <div className="flex items-center gap-0.5">
+        <IconBtn active={pinned} onClick={onTogglePin} title={pinned ? "Desfixar" : "Fixar"}>
+          <Pin className={cn("h-3.5 w-3.5", pinned && "fill-primary")} />
+        </IconBtn>
+        <IconBtn active={favorited} onClick={onToggleFav} title={favorited ? "Remover favorito" : "Favoritar"}>
+          <Heart className={cn("h-3.5 w-3.5", favorited && "fill-primary")} />
+        </IconBtn>
+      </div>
+    </div>
+  );
+}
+
+function CentroGroup({
+  centro, currentPath, open, onToggleOpen, prefs, onPin, onFav,
+}: {
+  centro: Centro; currentPath: string; open: boolean; onToggleOpen: () => void;
+  prefs: { pinned: string[]; favorites: string[] };
+  onPin: (p: string) => void; onFav: (p: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const visible = centro.items.slice(0, MAX_INLINE);
+  const hasMore = centro.items.length > MAX_INLINE;
+  const Icon = centro.icon;
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return centro.items;
+    return centro.items.filter((i) => i.label.toLowerCase().includes(q));
+  }, [centro.items, query]);
+
+  return (
+    <div className="mb-1">
+      <button
+        type="button"
+        onClick={onToggleOpen}
+        className="w-full flex items-center gap-2 px-3 h-8 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
+      >
+        {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+        <Icon className="h-3.5 w-3.5" />
+        <span className="flex-1 text-left truncate">{centro.label}</span>
+      </button>
+      {open && (
+        <div className="mt-0.5 space-y-0.5">
+          {visible.map((it) => (
+            <Row
+              key={it.path}
+              item={it}
+              active={currentPath === it.path || currentPath.startsWith(it.path + "/")}
+              pinned={prefs.pinned.includes(it.path)}
+              favorited={prefs.favorites.includes(it.path)}
+              onTogglePin={() => onPin(it.path)}
+              onToggleFav={() => onFav(it.path)}
+            />
+          ))}
+          {hasMore && (
+            <Sheet>
+              <SheetTrigger asChild>
+                <button
+                  type="button"
+                  className="pl-3 h-8 text-xs text-primary hover:underline w-full text-left"
+                >
+                  Ver todos ({centro.items.length}) →
+                </button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-[380px] sm:w-[420px]">
+                <SheetHeader>
+                  <SheetTitle className="flex items-center gap-2">
+                    <Icon className="h-4 w-4" /> {centro.label}
+                  </SheetTitle>
+                </SheetHeader>
+                <div className="mt-4 relative">
+                  <SearchIcon className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Buscar…"
+                    className="pl-8 h-9"
+                  />
+                </div>
+                <div className="mt-3 space-y-0.5 overflow-y-auto max-h-[calc(100vh-160px)]">
+                  {filtered.map((it) => (
+                    <Row
+                      key={it.path}
+                      item={it}
+                      active={currentPath === it.path}
+                      pinned={prefs.pinned.includes(it.path)}
+                      favorited={prefs.favorites.includes(it.path)}
+                      onTogglePin={() => onPin(it.path)}
+                      onToggleFav={() => onFav(it.path)}
+                    />
+                  ))}
+                  {filtered.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-6">Nada encontrado.</p>
+                  )}
+                </div>
+              </SheetContent>
+            </Sheet>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function MenuV2({ perfil = "gestor" }: { perfil?: PerfilKey }) {
+  const { prefs, loading, togglePin, toggleFavorite, toggleGroup, pushRecent } = useMenuPrefs();
+  const currentPath = useRouterState({ select: (s) => s.location.pathname });
+  const defaults = PERFIL_DEFAULTS[perfil];
+  const centrosVisiveis = CENTROS.filter((c) => defaults.centros.includes(c.key));
+
+  // pinned = user pinned OR perfil defaults (union, sem duplicar)
+  const effectivePinned = useMemo(() => {
+    const set = new Set<string>([...defaults.pinned, ...prefs.pinned]);
+    return Array.from(set);
+  }, [defaults.pinned, prefs.pinned]);
+
+  const pinnedItems = effectivePinned
+    .map((p) => findItem(p))
+    .filter((x): x is MenuItem => Boolean(x));
+
+  const recentesFiltrados = prefs.recent
+    .filter((r) => !effectivePinned.includes(r.path) && r.path !== currentPath)
+    .slice(0, 5);
+
+  const favoritos = prefs.favorites
+    .map((p) => findItem(p))
+    .filter((x): x is MenuItem => Boolean(x));
+
+  if (loading) {
+    return <div className="p-4 text-sm text-muted-foreground">Carregando menu…</div>;
+  }
+
+  return (
+    <TooltipProvider delayDuration={300}>
+      <aside
+        data-testid="menu-v2"
+        className="w-64 shrink-0 bg-sidebar text-sidebar-foreground border-r border-border h-full flex flex-col"
+      >
+        <div className="p-3 space-y-4 overflow-y-auto flex-1">
+          {/* Fixados */}
+          {pinnedItems.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 px-3 h-8 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <Pin className="h-3.5 w-3.5" /> Fixados
+              </div>
+              <div className="space-y-0.5">
+                {pinnedItems.map((it) => (
+                  <Row
+                    key={it.path}
+                    item={it}
+                    active={currentPath === it.path || currentPath.startsWith(it.path + "/")}
+                    pinned
+                    favorited={prefs.favorites.includes(it.path)}
+                    onTogglePin={() => togglePin(it.path)}
+                    onToggleFav={() => toggleFavorite(it.path)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Centros Operacionais */}
+          <div>
+            {centrosVisiveis.map((c) => (
+              <CentroGroup
+                key={c.key}
+                centro={c}
+                currentPath={currentPath}
+                open={prefs.groups[c.key] ?? true}
+                onToggleOpen={() => toggleGroup(c.key)}
+                prefs={{ pinned: effectivePinned, favorites: prefs.favorites }}
+                onPin={togglePin}
+                onFav={toggleFavorite}
+              />
+            ))}
+          </div>
+
+          {/* Recentes */}
+          {recentesFiltrados.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 px-3 h-8 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <Clock className="h-3.5 w-3.5" /> Recentes
+              </div>
+              <div className="space-y-0.5">
+                {recentesFiltrados.map((r) => (
+                  <Link
+                    key={r.path}
+                    to={r.path}
+                    className="flex items-center gap-2 pl-3 pr-2 h-8 rounded-md text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+                  >
+                    <span className="truncate">{r.label}</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Favoritos */}
+          {favoritos.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 px-3 h-8 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <Heart className="h-3.5 w-3.5" /> Favoritos
+              </div>
+              <div className="space-y-0.5">
+                {favoritos.map((it) => (
+                  <Row
+                    key={it.path}
+                    item={it}
+                    active={currentPath === it.path}
+                    pinned={effectivePinned.includes(it.path)}
+                    favorited
+                    onTogglePin={() => togglePin(it.path)}
+                    onToggleFav={() => toggleFavorite(it.path)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </aside>
+    </TooltipProvider>
+  );
+}
