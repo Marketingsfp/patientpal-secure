@@ -141,6 +141,7 @@ function DevListShellPreview() {
         onTabChange={setStatus}
         chips={<QuickFilters options={chipOptions} value={chips} onChange={setChips} multi />}
         empty="Nenhum registro para os filtros atuais."
+        isEmpty={filtered.length === 0}
       >
         <VirtualList
           items={visible}
