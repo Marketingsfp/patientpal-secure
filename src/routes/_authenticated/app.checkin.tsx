@@ -185,7 +185,7 @@ function DateSelector({ data, onDataChange }: { data: string; onDataChange: (val
           <ChevronLeft className="h-4 w-4" />
         </Button>
 
-        <div className="relative flex-1 min-w-[220px]">
+        <div className="relative flex-1 min-w-0">
           {/* Aqui removemos o 'truncate' e a data redundante para o texto respirar */}
           <Button
             variant="outline"
@@ -334,7 +334,7 @@ function SearchBar({
         </div>
       </div>
 
-      <div className="flex items-center gap-3 mt-4 pt-3 border-t">
+      <div className="flex flex-wrap items-center gap-3 mt-4 pt-3 border-t">
         <p className="text-xs text-muted-foreground">
           📋 Mostrando todos os pacientes agendados para o dia (pagos e pendentes)
         </p>
