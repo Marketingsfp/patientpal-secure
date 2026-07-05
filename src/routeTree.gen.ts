@@ -70,6 +70,7 @@ import { Route as AuthenticatedAppEquipeRouteImport } from './routes/_authentica
 import { Route as AuthenticatedAppEnfermagemRecursosRouteImport } from './routes/_authenticated/app.enfermagem-recursos'
 import { Route as AuthenticatedAppDocumentosRouteImport } from './routes/_authenticated/app.documentos'
 import { Route as AuthenticatedAppDisponibilidadesRouteImport } from './routes/_authenticated/app.disponibilidades'
+import { Route as AuthenticatedAppDevListShellRouteImport } from './routes/_authenticated/app.dev-list-shell'
 import { Route as AuthenticatedAppCrmRouteImport } from './routes/_authenticated/app.crm'
 import { Route as AuthenticatedAppContratosRouteImport } from './routes/_authenticated/app.contratos'
 import { Route as AuthenticatedAppConsultaRapidaRouteImport } from './routes/_authenticated/app.consulta-rapida'
@@ -458,6 +459,12 @@ const AuthenticatedAppDisponibilidadesRoute =
     path: '/disponibilidades',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
+const AuthenticatedAppDevListShellRoute =
+  AuthenticatedAppDevListShellRouteImport.update({
+    id: '/dev-list-shell',
+    path: '/dev-list-shell',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppCrmRoute = AuthenticatedAppCrmRouteImport.update({
   id: '/crm',
   path: '/crm',
@@ -811,6 +818,7 @@ export interface FileRoutesByFullPath {
   '/app/consulta-rapida': typeof AuthenticatedAppConsultaRapidaRoute
   '/app/contratos': typeof AuthenticatedAppContratosRoute
   '/app/crm': typeof AuthenticatedAppCrmRoute
+  '/app/dev-list-shell': typeof AuthenticatedAppDevListShellRoute
   '/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
   '/app/documentos': typeof AuthenticatedAppDocumentosRoute
   '/app/enfermagem-recursos': typeof AuthenticatedAppEnfermagemRecursosRoute
@@ -925,6 +933,7 @@ export interface FileRoutesByTo {
   '/app/consulta-rapida': typeof AuthenticatedAppConsultaRapidaRoute
   '/app/contratos': typeof AuthenticatedAppContratosRoute
   '/app/crm': typeof AuthenticatedAppCrmRoute
+  '/app/dev-list-shell': typeof AuthenticatedAppDevListShellRoute
   '/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
   '/app/documentos': typeof AuthenticatedAppDocumentosRoute
   '/app/enfermagem-recursos': typeof AuthenticatedAppEnfermagemRecursosRoute
@@ -1041,6 +1050,7 @@ export interface FileRoutesById {
   '/_authenticated/app/consulta-rapida': typeof AuthenticatedAppConsultaRapidaRoute
   '/_authenticated/app/contratos': typeof AuthenticatedAppContratosRoute
   '/_authenticated/app/crm': typeof AuthenticatedAppCrmRoute
+  '/_authenticated/app/dev-list-shell': typeof AuthenticatedAppDevListShellRoute
   '/_authenticated/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
   '/_authenticated/app/documentos': typeof AuthenticatedAppDocumentosRoute
   '/_authenticated/app/enfermagem-recursos': typeof AuthenticatedAppEnfermagemRecursosRoute
@@ -1159,6 +1169,7 @@ export interface FileRouteTypes {
     | '/app/consulta-rapida'
     | '/app/contratos'
     | '/app/crm'
+    | '/app/dev-list-shell'
     | '/app/disponibilidades'
     | '/app/documentos'
     | '/app/enfermagem-recursos'
@@ -1273,6 +1284,7 @@ export interface FileRouteTypes {
     | '/app/consulta-rapida'
     | '/app/contratos'
     | '/app/crm'
+    | '/app/dev-list-shell'
     | '/app/disponibilidades'
     | '/app/documentos'
     | '/app/enfermagem-recursos'
@@ -1388,6 +1400,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/consulta-rapida'
     | '/_authenticated/app/contratos'
     | '/_authenticated/app/crm'
+    | '/_authenticated/app/dev-list-shell'
     | '/_authenticated/app/disponibilidades'
     | '/_authenticated/app/documentos'
     | '/_authenticated/app/enfermagem-recursos'
@@ -1921,6 +1934,13 @@ declare module '@tanstack/react-router' {
       path: '/disponibilidades'
       fullPath: '/app/disponibilidades'
       preLoaderRoute: typeof AuthenticatedAppDisponibilidadesRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/dev-list-shell': {
+      id: '/_authenticated/app/dev-list-shell'
+      path: '/dev-list-shell'
+      fullPath: '/app/dev-list-shell'
+      preLoaderRoute: typeof AuthenticatedAppDevListShellRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/crm': {
@@ -2457,6 +2477,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppConsultaRapidaRoute: typeof AuthenticatedAppConsultaRapidaRoute
   AuthenticatedAppContratosRoute: typeof AuthenticatedAppContratosRoute
   AuthenticatedAppCrmRoute: typeof AuthenticatedAppCrmRoute
+  AuthenticatedAppDevListShellRoute: typeof AuthenticatedAppDevListShellRoute
   AuthenticatedAppDisponibilidadesRoute: typeof AuthenticatedAppDisponibilidadesRoute
   AuthenticatedAppDocumentosRoute: typeof AuthenticatedAppDocumentosRoute
   AuthenticatedAppEnfermagemRecursosRoute: typeof AuthenticatedAppEnfermagemRecursosRoute
@@ -2529,6 +2550,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppConsultaRapidaRoute: AuthenticatedAppConsultaRapidaRoute,
   AuthenticatedAppContratosRoute: AuthenticatedAppContratosRoute,
   AuthenticatedAppCrmRoute: AuthenticatedAppCrmRoute,
+  AuthenticatedAppDevListShellRoute: AuthenticatedAppDevListShellRoute,
   AuthenticatedAppDisponibilidadesRoute: AuthenticatedAppDisponibilidadesRoute,
   AuthenticatedAppDocumentosRoute: AuthenticatedAppDocumentosRoute,
   AuthenticatedAppEnfermagemRecursosRoute:
@@ -2632,13 +2654,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
