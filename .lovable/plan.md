@@ -1,200 +1,176 @@
-# Auditoria de Navegação & Paginação — ClinicaOS
 
-Diagnóstico completo + plano priorizado. **Nada é implementado nesta fase.**
+# A2 / UB — Busca Universal — Plano técnico
 
----
+Escopo: unificar Ctrl+K + barra de busca do topo em **um único módulo** capaz de localizar entidades, telas e ações. Sem convênios externos — só Particular, Associado, Cartão de Benefícios, Regras do Cartão e Empresas associadas.
 
-## 1. Diagnóstico do estado atual
+## 1. Entidades pesquisáveis (v1)
 
-### 1.1 Menu (fonte: `permissoes-presets.ts`, `app-shell.tsx`)
-- 60+ módulos registrados, agrupados em ~10 seções.
-- Sub-rotas hoje aparecem como itens de menu (Financeiro tem 12, Cartão de Benefícios 6, Marketing 5, RH 5, Serviços 4).
-- Sem busca de tela. Sem favoritos. Sem "recentes".
+| Entidade                | Fonte              | Campos indexados na busca                                         | Rota destino                                    |
+|-------------------------|--------------------|-------------------------------------------------------------------|-------------------------------------------------|
+| Paciente                | `pacientes`        | nome, cpf, telefone, email, data_nascimento, numero_pasta         | `/app/clientes/$id` (ou drawer de edição)       |
+| Orçamento               | `orcamentos`       | numero, paciente (join), status, valor_total, created_at          | `/app/orcamentos?abrir=$id`                     |
+| Agendamento             | `agendamentos`     | paciente (join), medico (join), inicio, status                    | `/app/agenda?ag=$id`                            |
+| Atendimento financeiro  | `fin_atendimentos` | numero, paciente (join), valor, status                            | `/app/financeiro/atendimentos?abrir=$id`        |
+| NFS-e                   | `nfse`             | numero, rps, tomador, valor, status                               | `/app/nfse?abrir=$id`                           |
+| Cartão de Benefícios    | `cb_convenios`     | nome do plano/entidade, ativo                                     | `/app/cartao-beneficios/convenios/$id`          |
+| Associado (contrato)    | `contratos_assinatura` + `contrato_dependentes` | titular, dependentes, numero_contrato, status | `/app/cartao-beneficios/contratos/$id` |
+| Regras do Cartão        | `cb_convenio_regras` | descricao, procedimento (join), plano (join)                    | `/app/cartao-beneficios/beneficios/$id`         |
+| Empresas associadas     | `cb_convenios` (subset "entidade juridica") | razão social / cnpj                        | `/app/cartao-beneficios/convenios/$id`          |
+| Médico                  | `medicos`          | nome, cpf, conselho, especialidades (join)                        | `/app/medicos/$id`                              |
+| Procedimento            | `procedimentos`    | nome, codigo_tuss, grupo                                          | `/app/procedimentos?abrir=$id`                  |
+| Tela                    | rota estática      | label, keywords                                                   | rota                                            |
+| Ação rápida             | comando estático   | label, contexto atual (paciente selecionado, caixa aberto, etc.)  | executa handler                                 |
 
-### 1.2 Paginação e limites (varredura em `src/routes/_authenticated/`)
-| Tela | Padrão atual | Volume típico |
-|---|---|---|
-| Clientes | Busca server-side + `limit 120` sem paginação | 10k+ pacientes |
-| Agenda | `limit` por dia, sem virtualização | 50–300/dia |
-| Agenda Express | Lista longa, sem chips | 100+ slots |
-| Orçamentos | `.range()` clássico + Pagination | 500+ |
-| Caixa | `.range()` + Pagination | 200–1000/dia |
-| Financeiro (movimento/atendimentos/notas/relatórios) | `.range()` + Pagination em quase todas | 1k–100k |
-| Prontuários | Lista por paciente, sem filtro por tipo | 50–500/paciente |
-| Documentos | Lista plana, sem agrupamento | 100+ |
-| Procedimentos | Tabela com `.range()` | 200–800 |
-| Relatórios | CuboBI com paginação | variável |
-| NFS-e | `.range()` + Pagination | 1k+/mês |
-| Auditoria | `.range()` + Pagination | 100k+ |
-| Cartão de Benefícios (5 abas) | `.range()` em todas | 500–5k |
+Fora do escopo v1 (para v2): boletos, exames-resultados, prontuários, salas, senhas.
 
-### 1.3 Sintomas confirmados
-- **Excesso de cliques:** Financeiro → Movimento → filtrar → paginar → abrir. 5+ cliques para achar um lançamento.
-- **Sem busca global:** só busca dentro de cada tela.
-- **Sem Ctrl+K.**
-- **Sem virtualização:** listas grandes renderizam DOM inteiro (Auditoria, NFS-e, Financeiro).
-- **Sem skeleton consistente:** algumas telas mostram "Carregando…", outras ficam em branco.
-- **Sem chips de status:** filtros ficam escondidos em selects/comboboxes.
+## 2. RPCs
 
----
+### Reutilizadas
+- `buscar_pacientes_global(_clinica_ids, _termo, _limite)` — já retorna ranqueado por `match_score`. Continua sendo a fonte de pacientes.
 
-## 2. Novo padrão proposto (referência para todas as telas)
+### Novas — 1 única RPC agregadora
+- `buscar_universal(_clinica_ids uuid[], _termo text, _tipos text[] DEFAULT NULL, _limite int DEFAULT 24)` — SECURITY DEFINER, `SET search_path=public`.
+  - Retorna: `tipo`, `id`, `titulo`, `subtitulo`, `hint`, `payload jsonb`, `score numeric`, `criado_em timestamptz`.
+  - Só devolve linhas de clínicas às quais o usuário pertence (checado via `clinica_memberships`).
+  - Para cada `_tipos` (default = todos), dispara uma CTE dedicada com `LIMIT ceil(_limite/n_tipos * 2)` e faz `UNION ALL` + `ORDER BY score DESC, criado_em DESC LIMIT _limite`.
+  - Fontes por tipo:
+    - `paciente` → chama `buscar_pacientes_global` internamente
+    - `orcamento` → `orcamentos` + join `pacientes`
+    - `agendamento` → `agendamentos` + joins
+    - `financeiro` → `fin_atendimentos`
+    - `nfse` → `nfse`
+    - `cartao_convenio` / `empresa_associada` → `cb_convenios` (flag na tabela distingue plano vs entidade jurídica)
+    - `contrato_associado` → `contratos_assinatura` + `contrato_dependentes`
+    - `regra_cartao` → `cb_convenio_regras`
+    - `medico` → `medicos`
+    - `procedimento` → `procedimentos`
+- Índices adicionais (aditivos, `CREATE INDEX IF NOT EXISTS`, todos com `WHERE ativo` onde faz sentido):
+  - `orcamentos(clinica_id, numero)`
+  - trigram `gin` em `orcamentos(pacientes_denorm_nome)` só se necessário na v2 (v1 usa o join já indexado)
+  - `nfse(clinica_id, numero)`, `nfse(clinica_id, rps)`
+  - `cb_convenios(clinica_id, lower(nome))`
+  - `contratos_assinatura(clinica_id, numero_contrato)`
+  - `medicos(clinica_id, lower(nome))`
+  - `procedimentos(clinica_id, lower(nome))`
+- Nenhuma alteração em RLS. A RPC é `SECURITY DEFINER` e valida `is_member(_clinica_id)` linha a linha para cada CTE.
 
-Toda lista deve seguir este esqueleto:
+## 3. Ranking
 
-```
-┌────────────────────────────────────────────────────────────┐
-│ [🔍 Busca forte 100% width no topo — 200ms debounce]        │
-├────────────────────────────────────────────────────────────┤
-│ [Todos] [Abertos] [Pendentes] [Concluídos] [Cancelados]     │  ← abas por status
-│ 🏷 Hoje  🏷 Semana  🏷 Mês  🏷 Unidade X  🏷 Convênio Y      │  ← chips filtros rápidos
-├────────────────────────────────────────────────────────────┤
-│ ▸ Hoje (12)                                                 │  ← agrupamento colapsável
-│    linha compacta · linha compacta · linha compacta         │
-│ ▸ Ontem (8)                                                 │
-├────────────────────────────────────────────────────────────┤
-│         ↓ scroll infinito / "carregar mais 50"              │
-└────────────────────────────────────────────────────────────┘
-```
+`score` calculado no SQL, escala 0–100:
 
-**Regras técnicas:**
-- Busca sempre server-side com RPC dedicada quando envolver >1 tabela.
-- Paginação clássica **só** em Auditoria, NFS-e e Relatórios (dados regulatórios que exigem paginação numerada).
-- Virtualização (`@tanstack/react-virtual`) obrigatória para listas com >200 linhas renderizadas.
-- Skeleton em todo carregamento inicial (usar `<Skeleton />` já existente).
-- Ctrl+K global: telas + pacientes + orçamentos + agendamentos + ações.
-- Favoritos e Recentes persistidos por usuário (`profiles` + localStorage).
+- +50 se match exato em campo-chave (numero, cpf, telefone)
+- +30 se prefixo de nome/título
+- +20 se substring
+- +10 se match em campo secundário (email, especialidade, grupo)
+- +5 por recência (últimos 30 dias)
+- ×0.7 quando entidade está `ativo=false` / `cancelado`
+- Ação e Tela recebem score fixo 90 quando keyword do label bate; senão 40
 
----
+Ordenação final: `score DESC, criado_em DESC, titulo ASC`.
 
-## 3. Auditoria por tela (prioridade Alta)
+## 4. Permissões por perfil
 
-### 3.1 Clientes
-- **Problema:** busca funciona, mas exibe só 120 primeiros. Sem chips (ativo/inativo/aniversariante). Sem virtualização.
-- **Solução:** manter RPC `buscar_pacientes`, adicionar chips (Ativos, Aniversariantes hoje, Novos 30d, Sem contato 90d), virtualizar tabela.
-- **Risco:** baixo. **Perf:** neutra (virtualização melhora). **Ganho:** −40% cliques.
+- A UB **filtra entradas** conforme `usePermissoes()` (mesmo Set que o menu já usa).
+- Mapa `tipo → moduloRequerido`:
+  - paciente → `clientes`
+  - orcamento → `orcamentos`
+  - agendamento → `agenda`
+  - financeiro/nfse → `financeiro` / `nfse`
+  - cartao_convenio / empresa_associada / regra_cartao / contrato_associado → `cartao-beneficios`
+  - medico → `medicos`
+  - procedimento → `procedimentos`
+  - tela → módulo próprio da tela (já sabido pela entrada)
+  - acao → módulo da ação
+- No servidor a RPC também respeita `is_member`; no cliente filtramos por módulo permitido antes de renderizar. Perfil `medico` recebe só paciente + agenda + prontuário-relacionadas; `caixa` recebe caixa/financeiro/paciente/nfse; `recepcao` recebe tudo exceto RH/relatórios; `admin`/`gestor` recebem todos.
 
-### 3.2 Agenda
-- **Problema:** dia com 200+ slots renderiza tudo. Sem chips por status/médico.
-- **Solução:** virtualizar coluna do dia, chips (Confirmados, Aguardando, Faltas), agrupamento por sala.
-- **Risco:** médio (agenda tem drag). **Perf:** +30% render. **Ganho:** −25% scroll.
+## 5. UX / superfície
 
-### 3.3 Agenda Express
-- **Problema:** lista longa de horários sem filtro rápido.
-- **Solução:** chips (Próxima hora, Hoje, Amanhã, Este médico) + busca por paciente.
-- **Risco:** baixo. **Ganho:** −50% cliques para achar horário.
+- **1 componente** `UniversalBar` em 3 superfícies:
+  1. Input compacto no header (desktop ≥ md) — abre modal ao focar.
+  2. Modal Ctrl/⌘+K (já implementado no A1).
+  3. Full-screen em mobile.
+- Debounce 200 ms, `AbortController`, cache LRU de 30 termos.
+- Agrupamento por tipo, com atalhos:
+  - `p:` só pacientes · `o:` só orçamentos · `a:` só agenda · `n:` só NFS-e · `c:` só cartão · `>` só ações · `?` só telas.
+- Últimas 8 buscas salvas em `profiles.preferencias_ui.ub.recents` (aditivo à coluna já aprovada em A7).
 
-### 3.4 Orçamentos
-- **Problema:** paginação clássica; filtro por status escondido.
-- **Solução:** abas [Rascunho|Enviado|Aprovado|Convertido|Recusado], scroll infinito, busca por paciente/número.
-- **Risco:** baixo. **Ganho:** −60% cliques.
+## 6. Performance esperada
 
-### 3.5 Caixa
-- **Problema:** paginação para movimentos do dia; recepção precisa achar pagamento rápido.
-- **Solução:** modo compacto padrão, abas [Sessão Atual|Hoje|Semana], busca por paciente, chip "Últimos 10 min" (Turbo).
-- **Risco:** baixo. **Ganho:** −70% tempo para localizar pagamento recente.
+- p50 ≤ 120 ms, p95 ≤ 350 ms na clínica de referência (~40k pacientes).
+- Cada CTE limita cedo (`LIMIT 24`), evitando full scan.
+- Índices trigram em `pacientes` já existem (via `buscar_pacientes_global`); os demais são `lower(campo)` ou `(clinica_id, numero)`, todos B-tree pequenos.
+- Response payload ≤ 8 KB (24 linhas × ~300 B).
+- No cliente: virtualização não é necessária (24 itens), lista simples.
 
-### 3.6 Financeiro (Movimento / Atendimentos / Notas)
-- **Problema:** 3 telas separadas, todas paginadas, filtros duplicados.
-- **Solução:** unificar em 1 tela com abas + chips de período + busca cross-entity. Manter paginação em Relatórios apenas.
-- **Risco:** médio (refactor de 3 rotas). **Ganho:** −65% cliques, menu −2 itens.
+## 7. Feature flag
 
-### 3.7 Prontuários
-- **Problema:** lista plana por paciente.
-- **Solução:** agrupamento por ano + tipo (Consulta/Exame/Anexo), filtro por médico, busca em texto do prontuário.
-- **Risco:** médio (busca full-text exige RPC nova). **Ganho:** −50% tempo.
+Flag: `ub_v1` em `profiles.preferencias_ui.flags.ub_v1` (default `false`) + override global via variável de ambiente `VITE_UB_DEFAULT=on` (opcional). Enquanto `false`:
+- Header segue como está (sem input de busca).
+- Ctrl+K continua abrindo o palette do A1 com apenas telas + ações (sem entidades).
 
-### 3.8 Documentos
-- **Problema:** lista plana, sem agrupamento.
-- **Solução:** agrupar por tipo (Contrato, Receita, Atestado, LGPD) + chips por status assinatura.
-- **Risco:** baixo. **Ganho:** −40% cliques.
+Ativação por usuário na tela `/app/perfil` (toggle "Busca Universal (beta)"). Admin pode ativar em massa depois via SQL.
 
-### 3.9 Procedimentos
-- **Problema:** tabela paginada, difícil achar por especialidade.
-- **Solução:** chips por especialidade + tipo_servico, busca fuzzy, modo compacto.
-- **Risco:** baixo. **Ganho:** −50% cliques.
+## 8. Fallback / erros
 
-### 3.10 Relatórios
-- **Problema:** CuboBI carrega dados demais.
-- **Solução:** manter paginação numerada (é relatório), mas adicionar "salvar visão" + presets de período.
-- **Risco:** baixo. **Ganho:** menor, mas evita rework.
+- Falha na RPC → toast discreto ("Busca temporariamente indisponível") e o palette continua funcionando com telas + ações (nunca quebra a UI).
+- Timeout do lado cliente: 4 s. Ao expirar, mostra "resultado parcial" com o que já veio.
+- Erros são logados via `console.error("[ub]", …)` + `audit_log` apenas em erro (não em cada busca, para não inflar).
 
----
+## 9. Rollback
 
-## 4. Componentes base a criar
+- Nível 1 (usuário): desligar flag `ub_v1` no perfil.
+- Nível 2 (global): `UPDATE profiles SET preferencias_ui = jsonb_set(coalesce(preferencias_ui,'{}'), '{flags,ub_v1}', 'false')`.
+- Nível 3 (código): remover `<UniversalBar>` do header e voltar `useDefaultScreenEntries` no palette. Componentes A1 permanecem.
+- Nível 4 (banco): a RPC nova e os índices são **aditivos**. Podem ser removidos com `DROP FUNCTION buscar_universal(…)` + `DROP INDEX IF EXISTS …` sem impacto.
 
-Reutilizáveis por todas as telas — construir 1x, usar 10x.
+Nenhuma tabela, coluna ou RPC existente é alterada. Nenhuma RLS é tocada.
 
-1. `<ListShell>` — busca + chips + abas + agrupamento + skeleton.
-2. `<VirtualList>` — wrap de `@tanstack/react-virtual`.
-3. `<CommandPalette>` — Ctrl+K, indexa rotas + entidades.
-4. `<QuickFilters>` — chips com estado em URL search params.
-5. `<StatusTabs>` — abas com contagem por status.
-6. `<GroupedList>` — agrupamento colapsável por data/status.
-7. `<CompactRow>` — linha densa (44px) padrão.
-8. `<RecentFavorites>` — sidebar/dropdown "recentes + favoritos".
+## 10. Testes Playwright
 
----
+Rota isolada `/app/dev-list-shell` (já existente, admin-only) ganha painel de teste da UB. Cenários:
 
-## 5. Plano priorizado
+1. **T1 — Abrir Ctrl+K** e ver telas + ações (sem entidades) quando flag off.
+2. **T2 — Ativar flag** via UI de perfil e reabrir: buscar "silva" → aparecem pacientes reais no grupo "Pacientes".
+3. **T3 — Prefixos**: `p:silva` só pacientes; `o:2024` só orçamentos; `c:` só Cartão de Benefícios / Empresas associadas.
+4. **T4 — Terminologia**: digitar "convên" retorna resultados de "Cartão de Benefícios" / "Empresas associadas" / "Regras do Cartão" — nunca a palavra "Convênio" aparece nos labels.
+5. **T5 — Permissões**: logar como perfil `caixa`: buscar "silva" mostra paciente; buscar "med" NÃO mostra grupo "Médicos"; buscar "unida" NÃO mostra grupo "Unidades".
+6. **T6 — Latência**: medir p50 em 30 buscas repetidas; falha se > 500 ms.
+7. **T7 — Fallback**: mockar `.rpc` para lançar erro; palette continua abrindo com telas + ações e toast aparece.
+8. **T8 — Zero regressão**: navegar Agenda, Caixa, Orçamentos, NFS-e, Recepção com flag ON e OFF; nenhum erro de console, layout idêntico.
 
-### 🔴 Alta prioridade (impacto direto na recepção/caixa)
-| # | Item | Esforço | Telas | Risco | Ganho |
-|---|---|---|---|---|---|
-| A1 | Componentes base (`ListShell`, `VirtualList`, `CommandPalette`, `QuickFilters`) | M | infra | baixo | destrava todo o resto |
-| A2 | Ctrl+K global (telas + pacientes + orçamentos) | M | global | baixo | −80% tempo para achar tela |
-| A3 | Busca global no topbar | P | global | baixo | −60% cliques |
-| A4 | Refactor **Caixa** (abas + busca + compact) | P | 1 | baixo | recepção mais rápida |
-| A5 | Refactor **Orçamentos** (abas por status + infinite scroll) | P | 1 | baixo | −60% cliques |
-| A6 | Refactor **Clientes** (chips + virtualização) | P | 1 | baixo | lida com 10k+ |
-| A7 | Menu curto (7 grupos, sub-rotas viram tabs) | M | global | médio | −85% itens visíveis |
+Todos os screenshots salvos em `/tmp/browser/a2/screenshots/` e anexados ao relatório final.
 
-### 🟡 Média prioridade
-| # | Item | Esforço | Telas | Risco | Ganho |
-|---|---|---|---|---|---|
-| M1 | Unificar Financeiro (Movimento+Atendimentos+Notas) | G | 3→1 | médio | menu −2, cliques −65% |
-| M2 | Agenda Express — chips + busca | P | 1 | baixo | −50% cliques |
-| M3 | Procedimentos — chips por especialidade | P | 1 | baixo | −50% cliques |
-| M4 | Documentos — agrupamento por tipo | P | 1 | baixo | −40% cliques |
-| M5 | Prontuários — agrupamento ano+tipo | M | 1 | médio | −50% tempo |
-| M6 | Favoritos + Recentes (persistência) | M | global | baixo | conveniência |
-| M7 | Agenda — virtualizar coluna do dia | M | 1 | médio | +30% render |
+## 11. Riscos
 
-### 🟢 Baixa prioridade
-| # | Item | Esforço | Telas | Risco | Ganho |
-|---|---|---|---|---|---|
-| B1 | NFS-e — manter paginação, adicionar presets | P | 1 | baixo | pequeno |
-| B2 | Auditoria — manter paginação, adicionar chip por tabela | P | 1 | baixo | pequeno |
-| B3 | Relatórios — salvar visão | M | 1 | baixo | conveniência |
-| B4 | Cartão de Benefícios — chips nas 5 sub-telas | M | 5 | baixo | menor uso |
-| B5 | Marketing (Leads, Campanhas, Envios) — mesmo padrão | M | 5 | baixo | menor uso |
+| Risco                                   | Mitigação                                              |
+|-----------------------------------------|--------------------------------------------------------|
+| RPC agregadora ficar lenta em produção  | Cada CTE tem `LIMIT` cedo + índices dedicados; feature flag permite rollback imediato. |
+| Vazamento de dados entre clínicas       | `is_member` obrigatório dentro da RPC; testes T5.      |
+| "Convênio" aparecendo em algum lugar    | Grep na PR + T4 automatizado; string proibida.         |
+| Ctrl+K conflitar com atalho de navegador| `e.preventDefault()` já no A1; testado.                |
+| Header ficar apertado em mobile         | Colapsa para ícone < 768px, abre modal full-screen.    |
+| Cache do cliente devolver dado stale    | LRU expira por termo; TTL 60 s; invalidado ao trocar clínica. |
 
-**Esforço:** P=1–2 dias, M=3–5 dias, G=1+ semana.
+## 12. Entregáveis do sprint A2
 
----
+1. Migração: `buscar_universal` RPC + índices aditivos + GRANT EXECUTE para `authenticated`.
+2. Server fn `buscar_universal.functions.ts` (usa `requireSupabaseAuth`, chama a RPC).
+3. Componente `UniversalBar` (header input + integra com CommandPalette já existente).
+4. Hook `useUniversalSearch(term, tipos?)` — cache, debounce, abort, fallback.
+5. Toggle de flag em `/app/perfil`.
+6. Atualização do `CommandPalette` para aceitar `asyncSearch` (já existe o slot no A1).
+7. Painel de teste em `/app/dev-list-shell` para os cenários T1–T8.
+8. Relatório final: componentes, RPCs, screenshots, testes, risco, confirmação de zero regressão em produção.
 
-## 6. Recomendação final
+## 13. Nomenclatura — proibições explícitas
 
-**Ordem de execução recomendada:**
-1. **Sprint 1 (fundação):** A1 + A2 + A3 — sem eles, os demais viram trabalho duplicado.
-2. **Sprint 2 (impacto imediato na operação):** A4 + A5 + A6 — recepção, caixa e clientes sentem no primeiro dia.
-3. **Sprint 3 (menu curto):** A7 — só depois que as abas por status já existirem nas telas principais.
-4. **Sprint 4 (média):** M1 → M2 → M5.
-5. **Sprint 5+ (baixa):** o que sobrar, conforme demanda.
+Em nenhum label, placeholder, grupo, chip, tipo (`tipo` do payload) ou keyword pode aparecer:
+- "Convênio", "Convênios", "convenio"
 
-**Regras de segurança durante o refactor:**
-- Nenhum item da lista Alta altera schema — só camada de UI + RPCs de busca (aditivas).
-- Toda RPC nova entra como Migração aditiva, reversível.
-- Cada sprint termina com bateria Playwright autenticada validando as telas afetadas.
-- Nenhuma tela vai a produção sem: skeleton, empty state, error state, teste de 1k+ linhas.
-- Perf: exigir `<200ms` para busca client-side e `<500ms` para RPC.
+Substitutos oficiais:
+- Plano/entidade do cartão → "Cartão de Benefícios"
+- Entidade jurídica → "Empresas associadas"
+- Titular + dependentes → "Associados"
+- Regras do plano → "Regras do Cartão"
 
-**Não faz parte desta fase:**
-- Nenhuma alteração de backend/schema.
-- Nenhuma implementação — só o plano acima está sendo entregue.
-
----
-
-## 7. Próximo passo
-
-Aprovar a lista Alta (A1–A7) e me autorizar a começar pelo **Sprint 1 (A1+A2+A3)**. Assim que aprovado, entrego mockup visual do novo `ListShell` + Ctrl+K antes de codar.
+Nota técnica: as tabelas legadas `cb_convenios` / `cb_convenio_regras` mantêm o nome no banco (migração de nome é outro sprint), mas nunca vazam para a UI.

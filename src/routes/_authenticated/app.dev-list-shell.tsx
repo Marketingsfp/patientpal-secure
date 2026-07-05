@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { useClinica } from "@/hooks/use-clinica";
 import { Button } from "@/components/ui/button";
+import { useUniversalSearcher, useUBFlag } from "@/hooks/use-universal-search";
 import {
   ListShell,
   VirtualList,
@@ -71,6 +73,16 @@ function DevListShellPreview() {
 
   const [paletteOpen, setPaletteOpen] = useCommandPaletteToggle();
   const screenEntries = useDefaultScreenEntries();
+  const navigate = useNavigate();
+  const { enabled: ubEnabled, loading: ubLoading, setEnabled: setUbEnabled } = useUBFlag();
+  const clinicaIds = useMemo(
+    () => (clinicaAtual?.clinica_id ? [clinicaAtual.clinica_id] : []),
+    [clinicaAtual?.clinica_id],
+  );
+  const searcher = useUniversalSearcher({
+    clinicaIds,
+    navigate: (to) => { void navigate({ to: to as never }); },
+  });
 
   const filtered = useMemo(() => {
     const q = busca.trim().toLowerCase();
@@ -117,6 +129,23 @@ function DevListShellPreview() {
         <strong>Preview A1 — List Shell (não é tela de produção).</strong>{" "}
         Componentes: <code>ListShell</code>, <code>VirtualList</code>, <code>QuickFilters</code>, <code>CommandPalette</code>.
         Pressione <kbd className="px-1 py-0.5 rounded bg-muted text-[10px]">Ctrl/⌘+K</kbd> para abrir a Busca Universal.
+      </div>
+
+      <div className="text-xs border rounded-md p-2 flex items-center gap-3">
+        <strong>A2 — Busca Universal (beta):</strong>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={ubEnabled}
+            disabled={ubLoading}
+            onChange={(e) => { void setUbEnabled(e.target.checked); }}
+          />
+          <span>{ubEnabled ? "Ativa" : "Desativada"} (flag ub_v1)</span>
+        </label>
+        <span className="text-muted-foreground">
+          Prefixos: <code>o:</code> orçamentos · <code>a:</code> agenda · <code>n:</code> NFS-e ·
+          <code> c:</code> cartão · <code>m:</code> médicos · <code>r:</code> procedimentos
+        </span>
       </div>
 
       <ListShell<Status>
@@ -170,6 +199,7 @@ function DevListShellPreview() {
         open={paletteOpen}
         onOpenChange={setPaletteOpen}
         entries={screenEntries}
+        asyncSearch={ubEnabled ? searcher : undefined}
         placeholder="Buscar telas, pacientes, orçamentos… (demo)"
       />
     </div>

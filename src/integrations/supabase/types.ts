@@ -6838,6 +6838,7 @@ export type Database = {
           created_at: string
           id: string
           nome: string
+          preferencias_ui: Json
           telefone: string | null
           telefone2: string | null
           updated_at: string
@@ -6847,6 +6848,7 @@ export type Database = {
           created_at?: string
           id: string
           nome: string
+          preferencias_ui?: Json
           telefone?: string | null
           telefone2?: string | null
           updated_at?: string
@@ -6856,6 +6858,7 @@ export type Database = {
           created_at?: string
           id?: string
           nome?: string
+          preferencias_ui?: Json
           telefone?: string | null
           telefone2?: string | null
           updated_at?: string
@@ -7731,6 +7734,24 @@ export type Database = {
           numero_pasta: string
           telefone: string
           ultima_consulta: string
+        }[]
+      }
+      buscar_universal: {
+        Args: {
+          _clinica_ids: string[]
+          _limite?: number
+          _termo: string
+          _tipos?: string[]
+        }
+        Returns: {
+          criado_em: string
+          hint: string
+          id: string
+          payload: Json
+          score: number
+          subtitulo: string
+          tipo: string
+          titulo: string
         }[]
       }
       can_manage_clinica: {
