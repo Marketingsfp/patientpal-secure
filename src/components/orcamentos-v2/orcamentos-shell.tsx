@@ -13,8 +13,9 @@ import { OrcamentoDrawer } from "./orcamento-drawer";
 import { deriveStatus, type DerivedStatus } from "./status-utils";
 import { ResumoBar, type ResumoData } from "./resumo-bar";
 import { OrcamentosKpiBar, type OrcKpi } from "./kpi-bar";
+import { HistoricoOrcamentoDialog } from "./historico-orcamento-dialog";
 
-type TabV = "todos" | "abertos" | "aprovados" | "convertidos" | "expirados" | "cancelados" | "pendencia";
+type TabV = "todos" | "abertos" | "convertidos" | "expirados" | "cancelados" | "pendencia";
 type TipoV = "particular" | "associado" | "cartao";
 type PeriodoV = "todos" | "hoje" | "7d" | "30d";
 
@@ -46,6 +47,7 @@ export function OrcamentosShellV2({ compactPref, onToggleCompact }: Props) {
   const [periodo, setPeriodo] = useState<PeriodoV[]>([]);
   const [drawerOrc, setDrawerOrc] = useState<OrcV2 | null>(null);
   const [conversaoId, setConversaoId] = useState<string | null>(null);
+  const [historicoId, setHistoricoId] = useState<string | null>(null);
   const [pageSize, setPageSize] = useState(50);
 
   const load = useCallback(async () => {
