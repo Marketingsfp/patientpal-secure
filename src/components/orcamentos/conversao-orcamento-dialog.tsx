@@ -337,7 +337,7 @@ function ItemCard({
   const op = labelOp(item.status_operacional);
   const fin = labelFin(item.status_financeiro);
   const acoes = new Set(item.acoes_disponiveis ?? []);
-  const total = Number(item.valor_unitario || 0) * Number(item.quantidade || 1);
+  const total = Number(item.valor_total || 0);
 
   const chip = (label: string, ativa: boolean | null | undefined) => (
     <span
@@ -357,7 +357,7 @@ function ItemCard({
         <div className="min-w-0">
           <div className="font-medium">{item.descricao}</div>
           <div className="text-xs text-muted-foreground">
-            {item.quantidade} × {BRL(item.valor_unitario)} = <b>{BRL(total)}</b>
+            {item.quantidade} × {BRL(item.valor_total)} = <b>{BRL(total)}</b>
           </div>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -452,7 +452,7 @@ function VendaSheet({
     if (!caixaSessaoId) { toast.error("Nenhuma sessão de caixa aberta."); return; }
     setSaving(true);
     const { data, error } = await supabase.rpc("converter_item_venda", {
-      p_item_id: item.item_id,
+      p_item_id: item.id,
       p_caixa_sessao_id: caixaSessaoId,
       p_forma_pagamento: forma,
       p_desconto: Number(desconto) || 0,
@@ -518,7 +518,7 @@ function AgendarSheet({
       ? { redirect_para_agenda: true }
       : {}; // RPC decide via fn_regras_procedimento
     const { data, error } = await supabase.rpc("converter_item_agendamento", {
-      p_item_id: item.item_id,
+      p_item_id: item.id,
       p_payload: payload,
     });
     setSaving(false);
@@ -582,7 +582,7 @@ function NaoAplicavelSheet({
     if (motivo.trim().length < 3) { toast.error("Descreva o motivo."); return; }
     setSaving(true);
     const { data, error } = await supabase.rpc("marcar_item_nao_aplicavel", {
-      p_item_id: item.item_id,
+      p_item_id: item.id,
       p_motivo: motivo.trim(),
     });
     setSaving(false);
@@ -636,7 +636,7 @@ function CancelarSheet({
     if (motivo.trim().length < 3) { toast.error("Descreva o motivo."); return; }
     setSaving(true);
     const { data, error } = await supabase.rpc("cancelar_item", {
-      p_item_id: item.item_id,
+      p_item_id: item.id,
       p_motivo: motivo.trim(),
       p_confirmar_cascata: false,
     });
@@ -661,7 +661,7 @@ function CancelarSheet({
   const confirmar = async () => {
     setSaving(true);
     const { data, error } = await supabase.rpc("cancelar_item", {
-      p_item_id: item.item_id,
+      p_item_id: item.id,
       p_motivo: motivo.trim(),
       p_confirmar_cascata: true,
     });
