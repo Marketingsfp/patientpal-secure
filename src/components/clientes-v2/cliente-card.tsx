@@ -1,9 +1,9 @@
-import { AlertTriangle, Copy, Phone, User } from "lucide-react";
+import { AlertTriangle, Cake, Copy, Phone, PhoneOff, User, IdCard } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import {
   cadastroIncompleto, calcularIdade, fmtCPF, fmtNasc, fmtTel,
-  pagadorLabel, type PacienteV2,
+  isAniversarianteHoje, pagadorLabel, semCpf, semTelefone, type PacienteV2,
 } from "./status-utils";
 
 interface Props {
@@ -15,9 +15,13 @@ interface Props {
 export function ClienteCard({ p, compact, onOpen }: Props) {
   const { tipo, label } = pagadorLabel(p);
   const incompleto = cadastroIncompleto(p);
+  const aniversariante = isAniversarianteHoje(p.data_nascimento);
+  const sTel = semTelefone(p);
+  const sCpf = semCpf(p);
   const idade = calcularIdade(p.data_nascimento);
   const borderClass =
     !p.ativo ? "border-l-slate-400"
+      : aniversariante ? "border-l-fuchsia-500"
       : incompleto ? "border-l-amber-500"
       : p.duplicado_hint ? "border-l-rose-500"
       : "border-l-emerald-500";
@@ -73,6 +77,21 @@ export function ClienteCard({ p, compact, onOpen }: Props) {
             {incompleto && (
               <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-400">
                 <AlertTriangle className="h-3 w-3" /> Cadastro incompleto
+              </span>
+            )}
+            {sTel && !incompleto && (
+              <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-400">
+                <PhoneOff className="h-3 w-3" /> Sem telefone
+              </span>
+            )}
+            {sCpf && !incompleto && (
+              <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-400">
+                <IdCard className="h-3 w-3" /> Sem CPF
+              </span>
+            )}
+            {aniversariante && (
+              <span className="inline-flex items-center gap-1 text-[10px] text-fuchsia-700 dark:text-fuchsia-400">
+                <Cake className="h-3 w-3" /> Aniversariante hoje
               </span>
             )}
             {p.duplicado_hint && (
