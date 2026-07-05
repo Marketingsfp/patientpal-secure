@@ -279,6 +279,83 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
 
   const filaPend = useMemo(() => fila.filter((f) => !f.ja_pago), [fila]);
 
+  // ===== Resumo agregado (client-side)
+  const resumoData = useMemo<ResumoData>(() => {
+    const recebimentos = movs.filter((m) => m.tipo === "recebimento");
+    const somaForma = (forma: string) =>
+      recebimentos
+        .filter((m) => (m.forma_pagamento ?? "").toLowerCase().includes(forma))
+        .reduce((s, m) => s + Number(m.valor || 0), 0);
+    const recebidoTotal = recebimentos.reduce((s, m) => s + Number(m.valor || 0), 0);
+    const recebidoSessao = sessao
+      ? recebimentos.filter((m) => m.sessao_id === sessao.id).reduce((s, m) => s + Number(m.valor || 0), 0)
+      : 0;
+    const saldo = movs.reduce((s, m) => s + Number(m.valor || 0) * (TIPO_SINAL[m.tipo] || 0), 0);
+    const particular = fila.filter((f) => !f.valor_cartao).reduce((s, f) => s + f.valor, 0);
+    const associado = fila.filter((f) => f.valor_cartao > 0).reduce((s, f) => s + f.valor_cartao, 0);
+    return {
+      saldo, recebidoHoje: recebidoTotal, recebidoSessao,
+      particular, associado,
+      dinheiro: somaForma("dinheiro"),
+      pix: somaForma("pix"),
+      cartao: somaForma("cart") + somaForma("credito") + somaForma("debito"),
+      pendentesFila: filaPend.length,
+      aguardandoPagamento: filaPend.filter((f) => !f.ja_pago).length,
+    };
+  }, [movs, fila, filaPend, sessao]);
+
+  // ===== Fila → cards (status + alertas)
+  const filaCards = useMemo<FilaCardData[]>(() => {
+    return filaPend.map((f) => {
+      const status: StatusFila = f.ja_pago ? "paid" : "waiting";
+      const alertas: AlertaBadge[] = detectarAlertas({
+        inicio: f.inicio, ja_pago: f.ja_pago,
+        // dados extras não presentes na RPC; futuras fases podem enriquecer
+        paciente_cpf: null, paciente_endereco: null,
+      });
+      const tipoCobranca: FilaCardData["tipoCobranca"] =
+        f.valor_cartao > 0 ? "Associado" : "Particular";
+      return {
+        id: f.id,
+        pacienteNome: f.paciente_nome,
+        pacienteIdade: null,
+        procedimento: f.procedimento,
+        medicoNome: f.medico_nome,
+        inicio: f.inicio,
+        valor: f.valor + f.valor_cartao,
+        tipoCobranca, status, alertas,
+      };
+    });
+  }, [filaPend]);
+
+  const totalAlertas = useMemo(
+    () => filaCards.reduce((n, c) => n + c.alertas.length, 0),
+    [filaCards],
+  );
+
+  // ===== Drawer da Mini Timeline
+  const [drawerId, setDrawerId] = useState<string | null>(null);
+  const drawerItem = useMemo(
+    () => filaCards.find((f) => f.id === drawerId) ?? null,
+    [drawerId, filaCards],
+  );
+
+  // ===== KPIs derivados
+  const kpiData = useMemo<KpiData>(() => {
+    const recebimentos = movs.filter((m) => m.tipo === "recebimento");
+    const receitaHoje = recebimentos.reduce((s, m) => s + Number(m.valor || 0), 0);
+    const receitaSessao = sessao
+      ? recebimentos.filter((m) => m.sessao_id === sessao.id).reduce((s, m) => s + Number(m.valor || 0), 0)
+      : 0;
+    return {
+      tempoMedioPagamentoMin: null,
+      maiorFila: null,
+      tempoMedioCaixaMin: null,
+      receitaSessao, receitaHoje,
+      atendimentos: recebimentos.length,
+    };
+  }, [movs, sessao]);
+
   const tabs: ReadonlyArray<StatusTab<TabKey>> = [
     { value: "hoje", label: "Hoje" },
     { value: "sessao", label: "Sessão atual", count: sessao ? undefined : 0 },
