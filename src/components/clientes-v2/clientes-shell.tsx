@@ -159,8 +159,11 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
     else if (tab === "inativos") r = r.filter((p) => !p.ativo);
     else if (tab === "incompletos") r = r.filter(cadastroIncompleto);
     else if (tab === "duplicados") r = r.filter((p) => p.duplicado_hint);
-    const tipos = chips.filter((c) => c === "particular" || c === "associado" || c === "cartao");
-    if (tipos.length > 0) r = r.filter((p) => tipos.includes(pagadorLabel(p).tipo as ChipV));
+    const tipos = chips.filter(
+      (c): c is "particular" | "associado" | "cartao" =>
+        c === "particular" || c === "associado" || c === "cartao",
+    );
+    if (tipos.length > 0) r = r.filter((p) => tipos.includes(pagadorLabel(p).tipo));
     if (chips.includes("aniv")) r = r.filter((p) => isAniversarianteHoje(p.data_nascimento));
     if (chips.includes("novos30")) r = r.filter(isNovo30d);
     if (chips.includes("sem_tel")) r = r.filter(semTelefone);
