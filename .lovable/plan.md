@@ -1,120 +1,138 @@
+# A6 — Clientes V2 (plano, aguardando aprovação)
 
-# A5 — Orçamentos V2 (dev-only, atrás de flag)
+Mesmo padrão de Caixa V2 e Orçamentos V2: preview isolado atrás de flag, clássico 100% intocado, promoção controlada só depois da validação visual.
 
-Escopo: recriar `/app/orcamentos` como painel operacional, aplicando o mesmo padrão validado em Caixa V2 e Menu V2. Nada de mudança em lógica de negócio (criação, conversão, impressão, splits, cobrança). Só apresentação, filtragem, virtualização e navegação.
+## 1. Escopo e não-escopo
 
-## 1. Estrutura de rollout (idêntico ao Caixa V2)
+**Faço:**
+- Nova apresentação de lista de pacientes (busca, filtros, virtualização, cards/tabela moderna, alertas).
+- Reusar 100% o `ClienteForm` clássico para criar/editar (nada muda em criação/edição).
+- Reusar o link já existente `/app/clientes/duplicados` (nada muda em deduplicação real).
 
-- Flag `orcamentos_v2` (default OFF) — hook `use-orcamentos-v2-flag.ts` reaproveitando o padrão de `use-caixa-v2-flag.ts`.
-- Rota dev isolada: `/app/dev-orcamentos-shell` (nunca substitui a rota atual).
-- Tela clássica `/app/orcamentos` permanece **100% intacta**.
-- Promoção só depois da validação visual, e inicialmente apenas para admin/gestor (mesmo modelo do `caixa-v2-mount.tsx`).
-- Recepção, financeiro e demais perfis continuam no clássico até liberação explícita.
+**Não faço:**
+- Nada de novo em criação, edição, merge, LGPD, biometria, prontuário, contratos, cartão, agendamentos, cobrança, exportação fiscal ou permissões.
+- Não mexer em `pacientes`, RLS, triggers ou schema.
+- Zero uso da palavra "Convênio" (usar Particular / Associado / Cartão de Benefícios).
 
-## 2. Layout do shell V2
+## 2. Rota e flag
 
-Usa `ListShell` já existente (`src/components/list-shell/`) para consistência com Caixa/Clientes futuros.
+- Preview: `/app/dev-clientes-shell` (noindex).
+- Flag: `clientes_v2` em `profiles.preferencias_ui.flags.clientes_v2` (default `false`), hook `useClientesV2Flag` (mesma forma do `useOrcamentosV2Flag`, com `clientes:flag-changed`).
+- Promoção controlada (fase 3, só após seu OK visual): dispatcher em `/app/clientes` idêntico ao de Orçamentos:
+  - `v2Allowed = role === 'admin' || role === 'gestor'`
+  - `if (!loading && enabled && v2Allowed) return <ClientesV2Mount />; return <ClientesPage />;`
+- Recepção/médico/caixa/financeiro continuam no clássico mesmo com flag ON.
 
+## 3. Layout proposto
+
+```text
+┌─ ResumoBar (KPIs em tempo real, filtrado)
+│   Total · Ativos · Inativos · Novos 30d · Aniversariantes hoje
+│   Cadastro incompleto · Possíveis duplicados
+├─ ListShell
+│   [Busca forte (debounced) — nome · CPF · telefone · prontuário · nascimento]     [Compacto] [Novo]
+│   Abas:  Todos · Ativos · Inativos · Incompletos · Duplicados · Aniversariantes
+│   Chips: [Particular] [Associado] [Cartão de Benefícios]
+│          [Cadastrados hoje] [7 dias] [30 dias]
+│          [Com foto] [Sem foto]  (opcional, discreto)
+│   VirtualList
+│     PacienteCard  ← borda esquerda por status + chips de alerta
+├─ KpiBar rodapé (compacto, estilo Caixa/Orçamentos)
+└─ Drawer lateral (Sheet) ao clicar no card:
+     ficha resumida + botões Editar (abre ClienteForm clássico), Ver prontuário,
+     Ver orçamentos, Ver agendamentos, Duplicados (link para tela existente)
 ```
-┌ Orçamentos                                    [Novo]  [Exportar] ┐
-│ 🔍 Busca forte: paciente, nº, procedimento, valor, período       │
-├──────────────────────────────────────────────────────────────────┤
-│ [ Todos 128 ] [ Abertos 41 ] [ Aprovados 22 ] [ Convertidos 47 ] │
-│                          [ Recusados 12 ] [ Expirados 6 ]        │
-│ Chips: [Particular] [Associado] [Cartão de Benefícios]           │
-│        [Hoje] [7d] [30d] [Personalizado]  [Com pendência]        │
-├──────────────────────────────────────────────────────────────────┤
-│ ● Maria Silva · #ORC-1042 · há 2h                     R$ 1.240   │
-│   3 itens · Dr. Marcos · [Particular]  [🟢 Aprovar] [Converter]  │
-│   ─────────────────────────────────────────────────────────────  │
-│ ● João Santos · #ORC-1041 · há 3h                     R$ 850     │
-└──────────────────────────────────────────────────────────────────┘
-                                                        [Compacto]
-```
 
-- **Busca forte** debounced (200ms), controlada, persistida em `?q=`.
-- **Abas por status** (Todos / Abertos / Aprovados / Convertidos / Recusados / Expirados) com contadores via `count head:true`.
-- **Chips (quick filters)**: tipo de pagador (Particular / Associado / Cartão de Benefícios — **zero "Convênio"**), período rápido, "com pendência".
-- **Cards** (não linhas de tabela) com hierarquia: paciente + nº, valor, itens, médico, badge de tipo, ações primárias.
-- **Modo compacto** (Ctrl+Shift+C) reduz altura e esconde subtítulo.
-- **Scroll infinito** via `VirtualList` do `list-shell/` — página de 50, prefetch quando faltarem 10.
-- **Drawer lateral** ao clicar no card: detalhes, itens, histórico, ações (mesmas do clássico, reaproveitando componentes existentes: `ConversaoOrcamentoDialog`, `HistoricoOrcamentoDialog`, `printOrcamento`).
+Mobile (≤ 640px): ResumoBar vira scroll horizontal, chips empilham, cards ocupam largura total.
 
-## 3. Filtros e URL
+## 4. Busca forte (debounced 300 ms)
 
-Query params validados (Zod + `fallback`):
-`q`, `status`, `tipo`, `periodo`, `de`, `ate`, `compacto`, `pendencia`.
-Persistência no URL para deep-link e refresh sem perder estado.
+Normalizada; um mesmo termo casa qualquer campo:
+- **Nome** — substring case-insensitive.
+- **CPF** — só dígitos (>=3) casa `regexp_replace(cpf,'\\D','','g')`.
+- **Telefone** — só dígitos (>=3) casa telefone normalizado.
+- **Prontuário** — casa `numero_pasta` e `codigo_prontuario`.
+- **Data de nascimento** — aceita `dd/mm`, `dd/mm/aaaa`, `aaaa-mm-dd` e apenas ano.
 
-## 4. Nomenclatura
+Estratégia: query base `select('id, nome, cpf, telefone, email, data_nascimento, numero_pasta, codigo_prontuario, ativo, foto_url, created_at, cidade, estado, categoria_pagador?')` limitada a N (500) por clínica, ordem `created_at desc`, e filtragem no cliente (mesma técnica do Orçamentos V2, mantendo UI responsiva). Se lista exceder o corte, mostrar aviso "Refine a busca" — não silenciar.
 
-- **Particular / Associado / Cartão de Benefícios**. Nunca "Convênio" no DOM.
-- Teste Playwright verifica `document.body.innerText` sem "Convênio".
+## 5. Filtros rápidos e abas
 
-## 5. Regras de negócio — inalteradas
+- **Abas** (contagens em tempo real sobre a base já filtrada por chips/busca):
+  - Todos · Ativos · Inativos · Incompletos · Duplicados · Aniversariantes (hoje)
+- **Chips (multi)**:
+  - Tipo de pagador: Particular · Associado · Cartão de Benefícios
+    Derivado de contrato/cartão ativo (leitura só; não altera regras).
+  - Período de cadastro: Hoje · 7 dias · 30 dias
+  - Foto: Com foto · Sem foto
 
-- Criação, edição, itens, conversão em pagamento, impressão, auditoria, splits, cobrança e permissões seguem exatamente como no clássico.
-- V2 apenas **consome** as mesmas queries + mesmas mutations.
-- Nenhuma tabela, RLS, edge function ou server function nova.
+Aba "Duplicados" mostra apenas pacientes com match por CPF ou (nome normalizado + nascimento). Botão "Resolver na tela dedicada" leva para `/app/clientes/duplicados` (sem alterar aquela tela).
 
-## 6. Arquivos
+## 6. Cards vs tabela
 
-Novos:
-- `src/hooks/use-orcamentos-v2-flag.ts`
-- `src/components/orcamentos-v2/orcamentos-shell.tsx`
-- `src/components/orcamentos-v2/orcamento-card.tsx`
-- `src/components/orcamentos-v2/orcamento-drawer.tsx`
-- `src/components/orcamentos-v2/quick-filters.tsx`
-- `src/routes/_authenticated/app.dev-orcamentos-shell.tsx`
+Cards por padrão (consistente com Orçamentos V2), mais legíveis em mobile e permitem chips de alerta. Modo compacto vira linha densa (avatar + nome + CPF + telefone + idade + ações), mantendo virtualização.
 
-Intocados:
-- `src/routes/_authenticated/app.orcamentos.tsx` (clássico)
-- Componentes de conversão, impressão, histórico, splits.
+Toggle **Compacto** persiste em `profiles.preferencias_ui.clientes.compact`. Atalho `Ctrl+Shift+C` igual às outras V2.
 
-## 7. Riscos
+## 7. Virtualização e paginação
+
+- `VirtualList` do `list-shell` (já usado em Caixa/Orçamentos).
+- `pageSize` inicial 50, cresce +50 em `onEndReached` (scroll infinito) até o corte da query (500). Aviso claro quando atinge o teto: "Mostrando 500 mais recentes — use a busca para refinar."
+
+## 8. Alertas nos cards
+
+Chips discretos, cores semânticas:
+- **Cadastro incompleto** — falta CPF, telefone, nascimento ou endereço mínimo.
+- **Possível duplicado** — mesmo CPF ou (nome normalizado + nascimento) que outro paciente da clínica.
+- **Sem foto** — apenas se filtro "Sem foto" ativo (evita ruído).
+- **Aniversariante hoje** — badge sutil.
+- **Inativo** — badge cinza.
+
+Borda esquerda do card:
+- Ativo → verde
+- Inativo → cinza
+- Incompleto → âmbar
+- Duplicado → vermelho (prioridade máxima)
+
+Cálculo de duplicidade: feito uma vez após load, em memória, `Map<cpfNormalizado, ids[]>` e `Map<nomeNorm+nascimento, ids[]>`. O(n).
+
+## 9. Riscos e mitigação
 
 | Risco | Mitigação |
 |---|---|
-| Query pesada em `orcamento_itens` para contagem | usar `count head:true` na aba ativa; agregações client-side sobre página atual |
-| Divergência de status entre clássico e V2 | reusar mesma view/RPC; nada de status calculado no cliente que não exista no clássico |
-| Realtime overhead | subscribe único no `orcamentos` da clínica, throttle 500ms |
-| Flag on quebrando build | mount fica em rota dev isolada, `caixa-v2-mount` pattern |
-| "Convênio" reaparecer via componente compartilhado | teste Playwright falha o promote |
+| Query pesada em clínicas grandes | Corte 500 + aviso; sem JOINs pesados no primeiro load. Dados de pagador/contrato buscados em lote separado só para os visíveis. |
+| Falso positivo de "duplicado" | Regra conservadora (CPF exato OU nome+nascimento exatos). Nunca faz merge automático — apenas sinaliza e linka para tela dedicada. |
+| Cadastro incompleto marcando muita gente | Regra é chip visual, não bloqueia nada. Só aparece se faltar pelo menos um dos 3 campos essenciais (CPF, telefone, nascimento). |
+| Categoria pagador inferida errada | Fallback silencioso para "Particular" quando não houver contrato/cartão ativo; mesma heurística do OrçamentosV2. |
+| Regressão no clássico | Rota clássica não é tocada. Dispatcher só entra em cena na fase 3. |
+| Flag vazando pra recepção | Dispatcher checa role, não só flag. |
 
-## 8. Rollback
+## 10. Rollback
 
-- Flag `orcamentos_v2` OFF → rota `/app/orcamentos` clássica intacta.
-- Rota dev pode ser deletada sem impacto.
-- Nenhuma migração, nenhum dado tocado.
+- Desligar flag `clientes_v2` no perfil → volta ao clássico sem reload (evento `clientes:flag-changed`).
+- Remover apenas o bloco `if (v2Allowed && enabled) return <ClientesV2Mount/>` do dispatcher desfaz a promoção.
+- Nada foi removido do clássico — reverter é sempre seguro.
 
-## 9. Testes (Playwright em `/tmp/browser/orcamentos-v2/`)
+## 11. Playwright (antes de propor promoção)
 
-1. Rota `/app/dev-orcamentos-shell` carrega, sem erros de console.
-2. Busca por nome retorna resultados < 500ms após debounce.
-3. Abas trocam contagem e filtragem.
-4. Chips somam com abas (AND).
-5. Scroll infinito carrega página 2 automaticamente.
-6. Modo compacto altera altura dos cards.
-7. Drawer abre, mostra itens, aciona conversão (sem finalizar) e fecha.
-8. Impressão dispara `printOrcamento` (mock).
-9. Zero "Convênio" no DOM.
-10. Mobile 390×844: cards empilhados, abas com scroll horizontal.
-11. Flag OFF → `/app/orcamentos` clássico continua idêntico.
-12. Flag ON só para admin/gestor no mount de promoção (fase seguinte).
+Cenários obrigatórios em `/app/dev-clientes-shell` com flag ON:
+1. Lista carrega, ResumoBar preenche, virtualização rola sem travar.
+2. Busca por nome, CPF (dígitos), telefone (dígitos), prontuário e data (dd/mm/aaaa) — cada uma retornando o paciente esperado.
+3. Chips Particular / Associado / Cartão de Benefícios filtram corretamente.
+4. Abas Ativos/Inativos/Incompletos/Duplicados/Aniversariantes com contagens coerentes.
+5. Modo compacto (botão + `Ctrl+Shift+C`) reduz altura e persiste no profile.
+6. Alerta "Cadastro incompleto" aparece em paciente sem CPF/telefone/nascimento.
+7. Alerta "Possível duplicado" aparece em pares reais; botão leva para `/app/clientes/duplicados`.
+8. Drawer abre; botão Editar abre o `ClienteForm` clássico sem regressão.
+9. Mobile 390px: layout empilha, cards legíveis, busca acessível.
+10. `/app/clientes` clássico continua idêntico (screenshot comparativo).
+11. Zero erros de console; tempo de load reportado.
+12. Zero ocorrências da palavra "Convênio" no DOM.
 
-## 10. Medição
+## 12. Entregáveis por fase
 
-| Métrica | Clássico | Meta V2 |
-|---|---|---|
-| Tempo até primeira lista | ~1.5s | <500ms |
-| Cliques até aprovar orçamento | 3 | 1 |
-| Info visível sem abrir | 3 campos | 6 campos |
-| Filtrar por status | via busca | 1 clique |
+- **Fase 1** — flag + hook + rota preview + shell + card + drawer + busca + abas + chips + virtualização.
+- **Fase 2** — ResumoBar + KpiBar + alertas (incompleto/duplicado/aniversariante) + modo compacto persistido.
+- **Fase 3** — promoção controlada em `/app/clientes` (admin/gestor + flag), após seu OK visual.
 
-## 11. Fora de escopo (fica para depois)
-
-- Promoção controlada para `/app/orcamentos` (fase A5.2, mesmo modelo do `caixa-v2-mount`).
-- Liberação para recepção (só após validação visual do usuário).
-- Qualquer alteração em conversão/cobrança/splits.
-
-**Aguardando aprovação para implementar A5 Fase 1 (shell dev + flag).**
+Aguardando aprovação para iniciar Fase 1.
