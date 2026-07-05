@@ -69,18 +69,17 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
     if (!clinicaAtual || scope.length === 0) return;
     const myReq = ++reqRef.current;
     setLoading(true);
-    const { data, error, count } = await supabase
+    const { data, error } = await supabase
       .from("pacientes")
       .select(
         "id, clinica_id, nome, cpf, telefone, telefone2, data_nascimento, email, ativo, codigo_prontuario, codigo_prontuario_anterior, numero_pasta, cidade, estado, foto_url, created_at",
-        { count: "estimated" },
       )
       .in("clinica_id", scope)
       .order("created_at", { ascending: false })
       .limit(50);
     if (myReq !== reqRef.current) return;
     if (error) { mostrarErro(error); setLoading(false); return; }
-    setTotalBase(count ?? null);
+    setTotalBase(null);
     setRows(marcarDuplicados((data ?? []) as PacienteV2[]));
     setLoading(false);
   }, [clinicaAtual, scope]);
