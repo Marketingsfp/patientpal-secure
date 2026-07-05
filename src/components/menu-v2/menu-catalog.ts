@@ -7,6 +7,9 @@ import {
   Settings, KeyRound, MapPin, BadgeCheck,
   type LucideIcon,
 } from "lucide-react";
+import {
+  Zap, LogIn, Workflow, ListChecks, Brain, Sparkles, Bell, FileSignature,
+} from "lucide-react";
 
 export type MenuItem = {
   path: string;
@@ -30,12 +33,17 @@ export const CENTROS: Centro[] = [
     icon: HeartPulse,
     items: [
       { path: "/app/agenda", label: "Agenda", icon: CalendarDays, modulo: "agenda" },
+      { path: "/app/agenda/express", label: "Agenda Express", icon: Zap, modulo: "agenda" },
+      { path: "/app/checkin", label: "Check-in", icon: LogIn },
+      { path: "/app/fluxo", label: "Fluxo", icon: Workflow },
+      { path: "/app/recepcao", label: "Recepção / Filas", icon: ListChecks },
       { path: "/app/clientes", label: "Clientes", icon: Users, modulo: "clientes" },
+      { path: "/app/orcamentos", label: "Orçamentos", icon: FileSignature },
       { path: "/app/prontuarios", label: "Prontuários", icon: FileHeart },
       { path: "/app/anamneses", label: "Anamneses", icon: ClipboardList },
       { path: "/app/triagem-enfermagem", label: "Triagem", icon: Activity, modulo: "triagem-enfermagem" },
       { path: "/app/chat", label: "Chat interno", icon: MessageCircle, modulo: "chat" },
-      { path: "/app/whatsapp", label: "WhatsApp", icon: Send },
+      { path: "/app/nina", label: "WhatsApp / Nina", icon: Send },
     ],
   },
   {
@@ -44,14 +52,15 @@ export const CENTROS: Centro[] = [
     icon: Wallet,
     items: [
       { path: "/app/caixa", label: "Caixa", icon: Wallet, modulo: "caixa" },
+      { path: "/app/orcamentos", label: "Orçamentos", icon: FileSignature },
       { path: "/app/boletos", label: "Boletos", icon: FileText },
       { path: "/app/nfse", label: "NFS-e", icon: Receipt },
       { path: "/app/financeiro/atendimentos", label: "Lançamentos", icon: DollarSign, modulo: "financeiro" },
       { path: "/app/financeiro/contas", label: "Contas", icon: Building2 },
       { path: "/app/financeiro/categorias", label: "Categorias", icon: LayoutGrid },
-      { path: "/app/financeiro/splits", label: "Splits", icon: ArrowRightLeft },
-      { path: "/app/financeiro/estornos", label: "Estornos", icon: Inbox },
-      { path: "/app/relatorios/financeiro", label: "Relatórios", icon: BarChart3 },
+      { path: "/app/financeiro/movimento", label: "Movimento", icon: ArrowRightLeft },
+      { path: "/app/financeiro/alertas", label: "Alertas", icon: Inbox },
+      { path: "/app/financeiro/relatorios", label: "Relatórios", icon: BarChart3 },
     ],
   },
   {
@@ -60,13 +69,11 @@ export const CENTROS: Centro[] = [
     icon: CreditCard,
     items: [
       { path: "/app/cartao-beneficios/contratos", label: "Contratos", icon: FileText, modulo: "cartao-beneficios" },
-      { path: "/app/cartao-beneficios/mensalidades", label: "Mensalidades", icon: DollarSign },
       { path: "/app/cartao-beneficios/dependentes", label: "Dependentes", icon: Users },
-      { path: "/app/cartao-beneficios/regras", label: "Regras do Cartão", icon: ShieldCheck },
-      { path: "/app/cartao-beneficios/faixas", label: "Faixas", icon: LayoutGrid },
-      { path: "/app/cartao-beneficios/associados", label: "Associados", icon: Contact },
-      { path: "/app/cartao-beneficios/empresas", label: "Empresas Associadas", icon: Briefcase },
+      { path: "/app/cartao-beneficios/modelos", label: "Regras / Modelos", icon: ShieldCheck },
+      { path: "/app/financeiro/empresas", label: "Empresas Associadas", icon: Briefcase },
       { path: "/app/cartao-beneficios/beneficios", label: "Benefícios", icon: Gift },
+      { path: "/app/cartao-beneficios/relatorios", label: "Relatórios Cartão", icon: BarChart3 },
     ],
   },
   {
@@ -77,11 +84,22 @@ export const CENTROS: Centro[] = [
       { path: "/app/procedimentos", label: "Procedimentos", icon: LayoutGrid },
       { path: "/app/exames-resultados", label: "Exames", icon: FlaskConical, modulo: "exames-resultados" },
       { path: "/app/prontuario-modelos", label: "Modelos de Prontuário", icon: BookOpen },
-      { path: "/app/anamnese-modelos", label: "Modelos de Anamnese", icon: BookOpen },
       { path: "/app/odontologia", label: "Odontograma", icon: Activity, modulo: "odontologia" },
       { path: "/app/medicos", label: "Médicos", icon: Stethoscope },
       { path: "/app/especialidades", label: "Especialidades", icon: BadgeCheck },
-      { path: "/app/escalas", label: "Escalas", icon: CalendarDays },
+      { path: "/app/disponibilidades", label: "Disponibilidades", icon: CalendarDays },
+      { path: "/app/enfermagem-recursos", label: "Enfermagem", icon: Activity },
+    ],
+  },
+  {
+    key: "inteligencia",
+    label: "Inteligência",
+    icon: Brain,
+    items: [
+      { path: "/app/atendimento-ia", label: "Atendimento IA", icon: Sparkles },
+      { path: "/app/consulta-rapida", label: "Consulta Rápida", icon: Zap },
+      { path: "/app/alertas-enfermagem", label: "Alertas Enfermagem", icon: Bell },
+      { path: "/app/nina", label: "Nina / WhatsApp", icon: Send },
     ],
   },
   {
@@ -107,12 +125,15 @@ export const CENTROS: Centro[] = [
       { path: "/app/clinicas", label: "Clínica", icon: Building2 },
       { path: "/app/unidades", label: "Unidades", icon: MapPin },
       { path: "/app/equipe", label: "Usuários", icon: Users, modulo: "equipe" },
-      { path: "/app/perfis-acesso", label: "Perfis & Permissões", icon: KeyRound },
+      { path: "/app/perfis", label: "Perfis & Permissões", icon: KeyRound },
       { path: "/app/cargos", label: "Cargos", icon: BadgeCheck },
       { path: "/app/setores", label: "Setores", icon: LayoutGrid },
-      { path: "/app/rh", label: "RH", icon: Users },
-      { path: "/app/integracoes", label: "Integrações", icon: ArrowRightLeft },
-      { path: "/app/configuracoes/preferencias", label: "Preferências", icon: Settings },
+      { path: "/app/hr-contratos", label: "RH · Contratos", icon: Users },
+      { path: "/app/hr-ferias", label: "RH · Férias", icon: Users },
+      { path: "/app/hr-holerites", label: "RH · Holerites", icon: Users },
+      { path: "/app/hr-ponto", label: "RH · Ponto", icon: Users },
+      { path: "/app/integration-secrets", label: "Integrações", icon: ArrowRightLeft },
+      { path: "/app/configuracoes/nfse", label: "Configuração NFS-e", icon: Receipt },
     ],
   },
 ];
@@ -122,27 +143,27 @@ export type PerfilKey = "recepcao" | "medico" | "caixa" | "financeiro" | "gestor
 export const PERFIL_DEFAULTS: Record<PerfilKey, { pinned: string[]; centros: string[] }> = {
   recepcao: {
     pinned: ["/app/agenda", "/app/caixa", "/app/clientes", "/app/orcamentos"],
-    centros: ["atendimento", "financeiro", "cartao"],
+    centros: ["atendimento", "financeiro", "cartao", "inteligencia"],
   },
   medico: {
     pinned: ["/app/agenda", "/app/prontuarios", "/app/clientes"],
-    centros: ["atendimento", "clinico"],
+    centros: ["atendimento", "clinico", "inteligencia"],
   },
   caixa: {
-    pinned: ["/app/caixa", "/app/boletos", "/app/nfse"],
+    pinned: ["/app/caixa", "/app/orcamentos", "/app/boletos", "/app/nfse"],
     centros: ["financeiro", "atendimento"],
   },
   financeiro: {
-    pinned: ["/app/financeiro/atendimentos", "/app/financeiro/contas", "/app/relatorios/financeiro"],
+    pinned: ["/app/financeiro/atendimentos", "/app/financeiro/contas", "/app/financeiro/relatorios", "/app/orcamentos"],
     centros: ["financeiro", "gestao"],
   },
   gestor: {
-    pinned: ["/app/painel", "/app/relatorios", "/app/agenda"],
-    centros: ["atendimento", "financeiro", "cartao", "clinico", "gestao"],
+    pinned: ["/app/painel", "/app/relatorios", "/app/agenda", "/app/orcamentos"],
+    centros: ["atendimento", "financeiro", "cartao", "clinico", "inteligencia", "gestao"],
   },
   admin: {
     pinned: ["/app/painel", "/app/clinicas", "/app/equipe"],
-    centros: ["atendimento", "financeiro", "cartao", "clinico", "gestao", "config"],
+    centros: ["atendimento", "financeiro", "cartao", "clinico", "inteligencia", "gestao", "config"],
   },
 };
 
