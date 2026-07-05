@@ -131,7 +131,12 @@ export function useUBFlag(): { enabled: boolean; loading: boolean; setEnabled: (
       const prefs = (data?.preferencias_ui ?? {}) as { flags?: { ub_v1?: boolean } };
       if (alive) { setEnabled(Boolean(prefs.flags?.ub_v1)); setLoading(false); }
     })();
-    return () => { alive = false; };
+    const onChange = (e: Event) => {
+      const ce = e as CustomEvent<{ ub_v1: boolean }>;
+      if (alive && ce.detail) setEnabled(Boolean(ce.detail.ub_v1));
+    };
+    window.addEventListener("ub:flag-changed", onChange as EventListener);
+    return () => { alive = false; window.removeEventListener("ub:flag-changed", onChange as EventListener); };
   }, []);
 
   const set = async (v: boolean) => {
@@ -143,6 +148,9 @@ export function useUBFlag(): { enabled: boolean; loading: boolean; setEnabled: (
     const next = { ...prev, flags };
     await supabase.from("profiles").update({ preferencias_ui: next }).eq("id", uidRef.current);
     setEnabled(v);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("ub:flag-changed", { detail: { ub_v1: v } }));
+    }
   };
 
   return { enabled, loading, setEnabled: set };
