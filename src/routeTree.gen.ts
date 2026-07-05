@@ -73,6 +73,7 @@ import { Route as AuthenticatedAppDisponibilidadesRouteImport } from './routes/_
 import { Route as AuthenticatedAppDevOrcamentosShellRouteImport } from './routes/_authenticated/app.dev-orcamentos-shell'
 import { Route as AuthenticatedAppDevMenuShellRouteImport } from './routes/_authenticated/app.dev-menu-shell'
 import { Route as AuthenticatedAppDevListShellRouteImport } from './routes/_authenticated/app.dev-list-shell'
+import { Route as AuthenticatedAppDevClientesShellRouteImport } from './routes/_authenticated/app.dev-clientes-shell'
 import { Route as AuthenticatedAppDevCaixaShellRouteImport } from './routes/_authenticated/app.dev-caixa-shell'
 import { Route as AuthenticatedAppCrmRouteImport } from './routes/_authenticated/app.crm'
 import { Route as AuthenticatedAppContratosRouteImport } from './routes/_authenticated/app.contratos'
@@ -480,6 +481,12 @@ const AuthenticatedAppDevListShellRoute =
     path: '/dev-list-shell',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
+const AuthenticatedAppDevClientesShellRoute =
+  AuthenticatedAppDevClientesShellRouteImport.update({
+    id: '/dev-clientes-shell',
+    path: '/dev-clientes-shell',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppDevCaixaShellRoute =
   AuthenticatedAppDevCaixaShellRouteImport.update({
     id: '/dev-caixa-shell',
@@ -840,6 +847,7 @@ export interface FileRoutesByFullPath {
   '/app/contratos': typeof AuthenticatedAppContratosRoute
   '/app/crm': typeof AuthenticatedAppCrmRoute
   '/app/dev-caixa-shell': typeof AuthenticatedAppDevCaixaShellRoute
+  '/app/dev-clientes-shell': typeof AuthenticatedAppDevClientesShellRoute
   '/app/dev-list-shell': typeof AuthenticatedAppDevListShellRoute
   '/app/dev-menu-shell': typeof AuthenticatedAppDevMenuShellRoute
   '/app/dev-orcamentos-shell': typeof AuthenticatedAppDevOrcamentosShellRoute
@@ -958,6 +966,7 @@ export interface FileRoutesByTo {
   '/app/contratos': typeof AuthenticatedAppContratosRoute
   '/app/crm': typeof AuthenticatedAppCrmRoute
   '/app/dev-caixa-shell': typeof AuthenticatedAppDevCaixaShellRoute
+  '/app/dev-clientes-shell': typeof AuthenticatedAppDevClientesShellRoute
   '/app/dev-list-shell': typeof AuthenticatedAppDevListShellRoute
   '/app/dev-menu-shell': typeof AuthenticatedAppDevMenuShellRoute
   '/app/dev-orcamentos-shell': typeof AuthenticatedAppDevOrcamentosShellRoute
@@ -1078,6 +1087,7 @@ export interface FileRoutesById {
   '/_authenticated/app/contratos': typeof AuthenticatedAppContratosRoute
   '/_authenticated/app/crm': typeof AuthenticatedAppCrmRoute
   '/_authenticated/app/dev-caixa-shell': typeof AuthenticatedAppDevCaixaShellRoute
+  '/_authenticated/app/dev-clientes-shell': typeof AuthenticatedAppDevClientesShellRoute
   '/_authenticated/app/dev-list-shell': typeof AuthenticatedAppDevListShellRoute
   '/_authenticated/app/dev-menu-shell': typeof AuthenticatedAppDevMenuShellRoute
   '/_authenticated/app/dev-orcamentos-shell': typeof AuthenticatedAppDevOrcamentosShellRoute
@@ -1200,6 +1210,7 @@ export interface FileRouteTypes {
     | '/app/contratos'
     | '/app/crm'
     | '/app/dev-caixa-shell'
+    | '/app/dev-clientes-shell'
     | '/app/dev-list-shell'
     | '/app/dev-menu-shell'
     | '/app/dev-orcamentos-shell'
@@ -1318,6 +1329,7 @@ export interface FileRouteTypes {
     | '/app/contratos'
     | '/app/crm'
     | '/app/dev-caixa-shell'
+    | '/app/dev-clientes-shell'
     | '/app/dev-list-shell'
     | '/app/dev-menu-shell'
     | '/app/dev-orcamentos-shell'
@@ -1437,6 +1449,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/contratos'
     | '/_authenticated/app/crm'
     | '/_authenticated/app/dev-caixa-shell'
+    | '/_authenticated/app/dev-clientes-shell'
     | '/_authenticated/app/dev-list-shell'
     | '/_authenticated/app/dev-menu-shell'
     | '/_authenticated/app/dev-orcamentos-shell'
@@ -1996,6 +2009,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppDevListShellRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/app/dev-clientes-shell': {
+      id: '/_authenticated/app/dev-clientes-shell'
+      path: '/dev-clientes-shell'
+      fullPath: '/app/dev-clientes-shell'
+      preLoaderRoute: typeof AuthenticatedAppDevClientesShellRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/app/dev-caixa-shell': {
       id: '/_authenticated/app/dev-caixa-shell'
       path: '/dev-caixa-shell'
@@ -2538,6 +2558,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppContratosRoute: typeof AuthenticatedAppContratosRoute
   AuthenticatedAppCrmRoute: typeof AuthenticatedAppCrmRoute
   AuthenticatedAppDevCaixaShellRoute: typeof AuthenticatedAppDevCaixaShellRoute
+  AuthenticatedAppDevClientesShellRoute: typeof AuthenticatedAppDevClientesShellRoute
   AuthenticatedAppDevListShellRoute: typeof AuthenticatedAppDevListShellRoute
   AuthenticatedAppDevMenuShellRoute: typeof AuthenticatedAppDevMenuShellRoute
   AuthenticatedAppDevOrcamentosShellRoute: typeof AuthenticatedAppDevOrcamentosShellRoute
@@ -2614,6 +2635,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppContratosRoute: AuthenticatedAppContratosRoute,
   AuthenticatedAppCrmRoute: AuthenticatedAppCrmRoute,
   AuthenticatedAppDevCaixaShellRoute: AuthenticatedAppDevCaixaShellRoute,
+  AuthenticatedAppDevClientesShellRoute: AuthenticatedAppDevClientesShellRoute,
   AuthenticatedAppDevListShellRoute: AuthenticatedAppDevListShellRoute,
   AuthenticatedAppDevMenuShellRoute: AuthenticatedAppDevMenuShellRoute,
   AuthenticatedAppDevOrcamentosShellRoute:
@@ -2721,13 +2743,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
