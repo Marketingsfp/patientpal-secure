@@ -51,17 +51,30 @@ export function CommandPalette({
   }, [term, asyncSearch]);
 
   const grouped = useMemo(() => {
-    const all = [...entries, ...asyncResults];
+    // Quando asyncSearch está ativo, o cmdk usa shouldFilter=false (pois os
+    // resultados server-side não têm o prefixo `o:`/`a:`/... no seu texto).
+    // Nesse caso filtramos manualmente as `entries` de navegação por termo,
+    // para que a lista de telas não fique inteira poluindo a busca.
+    const q = term.trim().toLowerCase();
+    const localEntries = !asyncSearch || q.length < 2
+      ? entries
+      : entries.filter((e) => {
+          const hay = `${e.label} ${e.hint ?? ""} ${(e.keywords ?? []).join(" ")}`.toLowerCase();
+          // ignora prefixo tipo "o:" para casar telas também
+          const bare = /^[a-z]:(.*)$/i.exec(q)?.[1]?.trim() ?? q;
+          return bare.length >= 2 && hay.includes(bare);
+        });
+    const all = [...localEntries, ...asyncResults];
     const map = new Map<string, CommandEntry[]>();
     for (const e of all) {
       if (!map.has(e.group)) map.set(e.group, []);
       map.get(e.group)!.push(e);
     }
     return Array.from(map.entries());
-  }, [entries, asyncResults]);
+  }, [entries, asyncResults, asyncSearch, term]);
 
   return (
-    <CommandDialog open={open} onOpenChange={onOpenChange}>
+    <CommandDialog open={open} onOpenChange={onOpenChange} shouldFilter={!asyncSearch}>
       <CommandInput placeholder={placeholder} value={term} onValueChange={setTerm} />
       <CommandList>
         <CommandEmpty>{loading ? "Buscando…" : "Nenhum resultado."}</CommandEmpty>
