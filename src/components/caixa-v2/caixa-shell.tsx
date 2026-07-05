@@ -147,7 +147,7 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
     return { from: start.toISOString(), to: end };
   }, [tab, periodo]);
 
-  const applyFilters = useCallback(<T extends { from: any }>(qb: T): T => {
+  const applyFilters = useCallback((qb: any): any => {
     let q: any = qb;
     q = q.eq("clinica_id", clinicaAtual!.clinica_id);
     if (tab === "sessao" && sessao) q = q.eq("sessao_id", sessao.id);
