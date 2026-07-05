@@ -642,14 +642,15 @@ function CancelarSheet({
     });
     setSaving(false);
     if (error) { mostrarErro(error); return; }
-    const resp = data as unknown as Resp & {
-      dados?: { requer_confirmacao?: boolean; tem_agendamento?: boolean; tem_pagamento?: boolean };
+    const resp = data as unknown as {
+      ok: boolean; codigo?: string; mensagem?: string;
+      requer_confirmacao?: boolean; tem_agendamento?: boolean; tem_pagamento?: boolean;
     };
     if (!resp?.ok) { toast.error(resp?.mensagem ?? `Erro: ${resp?.codigo ?? "?"}`); return; }
-    if (resp.dados?.requer_confirmacao) {
+    if (resp.requer_confirmacao) {
       onFlags({
-        tem_agendamento: !!resp.dados.tem_agendamento,
-        tem_pagamento: !!resp.dados.tem_pagamento,
+        tem_agendamento: !!resp.tem_agendamento,
+        tem_pagamento: !!resp.tem_pagamento,
       });
       setStep2(true);
     } else {
@@ -667,9 +668,9 @@ function CancelarSheet({
     });
     setSaving(false);
     if (error) { mostrarErro(error); return; }
-    const resp = data as unknown as Resp & { dados?: { aviso_pagamento?: boolean } };
+    const resp = data as unknown as { ok: boolean; codigo?: string; mensagem?: string; aviso_pagamento?: boolean };
     if (!resp?.ok) { toast.error(resp?.mensagem ?? `Erro: ${resp?.codigo ?? "?"}`); return; }
-    if (resp.dados?.aviso_pagamento) {
+    if (resp.aviso_pagamento) {
       toast.warning("Item cancelado. O pagamento não foi estornado automaticamente — verifique no Caixa/Financeiro.", { duration: 8000 });
     } else {
       toast.success("Item cancelado.");
