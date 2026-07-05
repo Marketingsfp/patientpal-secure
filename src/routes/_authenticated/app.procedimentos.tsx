@@ -1318,6 +1318,90 @@ function ProcedimentosPage() {
               <Checkbox checked={form.ativo} onCheckedChange={(v) => setForm({ ...form, ativo: !!v })} />
               Ativo
             </label>
+            <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase">Regras do procedimento</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Como este procedimento se comporta na Agenda, Caixa, Financeiro e NFS-e. Vale para todas as unidades — a unidade pode sobrescrever.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Fluxo de atendimento</Label>
+                  <Select
+                    value={form.fluxo_atendimento}
+                    onValueChange={(v) => setForm({ ...form, fluxo_atendimento: v })}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="consulta_padrao">Consulta padrão (com médico)</SelectItem>
+                      <SelectItem value="exame_com_laudo">Exame com laudo</SelectItem>
+                      <SelectItem value="exame_sem_laudo">Exame sem laudo</SelectItem>
+                      <SelectItem value="procedimento_enfermagem">Procedimento de enfermagem</SelectItem>
+                      <SelectItem value="laboratorio">Coleta laboratorial</SelectItem>
+                      <SelectItem value="entrega_domiciliar">Entrega/retirada domiciliar (MAPA/Holter)</SelectItem>
+                      <SelectItem value="balcao">Venda de balcão</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Duração padrão (min)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={form.tempo_padrao_min}
+                    onChange={(e) => setForm({ ...form, tempo_padrao_min: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-y-2 gap-x-3 pt-1">
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Checkbox
+                    checked={!!form.agenda_obrigatoria}
+                    onCheckedChange={(v) => setForm({ ...form, agenda_obrigatoria: !!v })}
+                  />
+                  Agenda obrigatória
+                </label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Checkbox
+                    checked={!!form.permite_venda_direta}
+                    onCheckedChange={(v) => setForm({ ...form, permite_venda_direta: !!v })}
+                  />
+                  Permite venda direta (sem agenda)
+                </label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Checkbox
+                    checked={!!form.medico_obrigatorio}
+                    onCheckedChange={(v) => setForm({ ...form, medico_obrigatorio: !!v })}
+                  />
+                  Médico obrigatório
+                </label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Checkbox
+                    checked={!!form.sala_obrigatoria}
+                    onCheckedChange={(v) => setForm({ ...form, sala_obrigatoria: !!v })}
+                  />
+                  Sala obrigatória
+                </label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Checkbox
+                    checked={!!form.equipamento_obrigatorio}
+                    onCheckedChange={(v) => setForm({ ...form, equipamento_obrigatorio: !!v })}
+                  />
+                  Equipamento obrigatório
+                </label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Checkbox
+                    checked={!!form.permite_encaixe}
+                    onCheckedChange={(v) => setForm({ ...form, permite_encaixe: !!v })}
+                  />
+                  Permite encaixe
+                </label>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                O modo de emissão de NFS-e (por item ou agrupada) é definido na configuração da clínica em <strong>Configurações → NFS-e</strong>.
+              </p>
+            </div>
             <div className="space-y-1">
               <Label>Observações</Label>
               <Textarea rows={2} value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} />
