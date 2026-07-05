@@ -1,149 +1,171 @@
-# A4 — Refactor Caixa (redução de paginação + listas rápidas)
+# A4 Fase 2 — Caixa como painel operacional
 
-Feature flag: `caixa_v2` em `profiles.preferencias_ui.flags`. Rota de pré-visualização isolada: `/app/dev-caixa-shell` (não altera `/app/caixa` até aprovação). Reaproveita `ListShell` + `VirtualList` do A1 e `UniversalSearch` do A2.
+Escopo: refinar `/app/dev-caixa-shell` (flag `caixa_v2`, off por padrão) para virar um **painel operacional**, não uma tabela. `/app/caixa` clássico permanece intocado. Nada de lógica financeira nova — só apresentação, agregação e atalhos sobre queries já existentes.
 
 ---
 
-## 1. Layout proposto
+## 1. Painel de Resumo (sticky topo)
 
-Densidade compacta, foco em operação contínua da recepção. Duas colunas em desktop, empilhado em mobile.
+Grid de cards pequenos (h ~64px), 3 linhas em desktop, scroll horizontal em mobile. Atualiza via realtime já ligado em `caixa_movimentos` + `agendamentos`.
 
 ```
-┌─ Topbar da tela ───────────────────────────────────────────────┐
-│  Caixa · [Sessão #123 · aberta há 2h14]        [Fechar caixa] │
-│  Saldo: R$ 1.240,00   Recebido: R$ 3.180,00   Sangrias: R$120 │
-├─ Ações rápidas (pill row, sticky) ─────────────────────────────┤
-│ [+ Receber] [+ Despesa] [+ Suprimento] [+ Sangria] [Imprimir] │
-├─ Coluna esquerda (2/3) ────────┬─ Coluna direita (1/3) ───────┤
-│ Busca forte (UB embutida)      │ Fila do caixa (pacientes)    │
-│ [Abas: Hoje · Sessão · Todos]  │ virtualizada, click = receber│
-│ Chips: Recebimento · Despesa · │                              │
-│        Sangria · Suprim.       │                              │
-│ Lista virtualizada (linhas 40px)│                              │
-│  hora · tipo · descrição · R$  │                              │
-│  → scroll infinito             │                              │
-└────────────────────────────────┴──────────────────────────────┘
+┌ Sessão #123 · aberta 2h14 ┐┌ Recebido hoje ┐┌ Recebido sessão ┐
+│ Saldo R$ 1.240,00         ││ R$ 3.180,00   ││ R$ 2.410,00     │
+└───────────────────────────┘└───────────────┘└─────────────────┘
+┌ Particular ┐┌ Associado ┐┌ Dinheiro ┐┌ Pix ┐┌ Cartão ┐
+│ R$ 1.900   ││ R$ 1.280  ││ R$ 640   ││ R$1k││ R$1.5k │
+└────────────┘└───────────┘└──────────┘└─────┘└────────┘
+┌ Pendentes na fila ┐┌ Aguardando pagamento ┐
+│ 7                 ││ 3 pacientes           │
+└───────────────────┘└───────────────────────┘
 ```
 
-Modo compacto (toggle no topbar): remove coluna direita, linhas 32px, esconde subtotais na linha; ideal para recepção usar em monitor pequeno.
+Agregação client-side sobre o array já carregado + `count head:true` para pendentes. Sem nova query pesada. Nomenclatura: **Particular / Associado / Cartão de Benefícios** — nunca "Convênio".
 
-## 2. Busca
+## 2. Receber em 1 clique
 
-- Input único no topo da lista (reaproveita `ListShell` — debounce 200ms).
-- Reconhece prefixos da UB (A2): `p:` paciente, `r:` recibo, `v:` valor, `d:` data (`d:hoje`, `d:07/07`).
-- Sem prefixo: match em descrição + nome paciente + valor formatado + forma de pagamento.
-- CPF/telefone puro entra no atalho da UB e abre paciente sem sair do caixa.
+Botão "Receber" vira ação primária (variant default, tamanho lg, cor verde tokenizada) em cada card da fila.
 
-## 3. Filtros rápidos (chips)
+- Fila carrega `agendamento_orcamento_itens` com `count` de itens pendentes.
+- 1 item pendente → clique direto abre modal de pagamento com item pré-selecionado.
+- >1 item → abre sheet de seleção; após seleção, mesma tela de pagamento.
+- Nada muda na lógica de gravação — só encurta o caminho de entrada.
 
-Chips toggláveis, múltipla seleção, persistidos em URL (`?tipo=recebimento,despesa`):
+## 3. Cores inteligentes (tokens novos em `src/styles.css`)
 
-- Tipo: Recebimento · Despesa · Sangria · Suprimento · Abertura/Fechamento
-- Forma: Dinheiro · Pix · Cartão · Boleto
-- Período: Hoje · 7d · 30d (só na aba "Todos")
-- "Somente estornáveis" (recebimentos não estornados)
+Tokens semânticos (evitar hard-coded, respeita dark mode):
 
-Chip ativo = badge com X. "Limpar filtros" aparece quando qualquer chip está ligado.
+```
+--status-paid: oklch(0.72 0.17 145);        /* verde  */
+--status-waiting: oklch(0.85 0.16 90);      /* amarelo*/
+--status-in-service: oklch(0.65 0.15 240);  /* azul   */
+--status-canceled: oklch(0.60 0.20 25);     /* vermelho*/
+--status-refunded: oklch(0.60 0.18 300);    /* roxo   */
+```
 
-## 4. Abas
+Ponto colorido 8px + label opcional. Aria-label mantém texto para acessibilidade ("Status: pago").
 
-Três abas apenas (menos é mais):
+## 4. Card de fila (não linha de tabela)
 
-- **Hoje** — todos movimentos da data atual, todas as sessões.
-- **Sessão atual** — só a sessão aberta do usuário (default se houver sessão aberta).
-- **Todos** — histórico completo com filtro de período obrigatório.
+Substitui a lista de 40px por cards de ~88px com hierarquia visual:
 
-Contadores nas abas via `count` da `StatusTab` (agregado leve, `head: true` no query).
+```
+┌ ● João Silva · 32a                        14:30 ┐
+│  Consulta cardiológica · Dr. Marcos             │
+│  [Particular] R$ 350,00        [🟢 Receber →]  │
+└─────────────────────────────────────────────────┘
+```
 
-## 5. Modo compacto
+Modo compacto (Ctrl+Shift+C): 56px, esconde procedimento e vira 2 colunas.
 
-Toggle 🡒 `Ctrl+Shift+C`. Persistido em `preferencias_ui.caixa.compact`.
+## 5. Mini Timeline (drawer lateral)
 
-- Linhas 32px (vs 40px normal).
-- Esconde coluna "forma de pagamento" (vira ícone).
-- Esconde subtotais inline.
-- Aumenta densidade para ~24 linhas visíveis em 1080p.
+Clique no card abre drawer (não navega). Timeline horizontal com 5 estágios derivados de `agendamentos.status` + `caixa_movimentos` + `atendimento_ia`:
 
-## 6. Scroll infinito
+```
+● Check-in  ● Recepção  ○ Caixa  ○ Atendimento  ○ Finalizado
+14:22       14:25       —        —              —
+```
 
-- Substitui a paginação atual (páginas de 50).
-- Página inicial: 60 itens. Batch subsequente: 40. Sem "carregar mais" — dispara ao chegar a 400px do fim (`endThresholdPx` já suportado em `VirtualList`).
-- Query com `range()` + `order created_at desc`.
-- Estado da lista preserva scroll ao voltar de dialog (recibo, estorno).
-- Realtime: novo movimento inserido no topo com fade-in leve; badge "3 novos" se scroll não está no topo.
+Preenchido = concluído; vazio = pendente; atual = pulsante. Read-only nesta fase.
 
-## 7. Ações críticas preservadas
+## 6. Alertas (badges no card + faixa no topo)
 
-Todas as ações da tela atual continuam disponíveis, apenas reagrupadas:
+Detecção client-side sobre os dados já carregados:
 
-- Abrir caixa / Fechar caixa
-- Novo recebimento (com vínculo a agendamento/orçamento)
-- Nova despesa
-- Sangria / Suprimento
-- Ver detalhe do movimento (drawer lateral, não navega)
-- Solicitar estorno (`SolicitarEstornoDialog` existente)
-- Imprimir recibo (`print-gr.ts`)
-- Exportar Excel (`exportToExcel`)
-- Fila do caixa → receber pagamento de agendamento
-- Vínculo com lançamento financeiro
+| Regra | Badge |
+|---|---|
+| Aguardando > 20min | ⏱️ "Espera longa" |
+| Pago sem check-in de atendimento | 🟢 "Pago aguardando" |
+| Atendimento iniciado sem pagamento | ⚠️ "Sem pagamento" |
+| Orçamento pendente vinculado | 📄 "Orçamento" |
+| NFS-e: falta CPF/endereço | 📋 "Cadastro incompleto" |
 
-Nada é removido. Somente reordenado por frequência de uso.
+Faixa no topo aparece só se houver alerta ativo, com contador e "Ver todos".
 
-## 8. Riscos
+## 7. Atalhos de teclado
 
-| Risco | Prob | Impacto | Mitigação |
-|---|---|---|---|
-| Recepção não achar botão que usava | Média | Alto | Flag off por padrão + rota dev isolada; ações críticas continuam com mesmo rótulo |
-| Perda de scroll ao abrir dialog | Média | Médio | Preservar posição via ref no `VirtualList` |
-| Realtime duplicar linhas | Baixa | Médio | Dedup por `id` no reducer |
-| Query pesada em "Todos" sem período | Média | Alto | Período obrigatório na aba "Todos" (default 7d) |
-| Fechamento de caixa quebrar | Baixa | Crítico | Não tocar em lógica de fechamento; só na renderização |
+Via listener no shell (limpo no unmount, ignora quando input focado exceto Esc):
 
-## 9. Rollback
+- **F2** — Receber pagamento do primeiro card da fila (ou selecionado)
+- **F3** — Imprimir último recibo
+- **F4** — Nova despesa
+- **Ctrl+Shift+C** — Compacto (já existe)
+- **Esc** — Fecha drawer/sheet
 
-1. Usuário: desliga `caixa_v2` em Preferências → volta ao `/app/caixa` atual sem reload.
-2. Global: default off; basta não promover.
-3. Código: componente novo isolado em `src/components/caixa-v2/`; rota atual `app.caixa.tsx` permanece intocada até a promoção.
-4. DB: sem migração — apenas leitura via mesma view/tabela atual.
+Tooltip nos botões mostra o atalho.
 
-## 10. Testes Playwright
+## 8. KPI operacional (rodapé sticky, discreto)
 
-Rota alvo: `/app/dev-caixa-shell`. Bateria:
+Barra fina, tabular-nums, agregada da sessão + hoje:
 
-- Abrir tela → sessão atual carrega em <500ms, primeiros 60 movimentos visíveis.
-- Busca "p:joão" → filtra por paciente.
-- Chip "Recebimento" + "Pix" → lista mostra só matches.
-- Trocar aba Hoje ↔ Sessão ↔ Todos → contadores batem com query.
-- Scroll até o fim → dispara próximo batch, sem duplicar itens.
-- Novo recebimento → aparece no topo, badge "1 novo" se scrollado.
-- Solicitar estorno de recebimento → dialog abre, aprova, linha marca "estornado".
-- Modo compacto on → linha 32px, coluna forma vira ícone.
-- Fechamento de caixa → dialog abre, valores conferem, salva.
-- Mobile 390×844 → coluna única, fila do caixa vira sheet.
-- Toggle `caixa_v2` off → redireciona para `/app/caixa` (atual).
-- Zero ocorrências de "Convênio" no DOM.
+```
+Tempo médio até pagamento: 4m12s · Maior fila: 9 (11h20)
+Tempo médio em caixa: 2m40s · Receita sessão: R$ 2.410
+Receita hoje: R$ 3.180 · Atendimentos: 18
+```
 
-## 11. Impacto esperado
+Cálculos derivados de timestamps já existentes (`agendamentos.created_at`, `caixa_movimentos.created_at`, etc). Cache 30s.
 
-| Métrica | Hoje | Meta v2 |
+## 9. Estética "painel operacional"
+
+- Zero `<table>`. Fila = grid de cards. Movimentos = lista com separadores sutis, não bordas de linha.
+- Espaçamento generoso, tipografia hierárquica, ícones semânticos.
+- Fundo `bg-muted/30` para respirar; cards em `bg-card` com `shadow-sm`.
+- Densidade equilibrada: modo normal respira, compacto para operação.
+
+## 10. Testes e medição
+
+Playwright em `/tmp/browser/caixa-v2-fase2/`:
+
+- resumo carrega e agrega corretamente (mockar 3 movimentos → conferir cards);
+- 1 item pendente → clique em Receber abre pagamento direto;
+- >1 item → clique abre seleção;
+- cores por status renderizam com `data-status`;
+- F2/F3/F4/Esc funcionam;
+- timeline reflete estágios corretos;
+- alertas aparecem conforme thresholds;
+- KPIs preenchidos;
+- mobile 390×844: cards empilhados, resumo com scroll horizontal;
+- zero "Convênio" no DOM;
+- console sem erros;
+- print desktop, compacto e mobile.
+
+**Medição:**
+
+| Métrica | Clássico | Meta v2 |
 |---|---|---|
-| Tempo até primeiro movimento visível | ~1.8s | <500ms |
-| Cliques para receber pagamento da fila | 3 | 1 |
-| Cliques para filtrar recebimentos em dinheiro do dia | 5 | 2 |
-| Movimentos visíveis sem scroll (1080p) | ~12 | ~24 (compacto) |
-| Requests ao rolar 500 itens | 10 (paginação) | 8 (infinito com batch 40) |
-| Perda de contexto ao abrir dialog | scroll reseta | preservado |
-
-Meta operacional: recepção conclui recebimento de agendamento em ≤2 cliques a partir da fila.
-
-## 12. O que NÃO muda nesta fase
-
-- Lógica de abertura/fechamento de caixa.
-- Regras de estorno.
-- Geração de recibo.
-- Vínculo com lançamento financeiro.
-- Fila do caixa (query e regras) — só muda a apresentação.
+| Cliques até receber pagamento | 4 | 1 |
+| Tempo até visualizar estado da fila | ~2s | <500ms |
+| Info visível por paciente sem abrir | 2 campos | 7 campos |
+| Recepção sabe onde paciente está | não | sim (timeline) |
 
 ---
 
-**Aguardando aprovação para implementar A4 fase 1 em `/app/dev-caixa-shell` atrás da flag `caixa_v2`.** Após estável, promovemos para `/app/caixa` mantendo o antigo como fallback pela flag, mesmo modelo do A7.
+## Arquivos
+
+Novos:
+- `src/components/caixa-v2/painel-resumo.tsx`
+- `src/components/caixa-v2/fila-card.tsx`
+- `src/components/caixa-v2/mini-timeline.tsx`
+- `src/components/caixa-v2/alertas-fila.ts` (regras puras)
+- `src/components/caixa-v2/kpi-bar.tsx`
+- `src/components/caixa-v2/atalhos.ts` (hook `useCaixaShortcuts`)
+
+Editados:
+- `src/components/caixa-v2/caixa-shell.tsx` — integra tudo
+- `src/styles.css` — tokens `--status-*`
+
+Intocado: `/app/caixa`, lógica de abertura/fechamento, estorno, recibo, NFS-e.
+
+## Riscos e rollback
+
+- Realtime overhead: agregações client-side, sem novas subscriptions.
+- Atalhos conflitando com browser (F3=find): `preventDefault` só quando shell montado + flag on.
+- Rollback: flag `caixa_v2` off → `/app/caixa` clássico.
+
+## Promoção
+
+Após validação (você + Playwright), promovo com o mesmo modelo do MenuV2: `/app/caixa` renderiza `CaixaShellV2` só para perfis autorizados (recepção/gestor/admin) atrás da flag, com fallback imediato para o clássico ao desligar.
+
+**Aguardando aprovação para implementar A4 Fase 2.**
