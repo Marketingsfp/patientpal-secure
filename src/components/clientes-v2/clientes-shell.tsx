@@ -14,13 +14,19 @@ import {
 import { ClienteCard } from "./cliente-card";
 import { ClienteDrawer } from "./cliente-drawer";
 import { ClientesKpiBar, type ClientesKpi } from "./kpi-bar";
+import { ResumoBar } from "./resumo-bar";
+import { useClientesKpis } from "./use-kpis";
 import {
-  cadastroIncompleto, marcarDuplicados, pagadorLabel,
+  cadastroIncompleto, isAniversarianteHoje, isNovo30d,
+  marcarDuplicados, pagadorLabel, semCpf, semTelefone,
   type PacienteV2,
 } from "./status-utils";
 
 type TabV = "todos" | "ativos" | "inativos" | "incompletos" | "duplicados";
-type TipoV = "particular" | "associado" | "cartao";
+type ChipV =
+  | "particular" | "associado" | "cartao"
+  | "aniv" | "novos30" | "sem_tel" | "sem_cpf";
+type ResumoMode = "none" | "aniv" | "novos30" | "semTel" | "semCpf" | "inativos";
 
 const TAB_OPTS: ReadonlyArray<StatusTab<TabV>> = [
   { value: "todos", label: "Todos" },
