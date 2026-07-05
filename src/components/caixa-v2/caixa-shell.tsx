@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   PlusCircle, MinusCircle, ArrowDownToLine, ArrowUpFromLine, Printer, FileDown,
-  Lock, Unlock, HandCoins, ChevronRight, X, Users, Wallet,
+  Lock, Unlock, ChevronRight, Users, Wallet, AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,6 +15,12 @@ import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/co
 import { ListShell, VirtualList, QuickFilters, type StatusTab } from "@/components/list-shell";
 import { brl } from "@/lib/financeiro/format";
 import { cn } from "@/lib/utils";
+import { PainelResumo, type ResumoData } from "./painel-resumo";
+import { FilaCard, type FilaCardData, type StatusFila } from "./fila-card";
+import { MiniTimeline, buildTimeline } from "./mini-timeline";
+import { detectarAlertas, type AlertaBadge } from "./alertas-fila";
+import { KpiBar, type KpiData } from "./kpi-bar";
+import { useCaixaShortcuts } from "./atalhos";
 
 type MovTipo = "abertura" | "sangria" | "suprimento" | "recebimento" | "despesa" | "fechamento";
 interface Sessao {
