@@ -147,7 +147,7 @@ function ClientesPage() {
           </h1>
           <p className="text-sm text-muted-foreground">Cadastre e gerencie os pacientes da clínica.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
             onClick={async () => {

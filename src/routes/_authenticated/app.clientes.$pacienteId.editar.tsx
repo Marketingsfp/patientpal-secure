@@ -46,7 +46,7 @@ function EditarClientePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Button variant="outline" size="sm" onClick={voltar}>
           <ArrowLeft className="h-4 w-4 mr-2" /> Voltar
         </Button>
@@ -67,7 +67,7 @@ function EditarClientePage() {
         </div>
       </div>
 
-      <div className="rounded-lg border border-border bg-card p-6">
+      <div className="rounded-lg border border-border bg-card p-4 sm:p-6">
         {loading ? (
           <p className="text-sm text-muted-foreground">Carregando…</p>
         ) : notFound || !paciente ? (
