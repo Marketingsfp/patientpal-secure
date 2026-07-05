@@ -10,9 +10,11 @@ Reutilizar componentes, busca de pacientes, padrões visuais e RPCs existentes. 
 Antes de implementar uma feature, declarar: impacto financeiro, operacional, experiência, risco técnico, risco de negócio, tempo estimado, ganho esperado.
 Prioridade máxima: reduzir cliques/tempo da recepção, evitar retrabalho e informações repetidas ao paciente.
 Sem convênios externos. Modalidades: Paciente Particular, Paciente Associado, Cartão de Benefícios. Em UI/menu/busca usar "Cartão de Benefícios", "Associados", "Regras do Cartão", "Empresas associadas" — nunca "Convênios".
+Identificadores legados de pacientes (codigo_prontuario, codigo_prontuario_anterior, numero_pasta, número de ficha) são IMUTÁVEIS: só leitura/busca/filtro. Proibido UPDATE, normalização, renumeração, trigger ou merge automático sem aprovação explícita.
 
 ## Memories
 - [Governança de mudanças](mem://preferences/governanca) — Framework dos 4 eixos + checklist pré-implementação
 - [Arquitetura de plataforma](mem://preferences/arquitetura-plataforma) — Config-first, motor de regras, separação de status, KPIs suportados
 - [Repasse cartão consulta](mem://features/repasse-cartao-consulta) — Regras de repasse
 - [Testes clientes pendentes](mem://tests/clientes-pendentes) — Notas de teste
+- [Identificadores legados de pacientes](mem://constraints/identificadores-legados-pacientes) — Campos protegidos, permitido/proibido
