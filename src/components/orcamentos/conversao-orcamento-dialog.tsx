@@ -357,7 +357,7 @@ function ItemCard({
         <div className="min-w-0">
           <div className="font-medium">{item.descricao}</div>
           <div className="text-xs text-muted-foreground">
-            {item.quantidade} × {BRL(item.valor_total)} = <b>{BRL(total)}</b>
+            Qtd {item.quantidade} · Total <b>{BRL(total)}</b>
           </div>
         </div>
         <div className="flex gap-2 flex-wrap">
