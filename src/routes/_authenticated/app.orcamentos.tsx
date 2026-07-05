@@ -17,6 +17,8 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 import { printOrcamento } from "@/lib/print-orcamento";
 import { ConversaoOrcamentoDialog } from "@/components/orcamentos/conversao-orcamento-dialog";
+import { useOrcamentosV2Flag } from "@/hooks/use-orcamentos-v2-flag";
+import { OrcamentosV2Mount } from "@/components/orcamentos-v2/orcamentos-v2-mount";
 
 type AuditRow = {
   id: string;
@@ -124,9 +126,29 @@ function HistoricoOrcamentoDialog({
 }
 
 export const Route = createFileRoute("/_authenticated/app/orcamentos")({
-  component: OrcamentosPage,
+  component: OrcamentosRouteDispatcher,
   head: () => ({ meta: [{ title: "Orçamentos — ClinicaOS" }] }),
 });
+
+/**
+ * Promoção controlada do OrcamentosShellV2 para `/app/orcamentos`, atrás da
+ * flag `orcamentos_v2` E limitado a admin/gestor. Recepção, médico, caixa,
+ * financeiro e demais perfis continuam vendo o `<OrcamentosPage />` clássico
+ * intocado — mesmo com a flag ligada. Kill-switch imediato: desligar a flag
+ * volta ao clássico sem reload (o hook escuta `orcamentos:flag-changed`).
+ *
+ * Este dispatcher é o ÚNICO ponto novo; nenhuma linha do fluxo clássico
+ * (criação, edição, conversão, impressão, histórico, cobrança, splits ou
+ * permissões) muda.
+ */
+function OrcamentosRouteDispatcher() {
+  const { clinicaAtual } = useClinica();
+  const { enabled, loading } = useOrcamentosV2Flag();
+  const role = clinicaAtual?.role ?? null;
+  const v2Allowed = role === "admin" || role === "gestor";
+  if (!loading && enabled && v2Allowed) return <OrcamentosV2Mount />;
+  return <OrcamentosPage />;
+}
 
 type Orc = {
   id: string;
