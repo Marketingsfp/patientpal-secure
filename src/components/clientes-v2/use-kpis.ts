@@ -31,38 +31,29 @@ export function useClientesKpis(clinicaId: string | null): ClientesKpiTotais {
   const load = useCallback(async () => {
     if (!clinicaId) return;
     setState((s) => ({ ...s, loading: true }));
-    const base = () => supabase.from("pacientes").select("*", { count: "exact", head: true }).eq("clinica_id", clinicaId);
-    const desde30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    const hoje = new Date();
-    const mmdd = `${String(hoje.getMonth() + 1).padStart(2, "0")}-${String(hoje.getDate()).padStart(2, "0")}`;
-
-    const [total, ativos, inativos, novos, semTel, semCpfQ, aniv, associadosCount] = await Promise.all([
-      base(),
-      base().eq("ativo", true),
-      base().eq("ativo", false),
-      base().gte("created_at", desde30),
-      base().is("telefone", null).is("telefone2", null),
-      base().or("cpf.is.null,cpf_digits.is.null"),
-      base().not("data_nascimento", "is", null).filter("data_nascimento", "like", `%-${mmdd}`),
-      supabase.from("contratos_assinatura")
-        .select("paciente_id", { count: "exact", head: true })
-        .eq("clinica_id", clinicaId)
-        .eq("status", "ativo"),
-    ]);
-
-    const t = total.count ?? null;
-    const asc = associadosCount.count ?? null;
+    const { data, error } = await supabase.rpc("kpis_clientes_v2", { _clinica_id: clinicaId });
+    if (error) {
+      setState((s) => ({ ...s, loading: false }));
+      return;
+    }
+    const r = (Array.isArray(data) ? data[0] : data) as {
+      total: number; ativos: number; inativos: number; novos30d: number;
+      sem_telefone: number; sem_cpf: number; aniversariantes: number; associados: number;
+    } | null;
+    if (!r) { setState((s) => ({ ...s, loading: false })); return; }
+    const t = Number(r.total);
+    const asc = Number(r.associados);
     setState({
       total: t,
-      ativos: ativos.count ?? null,
-      inativos: inativos.count ?? null,
-      novos30d: novos.count ?? null,
-      incompletos: null, // requer combinação; deixamos para bar visível
-      semTelefone: semTel.count ?? null,
-      semCpf: semCpfQ.count ?? null,
-      aniversariantes: aniv.count ?? null,
+      ativos: Number(r.ativos),
+      inativos: Number(r.inativos),
+      novos30d: Number(r.novos30d),
+      incompletos: null,
+      semTelefone: Number(r.sem_telefone),
+      semCpf: Number(r.sem_cpf),
+      aniversariantes: Number(r.aniversariantes),
       associados: asc,
-      particulares: t !== null && asc !== null ? Math.max(0, t - asc) : null,
+      particulares: Math.max(0, t - asc),
       loading: false,
     });
   }, [clinicaId]);
