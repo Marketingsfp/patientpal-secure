@@ -290,7 +290,7 @@ function TriagemEnfermagemPage() {
             Pacientes na etapa <b>Triagem</b> do fluxo. Chame, registre a anamnese e libere para o atendimento.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Label className="text-xs">Sala/Consultório</Label>
           <Input value={consultorio} onChange={(e) => setConsultorio(e.target.value.slice(0, 10))}
                  placeholder="Ex.: 1, 2, A" className="h-9 w-24" />
@@ -343,7 +343,7 @@ function TriagemEnfermagemPage() {
                   );
                 })}
               </ul>
-              <div className="flex items-center gap-2 pt-1">
+              <div className="flex flex-wrap items-center gap-2 pt-1">
                 <Button
                   size="sm" className="flex-1"
                   onClick={() => chamarPaciente(g)}

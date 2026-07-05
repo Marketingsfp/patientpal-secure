@@ -345,8 +345,9 @@ function FluxoPage() {
         </div>
       </div>
 
-      {/* Colunas do fluxo - grid sem scroll */}
-      <div className="grid grid-cols-7 gap-3">
+      {/* Colunas do fluxo - scroll horizontal interno em telas menores; sem scroll no desktop */}
+      <div className="overflow-x-auto pb-2">
+      <div className="grid grid-cols-7 gap-3 min-w-[840px]">
         {ETAPAS.map((col) => {
           const items = colunas.get(col.id) ?? [];
           const Icon = col.icon;
@@ -461,6 +462,7 @@ function FluxoPage() {
             </div>
           );
         })}
+      </div>
       </div>
     </div>
   );
