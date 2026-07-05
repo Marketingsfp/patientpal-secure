@@ -14,7 +14,6 @@ export type OrcV2 = {
   medico_nome: string | null;
   forma_pagamento: string | null;
   validade_dias: number | null;
-  aprovado?: boolean | null;
   valor_total: number;
   status: string;
   created_at: string;
