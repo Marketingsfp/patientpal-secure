@@ -99,8 +99,8 @@ export function useMenuPrefs() {
     const { data } = await supabase.from("profiles")
       .select("preferencias_ui").eq("id", uidRef.current).maybeSingle();
     const prev = (data?.preferencias_ui ?? {}) as Record<string, unknown>;
-    const next = { ...prev, menu: payload };
-    await supabase.from("profiles").update({ preferencias_ui: next }).eq("id", uidRef.current);
+    const next = { ...prev, menu: payload as unknown as Record<string, unknown> };
+    await supabase.from("profiles").update({ preferencias_ui: next as never }).eq("id", uidRef.current);
   }, []);
 
   const update = useCallback((mut: (p: MenuPrefs) => MenuPrefs) => {
