@@ -26,7 +26,7 @@ type TabV = "todos" | "ativos" | "inativos" | "incompletos" | "duplicados";
 type ChipV =
   | "particular" | "associado" | "cartao"
   | "aniv" | "novos30" | "sem_tel" | "sem_cpf";
-type ResumoMode = "none" | "aniv" | "novos30" | "semTel" | "semCpf" | "inativos";
+type ResumoMode = "none" | "aniv" | "inativos";
 
 const TAB_OPTS: ReadonlyArray<StatusTab<TabV>> = [
   { value: "todos", label: "Todos" },
