@@ -8000,6 +8000,19 @@ export type Database = {
         Args: { _clinica_id: string; _user_id: string }
         Returns: boolean
       }
+      kpis_clientes_v2: {
+        Args: { _clinica_id: string }
+        Returns: {
+          aniversariantes: number
+          associados: number
+          ativos: number
+          inativos: number
+          novos30d: number
+          sem_cpf: number
+          sem_telefone: number
+          total: number
+        }[]
+      }
       listar_duplicados_pacientes: {
         Args: { _clinica_ids: string[]; _limite?: number; _tipo?: string }
         Returns: {
