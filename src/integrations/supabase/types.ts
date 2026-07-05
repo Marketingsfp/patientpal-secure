@@ -6565,23 +6565,128 @@ export type Database = {
         }
         Relationships: []
       }
+      procedimento_unidade_regras: {
+        Row: {
+          agenda_obrigatoria: boolean | null
+          clinica_id: string
+          cor_agenda: string | null
+          created_at: string
+          equipamento_obrigatorio: boolean | null
+          exige_autorizacao: boolean | null
+          exige_preparo: boolean | null
+          exige_termo: boolean | null
+          fluxo_atendimento: string | null
+          id: string
+          medico_obrigatorio: boolean | null
+          permite_encaixe: boolean | null
+          permite_orcamento: boolean | null
+          permite_venda_direta: boolean | null
+          procedimento_id: string
+          sala_obrigatoria: boolean | null
+          tempo_padrao_min: number | null
+          tipo_procedimento: string | null
+          unidade_id: string
+          updated_at: string
+        }
+        Insert: {
+          agenda_obrigatoria?: boolean | null
+          clinica_id: string
+          cor_agenda?: string | null
+          created_at?: string
+          equipamento_obrigatorio?: boolean | null
+          exige_autorizacao?: boolean | null
+          exige_preparo?: boolean | null
+          exige_termo?: boolean | null
+          fluxo_atendimento?: string | null
+          id?: string
+          medico_obrigatorio?: boolean | null
+          permite_encaixe?: boolean | null
+          permite_orcamento?: boolean | null
+          permite_venda_direta?: boolean | null
+          procedimento_id: string
+          sala_obrigatoria?: boolean | null
+          tempo_padrao_min?: number | null
+          tipo_procedimento?: string | null
+          unidade_id: string
+          updated_at?: string
+        }
+        Update: {
+          agenda_obrigatoria?: boolean | null
+          clinica_id?: string
+          cor_agenda?: string | null
+          created_at?: string
+          equipamento_obrigatorio?: boolean | null
+          exige_autorizacao?: boolean | null
+          exige_preparo?: boolean | null
+          exige_termo?: boolean | null
+          fluxo_atendimento?: string | null
+          id?: string
+          medico_obrigatorio?: boolean | null
+          permite_encaixe?: boolean | null
+          permite_orcamento?: boolean | null
+          permite_venda_direta?: boolean | null
+          procedimento_id?: string
+          sala_obrigatoria?: boolean | null
+          tempo_padrao_min?: number | null
+          tipo_procedimento?: string | null
+          unidade_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "procedimento_unidade_regras_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "procedimento_unidade_regras_procedimento_id_fkey"
+            columns: ["procedimento_id"]
+            isOneToOne: false
+            referencedRelation: "procedimentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "procedimento_unidade_regras_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "unidades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       procedimentos: {
         Row: {
+          agenda_obrigatoria: boolean
           ativo: boolean
           clinica_id: string
           codigo: string | null
+          cor_agenda: string | null
           created_at: string
           duracao_minutos: number
+          equipamento_obrigatorio: boolean
+          exige_autorizacao: boolean
+          exige_preparo: boolean
+          exige_termo: boolean
+          fluxo_atendimento: string | null
           grupo: string | null
           id: string
+          medico_obrigatorio: boolean
           nome: string
           observacoes: string | null
+          permite_encaixe: boolean
+          permite_orcamento: boolean
+          permite_venda_direta: boolean
           preparo: string | null
           requer_laudo: boolean
           requer_medico: boolean
           requer_sala: boolean
+          sala_obrigatoria: boolean
+          tempo_padrao_min: number
           tipo: string
           tipo_destino: string | null
+          tipo_procedimento: string | null
           tipo_recurso: string | null
           updated_at: string
           valor_cartao: number
@@ -6595,21 +6700,35 @@ export type Database = {
           valor_pix: number
         }
         Insert: {
+          agenda_obrigatoria?: boolean
           ativo?: boolean
           clinica_id: string
           codigo?: string | null
+          cor_agenda?: string | null
           created_at?: string
           duracao_minutos?: number
+          equipamento_obrigatorio?: boolean
+          exige_autorizacao?: boolean
+          exige_preparo?: boolean
+          exige_termo?: boolean
+          fluxo_atendimento?: string | null
           grupo?: string | null
           id?: string
+          medico_obrigatorio?: boolean
           nome: string
           observacoes?: string | null
+          permite_encaixe?: boolean
+          permite_orcamento?: boolean
+          permite_venda_direta?: boolean
           preparo?: string | null
           requer_laudo?: boolean
           requer_medico?: boolean
           requer_sala?: boolean
+          sala_obrigatoria?: boolean
+          tempo_padrao_min?: number
           tipo?: string
           tipo_destino?: string | null
+          tipo_procedimento?: string | null
           tipo_recurso?: string | null
           updated_at?: string
           valor_cartao?: number
@@ -6623,21 +6742,35 @@ export type Database = {
           valor_pix?: number
         }
         Update: {
+          agenda_obrigatoria?: boolean
           ativo?: boolean
           clinica_id?: string
           codigo?: string | null
+          cor_agenda?: string | null
           created_at?: string
           duracao_minutos?: number
+          equipamento_obrigatorio?: boolean
+          exige_autorizacao?: boolean
+          exige_preparo?: boolean
+          exige_termo?: boolean
+          fluxo_atendimento?: string | null
           grupo?: string | null
           id?: string
+          medico_obrigatorio?: boolean
           nome?: string
           observacoes?: string | null
+          permite_encaixe?: boolean
+          permite_orcamento?: boolean
+          permite_venda_direta?: boolean
           preparo?: string | null
           requer_laudo?: boolean
           requer_medico?: boolean
           requer_sala?: boolean
+          sala_obrigatoria?: boolean
+          tempo_padrao_min?: number
           tipo?: string
           tipo_destino?: string | null
+          tipo_procedimento?: string | null
           tipo_recurso?: string | null
           updated_at?: string
           valor_cartao?: number
@@ -7707,6 +7840,10 @@ export type Database = {
           tipo: string
           total: number
         }[]
+      }
+      fn_regras_procedimento: {
+        Args: { p_procedimento_id: string; p_unidade_id?: string }
+        Returns: Json
       }
       get_horarios_disponiveis: {
         Args: {

@@ -1,177 +1,208 @@
 
-# Fase 3.b — UI de Conversão + RPCs
+# Fase 3.b (revisada) — Regras de procedimento + status duplo + cascata + NFS-e configurável
 
-Foco: entregar as 4 RPCs de conversão, o `ConversaoOrcamentoDialog` para orçamentos mistos e um alerta/aba de "Procedimentos sem classificação" (`tipo_destino IS NULL`). A migration da Fase 3.a já criou colunas, triggers e status. Nada de dado real é tocado nos testes.
+Escopo ampliado a partir das respostas. Tudo continua sem tocar em dados reais nos testes. Aproveito a estrutura já criada na Fase 3.a — as colunas `tipo_destino`, `requer_medico`, `requer_sala`, `tipo_recurso` viram parte do conjunto maior de regras e ganham override por unidade.
 
 ---
 
-## 1. RPCs (SECURITY INVOKER, retorno JSON, PT-BR)
+## 1. Regras do Procedimento (config-first, sem código)
 
-Todas usam `SELECT ... FOR UPDATE` no item + checagem de `orcamentos.status`; qualquer bloqueio grava no `audit_log` via trigger da Fase 2. Concorrência garantida pelas UNIQUE já criadas em `orcamento_itens.agendamento_id` e `orcamento_itens.fin_atendimento_id`.
+### 1.1 Novas colunas em `procedimentos` (defaults nas atuais)
+```
+tipo_procedimento  text  -- consulta|exame|laboratorio|procedimento|cirurgia|equipamento|vacina|telemedicina
+fluxo_atendimento  text  -- consulta_medica|exame_agendado|lab_ordem_chegada|lab_agendado
+                         --   |procedimento_ambulatorial|equipamento|domiciliar|telemedicina
+agenda_obrigatoria       bool default true
+medico_obrigatorio       bool default false
+sala_obrigatoria         bool default false
+equipamento_obrigatorio  bool default false
+permite_encaixe          bool default true
+permite_venda_direta     bool default false
+permite_orcamento        bool default true
+exige_autorizacao        bool default false
+exige_preparo            bool default false
+exige_termo              bool default false
+tempo_padrao_min         int  default 30
+cor_agenda               text
+-- categoria/grupo já existem
+```
+`tipo_destino` fica como coluna derivada (view/coluna gerada) a partir de `fluxo_atendimento` para não quebrar o que a Fase 3.a criou. Migração faz backfill: `consulta_medica→consulta`, `exame_agendado/equipamento→exame_equipamento`, `lab_*→laboratorio`, `procedimento_ambulatorial→procedimento_medico`.
 
-### 1.1 `converter_item_venda(p_item_id uuid, p_caixa_sessao_id uuid, p_forma_pagamento text, p_desconto numeric default 0)`
-- Pré-condições:
-  - item existe, `status_item = 'pendente'`, orçamento não `convertido` nem `cancelado`;
-  - `procedimentos.tipo_destino IN ('venda_balcao','laboratorio','exame_equipamento','procedimento_medico')` (consulta pura NÃO pode ser vendida sem agenda);
-  - `tipo_destino` NÃO pode ser NULL → erro `PROC_NAO_CLASSIFICADO`;
-  - `caixa_sessoes.status = 'aberta'` E pertence ao usuário/clínica atual → senão `CAIXA_FECHADO`.
-- Efeitos: cria `fin_atendimentos` (com `orcamento_item_id`), cria `caixa_movimentos` (entrada), grava `status_item='vendido'`, `fin_atendimento_id`, `status_alterado_por/em`.
-- Retorno: `{ ok, fin_atendimento_id, caixa_movimento_id, orcamento_status_novo }`.
+### 1.2 Override por unidade — `procedimento_unidade_regras`
+Nova tabela (por unidade/clínica). Mesmas colunas de regra acima, todas nullable — quando NULL herda do procedimento.
+```
+id, procedimento_id, unidade_id,
+tipo_procedimento?, fluxo_atendimento?, agenda_obrigatoria?, ...
+UNIQUE (procedimento_id, unidade_id)
+```
+Nova função `fn_regras_procedimento(p_procedimento_id, p_unidade_id) returns jsonb` faz o merge (override > base) e é o **único** lugar que a UI e as RPCs consultam para decidir o fluxo.
 
-### 1.2 `converter_item_agendamento(p_item_id uuid, p_payload jsonb)`
+GRANTs padrão + RLS: SELECT para authenticated (por clínica); INSERT/UPDATE/DELETE só admin/gestor.
+
+### 1.3 Aba "Regras" no cadastro de procedimento
+Em `app.procedimentos`: nova aba/dialog "Regras" com todos os toggles. Aba "Overrides por unidade" lista clínicas e permite editar override específico.
+
+Alerta em `app.orcamentos` continua: procedimentos com `fluxo_atendimento IS NULL` (ou incompatíveis) travam a conversão daquele item, com link para classificar.
+
+---
+
+## 2. Status duplo no item do orçamento
+
+`orcamento_itens.status_item` (Fase 3.a) é **repurposado** como status operacional. Adiciono status financeiro separado:
+
+```
+status_operacional text  -- pendente|aguardando_agendamento|agendado|em_atendimento|concluido|cancelado|nao_aplicavel
+status_financeiro  text  -- pendente|pago|estornado|isento|nao_aplicavel
+```
+
+Migration renomeia `status_item → status_operacional` (com view compat para telas que ainda leem `status_item`) e cria `status_financeiro` default `pendente`. Colunas `fin_atendimento_id` e `agendamento_id` continuam sendo as fontes-de-verdade dos vínculos.
+
+Trigger `fn_orcamento_recalcula_status` (Fase 3.a) passa a olhar **ambos**:
+- `convertido` só quando **todos** os itens têm `status_operacional IN (agendado, em_atendimento, concluido, nao_aplicavel, cancelado)` **e** `status_financeiro IN (pago, isento, nao_aplicavel)` (ou item cancelado, que ignora financeiro);
+- `parcialmente_agendado` quando parte dos itens tem operacional/financeiro resolvido;
+- `aberto` caso contrário.
+
+Sem duplicação: nada muda em `fin_atendimentos` (fonte financeira) nem em `agendamentos` (fonte operacional). Vínculo é 1-para-1 no item.
+
+---
+
+## 3. RPCs (revisadas)
+
+Todas SECURITY INVOKER, PT-BR, retorno JSON. Todas consultam `fn_regras_procedimento(procedimento_id, unidade_id)` no início — nenhuma lógica de "consulta/MAPA/US" hard-coded.
+
+### 3.1 `converter_item_venda(p_item_id, p_caixa_sessao_id, p_forma_pagamento, p_desconto)`
+- Regra do procedimento deve ter `permite_venda_direta=true` **OU** o item já ter `status_operacional='agendado'` (venda pós-agenda).
+- Exige caixa aberto da mesma clínica/usuário.
+- Grava `status_financeiro='pago'`, cria `fin_atendimentos` + `caixa_movimentos`.
+- Não muda `status_operacional` (pagar não atende).
+- Erro `VENDA_NAO_PERMITIDA` se regra proíbe.
+
+### 3.2 `converter_item_agendamento(p_item_id, p_payload jsonb)`
 Payload:
-```json
-{
-  "inicio": "timestamptz", "fim": "timestamptz",
-  "medico_id": "uuid|null",
-  "medico_agenda_id": "uuid|null",
-  "enfermagem_recurso_id": "uuid|null",
-  "sala": "text|null",
-  "tipo_atendimento": "text", "observacoes": "text|null"
-}
 ```
-- Validações por `tipo_destino`:
-  - `consulta` / `procedimento_medico` → exige `medico_id` + `medico_agenda_id` de tipo `consulta`/NULL; rejeita `enfermagem_recurso_id`;
-  - `exame_equipamento` (MAPA/Holter) → exige `enfermagem_recurso_id` OU `medico_agenda_id.tipo_recurso = procedimentos.tipo_recurso`; rejeita se tipos não baterem (`RECURSO_INCOMPATIVEL`);
-  - `us` (ultrassom, identificado por `tipo_recurso='us'`) → exige `medico_id` E (`sala` ou `medico_agenda_id.sala`);
-  - `laboratorio` → aceita destino "lab" (sem `agendamentos`): grava `status_item='agendado'` com `agendamento_id=null` e `observacoes` prefixado `[LAB]`; ou cria `agendamentos` se `medico_agenda_id` de tipo `laboratorio`;
-  - `venda_balcao` → erro `NAO_AGENDAVEL`.
-- `tipo_destino IS NULL` → erro `PROC_NAO_CLASSIFICADO`.
-- Efeitos: `INSERT INTO agendamentos (..., orcamento_id, orcamento_item_id)`; UNIQUE já impede duplicidade; grava `status_item='agendado'`, `agendamento_id`.
-- Retorno: `{ ok, agendamento_id, orcamento_status_novo, fluxo_lab: bool }`.
-
-### 1.3 `marcar_item_nao_aplicavel(p_item_id uuid, p_motivo text)`
-- Restrita a `has_role(auth.uid(),'admin')` OR `has_role(auth.uid(),'gestor')` → senão `PERMISSAO_NEGADA`.
-- Exige `p_motivo` não-vazio; grava `status_item='nao_aplicavel'`, `motivo_nao_aplicavel`, autor.
-- Retorno: `{ ok, orcamento_status_novo }`.
-
-### 1.4 `cancelar_item(p_item_id uuid, p_motivo text)`
-- Mesma regra de permissão. Grava `status_item='cancelado'` + motivo.
-- Se item já tinha `agendamento_id`, NÃO apaga o agendamento — apenas marca; UI mostra aviso "cancele o agendamento manualmente".
-- Retorno: `{ ok, orcamento_status_novo }`.
-
-### 1.5 Função de leitura `get_orcamento_conversao(p_orcamento_id uuid)` (view server-side)
-Retorna, por item:
+{ inicio, fim, medico_id?, medico_agenda_id?, enfermagem_recurso_id?, sala?, tipo_atendimento, observacoes? }
 ```
-item_id, procedimento_id, procedimento_nome,
-tipo_destino, tipo_recurso, requer_medico, requer_sala,
-quantidade, valor_unit, valor_total, desconto,
-status_item, agendamento_id, fin_atendimento_id,
-agenda_inicio, agenda_fim, medico_nome, recurso_nome, sala,
-motivo_nao_aplicavel,
-acoes_disponiveis text[]   -- ['vender','agendar','nao_aplicavel','cancelar']
-```
-+ cabeçalho: `orcamento_status`, `caixa_aberto bool`, `is_admin_or_gestor bool`, `total_itens`, `resolvidos`, `com_destino`.
+- Consulta regras da unidade do orçamento.
+- Se `agenda_obrigatoria=false` (ex.: lab ordem de chegada): não exige payload de horário; grava `status_operacional='aguardando_agendamento'` com flag `[FLUXO:<fluxo>]` em observações.
+- Se `agenda_obrigatoria=true`: valida `medico_obrigatorio`, `sala_obrigatoria`, `equipamento_obrigatorio`. Erros: `MEDICO_OBRIGATORIO`, `SALA_OBRIGATORIA`, `EQUIPAMENTO_OBRIGATORIO`, `RECURSO_INCOMPATIVEL`.
+- Cria `agendamentos` com `orcamento_item_id` UNIQUE.
+- Retorna `{ ok, agendamento_id, orcamento_status_novo, sem_agendamento_real: bool }`.
+
+### 3.3 `marcar_item_nao_aplicavel(p_item_id, p_motivo)` — admin/gestor, motivo obrigatório.
+
+### 3.4 `cancelar_item(p_item_id, p_motivo, p_confirmar_cascata bool default false)` — **cascata segura**
+Fluxo:
+1. Carrega item + `agendamentos` + `fin_atendimentos` vinculados.
+2. Se agendamento vinculado tem `status IN ('realizado','em_atendimento','concluido')` → erro `AGENDAMENTO_JA_REALIZADO` (com dica de admin/gestor).
+3. Se agendamento existe e `p_confirmar_cascata=false` → retorna `{ requer_confirmacao: true, agendamento_id, tem_pagamento: bool }` (UI mostra o dialog de confirmação).
+4. Se `p_confirmar_cascata=true`:
+   - marca item `status_operacional='cancelado'`;
+   - marca agendamento como `cancelado` (libera horário);
+   - se `fin_atendimento_id` existe e `status_financeiro='pago'` → **não estorna**, mas retorna `{ aviso_pagamento: true, fin_atendimento_id }` e o item mantém `status_financeiro='pago'` até estorno manual;
+   - grava tudo em `audit_log`, preserva vínculos.
+5. Restrita a admin/gestor **exceto** cancelamento de item ainda pendente (sem agendamento e sem pagamento) — recepção pode.
+
+### 3.5 `get_orcamento_conversao(p_orcamento_id)`
+Retorna, por item, o merge de regras + status duplo + ações disponíveis + flags (`tem_agendamento_futuro`, `tem_pagamento`).
 
 ---
 
-## 2. UI: `ConversaoOrcamentoDialog`
+## 4. NFS-e configurável por clínica
 
-Rota: mesma `app.orcamentos` — botão "Converter" no card do orçamento abre o dialog em modo full-screen (>=lg) / bottom-sheet (mobile).
-
-### Layout
+### 4.1 Config
+Nova coluna em `clinicas` (ou `nfse_emitentes`):
 ```
-┌─ Orçamento #123 — Paciente X ─────────── [status: parcialmente_agendado] ─┐
-│  Progresso: 2 de 4 itens resolvidos     [ Caixa: ABERTO ● / FECHADO ● ]    │
-├────────────────────────────────────────────────────────────────────────────┤
-│  # | Procedimento | Tipo destino | Valor | Requisitos | Status | Ação      │
-│  1 | Consulta card| consulta     | 300   | Médico     | ✅ Agend| —         │
-│  2 | MAPA 24h     | exame_equip. | 250   | Recurso    | ⏳ Pend | Agendar ▾ │
-│  3 | US abdômen   | us           | 400   | Méd+Sala   | ⏳ Pend | Agendar ▾ │
-│  4 | Vitamina B12 | venda_balcao | 90    | Caixa      | ⏳ Pend | Vender ▾  │
-├────────────────────────────────────────────────────────────────────────────┤
-│  [Histórico]                                        [Fechar]  [Finalizar]  │
-└────────────────────────────────────────────────────────────────────────────┘
+nfse_modo_emissao text default 'agrupada'  -- 'agrupada' | 'por_item'
 ```
+UI: em `app.configuracoes.nfse` uma escolha simples com explicação.
 
-- **Ação por linha** abre um `Sheet` lateral (subformulário contextual):
-  - `Agendar consulta` → `SearchableSelect` médico → `medico_agendas` compatíveis → slots livres.
-  - `Agendar exame` → recurso (`enfermagem_recursos` filtrado por `tipo_recurso`) → slots.
-  - `Agendar US` → médico + sala + slot.
-  - `Fluxo lab` → botão único "Enviar para laboratório" (sem slot).
-  - `Vender` → forma de pagamento, desconto, confirma sessão de caixa.
-  - `Marcar não aplicável` / `Cancelar item` → apenas admin/gestor; exige motivo.
-- **Sem caixa aberta**: botão Vender desabilitado + tooltip "Abra o caixa em /app/caixa".
-- **Ações disponíveis** vêm de `acoes_disponiveis` do backend — nunca calculadas só no cliente.
-- **"Finalizar" não muda status** — status é recomputado pela trigger; botão só fecha o dialog e faz `invalidateQueries`.
-- **Tipo_destino NULL**: linha aparece bloqueada com badge vermelho "Procedimento não classificado" e link "Classificar" → abre o gerenciamento em Procedimentos.
-- **Histórico** reaproveita o dialog já existente da Fase 2 (`audit_log` filtrado por `orcamento_id`).
+### 4.2 Emissão
+- `por_item`: comportamento atual (1 NFS-e por `fin_atendimento`).
+- `agrupada`: novo `emitir_nfse_orcamento(p_orcamento_id)` monta 1 NFS-e com todos os `fin_atendimentos` do orçamento como itens de serviço; `nfse.orcamento_id` referencia a origem; cada `fin_atendimento.nfse_id` aponta para a mesma nota.
+- Comissão, repasse, produção, estatísticas, financeiro e auditoria continuam por `fin_atendimento` (nada muda).
+- Focus NFS-e: o payload já aceita `itens[]` — reuso o mesmo cliente.
 
-### Componentes novos
-- `src/components/orcamentos/ConversaoOrcamentoDialog.tsx` (container + tabela)
+### 4.3 Compatibilidade
+Nenhum relatório existente muda; queries continuam agrupando por `fin_atendimento`. NFS-e agrupada é uma linha em `nfse` a mais, referenciada por N atendimentos — impacto zero em séries históricas.
+
+---
+
+## 5. UI: `ConversaoOrcamentoDialog` (revisada)
+
+Colunas por linha:
+```
+Procedimento | Fluxo (regra) | Valor | Op | Fin | Requisitos | Ação
+```
+- `Op` = status operacional (badge), `Fin` = status financeiro (badge).
+- Ações vindas do backend (`acoes_disponiveis`): `agendar`, `sem_agenda`, `vender`, `cancelar`, `nao_aplicavel`.
+- Sistema **não pergunta** o fluxo — só executa: se `fluxo_atendimento='lab_ordem_chegada'`, ação é `Enviar p/ fila`; se `equipamento`, abre sheet de recurso; etc.
+- **Cancelar** abre confirmação com o texto exato pedido, mostrando badges `tem_agendamento`, `tem_pagamento`.
+- Alerta topo do dialog quando qualquer item tem regra inválida (`fluxo_atendimento IS NULL`), com link para "Regras do procedimento".
+
+Componentes:
+- `src/components/orcamentos/ConversaoOrcamentoDialog.tsx`
 - `src/components/orcamentos/conversao/LinhaItem.tsx`
-- `src/components/orcamentos/conversao/SheetAgendarConsulta.tsx`
-- `src/components/orcamentos/conversao/SheetAgendarRecurso.tsx` (MAPA/Holter/US)
-- `src/components/orcamentos/conversao/SheetVender.tsx`
-- `src/components/orcamentos/conversao/SheetNaoAplicavel.tsx` (também usa para Cancelar)
-
-Servidor (client-safe): `src/lib/orcamentos-conversao.functions.ts` com 5 `createServerFn` — um por RPC + o `get_orcamento_conversao`. Todos com `.middleware([requireSupabaseAuth])`.
+- `src/components/orcamentos/conversao/Sheet{Agendar,SemAgenda,Vender,Cancelar,NaoAplicavel}.tsx`
+- Server: `src/lib/orcamentos-conversao.functions.ts` (6 fns: get + 5 RPCs), todas com `requireSupabaseAuth`.
 
 ---
 
-## 3. Aba "Procedimentos sem classificação"
+## 6. Testes UI + backend (`[TESTE-FASE3-UI]`)
 
-Em `src/routes/_authenticated/app.procedimentos.tsx`:
-- Novo `<Tabs>` com abas `Todos` | `Sem classificação (N)`.
-- Badge vermelho com contagem em tempo real.
-- Alerta no topo de `app.orcamentos.tsx`: quando existir ≥1 procedimento NULL, exibe `Alert` com CTA "Classificar N procedimento(s)" → link para a nova aba.
-- Reutiliza o form de procedimento existente; adiciona campos `tipo_destino`, `requer_medico`, `requer_sala`, `tipo_recurso` (todos criados na Fase 3.a).
+Setup: seed transacional com 6 itens cobrindo consulta, hemograma (ordem_chegada), curva glicêmica (lab_agendado), MAPA (equipamento), US (equipamento+sala), venda balcão.
 
-Nada de RPC nova aqui — usa `.update` normal via RLS existente (admin/gestor).
+1. Render + status duplo (Op/Fin) por linha.
+2. Consulta agendada → Op=`agendado`, Fin=`pendente`.
+3. Hemograma ordem de chegada → sem agenda real, Op=`aguardando_agendamento`.
+4. MAPA em agenda errada → RPC recusa (regra `equipamento_obrigatorio`).
+5. US sem sala → recusa; com sala → ok.
+6. Venda sem caixa → botão desabilitado.
+7. Venda balcão com caixa → Fin=`pago`.
+8. Venda de item já agendado (`permite_venda_direta=false`, mas agenda existe) → permite; Fin=`pago`, Op mantém `agendado`.
+9. Cancelar item pendente (recepção) → ok.
+10. Cancelar item agendado sem confirmar → retorna `requer_confirmacao`; UI abre dialog.
+11. Confirmar cascata → agendamento cancelado, horário liberado, audit gravado.
+12. Cancelar item com agendamento realizado → bloqueia.
+13. Cancelar item pago → cascata + `aviso_pagamento`.
+14. Trigger recalcula: só vira `convertido` quando Op resolvido **e** Fin resolvido em todos.
+15. Override por unidade: mesmo hemograma vira `lab_agendado` em outra clínica → RPC pede agenda.
+16. NFS-e por_item vs agrupada: emitir orçamento com 3 itens em cada modo; verificar 3 vs 1 registros em `nfse` e vínculos corretos em `fin_atendimentos.nfse_id`.
+17. Cleanup por `[TESTE-FASE3-UI]` + contagens antes/depois.
 
----
-
-## 4. Rollback
-
-Backend: `DROP FUNCTION` das 5 RPCs (idempotente). Nada estrutural muda; migration da Fase 3.a permanece.
-
-Front-end: revert dos commits que adicionam
-- `src/components/orcamentos/ConversaoOrcamentoDialog.tsx` + subcomponentes
-- `src/lib/orcamentos-conversao.functions.ts`
-- diffs em `app.orcamentos.tsx` (botão Converter, alerta) e `app.procedimentos.tsx` (aba).
-
-O bloqueio da Fase 2 e as triggers da Fase 3.a continuam ativos — recepção não consegue editar orçamento convertido mesmo sem a UI.
-
----
-
-## 5. Testes UI (padrão Fase 2 — prefixo `[TESTE-FASE3-UI]`, Playwright headless, cleanup ao final)
-
-Setup: seed transacional cria 1 paciente teste + 1 orçamento com 4 itens (consulta, MAPA, US, produto). Cada teste roda contra `http://localhost:8080` autenticado via `LOVABLE_BROWSER_SUPABASE_*`.
-
-1. **T1 — Render**: abre dialog, valida colunas, contadores, status inicial `aberto`.
-2. **T2 — Consulta OK**: agenda a consulta, item vira `agendado`, orçamento vira `parcialmente_agendado`.
-3. **T3 — MAPA em agenda de consulta**: seleciona médico sem recurso, backend rejeita, toast PT-BR, item continua `pendente`.
-4. **T4 — MAPA em recurso correto**: agenda passa, orçamento continua `parcialmente_agendado`.
-5. **T5 — US sem sala**: bloqueia; com sala: ok.
-6. **T6 — Venda sem caixa**: botão desabilitado + tooltip.
-7. **T7 — Venda com caixa aberto**: gera `fin_atendimentos` + `caixa_movimentos`; item vira `vendido`.
-8. **T8 — Status final**: com todos resolvidos, orçamento vira `convertido` automaticamente; botões de ação somem.
-9. **T9 — Duplicidade**: tenta agendar 2× o mesmo item em paralelo (RPC direta) → UNIQUE dispara, 1 falha.
-10. **T10 — Recepção tenta "não aplicável"**: bloqueado; admin consegue com motivo.
-11. **T11 — Editar convertido**: bloqueio da Fase 2 dispara, grava audit.
-12. **T12 — Procedimento NULL**: alerta aparece; ação `Agendar/Vender` bloqueada com badge "não classificado".
-13. **T13 — Cleanup**: apaga tudo via `observacoes LIKE '[TESTE-FASE3-UI]%'` + `motivo LIKE '[TESTE-FASE3-UI]%'`; conta rows antes/depois em `orcamentos, orcamento_itens, agendamentos, fin_atendimentos, caixa_movimentos, audit_log` → esperado igual, exceto `audit_log` (append-only).
+Tudo Playwright headless para UI + `psql SELECT` para asserções de linha.
 
 ---
 
-## 6. Riscos por módulo
+## 7. Rollback
 
-| Módulo | Risco | Mitigação |
+Backend: `DROP FUNCTION` das 6 fns + `emitir_nfse_orcamento`; `DROP TABLE procedimento_unidade_regras`; `ALTER TABLE clinicas DROP COLUMN nfse_modo_emissao`; colunas de regra em `procedimentos` ficam (não quebram nada); `status_financeiro` cai; `status_operacional` renomeia para `status_item`. Migration idempotente.
+
+Front: revert dos arquivos novos + diffs em `app.orcamentos.tsx`, `app.procedimentos.tsx`, `app.configuracoes.nfse.tsx`.
+
+Bloqueio Fase 2 e triggers Fase 3.a permanecem intactos.
+
+---
+
+## 8. Impacto por módulo
+
+| Módulo | Impacto | Risco |
 |---|---|---|
-| **Agenda** | Novo `orcamento_item_id` em `agendamentos` + trigger `fn_agendamento_valida_destino` já ativa. Risco: agendamento manual sem orçamento continuar funcionando. | Trigger só valida quando `orcamento_item_id IS NOT NULL`. T-smoke reagendando consulta comum no `/app/agenda`. |
-| **Caixa** | Venda via RPC precisa da sessão aberta correta. Risco: gravar movimento em sessão de outra clínica. | RPC valida `caixa_sessoes.clinica_id = orcamento.clinica_id` + `usuario_id = auth.uid()` OU `has_role admin/gestor`. |
-| **Financeiro** | `fin_atendimentos` recebe `orcamento_item_id` UNIQUE. Risco: split/comissão existente ignorar orçamento. | Splits continuam por `fin_atendimento_id`; nada muda no fluxo de repasse. Query de comissão passa a poder agrupar por orçamento (ganho, não risco). |
-| **NFS-e** | Emissão hoje parte de `fin_atendimentos`. Risco: 1 orçamento misto gerar N NFS-e (uma por item). | Comportamento desejado (item = serviço distinto). Documentar em `docs/regras-negocio.md`. |
-| **Relatórios** | Novo status `parcialmente_agendado`. Risco: filtros que só consideram `convertido` esconderem dados. | Grep em `src/routes/_authenticated/app.relatorios.tsx` e `financeiro.*` — ajustar filtros que assumem `status IN ('convertido')` para `IN ('convertido','parcialmente_agendado')` quando fizer sentido. Lista de arquivos afetados sai no relatório pós-implementação. |
-| **Enfermagem/Recursos** | MAPA/Holter passam a chegar via orçamento. | Fluxo de `agendamentos` já suporta `enfermagem_recurso_id`; validar smoke test. |
+| Agenda | Novo fluxo "sem agenda real" (fila); agendamento com cascata de cancelamento | 🟡 validar liberação de horário |
+| Caixa | Venda passa a checar `permite_venda_direta` + venda pós-agenda | 🟢 |
+| Financeiro | Nova coluna `status_financeiro` no item; nada muda em `fin_atendimentos` | 🟢 |
+| Comissão/Repasse | Continuam por `fin_atendimento` — zero mudança | 🟢 |
+| NFS-e (Focus) | Novo modo agrupado usa `itens[]`; compat total | 🟡 testar sandbox Focus |
+| Relatórios | Status novo `status_operacional`; view compat evita quebra | 🟡 grep + ajuste |
+| Enfermagem | Sem mudança direta; MAPA/Holter continuam via recurso | 🟢 |
 
 ---
 
-## 7. Decisões que preciso confirmar
+## 9. Ordem de execução (peço confirmação para começar)
 
-1. **Fluxo lab sem `agendamentos`** (item vira `agendado` só com flag `[LAB]` em observações) — ok ou prefere sempre gerar um `agendamentos` de tipo `laboratorio`?
-2. **Venda de item `laboratorio`/`exame_equipamento`**: liberar venda no balcão (pagamento antes do agendamento) OU obrigar agendar primeiro e cobrar só depois?
-3. **Cancelar item já agendado**: manter agendamento (proposta atual, com aviso) ou também cancelar o `agendamentos` via RPC?
-4. **NFS-e por item vs. agrupada por orçamento**: confirmar que 1 item = 1 NFS-e é o desejado.
+1. Migration A: colunas de regra em `procedimentos` + tabela de override + `fn_regras_procedimento` + backfill de `fluxo_atendimento`.
+2. Migration B: `status_operacional`/`status_financeiro` + trigger revisada + view compat.
+3. Migration C: 6 RPCs + `emitir_nfse_orcamento` + `nfse_modo_emissao` em clínicas.
+4. Frontend: `ConversaoOrcamentoDialog` + sheets + aba Regras em procedimentos + toggle NFS-e nas config.
+5. Bateria de 17 testes + relatório antes/depois.
 
-Aprovando o plano + as 4 decisões, sigo: criar as RPCs (nova migration) → gerar tipos → implementar UI e alerta → rodar bateria de 13 testes → relatório antes/depois.
+Aprovando, começo pela Migration A na próxima mensagem.
