@@ -5,7 +5,6 @@ import { STATUS_META } from "./status-utils";
 export interface ResumoData {
   total: number;
   abertos: number;
-  aprovados: number;
   convertidos: number;
   expirados: number;
   valorAberto: number;
@@ -34,12 +33,11 @@ function Card({
 export function ResumoBar({ data }: { data: ResumoData }) {
   return (
     <div
-      className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 mb-3"
+      className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 mb-3"
       data-testid="orcamentos-resumo"
     >
       <Card label="Total"       value={String(data.total)}       testid="resumo-total" />
       <Card label="Abertos"     value={String(data.abertos)}     color={STATUS_META.aberto.dot}     testid="resumo-abertos" />
-      <Card label="Aprovados"   value={String(data.aprovados)}   color={STATUS_META.aprovado.dot}   testid="resumo-aprovados" />
       <Card label="Convertidos" value={String(data.convertidos)} color={STATUS_META.convertido.dot} testid="resumo-convertidos" />
       <Card label="Expirados"   value={String(data.expirados)}   color={STATUS_META.expirado.dot}   testid="resumo-expirados" />
       <Card label="Valor aberto"    value={brl(data.valorAberto)}    testid="resumo-valor-aberto" />
