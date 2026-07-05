@@ -4,7 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
-import { isCPFValido, somenteDigitos } from "@/lib/cpf";
+import { formatarCPF, isCPFValido, somenteDigitos } from "@/lib/cpf";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -84,6 +84,21 @@ function normalizarFalaEmail(t: string): string {
     .replace(/\s+/g, "");
 }
 function normalizarFalaDigitos(t: string): string { return t.replace(/\D+/g, ""); }
+function formatarTelefone(t: string): string {
+  const d = somenteDigitos(t).slice(0, 11);
+  if (d.length > 10) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length > 6) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  if (d.length > 2) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length > 0) return `(${d}`;
+  return "";
+}
+function formatarCampo(field: keyof FormState, value: string): string {
+  if (field === "cpf" || field === "responsavel_cpf") return formatarCPF(value);
+  if (field === "telefone" || field === "telefone2" || field === "responsavel_telefone") {
+    return formatarTelefone(value);
+  }
+  return value;
+}
 function normalizarFala(field: string, raw: string): string {
   if (field === "email") return normalizarFalaEmail(raw);
   if (field === "cpf" || field === "telefone" || field === "cep" ||
@@ -233,8 +248,8 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
     }
     setForm({
       nome: editing.nome,
-      cpf: editing.cpf ?? "", numero_pasta: editing.numero_pasta ?? "",
-      telefone: editing.telefone ?? "", telefone2: editing.telefone2 ?? "",
+      cpf: formatarCPF(editing.cpf ?? ""), numero_pasta: editing.numero_pasta ?? "",
+      telefone: formatarTelefone(editing.telefone ?? ""), telefone2: formatarTelefone(editing.telefone2 ?? ""),
       email: editing.email ?? "",
       data_nascimento: editing.data_nascimento ?? "",
       sexo: editing.sexo ?? "nao_informar", ativo: editing.ativo,
@@ -243,8 +258,8 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
       bairro: editing.bairro ?? "", cidade: editing.cidade ?? "",
       estado: editing.estado ?? "",
       responsavel_nome: editing.responsavel_nome ?? "",
-      responsavel_cpf: editing.responsavel_cpf ?? "",
-      responsavel_telefone: editing.responsavel_telefone ?? "",
+      responsavel_cpf: formatarCPF(editing.responsavel_cpf ?? ""),
+      responsavel_telefone: formatarTelefone(editing.responsavel_telefone ?? ""),
       responsavel_parentesco: editing.responsavel_parentesco ?? "",
     });
     setTab("dados");
@@ -336,7 +351,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
         const sep = cur && field !== "email" && field !== "cpf" && field !== "telefone" && field !== "telefone2" &&
                     field !== "cep" && field !== "numero" &&
                     field !== "responsavel_cpf" && field !== "responsavel_telefone" ? " " : "";
-        return { ...f, [field]: cur + sep + text } as FormState;
+        return { ...f, [field]: formatarCampo(field, cur + sep + text) } as FormState;
       });
     };
     r.onerror = () => { toast.error("Erro no reconhecimento de voz."); setRecording(false); setVoiceField(null); };
@@ -687,9 +702,10 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
   const fieldProps = (field: keyof FormState) => {
     const active = recording && voiceField === field;
     return {
+      id: `cliente-${field}`,
       field: field as string,
       value: form[field] as string,
-      onChange: (v: string) => setForm(f => ({ ...f, [field]: v } as FormState)),
+      onChange: (v: string) => setForm(f => ({ ...f, [field]: formatarCampo(field, v) } as FormState)),
       onVoice: () => active ? stopVoice() : startVoice(field),
       voiceActive: active,
       speechSupported,
@@ -744,8 +760,8 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
       nome: form.nome.trim(),
       cpf: form.cpf.trim() ? somenteDigitos(form.cpf) : null,
       numero_pasta: form.numero_pasta.trim() || null,
-      telefone: form.telefone.trim() || null,
-      telefone2: form.telefone2.trim() || null,
+      telefone: form.telefone.trim() ? somenteDigitos(form.telefone) : null,
+      telefone2: form.telefone2.trim() ? somenteDigitos(form.telefone2) : null,
       email: form.email.trim() || null,
       data_nascimento: form.data_nascimento || null,
       sexo: form.sexo,
@@ -759,7 +775,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
       estado: form.estado.trim() || null,
       responsavel_nome: form.responsavel_nome.trim() || null,
       responsavel_cpf: form.responsavel_cpf.trim() ? somenteDigitos(form.responsavel_cpf) : null,
-      responsavel_telefone: form.responsavel_telefone.trim() || null,
+      responsavel_telefone: form.responsavel_telefone.trim() ? somenteDigitos(form.responsavel_telefone) : null,
       responsavel_parentesco: form.responsavel_parentesco.trim() || null,
       clinica_id: clinicaId,
     };
@@ -859,18 +875,18 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
                 <p className="text-xs text-muted-foreground">JPG, PNG ou WebP até 5 MB. Acesso restrito à clínica.</p>
               </div>
             </div>
-            <div className="space-y-1"><Label>Nome *</Label><InputVoz {...fieldProps("nome")} required maxLength={120} /></div>
-            <div className="space-y-1"><Label>Número de serviço</Label><InputVoz {...fieldProps("numero_pasta")} placeholder="Ex.: 1234" /></div>
+            <div className="space-y-1"><Label htmlFor="cliente-nome">Nome *</Label><InputVoz {...fieldProps("nome")} required maxLength={120} /></div>
+            <div className="space-y-1"><Label htmlFor="cliente-numero_pasta">Número de serviço</Label><InputVoz {...fieldProps("numero_pasta")} placeholder="Ex.: 1234" /></div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1"><Label>CPF</Label><InputVoz {...fieldProps("cpf")} /></div>
-              <div className="space-y-1"><Label>Telefone *</Label><InputVoz {...fieldProps("telefone")} /></div>
+              <div className="space-y-1"><Label htmlFor="cliente-cpf">CPF</Label><InputVoz {...fieldProps("cpf")} inputMode="numeric" maxLength={14} placeholder="000.000.000-00" /></div>
+              <div className="space-y-1"><Label htmlFor="cliente-telefone">Telefone *</Label><InputVoz {...fieldProps("telefone")} inputMode="tel" maxLength={15} placeholder="(00) 00000-0000" /></div>
             </div>
-            <div className="space-y-1"><Label>Telefone 2 <span className="text-xs text-muted-foreground">(opcional)</span></Label><InputVoz {...fieldProps("telefone2")} /></div>
-            <div className="space-y-1"><Label>E-mail <span className="text-xs text-muted-foreground">(usado em nota fiscal)</span></Label><InputVoz {...fieldProps("email")} type="email" /></div>
+            <div className="space-y-1"><Label htmlFor="cliente-telefone2">Telefone 2 <span className="text-xs text-muted-foreground">(opcional)</span></Label><InputVoz {...fieldProps("telefone2")} inputMode="tel" maxLength={15} placeholder="(00) 00000-0000" /></div>
+            <div className="space-y-1"><Label htmlFor="cliente-email">E-mail <span className="text-xs text-muted-foreground">(usado em nota fiscal)</span></Label><InputVoz {...fieldProps("email")} type="email" /></div>
             <div className="grid grid-cols-2 gap-3 items-end">
               <div className="space-y-1">
-                <Label>Data de nascimento *</Label>
-                <Input type="date" required value={form.data_nascimento}
+                <Label htmlFor="cliente-data_nascimento">Data de nascimento *</Label>
+                <Input id="cliente-data_nascimento" type="date" required value={form.data_nascimento}
                   min="1900-01-01"
                   max={new Date().toISOString().slice(0, 10)}
                   onChange={(e) => setForm({ ...form, data_nascimento: e.target.value })} />
@@ -940,14 +956,14 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
             <p className="text-sm text-muted-foreground">
               Para menores de idade ou pacientes que precisam de acompanhante.
             </p>
-            <div className="space-y-1"><Label>Nome do responsável</Label><InputVoz {...fieldProps("responsavel_nome")} /></div>
+            <div className="space-y-1"><Label htmlFor="cliente-responsavel_nome">Nome do responsável</Label><InputVoz {...fieldProps("responsavel_nome")} /></div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1"><Label>CPF</Label><InputVoz {...fieldProps("responsavel_cpf")} /></div>
-              <div className="space-y-1"><Label>Telefone</Label><InputVoz {...fieldProps("responsavel_telefone")} /></div>
+              <div className="space-y-1"><Label htmlFor="cliente-responsavel_cpf">CPF</Label><InputVoz {...fieldProps("responsavel_cpf")} inputMode="numeric" maxLength={14} placeholder="000.000.000-00" /></div>
+              <div className="space-y-1"><Label htmlFor="cliente-responsavel_telefone">Telefone</Label><InputVoz {...fieldProps("responsavel_telefone")} inputMode="tel" maxLength={15} placeholder="(00) 00000-0000" /></div>
             </div>
             <div className="space-y-1">
-              <Label>Parentesco</Label>
-              <Input value={form.responsavel_parentesco}
+              <Label htmlFor="cliente-responsavel_parentesco">Parentesco</Label>
+              <Input id="cliente-responsavel_parentesco" value={form.responsavel_parentesco}
                 onChange={(e) => setForm({ ...form, responsavel_parentesco: e.target.value })}
                 placeholder="Ex.: Mãe, Pai, Filho(a), Cuidador" />
             </div>
