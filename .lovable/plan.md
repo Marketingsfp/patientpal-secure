@@ -200,7 +200,7 @@ Bloqueio Fase 2 e triggers Fase 3.a permanecem intactos.
 ## 9. Ordem de execução (peço confirmação para começar)
 
 1. Migration A: colunas de regra em `procedimentos` + tabela de override + `fn_regras_procedimento` + backfill de `fluxo_atendimento`.
-2. Migration B: `status_operacional`/`status_financeiro` + trigger revisada + view compat.
+2. Migration B: `status_operacional`/`status_financeiro` + timestamps de transição (pago/agendado/concluído/cancelado) + gatilho bidirecional `status_item` ↔ `status_operacional` + novo vocabulário do orçamento (`aberto|em_andamento|finalizado|cancelado`) + trigger dual-status + bloqueio de edição estendido a `finalizado`. **✅ APLICADA**
 3. Migration C: 6 RPCs + `emitir_nfse_orcamento` + `nfse_modo_emissao` em clínicas.
 4. Frontend: `ConversaoOrcamentoDialog` + sheets + aba Regras em procedimentos + toggle NFS-e nas config.
 5. Bateria de 17 testes + relatório antes/depois.

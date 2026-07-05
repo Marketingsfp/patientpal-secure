@@ -5746,7 +5746,10 @@ export type Database = {
       }
       orcamento_itens: {
         Row: {
+          agendado_em: string | null
           agendamento_id: string | null
+          cancelado_em: string | null
+          concluido_em: string | null
           created_at: string
           descricao: string
           fin_atendimento_id: string | null
@@ -5754,17 +5757,25 @@ export type Database = {
           motivo_nao_aplicavel: string | null
           orcamento_id: string
           ordem: number
+          pago_em: string | null
           procedimento_id: string | null
           quantidade: number
           status_alterado_em: string | null
           status_alterado_por: string | null
+          status_fin_em: string | null
+          status_financeiro: string
           status_item: string
+          status_op_em: string | null
+          status_operacional: string
           valor_total: number
           valor_unitario: number
           valores_formas: Json | null
         }
         Insert: {
+          agendado_em?: string | null
           agendamento_id?: string | null
+          cancelado_em?: string | null
+          concluido_em?: string | null
           created_at?: string
           descricao: string
           fin_atendimento_id?: string | null
@@ -5772,17 +5783,25 @@ export type Database = {
           motivo_nao_aplicavel?: string | null
           orcamento_id: string
           ordem?: number
+          pago_em?: string | null
           procedimento_id?: string | null
           quantidade?: number
           status_alterado_em?: string | null
           status_alterado_por?: string | null
+          status_fin_em?: string | null
+          status_financeiro?: string
           status_item?: string
+          status_op_em?: string | null
+          status_operacional?: string
           valor_total?: number
           valor_unitario?: number
           valores_formas?: Json | null
         }
         Update: {
+          agendado_em?: string | null
           agendamento_id?: string | null
+          cancelado_em?: string | null
+          concluido_em?: string | null
           created_at?: string
           descricao?: string
           fin_atendimento_id?: string | null
@@ -5790,11 +5809,16 @@ export type Database = {
           motivo_nao_aplicavel?: string | null
           orcamento_id?: string
           ordem?: number
+          pago_em?: string | null
           procedimento_id?: string | null
           quantidade?: number
           status_alterado_em?: string | null
           status_alterado_por?: string | null
+          status_fin_em?: string | null
+          status_financeiro?: string
           status_item?: string
+          status_op_em?: string | null
+          status_operacional?: string
           valor_total?: number
           valor_unitario?: number
           valores_formas?: Json | null
