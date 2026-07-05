@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { FileText, Plus, Printer, Trash2, Search, AlertTriangle, Calendar, Columns2, CheckCircle2, CircleDashed, Download, History } from "lucide-react";
+import { FileText, Plus, Printer, Trash2, Search, AlertTriangle, Calendar, Columns2, CheckCircle2, CircleDashed, Download, History, Workflow } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,6 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 import { printOrcamento } from "@/lib/print-orcamento";
+import { ConversaoOrcamentoDialog } from "@/components/orcamentos/conversao-orcamento-dialog";
 
 type AuditRow = {
   id: string;
@@ -186,6 +187,7 @@ function OrcamentosPage() {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [historicoId, setHistoricoId] = useState<string | null>(null);
+  const [conversaoId, setConversaoId] = useState<string | null>(null);
   const podeVerHistorico = clinicaAtual?.role === "admin" || clinicaAtual?.role === "gestor";
   const [filtroRealizacao, setFiltroRealizacao] = useState<"todos" | "realizados" | "nao_realizados">("todos");
   const [periodo, setPeriodo] = useState<"hoje" | "semana" | "quinzena" | "mes" | "personalizado" | "todos">("todos");
@@ -495,6 +497,14 @@ function OrcamentosPage() {
                     >
                       <Calendar className="h-4 w-4 text-emerald-600" />
                     </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setConversaoId(o.id)}
+                      title="Converter itens (vender, agendar, cancelar, NFS-e)"
+                    >
+                      <Workflow className="h-4 w-4 text-primary" />
+                    </Button>
                     <Button size="sm" variant="ghost" onClick={() => imprimir(o.id)} title="Imprimir"><Printer className="h-4 w-4" /></Button>
                     {podeVerHistorico && (
                       <Button size="sm" variant="ghost" onClick={() => setHistoricoId(o.id)} title="Histórico">
@@ -531,6 +541,15 @@ function OrcamentosPage() {
           onClose={() => setHistoricoId(null)}
           orcamentoId={historicoId}
           clinicaId={clinicaAtual.clinica_id}
+        />
+      )}
+
+      {conversaoId && (
+        <ConversaoOrcamentoDialog
+          open={!!conversaoId}
+          onClose={() => setConversaoId(null)}
+          orcamentoId={conversaoId}
+          onChanged={() => { void load(); }}
         />
       )}
     </div>
