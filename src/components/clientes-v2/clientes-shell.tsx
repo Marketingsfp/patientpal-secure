@@ -96,7 +96,14 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
     });
     if (myReq !== reqRef.current) return;
     if (error) { mostrarErro(error); setLoading(false); return; }
-    const base = (data ?? []) as PacienteV2[];
+    const base = ((data ?? []) as unknown as PacienteV2[]).map((r) => ({
+      ...r,
+      ativo: true,
+      cidade: null,
+      estado: null,
+      foto_url: null,
+      created_at: "",
+    })) as PacienteV2[];
     const ids = base.map((r) => r.id);
     if (ids.length > 0) {
       const { data: extra } = await supabase
