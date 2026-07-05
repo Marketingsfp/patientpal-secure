@@ -12,6 +12,35 @@ async function assertManager(userId: string, clinicaId: string) {
   if (!data) throw new Error("Sem permissão para gerenciar a equipe desta clínica");
 }
 
+async function assertResourcesBelongToClinica(
+  recursoIds: string[],
+  clinicaId: string,
+) {
+  if (recursoIds.length === 0) return;
+  const uniqueIds = [...new Set(recursoIds)];
+  const { data, error } = await supabaseAdmin
+    .from("enfermagem_recursos")
+    .select("id")
+    .eq("clinica_id", clinicaId)
+    .in("id", uniqueIds);
+  if (error) throw new Error(error.message);
+  if ((data ?? []).length !== uniqueIds.length) {
+    throw new Error("Um ou mais recursos não pertencem a esta clínica");
+  }
+}
+
+async function assertUserBelongsToClinica(userId: string, clinicaId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("clinica_memberships")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("clinica_id", clinicaId)
+    .eq("ativo", true)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Usuário não pertence a esta clínica");
+}
+
 export const salvarVinculosAgendas = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
@@ -23,6 +52,8 @@ export const salvarVinculosAgendas = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertManager(context.userId, data.clinicaId);
+    await assertUserBelongsToClinica(data.userId, data.clinicaId);
+    await assertResourcesBelongToClinica(data.recursoIds, data.clinicaId);
 
     // Carrega vínculos atuais para o user nesta clínica
     const { data: atuais, error: aErr } = await supabaseAdmin
@@ -48,6 +79,7 @@ export const salvarVinculosAgendas = createServerFn({ method: "POST" })
       const { error } = await supabaseAdmin
         .from("enfermagem_recurso_atendentes")
         .delete()
+        .eq("clinica_id", data.clinicaId)
         .in("id", paraRemover);
       if (error) throw new Error(error.message);
     }
@@ -70,6 +102,7 @@ export const listarVinculosAgendas = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertManager(context.userId, data.clinicaId);
+    await assertUserBelongsToClinica(data.userId, data.clinicaId);
     const { data: rows, error } = await supabaseAdmin
       .from("enfermagem_recurso_atendentes")
       .select("recurso_id")

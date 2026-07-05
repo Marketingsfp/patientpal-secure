@@ -31,6 +31,7 @@ export const listarEquipe = createServerFn({ method: "POST" })
     z.object({ clinicaId: z.string().uuid() }).parse(input),
   )
   .handler(async ({ data, context }) => {
+    await assertManager(context.userId, data.clinicaId);
     const { supabase } = context;
     const { data: mems, error } = await supabase
       .from("clinica_memberships")

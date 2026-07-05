@@ -2,7 +2,28 @@
 import { createMiddleware } from '@tanstack/react-start'
 import { getRequest } from '@tanstack/react-start/server'
 import { createClient } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from './types'
+
+export async function assertActiveStaffMembership(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+) {
+  const { data, error } = await supabase
+    .from('clinica_memberships')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('ativo', true)
+    .limit(1)
+    .maybeSingle()
+
+  if (error) {
+    throw new Error('Forbidden: Unable to validate clinic membership')
+  }
+  if (!data) {
+    throw new Error('Forbidden: Active clinic membership required')
+  }
+}
 
 
 

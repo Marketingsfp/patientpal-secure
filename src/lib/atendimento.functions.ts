@@ -23,6 +23,47 @@ async function assertManager(userId: string, clinicaId: string) {
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Apenas gestores/admins podem alterar isto");
 }
+async function assertConversationInClinic(conversaId: string, clinicaId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("atend_conversas")
+    .select("id")
+    .eq("id", conversaId)
+    .eq("clinica_id", clinicaId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Conversa não encontrada nesta clínica");
+}
+async function assertDepartmentInClinic(departamentoId: string, clinicaId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("atend_departamentos")
+    .select("id")
+    .eq("id", departamentoId)
+    .eq("clinica_id", clinicaId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Departamento não encontrado nesta clínica");
+}
+async function assertPauseReasonInClinic(reasonId: string, clinicaId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("atend_pause_reasons")
+    .select("id")
+    .eq("id", reasonId)
+    .eq("clinica_id", clinicaId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Motivo de pausa não encontrado nesta clínica");
+}
+async function assertActiveClinicUser(userId: string, clinicaId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("clinica_memberships")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("clinica_id", clinicaId)
+    .eq("ativo", true)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Usuário não pertence a esta clínica");
+}
 
 const clinIdSchema = z.object({ clinicaId: z.string().uuid() });
 
@@ -77,6 +118,11 @@ export const atribuirConversa = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.userId, data.clinicaId);
+    await assertConversationInClinic(data.conversaId, data.clinicaId);
+    if (data.userId) await assertActiveClinicUser(data.userId, data.clinicaId);
+    if (data.departamentoId) {
+      await assertDepartmentInClinic(data.departamentoId, data.clinicaId);
+    }
     const patch: {
       atribuida_user_id: string | null;
       status: "active" | "waiting";
@@ -108,10 +154,18 @@ export const transferirConversa = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.userId, data.clinicaId);
+    await assertConversationInClinic(data.conversaId, data.clinicaId);
+    if (data.paraUserId) {
+      await assertActiveClinicUser(data.paraUserId, data.clinicaId);
+    }
+    if (data.paraDepartamentoId) {
+      await assertDepartmentInClinic(data.paraDepartamentoId, data.clinicaId);
+    }
     const { data: conv, error: e1 } = await supabaseAdmin
       .from("atend_conversas")
       .select("atribuida_user_id, departamento_id")
       .eq("id", data.conversaId)
+      .eq("clinica_id", data.clinicaId)
       .single();
     if (e1) throw new Error(e1.message);
     await supabaseAdmin.from("atend_transferencias").insert({
@@ -130,7 +184,8 @@ export const transferirConversa = createServerFn({ method: "POST" })
         departamento_id: data.paraDepartamentoId ?? conv.departamento_id,
         status: data.paraUserId ? "active" : "waiting",
       })
-      .eq("id", data.conversaId);
+      .eq("id", data.conversaId)
+      .eq("clinica_id", data.clinicaId);
     if (e2) throw new Error(e2.message);
     return { ok: true };
   });
@@ -145,6 +200,7 @@ export const fecharConversa = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.userId, data.clinicaId);
+    await assertConversationInClinic(data.conversaId, data.clinicaId);
     const { data: prot } = await supabaseAdmin.rpc("atend_gerar_protocolo", { _clinica_id: data.clinicaId });
     const { error } = await supabaseAdmin
       .from("atend_conversas")
@@ -153,7 +209,8 @@ export const fecharConversa = createServerFn({ method: "POST" })
         closed_at: new Date().toISOString(),
         protocol_number: prot as string,
       })
-      .eq("id", data.conversaId);
+      .eq("id", data.conversaId)
+      .eq("clinica_id", data.clinicaId);
     if (error) throw new Error(error.message);
     return { ok: true, protocol: prot as string };
   });
@@ -165,7 +222,12 @@ export const marcarLida = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.userId, data.clinicaId);
-    await supabaseAdmin.from("atend_conversas").update({ unread_count: 0 }).eq("id", data.conversaId);
+    await assertConversationInClinic(data.conversaId, data.clinicaId);
+    await supabaseAdmin
+      .from("atend_conversas")
+      .update({ unread_count: 0 })
+      .eq("id", data.conversaId)
+      .eq("clinica_id", data.clinicaId);
     return { ok: true };
   });
 
@@ -179,9 +241,11 @@ export const listarNotas = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.userId, data.clinicaId);
+    await assertConversationInClinic(data.conversaId, data.clinicaId);
     const { data: rows, error } = await supabaseAdmin
       .from("atend_notas_internas")
       .select("*")
+      .eq("clinica_id", data.clinicaId)
       .eq("conversa_id", data.conversaId)
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
@@ -199,6 +263,7 @@ export const criarNota = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.userId, data.clinicaId);
+    await assertConversationInClinic(data.conversaId, data.clinicaId);
     const { data: prof } = await supabaseAdmin.from("profiles").select("nome").eq("id", context.userId).maybeSingle();
     const { error } = await supabaseAdmin.from("atend_notas_internas").insert({
       clinica_id: data.clinicaId,
@@ -253,7 +318,11 @@ export const salvarDepartamento = createServerFn({ method: "POST" })
       ativo: data.ativo,
     };
     if (data.id) {
-      const { error } = await supabaseAdmin.from("atend_departamentos").update(row).eq("id", data.id);
+      const { error } = await supabaseAdmin
+        .from("atend_departamentos")
+        .update(row)
+        .eq("id", data.id)
+        .eq("clinica_id", data.clinicaId);
       if (error) throw new Error(error.message);
       return { id: data.id };
     }
@@ -308,6 +377,8 @@ export const adicionarMembro = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertManager(context.userId, data.clinicaId);
+    await assertDepartmentInClinic(data.departamentoId, data.clinicaId);
+    await assertActiveClinicUser(data.userId, data.clinicaId);
     const { error } = await supabaseAdmin
       .from("atend_departamento_membros")
       .upsert({
@@ -404,7 +475,11 @@ export const salvarKb = createServerFn({ method: "POST" })
       publicado: data.publicado,
     };
     if (data.id) {
-      const { error } = await supabaseAdmin.from("atend_kb").update(row).eq("id", data.id);
+      const { error } = await supabaseAdmin
+        .from("atend_kb")
+        .update(row)
+        .eq("id", data.id)
+        .eq("clinica_id", data.clinicaId);
       if (error) throw new Error(error.message);
       return { id: data.id };
     }
@@ -461,7 +536,11 @@ export const salvarMacro = createServerFn({ method: "POST" })
       ativo: data.ativo,
     };
     if (data.id) {
-      const { error } = await supabaseAdmin.from("atend_macros").update(row).eq("id", data.id);
+      const { error } = await supabaseAdmin
+        .from("atend_macros")
+        .update(row)
+        .eq("id", data.id)
+        .eq("clinica_id", data.clinicaId);
       if (error) throw new Error(error.message);
       return { id: data.id };
     }
@@ -521,7 +600,11 @@ export const salvarPauseReason = createServerFn({ method: "POST" })
       ativo: data.ativo,
     };
     if (data.id) {
-      const { error } = await supabaseAdmin.from("atend_pause_reasons").update(row).eq("id", data.id);
+      const { error } = await supabaseAdmin
+        .from("atend_pause_reasons")
+        .update(row)
+        .eq("id", data.id)
+        .eq("clinica_id", data.clinicaId);
       if (error) throw new Error(error.message);
       return { id: data.id };
     }
@@ -547,10 +630,13 @@ export const iniciarPausa = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.userId, data.clinicaId);
+    await assertPauseReasonInClinic(data.reasonId, data.clinicaId);
     // fecha pausas abertas
     await supabaseAdmin.from("atend_pausas_log")
       .update({ finalizada_em: new Date().toISOString() })
-      .eq("user_id", context.userId).is("finalizada_em", null);
+      .eq("clinica_id", data.clinicaId)
+      .eq("user_id", context.userId)
+      .is("finalizada_em", null);
     const { data: ins, error } = await supabaseAdmin.from("atend_pausas_log").insert({
       clinica_id: data.clinicaId,
       user_id: context.userId,
@@ -567,7 +653,9 @@ export const finalizarPausa = createServerFn({ method: "POST" })
     await assertMember(context.userId, data.clinicaId);
     const { error } = await supabaseAdmin.from("atend_pausas_log")
       .update({ finalizada_em: new Date().toISOString() })
-      .eq("user_id", context.userId).is("finalizada_em", null);
+      .eq("clinica_id", data.clinicaId)
+      .eq("user_id", context.userId)
+      .is("finalizada_em", null);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -579,7 +667,9 @@ export const pausaAtual = createServerFn({ method: "POST" })
     await assertMember(context.userId, data.clinicaId);
     const { data: row } = await supabaseAdmin.from("atend_pausas_log")
       .select("*, atend_pause_reasons(nome, cor, tolerancia_minutos)")
-      .eq("user_id", context.userId).is("finalizada_em", null)
+      .eq("clinica_id", data.clinicaId)
+      .eq("user_id", context.userId)
+      .is("finalizada_em", null)
       .order("iniciada_em", { ascending: false }).limit(1).maybeSingle();
     return row ?? null;
   });
@@ -623,7 +713,11 @@ export const salvarHorario = createServerFn({ method: "POST" })
       ativo: data.ativo,
     };
     if (data.id) {
-      const { error } = await supabaseAdmin.from("atend_horarios").update(row).eq("id", data.id);
+      const { error } = await supabaseAdmin
+        .from("atend_horarios")
+        .update(row)
+        .eq("id", data.id)
+        .eq("clinica_id", data.clinicaId);
       if (error) throw new Error(error.message);
       return { id: data.id };
     }
@@ -763,6 +857,14 @@ export const salvarBotConfig = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertManager(context.userId, data.clinicaId);
+    const departmentIds = [
+      data.departamentoId,
+      data.fallback_departamento_id,
+      ...data.menu_options.map((option) => option.departamento_id),
+    ].filter((id): id is string => Boolean(id));
+    for (const departmentId of new Set(departmentIds)) {
+      await assertDepartmentInClinic(departmentId, data.clinicaId);
+    }
     const row = {
       clinica_id: data.clinicaId,
       departamento_id: data.departamentoId ?? null,
@@ -776,7 +878,11 @@ export const salvarBotConfig = createServerFn({ method: "POST" })
       ativo: data.ativo,
     };
     if (data.id) {
-      const { error } = await supabaseAdmin.from("atend_bot_configs").update(row).eq("id", data.id);
+      const { error } = await supabaseAdmin
+        .from("atend_bot_configs")
+        .update(row)
+        .eq("id", data.id)
+        .eq("clinica_id", data.clinicaId);
       if (error) throw new Error(error.message);
       return { id: data.id };
     }
@@ -858,6 +964,7 @@ export const listarMensagensConversa = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.userId, data.clinicaId);
+    await assertConversationInClinic(data.conversaId, data.clinicaId);
     const { data: rows, error } = await supabaseAdmin
       .from("whatsapp_mensagens")
       .select("id, direction, from_number, to_number, body, tipo, enviada_por, recebida_em, media_url, media_mime, status")
@@ -880,12 +987,15 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.userId, data.clinicaId);
+    await assertConversationInClinic(data.conversaId, data.clinicaId);
     const cfg = await loadWhatsAppConfig(data.clinicaId);
     if (!cfg?.phone_number_id || !cfg?.access_token) throw new Error("WhatsApp não configurado.");
     const { data: conv, error: cErr } = await supabaseAdmin
       .from("atend_conversas")
       .select("id, contato_telefone, primeiro_resp_em, aguardando_desde, atribuida_user_id")
-      .eq("id", data.conversaId).single();
+      .eq("id", data.conversaId)
+      .eq("clinica_id", data.clinicaId)
+      .single();
     if (cErr || !conv) throw new Error("Conversa não encontrada");
     if (!conv.contato_telefone) throw new Error("Conversa sem telefone");
 
@@ -914,7 +1024,11 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
         patch.sla_first_response_seg = Math.max(0, Math.round((Date.now() - new Date(ref).getTime()) / 1000));
       }
     }
-    await supabaseAdmin.from("atend_conversas").update(patch).eq("id", data.conversaId);
+    await supabaseAdmin
+      .from("atend_conversas")
+      .update(patch)
+      .eq("id", data.conversaId)
+      .eq("clinica_id", data.clinicaId);
 
     return { ok: true, wa_message_id };
   });
@@ -926,10 +1040,13 @@ export const obterDadosContato = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.userId, data.clinicaId);
+    await assertConversationInClinic(data.conversaId, data.clinicaId);
     const { data: conv } = await supabaseAdmin
       .from("atend_conversas")
       .select("*, atend_departamentos(nome)")
-      .eq("id", data.conversaId).single();
+      .eq("id", data.conversaId)
+      .eq("clinica_id", data.clinicaId)
+      .single();
     if (!conv) throw new Error("Conversa não encontrada");
 
     let paciente: any = null;
@@ -940,7 +1057,9 @@ export const obterDadosContato = createServerFn({ method: "POST" })
     if (conv.contato_paciente_id) {
       const { data: p } = await supabaseAdmin.from("pacientes")
         .select("id, nome, telefone, email, cpf, data_nascimento, sexo, cidade, estado")
-        .eq("id", conv.contato_paciente_id).single();
+        .eq("id", conv.contato_paciente_id)
+        .eq("clinica_id", data.clinicaId)
+        .single();
       paciente = p;
     } else if (conv.contato_telefone) {
       const digits = conv.contato_telefone.replace(/\D/g, "");
@@ -955,8 +1074,10 @@ export const obterDadosContato = createServerFn({ method: "POST" })
     if (paciente?.id) {
       const [agR, ctR] = await Promise.all([
         supabaseAdmin.from("agendamentos").select("id, inicio, procedimento, status, medico_nome")
+          .eq("clinica_id", data.clinicaId)
           .eq("paciente_id", paciente.id).order("inicio", { ascending: false }).limit(5),
         supabaseAdmin.from("contratos_assinatura").select("id, numero, status, data_inicio")
+          .eq("clinica_id", data.clinicaId)
           .eq("paciente_id", paciente.id).order("created_at", { ascending: false }).limit(5),
       ]);
       agendamentos = agR.data ?? [];
@@ -990,15 +1111,20 @@ export const autoAtribuirRoundRobin = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.userId, data.clinicaId);
+    await assertConversationInClinic(data.conversaId, data.clinicaId);
 
     // Pega departamento alvo
     let deptId = data.departamentoId;
     if (!deptId) {
       const { data: c } = await supabaseAdmin.from("atend_conversas")
-        .select("departamento_id").eq("id", data.conversaId).single();
+        .select("departamento_id")
+        .eq("id", data.conversaId)
+        .eq("clinica_id", data.clinicaId)
+        .single();
       deptId = c?.departamento_id ?? undefined;
     }
     if (!deptId) throw new Error("Conversa sem departamento — configure roteamento.");
+    await assertDepartmentInClinic(deptId, data.clinicaId);
 
     // Membros disponíveis (não em pausa, fila desbloqueada)
     const { data: membros } = await supabaseAdmin
@@ -1011,7 +1137,7 @@ export const autoAtribuirRoundRobin = createServerFn({ method: "POST" })
       // fica em waiting na fila do departamento
       await supabaseAdmin.from("atend_conversas").update({
         departamento_id: deptId, status: "waiting", aguardando_desde: new Date().toISOString(),
-      }).eq("id", data.conversaId);
+      }).eq("id", data.conversaId).eq("clinica_id", data.clinicaId);
       return { ok: false, motivo: "Sem agentes disponíveis" };
     }
 
@@ -1026,7 +1152,7 @@ export const autoAtribuirRoundRobin = createServerFn({ method: "POST" })
     if (userIds.length === 0) {
       await supabaseAdmin.from("atend_conversas").update({
         departamento_id: deptId, status: "waiting", aguardando_desde: agora,
-      }).eq("id", data.conversaId);
+      }).eq("id", data.conversaId).eq("clinica_id", data.clinicaId);
       return { ok: false, motivo: "Todos em pausa" };
     }
     const { data: cargas } = await supabaseAdmin
@@ -1053,12 +1179,12 @@ export const autoAtribuirRoundRobin = createServerFn({ method: "POST" })
     if (!best) {
       await supabaseAdmin.from("atend_conversas").update({
         departamento_id: deptId, status: "waiting", aguardando_desde: agora,
-      }).eq("id", data.conversaId);
+      }).eq("id", data.conversaId).eq("clinica_id", data.clinicaId);
       return { ok: false, motivo: "Capacidade lotada" };
     }
     await supabaseAdmin.from("atend_conversas").update({
       departamento_id: deptId, atribuida_user_id: best, status: "active",
-    }).eq("id", data.conversaId);
+    }).eq("id", data.conversaId).eq("clinica_id", data.clinicaId);
     return { ok: true, user_id: best };
   });
 
@@ -1096,6 +1222,9 @@ export const salvarRoutingRule = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertManager(context.userId, data.clinicaId);
+    if (data.departamento_id) {
+      await assertDepartmentInClinic(data.departamento_id, data.clinicaId);
+    }
     const { id, clinicaId, ...rest } = data;
     if (id) {
       const { error } = await supabaseAdmin.from("atend_routing_rules").update(rest).eq("id", id).eq("clinica_id", clinicaId);

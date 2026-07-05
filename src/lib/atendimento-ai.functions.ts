@@ -1,5 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import {
+  assertActiveStaffMembership,
+  requireSupabaseAuth,
+} from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
@@ -41,7 +44,8 @@ const EstruturarSchema = z.object({
 export const gerarAnamneseEstruturada = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => EstruturarSchema.parse(i))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertActiveStaffMembership(context.supabase, context.userId);
     const sys = `Você é um assistente médico que estrutura consultas em prontuário SOAP em português do Brasil.
 Especialidade: ${data.especialidade ?? "Clínica Geral"}.
 ${data.promptExtra ?? ""}
@@ -80,7 +84,8 @@ const SugerirSchema = z.object({
 export const sugerirCondutaClinica = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => SugerirSchema.parse(i))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertActiveStaffMembership(context.supabase, context.userId);
     const sys = `Você é um assistente médico de apoio à decisão para ${data.especialidade ?? "clínica geral"} no Brasil.
 Com base nos dados clínicos, sugira:
 - CIDs prováveis (CID-10, código + descrição, máx 5).
@@ -124,6 +129,7 @@ export const resumirHistoricoPaciente = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => ResumirSchema.parse(i))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    await assertActiveStaffMembership(supabase, context.userId);
     const { data: pron, error } = await supabase
       .from("prontuarios")
       .select("data,queixa_principal,hipotese_diagnostica,conduta,prescricao")

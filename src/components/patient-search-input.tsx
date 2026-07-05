@@ -128,8 +128,9 @@ export function PatientSearchInput({
         _limite: 20,
       });
       if (error) {
-        // eslint-disable-next-line no-console
-        console.error("[patient-search] rpc error", { term, scope, error });
+        console.error("[patient-search] rpc error", {
+          code: error.code,
+        });
       }
       if (myReq !== reqIdRef.current) return;
       const todas = (data ?? []) as PatientOption[];

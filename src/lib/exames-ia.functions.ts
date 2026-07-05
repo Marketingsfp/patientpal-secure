@@ -1,5 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import {
+  assertActiveStaffMembership,
+  requireSupabaseAuth,
+} from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
@@ -50,7 +53,8 @@ const ExtrairSchema = z.object({
 export const extrairTextoExameDeArquivo = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => ExtrairSchema.parse(i))
-  .handler(async ({ data }): Promise<{ texto: string; tipo_sugerido: string }> => {
+  .handler(async ({ data, context }): Promise<{ texto: string; tipo_sugerido: string }> => {
+    await assertActiveStaffMembership(context.supabase, context.userId);
     const dataUrl = data.arquivo_base64.startsWith("data:")
       ? data.arquivo_base64
       : `data:${data.mime};base64,${data.arquivo_base64}`;
@@ -98,7 +102,8 @@ export type ClassificacaoExame = {
 export const classificarResultadoExame = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => Schema.parse(i))
-  .handler(async ({ data }): Promise<ClassificacaoExame> => {
+  .handler(async ({ data, context }): Promise<ClassificacaoExame> => {
+    await assertActiveStaffMembership(context.supabase, context.userId);
     const sys = `Você é uma enfermeira clínica experiente analisando resultados de exames em português do Brasil.
 Receberá o nome do exame e o texto do resultado e deve classificar.
 Use a melhor evidência clínica. Seja objetiva.

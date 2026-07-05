@@ -1,5 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import {
+  assertActiveStaffMembership,
+  requireSupabaseAuth,
+} from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
 const Schema = z.object({
@@ -11,7 +14,8 @@ const Schema = z.object({
 export const transcribeAudio = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => Schema.parse(input))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertActiveStaffMembership(context.supabase, context.userId);
     const key = process.env.LOVABLE_API_KEY;
     if (!key) return { text: "", error: "LOVABLE_API_KEY ausente" };
 
