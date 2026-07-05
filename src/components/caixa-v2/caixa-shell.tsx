@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   PlusCircle, MinusCircle, ArrowDownToLine, ArrowUpFromLine, Printer, FileDown,
-  Lock, Unlock, ChevronRight, Users, Wallet, AlertTriangle,
+  Lock, Unlock, ChevronRight, Users, Wallet, AlertTriangle, HandCoins,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
