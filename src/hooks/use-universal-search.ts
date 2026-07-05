@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { CommandEntry } from "@/components/list-shell";
 
 export type UBTipo =
-  | "orcamento" | "agendamento" | "financeiro" | "nfse"
+  | "paciente" | "orcamento" | "agendamento" | "financeiro" | "nfse"
   | "cartao_convenio" | "contrato_associado" | "medico" | "procedimento";
 
 export interface UBRow {
@@ -18,6 +18,7 @@ export interface UBRow {
 }
 
 const GROUPS: Record<UBTipo, string> = {
+  paciente: "Pacientes",
   orcamento: "Orçamentos",
   agendamento: "Agenda",
   financeiro: "Financeiro",
@@ -29,6 +30,7 @@ const GROUPS: Record<UBTipo, string> = {
 };
 
 const ROUTE_OF: Record<UBTipo, (r: UBRow) => string> = {
+  paciente: (r) => `/app/clientes/${r.id}/editar`,
   orcamento: (r) => `/app/orcamentos?abrir=${r.id}`,
   agendamento: () => `/app/agenda`,
   financeiro: () => `/app/financeiro/atendimentos`,
@@ -39,12 +41,12 @@ const ROUTE_OF: Record<UBTipo, (r: UBRow) => string> = {
   procedimento: (r) => `/app/procedimentos?abrir=${r.id}`,
 };
 
-/** Prefixos: p:silva, o:2024, a:, n:, c:, m:, r: (procedimento) */
+/** Prefixos: p:silva (paciente), o:2024, a:, n:, c:, m:, r: (procedimento) */
 function parseTerm(input: string): { termo: string; tipos?: UBTipo[] } {
   const m = /^([poancmr]):(.*)$/i.exec(input.trim());
   if (!m) return { termo: input.trim() };
   const map: Record<string, UBTipo[]> = {
-    p: ["orcamento" /* placeholder — paciente será combinado no futuro */],
+    p: ["paciente"],
     o: ["orcamento"],
     a: ["agendamento"],
     n: ["nfse"],
