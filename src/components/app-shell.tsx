@@ -13,6 +13,9 @@ import logoMeninoJesus from "@/assets/logo-menino-jesus.png";
 import logoConsultaHoje from "@/assets/logo-consulta-hoje.png";
 import { EstornosBell } from "@/components/EstornosBell";
 import { UniversalSearchBar } from "@/components/universal-search-bar";
+import { MenuV2 } from "@/components/menu-v2/menu-v2";
+import { useMenuV2Flag } from "@/hooks/use-menu-prefs";
+import type { PerfilKey } from "@/components/menu-v2/menu-catalog";
 
 function corDaClinica(nome?: string): string {
   const n = (nome ?? "").toLowerCase();
@@ -191,6 +194,7 @@ export function AppShell() {
   const { memberships, clinicaAtual, setClinicaAtual, modoTodas, setModoTodas, branding } = useClinica();
   const { isMedicoOnly } = useMedicoContext();
   const { allowed: allowedModules } = usePermissoes();
+  const { enabled: menuV2Enabled } = useMenuV2Flag();
   const location = useLocation();
   const navigate = useNavigate();
   const navScrollRef = useRef<HTMLElement | null>(null);
@@ -359,6 +363,14 @@ export function AppShell() {
   const visibleNavRows = isMedicoOnly ? medicoNavRows : permissionFilteredRows;
   const subsystemLabel = subsystem ? SUBSYSTEMS[subsystem].label : null;
 
+  // Kill-switch gradual: MenuV2 só é ativado se a flag `menu_v2` estiver on
+  // E o role atual for admin ou gestor. Recepção/médico/caixa/financeiro
+  // continuam vendo o menu antigo mesmo se a flag estiver ligada.
+  const roleAtual = clinicaAtual?.role ?? null;
+  const menuV2Allowed = roleAtual === "admin" || roleAtual === "gestor";
+  const useMenuV2 = menuV2Enabled && menuV2Allowed && !isMedicoOnly;
+  const perfilV2: PerfilKey = roleAtual === "admin" ? "admin" : "gestor";
+
   // Lista plana de rotas visíveis no menu (respeitando grupos abertos) para navegação por seta
   const flatNavLeaves = useMemo(() => {
     const leaves: string[] = [];
@@ -458,7 +470,10 @@ export function AppShell() {
 
   return (
     <div className="h-screen flex bg-background overflow-hidden">
-      {!isChooser && (
+      {!isChooser && useMenuV2 && (
+        <MenuV2 perfil={perfilV2} />
+      )}
+      {!isChooser && !useMenuV2 && (
       <aside
         className={`${collapsed ? "w-16" : "w-64"} transition-all duration-200 shrink-0 text-white h-screen overflow-hidden flex flex-col`}
         style={{ backgroundColor: clinicColor }}
