@@ -12,6 +12,7 @@ import logoSaoFrancisco from "@/assets/logo-sao-francisco.png";
 import logoMeninoJesus from "@/assets/logo-menino-jesus.png";
 import logoConsultaHoje from "@/assets/logo-consulta-hoje.png";
 import { EstornosBell } from "@/components/EstornosBell";
+import { UniversalSearchBar } from "@/components/universal-search-bar";
 
 function corDaClinica(nome?: string): string {
   const n = (nome ?? "").toLowerCase();
@@ -689,7 +690,9 @@ export function AppShell() {
               </SelectContent>
             </Select>
           )}
-          <div className="flex-1" />
+          <div className="flex-1 flex justify-center px-2 min-w-0">
+            <UniversalSearchBar />
+          </div>
           <div className="flex items-center gap-2">
             <Button
               variant="ghost"
