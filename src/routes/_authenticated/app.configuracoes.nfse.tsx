@@ -1,11 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Building2 } from "lucide-react";
+import { Building2, FileStack } from "lucide-react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SimpleCrud } from "@/components/simple-crud/SimpleCrud";
 import { ItemServicoPicker } from "@/components/nfse/item-servico-picker";
+import { supabase } from "@/integrations/supabase/client";
+import { useClinica } from "@/hooks/use-clinica";
+import { mostrarErro } from "@/lib/traduzir-erro";
 
 export const Route = createFileRoute("/_authenticated/app/configuracoes/nfse")({
   component: NfseConfigPage,
@@ -84,6 +89,8 @@ const REGIMES = [
 
 function NfseConfigPage() {
   return (
+    <div className="space-y-6">
+      <ClinicaNfseModoCard />
     <SimpleCrud<Row, Form>
       table="nfse_emitentes"
       selectColumns="id, nome, cnpj, razao_social, nome_fantasia, inscricao_municipal, cep, logradouro, numero, complemento, bairro, municipio, uf, codigo_municipio, telefone, email, regime_tributario, optante_simples, item_lista_servico, codigo_tributario_municipio, codigo_cnae, aliquota_iss, descricao_servico_padrao, focus_ambiente, rps_serie, rps_proximo_numero, ativo, padrao, usar_ambiente_nacional"
@@ -298,5 +305,93 @@ function NfseConfigPage() {
         </div>
       )}
     />
+    </div>
+  );
+}
+
+function ClinicaNfseModoCard() {
+  const { clinicaAtual } = useClinica();
+  const [modo, setModo] = useState<"por_item" | "agrupada">("por_item");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!clinicaAtual) return;
+    setLoading(true);
+    supabase
+      .from("clinicas")
+      .select("nfse_modo_emissao")
+      .eq("id", clinicaAtual.clinica_id)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error) mostrarErro(error);
+        else if (data?.nfse_modo_emissao === "agrupada") setModo("agrupada");
+        else setModo("por_item");
+        setLoading(false);
+      });
+  }, [clinicaAtual]);
+
+  const salvar = async (novo: "por_item" | "agrupada") => {
+    if (!clinicaAtual) return;
+    setSaving(true);
+    const anterior = modo;
+    setModo(novo);
+    const { error } = await supabase
+      .from("clinicas")
+      .update({ nfse_modo_emissao: novo })
+      .eq("id", clinicaAtual.clinica_id);
+    setSaving(false);
+    if (error) {
+      setModo(anterior);
+      mostrarErro(error);
+      return;
+    }
+    toast.success(
+      novo === "agrupada"
+        ? "NFS-e agrupada por orçamento ativada."
+        : "NFS-e emitida por item (comportamento padrão).",
+    );
+  };
+
+  return (
+    <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+      <div className="flex items-start gap-3">
+        <FileStack className="h-5 w-5 text-primary mt-0.5" />
+        <div className="flex-1">
+          <h3 className="text-sm font-semibold">Modo de emissão de NFS-e</h3>
+          <p className="text-xs text-muted-foreground">
+            Vale para toda a clínica. A regra é aplicada na emissão a partir do orçamento — comissão, repasse e financeiro continuam por atendimento.
+          </p>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <button
+          type="button"
+          disabled={loading || saving}
+          onClick={() => salvar("por_item")}
+          className={`text-left rounded-md border p-3 transition ${
+            modo === "por_item" ? "border-primary bg-primary/5" : "border-border hover:bg-accent"
+          }`}
+        >
+          <div className="text-sm font-medium">Por item</div>
+          <div className="text-xs text-muted-foreground">
+            Uma NFS-e para cada procedimento pago. Comportamento padrão.
+          </div>
+        </button>
+        <button
+          type="button"
+          disabled={loading || saving}
+          onClick={() => salvar("agrupada")}
+          className={`text-left rounded-md border p-3 transition ${
+            modo === "agrupada" ? "border-primary bg-primary/5" : "border-border hover:bg-accent"
+          }`}
+        >
+          <div className="text-sm font-medium">Agrupada por orçamento</div>
+          <div className="text-xs text-muted-foreground">
+            Uma única NFS-e contendo todos os itens pagos do orçamento (ex.: Menino Jesus).
+          </div>
+        </button>
+      </div>
+    </div>
   );
 }

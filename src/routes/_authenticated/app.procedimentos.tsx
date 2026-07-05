@@ -53,6 +53,14 @@ interface Procedimento {
   observacoes: string | null;
   preparo: string | null;
   ativo: boolean;
+  fluxo_atendimento?: string | null;
+  agenda_obrigatoria?: boolean | null;
+  medico_obrigatorio?: boolean | null;
+  sala_obrigatoria?: boolean | null;
+  equipamento_obrigatorio?: boolean | null;
+  permite_venda_direta?: boolean | null;
+  permite_encaixe?: boolean | null;
+  tempo_padrao_min?: number | null;
 }
 interface Cartao {
   id: string;
@@ -88,6 +96,15 @@ const EMPTY = {
   valor_dinheiro: "0", valor_pix_cartao: "0",
   valor_cartao_consulta: "0", valor_cartao_desconto: "0",
   duracao_minutos: "30", observacoes: "", preparo: "", ativo: true,
+  // Regras do procedimento (arquitetura de plataforma — fn_regras_procedimento)
+  fluxo_atendimento: "consulta_padrao",
+  agenda_obrigatoria: true,
+  medico_obrigatorio: false,
+  sala_obrigatoria: false,
+  equipamento_obrigatorio: false,
+  permite_venda_direta: false,
+  permite_encaixe: true,
+  tempo_padrao_min: "30",
 };
 
 const EMPTY_CARTAO = { nome: "", descricao: "", percentual_desconto: "0", ativo: true };
@@ -673,6 +690,14 @@ function ProcedimentosPage() {
       valor_cartao_consulta: String(p.valor_cartao_consulta ?? 0),
       valor_cartao_desconto: String(p.valor_cartao_desconto ?? 0),
       duracao_minutos: String(p.duracao_minutos), observacoes: p.observacoes ?? "", preparo: p.preparo ?? "", ativo: p.ativo,
+      fluxo_atendimento: p.fluxo_atendimento ?? "consulta_padrao",
+      agenda_obrigatoria: p.agenda_obrigatoria ?? true,
+      medico_obrigatorio: p.medico_obrigatorio ?? false,
+      sala_obrigatoria: p.sala_obrigatoria ?? false,
+      equipamento_obrigatorio: p.equipamento_obrigatorio ?? false,
+      permite_venda_direta: p.permite_venda_direta ?? false,
+      permite_encaixe: p.permite_encaixe ?? true,
+      tempo_padrao_min: String(p.tempo_padrao_min ?? p.duracao_minutos ?? 30),
     });
     setOpen(true);
   };
@@ -702,6 +727,15 @@ function ProcedimentosPage() {
       observacoes: form.observacoes.trim() || null,
       preparo: form.preparo.trim() || null,
       ativo: form.ativo,
+      // Regras do procedimento (configuração > código)
+      fluxo_atendimento: form.fluxo_atendimento || null,
+      agenda_obrigatoria: !!form.agenda_obrigatoria,
+      medico_obrigatorio: !!form.medico_obrigatorio,
+      sala_obrigatoria: !!form.sala_obrigatoria,
+      equipamento_obrigatorio: !!form.equipamento_obrigatorio,
+      permite_venda_direta: !!form.permite_venda_direta,
+      permite_encaixe: !!form.permite_encaixe,
+      tempo_padrao_min: Math.max(0, Number(form.tempo_padrao_min) || 30),
     };
     // Ao criar (não editar), verifica se já existe procedimento com o mesmo nome
     // nesta clínica e pergunta antes de cadastrar.
@@ -1284,6 +1318,90 @@ function ProcedimentosPage() {
               <Checkbox checked={form.ativo} onCheckedChange={(v) => setForm({ ...form, ativo: !!v })} />
               Ativo
             </label>
+            <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase">Regras do procedimento</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Como este procedimento se comporta na Agenda, Caixa, Financeiro e NFS-e. Vale para todas as unidades — a unidade pode sobrescrever.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Fluxo de atendimento</Label>
+                  <Select
+                    value={form.fluxo_atendimento}
+                    onValueChange={(v) => setForm({ ...form, fluxo_atendimento: v })}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="consulta_padrao">Consulta padrão (com médico)</SelectItem>
+                      <SelectItem value="exame_com_laudo">Exame com laudo</SelectItem>
+                      <SelectItem value="exame_sem_laudo">Exame sem laudo</SelectItem>
+                      <SelectItem value="procedimento_enfermagem">Procedimento de enfermagem</SelectItem>
+                      <SelectItem value="laboratorio">Coleta laboratorial</SelectItem>
+                      <SelectItem value="entrega_domiciliar">Entrega/retirada domiciliar (MAPA/Holter)</SelectItem>
+                      <SelectItem value="balcao">Venda de balcão</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Duração padrão (min)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={form.tempo_padrao_min}
+                    onChange={(e) => setForm({ ...form, tempo_padrao_min: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-y-2 gap-x-3 pt-1">
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Checkbox
+                    checked={!!form.agenda_obrigatoria}
+                    onCheckedChange={(v) => setForm({ ...form, agenda_obrigatoria: !!v })}
+                  />
+                  Agenda obrigatória
+                </label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Checkbox
+                    checked={!!form.permite_venda_direta}
+                    onCheckedChange={(v) => setForm({ ...form, permite_venda_direta: !!v })}
+                  />
+                  Permite venda direta (sem agenda)
+                </label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Checkbox
+                    checked={!!form.medico_obrigatorio}
+                    onCheckedChange={(v) => setForm({ ...form, medico_obrigatorio: !!v })}
+                  />
+                  Médico obrigatório
+                </label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Checkbox
+                    checked={!!form.sala_obrigatoria}
+                    onCheckedChange={(v) => setForm({ ...form, sala_obrigatoria: !!v })}
+                  />
+                  Sala obrigatória
+                </label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Checkbox
+                    checked={!!form.equipamento_obrigatorio}
+                    onCheckedChange={(v) => setForm({ ...form, equipamento_obrigatorio: !!v })}
+                  />
+                  Equipamento obrigatório
+                </label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Checkbox
+                    checked={!!form.permite_encaixe}
+                    onCheckedChange={(v) => setForm({ ...form, permite_encaixe: !!v })}
+                  />
+                  Permite encaixe
+                </label>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                O modo de emissão de NFS-e (por item ou agrupada) é definido na configuração da clínica em <strong>Configurações → NFS-e</strong>.
+              </p>
+            </div>
             <div className="space-y-1">
               <Label>Observações</Label>
               <Textarea rows={2} value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} />
