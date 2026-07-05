@@ -554,14 +554,65 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
   );
 
   return (
-    <div className="h-full flex flex-col min-h-0 p-3 md:p-4">
-      {topbar}
-      <div className={cn("flex-1 min-h-0 grid gap-3",
-        isMobile ? "grid-cols-1" : "grid-cols-[minmax(0,3fr)_minmax(280px,1fr)]",
+    <div className="h-full flex flex-col min-h-0 bg-muted/20">
+      <div className="p-3 md:p-4 pb-2">
+        <PainelResumo
+          data={resumoData}
+          sessaoInfo={sessao ? `#${sessao.id.slice(0, 6)} · ${agoraTexto(sessao.aberto_em)}` : "Nenhuma aberta"}
+        />
+      </div>
+      <div className="px-3 md:px-4">{topbar}</div>
+      <div className={cn("flex-1 min-h-0 grid gap-3 px-3 md:px-4",
+        isMobile ? "grid-cols-1" : "grid-cols-[minmax(0,3fr)_minmax(300px,1fr)]",
       )}>
         <div className="min-h-0">{listEl}</div>
         {!isMobile && <div className="min-h-0">{filaEl}</div>}
       </div>
+      <KpiBar data={kpiData} />
+
+      {/* Drawer da Mini Timeline */}
+      <Sheet open={!!drawerItem} onOpenChange={(o) => { if (!o) setDrawerId(null); }}>
+        <SheetContent side="right" className="w-[92vw] sm:max-w-md p-0 flex flex-col">
+          <SheetHeader className="p-4 border-b">
+            <SheetTitle className="truncate">{drawerItem?.pacienteNome ?? "Paciente"}</SheetTitle>
+            <div className="text-xs text-muted-foreground truncate">
+              {drawerItem?.procedimento ?? ""}{drawerItem?.medicoNome ? ` · ${drawerItem.medicoNome}` : ""}
+            </div>
+          </SheetHeader>
+          <div className="p-4 space-y-4 overflow-auto">
+            {drawerItem && (
+              <>
+                <MiniTimeline etapas={buildTimeline({
+                  checkin: drawerItem.inicio,
+                  recepcao: drawerItem.inicio,
+                  caixa: drawerItem.status === "paid" ? drawerItem.inicio : null,
+                  atendimento: null,
+                  finalizado: null,
+                })} />
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">{drawerItem.tipoCobranca}</span>
+                  <span className="font-semibold tabular-nums">{brl(drawerItem.valor)}</span>
+                </div>
+                {drawerItem.alertas.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {drawerItem.alertas.map((a) => (
+                      <span key={a.tipo} className="rounded-full bg-muted px-2 py-0.5 text-[11px]">
+                        {a.emoji} {a.label}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <Button
+                  className="w-full bg-status-paid hover:bg-status-paid/90 text-white"
+                  onClick={() => receberFila(drawerItem.id)}
+                >
+                  <HandCoins className="h-4 w-4 mr-1" /> Receber pagamento
+                </Button>
+              </>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
