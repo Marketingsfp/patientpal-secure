@@ -543,6 +543,15 @@ function OrcamentosPage() {
           clinicaId={clinicaAtual.clinica_id}
         />
       )}
+
+      {conversaoId && (
+        <ConversaoOrcamentoDialog
+          open={!!conversaoId}
+          onClose={() => setConversaoId(null)}
+          orcamentoId={conversaoId}
+          onChanged={() => { void load(); }}
+        />
+      )}
     </div>
   );
 }
