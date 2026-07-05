@@ -69,12 +69,16 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
     if (!clinicaAtual || scope.length === 0) return;
     const myReq = ++reqRef.current;
     setLoading(true);
-    const { data, error } = await supabase
-      .from("pacientes")
-      .select(
-        "id, clinica_id, nome, cpf, telefone, telefone2, data_nascimento, email, ativo, codigo_prontuario, codigo_prontuario_anterior, numero_pasta, cidade, estado, foto_url, created_at",
-      )
-      .in("clinica_id", scope)
+    // usar .eq quando houver 1 clínica — o planner faz index scan direto
+    // no idx (clinica_id, created_at DESC). Com .in em base grande (200k+
+    // pacientes) o planner às vezes escolhe scan e estoura statement_timeout.
+    const cols =
+      "id, clinica_id, nome, cpf, telefone, telefone2, data_nascimento, email, ativo, codigo_prontuario, codigo_prontuario_anterior, numero_pasta, cidade, estado, foto_url, created_at";
+    const base = supabase.from("pacientes").select(cols);
+    const scoped = scope.length === 1
+      ? base.eq("clinica_id", scope[0])
+      : base.in("clinica_id", scope);
+    const { data, error } = await scoped
       .order("created_at", { ascending: false })
       .limit(50);
     if (myReq !== reqRef.current) return;
