@@ -53,6 +53,14 @@ interface Procedimento {
   observacoes: string | null;
   preparo: string | null;
   ativo: boolean;
+  fluxo_atendimento?: string | null;
+  agenda_obrigatoria?: boolean | null;
+  medico_obrigatorio?: boolean | null;
+  sala_obrigatoria?: boolean | null;
+  equipamento_obrigatorio?: boolean | null;
+  permite_venda_direta?: boolean | null;
+  permite_encaixe?: boolean | null;
+  tempo_padrao_min?: number | null;
 }
 interface Cartao {
   id: string;
@@ -88,6 +96,15 @@ const EMPTY = {
   valor_dinheiro: "0", valor_pix_cartao: "0",
   valor_cartao_consulta: "0", valor_cartao_desconto: "0",
   duracao_minutos: "30", observacoes: "", preparo: "", ativo: true,
+  // Regras do procedimento (arquitetura de plataforma — fn_regras_procedimento)
+  fluxo_atendimento: "consulta_padrao",
+  agenda_obrigatoria: true,
+  medico_obrigatorio: false,
+  sala_obrigatoria: false,
+  equipamento_obrigatorio: false,
+  permite_venda_direta: false,
+  permite_encaixe: true,
+  tempo_padrao_min: "30",
 };
 
 const EMPTY_CARTAO = { nome: "", descricao: "", percentual_desconto: "0", ativo: true };
