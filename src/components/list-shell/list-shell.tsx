@@ -27,7 +27,9 @@ interface ListShellProps<S extends string> {
   chips?: ReactNode;
 
   loading?: boolean;
+  /** Renderiza o slot vazio somente quando `isEmpty` for true. */
   empty?: ReactNode;
+  isEmpty?: boolean;
   children: ReactNode;
 
   className?: string;
@@ -46,7 +48,7 @@ export function ListShell<S extends string>({
   title, actions,
   searchValue, onSearchChange, searchPlaceholder = "Buscar…", searchDebounceMs = 200,
   tabs, tabValue, onTabChange,
-  chips, loading, empty, children,
+  chips, loading, empty, isEmpty, children,
   className, bodyClassName,
 }: ListShellProps<S>) {
   const [inner, setInner] = useState(searchValue);
@@ -106,7 +108,7 @@ export function ListShell<S extends string>({
               <Skeleton key={i} className="h-10 w-full" />
             ))}
           </div>
-        ) : empty ? (
+        ) : isEmpty && empty ? (
           <div className="h-full flex items-center justify-center text-sm text-muted-foreground p-6 text-center">
             {empty}
           </div>
