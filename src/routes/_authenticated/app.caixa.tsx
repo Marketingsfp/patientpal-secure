@@ -29,11 +29,32 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { SolicitarEstornoDialog } from "@/components/financeiro/SolicitarEstornoDialog";
+import { useCaixaV2Flag } from "@/hooks/use-caixa-v2-flag";
+import { CaixaV2Mount } from "@/components/caixa-v2/caixa-v2-mount";
 
 export const Route = createFileRoute("/_authenticated/app/caixa")({
-  component: Page,
+  component: CaixaRouteDispatcher,
   head: () => ({ meta: [{ title: "Caixa — ClinicaOS" }] }),
 });
+
+/**
+ * Promoção controlada do CaixaShellV2 para `/app/caixa`, atrás da flag
+ * `caixa_v2` E limitado a admin/gestor. Recepção, caixa, médico, financeiro
+ * e demais perfis continuam vendo o `<Page />` clássico intocado — mesmo
+ * com a flag ligada. Kill-switch imediato: desligar a flag no perfil
+ * volta para o clássico sem reload (o hook escuta `caixa:flag-changed`).
+ *
+ * Este dispatcher é o ÚNICO ponto novo; nenhuma linha do fluxo clássico
+ * (cobrança, estorno, recibo, NFS-e, splits, abertura/fechamento) muda.
+ */
+function CaixaRouteDispatcher() {
+  const { clinicaAtual } = useClinica();
+  const { enabled, loading } = useCaixaV2Flag();
+  const role = clinicaAtual?.role ?? null;
+  const v2Allowed = role === "admin" || role === "gestor";
+  if (!loading && enabled && v2Allowed) return <CaixaV2Mount />;
+  return <Page />;
+}
 
 type MovTipo = "abertura" | "sangria" | "suprimento" | "recebimento" | "despesa" | "fechamento";
 interface Sessao {
