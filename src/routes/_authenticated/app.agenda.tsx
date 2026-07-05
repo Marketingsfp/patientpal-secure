@@ -3100,7 +3100,7 @@ function AgendaPage() {
     <div className="space-y-3">
       {emitenteNfseDialog}
       {reagendandoAg && (
-        <div className="sticky top-0 z-30 -mx-4 px-4 py-2 border-b bg-primary text-primary-foreground shadow-sm">
+        <div className="sticky top-0 z-30 -mx-3 px-3 sm:-mx-4 sm:px-4 py-2 border-b bg-primary text-primary-foreground shadow-sm">
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <CalendarDays className="h-4 w-4 shrink-0" />
             <div className="flex-1 min-w-0">
@@ -3123,7 +3123,7 @@ function AgendaPage() {
         </div>
       )}
       {reagLoteIds && reagLoteIds.length > 0 && (
-        <div className="sticky top-0 z-30 -mx-4 px-4 py-2 border-b bg-primary text-primary-foreground shadow-sm">
+        <div className="sticky top-0 z-30 -mx-3 px-3 sm:-mx-4 sm:px-4 py-2 border-b bg-primary text-primary-foreground shadow-sm">
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <CalendarDays className="h-4 w-4 shrink-0" />
             <div className="flex-1 min-w-0">
@@ -3150,7 +3150,7 @@ function AgendaPage() {
           </h1>
           <p className="text-sm text-muted-foreground">Filtre e gerencie os agendamentos da clínica.</p>
         </div>
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           <TurboModeToggle />
           <div className="inline-flex rounded-full border bg-card p-0.5">
             <button
@@ -3277,7 +3277,7 @@ function AgendaPage() {
                 className="space-y-2 contents disabled:opacity-90"
               >
               <div className="space-y-1 rounded-md border border-dashed border-primary/40 bg-primary/5 p-2 text-xs">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Label className="text-xs uppercase whitespace-nowrap">Nº do orçamento</Label>
                   <Input
                     inputMode="numeric"
@@ -3440,7 +3440,7 @@ function AgendaPage() {
                 />
               </div>
               <div className="space-y-1">
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div className="space-y-1">
                     <Label className="text-xs">Data consulta/exame</Label>
                     <Input type="datetime-local" value={form.inicio} onChange={(e) => setForm(f => ({ ...f, inicio: e.target.value, fim: calcFimAuto(e.target.value, f.medico_id) }))} required />
@@ -3912,7 +3912,7 @@ function AgendaPage() {
             <DialogTitle>Aplicar desconto</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div className="space-y-1">
                 <Label>Tipo</Label>
                 <Select value={descForm.tipo} onValueChange={(v) => setDescForm((f) => ({ ...f, tipo: v as "valor" | "percentual" }))}>
@@ -4018,7 +4018,7 @@ function AgendaPage() {
               <Label>Nome *</Label>
               <Input value={novoPac.nome} onChange={(e) => setNovoPac(p => ({ ...p, nome: e.target.value }))} required autoFocus />
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div className="space-y-1">
                 <Label>CPF</Label>
                 <Input
@@ -4328,7 +4328,7 @@ function AgendaPage() {
       {viewMode === "dia" && (
       <>
       {pacienteCopia && (
-        <div className="sticky top-0 z-30 -mx-4 px-4 py-2 border-b bg-primary text-primary-foreground shadow-sm">
+        <div className="sticky top-0 z-30 -mx-3 px-3 sm:-mx-4 sm:px-4 py-2 border-b bg-primary text-primary-foreground shadow-sm">
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <CalendarDays className="h-4 w-4 shrink-0" />
             <div className="flex-1 min-w-0">
@@ -4343,7 +4343,7 @@ function AgendaPage() {
       )}
       {/* Totais + paginação topo */}
       <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
-        <div className="flex gap-4">
+        <div className="flex flex-wrap gap-x-4 gap-y-1">
           <span>Total: <b className="text-foreground">{totais.total}</b></span>
           <span>Confirmados: <b className="text-foreground">{totais.confirmados}</b></span>
           <span>Realizados: <b className="text-foreground">{totais.realizados}</b></span>
@@ -4774,12 +4774,12 @@ function AgendaPage() {
                   )}
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2 pt-2 border-t">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t">
                 <div><span className="text-muted-foreground">CPF: </span>{pacInfo.cpf || "—"}</div>
                 <div><span className="text-muted-foreground">Nasc.: </span>{pacInfo.data_nascimento ? new Date(pacInfo.data_nascimento + "T00:00:00").toLocaleDateString("pt-BR") : "—"}</div>
                 <div><span className="text-muted-foreground">Telefone: </span>{pacInfo.telefone || "—"}</div>
                 <div className="truncate"><span className="text-muted-foreground">Email: </span>{pacInfo.email || "—"}</div>
-                <div className="col-span-2"><span className="text-muted-foreground">Endereço: </span>{[pacInfo.logradouro, pacInfo.numero, pacInfo.bairro, pacInfo.cidade, pacInfo.estado].filter(Boolean).join(", ") || "—"}</div>
+                <div className="sm:col-span-2"><span className="text-muted-foreground">Endereço: </span>{[pacInfo.logradouro, pacInfo.numero, pacInfo.bairro, pacInfo.cidade, pacInfo.estado].filter(Boolean).join(", ") || "—"}</div>
               </div>
               {pacInfo.id && (
                 <div className="pt-2">
@@ -4822,7 +4822,7 @@ function Paginacao({ page, totalPages, onChange }: { page: number; totalPages: n
     return arr;
   }, [page, totalPages]);
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex flex-wrap items-center justify-center gap-1">
       <Button variant="outline" size="sm" disabled={page === 1} onClick={() => onChange(1)}>«</Button>
       <Button variant="outline" size="sm" disabled={page === 1} onClick={() => onChange(page - 1)}>‹</Button>
       {nums.map(n => (

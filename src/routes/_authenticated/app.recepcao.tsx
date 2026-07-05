@@ -121,7 +121,7 @@ function RecepcaoPage() {
           <h1 className="text-2xl font-bold">Recepção · Filas</h1>
           <p className="text-sm text-muted-foreground">Chame a próxima senha e acompanhe a fila em tempo real.</p>
         </div>
-        <div className="flex items-end gap-3">
+        <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Meu guichê</label>
             <input
@@ -153,14 +153,14 @@ function RecepcaoPage() {
             {fila.length === 0 && <div className="text-sm text-muted-foreground py-6 text-center">Fila vazia</div>}
             {fila.map((s) => (
               <div key={s.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/40">
-                <div className="flex items-center gap-3">
-                  <span className={`px-2 py-0.5 rounded text-xs font-semibold ${TIPO_COR[s.tipo]}`}>{s.tipo}</span>
-                  <span className="font-bold tabular-nums">{s.codigo}</span>
-                  <span className="text-sm text-muted-foreground">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className={`px-2 py-0.5 rounded text-xs font-semibold shrink-0 ${TIPO_COR[s.tipo]}`}>{s.tipo}</span>
+                  <span className="font-bold tabular-nums shrink-0">{s.codigo}</span>
+                  <span className="text-sm text-muted-foreground truncate">
                     {s.pacientes?.nome ?? "Anônimo"}{s.identificado_por_facial ? " · 📷" : ""}
                   </span>
                 </div>
-                <Button variant="ghost" size="sm" onClick={() => setStatus(s.id, "cancelada")}>
+                <Button variant="ghost" size="sm" className="shrink-0" onClick={() => setStatus(s.id, "cancelada")}>
                   <X className="h-4 w-4" />
                 </Button>
               </div>
@@ -174,12 +174,12 @@ function RecepcaoPage() {
             {chamadas.length === 0 && <div className="text-sm text-muted-foreground py-6 text-center">Nenhuma chamada hoje</div>}
             {chamadas.map((s) => (
               <div key={s.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/40">
-                <div className="flex items-center gap-3">
-                  <span className={`px-2 py-0.5 rounded text-xs font-semibold ${TIPO_COR[s.tipo]}`}>{s.tipo}</span>
-                  <span className="font-bold tabular-nums">{s.codigo}</span>
-                  <span className="text-sm text-muted-foreground">Guichê {s.guiche ?? "—"}</span>
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className={`px-2 py-0.5 rounded text-xs font-semibold shrink-0 ${TIPO_COR[s.tipo]}`}>{s.tipo}</span>
+                  <span className="font-bold tabular-nums shrink-0">{s.codigo}</span>
+                  <span className="text-sm text-muted-foreground truncate">Guichê {s.guiche ?? "—"}</span>
                 </div>
-                <Button size="sm" variant="outline" onClick={() => setStatus(s.id, "atendida")}>
+                <Button size="sm" variant="outline" className="shrink-0" onClick={() => setStatus(s.id, "atendida")}>
                   <Check className="h-4 w-4 mr-1" /> Concluir
                 </Button>
               </div>
