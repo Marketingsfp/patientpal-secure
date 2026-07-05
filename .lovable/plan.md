@@ -1,75 +1,116 @@
-# Migração C.1 — `fin_atendimentos.nfse_id`
+# Plano — Auditoria de Integração + Proposta Visual
 
-Correção pontual para desbloquear os 2 cenários de NFS-e (agrupada e por item) que falharam no E2E da Migração C. Aditiva, reversível, sem tocar em dado real.
+Dois entregáveis independentes. Nada é implementado antes da sua aprovação.
 
-## 1. Alteração de schema
+---
 
-**Coluna nova em `public.fin_atendimentos`:**
-```sql
-ALTER TABLE public.fin_atendimentos
-  ADD COLUMN nfse_id uuid NULL
-  REFERENCES public.nfse(id) ON DELETE SET NULL;
-```
-- Nullable (atendimento pode existir sem NFS-e emitida).
-- `ON DELETE SET NULL`: se a NFS-e for excluída/cancelada, o vínculo é limpo mas o atendimento permanece intacto (regra financeira: nunca perder receita).
+## Frente 1 — Auditoria de Integração Ponta a Ponta
 
-**Índice:**
-```sql
-CREATE INDEX idx_fin_atendimentos_nfse_id
-  ON public.fin_atendimentos(nfse_id)
-  WHERE nfse_id IS NOT NULL;
-```
-Parcial (só linhas com NFS-e) — suporta a consulta N atendimentos → 1 NFS-e no modo `agrupada` sem inflar o índice.
+Objetivo: rodar 2 jornadas completas (particular e associado) cobrindo 5 tipos de serviço, do orçamento à NFS-e, e reportar onde a integração quebra ou diverge da regra.
 
-**Nenhum GRANT novo** — `fin_atendimentos` já tem os grants para `authenticated`/`service_role`.
+### Escopo por jornada
 
-## 2. Impacto por eixo
+Cada jornada roda como bateria Playwright autenticada como admin, com dados prefixados `[TESTE-AUDIT-INT]` e cleanup 100% ao final.
 
-| Eixo | Impacto | Risco |
+**Jornada A — Paciente Particular**
+1. Criar paciente particular.
+2. Criar orçamento com 5 itens: Consulta, Laboratório, Ultrassom, MAPA, Holter.
+3. Validar `fn_regras_procedimento` para cada item (regra vinda do cadastro, não hardcoded).
+4. Conversão via `ConversaoOrcamentoDialog` — item a item, validando badges operacional/financeiro.
+5. Registrar pagamento no Caixa (sessão aberta e fechada).
+6. Emitir NFS-e nos 2 modos (`por_item` e `agrupada`), alternando `clinicas.nfse_modo_emissao`.
+7. Validar reflexo em Financeiro (`fin_atendimentos`, `fin_lancamentos`) e vínculo `nfse_id`.
+8. Sem contrato/mensalidade — validar que nenhum informativo indevido é gerado.
+
+**Jornada B — Paciente Associado (cartão de benefícios / convênio)**
+1. Paciente vinculado a `cb_convenios` ativo, com contrato de assinatura vigente.
+2. Mesmo orçamento (5 itens), aplicando `procedimento_cb_convenio_valores` e `cb_convenio_regras`.
+3. Validar desconto/copay por item conforme regra do convênio.
+4. Conversão + Caixa + NFS-e (idem).
+5. Validar contrato: `contrato_mensalidades` não afetada indevidamente; informativo de convênio emitido quando aplicável.
+6. Validar split (`procedimento_split_regras` / `pagamento_splits`) se o convênio exigir.
+
+### Matriz de verificação (13 pontos por jornada)
+
+| # | Ponto | Fonte da verdade |
 |---|---|---|
-| 💰 Financeiro | Vínculo 1-N (1 NFS-e ↔ N atendimentos) fica explícito; nenhuma coluna de valor muda | 🟢 |
-| 🧾 NFS-e | `emitir_nfse_orcamento` passa a executar (para de referenciar coluna inexistente); modo `por_item` grava 1-para-1, `agrupada` grava N-para-1 | 🟢 |
-| 💵 Caixa | Nenhum — `caixa_movimentos` e `caixa_sessoes` não são tocados | 🟢 |
-| 📊 Relatórios | Habilita filtros "atendimentos faturados/não faturados" e "atendimentos por NFS-e"; nenhuma view existente quebra (coluna aditiva) | 🟢 |
-| 🛡️ Auditoria | `emitir_nfse_orcamento` já grava `audit_log`; nenhum ajuste necessário | 🟢 |
+| 1 | Orçamento criado com todos itens | `orcamentos` + `orcamento_itens` |
+| 2 | Regra correta por item | `fn_regras_procedimento` |
+| 3 | Status operacional coerente | dialog + RPC |
+| 4 | Status financeiro coerente | dialog + RPC |
+| 5 | Venda antecipada permitida onde configurada | `procedimento_unidade_regras` |
+| 6 | Agendamento em cascata no cancelamento | `agendamentos` |
+| 7 | Pagamento sem estorno automático | `caixa_movimentos` |
+| 8 | Bloqueio de conversão duplicada | RPC |
+| 9 | NFS-e por item (1-para-1) | `nfse` + `fin_atendimentos.nfse_id` |
+| 10 | NFS-e agrupada (N-para-1) | idem |
+| 11 | Idempotência NFS-e | `NFSE_JA_EMITIDA` |
+| 12 | Convênio: desconto/copay | `cb_convenio_regras` |
+| 13 | Contrato: informativo correto | `contratos_assinatura` + `contrato_mensalidades` |
 
-## 3. Rollback
+### Entregáveis da Frente 1
+- Relatório antes/depois por jornada.
+- Lista de bugs/divergências (com evidência: print + query).
+- Confirmação de cleanup + zero alteração em dado real.
+- **Nenhuma correção aplicada nesta fase** — apenas diagnóstico. Correções entram como Migração D (se necessária) após você aprovar o que corrigir.
 
-```sql
-DROP INDEX IF EXISTS public.idx_fin_atendimentos_nfse_id;
-ALTER TABLE public.fin_atendimentos DROP COLUMN IF EXISTS nfse_id;
-```
-Reversão limpa. Como a coluna é aditiva e nullable, dropar não afeta linhas existentes.
+---
 
-## 4. Testes pós-aplicação (só os 2 cenários que falharam)
+## Frente 2 — Proposta Visual (mockups, sem código)
 
-Prefixo `[TESTE-FRONT-CONVERSAO]`. Via Playwright autenticado como admin, pelo `ConversaoOrcamentoDialog`.
+Objetivo: reduzir atrito de navegação. Entregar **modelos visuais** para você escolher, antes de qualquer refactor.
 
-**Teste 1 — NFS-e por item** (`clinicas.nfse_modo_emissao='por_item'`):
-1. Seed: orçamento com 3 itens, todos convertidos em venda → 3 `fin_atendimentos` pagos.
-2. UI: clicar "Emitir NFS-e" no dialog.
-3. Asserts:
-   - 3 rows em `nfse` criadas (1 por atendimento).
-   - `fin_atendimentos.nfse_id` de cada uma aponta para a NFS-e correspondente (1-para-1).
-   - Segunda chamada retorna `NFSE_JA_EMITIDA` (sem duplicar).
+### Diagnóstico rápido do estado atual
+- Menu lateral com ~40 itens em ~10 seções (`src/lib/permissoes-presets.ts` lista 60+ módulos).
+- Paginação profunda: Financeiro tem 12 sub-rotas, Cartão de Benefícios tem 6, etc.
+- Já existe Modo Turbo (`turbo-mode.ts`) mas só na Agenda.
+- Dashboard atual (`app.index.tsx`) é só um seletor de subsistema, não um painel operacional.
 
-**Teste 2 — NFS-e agrupada** (`clinicas.nfse_modo_emissao='agrupada'`):
-1. Seed: mesmo orçamento com 3 itens pagos.
-2. UI: clicar "Emitir NFS-e".
-3. Asserts:
-   - 1 row em `nfse` com `orcamento_id` preenchido e `valor_servicos = SUM(itens)`.
-   - `fin_atendimentos.nfse_id` das 3 rows aponta para o **mesmo** `nfse.id`.
-   - Segunda chamada retorna `NFSE_JA_EMITIDA`.
-   - Se algum item não estiver pago → `NFSE_ITENS_PENDENTES` e nenhuma NFS-e criada.
+### O que será proposto (5 protótipos visuais)
 
-**Confirmações finais que serão reportadas:**
-- NFS-e vinculada a cada atendimento via `fin_atendimentos.nfse_id`.
-- Não duplica emissão (bloqueio idempotente).
-- Respeita `clinicas.nfse_modo_emissao` (dois modos testados no mesmo turno, alternando a config).
-- Cleanup 100% via prefixo `[TESTE-FRONT-CONVERSAO]` + contagem antes/depois.
-- Nenhum dado real alterado (config da clínica restaurada ao valor original ao fim do teste).
+1. **Menu curto — Command Rail**
+   Sidebar reduzida a 7 grupos fixos (Início, Agenda, Pacientes, Financeiro, Serviços, Equipe, Config). Sub-rotas viram tabs no topo da página, não itens de menu. Alvo: cortar itens visíveis de ~40 para ~7.
 
-## 5. Não faz parte desta migração
-- Não altera a RPC `emitir_nfse_orcamento` (ela já espera `nfse_id`; só adicionamos a coluna).
-- Não muda default de `nfse_modo_emissao` em clínicas existentes.
-- Não emite NFS-e real no Focus — os testes usam o caminho de gravação local (sem chamada externa).
+2. **Command Palette (Ctrl+K)**
+   Overlay estilo Linear/Raycast: busca fuzzy em telas, ações, pacientes, orçamentos, agendamentos. Atalhos globais (F2–F9 já existentes + Ctrl+K). Fonte: rotas registradas + tabelas indexadas.
+
+3. **Busca Global no topbar**
+   Input persistente no header, sempre visível, com autocomplete cross-entity (paciente, orçamento, agendamento, NFS-e, contrato). Ctrl+K abre a mesma coisa em modal.
+
+4. **Recepção Turbo expandida**
+   Modo Turbo hoje vive só na Agenda. Proposta: estender para Recepção, Caixa e Fluxo, com HUD de atalhos visível quando ativo, e uma tela "cockpit" única substituindo a navegação entre 4 abas.
+
+5. **Dashboard por perfil (7 variantes)**
+   - **admin/gestor**: KPIs financeiros + ocupação + alertas.
+   - **médico**: agenda do dia + pendências de prontuário.
+   - **recepção**: fila + próximos horários + orçamentos abertos.
+   - **caixa**: sessão aberta + pendências de pagamento + estornos.
+   - **financeiro**: contas a receber/pagar + NFS-e do dia + alertas.
+   - **enfermeiro**: triagens abertas + alertas de enfermagem.
+   - **gestor de pessoas**: ponto + férias + treinamentos.
+
+### Como você vai ver os mockups
+Vou gerar direções visuais renderizadas (não código de produção) para você aprovar antes de implementar. Sequência:
+1. Escolha de paleta + tipografia + layout (3 perguntas visuais).
+2. Geração de 3 direções renderizadas do novo shell (sidebar + topbar + dashboard + Ctrl+K).
+3. Você escolhe 1. Só então parto para o código.
+
+### Entregáveis da Frente 2
+- 3 direções visuais renderizadas do novo shell.
+- Wireframe dos 7 dashboards por perfil.
+- Mapa de menu antes/depois (de ~40 para ~7 itens).
+- **Nenhum código alterado nesta fase.**
+
+---
+
+## Ordem de execução proposta
+
+1. Você aprova este plano.
+2. Frente 1 roda primeiro (não bloqueia UI, é diagnóstico).
+3. Em paralelo, faço as 3 perguntas visuais da Frente 2 e gero as direções.
+4. Consolido: relatório da auditoria + direção visual escolhida → plano de implementação (Migração D + refactor de shell).
+
+## Fora de escopo agora
+- Não altero backend nesta fase (auditoria é read-only + testes com prefixo).
+- Não implemento nenhum componente novo antes da sua escolha visual.
+- Não mexo em Modo Turbo atual até definir o cockpit.
