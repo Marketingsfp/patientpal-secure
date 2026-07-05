@@ -14,13 +14,19 @@ import {
 import { ClienteCard } from "./cliente-card";
 import { ClienteDrawer } from "./cliente-drawer";
 import { ClientesKpiBar, type ClientesKpi } from "./kpi-bar";
+import { ResumoBar } from "./resumo-bar";
+import { useClientesKpis } from "./use-kpis";
 import {
-  cadastroIncompleto, marcarDuplicados, pagadorLabel,
+  cadastroIncompleto, isAniversarianteHoje, isNovo30d,
+  marcarDuplicados, pagadorLabel, semCpf, semTelefone,
   type PacienteV2,
 } from "./status-utils";
 
 type TabV = "todos" | "ativos" | "inativos" | "incompletos" | "duplicados";
-type TipoV = "particular" | "associado" | "cartao";
+type ChipV =
+  | "particular" | "associado" | "cartao"
+  | "aniv" | "novos30" | "sem_tel" | "sem_cpf";
+type ResumoMode = "none" | "aniv" | "inativos";
 
 const TAB_OPTS: ReadonlyArray<StatusTab<TabV>> = [
   { value: "todos", label: "Todos" },
@@ -30,10 +36,14 @@ const TAB_OPTS: ReadonlyArray<StatusTab<TabV>> = [
   { value: "duplicados", label: "Possíveis duplicidades" },
 ];
 
-const TIPO_OPTS: ReadonlyArray<QuickFilterOption<TipoV>> = [
+const CHIP_OPTS: ReadonlyArray<QuickFilterOption<ChipV>> = [
   { value: "particular", label: "Particular" },
   { value: "associado", label: "Associado" },
   { value: "cartao", label: "Cartão de Benefícios" },
+  { value: "aniv", label: "Aniversariantes hoje" },
+  { value: "novos30", label: "Novos 30 dias" },
+  { value: "sem_tel", label: "Sem telefone" },
+  { value: "sem_cpf", label: "Sem CPF" },
 ];
 
 interface Props {
@@ -53,11 +63,14 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [tab, setTab] = useState<TabV>("todos");
-  const [tipo, setTipo] = useState<TipoV[]>([]);
+  const [chips, setChips] = useState<ChipV[]>([]);
+  const [resumoMode, setResumoMode] = useState<ResumoMode>("none");
   const [drawer, setDrawer] = useState<PacienteV2 | null>(null);
   const [pageSize, setPageSize] = useState(50);
   const [totalBase, setTotalBase] = useState<number | null>(null);
   const reqRef = useRef(0);
+
+  const kpis = useClientesKpis(clinicaAtual?.clinica_id ?? null);
 
   const modoBusca = q.trim().length >= 2;
   const scope = useMemo(
@@ -69,24 +82,32 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
     if (!clinicaAtual || scope.length === 0) return;
     const myReq = ++reqRef.current;
     setLoading(true);
-    // usar .eq quando houver 1 clínica — o planner faz index scan direto
-    // no idx (clinica_id, created_at DESC). Com .in em base grande (200k+
-    // pacientes) o planner às vezes escolhe scan e estoura statement_timeout.
     const cols =
       "id, clinica_id, nome, cpf, telefone, telefone2, data_nascimento, email, ativo, codigo_prontuario, codigo_prontuario_anterior, numero_pasta, cidade, estado, foto_url, created_at";
-    const base = supabase.from("pacientes").select(cols);
-    const scoped = scope.length === 1
-      ? base.eq("clinica_id", scope[0])
-      : base.in("clinica_id", scope);
-    const { data, error } = await scoped
-      .order("created_at", { ascending: false })
-      .limit(50);
+    let query = supabase.from("pacientes").select(cols);
+    query = scope.length === 1 ? query.eq("clinica_id", scope[0]) : query.in("clinica_id", scope);
+    // Modos server-side leves (usam índices ou RPC dedicada).
+    // Os demais filtros são aplicados client-side sobre os últimos 50.
+    let mode: ResumoMode = resumoMode;
+    if (mode === "none" && chips.includes("aniv")) mode = "aniv";
+    if (mode === "aniv") {
+      const { data, error } = await supabase.rpc("pacientes_aniversariantes_hoje", {
+        _clinica_id: scope[0], _limite: 200,
+      });
+      if (myReq !== reqRef.current) return;
+      if (error) { mostrarErro(error); setLoading(false); return; }
+      setRows(marcarDuplicados((data ?? []) as PacienteV2[]));
+      setLoading(false);
+      return;
+    }
+    if (mode === "inativos") query = query.eq("ativo", false);
+    const { data, error } = await query.order("created_at", { ascending: false }).limit(50);
     if (myReq !== reqRef.current) return;
     if (error) { mostrarErro(error); setLoading(false); return; }
     setTotalBase(null);
     setRows(marcarDuplicados((data ?? []) as PacienteV2[]));
     setLoading(false);
-  }, [clinicaAtual, scope]);
+  }, [clinicaAtual, scope, resumoMode, chips]);
 
   const loadBusca = useCallback(async (termo: string) => {
     if (scope.length === 0) return;
@@ -137,11 +158,17 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
     else if (tab === "inativos") r = r.filter((p) => !p.ativo);
     else if (tab === "incompletos") r = r.filter(cadastroIncompleto);
     else if (tab === "duplicados") r = r.filter((p) => p.duplicado_hint);
-    if (tipo.length > 0) {
-      r = r.filter((p) => tipo.includes(pagadorLabel(p).tipo));
-    }
+    const tipos = chips.filter(
+      (c): c is "particular" | "associado" | "cartao" =>
+        c === "particular" || c === "associado" || c === "cartao",
+    );
+    if (tipos.length > 0) r = r.filter((p) => tipos.includes(pagadorLabel(p).tipo));
+    if (chips.includes("aniv")) r = r.filter((p) => isAniversarianteHoje(p.data_nascimento));
+    if (chips.includes("novos30")) r = r.filter(isNovo30d);
+    if (chips.includes("sem_tel")) r = r.filter(semTelefone);
+    if (chips.includes("sem_cpf")) r = r.filter(semCpf);
     return r;
-  }, [rows, tab, tipo]);
+  }, [rows, tab, chips]);
 
   const visiveis = filtrados.slice(0, pageSize);
 
@@ -176,6 +203,7 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
 
   return (
     <div className="h-full flex flex-col min-h-0">
+      <ResumoBar k={kpis} activeMode={resumoMode} onSelect={setResumoMode} />
       <div className="flex-1 min-h-0 p-3 sm:p-4">
         <ListShell<TabV>
           title={
@@ -211,11 +239,13 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
           onTabChange={setTab}
           chips={
             <div className="flex flex-wrap items-center gap-3">
-              <QuickFilters options={TIPO_OPTS} value={tipo} onChange={setTipo} multi ariaLabel="Tipo de pagador" />
+              <QuickFilters options={CHIP_OPTS} value={chips} onChange={setChips} multi ariaLabel="Filtros rápidos" />
               {!modoBusca && (
                 <div className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
                   <Info className="h-3.5 w-3.5" />
-                  Mostrando pacientes recentes. Use a busca para localizar qualquer paciente.
+                  {resumoMode === "none"
+                    ? "Mostrando pacientes recentes. Use a busca para localizar qualquer paciente."
+                    : "Filtro do painel ativo (limite ampliado). Clique no card novamente para voltar."}
                 </div>
               )}
             </div>

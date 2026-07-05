@@ -8000,6 +8000,19 @@ export type Database = {
         Args: { _clinica_id: string; _user_id: string }
         Returns: boolean
       }
+      kpis_clientes_v2: {
+        Args: { _clinica_id: string }
+        Returns: {
+          aniversariantes: number
+          associados: number
+          ativos: number
+          inativos: number
+          novos30d: number
+          sem_cpf: number
+          sem_telefone: number
+          total: number
+        }[]
+      }
       listar_duplicados_pacientes: {
         Args: { _clinica_ids: string[]; _limite?: number; _tipo?: string }
         Returns: {
@@ -8098,6 +8111,51 @@ export type Database = {
           ultimo_exame_nome: string
           whatsapp_valido: boolean
         }[]
+      }
+      pacientes_aniversariantes_hoje: {
+        Args: { _clinica_id: string; _limite?: number }
+        Returns: {
+          ativo: boolean
+          bairro: string | null
+          cep: string | null
+          cidade: string | null
+          clinica_id: string
+          codigo_prontuario: string | null
+          codigo_prontuario_anterior: string | null
+          complemento: string | null
+          consentimento_lgpd_em: string | null
+          cpf: string | null
+          cpf_digits: string | null
+          created_at: string
+          data_nascimento: string | null
+          email: string | null
+          estado: string | null
+          face_atualizado_em: string | null
+          face_descriptor: number[] | null
+          foto_atualizado_em: string | null
+          foto_url: string | null
+          id: string
+          legacy_id: number | null
+          logradouro: string | null
+          nome: string
+          numero: string | null
+          numero_pasta: string | null
+          prontuarios_anteriores: string | null
+          responsavel_cpf: string | null
+          responsavel_nome: string | null
+          responsavel_parentesco: string | null
+          responsavel_telefone: string | null
+          sexo: string
+          telefone: string | null
+          telefone2: string | null
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "pacientes"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       pacientes_face_lista: {
         Args: { _clinica_id: string }
