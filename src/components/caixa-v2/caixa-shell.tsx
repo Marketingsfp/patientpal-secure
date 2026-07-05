@@ -368,6 +368,23 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
     window.location.href = "/app/caixa";
   };
 
+  // Ação primária "Receber" — 1 clique. Se houver único item pendente,
+  // navega direto para /app/caixa com hint via query; caso contrário abre
+  // seleção lá. A gravação/regra continua no clássico.
+  const receberFila = useCallback((filaId?: string) => {
+    const id = filaId ?? filaCards[0]?.id;
+    if (!id) { toast.info("Nenhum paciente na fila."); return; }
+    window.location.href = `/app/caixa?receber=${encodeURIComponent(id)}`;
+  }, [filaCards]);
+
+  // Atalhos F2/F3/F4/Esc
+  useCaixaShortcuts({
+    onReceber: () => receberFila(),
+    onImprimir: () => goCaixa("Impressão de recibo abre no caixa clássico"),
+    onDespesa: () => goCaixa("Nova despesa abre no caixa clássico"),
+    onEscape: () => setDrawerId(null),
+  });
+
   // Layout
   const listEl = (
     <ListShell<TabKey>
