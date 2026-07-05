@@ -497,6 +497,14 @@ function OrcamentosPage() {
                     >
                       <Calendar className="h-4 w-4 text-emerald-600" />
                     </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setConversaoId(o.id)}
+                      title="Converter itens (vender, agendar, cancelar, NFS-e)"
+                    >
+                      <Workflow className="h-4 w-4 text-primary" />
+                    </Button>
                     <Button size="sm" variant="ghost" onClick={() => imprimir(o.id)} title="Imprimir"><Printer className="h-4 w-4" /></Button>
                     {podeVerHistorico && (
                       <Button size="sm" variant="ghost" onClick={() => setHistoricoId(o.id)} title="Histórico">
