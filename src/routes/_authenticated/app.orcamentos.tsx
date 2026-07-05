@@ -187,6 +187,7 @@ function OrcamentosPage() {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [historicoId, setHistoricoId] = useState<string | null>(null);
+  const [conversaoId, setConversaoId] = useState<string | null>(null);
   const podeVerHistorico = clinicaAtual?.role === "admin" || clinicaAtual?.role === "gestor";
   const [filtroRealizacao, setFiltroRealizacao] = useState<"todos" | "realizados" | "nao_realizados">("todos");
   const [periodo, setPeriodo] = useState<"hoje" | "semana" | "quinzena" | "mes" | "personalizado" | "todos">("todos");
