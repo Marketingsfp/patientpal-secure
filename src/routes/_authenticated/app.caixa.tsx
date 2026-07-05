@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   Wallet, PlusCircle, MinusCircle, ArrowDownToLine, ArrowUpFromLine, Lock,
   Unlock, Eye, FileDown, Users, Receipt, ChevronRight, Trash2, Plus, HandCoins, ArrowRight, Undo2, Printer,
@@ -349,6 +349,34 @@ function Page() {
   }, [clinicaAtual]);
 
   useEffect(() => { if (minhaSessao) void loadFilaCaixa(); }, [minhaSessao, loadFilaCaixa]);
+
+  // Consome ?receber=<agendamentoId> vindo do CaixaShellV2:
+  // abre a cobrança do paciente correto assim que a fila carregar.
+  // Mantém a lógica de gravação/regra intacta — apenas atalho de UI.
+  const receberHandledRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!minhaSessao || filaCaixa.length === 0) return;
+    const url = new URL(window.location.href);
+    const rid = url.searchParams.get("receber");
+    if (!rid || receberHandledRef.current === rid) return;
+    receberHandledRef.current = rid;
+    const item = filaCaixa.find((f) => f.id === rid);
+    // limpa o parâmetro para não reabrir em refresh
+    url.searchParams.delete("receber");
+    window.history.replaceState({}, "", url.pathname + (url.search || "") + url.hash);
+    if (!item) {
+      toast.info("Paciente não está mais na fila do caixa.");
+      return;
+    }
+    if (item.ja_pago) {
+      toast.info(`${item.paciente_nome} já foi pago — cobrança bloqueada para evitar duplicidade.`);
+      return;
+    }
+    setOpenCobranca(item);
+    setCobrancaLinhas([{ forma: "dinheiro", valor: String(item.valor || 0), bandeira: "", parcelas: "1" }]);
+  }, [minhaSessao, filaCaixa]);
+
   useEffect(() => {
     if (!clinicaAtual || !minhaSessao) return;
     const ch = supabase
