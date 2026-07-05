@@ -107,7 +107,10 @@ export function useMenuPrefs() {
     setPrefs((cur) => {
       const nx = mut(cur);
       dirtyRef.current = nx;
-      window.dispatchEvent(new CustomEvent(EVT_PREFS, { detail: nx }));
+      // dispatch fora do updater para evitar setState durante render em outros listeners
+      queueMicrotask(() => {
+        window.dispatchEvent(new CustomEvent(EVT_PREFS, { detail: nx }));
+      });
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => { void flush(); }, 2000);
       return nx;
