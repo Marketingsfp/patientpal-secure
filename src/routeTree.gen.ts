@@ -72,6 +72,7 @@ import { Route as AuthenticatedAppDocumentosRouteImport } from './routes/_authen
 import { Route as AuthenticatedAppDisponibilidadesRouteImport } from './routes/_authenticated/app.disponibilidades'
 import { Route as AuthenticatedAppDevMenuShellRouteImport } from './routes/_authenticated/app.dev-menu-shell'
 import { Route as AuthenticatedAppDevListShellRouteImport } from './routes/_authenticated/app.dev-list-shell'
+import { Route as AuthenticatedAppDevCaixaShellRouteImport } from './routes/_authenticated/app.dev-caixa-shell'
 import { Route as AuthenticatedAppCrmRouteImport } from './routes/_authenticated/app.crm'
 import { Route as AuthenticatedAppContratosRouteImport } from './routes/_authenticated/app.contratos'
 import { Route as AuthenticatedAppConsultaRapidaRouteImport } from './routes/_authenticated/app.consulta-rapida'
@@ -472,6 +473,12 @@ const AuthenticatedAppDevListShellRoute =
     path: '/dev-list-shell',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
+const AuthenticatedAppDevCaixaShellRoute =
+  AuthenticatedAppDevCaixaShellRouteImport.update({
+    id: '/dev-caixa-shell',
+    path: '/dev-caixa-shell',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppCrmRoute = AuthenticatedAppCrmRouteImport.update({
   id: '/crm',
   path: '/crm',
@@ -825,6 +832,7 @@ export interface FileRoutesByFullPath {
   '/app/consulta-rapida': typeof AuthenticatedAppConsultaRapidaRoute
   '/app/contratos': typeof AuthenticatedAppContratosRoute
   '/app/crm': typeof AuthenticatedAppCrmRoute
+  '/app/dev-caixa-shell': typeof AuthenticatedAppDevCaixaShellRoute
   '/app/dev-list-shell': typeof AuthenticatedAppDevListShellRoute
   '/app/dev-menu-shell': typeof AuthenticatedAppDevMenuShellRoute
   '/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
@@ -941,6 +949,7 @@ export interface FileRoutesByTo {
   '/app/consulta-rapida': typeof AuthenticatedAppConsultaRapidaRoute
   '/app/contratos': typeof AuthenticatedAppContratosRoute
   '/app/crm': typeof AuthenticatedAppCrmRoute
+  '/app/dev-caixa-shell': typeof AuthenticatedAppDevCaixaShellRoute
   '/app/dev-list-shell': typeof AuthenticatedAppDevListShellRoute
   '/app/dev-menu-shell': typeof AuthenticatedAppDevMenuShellRoute
   '/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
@@ -1059,6 +1068,7 @@ export interface FileRoutesById {
   '/_authenticated/app/consulta-rapida': typeof AuthenticatedAppConsultaRapidaRoute
   '/_authenticated/app/contratos': typeof AuthenticatedAppContratosRoute
   '/_authenticated/app/crm': typeof AuthenticatedAppCrmRoute
+  '/_authenticated/app/dev-caixa-shell': typeof AuthenticatedAppDevCaixaShellRoute
   '/_authenticated/app/dev-list-shell': typeof AuthenticatedAppDevListShellRoute
   '/_authenticated/app/dev-menu-shell': typeof AuthenticatedAppDevMenuShellRoute
   '/_authenticated/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
@@ -1179,6 +1189,7 @@ export interface FileRouteTypes {
     | '/app/consulta-rapida'
     | '/app/contratos'
     | '/app/crm'
+    | '/app/dev-caixa-shell'
     | '/app/dev-list-shell'
     | '/app/dev-menu-shell'
     | '/app/disponibilidades'
@@ -1295,6 +1306,7 @@ export interface FileRouteTypes {
     | '/app/consulta-rapida'
     | '/app/contratos'
     | '/app/crm'
+    | '/app/dev-caixa-shell'
     | '/app/dev-list-shell'
     | '/app/dev-menu-shell'
     | '/app/disponibilidades'
@@ -1412,6 +1424,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/consulta-rapida'
     | '/_authenticated/app/contratos'
     | '/_authenticated/app/crm'
+    | '/_authenticated/app/dev-caixa-shell'
     | '/_authenticated/app/dev-list-shell'
     | '/_authenticated/app/dev-menu-shell'
     | '/_authenticated/app/disponibilidades'
@@ -1963,6 +1976,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppDevListShellRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/app/dev-caixa-shell': {
+      id: '/_authenticated/app/dev-caixa-shell'
+      path: '/dev-caixa-shell'
+      fullPath: '/app/dev-caixa-shell'
+      preLoaderRoute: typeof AuthenticatedAppDevCaixaShellRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/app/crm': {
       id: '/_authenticated/app/crm'
       path: '/crm'
@@ -2497,6 +2517,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppConsultaRapidaRoute: typeof AuthenticatedAppConsultaRapidaRoute
   AuthenticatedAppContratosRoute: typeof AuthenticatedAppContratosRoute
   AuthenticatedAppCrmRoute: typeof AuthenticatedAppCrmRoute
+  AuthenticatedAppDevCaixaShellRoute: typeof AuthenticatedAppDevCaixaShellRoute
   AuthenticatedAppDevListShellRoute: typeof AuthenticatedAppDevListShellRoute
   AuthenticatedAppDevMenuShellRoute: typeof AuthenticatedAppDevMenuShellRoute
   AuthenticatedAppDisponibilidadesRoute: typeof AuthenticatedAppDisponibilidadesRoute
@@ -2571,6 +2592,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppConsultaRapidaRoute: AuthenticatedAppConsultaRapidaRoute,
   AuthenticatedAppContratosRoute: AuthenticatedAppContratosRoute,
   AuthenticatedAppCrmRoute: AuthenticatedAppCrmRoute,
+  AuthenticatedAppDevCaixaShellRoute: AuthenticatedAppDevCaixaShellRoute,
   AuthenticatedAppDevListShellRoute: AuthenticatedAppDevListShellRoute,
   AuthenticatedAppDevMenuShellRoute: AuthenticatedAppDevMenuShellRoute,
   AuthenticatedAppDisponibilidadesRoute: AuthenticatedAppDisponibilidadesRoute,
