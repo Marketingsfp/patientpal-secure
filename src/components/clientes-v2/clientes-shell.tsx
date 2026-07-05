@@ -204,6 +204,7 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
 
   return (
     <div className="h-full flex flex-col min-h-0">
+      <ResumoBar k={kpis} activeMode={resumoMode} onSelect={setResumoMode} />
       <div className="flex-1 min-h-0 p-3 sm:p-4">
         <ListShell<TabV>
           title={
