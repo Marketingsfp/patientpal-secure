@@ -826,7 +826,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
           </div>
         )}
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="grid grid-cols-7 w-full">
+          <TabsList className="w-full h-auto flex flex-wrap justify-start md:grid md:grid-cols-7">
             <TabsTrigger value="dados">Dados</TabsTrigger>
             <TabsTrigger value="endereco">Endereço</TabsTrigger>
             <TabsTrigger value="responsavel">
@@ -877,13 +877,13 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
             </div>
             <div className="space-y-1"><Label htmlFor="cliente-nome">Nome *</Label><InputVoz {...fieldProps("nome")} required maxLength={120} /></div>
             <div className="space-y-1"><Label htmlFor="cliente-numero_pasta">Número de serviço</Label><InputVoz {...fieldProps("numero_pasta")} placeholder="Ex.: 1234" /></div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1"><Label htmlFor="cliente-cpf">CPF</Label><InputVoz {...fieldProps("cpf")} inputMode="numeric" maxLength={14} placeholder="000.000.000-00" /></div>
               <div className="space-y-1"><Label htmlFor="cliente-telefone">Telefone *</Label><InputVoz {...fieldProps("telefone")} inputMode="tel" maxLength={15} placeholder="(00) 00000-0000" /></div>
             </div>
             <div className="space-y-1"><Label htmlFor="cliente-telefone2">Telefone 2 <span className="text-xs text-muted-foreground">(opcional)</span></Label><InputVoz {...fieldProps("telefone2")} inputMode="tel" maxLength={15} placeholder="(00) 00000-0000" /></div>
             <div className="space-y-1"><Label htmlFor="cliente-email">E-mail <span className="text-xs text-muted-foreground">(usado em nota fiscal)</span></Label><InputVoz {...fieldProps("email")} type="email" /></div>
-            <div className="grid grid-cols-2 gap-3 items-end">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
               <div className="space-y-1">
                 <Label htmlFor="cliente-data_nascimento">Data de nascimento *</Label>
                 <Input id="cliente-data_nascimento" type="date" required value={form.data_nascimento}
@@ -937,13 +937,13 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
               <p className="text-xs text-muted-foreground">Preenche o endereço automaticamente.</p>
             </div>
             <div className="space-y-1"><Label>Logradouro</Label><InputVoz {...fieldProps("logradouro")} /></div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1"><Label>Número</Label><InputVoz {...fieldProps("numero")} /></div>
-              <div className="space-y-1 col-span-2"><Label>Complemento</Label><InputVoz {...fieldProps("complemento")} /></div>
+              <div className="space-y-1 sm:col-span-2"><Label>Complemento</Label><InputVoz {...fieldProps("complemento")} /></div>
             </div>
             <div className="space-y-1"><Label>Bairro</Label><InputVoz {...fieldProps("bairro")} /></div>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="space-y-1 col-span-2"><Label>Cidade</Label><InputVoz {...fieldProps("cidade")} /></div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1 sm:col-span-2"><Label>Cidade</Label><InputVoz {...fieldProps("cidade")} /></div>
               <div className="space-y-1">
                 <Label>UF</Label>
                 <Input value={form.estado} maxLength={2}
@@ -957,7 +957,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
               Para menores de idade ou pacientes que precisam de acompanhante.
             </p>
             <div className="space-y-1"><Label htmlFor="cliente-responsavel_nome">Nome do responsável</Label><InputVoz {...fieldProps("responsavel_nome")} /></div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1"><Label htmlFor="cliente-responsavel_cpf">CPF</Label><InputVoz {...fieldProps("responsavel_cpf")} inputMode="numeric" maxLength={14} placeholder="000.000.000-00" /></div>
               <div className="space-y-1"><Label htmlFor="cliente-responsavel_telefone">Telefone</Label><InputVoz {...fieldProps("responsavel_telefone")} inputMode="tel" maxLength={15} placeholder="(00) 00000-0000" /></div>
             </div>
