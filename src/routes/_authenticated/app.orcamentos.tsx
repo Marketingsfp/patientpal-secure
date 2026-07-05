@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { FileText, Plus, Printer, Trash2, Search, AlertTriangle, Calendar, Columns2, CheckCircle2, CircleDashed, Download, History } from "lucide-react";
+import { FileText, Plus, Printer, Trash2, Search, AlertTriangle, Calendar, Columns2, CheckCircle2, CircleDashed, Download, History, Workflow } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,6 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 import { printOrcamento } from "@/lib/print-orcamento";
+import { ConversaoOrcamentoDialog } from "@/components/orcamentos/conversao-orcamento-dialog";
 
 type AuditRow = {
   id: string;
