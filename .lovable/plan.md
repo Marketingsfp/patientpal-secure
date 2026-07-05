@@ -1,176 +1,190 @@
+# A7 — Menu Inteligente + Navegação Moderna
 
-# A2 / UB — Busca Universal — Plano técnico
+Feature flag: `menu_v2` em `profiles.preferencias_ui.flags`. Sem alterar o menu antigo — os dois convivem, alternáveis por usuário.
 
-Escopo: unificar Ctrl+K + barra de busca do topo em **um único módulo** capaz de localizar entidades, telas e ações. Sem convênios externos — só Particular, Associado, Cartão de Benefícios, Regras do Cartão e Empresas associadas.
+---
 
-## 1. Entidades pesquisáveis (v1)
+## 1. Estrutura do novo menu
 
-| Entidade                | Fonte              | Campos indexados na busca                                         | Rota destino                                    |
-|-------------------------|--------------------|-------------------------------------------------------------------|-------------------------------------------------|
-| Paciente                | `pacientes`        | nome, cpf, telefone, email, data_nascimento, numero_pasta         | `/app/clientes/$id` (ou drawer de edição)       |
-| Orçamento               | `orcamentos`       | numero, paciente (join), status, valor_total, created_at          | `/app/orcamentos?abrir=$id`                     |
-| Agendamento             | `agendamentos`     | paciente (join), medico (join), inicio, status                    | `/app/agenda?ag=$id`                            |
-| Atendimento financeiro  | `fin_atendimentos` | numero, paciente (join), valor, status                            | `/app/financeiro/atendimentos?abrir=$id`        |
-| NFS-e                   | `nfse`             | numero, rps, tomador, valor, status                               | `/app/nfse?abrir=$id`                           |
-| Cartão de Benefícios    | `cb_convenios`     | nome do plano/entidade, ativo                                     | `/app/cartao-beneficios/convenios/$id`          |
-| Associado (contrato)    | `contratos_assinatura` + `contrato_dependentes` | titular, dependentes, numero_contrato, status | `/app/cartao-beneficios/contratos/$id` |
-| Regras do Cartão        | `cb_convenio_regras` | descricao, procedimento (join), plano (join)                    | `/app/cartao-beneficios/beneficios/$id`         |
-| Empresas associadas     | `cb_convenios` (subset "entidade juridica") | razão social / cnpj                        | `/app/cartao-beneficios/convenios/$id`          |
-| Médico                  | `medicos`          | nome, cpf, conselho, especialidades (join)                        | `/app/medicos/$id`                              |
-| Procedimento            | `procedimentos`    | nome, codigo_tuss, grupo                                          | `/app/procedimentos?abrir=$id`                  |
-| Tela                    | rota estática      | label, keywords                                                   | rota                                            |
-| Ação rápida             | comando estático   | label, contexto atual (paciente selecionado, caixa aberto, etc.)  | executa handler                                 |
+Sidebar colapsável (usa `SidebarProvider`), 3 zonas verticais:
 
-Fora do escopo v1 (para v2): boletos, exames-resultados, prontuários, salas, senhas.
+```
+┌─ Topo ────────────────┐
+│ Logo + nome clínica   │
+│ Universal Search pill │  (reaproveita UB do A2)
+├─ Zona 1: Fixados ─────┤
+│ ★ Agenda              │
+│ ★ Caixa               │
+│ ★ Orçamentos          │
+├─ Zona 2: Centros Op. ─┤
+│ ▸ Atendimento         │
+│ ▸ Financeiro          │
+│ ▸ Cartão de Benefícios│
+│ ▸ Clínico             │
+│ ▸ Gestão              │
+│ ▸ Configurações       │
+├─ Zona 3: Dinâmico ────┤
+│ Recentes (últ. 5)     │
+│ Favoritos (do user)   │
+└───────────────────────┘
+```
 
-## 2. RPCs
+Estética: densidade compacta (36px linha), ícones lucide 16px, `text-sm`, `rounded-md`, hover `bg-sidebar-accent`, ativo com `border-l-2 border-primary` + `bg-sidebar-accent`. Grupos com chevron animado. Transições 150ms. Modo collapsed = só ícones com tooltip.
 
-### Reutilizadas
-- `buscar_pacientes_global(_clinica_ids, _termo, _limite)` — já retorna ranqueado por `match_score`. Continua sendo a fonte de pacientes.
+## 2. Fixados
 
-### Novas — 1 única RPC agregadora
-- `buscar_universal(_clinica_ids uuid[], _termo text, _tipos text[] DEFAULT NULL, _limite int DEFAULT 24)` — SECURITY DEFINER, `SET search_path=public`.
-  - Retorna: `tipo`, `id`, `titulo`, `subtitulo`, `hint`, `payload jsonb`, `score numeric`, `criado_em timestamptz`.
-  - Só devolve linhas de clínicas às quais o usuário pertence (checado via `clinica_memberships`).
-  - Para cada `_tipos` (default = todos), dispara uma CTE dedicada com `LIMIT ceil(_limite/n_tipos * 2)` e faz `UNION ALL` + `ORDER BY score DESC, criado_em DESC LIMIT _limite`.
-  - Fontes por tipo:
-    - `paciente` → chama `buscar_pacientes_global` internamente
-    - `orcamento` → `orcamentos` + join `pacientes`
-    - `agendamento` → `agendamentos` + joins
-    - `financeiro` → `fin_atendimentos`
-    - `nfse` → `nfse`
-    - `cartao_convenio` / `empresa_associada` → `cb_convenios` (flag na tabela distingue plano vs entidade jurídica)
-    - `contrato_associado` → `contratos_assinatura` + `contrato_dependentes`
-    - `regra_cartao` → `cb_convenio_regras`
-    - `medico` → `medicos`
-    - `procedimento` → `procedimentos`
-- Índices adicionais (aditivos, `CREATE INDEX IF NOT EXISTS`, todos com `WHERE ativo` onde faz sentido):
-  - `orcamentos(clinica_id, numero)`
-  - trigram `gin` em `orcamentos(pacientes_denorm_nome)` só se necessário na v2 (v1 usa o join já indexado)
-  - `nfse(clinica_id, numero)`, `nfse(clinica_id, rps)`
-  - `cb_convenios(clinica_id, lower(nome))`
-  - `contratos_assinatura(clinica_id, numero_contrato)`
-  - `medicos(clinica_id, lower(nome))`
-  - `procedimentos(clinica_id, lower(nome))`
-- Nenhuma alteração em RLS. A RPC é `SECURITY DEFINER` e valida `is_member(_clinica_id)` linha a linha para cada CTE.
+- Definidos por padrão do perfil (ver §6) — 3 a 5 itens.
+- Usuário pode fixar/desfixar via ícone ★ em qualquer item do menu ou via "Ver todos".
+- Persistidos em `preferencias_ui.menu.pinned: string[]` (route paths).
+- Sempre visíveis no topo, sem grupo colapsável.
 
-## 3. Ranking
+## 3. Recentes
 
-`score` calculado no SQL, escala 0–100:
+- Últimas 5 rotas visitadas distintas, excluindo Fixados e a rota atual.
+- Registrado client-side em subscriber do `router` (evento `onResolved`).
+- Persistido em `preferencias_ui.menu.recent: {path, label, ts}[]` (debounce 2s, gravação upsert em `profiles`).
+- LRU cap 20 em memória, exibe 5.
+- Ignora rotas efêmeras (`/auth`, `/app/dev-*`).
 
-- +50 se match exato em campo-chave (numero, cpf, telefone)
-- +30 se prefixo de nome/título
-- +20 se substring
-- +10 se match em campo secundário (email, especialidade, grupo)
-- +5 por recência (últimos 30 dias)
-- ×0.7 quando entidade está `ativo=false` / `cancelado`
-- Ação e Tela recebem score fixo 90 quando keyword do label bate; senão 40
+## 4. Favoritos
 
-Ordenação final: `score DESC, criado_em DESC, titulo ASC`.
+- Ação explícita do usuário (♥ no header de cada tela + no "Ver todos").
+- Persistidos em `preferencias_ui.menu.favorites: string[]`.
+- Exibidos abaixo de Recentes, ordenados por adição.
+- Sem limite rígido (soft cap 15, warning acima).
 
-## 4. Permissões por perfil
+## 5. "Ver todos" por Centros Operacionais
 
-- A UB **filtra entradas** conforme `usePermissoes()` (mesmo Set que o menu já usa).
-- Mapa `tipo → moduloRequerido`:
-  - paciente → `clientes`
-  - orcamento → `orcamentos`
-  - agendamento → `agenda`
-  - financeiro/nfse → `financeiro` / `nfse`
-  - cartao_convenio / empresa_associada / regra_cartao / contrato_associado → `cartao-beneficios`
-  - medico → `medicos`
-  - procedimento → `procedimentos`
-  - tela → módulo próprio da tela (já sabido pela entrada)
-  - acao → módulo da ação
-- No servidor a RPC também respeita `is_member`; no cliente filtramos por módulo permitido antes de renderizar. Perfil `medico` recebe só paciente + agenda + prontuário-relacionadas; `caixa` recebe caixa/financeiro/paciente/nfse; `recepcao` recebe tudo exceto RH/relatórios; `admin`/`gestor` recebem todos.
+- Cada Centro Operacional é um `SidebarGroup` colapsável mostrando **até 6 itens principais** + link "Ver todos →".
+- "Ver todos" abre `Sheet` lateral (drawer) com:
+  - Todos os itens do centro (filtrados por permissão).
+  - Busca local por nome.
+  - Estrela para fixar/desfixar, coração para favoritar.
+  - Agrupamento visual por subcategoria.
+- Estado do grupo (aberto/fechado) persistido em `preferencias_ui.menu.groups: Record<string, boolean>`.
 
-## 5. UX / superfície
+## 6. Separação por perfil
 
-- **1 componente** `UniversalBar` em 3 superfícies:
-  1. Input compacto no header (desktop ≥ md) — abre modal ao focar.
-  2. Modal Ctrl/⌘+K (já implementado no A1).
-  3. Full-screen em mobile.
-- Debounce 200 ms, `AbortController`, cache LRU de 30 termos.
-- Agrupamento por tipo, com atalhos:
-  - `p:` só pacientes · `o:` só orçamentos · `a:` só agenda · `n:` só NFS-e · `c:` só cartão · `>` só ações · `?` só telas.
-- Últimas 8 buscas salvas em `profiles.preferencias_ui.ub.recents` (aditivo à coluna já aprovada em A7).
+Fixados padrão + Centros visíveis (permissão via `has_role` + `perfil_permissoes`):
 
-## 6. Performance esperada
+| Perfil | Fixados padrão | Centros visíveis |
+|---|---|---|
+| **recepcao** | Agenda, Caixa, Clientes, Orçamentos | Atendimento, Financeiro (limitado), Cartão de Benefícios |
+| **medico** | Agenda, Prontuário, Meus Pacientes | Atendimento, Clínico |
+| **caixa** | Caixa, Boletos, NFS-e | Financeiro, Atendimento (leitura) |
+| **financeiro** | Lançamentos, Contas, Relatórios Fin. | Financeiro, Gestão (relatórios) |
+| **gestor** | Dashboard, Relatórios, Agenda | Todos (leitura ampla) |
+| **admin** | Dashboard, Configurações, Usuários | Todos + Configurações |
 
-- p50 ≤ 120 ms, p95 ≤ 350 ms na clínica de referência (~40k pacientes).
-- Cada CTE limita cedo (`LIMIT 24`), evitando full scan.
-- Índices trigram em `pacientes` já existem (via `buscar_pacientes_global`); os demais são `lower(campo)` ou `(clinica_id, numero)`, todos B-tree pequenos.
-- Response payload ≤ 8 KB (24 linhas × ~300 B).
-- No cliente: virtualização não é necessária (24 itens), lista simples.
+Perfil detectado via `user_roles` (fonte única) + `clinica_memberships.perfil_id`.
 
-## 7. Feature flag
+## 7. Uso de `profiles.preferencias_ui`
 
-Flag: `ub_v1` em `profiles.preferencias_ui.flags.ub_v1` (default `false`) + override global via variável de ambiente `VITE_UB_DEFAULT=on` (opcional). Enquanto `false`:
-- Header segue como está (sem input de busca).
-- Ctrl+K continua abrindo o palette do A1 com apenas telas + ações (sem entidades).
+Namespace novo `menu` dentro do JSONB existente (aditivo, não quebra flags atuais):
 
-Ativação por usuário na tela `/app/perfil` (toggle "Busca Universal (beta)"). Admin pode ativar em massa depois via SQL.
+```json
+{
+  "flags": { "ub_v1": true, "menu_v2": true },
+  "menu": {
+    "pinned": ["/app/agenda", "/app/caixa"],
+    "favorites": ["/app/relatorios/financeiro"],
+    "recent": [{"path":"/app/clientes","label":"Clientes","ts":1730000000}],
+    "groups": { "atendimento": true, "financeiro": false },
+    "collapsed": false
+  }
+}
+```
 
-## 8. Fallback / erros
+Escrita: hook `use-menu-prefs` com debounce 2s, upsert único em `profiles.preferencias_ui` via merge JSONB no servidor (`jsonb_set`).
 
-- Falha na RPC → toast discreto ("Busca temporariamente indisponível") e o palette continua funcionando com telas + ações (nunca quebra a UI).
-- Timeout do lado cliente: 4 s. Ao expirar, mostra "resultado parcial" com o que já veio.
-- Erros são logados via `console.error("[ub]", …)` + `audit_log` apenas em erro (não em cada busca, para não inflar).
+## 8. Feature flag
 
-## 9. Rollback
+- Chave: `preferencias_ui.flags.menu_v2` (boolean).
+- Default: **off** para todos.
+- Piloto: ativar manualmente para admin/gestor de 1 clínica.
+- Sidebar renderiza `<MenuV2 />` se flag on, senão mantém `<AppSidebar />` atual **intocado**.
+- Toggle em `/app/configuracoes/preferencias` + evento `menu:flag-changed` (mesmo padrão do `ub:flag-changed`) para trocar sem reload.
+- Kill-switch: usuário ou admin desliga → volta ao menu antigo imediatamente.
 
-- Nível 1 (usuário): desligar flag `ub_v1` no perfil.
-- Nível 2 (global): `UPDATE profiles SET preferencias_ui = jsonb_set(coalesce(preferencias_ui,'{}'), '{flags,ub_v1}', 'false')`.
-- Nível 3 (código): remover `<UniversalBar>` do header e voltar `useDefaultScreenEntries` no palette. Componentes A1 permanecem.
-- Nível 4 (banco): a RPC nova e os índices são **aditivos**. Podem ser removidos com `DROP FUNCTION buscar_universal(…)` + `DROP INDEX IF EXISTS …` sem impacto.
+## 9. Nomenclatura
 
-Nenhuma tabela, coluna ou RPC existente é alterada. Nenhuma RLS é tocada.
+Zero ocorrência de "Convênio(s)" em labels, tooltips, grupos ou rotas novas. Vocabulário oficial:
 
-## 10. Testes Playwright
+- **Cartão de Benefícios** (centro operacional)
+- **Regras do Cartão**
+- **Associados**
+- **Empresas Associadas**
+- **Contratos** (não "contratos de convênio")
 
-Rota isolada `/app/dev-list-shell` (já existente, admin-only) ganha painel de teste da UB. Cenários:
+Lint de string: teste Playwright verifica ausência da palavra no DOM da sidebar em todos os perfis.
 
-1. **T1 — Abrir Ctrl+K** e ver telas + ações (sem entidades) quando flag off.
-2. **T2 — Ativar flag** via UI de perfil e reabrir: buscar "silva" → aparecem pacientes reais no grupo "Pacientes".
-3. **T3 — Prefixos**: `p:silva` só pacientes; `o:2024` só orçamentos; `c:` só Cartão de Benefícios / Empresas associadas.
-4. **T4 — Terminologia**: digitar "convên" retorna resultados de "Cartão de Benefícios" / "Empresas associadas" / "Regras do Cartão" — nunca a palavra "Convênio" aparece nos labels.
-5. **T5 — Permissões**: logar como perfil `caixa`: buscar "silva" mostra paciente; buscar "med" NÃO mostra grupo "Médicos"; buscar "unida" NÃO mostra grupo "Unidades".
-6. **T6 — Latência**: medir p50 em 30 buscas repetidas; falha se > 500 ms.
-7. **T7 — Fallback**: mockar `.rpc` para lançar erro; palette continua abrindo com telas + ações e toast aparece.
-8. **T8 — Zero regressão**: navegar Agenda, Caixa, Orçamentos, NFS-e, Recepção com flag ON e OFF; nenhum erro de console, layout idêntico.
+## 10. Telas por Centro Operacional
 
-Todos os screenshots salvos em `/tmp/browser/a2/screenshots/` e anexados ao relatório final.
+**Atendimento**
+Agenda · Clientes · Prontuários · Anamneses · Triagem Enfermagem · Chat interno · WhatsApp
+
+**Financeiro**
+Caixa · Boletos · NFS-e · Lançamentos · Contas · Categorias · Splits · Estornos · Relatórios Financeiros
+
+**Cartão de Benefícios**
+Contratos · Mensalidades · Dependentes · Regras do Cartão · Faixas · Associados · Empresas Associadas · Benefícios
+
+**Clínico**
+Procedimentos · Exames · Modelos de Prontuário · Modelos de Anamnese · Odontograma · Médicos · Especialidades · Escalas
+
+**Gestão**
+Dashboard · Relatórios · CRM · Marketing · Campanhas · LGPD · Auditoria · Estoque
+
+**Configurações**
+Clínica · Unidades · Usuários · Perfis & Permissões · Cargos · Setores · RH · Integrações · Preferências
 
 ## 11. Riscos
 
-| Risco                                   | Mitigação                                              |
-|-----------------------------------------|--------------------------------------------------------|
-| RPC agregadora ficar lenta em produção  | Cada CTE tem `LIMIT` cedo + índices dedicados; feature flag permite rollback imediato. |
-| Vazamento de dados entre clínicas       | `is_member` obrigatório dentro da RPC; testes T5.      |
-| "Convênio" aparecendo em algum lugar    | Grep na PR + T4 automatizado; string proibida.         |
-| Ctrl+K conflitar com atalho de navegador| `e.preventDefault()` já no A1; testado.                |
-| Header ficar apertado em mobile         | Colapsa para ícone < 768px, abre modal full-screen.    |
-| Cache do cliente devolver dado stale    | LRU expira por termo; TTL 60 s; invalidado ao trocar clínica. |
+| Risco | Prob. | Impacto | Mitigação |
+|---|---|---|---|
+| Usuário perde item que usava | Média | Médio | Menu antigo permanece 1 clique atrás da flag; Recentes cobre o gap |
+| Escrita excessiva em `profiles` | Média | Baixo | Debounce 2s + merge JSONB no servidor |
+| Permissão inconsistente | Baixa | Alto | Filtro via `has_role` + `perfil_permissoes` no client E teste Playwright por perfil |
+| Regressão visual do header (A2) | Baixa | Médio | Sidebar isolada, não toca `AppShell` header |
+| Sidebar quebrar em mobile | Média | Médio | Usa `Sheet` do shadcn no breakpoint `<md` |
 
-## 12. Entregáveis do sprint A2
+## 12. Rollback
 
-1. Migração: `buscar_universal` RPC + índices aditivos + GRANT EXECUTE para `authenticated`.
-2. Server fn `buscar_universal.functions.ts` (usa `requireSupabaseAuth`, chama a RPC).
-3. Componente `UniversalBar` (header input + integra com CommandPalette já existente).
-4. Hook `useUniversalSearch(term, tipos?)` — cache, debounce, abort, fallback.
-5. Toggle de flag em `/app/perfil`.
-6. Atualização do `CommandPalette` para aceitar `asyncSearch` (já existe o slot no A1).
-7. Painel de teste em `/app/dev-list-shell` para os cenários T1–T8.
-8. Relatório final: componentes, RPCs, screenshots, testes, risco, confirmação de zero regressão em produção.
+1. **Instantâneo (usuário)**: desligar `menu_v2` em Preferências → volta ao menu antigo sem reload.
+2. **Por clínica**: SQL `UPDATE profiles SET preferencias_ui = jsonb_set(preferencias_ui,'{flags,menu_v2}','false') WHERE clinica_id = X`.
+3. **Global**: default já é off; basta não promover. Se promovido, mesmo SQL sem WHERE.
+4. **Código**: componente `<MenuV2 />` isolado em `src/components/menu-v2/`; remoção do import em `AppSidebar` desliga em build. Migração não altera schema (apenas usa JSONB existente) — nada a reverter no DB.
 
-## 13. Nomenclatura — proibições explícitas
+## 13. Testes Playwright
 
-Em nenhum label, placeholder, grupo, chip, tipo (`tipo` do payload) ou keyword pode aparecer:
-- "Convênio", "Convênios", "convenio"
+Rota de teste segura: `/app/dev-menu-shell` (espelha `dev-list-shell`, isolada). Bateria por perfil:
 
-Substitutos oficiais:
-- Plano/entidade do cartão → "Cartão de Benefícios"
-- Entidade jurídica → "Empresas associadas"
-- Titular + dependentes → "Associados"
-- Regras do plano → "Regras do Cartão"
+**Por perfil** (recepcao, medico, caixa, financeiro, gestor, admin):
+- Login → abrir `/app/dev-menu-shell` → screenshot sidebar.
+- Verificar fixados padrão presentes.
+- Verificar centros visíveis == esperado do perfil.
+- Verificar que centros não permitidos **não aparecem**.
+- Buscar "convênio" no DOM da sidebar → deve ser 0.
 
-Nota técnica: as tabelas legadas `cb_convenios` / `cb_convenio_regras` mantêm o nome no banco (migração de nome é outro sprint), mas nunca vazam para a UI.
+**Interações**:
+- Fixar/desfixar item → recarregar → estado persistiu.
+- Favoritar → aparece em Favoritos → desfavoritar → some.
+- Navegar 3 rotas → Recentes mostra as 3 na ordem.
+- Abrir "Ver todos" de um centro → busca local funciona → fixar dali.
+- Colapsar sidebar → ícones visíveis, tooltip aparece.
+- Toggle `menu_v2` off → menu antigo volta sem reload.
+- Mobile viewport (390×844) → Sheet abre/fecha corretamente.
+
+**Performance**:
+- Tempo de render inicial da sidebar < 100ms.
+- Debounce de escrita: 5 cliques em 1s = 1 request após 2s.
+
+**Regressão**:
+- Header A2 (UB) continua funcional com `menu_v2` on.
+- Rota `/app/agenda` (produção) não muda visualmente.
+
+---
+
+Depois do menu aprovado e estável, seguimos para **redução de paginação em Caixa, Orçamentos e Clientes** (A8) — infinite scroll ou "carregar mais" com virtualização.
+
+Aguardo aprovação para implementar A7 fase 1 em `/app/dev-menu-shell` atrás da flag `menu_v2`.
