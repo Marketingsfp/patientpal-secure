@@ -86,16 +86,11 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
       "id, clinica_id, nome, cpf, telefone, telefone2, data_nascimento, email, ativo, codigo_prontuario, codigo_prontuario_anterior, numero_pasta, cidade, estado, foto_url, created_at";
     let query = supabase.from("pacientes").select(cols);
     query = scope.length === 1 ? query.eq("clinica_id", scope[0]) : query.in("clinica_id", scope);
+    // Modos server-side leves (usam índices ou RPC dedicada).
+    // Os demais filtros são aplicados client-side sobre os últimos 50.
     let mode: ResumoMode = resumoMode;
-    if (mode === "none") {
-      if (chips.includes("aniv")) mode = "aniv";
-      else if (chips.includes("novos30")) mode = "novos30";
-      else if (chips.includes("sem_tel")) mode = "semTel";
-      else if (chips.includes("sem_cpf")) mode = "semCpf";
-    }
-    const desde30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    if (mode === "none" && chips.includes("aniv")) mode = "aniv";
     if (mode === "aniv") {
-      // aniversariantes: uses dedicated RPC (to_char sobre date)
       const { data, error } = await supabase.rpc("pacientes_aniversariantes_hoje", {
         _clinica_id: scope[0], _limite: 200,
       });
@@ -105,12 +100,8 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
       setLoading(false);
       return;
     }
-    if (mode === "novos30") query = query.gte("created_at", desde30);
-    else if (mode === "semTel") query = query.is("telefone", null).is("telefone2", null);
-    else if (mode === "semCpf") query = query.or("cpf.is.null,cpf_digits.is.null");
-    else if (mode === "inativos") query = query.eq("ativo", false);
-    const limite = mode === "none" ? 50 : 200;
-    const { data, error } = await query.order("created_at", { ascending: false }).limit(limite);
+    if (mode === "inativos") query = query.eq("ativo", false);
+    const { data, error } = await query.order("created_at", { ascending: false }).limit(50);
     if (myReq !== reqRef.current) return;
     if (error) { mostrarErro(error); setLoading(false); return; }
     setTotalBase(null);
