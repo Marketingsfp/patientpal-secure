@@ -53,6 +53,7 @@ import { IdadeIcon } from "@/components/idade-icon";
 
 export const Route = createFileRoute("/_authenticated/app/agenda")({
   component: AgendaPage,
+  head: () => ({ meta: [{ title: "Agenda — ClinicaOS" }] }),
 });
 
 type Status = "agendado" | "confirmado" | "realizado" | "cancelado" | "faltou";
@@ -3278,8 +3279,9 @@ function AgendaPage() {
               >
               <div className="space-y-1 rounded-md border border-dashed border-primary/40 bg-primary/5 p-2 text-xs">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Label className="text-xs uppercase whitespace-nowrap">Nº do orçamento</Label>
+                  <Label htmlFor="agenda-orcamento-numero" className="text-xs uppercase whitespace-nowrap">Nº do orçamento</Label>
                   <Input
+                    id="agenda-orcamento-numero"
                     inputMode="numeric"
                     placeholder="Ex.: 123"
                     value={form.orcamento_numero}
@@ -3317,10 +3319,11 @@ function AgendaPage() {
                 )}
               </div>
               <div className="space-y-1">
-                <Label>Paciente</Label>
+                <Label htmlFor="agenda-paciente">Paciente</Label>
                 <div className="flex gap-2">
                   <div className="flex-1">
                     <PatientSearchInput
+                      inputId="agenda-paciente"
                       clinicaIdsOverride={clinicaAtual ? [clinicaAtual.clinica_id] : undefined}
                       value={
                         form.paciente_id
@@ -3375,12 +3378,12 @@ function AgendaPage() {
               </div>
               {contratoPacienteInfo && (
                 <div className="space-y-1">
-                  <Label>Tipo de atendimento</Label>
+                  <Label htmlFor="agenda-tipo-atendimento">Tipo de atendimento</Label>
                   <Select
                     value={form.tipo_atendimento}
                     onValueChange={(v) => setForm((f) => ({ ...f, tipo_atendimento: v as TipoAtendimento }))}
                   >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger id="agenda-tipo-atendimento"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="convenio">
                         Convênio — {contratoPacienteInfo.convenioNome}
@@ -3403,8 +3406,9 @@ function AgendaPage() {
                 </div>
               )}
               <div className="space-y-1">
-                <Label>Médico ou Exame</Label>
+                <Label htmlFor="agenda-medico-exame">Médico ou Exame</Label>
                 <SearchableSelect
+                  id="agenda-medico-exame"
                   value={form.medico_id || "none"}
                   disabled={!!editing}
                   onChange={(v) => {
@@ -3442,12 +3446,13 @@ function AgendaPage() {
               <div className="space-y-1">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div className="space-y-1">
-                    <Label className="text-xs">Data consulta/exame</Label>
-                    <Input type="datetime-local" value={form.inicio} onChange={(e) => setForm(f => ({ ...f, inicio: e.target.value, fim: calcFimAuto(e.target.value, f.medico_id) }))} required />
+                    <Label htmlFor="agenda-data-consulta" className="text-xs">Data consulta/exame</Label>
+                    <Input id="agenda-data-consulta" type="datetime-local" value={form.inicio} onChange={(e) => setForm(f => ({ ...f, inicio: e.target.value, fim: calcFimAuto(e.target.value, f.medico_id) }))} required />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs">Data de pagamento</Label>
+                    <Label htmlFor="agenda-data-pagamento" className="text-xs">Data de pagamento</Label>
                     <Input
+                      id="agenda-data-pagamento"
                       type="text"
                       value={form.data_pagamento
                         ? new Date(form.data_pagamento + "T00:00:00").toLocaleDateString("pt-BR")
@@ -3464,7 +3469,7 @@ function AgendaPage() {
                 </p>
               </div>
               <div className="space-y-1">
-                <Label>Serviço</Label>
+                <Label htmlFor="agenda-servico">Serviço</Label>
                 {form.medico_id ? (
                   (procOpcoesPorMedico.get(form.medico_id)?.length || procPorMedico.get(form.medico_id)?.size || procNomesPorMedico.get(form.medico_id)?.size) ? (
                     <p className="text-xs text-muted-foreground">Mostrando apenas serviços configurados para este médico.</p>
@@ -3481,6 +3486,7 @@ function AgendaPage() {
                   <p className="text-xs text-muted-foreground">Selecione um médico para ver os serviços disponíveis.</p>
                 )}
                 <SearchableSelect
+                  id="agenda-servico"
                   value={form.procedimento || "none"}
                   onChange={(v) => setForm(f => ({ ...f, procedimento: v === "none" ? "" : v }))}
                   placeholder="Selecione o serviço"
@@ -3600,10 +3606,10 @@ function AgendaPage() {
                 />
               </div>
               <div className="space-y-1">
-                <Label>Status</Label>
+                <Label htmlFor="agenda-status">Status</Label>
                 {editing && !isSlotLivre(editing.paciente_nome) ? (
                   <Select value={form.status} onValueChange={(v) => setForm(f => ({ ...f, status: v as Status }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger id="agenda-status"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {(Object.keys(STATUS_LABEL) as Status[]).map(s => (
                         <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>
@@ -3611,7 +3617,7 @@ function AgendaPage() {
                     </SelectContent>
                   </Select>
                 ) : (
-                  <Input value={STATUS_LABEL[form.status]} disabled readOnly />
+                  <Input id="agenda-status" value={STATUS_LABEL[form.status]} disabled readOnly />
                 )}
                 {(!editing || isSlotLivre(editing.paciente_nome)) && (
                   <p className="text-xs text-muted-foreground">Status definido automaticamente. Pode ser alterado depois pelo menu de ações.</p>
@@ -3619,7 +3625,7 @@ function AgendaPage() {
               </div>
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <Label>Observações</Label>
+                  <Label htmlFor="agenda-observacoes">Observações</Label>
                   <VoiceInput
                     size="sm"
                     currentValue={form.observacoes}
@@ -3627,7 +3633,7 @@ function AgendaPage() {
                     title="Ditar observações"
                   />
                 </div>
-                <Textarea value={form.observacoes} onChange={(e) => setForm(f => ({ ...f, observacoes: e.target.value }))} rows={2} />
+                <Textarea id="agenda-observacoes" value={form.observacoes} onChange={(e) => setForm(f => ({ ...f, observacoes: e.target.value }))} rows={2} />
               </div>
               </fieldset>
               <DialogFooter className="sticky bottom-0 bg-background pt-2 -mx-4 px-4 border-t mt-2">

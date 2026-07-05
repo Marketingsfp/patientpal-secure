@@ -10,6 +10,7 @@ import {
 export type SearchableOption = { value: string; label: string };
 
 interface Props {
+  id?: string;
   options: SearchableOption[];
   value: string;
   onChange: (v: string) => void;
@@ -21,6 +22,7 @@ interface Props {
 }
 
 export function SearchableSelect({
+  id,
   options,
   value,
   onChange,
@@ -37,6 +39,7 @@ export function SearchableSelect({
     <Popover open={open} onOpenChange={(o) => { if (!disabled) setOpen(o); }}>
       <PopoverTrigger asChild>
         <Button
+          id={id}
           type="button"
           variant="outline"
           role="combobox"

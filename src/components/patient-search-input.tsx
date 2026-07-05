@@ -26,6 +26,7 @@ export interface PatientOption {
 }
 
 interface PatientSearchInputProps {
+  inputId?: string;
   value?: PatientOption | null;
   onSelect: (patient: PatientOption | null) => void;
   placeholder?: string;
@@ -76,6 +77,7 @@ function parseDataBusca(term: string): { iso?: string; partial?: { dia: string; 
 }
 
 export function PatientSearchInput({
+  inputId,
   value,
   onSelect,
   placeholder = "Buscar por nome, nascimento (DD/MM/AAAA), CPF, pasta ou prontuário…",
@@ -171,6 +173,7 @@ export function PatientSearchInput({
     <div ref={containerRef} className={cn("relative", className)}>
       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
       <Input
+        id={inputId}
         autoFocus={autoFocus}
         data-quick-search
         value={query}
