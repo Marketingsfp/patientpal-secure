@@ -1,171 +1,120 @@
-# A4 Fase 2 — Caixa como painel operacional
 
-Escopo: refinar `/app/dev-caixa-shell` (flag `caixa_v2`, off por padrão) para virar um **painel operacional**, não uma tabela. `/app/caixa` clássico permanece intocado. Nada de lógica financeira nova — só apresentação, agregação e atalhos sobre queries já existentes.
+# A5 — Orçamentos V2 (dev-only, atrás de flag)
 
----
+Escopo: recriar `/app/orcamentos` como painel operacional, aplicando o mesmo padrão validado em Caixa V2 e Menu V2. Nada de mudança em lógica de negócio (criação, conversão, impressão, splits, cobrança). Só apresentação, filtragem, virtualização e navegação.
 
-## 1. Painel de Resumo (sticky topo)
+## 1. Estrutura de rollout (idêntico ao Caixa V2)
 
-Grid de cards pequenos (h ~64px), 3 linhas em desktop, scroll horizontal em mobile. Atualiza via realtime já ligado em `caixa_movimentos` + `agendamentos`.
+- Flag `orcamentos_v2` (default OFF) — hook `use-orcamentos-v2-flag.ts` reaproveitando o padrão de `use-caixa-v2-flag.ts`.
+- Rota dev isolada: `/app/dev-orcamentos-shell` (nunca substitui a rota atual).
+- Tela clássica `/app/orcamentos` permanece **100% intacta**.
+- Promoção só depois da validação visual, e inicialmente apenas para admin/gestor (mesmo modelo do `caixa-v2-mount.tsx`).
+- Recepção, financeiro e demais perfis continuam no clássico até liberação explícita.
 
-```
-┌ Sessão #123 · aberta 2h14 ┐┌ Recebido hoje ┐┌ Recebido sessão ┐
-│ Saldo R$ 1.240,00         ││ R$ 3.180,00   ││ R$ 2.410,00     │
-└───────────────────────────┘└───────────────┘└─────────────────┘
-┌ Particular ┐┌ Associado ┐┌ Dinheiro ┐┌ Pix ┐┌ Cartão ┐
-│ R$ 1.900   ││ R$ 1.280  ││ R$ 640   ││ R$1k││ R$1.5k │
-└────────────┘└───────────┘└──────────┘└─────┘└────────┘
-┌ Pendentes na fila ┐┌ Aguardando pagamento ┐
-│ 7                 ││ 3 pacientes           │
-└───────────────────┘└───────────────────────┘
-```
+## 2. Layout do shell V2
 
-Agregação client-side sobre o array já carregado + `count head:true` para pendentes. Sem nova query pesada. Nomenclatura: **Particular / Associado / Cartão de Benefícios** — nunca "Convênio".
-
-## 2. Receber em 1 clique
-
-Botão "Receber" vira ação primária (variant default, tamanho lg, cor verde tokenizada) em cada card da fila.
-
-- Fila carrega `agendamento_orcamento_itens` com `count` de itens pendentes.
-- 1 item pendente → clique direto abre modal de pagamento com item pré-selecionado.
-- >1 item → abre sheet de seleção; após seleção, mesma tela de pagamento.
-- Nada muda na lógica de gravação — só encurta o caminho de entrada.
-
-## 3. Cores inteligentes (tokens novos em `src/styles.css`)
-
-Tokens semânticos (evitar hard-coded, respeita dark mode):
+Usa `ListShell` já existente (`src/components/list-shell/`) para consistência com Caixa/Clientes futuros.
 
 ```
---status-paid: oklch(0.72 0.17 145);        /* verde  */
---status-waiting: oklch(0.85 0.16 90);      /* amarelo*/
---status-in-service: oklch(0.65 0.15 240);  /* azul   */
---status-canceled: oklch(0.60 0.20 25);     /* vermelho*/
---status-refunded: oklch(0.60 0.18 300);    /* roxo   */
+┌ Orçamentos                                    [Novo]  [Exportar] ┐
+│ 🔍 Busca forte: paciente, nº, procedimento, valor, período       │
+├──────────────────────────────────────────────────────────────────┤
+│ [ Todos 128 ] [ Abertos 41 ] [ Aprovados 22 ] [ Convertidos 47 ] │
+│                          [ Recusados 12 ] [ Expirados 6 ]        │
+│ Chips: [Particular] [Associado] [Cartão de Benefícios]           │
+│        [Hoje] [7d] [30d] [Personalizado]  [Com pendência]        │
+├──────────────────────────────────────────────────────────────────┤
+│ ● Maria Silva · #ORC-1042 · há 2h                     R$ 1.240   │
+│   3 itens · Dr. Marcos · [Particular]  [🟢 Aprovar] [Converter]  │
+│   ─────────────────────────────────────────────────────────────  │
+│ ● João Santos · #ORC-1041 · há 3h                     R$ 850     │
+└──────────────────────────────────────────────────────────────────┘
+                                                        [Compacto]
 ```
 
-Ponto colorido 8px + label opcional. Aria-label mantém texto para acessibilidade ("Status: pago").
+- **Busca forte** debounced (200ms), controlada, persistida em `?q=`.
+- **Abas por status** (Todos / Abertos / Aprovados / Convertidos / Recusados / Expirados) com contadores via `count head:true`.
+- **Chips (quick filters)**: tipo de pagador (Particular / Associado / Cartão de Benefícios — **zero "Convênio"**), período rápido, "com pendência".
+- **Cards** (não linhas de tabela) com hierarquia: paciente + nº, valor, itens, médico, badge de tipo, ações primárias.
+- **Modo compacto** (Ctrl+Shift+C) reduz altura e esconde subtítulo.
+- **Scroll infinito** via `VirtualList` do `list-shell/` — página de 50, prefetch quando faltarem 10.
+- **Drawer lateral** ao clicar no card: detalhes, itens, histórico, ações (mesmas do clássico, reaproveitando componentes existentes: `ConversaoOrcamentoDialog`, `HistoricoOrcamentoDialog`, `printOrcamento`).
 
-## 4. Card de fila (não linha de tabela)
+## 3. Filtros e URL
 
-Substitui a lista de 40px por cards de ~88px com hierarquia visual:
+Query params validados (Zod + `fallback`):
+`q`, `status`, `tipo`, `periodo`, `de`, `ate`, `compacto`, `pendencia`.
+Persistência no URL para deep-link e refresh sem perder estado.
 
-```
-┌ ● João Silva · 32a                        14:30 ┐
-│  Consulta cardiológica · Dr. Marcos             │
-│  [Particular] R$ 350,00        [🟢 Receber →]  │
-└─────────────────────────────────────────────────┘
-```
+## 4. Nomenclatura
 
-Modo compacto (Ctrl+Shift+C): 56px, esconde procedimento e vira 2 colunas.
+- **Particular / Associado / Cartão de Benefícios**. Nunca "Convênio" no DOM.
+- Teste Playwright verifica `document.body.innerText` sem "Convênio".
 
-## 5. Mini Timeline (drawer lateral)
+## 5. Regras de negócio — inalteradas
 
-Clique no card abre drawer (não navega). Timeline horizontal com 5 estágios derivados de `agendamentos.status` + `caixa_movimentos` + `atendimento_ia`:
+- Criação, edição, itens, conversão em pagamento, impressão, auditoria, splits, cobrança e permissões seguem exatamente como no clássico.
+- V2 apenas **consome** as mesmas queries + mesmas mutations.
+- Nenhuma tabela, RLS, edge function ou server function nova.
 
-```
-● Check-in  ● Recepção  ○ Caixa  ○ Atendimento  ○ Finalizado
-14:22       14:25       —        —              —
-```
-
-Preenchido = concluído; vazio = pendente; atual = pulsante. Read-only nesta fase.
-
-## 6. Alertas (badges no card + faixa no topo)
-
-Detecção client-side sobre os dados já carregados:
-
-| Regra | Badge |
-|---|---|
-| Aguardando > 20min | ⏱️ "Espera longa" |
-| Pago sem check-in de atendimento | 🟢 "Pago aguardando" |
-| Atendimento iniciado sem pagamento | ⚠️ "Sem pagamento" |
-| Orçamento pendente vinculado | 📄 "Orçamento" |
-| NFS-e: falta CPF/endereço | 📋 "Cadastro incompleto" |
-
-Faixa no topo aparece só se houver alerta ativo, com contador e "Ver todos".
-
-## 7. Atalhos de teclado
-
-Via listener no shell (limpo no unmount, ignora quando input focado exceto Esc):
-
-- **F2** — Receber pagamento do primeiro card da fila (ou selecionado)
-- **F3** — Imprimir último recibo
-- **F4** — Nova despesa
-- **Ctrl+Shift+C** — Compacto (já existe)
-- **Esc** — Fecha drawer/sheet
-
-Tooltip nos botões mostra o atalho.
-
-## 8. KPI operacional (rodapé sticky, discreto)
-
-Barra fina, tabular-nums, agregada da sessão + hoje:
-
-```
-Tempo médio até pagamento: 4m12s · Maior fila: 9 (11h20)
-Tempo médio em caixa: 2m40s · Receita sessão: R$ 2.410
-Receita hoje: R$ 3.180 · Atendimentos: 18
-```
-
-Cálculos derivados de timestamps já existentes (`agendamentos.created_at`, `caixa_movimentos.created_at`, etc). Cache 30s.
-
-## 9. Estética "painel operacional"
-
-- Zero `<table>`. Fila = grid de cards. Movimentos = lista com separadores sutis, não bordas de linha.
-- Espaçamento generoso, tipografia hierárquica, ícones semânticos.
-- Fundo `bg-muted/30` para respirar; cards em `bg-card` com `shadow-sm`.
-- Densidade equilibrada: modo normal respira, compacto para operação.
-
-## 10. Testes e medição
-
-Playwright em `/tmp/browser/caixa-v2-fase2/`:
-
-- resumo carrega e agrega corretamente (mockar 3 movimentos → conferir cards);
-- 1 item pendente → clique em Receber abre pagamento direto;
-- >1 item → clique abre seleção;
-- cores por status renderizam com `data-status`;
-- F2/F3/F4/Esc funcionam;
-- timeline reflete estágios corretos;
-- alertas aparecem conforme thresholds;
-- KPIs preenchidos;
-- mobile 390×844: cards empilhados, resumo com scroll horizontal;
-- zero "Convênio" no DOM;
-- console sem erros;
-- print desktop, compacto e mobile.
-
-**Medição:**
-
-| Métrica | Clássico | Meta v2 |
-|---|---|---|
-| Cliques até receber pagamento | 4 | 1 |
-| Tempo até visualizar estado da fila | ~2s | <500ms |
-| Info visível por paciente sem abrir | 2 campos | 7 campos |
-| Recepção sabe onde paciente está | não | sim (timeline) |
-
----
-
-## Arquivos
+## 6. Arquivos
 
 Novos:
-- `src/components/caixa-v2/painel-resumo.tsx`
-- `src/components/caixa-v2/fila-card.tsx`
-- `src/components/caixa-v2/mini-timeline.tsx`
-- `src/components/caixa-v2/alertas-fila.ts` (regras puras)
-- `src/components/caixa-v2/kpi-bar.tsx`
-- `src/components/caixa-v2/atalhos.ts` (hook `useCaixaShortcuts`)
+- `src/hooks/use-orcamentos-v2-flag.ts`
+- `src/components/orcamentos-v2/orcamentos-shell.tsx`
+- `src/components/orcamentos-v2/orcamento-card.tsx`
+- `src/components/orcamentos-v2/orcamento-drawer.tsx`
+- `src/components/orcamentos-v2/quick-filters.tsx`
+- `src/routes/_authenticated/app.dev-orcamentos-shell.tsx`
 
-Editados:
-- `src/components/caixa-v2/caixa-shell.tsx` — integra tudo
-- `src/styles.css` — tokens `--status-*`
+Intocados:
+- `src/routes/_authenticated/app.orcamentos.tsx` (clássico)
+- Componentes de conversão, impressão, histórico, splits.
 
-Intocado: `/app/caixa`, lógica de abertura/fechamento, estorno, recibo, NFS-e.
+## 7. Riscos
 
-## Riscos e rollback
+| Risco | Mitigação |
+|---|---|
+| Query pesada em `orcamento_itens` para contagem | usar `count head:true` na aba ativa; agregações client-side sobre página atual |
+| Divergência de status entre clássico e V2 | reusar mesma view/RPC; nada de status calculado no cliente que não exista no clássico |
+| Realtime overhead | subscribe único no `orcamentos` da clínica, throttle 500ms |
+| Flag on quebrando build | mount fica em rota dev isolada, `caixa-v2-mount` pattern |
+| "Convênio" reaparecer via componente compartilhado | teste Playwright falha o promote |
 
-- Realtime overhead: agregações client-side, sem novas subscriptions.
-- Atalhos conflitando com browser (F3=find): `preventDefault` só quando shell montado + flag on.
-- Rollback: flag `caixa_v2` off → `/app/caixa` clássico.
+## 8. Rollback
 
-## Promoção
+- Flag `orcamentos_v2` OFF → rota `/app/orcamentos` clássica intacta.
+- Rota dev pode ser deletada sem impacto.
+- Nenhuma migração, nenhum dado tocado.
 
-Após validação (você + Playwright), promovo com o mesmo modelo do MenuV2: `/app/caixa` renderiza `CaixaShellV2` só para perfis autorizados (recepção/gestor/admin) atrás da flag, com fallback imediato para o clássico ao desligar.
+## 9. Testes (Playwright em `/tmp/browser/orcamentos-v2/`)
 
-**Aguardando aprovação para implementar A4 Fase 2.**
+1. Rota `/app/dev-orcamentos-shell` carrega, sem erros de console.
+2. Busca por nome retorna resultados < 500ms após debounce.
+3. Abas trocam contagem e filtragem.
+4. Chips somam com abas (AND).
+5. Scroll infinito carrega página 2 automaticamente.
+6. Modo compacto altera altura dos cards.
+7. Drawer abre, mostra itens, aciona conversão (sem finalizar) e fecha.
+8. Impressão dispara `printOrcamento` (mock).
+9. Zero "Convênio" no DOM.
+10. Mobile 390×844: cards empilhados, abas com scroll horizontal.
+11. Flag OFF → `/app/orcamentos` clássico continua idêntico.
+12. Flag ON só para admin/gestor no mount de promoção (fase seguinte).
+
+## 10. Medição
+
+| Métrica | Clássico | Meta V2 |
+|---|---|---|
+| Tempo até primeira lista | ~1.5s | <500ms |
+| Cliques até aprovar orçamento | 3 | 1 |
+| Info visível sem abrir | 3 campos | 6 campos |
+| Filtrar por status | via busca | 1 clique |
+
+## 11. Fora de escopo (fica para depois)
+
+- Promoção controlada para `/app/orcamentos` (fase A5.2, mesmo modelo do `caixa-v2-mount`).
+- Liberação para recepção (só após validação visual do usuário).
+- Qualquer alteração em conversão/cobrança/splits.
+
+**Aguardando aprovação para implementar A5 Fase 1 (shell dev + flag).**
