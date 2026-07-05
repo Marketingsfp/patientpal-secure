@@ -727,6 +727,15 @@ function ProcedimentosPage() {
       observacoes: form.observacoes.trim() || null,
       preparo: form.preparo.trim() || null,
       ativo: form.ativo,
+      // Regras do procedimento (configuração > código)
+      fluxo_atendimento: form.fluxo_atendimento || null,
+      agenda_obrigatoria: !!form.agenda_obrigatoria,
+      medico_obrigatorio: !!form.medico_obrigatorio,
+      sala_obrigatoria: !!form.sala_obrigatoria,
+      equipamento_obrigatorio: !!form.equipamento_obrigatorio,
+      permite_venda_direta: !!form.permite_venda_direta,
+      permite_encaixe: !!form.permite_encaixe,
+      tempo_padrao_min: Math.max(0, Number(form.tempo_padrao_min) || 30),
     };
     // Ao criar (não editar), verifica se já existe procedimento com o mesmo nome
     // nesta clínica e pergunta antes de cadastrar.
