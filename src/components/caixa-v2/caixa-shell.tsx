@@ -453,49 +453,30 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
         <div className="flex items-center gap-2">
           <Users className="h-4 w-4 text-primary" aria-hidden />
           <div className="font-semibold text-sm">Fila do caixa</div>
-          <Badge variant="secondary">{filaPend.length}</Badge>
+          <Badge variant="secondary">{filaCards.length}</Badge>
+          {totalAlertas > 0 && (
+            <Badge variant="outline" className="text-status-canceled border-status-canceled/40 gap-1">
+              <AlertTriangle className="h-3 w-3" /> {totalAlertas}
+            </Badge>
+          )}
         </div>
         <span className="text-xs text-muted-foreground">Hoje</span>
       </div>
-      <div className="flex-1 min-h-0 overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-auto p-2 space-y-2">
         {filaLoading ? (
           <div className="p-3 text-sm text-muted-foreground">Carregando…</div>
-        ) : filaPend.length === 0 ? (
+        ) : filaCards.length === 0 ? (
           <div className="p-6 text-sm text-muted-foreground text-center">Nenhum paciente aguardando.</div>
         ) : (
-          <VirtualList<FilaItem>
-            items={filaPend}
-            estimateSize={68}
-            getKey={(f) => f.id}
-            renderItem={(f) => (
-              <div className="border-b border-border/50 p-2.5 hover:bg-accent/40 transition-colors">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium">{f.paciente_nome}</div>
-                    <div className="truncate text-xs text-muted-foreground">
-                      {new Date(f.inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                      {f.medico_nome ? ` · ${f.medico_nome}` : ""}
-                    </div>
-                    {f.procedimento && (
-                      <div className="truncate text-xs text-muted-foreground">{f.procedimento}</div>
-                    )}
-                  </div>
-                  <div className="text-right shrink-0">
-                    <div className="text-sm font-semibold tabular-nums">{brl(f.valor)}</div>
-                  </div>
-                </div>
-                <div className="mt-1.5">
-                  <Button
-                    size="sm" className="w-full h-8 gap-1.5"
-                    onClick={() => goCaixa("Abrindo cobrança na tela do Caixa…")}
-                    data-testid={`fila-receber-${f.id}`}
-                  >
-                    <HandCoins className="h-4 w-4" /> Receber pagamento
-                  </Button>
-                </div>
-              </div>
-            )}
-          />
+          filaCards.map((c) => (
+            <FilaCard
+              key={c.id}
+              data={c}
+              compact={compact}
+              onReceber={() => receberFila(c.id)}
+              onOpenTimeline={() => setDrawerId(c.id)}
+            />
+          ))
         )}
       </div>
     </div>
