@@ -26,8 +26,8 @@ function Card({
 
 export interface ResumoBarProps {
   k: ClientesKpiTotais;
-  activeMode: "none" | "aniv" | "novos30" | "semTel" | "semCpf" | "inativos";
-  onSelect: (mode: "none" | "aniv" | "novos30" | "semTel" | "semCpf" | "inativos") => void;
+  activeMode: "none" | "aniv" | "inativos";
+  onSelect: (mode: "none" | "aniv" | "inativos") => void;
 }
 
 export function ResumoBar({ k, activeMode, onSelect }: ResumoBarProps) {
@@ -37,14 +37,11 @@ export function ResumoBar({ k, activeMode, onSelect }: ResumoBarProps) {
       <Card label="Total" v={k.total} />
       <Card label="Ativos" v={k.ativos} tone="text-emerald-700 dark:text-emerald-400" />
       <Card label="Inativos" v={k.inativos} onClick={pick("inativos")} active={activeMode === "inativos"} />
-      <Card label="Novos 30 dias" v={k.novos30d} tone="text-sky-700 dark:text-sky-400"
-            onClick={pick("novos30")} active={activeMode === "novos30"} />
+      <Card label="Novos 30 dias" v={k.novos30d} tone="text-sky-700 dark:text-sky-400" />
       <Card label="Aniversariantes hoje" v={k.aniversariantes} tone="text-fuchsia-700 dark:text-fuchsia-400"
             onClick={pick("aniv")} active={activeMode === "aniv"} />
-      <Card label="Sem telefone" v={k.semTelefone} tone="text-amber-700 dark:text-amber-400"
-            onClick={pick("semTel")} active={activeMode === "semTel"} />
-      <Card label="Sem CPF" v={k.semCpf} tone="text-amber-700 dark:text-amber-400"
-            onClick={pick("semCpf")} active={activeMode === "semCpf"} />
+      <Card label="Sem telefone" v={k.semTelefone} tone="text-amber-700 dark:text-amber-400" />
+      <Card label="Sem CPF" v={k.semCpf} tone="text-amber-700 dark:text-amber-400" />
       <Card label="Associados" v={k.associados} tone="text-emerald-700 dark:text-emerald-400" />
       <Card label="Particulares" v={k.particulares} />
     </div>
