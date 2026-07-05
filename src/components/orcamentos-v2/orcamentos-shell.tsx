@@ -13,8 +13,9 @@ import { OrcamentoDrawer } from "./orcamento-drawer";
 import { deriveStatus, type DerivedStatus } from "./status-utils";
 import { ResumoBar, type ResumoData } from "./resumo-bar";
 import { OrcamentosKpiBar, type OrcKpi } from "./kpi-bar";
+import { HistoricoOrcamentoDialog } from "./historico-orcamento-dialog";
 
-type TabV = "todos" | "abertos" | "aprovados" | "convertidos" | "expirados" | "cancelados" | "pendencia";
+type TabV = "todos" | "abertos" | "convertidos" | "expirados" | "cancelados" | "pendencia";
 type TipoV = "particular" | "associado" | "cartao";
 type PeriodoV = "todos" | "hoje" | "7d" | "30d";
 
@@ -46,6 +47,7 @@ export function OrcamentosShellV2({ compactPref, onToggleCompact }: Props) {
   const [periodo, setPeriodo] = useState<PeriodoV[]>([]);
   const [drawerOrc, setDrawerOrc] = useState<OrcV2 | null>(null);
   const [conversaoId, setConversaoId] = useState<string | null>(null);
+  const [historicoId, setHistoricoId] = useState<string | null>(null);
   const [pageSize, setPageSize] = useState(50);
 
   const load = useCallback(async () => {
@@ -158,7 +160,7 @@ export function OrcamentosShellV2({ compactPref, onToggleCompact }: Props) {
     const st = deriveStatus(o);
     if (t === "pendencia") return st === "convertido" && (o.itens_consumidos ?? 0) < (o.itens_total ?? 0);
     const map: Record<Exclude<TabV, "todos" | "pendencia">, DerivedStatus> = {
-      abertos: "aberto", aprovados: "aprovado", convertidos: "convertido",
+      abertos: "aberto", convertidos: "convertido",
       expirados: "expirado", cancelados: "cancelado",
     };
     return st === map[t as Exclude<TabV, "todos" | "pendencia">];
@@ -166,13 +168,12 @@ export function OrcamentosShellV2({ compactPref, onToggleCompact }: Props) {
 
   const { counts, resumo, kpi } = useMemo(() => {
     const base = list.filter(applyBase);
-    const c = { todos: base.length, abertos: 0, aprovados: 0, convertidos: 0, expirados: 0, cancelados: 0, pendencia: 0 };
+    const c = { todos: base.length, abertos: 0, convertidos: 0, expirados: 0, cancelados: 0, pendencia: 0 };
     let valorAberto = 0, valorConvPeriodo = 0, valorConvHoje = 0, conversoesHoje = 0;
     const startHoje = new Date(); startHoje.setHours(0, 0, 0, 0);
     for (const o of base) {
       const st = deriveStatus(o);
       if (st === "aberto") { c.abertos++; valorAberto += Number(o.valor_total); }
-      else if (st === "aprovado") c.aprovados++;
       else if (st === "convertido") {
         c.convertidos++;
         valorConvPeriodo += Number(o.valor_total);
@@ -187,7 +188,7 @@ export function OrcamentosShellV2({ compactPref, onToggleCompact }: Props) {
     const ticketMedio = base.length ? base.reduce((s, o) => s + Number(o.valor_total), 0) / base.length : 0;
     const conversaoPct = c.todos ? (c.convertidos / c.todos) * 100 : 0;
     const r: ResumoData = {
-      total: c.todos, abertos: c.abertos, aprovados: c.aprovados,
+      total: c.todos, abertos: c.abertos,
       convertidos: c.convertidos, expirados: c.expirados,
       valorAberto, valorConvertidoPeriodo: valorConvPeriodo, ticketMedio,
     };
@@ -205,7 +206,6 @@ export function OrcamentosShellV2({ compactPref, onToggleCompact }: Props) {
   const tabs: ReadonlyArray<StatusTab<TabV>> = [
     { value: "todos", label: "Todos", count: counts.todos },
     { value: "abertos", label: "Abertos", count: counts.abertos },
-    { value: "aprovados", label: "Aprovados", count: counts.aprovados },
     { value: "convertidos", label: "Convertidos", count: counts.convertidos },
     { value: "expirados", label: "Expirados", count: counts.expirados },
     { value: "cancelados", label: "Cancelados", count: counts.cancelados },
@@ -275,6 +275,7 @@ export function OrcamentosShellV2({ compactPref, onToggleCompact }: Props) {
               onOpen={() => setDrawerOrc(o)}
               onPrint={() => void imprimir(o.id)}
               onConverter={() => setConversaoId(o.id)}
+              onHistorico={podeHistorico ? () => setHistoricoId(o.id) : undefined}
               podeHistorico={podeHistorico}
             />
           )}
@@ -287,6 +288,7 @@ export function OrcamentosShellV2({ compactPref, onToggleCompact }: Props) {
         onClose={() => setDrawerOrc(null)}
         onPrint={(id) => void imprimir(id)}
         onConverter={(id) => setConversaoId(id)}
+        onHistorico={podeHistorico ? (id) => setHistoricoId(id) : undefined}
         podeHistorico={podeHistorico}
       />
 
@@ -296,6 +298,15 @@ export function OrcamentosShellV2({ compactPref, onToggleCompact }: Props) {
           onClose={() => setConversaoId(null)}
           orcamentoId={conversaoId}
           onChanged={() => void load()}
+        />
+      )}
+
+      {historicoId && clinicaAtual && podeHistorico && (
+        <HistoricoOrcamentoDialog
+          open={!!historicoId}
+          onClose={() => setHistoricoId(null)}
+          orcamentoId={historicoId}
+          clinicaId={clinicaAtual.clinica_id}
         />
       )}
     </div>
