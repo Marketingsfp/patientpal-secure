@@ -2261,6 +2261,7 @@ export type Database = {
           id: string
           latitude: number | null
           longitude: number | null
+          nfse_modo_emissao: string
           nome: string
           paytime_recipient_id: string | null
           raio_metros: number
@@ -2281,6 +2282,7 @@ export type Database = {
           id?: string
           latitude?: number | null
           longitude?: number | null
+          nfse_modo_emissao?: string
           nome: string
           paytime_recipient_id?: string | null
           raio_metros?: number
@@ -2301,6 +2303,7 @@ export type Database = {
           id?: string
           latitude?: number | null
           longitude?: number | null
+          nfse_modo_emissao?: string
           nome?: string
           paytime_recipient_id?: string | null
           raio_metros?: number
@@ -5407,6 +5410,7 @@ export type Database = {
           medico_id: string | null
           numero: string | null
           observacoes: string | null
+          orcamento_id: string | null
           paciente_id: string | null
           pagamento_id: string | null
           payload_envio: Json | null
@@ -5445,6 +5449,7 @@ export type Database = {
           medico_id?: string | null
           numero?: string | null
           observacoes?: string | null
+          orcamento_id?: string | null
           paciente_id?: string | null
           pagamento_id?: string | null
           payload_envio?: Json | null
@@ -5483,6 +5488,7 @@ export type Database = {
           medico_id?: string | null
           numero?: string | null
           observacoes?: string | null
+          orcamento_id?: string | null
           paciente_id?: string | null
           pagamento_id?: string | null
           payload_envio?: Json | null
@@ -5515,6 +5521,13 @@ export type Database = {
             columns: ["emitente_id"]
             isOneToOne: false
             referencedRelation: "nfse_emitentes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nfse_orcamento_id_fkey"
+            columns: ["orcamento_id"]
+            isOneToOne: false
+            referencedRelation: "orcamentos"
             referencedColumns: ["id"]
           },
           {
@@ -7714,6 +7727,14 @@ export type Database = {
         Args: { _clinica_id: string; _user_id: string }
         Returns: boolean
       }
+      cancelar_item: {
+        Args: {
+          p_confirmar_cascata?: boolean
+          p_item_id: string
+          p_motivo: string
+        }
+        Returns: Json
+      }
       chamar_proxima_senha: {
         Args: { _clinica_id: string; _guiche: string }
         Returns: {
@@ -7743,6 +7764,19 @@ export type Database = {
       checkin_agendamento: { Args: { _token: string }; Returns: Json }
       consulta_publica: { Args: { _token: string }; Returns: Json }
       contrato_publico: { Args: { _token: string }; Returns: Json }
+      converter_item_agendamento: {
+        Args: { p_item_id: string; p_payload: Json }
+        Returns: Json
+      }
+      converter_item_venda: {
+        Args: {
+          p_caixa_sessao_id: string
+          p_desconto?: number
+          p_forma_pagamento: string
+          p_item_id: string
+        }
+        Returns: Json
+      }
       criar_clinica_com_admin: {
         Args: {
           _cidade?: string
@@ -7774,6 +7808,7 @@ export type Database = {
         }[]
       }
       each: { Args: { hs: unknown }; Returns: Record<string, unknown>[] }
+      emitir_nfse_orcamento: { Args: { p_orcamento_id: string }; Returns: Json }
       emitir_senha: {
         Args: {
           _clinica_id: string
@@ -7890,6 +7925,10 @@ export type Database = {
           ocupados: number
         }[]
       }
+      get_orcamento_conversao: {
+        Args: { p_orcamento_id: string }
+        Returns: Json
+      }
       get_ultimo_agendamento_paciente: {
         Args: { _paciente_id: string }
         Returns: {
@@ -7951,6 +7990,10 @@ export type Database = {
           _table_name: string
         }
         Returns: undefined
+      }
+      marcar_item_nao_aplicavel: {
+        Args: { p_item_id: string; p_motivo: string }
+        Returns: Json
       }
       medico_dados_sensiveis: { Args: { _medico_id: string }; Returns: Json }
       medicos_face_lista: {
