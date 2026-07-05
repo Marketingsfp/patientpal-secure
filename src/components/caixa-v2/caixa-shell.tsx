@@ -347,14 +347,37 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
     const receitaSessao = sessao
       ? recebimentos.filter((m) => m.sessao_id === sessao.id).reduce((s, m) => s + Number(m.valor || 0), 0)
       : 0;
+    // Tempo médio de espera atual (min) — só quando há fila pendente
+    const esperas = filaPend.map((f) => (Date.now() - new Date(f.inicio).getTime()) / 60000)
+      .filter((n) => Number.isFinite(n) && n >= 0);
+    const tempoMedioPagamentoMin = esperas.length
+      ? esperas.reduce((s, n) => s + n, 0) / esperas.length
+      : null;
+    // Intervalo médio entre recebimentos consecutivos da sessão (min)
+    const recSessao = (sessao
+      ? recebimentos.filter((m) => m.sessao_id === sessao.id)
+      : recebimentos)
+      .slice()
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    let tempoMedioCaixaMin: number | null = null;
+    if (recSessao.length >= 2) {
+      const gaps: number[] = [];
+      for (let i = 1; i < recSessao.length; i++) {
+        gaps.push((new Date(recSessao[i].created_at).getTime() - new Date(recSessao[i - 1].created_at).getTime()) / 60000);
+      }
+      tempoMedioCaixaMin = gaps.reduce((s, n) => s + n, 0) / gaps.length;
+    }
+    const maiorFila = filaPend.length > 0
+      ? { qtd: filaPend.length, hora: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) }
+      : null;
     return {
-      tempoMedioPagamentoMin: null,
-      maiorFila: null,
-      tempoMedioCaixaMin: null,
+      tempoMedioPagamentoMin,
+      maiorFila,
+      tempoMedioCaixaMin,
       receitaSessao, receitaHoje,
       atendimentos: recebimentos.length,
     };
-  }, [movs, sessao]);
+  }, [movs, sessao, filaPend]);
 
   const tabs: ReadonlyArray<StatusTab<TabKey>> = [
     { value: "hoje", label: "Hoje" },
