@@ -51,6 +51,31 @@ export function calcularIdade(nasc: string | null): number | null {
   return idade;
 }
 
+export function isAniversarianteHoje(nasc: string | null): boolean {
+  if (!nasc) return false;
+  const [, m, d] = nasc.split("-");
+  const hoje = new Date();
+  const mm = String(hoje.getMonth() + 1).padStart(2, "0");
+  const dd = String(hoje.getDate()).padStart(2, "0");
+  return m === mm && d === dd;
+}
+
+export function semTelefone(p: PacienteV2): boolean {
+  return !p.telefone && !p.telefone2;
+}
+
+export function semCpf(p: PacienteV2): boolean {
+  const d = (p.cpf ?? "").replace(/\D/g, "");
+  return d.length !== 11;
+}
+
+export function isNovo30d(p: PacienteV2): boolean {
+  if (!p.created_at) return false;
+  const t = Date.parse(p.created_at);
+  if (Number.isNaN(t)) return false;
+  return Date.now() - t <= 30 * 24 * 60 * 60 * 1000;
+}
+
 export function fmtCPF(v: string | null): string {
   if (!v) return "—";
   const d = v.replace(/\D/g, "");
