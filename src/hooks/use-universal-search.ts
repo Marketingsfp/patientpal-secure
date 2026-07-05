@@ -82,7 +82,7 @@ export function useUniversalSearcher(opts: UseUniversalSearchOpts) {
       const { data, error } = await supabase.rpc("buscar_universal", {
         _clinica_ids: clinicaIds,
         _termo: termo,
-        _tipos: tipos ?? null,
+        _tipos: tipos ?? undefined,
         _limite: 24,
       });
       if (error) {
