@@ -3143,6 +3143,7 @@ export type Database = {
           laudo_status: string | null
           medico_id: string | null
           medico_laudador_id: string | null
+          nfse_id: string | null
           observacoes: string | null
           orcamento_item_id: string | null
           paciente_id: string | null
@@ -3173,6 +3174,7 @@ export type Database = {
           laudo_status?: string | null
           medico_id?: string | null
           medico_laudador_id?: string | null
+          nfse_id?: string | null
           observacoes?: string | null
           orcamento_item_id?: string | null
           paciente_id?: string | null
@@ -3203,6 +3205,7 @@ export type Database = {
           laudo_status?: string | null
           medico_id?: string | null
           medico_laudador_id?: string | null
+          nfse_id?: string | null
           observacoes?: string | null
           orcamento_item_id?: string | null
           paciente_id?: string | null
@@ -3254,6 +3257,13 @@ export type Database = {
             columns: ["medico_laudador_id"]
             isOneToOne: false
             referencedRelation: "medicos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fin_atendimentos_nfse_id_fkey"
+            columns: ["nfse_id"]
+            isOneToOne: false
+            referencedRelation: "nfse"
             referencedColumns: ["id"]
           },
           {
