@@ -68,16 +68,16 @@ type Regra = {
 };
 
 type ItemConversao = {
-  item_id: string;
+  id: string;
   procedimento_id: string | null;
   descricao: string;
   quantidade: number;
-  valor_unitario: number;
+  valor_total: number;
   status_operacional: StatusOp;
   status_financeiro: StatusFin;
   regras: Regra;
   acoes_disponiveis: Acao[];
-  tem_agendamento_futuro: boolean;
+  tem_agendamento: boolean;
   tem_pagamento: boolean;
   agendamento_id?: string | null;
   fin_atendimento_id?: string | null;
@@ -88,14 +88,26 @@ type Resp = {
   ok: boolean;
   codigo?: string;
   mensagem?: string;
-  dados?: {
-    orcamento_id: string;
-    orcamento_status?: string;
-    nfse_modo_emissao?: "por_item" | "agrupada";
-    caixa_aberto?: boolean;
-    caixa_sessao_id?: string | null;
-    itens: ItemConversao[];
+  orcamento?: {
+    id: string;
+    numero?: string | number | null;
+    status?: string;
+    clinica_id?: string;
+    paciente_nome?: string | null;
+    valor_total?: number;
   };
+  caixa_aberto?: boolean;
+  itens?: ItemConversao[];
+};
+
+type UIState = {
+  orcamento_id: string;
+  orcamento_status?: string;
+  clinica_id?: string;
+  nfse_modo_emissao: "por_item" | "agrupada";
+  caixa_aberto: boolean;
+  caixa_sessao_id: string | null;
+  itens: ItemConversao[];
 };
 
 // -------- Small helpers --------
@@ -148,20 +160,41 @@ export function ConversaoOrcamentoDialog({
   orcamentoId: string;
   onChanged?: () => void;
 }) {
-  const { clinicaAtual } = useClinica();
+  useClinica();
   const [loading, setLoading] = useState(false);
-  const [payload, setPayload] = useState<Resp["dados"] | null>(null);
+  const [payload, setPayload] = useState<UIState | null>(null);
   const [action, setAction] = useState<ActionState>({ kind: "none" });
   const [emitindoNfse, setEmitindoNfse] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase.rpc("get_orcamento_conversao", { p_orcamento_id: orcamentoId });
-    setLoading(false);
-    if (error) { mostrarErro(error); return; }
+    if (error) { setLoading(false); mostrarErro(error); return; }
     const resp = data as unknown as Resp;
-    if (!resp?.ok) { toast.error(resp?.mensagem ?? "Falha ao carregar conversão"); return; }
-    setPayload(resp.dados ?? null);
+    if (!resp?.ok) { setLoading(false); toast.error(resp?.mensagem ?? "Falha ao carregar conversão"); return; }
+    const clinicaId = resp.orcamento?.clinica_id ?? null;
+
+    // buscar nfse_modo_emissao da clínica + sessão de caixa aberta do usuário
+    let nfseModo: "por_item" | "agrupada" = "por_item";
+    let caixaSessaoId: string | null = null;
+    if (clinicaId) {
+      const [{ data: clin }, { data: sess }] = await Promise.all([
+        supabase.from("clinicas").select("nfse_modo_emissao").eq("id", clinicaId).maybeSingle(),
+        supabase.from("caixa_sessoes").select("id").eq("clinica_id", clinicaId).eq("status", "aberto").order("aberto_em", { ascending: false }).limit(1).maybeSingle(),
+      ]);
+      if (clin && (clin as { nfse_modo_emissao?: string }).nfse_modo_emissao === "agrupada") nfseModo = "agrupada";
+      caixaSessaoId = (sess as { id?: string } | null)?.id ?? null;
+    }
+    setPayload({
+      orcamento_id: resp.orcamento?.id ?? orcamentoId,
+      orcamento_status: resp.orcamento?.status,
+      clinica_id: clinicaId ?? undefined,
+      nfse_modo_emissao: nfseModo,
+      caixa_aberto: !!resp.caixa_aberto,
+      caixa_sessao_id: caixaSessaoId,
+      itens: resp.itens ?? [],
+    });
+    setLoading(false);
   }, [orcamentoId]);
 
   useEffect(() => { if (open) void load(); }, [open, load]);
@@ -181,7 +214,7 @@ export function ConversaoOrcamentoDialog({
     const { data, error } = await supabase.rpc("emitir_nfse_orcamento", { p_orcamento_id: orcamentoId });
     setEmitindoNfse(false);
     if (error) { mostrarErro(error); return; }
-    const resp = data as unknown as Resp;
+    const resp = data as unknown as { ok: boolean; codigo?: string; mensagem?: string };
     if (!resp?.ok) { toast.error(resp?.mensagem ?? `Erro: ${resp?.codigo ?? "?"}`); return; }
     toast.success("NFS-e agrupada emitida.");
     await refresh();
@@ -234,7 +267,7 @@ export function ConversaoOrcamentoDialog({
               <div className="space-y-3 mt-3">
                 {(payload.itens ?? []).map((it) => (
                   <ItemCard
-                    key={it.item_id}
+                    key={it.id}
                     item={it}
                     caixaAberto={!!payload.caixa_aberto}
                     onAction={(kind) => setAction({ kind, item: it } as ActionState)}
