@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   PlusCircle, MinusCircle, ArrowDownToLine, ArrowUpFromLine, Printer, FileDown,
-  Lock, Unlock, HandCoins, ChevronRight, X, Users, Wallet,
+  Lock, Unlock, ChevronRight, Users, Wallet, AlertTriangle, HandCoins,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,6 +15,12 @@ import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/co
 import { ListShell, VirtualList, QuickFilters, type StatusTab } from "@/components/list-shell";
 import { brl } from "@/lib/financeiro/format";
 import { cn } from "@/lib/utils";
+import { PainelResumo, type ResumoData } from "./painel-resumo";
+import { FilaCard, type FilaCardData, type StatusFila } from "./fila-card";
+import { MiniTimeline, buildTimeline } from "./mini-timeline";
+import { detectarAlertas, type AlertaBadge } from "./alertas-fila";
+import { KpiBar, type KpiData } from "./kpi-bar";
+import { useCaixaShortcuts } from "./atalhos";
 
 type MovTipo = "abertura" | "sangria" | "suprimento" | "recebimento" | "despesa" | "fechamento";
 interface Sessao {
@@ -273,6 +279,83 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
 
   const filaPend = useMemo(() => fila.filter((f) => !f.ja_pago), [fila]);
 
+  // ===== Resumo agregado (client-side)
+  const resumoData = useMemo<ResumoData>(() => {
+    const recebimentos = movs.filter((m) => m.tipo === "recebimento");
+    const somaForma = (forma: string) =>
+      recebimentos
+        .filter((m) => (m.forma_pagamento ?? "").toLowerCase().includes(forma))
+        .reduce((s, m) => s + Number(m.valor || 0), 0);
+    const recebidoTotal = recebimentos.reduce((s, m) => s + Number(m.valor || 0), 0);
+    const recebidoSessao = sessao
+      ? recebimentos.filter((m) => m.sessao_id === sessao.id).reduce((s, m) => s + Number(m.valor || 0), 0)
+      : 0;
+    const saldo = movs.reduce((s, m) => s + Number(m.valor || 0) * (TIPO_SINAL[m.tipo] || 0), 0);
+    const particular = fila.filter((f) => !f.valor_cartao).reduce((s, f) => s + f.valor, 0);
+    const associado = fila.filter((f) => f.valor_cartao > 0).reduce((s, f) => s + f.valor_cartao, 0);
+    return {
+      saldo, recebidoHoje: recebidoTotal, recebidoSessao,
+      particular, associado,
+      dinheiro: somaForma("dinheiro"),
+      pix: somaForma("pix"),
+      cartao: somaForma("cart") + somaForma("credito") + somaForma("debito"),
+      pendentesFila: filaPend.length,
+      aguardandoPagamento: filaPend.filter((f) => !f.ja_pago).length,
+    };
+  }, [movs, fila, filaPend, sessao]);
+
+  // ===== Fila → cards (status + alertas)
+  const filaCards = useMemo<FilaCardData[]>(() => {
+    return filaPend.map((f) => {
+      const status: StatusFila = f.ja_pago ? "paid" : "waiting";
+      const alertas: AlertaBadge[] = detectarAlertas({
+        inicio: f.inicio, ja_pago: f.ja_pago,
+        // dados extras não presentes na RPC; futuras fases podem enriquecer
+        paciente_cpf: null, paciente_endereco: null,
+      });
+      const tipoCobranca: FilaCardData["tipoCobranca"] =
+        f.valor_cartao > 0 ? "Associado" : "Particular";
+      return {
+        id: f.id,
+        pacienteNome: f.paciente_nome,
+        pacienteIdade: null,
+        procedimento: f.procedimento,
+        medicoNome: f.medico_nome,
+        inicio: f.inicio,
+        valor: f.valor + f.valor_cartao,
+        tipoCobranca, status, alertas,
+      };
+    });
+  }, [filaPend]);
+
+  const totalAlertas = useMemo(
+    () => filaCards.reduce((n, c) => n + c.alertas.length, 0),
+    [filaCards],
+  );
+
+  // ===== Drawer da Mini Timeline
+  const [drawerId, setDrawerId] = useState<string | null>(null);
+  const drawerItem = useMemo(
+    () => filaCards.find((f) => f.id === drawerId) ?? null,
+    [drawerId, filaCards],
+  );
+
+  // ===== KPIs derivados
+  const kpiData = useMemo<KpiData>(() => {
+    const recebimentos = movs.filter((m) => m.tipo === "recebimento");
+    const receitaHoje = recebimentos.reduce((s, m) => s + Number(m.valor || 0), 0);
+    const receitaSessao = sessao
+      ? recebimentos.filter((m) => m.sessao_id === sessao.id).reduce((s, m) => s + Number(m.valor || 0), 0)
+      : 0;
+    return {
+      tempoMedioPagamentoMin: null,
+      maiorFila: null,
+      tempoMedioCaixaMin: null,
+      receitaSessao, receitaHoje,
+      atendimentos: recebimentos.length,
+    };
+  }, [movs, sessao]);
+
   const tabs: ReadonlyArray<StatusTab<TabKey>> = [
     { value: "hoje", label: "Hoje" },
     { value: "sessao", label: "Sessão atual", count: sessao ? undefined : 0 },
@@ -284,6 +367,23 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
     if (msg) toast.info(msg);
     window.location.href = "/app/caixa";
   };
+
+  // Ação primária "Receber" — 1 clique. Se houver único item pendente,
+  // navega direto para /app/caixa com hint via query; caso contrário abre
+  // seleção lá. A gravação/regra continua no clássico.
+  const receberFila = useCallback((filaId?: string) => {
+    const id = filaId ?? filaCards[0]?.id;
+    if (!id) { toast.info("Nenhum paciente na fila."); return; }
+    window.location.href = `/app/caixa?receber=${encodeURIComponent(id)}`;
+  }, [filaCards]);
+
+  // Atalhos F2/F3/F4/Esc
+  useCaixaShortcuts({
+    onReceber: () => receberFila(),
+    onImprimir: () => goCaixa("Impressão de recibo abre no caixa clássico"),
+    onDespesa: () => goCaixa("Nova despesa abre no caixa clássico"),
+    onEscape: () => setDrawerId(null),
+  });
 
   // Layout
   const listEl = (
@@ -353,49 +453,30 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
         <div className="flex items-center gap-2">
           <Users className="h-4 w-4 text-primary" aria-hidden />
           <div className="font-semibold text-sm">Fila do caixa</div>
-          <Badge variant="secondary">{filaPend.length}</Badge>
+          <Badge variant="secondary">{filaCards.length}</Badge>
+          {totalAlertas > 0 && (
+            <Badge variant="outline" className="text-status-canceled border-status-canceled/40 gap-1">
+              <AlertTriangle className="h-3 w-3" /> {totalAlertas}
+            </Badge>
+          )}
         </div>
         <span className="text-xs text-muted-foreground">Hoje</span>
       </div>
-      <div className="flex-1 min-h-0 overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-auto p-2 space-y-2">
         {filaLoading ? (
           <div className="p-3 text-sm text-muted-foreground">Carregando…</div>
-        ) : filaPend.length === 0 ? (
+        ) : filaCards.length === 0 ? (
           <div className="p-6 text-sm text-muted-foreground text-center">Nenhum paciente aguardando.</div>
         ) : (
-          <VirtualList<FilaItem>
-            items={filaPend}
-            estimateSize={68}
-            getKey={(f) => f.id}
-            renderItem={(f) => (
-              <div className="border-b border-border/50 p-2.5 hover:bg-accent/40 transition-colors">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium">{f.paciente_nome}</div>
-                    <div className="truncate text-xs text-muted-foreground">
-                      {new Date(f.inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                      {f.medico_nome ? ` · ${f.medico_nome}` : ""}
-                    </div>
-                    {f.procedimento && (
-                      <div className="truncate text-xs text-muted-foreground">{f.procedimento}</div>
-                    )}
-                  </div>
-                  <div className="text-right shrink-0">
-                    <div className="text-sm font-semibold tabular-nums">{brl(f.valor)}</div>
-                  </div>
-                </div>
-                <div className="mt-1.5">
-                  <Button
-                    size="sm" className="w-full h-8 gap-1.5"
-                    onClick={() => goCaixa("Abrindo cobrança na tela do Caixa…")}
-                    data-testid={`fila-receber-${f.id}`}
-                  >
-                    <HandCoins className="h-4 w-4" /> Receber pagamento
-                  </Button>
-                </div>
-              </div>
-            )}
-          />
+          filaCards.map((c) => (
+            <FilaCard
+              key={c.id}
+              data={c}
+              compact={compact}
+              onReceber={() => receberFila(c.id)}
+              onOpenTimeline={() => setDrawerId(c.id)}
+            />
+          ))
         )}
       </div>
     </div>
@@ -473,14 +554,65 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
   );
 
   return (
-    <div className="h-full flex flex-col min-h-0 p-3 md:p-4">
-      {topbar}
-      <div className={cn("flex-1 min-h-0 grid gap-3",
-        isMobile ? "grid-cols-1" : "grid-cols-[minmax(0,3fr)_minmax(280px,1fr)]",
+    <div className="h-full flex flex-col min-h-0 bg-muted/20">
+      <div className="p-3 md:p-4 pb-2">
+        <PainelResumo
+          data={resumoData}
+          sessaoInfo={sessao ? `#${sessao.id.slice(0, 6)} · ${agoraTexto(sessao.aberto_em)}` : "Nenhuma aberta"}
+        />
+      </div>
+      <div className="px-3 md:px-4">{topbar}</div>
+      <div className={cn("flex-1 min-h-0 grid gap-3 px-3 md:px-4",
+        isMobile ? "grid-cols-1" : "grid-cols-[minmax(0,3fr)_minmax(300px,1fr)]",
       )}>
         <div className="min-h-0">{listEl}</div>
         {!isMobile && <div className="min-h-0">{filaEl}</div>}
       </div>
+      <KpiBar data={kpiData} />
+
+      {/* Drawer da Mini Timeline */}
+      <Sheet open={!!drawerItem} onOpenChange={(o) => { if (!o) setDrawerId(null); }}>
+        <SheetContent side="right" className="w-[92vw] sm:max-w-md p-0 flex flex-col">
+          <SheetHeader className="p-4 border-b">
+            <SheetTitle className="truncate">{drawerItem?.pacienteNome ?? "Paciente"}</SheetTitle>
+            <div className="text-xs text-muted-foreground truncate">
+              {drawerItem?.procedimento ?? ""}{drawerItem?.medicoNome ? ` · ${drawerItem.medicoNome}` : ""}
+            </div>
+          </SheetHeader>
+          <div className="p-4 space-y-4 overflow-auto">
+            {drawerItem && (
+              <>
+                <MiniTimeline etapas={buildTimeline({
+                  checkin: drawerItem.inicio,
+                  recepcao: drawerItem.inicio,
+                  caixa: drawerItem.status === "paid" ? drawerItem.inicio : null,
+                  atendimento: null,
+                  finalizado: null,
+                })} />
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">{drawerItem.tipoCobranca}</span>
+                  <span className="font-semibold tabular-nums">{brl(drawerItem.valor)}</span>
+                </div>
+                {drawerItem.alertas.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {drawerItem.alertas.map((a) => (
+                      <span key={a.tipo} className="rounded-full bg-muted px-2 py-0.5 text-[11px]">
+                        {a.emoji} {a.label}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <Button
+                  className="w-full bg-status-paid hover:bg-status-paid/90 text-white"
+                  onClick={() => receberFila(drawerItem.id)}
+                >
+                  <HandCoins className="h-4 w-4 mr-1" /> Receber pagamento
+                </Button>
+              </>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
