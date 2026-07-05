@@ -15,17 +15,21 @@ import { useMenuPrefs } from "@/hooks/use-menu-prefs";
 const MAX_INLINE = 6;
 
 function IconBtn({
-  active, onClick, title, children,
-}: { active?: boolean; onClick: () => void; title: string; children: React.ReactNode }) {
+  active, onClick, title, children, pressed,
+}: { active?: boolean; onClick: () => void; title: string; children: React.ReactNode; pressed?: boolean }) {
   return (
     <button
       type="button"
       onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClick(); }}
       title={title}
+      aria-label={title}
+      aria-pressed={pressed}
       className={cn(
-        "opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity",
-        "text-muted-foreground hover:text-foreground p-1 rounded",
-        active && "opacity-100 text-primary hover:text-primary",
+        // Sempre visível (a11y: teclado + touch), com destaque leve no hover
+        "text-muted-foreground/60 hover:text-foreground focus-visible:text-foreground",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+        "p-1 rounded transition-colors",
+        active && "text-primary hover:text-primary",
       )}
     >
       {children}
@@ -53,10 +57,10 @@ function Row({
         <span className="truncate">{item.label}</span>
       </Link>
       <div className="flex items-center gap-0.5">
-        <IconBtn active={pinned} onClick={onTogglePin} title={pinned ? "Desfixar" : "Fixar"}>
+        <IconBtn active={pinned} pressed={pinned} onClick={onTogglePin} title={pinned ? "Desfixar" : "Fixar"}>
           <Pin className={cn("h-3.5 w-3.5", pinned && "fill-primary")} />
         </IconBtn>
-        <IconBtn active={favorited} onClick={onToggleFav} title={favorited ? "Remover favorito" : "Favoritar"}>
+        <IconBtn active={favorited} pressed={favorited} onClick={onToggleFav} title={favorited ? "Remover favorito" : "Favoritar"}>
           <Heart className={cn("h-3.5 w-3.5", favorited && "fill-primary")} />
         </IconBtn>
       </div>
