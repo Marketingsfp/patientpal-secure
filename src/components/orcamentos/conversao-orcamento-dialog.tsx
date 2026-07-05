@@ -68,16 +68,16 @@ type Regra = {
 };
 
 type ItemConversao = {
-  item_id: string;
+  id: string;
   procedimento_id: string | null;
   descricao: string;
   quantidade: number;
-  valor_unitario: number;
+  valor_total: number;
   status_operacional: StatusOp;
   status_financeiro: StatusFin;
   regras: Regra;
   acoes_disponiveis: Acao[];
-  tem_agendamento_futuro: boolean;
+  tem_agendamento: boolean;
   tem_pagamento: boolean;
   agendamento_id?: string | null;
   fin_atendimento_id?: string | null;
@@ -88,14 +88,26 @@ type Resp = {
   ok: boolean;
   codigo?: string;
   mensagem?: string;
-  dados?: {
-    orcamento_id: string;
-    orcamento_status?: string;
-    nfse_modo_emissao?: "por_item" | "agrupada";
-    caixa_aberto?: boolean;
-    caixa_sessao_id?: string | null;
-    itens: ItemConversao[];
+  orcamento?: {
+    id: string;
+    numero?: string | number | null;
+    status?: string;
+    clinica_id?: string;
+    paciente_nome?: string | null;
+    valor_total?: number;
   };
+  caixa_aberto?: boolean;
+  itens?: ItemConversao[];
+};
+
+type UIState = {
+  orcamento_id: string;
+  orcamento_status?: string;
+  clinica_id?: string;
+  nfse_modo_emissao: "por_item" | "agrupada";
+  caixa_aberto: boolean;
+  caixa_sessao_id: string | null;
+  itens: ItemConversao[];
 };
 
 // -------- Small helpers --------
@@ -148,20 +160,41 @@ export function ConversaoOrcamentoDialog({
   orcamentoId: string;
   onChanged?: () => void;
 }) {
-  const { clinicaAtual } = useClinica();
+  useClinica();
   const [loading, setLoading] = useState(false);
-  const [payload, setPayload] = useState<Resp["dados"] | null>(null);
+  const [payload, setPayload] = useState<UIState | null>(null);
   const [action, setAction] = useState<ActionState>({ kind: "none" });
   const [emitindoNfse, setEmitindoNfse] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase.rpc("get_orcamento_conversao", { p_orcamento_id: orcamentoId });
-    setLoading(false);
-    if (error) { mostrarErro(error); return; }
+    if (error) { setLoading(false); mostrarErro(error); return; }
     const resp = data as unknown as Resp;
-    if (!resp?.ok) { toast.error(resp?.mensagem ?? "Falha ao carregar conversão"); return; }
-    setPayload(resp.dados ?? null);
+    if (!resp?.ok) { setLoading(false); toast.error(resp?.mensagem ?? "Falha ao carregar conversão"); return; }
+    const clinicaId = resp.orcamento?.clinica_id ?? null;
+
+    // buscar nfse_modo_emissao da clínica + sessão de caixa aberta do usuário
+    let nfseModo: "por_item" | "agrupada" = "por_item";
+    let caixaSessaoId: string | null = null;
+    if (clinicaId) {
+      const [{ data: clin }, { data: sess }] = await Promise.all([
+        supabase.from("clinicas").select("nfse_modo_emissao").eq("id", clinicaId).maybeSingle(),
+        supabase.from("caixa_sessoes").select("id").eq("clinica_id", clinicaId).eq("status", "aberto").order("aberto_em", { ascending: false }).limit(1).maybeSingle(),
+      ]);
+      if (clin && (clin as { nfse_modo_emissao?: string }).nfse_modo_emissao === "agrupada") nfseModo = "agrupada";
+      caixaSessaoId = (sess as { id?: string } | null)?.id ?? null;
+    }
+    setPayload({
+      orcamento_id: resp.orcamento?.id ?? orcamentoId,
+      orcamento_status: resp.orcamento?.status,
+      clinica_id: clinicaId ?? undefined,
+      nfse_modo_emissao: nfseModo,
+      caixa_aberto: !!resp.caixa_aberto,
+      caixa_sessao_id: caixaSessaoId,
+      itens: resp.itens ?? [],
+    });
+    setLoading(false);
   }, [orcamentoId]);
 
   useEffect(() => { if (open) void load(); }, [open, load]);
@@ -181,7 +214,7 @@ export function ConversaoOrcamentoDialog({
     const { data, error } = await supabase.rpc("emitir_nfse_orcamento", { p_orcamento_id: orcamentoId });
     setEmitindoNfse(false);
     if (error) { mostrarErro(error); return; }
-    const resp = data as unknown as Resp;
+    const resp = data as unknown as { ok: boolean; codigo?: string; mensagem?: string };
     if (!resp?.ok) { toast.error(resp?.mensagem ?? `Erro: ${resp?.codigo ?? "?"}`); return; }
     toast.success("NFS-e agrupada emitida.");
     await refresh();
@@ -234,7 +267,7 @@ export function ConversaoOrcamentoDialog({
               <div className="space-y-3 mt-3">
                 {(payload.itens ?? []).map((it) => (
                   <ItemCard
-                    key={it.item_id}
+                    key={it.id}
                     item={it}
                     caixaAberto={!!payload.caixa_aberto}
                     onAction={(kind) => setAction({ kind, item: it } as ActionState)}
@@ -304,7 +337,7 @@ function ItemCard({
   const op = labelOp(item.status_operacional);
   const fin = labelFin(item.status_financeiro);
   const acoes = new Set(item.acoes_disponiveis ?? []);
-  const total = Number(item.valor_unitario || 0) * Number(item.quantidade || 1);
+  const total = Number(item.valor_total || 0);
 
   const chip = (label: string, ativa: boolean | null | undefined) => (
     <span
@@ -324,7 +357,7 @@ function ItemCard({
         <div className="min-w-0">
           <div className="font-medium">{item.descricao}</div>
           <div className="text-xs text-muted-foreground">
-            {item.quantidade} × {BRL(item.valor_unitario)} = <b>{BRL(total)}</b>
+            Qtd {item.quantidade} · Total <b>{BRL(total)}</b>
           </div>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -419,7 +452,7 @@ function VendaSheet({
     if (!caixaSessaoId) { toast.error("Nenhuma sessão de caixa aberta."); return; }
     setSaving(true);
     const { data, error } = await supabase.rpc("converter_item_venda", {
-      p_item_id: item.item_id,
+      p_item_id: item.id,
       p_caixa_sessao_id: caixaSessaoId,
       p_forma_pagamento: forma,
       p_desconto: Number(desconto) || 0,
@@ -485,7 +518,7 @@ function AgendarSheet({
       ? { redirect_para_agenda: true }
       : {}; // RPC decide via fn_regras_procedimento
     const { data, error } = await supabase.rpc("converter_item_agendamento", {
-      p_item_id: item.item_id,
+      p_item_id: item.id,
       p_payload: payload,
     });
     setSaving(false);
@@ -549,7 +582,7 @@ function NaoAplicavelSheet({
     if (motivo.trim().length < 3) { toast.error("Descreva o motivo."); return; }
     setSaving(true);
     const { data, error } = await supabase.rpc("marcar_item_nao_aplicavel", {
-      p_item_id: item.item_id,
+      p_item_id: item.id,
       p_motivo: motivo.trim(),
     });
     setSaving(false);
@@ -603,20 +636,21 @@ function CancelarSheet({
     if (motivo.trim().length < 3) { toast.error("Descreva o motivo."); return; }
     setSaving(true);
     const { data, error } = await supabase.rpc("cancelar_item", {
-      p_item_id: item.item_id,
+      p_item_id: item.id,
       p_motivo: motivo.trim(),
       p_confirmar_cascata: false,
     });
     setSaving(false);
     if (error) { mostrarErro(error); return; }
-    const resp = data as unknown as Resp & {
-      dados?: { requer_confirmacao?: boolean; tem_agendamento?: boolean; tem_pagamento?: boolean };
+    const resp = data as unknown as {
+      ok: boolean; codigo?: string; mensagem?: string;
+      requer_confirmacao?: boolean; tem_agendamento?: boolean; tem_pagamento?: boolean;
     };
     if (!resp?.ok) { toast.error(resp?.mensagem ?? `Erro: ${resp?.codigo ?? "?"}`); return; }
-    if (resp.dados?.requer_confirmacao) {
+    if (resp.requer_confirmacao) {
       onFlags({
-        tem_agendamento: !!resp.dados.tem_agendamento,
-        tem_pagamento: !!resp.dados.tem_pagamento,
+        tem_agendamento: !!resp.tem_agendamento,
+        tem_pagamento: !!resp.tem_pagamento,
       });
       setStep2(true);
     } else {
@@ -628,15 +662,15 @@ function CancelarSheet({
   const confirmar = async () => {
     setSaving(true);
     const { data, error } = await supabase.rpc("cancelar_item", {
-      p_item_id: item.item_id,
+      p_item_id: item.id,
       p_motivo: motivo.trim(),
       p_confirmar_cascata: true,
     });
     setSaving(false);
     if (error) { mostrarErro(error); return; }
-    const resp = data as unknown as Resp & { dados?: { aviso_pagamento?: boolean } };
+    const resp = data as unknown as { ok: boolean; codigo?: string; mensagem?: string; aviso_pagamento?: boolean };
     if (!resp?.ok) { toast.error(resp?.mensagem ?? `Erro: ${resp?.codigo ?? "?"}`); return; }
-    if (resp.dados?.aviso_pagamento) {
+    if (resp.aviso_pagamento) {
       toast.warning("Item cancelado. O pagamento não foi estornado automaticamente — verifique no Caixa/Financeiro.", { duration: 8000 });
     } else {
       toast.success("Item cancelado.");
