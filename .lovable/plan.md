@@ -1,190 +1,149 @@
-# A7 — Menu Inteligente + Navegação Moderna
+# A4 — Refactor Caixa (redução de paginação + listas rápidas)
 
-Feature flag: `menu_v2` em `profiles.preferencias_ui.flags`. Sem alterar o menu antigo — os dois convivem, alternáveis por usuário.
+Feature flag: `caixa_v2` em `profiles.preferencias_ui.flags`. Rota de pré-visualização isolada: `/app/dev-caixa-shell` (não altera `/app/caixa` até aprovação). Reaproveita `ListShell` + `VirtualList` do A1 e `UniversalSearch` do A2.
 
 ---
 
-## 1. Estrutura do novo menu
+## 1. Layout proposto
 
-Sidebar colapsável (usa `SidebarProvider`), 3 zonas verticais:
+Densidade compacta, foco em operação contínua da recepção. Duas colunas em desktop, empilhado em mobile.
 
 ```
-┌─ Topo ────────────────┐
-│ Logo + nome clínica   │
-│ Universal Search pill │  (reaproveita UB do A2)
-├─ Zona 1: Fixados ─────┤
-│ ★ Agenda              │
-│ ★ Caixa               │
-│ ★ Orçamentos          │
-├─ Zona 2: Centros Op. ─┤
-│ ▸ Atendimento         │
-│ ▸ Financeiro          │
-│ ▸ Cartão de Benefícios│
-│ ▸ Clínico             │
-│ ▸ Gestão              │
-│ ▸ Configurações       │
-├─ Zona 3: Dinâmico ────┤
-│ Recentes (últ. 5)     │
-│ Favoritos (do user)   │
-└───────────────────────┘
+┌─ Topbar da tela ───────────────────────────────────────────────┐
+│  Caixa · [Sessão #123 · aberta há 2h14]        [Fechar caixa] │
+│  Saldo: R$ 1.240,00   Recebido: R$ 3.180,00   Sangrias: R$120 │
+├─ Ações rápidas (pill row, sticky) ─────────────────────────────┤
+│ [+ Receber] [+ Despesa] [+ Suprimento] [+ Sangria] [Imprimir] │
+├─ Coluna esquerda (2/3) ────────┬─ Coluna direita (1/3) ───────┤
+│ Busca forte (UB embutida)      │ Fila do caixa (pacientes)    │
+│ [Abas: Hoje · Sessão · Todos]  │ virtualizada, click = receber│
+│ Chips: Recebimento · Despesa · │                              │
+│        Sangria · Suprim.       │                              │
+│ Lista virtualizada (linhas 40px)│                              │
+│  hora · tipo · descrição · R$  │                              │
+│  → scroll infinito             │                              │
+└────────────────────────────────┴──────────────────────────────┘
 ```
 
-Estética: densidade compacta (36px linha), ícones lucide 16px, `text-sm`, `rounded-md`, hover `bg-sidebar-accent`, ativo com `border-l-2 border-primary` + `bg-sidebar-accent`. Grupos com chevron animado. Transições 150ms. Modo collapsed = só ícones com tooltip.
+Modo compacto (toggle no topbar): remove coluna direita, linhas 32px, esconde subtotais na linha; ideal para recepção usar em monitor pequeno.
 
-## 2. Fixados
+## 2. Busca
 
-- Definidos por padrão do perfil (ver §6) — 3 a 5 itens.
-- Usuário pode fixar/desfixar via ícone ★ em qualquer item do menu ou via "Ver todos".
-- Persistidos em `preferencias_ui.menu.pinned: string[]` (route paths).
-- Sempre visíveis no topo, sem grupo colapsável.
+- Input único no topo da lista (reaproveita `ListShell` — debounce 200ms).
+- Reconhece prefixos da UB (A2): `p:` paciente, `r:` recibo, `v:` valor, `d:` data (`d:hoje`, `d:07/07`).
+- Sem prefixo: match em descrição + nome paciente + valor formatado + forma de pagamento.
+- CPF/telefone puro entra no atalho da UB e abre paciente sem sair do caixa.
 
-## 3. Recentes
+## 3. Filtros rápidos (chips)
 
-- Últimas 5 rotas visitadas distintas, excluindo Fixados e a rota atual.
-- Registrado client-side em subscriber do `router` (evento `onResolved`).
-- Persistido em `preferencias_ui.menu.recent: {path, label, ts}[]` (debounce 2s, gravação upsert em `profiles`).
-- LRU cap 20 em memória, exibe 5.
-- Ignora rotas efêmeras (`/auth`, `/app/dev-*`).
+Chips toggláveis, múltipla seleção, persistidos em URL (`?tipo=recebimento,despesa`):
 
-## 4. Favoritos
+- Tipo: Recebimento · Despesa · Sangria · Suprimento · Abertura/Fechamento
+- Forma: Dinheiro · Pix · Cartão · Boleto
+- Período: Hoje · 7d · 30d (só na aba "Todos")
+- "Somente estornáveis" (recebimentos não estornados)
 
-- Ação explícita do usuário (♥ no header de cada tela + no "Ver todos").
-- Persistidos em `preferencias_ui.menu.favorites: string[]`.
-- Exibidos abaixo de Recentes, ordenados por adição.
-- Sem limite rígido (soft cap 15, warning acima).
+Chip ativo = badge com X. "Limpar filtros" aparece quando qualquer chip está ligado.
 
-## 5. "Ver todos" por Centros Operacionais
+## 4. Abas
 
-- Cada Centro Operacional é um `SidebarGroup` colapsável mostrando **até 6 itens principais** + link "Ver todos →".
-- "Ver todos" abre `Sheet` lateral (drawer) com:
-  - Todos os itens do centro (filtrados por permissão).
-  - Busca local por nome.
-  - Estrela para fixar/desfixar, coração para favoritar.
-  - Agrupamento visual por subcategoria.
-- Estado do grupo (aberto/fechado) persistido em `preferencias_ui.menu.groups: Record<string, boolean>`.
+Três abas apenas (menos é mais):
 
-## 6. Separação por perfil
+- **Hoje** — todos movimentos da data atual, todas as sessões.
+- **Sessão atual** — só a sessão aberta do usuário (default se houver sessão aberta).
+- **Todos** — histórico completo com filtro de período obrigatório.
 
-Fixados padrão + Centros visíveis (permissão via `has_role` + `perfil_permissoes`):
+Contadores nas abas via `count` da `StatusTab` (agregado leve, `head: true` no query).
 
-| Perfil | Fixados padrão | Centros visíveis |
-|---|---|---|
-| **recepcao** | Agenda, Caixa, Clientes, Orçamentos | Atendimento, Financeiro (limitado), Cartão de Benefícios |
-| **medico** | Agenda, Prontuário, Meus Pacientes | Atendimento, Clínico |
-| **caixa** | Caixa, Boletos, NFS-e | Financeiro, Atendimento (leitura) |
-| **financeiro** | Lançamentos, Contas, Relatórios Fin. | Financeiro, Gestão (relatórios) |
-| **gestor** | Dashboard, Relatórios, Agenda | Todos (leitura ampla) |
-| **admin** | Dashboard, Configurações, Usuários | Todos + Configurações |
+## 5. Modo compacto
 
-Perfil detectado via `user_roles` (fonte única) + `clinica_memberships.perfil_id`.
+Toggle 🡒 `Ctrl+Shift+C`. Persistido em `preferencias_ui.caixa.compact`.
 
-## 7. Uso de `profiles.preferencias_ui`
+- Linhas 32px (vs 40px normal).
+- Esconde coluna "forma de pagamento" (vira ícone).
+- Esconde subtotais inline.
+- Aumenta densidade para ~24 linhas visíveis em 1080p.
 
-Namespace novo `menu` dentro do JSONB existente (aditivo, não quebra flags atuais):
+## 6. Scroll infinito
 
-```json
-{
-  "flags": { "ub_v1": true, "menu_v2": true },
-  "menu": {
-    "pinned": ["/app/agenda", "/app/caixa"],
-    "favorites": ["/app/relatorios/financeiro"],
-    "recent": [{"path":"/app/clientes","label":"Clientes","ts":1730000000}],
-    "groups": { "atendimento": true, "financeiro": false },
-    "collapsed": false
-  }
-}
-```
+- Substitui a paginação atual (páginas de 50).
+- Página inicial: 60 itens. Batch subsequente: 40. Sem "carregar mais" — dispara ao chegar a 400px do fim (`endThresholdPx` já suportado em `VirtualList`).
+- Query com `range()` + `order created_at desc`.
+- Estado da lista preserva scroll ao voltar de dialog (recibo, estorno).
+- Realtime: novo movimento inserido no topo com fade-in leve; badge "3 novos" se scroll não está no topo.
 
-Escrita: hook `use-menu-prefs` com debounce 2s, upsert único em `profiles.preferencias_ui` via merge JSONB no servidor (`jsonb_set`).
+## 7. Ações críticas preservadas
 
-## 8. Feature flag
+Todas as ações da tela atual continuam disponíveis, apenas reagrupadas:
 
-- Chave: `preferencias_ui.flags.menu_v2` (boolean).
-- Default: **off** para todos.
-- Piloto: ativar manualmente para admin/gestor de 1 clínica.
-- Sidebar renderiza `<MenuV2 />` se flag on, senão mantém `<AppSidebar />` atual **intocado**.
-- Toggle em `/app/configuracoes/preferencias` + evento `menu:flag-changed` (mesmo padrão do `ub:flag-changed`) para trocar sem reload.
-- Kill-switch: usuário ou admin desliga → volta ao menu antigo imediatamente.
+- Abrir caixa / Fechar caixa
+- Novo recebimento (com vínculo a agendamento/orçamento)
+- Nova despesa
+- Sangria / Suprimento
+- Ver detalhe do movimento (drawer lateral, não navega)
+- Solicitar estorno (`SolicitarEstornoDialog` existente)
+- Imprimir recibo (`print-gr.ts`)
+- Exportar Excel (`exportToExcel`)
+- Fila do caixa → receber pagamento de agendamento
+- Vínculo com lançamento financeiro
 
-## 9. Nomenclatura
+Nada é removido. Somente reordenado por frequência de uso.
 
-Zero ocorrência de "Convênio(s)" em labels, tooltips, grupos ou rotas novas. Vocabulário oficial:
+## 8. Riscos
 
-- **Cartão de Benefícios** (centro operacional)
-- **Regras do Cartão**
-- **Associados**
-- **Empresas Associadas**
-- **Contratos** (não "contratos de convênio")
-
-Lint de string: teste Playwright verifica ausência da palavra no DOM da sidebar em todos os perfis.
-
-## 10. Telas por Centro Operacional
-
-**Atendimento**
-Agenda · Clientes · Prontuários · Anamneses · Triagem Enfermagem · Chat interno · WhatsApp
-
-**Financeiro**
-Caixa · Boletos · NFS-e · Lançamentos · Contas · Categorias · Splits · Estornos · Relatórios Financeiros
-
-**Cartão de Benefícios**
-Contratos · Mensalidades · Dependentes · Regras do Cartão · Faixas · Associados · Empresas Associadas · Benefícios
-
-**Clínico**
-Procedimentos · Exames · Modelos de Prontuário · Modelos de Anamnese · Odontograma · Médicos · Especialidades · Escalas
-
-**Gestão**
-Dashboard · Relatórios · CRM · Marketing · Campanhas · LGPD · Auditoria · Estoque
-
-**Configurações**
-Clínica · Unidades · Usuários · Perfis & Permissões · Cargos · Setores · RH · Integrações · Preferências
-
-## 11. Riscos
-
-| Risco | Prob. | Impacto | Mitigação |
+| Risco | Prob | Impacto | Mitigação |
 |---|---|---|---|
-| Usuário perde item que usava | Média | Médio | Menu antigo permanece 1 clique atrás da flag; Recentes cobre o gap |
-| Escrita excessiva em `profiles` | Média | Baixo | Debounce 2s + merge JSONB no servidor |
-| Permissão inconsistente | Baixa | Alto | Filtro via `has_role` + `perfil_permissoes` no client E teste Playwright por perfil |
-| Regressão visual do header (A2) | Baixa | Médio | Sidebar isolada, não toca `AppShell` header |
-| Sidebar quebrar em mobile | Média | Médio | Usa `Sheet` do shadcn no breakpoint `<md` |
+| Recepção não achar botão que usava | Média | Alto | Flag off por padrão + rota dev isolada; ações críticas continuam com mesmo rótulo |
+| Perda de scroll ao abrir dialog | Média | Médio | Preservar posição via ref no `VirtualList` |
+| Realtime duplicar linhas | Baixa | Médio | Dedup por `id` no reducer |
+| Query pesada em "Todos" sem período | Média | Alto | Período obrigatório na aba "Todos" (default 7d) |
+| Fechamento de caixa quebrar | Baixa | Crítico | Não tocar em lógica de fechamento; só na renderização |
 
-## 12. Rollback
+## 9. Rollback
 
-1. **Instantâneo (usuário)**: desligar `menu_v2` em Preferências → volta ao menu antigo sem reload.
-2. **Por clínica**: SQL `UPDATE profiles SET preferencias_ui = jsonb_set(preferencias_ui,'{flags,menu_v2}','false') WHERE clinica_id = X`.
-3. **Global**: default já é off; basta não promover. Se promovido, mesmo SQL sem WHERE.
-4. **Código**: componente `<MenuV2 />` isolado em `src/components/menu-v2/`; remoção do import em `AppSidebar` desliga em build. Migração não altera schema (apenas usa JSONB existente) — nada a reverter no DB.
+1. Usuário: desliga `caixa_v2` em Preferências → volta ao `/app/caixa` atual sem reload.
+2. Global: default off; basta não promover.
+3. Código: componente novo isolado em `src/components/caixa-v2/`; rota atual `app.caixa.tsx` permanece intocada até a promoção.
+4. DB: sem migração — apenas leitura via mesma view/tabela atual.
 
-## 13. Testes Playwright
+## 10. Testes Playwright
 
-Rota de teste segura: `/app/dev-menu-shell` (espelha `dev-list-shell`, isolada). Bateria por perfil:
+Rota alvo: `/app/dev-caixa-shell`. Bateria:
 
-**Por perfil** (recepcao, medico, caixa, financeiro, gestor, admin):
-- Login → abrir `/app/dev-menu-shell` → screenshot sidebar.
-- Verificar fixados padrão presentes.
-- Verificar centros visíveis == esperado do perfil.
-- Verificar que centros não permitidos **não aparecem**.
-- Buscar "convênio" no DOM da sidebar → deve ser 0.
+- Abrir tela → sessão atual carrega em <500ms, primeiros 60 movimentos visíveis.
+- Busca "p:joão" → filtra por paciente.
+- Chip "Recebimento" + "Pix" → lista mostra só matches.
+- Trocar aba Hoje ↔ Sessão ↔ Todos → contadores batem com query.
+- Scroll até o fim → dispara próximo batch, sem duplicar itens.
+- Novo recebimento → aparece no topo, badge "1 novo" se scrollado.
+- Solicitar estorno de recebimento → dialog abre, aprova, linha marca "estornado".
+- Modo compacto on → linha 32px, coluna forma vira ícone.
+- Fechamento de caixa → dialog abre, valores conferem, salva.
+- Mobile 390×844 → coluna única, fila do caixa vira sheet.
+- Toggle `caixa_v2` off → redireciona para `/app/caixa` (atual).
+- Zero ocorrências de "Convênio" no DOM.
 
-**Interações**:
-- Fixar/desfixar item → recarregar → estado persistiu.
-- Favoritar → aparece em Favoritos → desfavoritar → some.
-- Navegar 3 rotas → Recentes mostra as 3 na ordem.
-- Abrir "Ver todos" de um centro → busca local funciona → fixar dali.
-- Colapsar sidebar → ícones visíveis, tooltip aparece.
-- Toggle `menu_v2` off → menu antigo volta sem reload.
-- Mobile viewport (390×844) → Sheet abre/fecha corretamente.
+## 11. Impacto esperado
 
-**Performance**:
-- Tempo de render inicial da sidebar < 100ms.
-- Debounce de escrita: 5 cliques em 1s = 1 request após 2s.
+| Métrica | Hoje | Meta v2 |
+|---|---|---|
+| Tempo até primeiro movimento visível | ~1.8s | <500ms |
+| Cliques para receber pagamento da fila | 3 | 1 |
+| Cliques para filtrar recebimentos em dinheiro do dia | 5 | 2 |
+| Movimentos visíveis sem scroll (1080p) | ~12 | ~24 (compacto) |
+| Requests ao rolar 500 itens | 10 (paginação) | 8 (infinito com batch 40) |
+| Perda de contexto ao abrir dialog | scroll reseta | preservado |
 
-**Regressão**:
-- Header A2 (UB) continua funcional com `menu_v2` on.
-- Rota `/app/agenda` (produção) não muda visualmente.
+Meta operacional: recepção conclui recebimento de agendamento em ≤2 cliques a partir da fila.
+
+## 12. O que NÃO muda nesta fase
+
+- Lógica de abertura/fechamento de caixa.
+- Regras de estorno.
+- Geração de recibo.
+- Vínculo com lançamento financeiro.
+- Fila do caixa (query e regras) — só muda a apresentação.
 
 ---
 
-Depois do menu aprovado e estável, seguimos para **redução de paginação em Caixa, Orçamentos e Clientes** (A8) — infinite scroll ou "carregar mais" com virtualização.
-
-Aguardo aprovação para implementar A7 fase 1 em `/app/dev-menu-shell` atrás da flag `menu_v2`.
+**Aguardando aprovação para implementar A4 fase 1 em `/app/dev-caixa-shell` atrás da flag `caixa_v2`.** Após estável, promovemos para `/app/caixa` mantendo o antigo como fallback pela flag, mesmo modelo do A7.
