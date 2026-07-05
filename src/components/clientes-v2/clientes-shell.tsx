@@ -96,8 +96,18 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
     const hoje = new Date();
     const mmdd = `${String(hoje.getMonth() + 1).padStart(2, "0")}-${String(hoje.getDate()).padStart(2, "0")}`;
     const desde30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    if (mode === "aniv") query = query.not("data_nascimento", "is", null).filter("data_nascimento", "like", `%-${mmdd}`).eq("ativo", true);
-    else if (mode === "novos30") query = query.gte("created_at", desde30);
+    if (mode === "aniv") {
+      // aniversariantes: uses dedicated RPC (to_char sobre date)
+      const { data, error } = await supabase.rpc("pacientes_aniversariantes_hoje", {
+        _clinica_id: scope[0], _limite: 200,
+      });
+      if (myReq !== reqRef.current) return;
+      if (error) { mostrarErro(error); setLoading(false); return; }
+      setRows(marcarDuplicados((data ?? []) as PacienteV2[]));
+      setLoading(false);
+      return;
+    }
+    if (mode === "novos30") query = query.gte("created_at", desde30);
     else if (mode === "semTel") query = query.is("telefone", null).is("telefone2", null);
     else if (mode === "semCpf") query = query.or("cpf.is.null,cpf_digits.is.null");
     else if (mode === "inativos") query = query.eq("ativo", false);
