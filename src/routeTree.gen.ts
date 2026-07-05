@@ -70,6 +70,7 @@ import { Route as AuthenticatedAppEquipeRouteImport } from './routes/_authentica
 import { Route as AuthenticatedAppEnfermagemRecursosRouteImport } from './routes/_authenticated/app.enfermagem-recursos'
 import { Route as AuthenticatedAppDocumentosRouteImport } from './routes/_authenticated/app.documentos'
 import { Route as AuthenticatedAppDisponibilidadesRouteImport } from './routes/_authenticated/app.disponibilidades'
+import { Route as AuthenticatedAppDevMenuShellRouteImport } from './routes/_authenticated/app.dev-menu-shell'
 import { Route as AuthenticatedAppDevListShellRouteImport } from './routes/_authenticated/app.dev-list-shell'
 import { Route as AuthenticatedAppCrmRouteImport } from './routes/_authenticated/app.crm'
 import { Route as AuthenticatedAppContratosRouteImport } from './routes/_authenticated/app.contratos'
@@ -459,6 +460,12 @@ const AuthenticatedAppDisponibilidadesRoute =
     path: '/disponibilidades',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
+const AuthenticatedAppDevMenuShellRoute =
+  AuthenticatedAppDevMenuShellRouteImport.update({
+    id: '/dev-menu-shell',
+    path: '/dev-menu-shell',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppDevListShellRoute =
   AuthenticatedAppDevListShellRouteImport.update({
     id: '/dev-list-shell',
@@ -819,6 +826,7 @@ export interface FileRoutesByFullPath {
   '/app/contratos': typeof AuthenticatedAppContratosRoute
   '/app/crm': typeof AuthenticatedAppCrmRoute
   '/app/dev-list-shell': typeof AuthenticatedAppDevListShellRoute
+  '/app/dev-menu-shell': typeof AuthenticatedAppDevMenuShellRoute
   '/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
   '/app/documentos': typeof AuthenticatedAppDocumentosRoute
   '/app/enfermagem-recursos': typeof AuthenticatedAppEnfermagemRecursosRoute
@@ -934,6 +942,7 @@ export interface FileRoutesByTo {
   '/app/contratos': typeof AuthenticatedAppContratosRoute
   '/app/crm': typeof AuthenticatedAppCrmRoute
   '/app/dev-list-shell': typeof AuthenticatedAppDevListShellRoute
+  '/app/dev-menu-shell': typeof AuthenticatedAppDevMenuShellRoute
   '/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
   '/app/documentos': typeof AuthenticatedAppDocumentosRoute
   '/app/enfermagem-recursos': typeof AuthenticatedAppEnfermagemRecursosRoute
@@ -1051,6 +1060,7 @@ export interface FileRoutesById {
   '/_authenticated/app/contratos': typeof AuthenticatedAppContratosRoute
   '/_authenticated/app/crm': typeof AuthenticatedAppCrmRoute
   '/_authenticated/app/dev-list-shell': typeof AuthenticatedAppDevListShellRoute
+  '/_authenticated/app/dev-menu-shell': typeof AuthenticatedAppDevMenuShellRoute
   '/_authenticated/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
   '/_authenticated/app/documentos': typeof AuthenticatedAppDocumentosRoute
   '/_authenticated/app/enfermagem-recursos': typeof AuthenticatedAppEnfermagemRecursosRoute
@@ -1170,6 +1180,7 @@ export interface FileRouteTypes {
     | '/app/contratos'
     | '/app/crm'
     | '/app/dev-list-shell'
+    | '/app/dev-menu-shell'
     | '/app/disponibilidades'
     | '/app/documentos'
     | '/app/enfermagem-recursos'
@@ -1285,6 +1296,7 @@ export interface FileRouteTypes {
     | '/app/contratos'
     | '/app/crm'
     | '/app/dev-list-shell'
+    | '/app/dev-menu-shell'
     | '/app/disponibilidades'
     | '/app/documentos'
     | '/app/enfermagem-recursos'
@@ -1401,6 +1413,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/contratos'
     | '/_authenticated/app/crm'
     | '/_authenticated/app/dev-list-shell'
+    | '/_authenticated/app/dev-menu-shell'
     | '/_authenticated/app/disponibilidades'
     | '/_authenticated/app/documentos'
     | '/_authenticated/app/enfermagem-recursos'
@@ -1934,6 +1947,13 @@ declare module '@tanstack/react-router' {
       path: '/disponibilidades'
       fullPath: '/app/disponibilidades'
       preLoaderRoute: typeof AuthenticatedAppDisponibilidadesRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/dev-menu-shell': {
+      id: '/_authenticated/app/dev-menu-shell'
+      path: '/dev-menu-shell'
+      fullPath: '/app/dev-menu-shell'
+      preLoaderRoute: typeof AuthenticatedAppDevMenuShellRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/dev-list-shell': {
@@ -2478,6 +2498,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppContratosRoute: typeof AuthenticatedAppContratosRoute
   AuthenticatedAppCrmRoute: typeof AuthenticatedAppCrmRoute
   AuthenticatedAppDevListShellRoute: typeof AuthenticatedAppDevListShellRoute
+  AuthenticatedAppDevMenuShellRoute: typeof AuthenticatedAppDevMenuShellRoute
   AuthenticatedAppDisponibilidadesRoute: typeof AuthenticatedAppDisponibilidadesRoute
   AuthenticatedAppDocumentosRoute: typeof AuthenticatedAppDocumentosRoute
   AuthenticatedAppEnfermagemRecursosRoute: typeof AuthenticatedAppEnfermagemRecursosRoute
@@ -2551,6 +2572,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppContratosRoute: AuthenticatedAppContratosRoute,
   AuthenticatedAppCrmRoute: AuthenticatedAppCrmRoute,
   AuthenticatedAppDevListShellRoute: AuthenticatedAppDevListShellRoute,
+  AuthenticatedAppDevMenuShellRoute: AuthenticatedAppDevMenuShellRoute,
   AuthenticatedAppDisponibilidadesRoute: AuthenticatedAppDisponibilidadesRoute,
   AuthenticatedAppDocumentosRoute: AuthenticatedAppDocumentosRoute,
   AuthenticatedAppEnfermagemRecursosRoute:
