@@ -369,7 +369,7 @@ function DashboardPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Painel</h1>
           <p className="text-sm text-muted-foreground">{clinicaAtual?.clinica.nome} {carregando && "• atualizando…"}</p>
         </div>
-        <div className="flex items-end gap-2">
+        <div className="flex w-full flex-wrap items-end gap-2 lg:w-auto">
           <MultiSelectFiltro
             label="Profissional"
             placeholder="Todos os profissionais"
@@ -391,13 +391,13 @@ function DashboardPage() {
             busca={buscaEsp}
             setBusca={setBuscaEsp}
           />
-          <div className="space-y-1">
+          <div className="space-y-1 min-w-0 flex-1 sm:flex-none">
             <Label className="text-xs">Período</Label>
-            <Input type="date" value={periodo.de} onChange={(e) => setPeriodo(p => ({ ...p, de: e.target.value }))} className="w-40" />
+            <Input type="date" value={periodo.de} onChange={(e) => setPeriodo(p => ({ ...p, de: e.target.value }))} className="w-full sm:w-40" />
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1 min-w-0 flex-1 sm:flex-none">
             <Label className="text-xs">até</Label>
-            <Input type="date" value={periodo.ate} onChange={(e) => setPeriodo(p => ({ ...p, ate: e.target.value }))} className="w-40" />
+            <Input type="date" value={periodo.ate} onChange={(e) => setPeriodo(p => ({ ...p, ate: e.target.value }))} className="w-full sm:w-40" />
           </div>
           <Button variant="outline" onClick={load}>Atualizar</Button>
         </div>
@@ -666,11 +666,11 @@ function MultiSelectFiltro({
       ? options.find(o => o.value === selected[0])?.label ?? "1 selecionado"
       : `${selected.length} selecionados`;
   return (
-    <div className="space-y-1">
+    <div className="space-y-1 w-full sm:w-auto">
       <Label className="text-xs">{label}</Label>
       <Popover>
         <PopoverTrigger asChild>
-          <Button variant="outline" className="w-56 justify-between font-normal">
+          <Button variant="outline" className="w-full sm:w-56 justify-between font-normal">
             <span className="flex items-center gap-2 truncate">
               <Filter className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
               <span className="truncate">{resumo}</span>
