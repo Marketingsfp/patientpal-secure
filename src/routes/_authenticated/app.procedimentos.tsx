@@ -690,6 +690,14 @@ function ProcedimentosPage() {
       valor_cartao_consulta: String(p.valor_cartao_consulta ?? 0),
       valor_cartao_desconto: String(p.valor_cartao_desconto ?? 0),
       duracao_minutos: String(p.duracao_minutos), observacoes: p.observacoes ?? "", preparo: p.preparo ?? "", ativo: p.ativo,
+      fluxo_atendimento: p.fluxo_atendimento ?? "consulta_padrao",
+      agenda_obrigatoria: p.agenda_obrigatoria ?? true,
+      medico_obrigatorio: p.medico_obrigatorio ?? false,
+      sala_obrigatoria: p.sala_obrigatoria ?? false,
+      equipamento_obrigatorio: p.equipamento_obrigatorio ?? false,
+      permite_venda_direta: p.permite_venda_direta ?? false,
+      permite_encaixe: p.permite_encaixe ?? true,
+      tempo_padrao_min: String(p.tempo_padrao_min ?? p.duracao_minutos ?? 30),
     });
     setOpen(true);
   };
