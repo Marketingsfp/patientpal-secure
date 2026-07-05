@@ -647,10 +647,10 @@ export function AppShell() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <p className="text-sm font-medium truncate max-w-[160px]" title={user?.email ?? undefined}>{userName}</p>
+            <p className="hidden sm:block text-sm font-medium truncate max-w-[160px]" title={user?.email ?? undefined}>{userName}</p>
           </div>
           {clinicaAtual && logoDaClinica(clinicaAtual.clinica.nome) && (
-            <div className="bg-white rounded-lg shadow-sm border px-2 py-1 flex items-center justify-center shrink-0">
+            <div className="bg-white rounded-lg shadow-sm border px-2 py-1 hidden sm:flex items-center justify-center shrink-0">
               <img
                 src={logoDaClinica(clinicaAtual.clinica.nome)!}
                 alt={clinicaAtual.clinica.nome}
@@ -666,7 +666,7 @@ export function AppShell() {
                 else setClinicaAtual(v);
               }}
             >
-              <SelectTrigger className="w-[260px] h-8 text-xs">
+              <SelectTrigger className="h-8 w-full min-w-0 max-w-[260px] text-xs">
                 <SelectValue placeholder="Selecione a clínica" />
               </SelectTrigger>
               <SelectContent>
@@ -690,11 +690,11 @@ export function AppShell() {
             </Select>
           )}
           <div className="flex-1" />
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <Button
               variant="ghost"
               size="sm"
-              className="h-9 w-9 p-0 rounded-full"
+              className="hidden sm:inline-flex h-9 w-9 p-0 rounded-full"
               title="Atalhos de teclado (?)"
               onClick={() => {
                 window.dispatchEvent(new KeyboardEvent("keydown", { key: "?" }));

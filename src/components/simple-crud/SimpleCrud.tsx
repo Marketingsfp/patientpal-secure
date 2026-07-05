@@ -139,12 +139,12 @@ export function SimpleCrud<T extends { id: string }, F>({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold flex items-center gap-2">{icon} {title}</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-semibold flex items-center gap-2">{icon} {title}</h1>
           {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
         </div>
-        <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" /> Novo</Button>
+        <Button onClick={openNew} className="shrink-0"><Plus className="h-4 w-4 mr-2" /> Novo</Button>
       </div>
 
       {searchFields && searchFields.length > 0 && (
