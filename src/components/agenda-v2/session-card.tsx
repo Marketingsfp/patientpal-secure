@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { TIPO_SESSAO_ESTILO, TIPO_SESSAO_LABEL, type TipoSessao } from "@/lib/agenda-v2/session-detect";
+import { HhpChip } from "@/design-system/hhp";
 
 // Chips de status — tom baixo, editorial.
 const STATUS_LABEL: Record<string, string> = {
@@ -220,9 +221,9 @@ export function SessionCard({
               </>
             )}
             {data.is_encaixe && (
-              <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200/60">
+              <HhpChip tone="warn" variant="outline" size="xs" radius="md" className="ml-1">
                 Encaixe
-              </span>
+              </HhpChip>
             )}
           </div>
 
