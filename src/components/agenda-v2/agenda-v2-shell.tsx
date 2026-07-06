@@ -12,6 +12,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { HhpSkeletonCard } from "@/design-system/hhp";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
@@ -708,7 +709,7 @@ export function AgendaV2Shell() {
         {rows === null ? (
           <div className="p-6 space-y-3">
             {Array.from({ length: 8 }).map((_, i) => (
-              <Skeleton key={i} className={compact ? "h-14 w-full rounded-2xl" : "h-24 w-full rounded-3xl"} />
+              <HhpSkeletonCard key={i} density={compact ? "compacto" : "confortavel"} />
             ))}
           </div>
         ) : filtradas.length === 0 ? (
