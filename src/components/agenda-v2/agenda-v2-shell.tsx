@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   ChevronLeft, ChevronRight, LayoutList, GanttChartSquare, CalendarDays,
-  Search, Rows3, Rows2, Sparkles, Plus,
+  Search, Rows3, Rows2, Focus, Sparkles, Plus,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,8 +16,9 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 import { KpiBar, type Kpi } from "./kpi-bar";
 import { SessionCard, type SessionCardData, type SessionDensity } from "./session-card";
 import { AgendaV2Sidebar } from "./agenda-v2-sidebar";
-import type { TimelineData } from "./patient-timeline-drawer";
-import { PatientTimelineDrawer } from "./patient-timeline-drawer";
+import { PatientDrawer, type DrawerPatientData } from "./patient-drawer";
+import { AiInsightsStrip } from "./ai-insights-strip";
+import { NovoAgendamentoWizard } from "./novo-agendamento-wizard";
 import { tipoDaSessao, type ProcMeta } from "@/lib/agenda-v2/session-detect";
 import { cn } from "@/lib/utils";
 
@@ -57,6 +58,7 @@ export function AgendaV2Shell() {
   const [filtroRecurso, setFiltroRecurso] = useState<string>("");
   const [drawerPacote, setDrawerPacote] = useState<string | null>(null);
   const [drawerMounted, setDrawerMounted] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
   const [density, setDensity] = useState<SessionDensity>(() => {
     if (typeof window === "undefined") return "confortavel";
     return (window.localStorage.getItem(DENSITY_KEY) as SessionDensity) ?? "confortavel";
@@ -295,17 +297,29 @@ export function AgendaV2Shell() {
     return m;
   }, [sessoes]);
 
-  const drawerData = useMemo<TimelineData | null>(() => {
+  const drawerData = useMemo<DrawerPatientData | null>(() => {
     if (!drawerPacote || !rows) return null;
     const grupo = rows.filter((r) => (r.pacote_id ?? r.id) === drawerPacote);
     if (grupo.length === 0) return null;
     const primeiro = grupo[0];
+    const medicoNome = primeiro.medico_id ? medicos.get(primeiro.medico_id) : null;
+    const chegada = primeiro.fluxo_atualizado_em
+      ? new Date(primeiro.fluxo_atualizado_em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+      : null;
+    const partes = [
+      medicoNome ? medicoNome : null,
+      chegada ? `chegou ${chegada}` : null,
+    ].filter(Boolean);
+    const hora = new Date(primeiro.inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
     return {
       paciente_nome: primeiro.paciente_nome,
+      resumo_clinico: partes.length ? partes.join(" · ") : null,
       etapa_atual: primeiro.fluxo_etapa ?? "aguardando_recepcao",
       historico: primeiro.fluxo_atualizado_em
         ? [{ etapa: primeiro.fluxo_etapa ?? "aguardando_recepcao", timestamp: primeiro.fluxo_atualizado_em }]
         : [],
+      proc_titulo: primeiro.procedimento,
+      hora,
     };
   }, [drawerPacote, rows]);
 
@@ -315,6 +329,7 @@ export function AgendaV2Shell() {
 
   const openDrawer = (id: string) => { setDrawerMounted(true); setDrawerPacote(id); };
   const compact = density === "compacto";
+  const foco = density === "foco";
 
   // Agrupar sessões por hora para render com régua de horas.
   const porHora = useMemo(() => {
@@ -351,14 +366,14 @@ export function AgendaV2Shell() {
   const isToday = new Date(diaKey).toDateString() === new Date().toDateString();
 
   return (
-    <div className="h-full flex bg-[#FBFBFA]">
-      <AgendaV2Sidebar
+    <div className="h-full flex bg-[#FAFAF8]">
+      {!foco && <AgendaV2Sidebar
         clinicaNome={clinicaNome}
         dia={dia}
         sessoes={sessoes}
         recursos={recursosOcup}
         equipeOnline={equipeOnline}
-      />
+      />}
 
       <div className="flex-1 min-w-0 flex flex-col">
       {/* Header */}
@@ -376,6 +391,7 @@ export function AgendaV2Shell() {
           <div className="flex items-center gap-2">
             <Button
               size="sm"
+              onClick={() => setWizardOpen(true)}
               className="h-9 px-4 rounded-2xl gap-1.5 bg-slate-900 hover:bg-slate-800 text-white shadow-sm transition-all hover:shadow-md hover:-translate-y-[1px]"
             >
               <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
@@ -393,6 +409,9 @@ export function AgendaV2Shell() {
               </ToggleGroupItem>
               <ToggleGroupItem value="compacto" aria-label="Compacto" className="h-8 w-8 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm">
                 <Rows2 className="h-3.5 w-3.5" />
+              </ToggleGroupItem>
+              <ToggleGroupItem value="foco" aria-label="Foco" className="h-8 w-8 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm">
+                <Focus className="h-3.5 w-3.5" />
               </ToggleGroupItem>
             </ToggleGroup>
 
@@ -495,6 +514,11 @@ export function AgendaV2Shell() {
         />
       </div>
 
+      {/* Faixa de sugestões IA (visual) */}
+      {rows !== null && filtradas.length > 0 && (
+        <AiInsightsStrip sessoes={filtradas} livresPorHora={livresPorHora} />
+      )}
+
       {/* Corpo */}
       <div className="flex-1 min-h-0 overflow-hidden">
         {rows === null ? (
@@ -509,35 +533,41 @@ export function AgendaV2Shell() {
             <div>Nenhuma sessão para os filtros atuais.</div>
           </div>
         ) : (
-          <div className="h-full overflow-y-auto px-6 pt-4 pb-8">
+          <div className={cn("h-full overflow-y-auto pb-8", foco ? "px-10 pt-6 max-w-4xl mx-auto" : "px-6 pt-4")}>
             {porHora.map(([hora, lista]) => {
               const isNowHour = isToday && hora === nowHour;
               return (
                 <div key={hora} className="flex gap-4 relative">
                   {/* Coluna de hora (régua) */}
-                  <div className="w-14 shrink-0 relative">
+                  <div className={cn("shrink-0 relative", foco ? "w-16" : "w-14")}>
                     <div className={cn(
-                      "sticky top-0 text-[11px] font-bold tabular-nums uppercase tracking-wider pt-1",
-                      isNowHour ? "text-rose-600" : "text-slate-400",
+                      "sticky top-0 tabular-nums pt-1",
+                      foco ? "text-[13px] font-semibold text-slate-500" : "text-[11px] font-bold uppercase tracking-wider text-slate-400",
                     )}>
                       {String(hora).padStart(2, "0")}:00
                     </div>
                   </div>
                   {/* Coluna de sessões */}
-                  <div className="flex-1 min-w-0 border-l border-slate-100 pl-6 pb-4 relative">
+                  <div className={cn("flex-1 min-w-0 border-l border-slate-100 pb-4 relative", foco ? "pl-8" : "pl-6")}>
                     {isNowHour && (
                       <div
                         className="absolute -left-[3px] right-0 flex items-center gap-2 z-10 pointer-events-none"
                         style={{ top: `${(nowMin / 60) * 100}%` }}
                       >
-                        <span className="h-1.5 w-1.5 rounded-full bg-rose-500 shadow-[0_0_0_3px_rgba(244,63,94,0.15)]" />
-                        <span className="flex-1 h-px bg-gradient-to-r from-rose-400 via-rose-200 to-transparent" />
-                        <span className="text-[9px] font-bold uppercase tracking-wider text-rose-500 pr-2">
+                        <span
+                          className="h-1.5 w-1.5 rounded-full"
+                          style={{ background: "rgba(79, 70, 229, 0.55)" }}
+                        />
+                        <span
+                          className="flex-1 h-px"
+                          style={{ background: "rgba(79, 70, 229, 0.35)" }}
+                        />
+                        <span className="text-[9px] font-semibold uppercase tracking-wider text-indigo-500/70 pr-2">
                           agora · {String(nowHour).padStart(2, "0")}:{String(nowMin).padStart(2, "0")}
                         </span>
                       </div>
                     )}
-                    <div className="space-y-3">
+                    <div className={cn(compact ? "space-y-1.5" : foco ? "space-y-4" : "space-y-2.5")}>
                       {lista.map((s) => (
                         <SessionCard key={s.pacote_id} data={s} onOpenTimeline={openDrawer} density={density} />
                       ))}
@@ -558,12 +588,13 @@ export function AgendaV2Shell() {
       </div>
 
       {drawerMounted && (
-        <PatientTimelineDrawer
+        <PatientDrawer
           open={!!drawerPacote}
           onOpenChange={(v) => { if (!v) setDrawerPacote(null); }}
           data={drawerData}
         />
       )}
+      <NovoAgendamentoWizard open={wizardOpen} onOpenChange={setWizardOpen} />
     </div>
   );
 }
