@@ -97,7 +97,20 @@ export function AgendaV2Shell() {
     const list: SessionCardData[] = [];
     for (const [key, group] of map.entries()) {
       const primeiro = group[0];
-      const items: ProcMeta[] = group.map((g) => procMeta.get((g.procedimento ?? "").toLowerCase()) ?? { nome: g.procedimento, tipo: null, grupo: null });
+      const items: ProcMeta[] = group.map((g) => {
+        const nome = g.procedimento ?? "";
+        const key = nome.toLowerCase();
+        const meta = procMeta.get(key);
+        if (meta) return meta;
+        // Fallback heurístico quando o texto livre do agendamento não bate
+        // com o catálogo (ex.: "GLICOSE BASAL (LABORATORIO)").
+        const grupoInf = /\bLABORAT/i.test(nome) ? "Laboratório"
+          : /\bRAIO|\bTOMOG|\bRESSON|\bULTRASSOM|\bIMAGEM/i.test(nome) ? "Imagem"
+          : /\bENDOSC|\bCOLONOSC/i.test(nome) ? "Endoscopia"
+          : /\bCARDIO|\bECOCARDIO|\bELETROC/i.test(nome) ? "Cardiologia"
+          : null;
+        return { nome, tipo: null, grupo: grupoInf };
+      });
       const tipo = tipoDaSessao(items);
       list.push({
         pacote_id: key,
