@@ -86,7 +86,7 @@ function ContratosPage() {
   useEffect(() => {
     if (autoNew === "1" && clinicaAtual) {
       openNew();
-      void navigate({ to: "/app/hr-contratos", search: {}, replace: true });
+      void navigate({ to: "/app/hr-contratos", search: { new: undefined, edit: undefined }, replace: true });
     }
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [autoNew, clinicaAtual?.clinica_id]);
@@ -111,7 +111,7 @@ function ContratosPage() {
         setPrefillUserId(autoEdit);
         setOpen(true);
       }
-      void navigate({ to: "/app/hr-contratos", search: {}, replace: true });
+      void navigate({ to: "/app/hr-contratos", search: { new: undefined, edit: undefined }, replace: true });
     })();
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [autoEdit, clinicaAtual?.clinica_id, loading]);

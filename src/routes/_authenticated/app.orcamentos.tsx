@@ -337,7 +337,7 @@ function OrcamentosPage() {
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
-            onClick={() => navigate({ to: "/app/orcamentos-agenda" })}
+            onClick={() => navigate({ to: "/app/orcamentos-agenda", search: { orc: undefined } })}
             className="gap-2"
             title="Abrir orçamentos e agenda lado a lado"
           >

@@ -71,7 +71,7 @@ function MedicosPage() {
   useEffect(() => {
     if (autoNew === "1") {
       setDialog({ open: true, id: null });
-      void navigate({ to: "/app/medicos", search: {}, replace: true });
+      void navigate({ to: "/app/medicos", search: { new: undefined, edit: undefined }, replace: true });
     }
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [autoNew]);
@@ -79,7 +79,7 @@ function MedicosPage() {
   useEffect(() => {
     if (autoEdit) {
       setDialog({ open: true, id: autoEdit });
-      void navigate({ to: "/app/medicos", search: {}, replace: true });
+      void navigate({ to: "/app/medicos", search: { new: undefined, edit: undefined }, replace: true });
     }
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [autoEdit]);
