@@ -1,44 +1,76 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Play, DollarSign, Check } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
+import {
+  Check, FileText, CalendarClock, Wallet, FileSignature,
+  MessageCircle, History, Stethoscope, Sparkles, AlertTriangle,
+  Coffee, DollarSign, Clock, ClipboardCheck,
+} from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
 export interface DrawerPatientData {
+  paciente_id?: string | null;
   paciente_nome: string;
   paciente_avatar_url?: string | null;
-  resumo_clinico?: string | null;   // "42a · Unimed · Cardiologia · Dra. Ana · chegou 09:28"
+  medico_nome?: string | null;
+  especialidade?: string | null;
+  status?: string | null;
+  chegou_em?: string | null;         // "09:28"
   etapa_atual: string | null;
   historico: Array<{ etapa: string; timestamp: string }>;
   proc_titulo?: string | null;
   hora?: string | null;
 }
 
+// 6 etapas rev.3 (rev. paciente).
 const ETAPAS = [
-  { key: "agendado", label: "Agendamento" },
+  { key: "agendado", label: "Confirmado" },
   { key: "aguardando_recepcao", label: "Check-in" },
-  { key: "recepcao", label: "Recepção" },
-  { key: "caixa", label: "Pagamento" },
-  { key: "triagem", label: "Triagem" },
-  { key: "atendimento", label: "Atendimento" },
+  { key: "caixa", label: "Financeiro" },
+  { key: "atendimento", label: "Em atendimento" },
   { key: "exame", label: "Exames" },
   { key: "finalizado", label: "Alta" },
 ] as const;
 
-type Tab = "financeiro" | "docs" | "historico" | "prontuario";
+type Tab = "resumo" | "financeiro" | "docs" | "historico" | "prontuario";
+
+const STATUS_LABEL: Record<string, string> = {
+  agendado: "Aguardando",
+  confirmado: "Confirmado",
+  em_atendimento: "Em atendimento",
+  realizado: "Realizado",
+  cancelado: "Cancelado",
+  faltou: "Faltou",
+};
 
 function initials(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("");
 }
 
+function idadeFromDob(dob: string | null | undefined): number | null {
+  if (!dob) return null;
+  const d = new Date(dob);
+  if (Number.isNaN(d.getTime())) return null;
+  const t = new Date();
+  let a = t.getFullYear() - d.getFullYear();
+  const m = t.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && t.getDate() < d.getDate())) a--;
+  return a >= 0 && a < 130 ? a : null;
+}
+
 /**
- * Drawer padrão do paciente (rev.3):
- * - foto 96px, nome 24px em Inter Tight
- * - linha compacta de resumo clínico logo abaixo do nome
- * - timeline vertical de etapas
- * - CTAs "Iniciar atendimento" e "Pagar"
- * - abas segmentadas: Financeiro · Docs · Histórico · Prontuário
+ * Drawer — Centro de Atendimento (Fase C):
+ * - Header: foto 96, nome dominante, chips (idade · convênio · médico · especialidade · hora · status)
+ * - Jornada visual de 6 etapas em linha contínua
+ * - 7 ações rápidas
+ * - Bloco de sugestões IA (estrutura visual)
+ * - Painel rápido (Resumo) + abas Financeiro/Docs/Histórico/Prontuário
+ * - Abertura instantânea; detalhes do paciente carregam em segundo plano.
  */
 export function PatientDrawer({
   open, onOpenChange, data,
@@ -47,103 +79,144 @@ export function PatientDrawer({
   onOpenChange: (v: boolean) => void;
   data: DrawerPatientData | null;
 }) {
-  const [tab, setTab] = useState<Tab>("financeiro");
+  const [tab, setTab] = useState<Tab>("resumo");
+  const openedAtRef = useRef<number>(0);
+  const [openMs, setOpenMs] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      openedAtRef.current = performance.now();
+      setOpenMs(null);
+      requestAnimationFrame(() => {
+        setOpenMs(Math.round(performance.now() - openedAtRef.current));
+      });
+    }
+  }, [open, data?.paciente_id]);
+
   const idx = data ? ETAPAS.findIndex((e) => e.key === data.etapa_atual) : -1;
+
+  // Fetch em segundo plano — nome do convênio + idade — sem bloquear a abertura.
+  const detalhesQuery = useQuery({
+    queryKey: ["agenda-v2", "drawer-paciente", data?.paciente_id],
+    enabled: open && !!data?.paciente_id,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data: p } = await supabase
+        .from("pacientes")
+        .select("id,data_nascimento")
+        .eq("id", data!.paciente_id!)
+        .maybeSingle();
+      return { idade: idadeFromDob(p?.data_nascimento) };
+    },
+  });
+
+  const idade = detalhesQuery.data?.idade ?? null;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-[480px] overflow-y-auto p-0 bg-white">
+      <SheetContent
+        side="right"
+        className="w-full sm:max-w-[520px] overflow-y-auto p-0 bg-white transition-transform duration-150"
+      >
         <VisuallyHidden.Root>
           <SheetTitle>{data?.paciente_nome ?? "Paciente"}</SheetTitle>
-          <SheetDescription>Resumo clínico, jornada e ações rápidas.</SheetDescription>
+          <SheetDescription>Centro de Atendimento do paciente: jornada, ações rápidas e sugestões.</SheetDescription>
         </VisuallyHidden.Root>
         {data && (
-          <>
-            <div className="px-6 pt-8 pb-5 border-b border-slate-100">
+          <div className="animate-in fade-in duration-150">
+            {/* 1. Cabeçalho */}
+            <div className="px-6 pt-7 pb-5 border-b border-slate-100">
               <div className="flex items-start gap-4">
-                <Avatar className="h-24 w-24 border border-slate-200/80 shadow-sm">
+                <Avatar className="h-24 w-24 border border-slate-200/80 shadow-sm shrink-0">
                   {data.paciente_avatar_url && <AvatarImage src={data.paciente_avatar_url} alt={data.paciente_nome} />}
                   <AvatarFallback className="bg-slate-50 text-slate-500 text-2xl font-semibold">
                     {initials(data.paciente_nome)}
                   </AvatarFallback>
                 </Avatar>
-                <div className="min-w-0 flex-1 pt-1">
+                <div className="min-w-0 flex-1 pt-0.5">
                   <h2
-                    className="text-2xl font-semibold text-slate-900 truncate"
+                    className="text-[22px] leading-tight font-semibold text-slate-900 truncate"
                     style={{ fontFamily: "'Inter Tight', Inter, sans-serif", letterSpacing: "-0.01em" }}
                   >
                     {data.paciente_nome}
                   </h2>
-                  {data.resumo_clinico && (
-                    <p className="mt-1 text-xs text-slate-500 leading-relaxed">
-                      {data.resumo_clinico}
-                    </p>
-                  )}
-                  {(data.proc_titulo || data.hora) && (
+                  <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
+                    <MetaChip label={idade === null ? (detalhesQuery.isLoading ? "…" : "—") : `${idade}a`} />
+                    <MetaChip label={/* convênio: placeholder */ "Particular"} muted />
+                    {data.medico_nome && <MetaChip label={data.medico_nome} />}
+                    {data.especialidade && <MetaChip label={data.especialidade} />}
+                    {data.hora && <MetaChip label={data.hora} tabular />}
+                    {data.status && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 text-[11px] font-medium">
+                        {STATUS_LABEL[data.status] ?? data.status.replace(/_/g, " ")}
+                      </span>
+                    )}
+                  </div>
+                  {data.chegou_em && (
                     <p className="mt-2 text-[11px] uppercase tracking-widest text-slate-400">
-                      {[data.hora, data.proc_titulo].filter(Boolean).join(" · ")}
+                      Chegou {data.chegou_em}
                     </p>
                   )}
                 </div>
               </div>
-
-              <div className="mt-5 flex gap-2">
-                <button
-                  type="button"
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 h-10 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition-colors"
-                >
-                  <Play className="h-3.5 w-3.5" /> Iniciar atendimento
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex items-center justify-center gap-1.5 h-10 px-4 rounded-xl border border-slate-200 text-slate-700 text-sm font-semibold hover:bg-slate-50 transition-colors"
-                >
-                  <DollarSign className="h-3.5 w-3.5" /> Pagar
-                </button>
-              </div>
             </div>
 
+            {/* 2. Jornada (linha contínua) */}
             <div className="px-6 py-5 border-b border-slate-100">
-              <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-3">
-                Jornada do paciente
-              </div>
-              <ol className="relative space-y-2">
-                {ETAPAS.map((e, i) => {
-                  const past = i < idx;
-                  const current = i === idx;
-                  const isLast = i === ETAPAS.length - 1;
-                  return (
-                    <li key={e.key} className="flex gap-3">
-                      <div className="flex flex-col items-center">
-                        <div className={cn(
-                          "h-6 w-6 rounded-full flex items-center justify-center shrink-0 text-[10px] font-semibold",
-                          past && "bg-emerald-500 text-white",
-                          current && "bg-indigo-500 text-white ring-4 ring-indigo-100 animate-pulse",
-                          !past && !current && "bg-slate-100 text-slate-400 border border-slate-200/60",
-                        )}>
-                          {past ? <Check className="h-3 w-3" /> : i + 1}
-                        </div>
-                        {!isLast && (
-                          <div className={cn("w-px flex-1 min-h-4 my-1", past ? "bg-emerald-300" : "bg-slate-200/70")} />
-                        )}
-                      </div>
-                      <div className="flex-1 pb-2 pt-0.5">
-                        <div className={cn(
-                          "text-[13px]",
-                          current ? "font-semibold text-slate-900" : past ? "text-slate-700" : "text-slate-400",
-                        )}>
-                          {e.label}
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ol>
+              <SectionTitle>Jornada</SectionTitle>
+              <JourneyLine currentIdx={idx} />
             </div>
 
+            {/* 4. Ações rápidas */}
+            <div className="px-6 py-4 border-b border-slate-100">
+              <SectionTitle>Ações rápidas</SectionTitle>
+              <div className="grid grid-cols-4 gap-2">
+                <QuickAction icon={<Stethoscope className="h-4 w-4" />} label="Prontuário" />
+                <QuickAction icon={<CalendarClock className="h-4 w-4" />} label="Reagendar" />
+                <QuickAction icon={<Wallet className="h-4 w-4" />} label="Financeiro" />
+                <QuickAction icon={<FileSignature className="h-4 w-4" />} label="Orçamento" />
+                <QuickAction icon={<FileText className="h-4 w-4" />} label="Documentos" />
+                <QuickAction icon={<MessageCircle className="h-4 w-4" />} label="WhatsApp" />
+                <QuickAction icon={<History className="h-4 w-4" />} label="Histórico" />
+                <QuickAction icon={<Sparkles className="h-4 w-4" />} label="Nina" />
+              </div>
+            </div>
+
+            {/* 5. Sugestões IA (estrutura visual) */}
+            <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-b from-indigo-50/40 to-white">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-indigo-600">
+                  <Sparkles className="h-3 w-3" /> Sugestões da IA
+                </div>
+                <span className="text-[10px] text-slate-400">3 sinais</span>
+              </div>
+              <div className="space-y-1.5">
+                <AiChip
+                  icon={<Clock className="h-3.5 w-3.5" />}
+                  tone="warn"
+                  label="Paciente chegou antes do horário"
+                  hint="Considere adiantar a triagem."
+                />
+                <AiChip
+                  icon={<Coffee className="h-3.5 w-3.5" />}
+                  tone="info"
+                  label="Exame exige jejum de 8h"
+                  hint="Confirmar preparo antes da coleta."
+                />
+                <AiChip
+                  icon={<DollarSign className="h-3.5 w-3.5" />}
+                  tone="danger"
+                  label="Existe pendência financeira"
+                  hint="Verifique no Financeiro antes da alta."
+                />
+              </div>
+            </div>
+
+            {/* 3 + tabs: Painel rápido + demais abas (conteúdo pesado só ao trocar de aba) */}
             <div className="px-6 py-4">
               <div className="flex gap-1 p-1 bg-slate-100 rounded-xl mb-4">
                 {([
+                  { key: "resumo", label: "Resumo" },
                   { key: "financeiro", label: "Financeiro" },
                   { key: "docs", label: "Docs" },
                   { key: "historico", label: "Histórico" },
@@ -154,7 +227,7 @@ export function PatientDrawer({
                     type="button"
                     onClick={() => setTab(t.key)}
                     className={cn(
-                      "flex-1 h-8 rounded-lg text-[12px] font-medium transition-all",
+                      "flex-1 h-8 rounded-lg text-[11px] font-medium transition-all",
                       tab === t.key
                         ? "bg-white text-slate-900 shadow-sm"
                         : "text-slate-500 hover:text-slate-700",
@@ -165,36 +238,200 @@ export function PatientDrawer({
                 ))}
               </div>
 
-              <div className="min-h-[120px] text-sm text-slate-500 rounded-xl border border-slate-100 bg-slate-50/40 p-4">
-                {tab === "financeiro" && (
-                  <div className="space-y-2">
-                    <div className="flex justify-between"><span>Total previsto</span><span className="tabular-nums text-slate-700 font-semibold">—</span></div>
-                    <div className="flex justify-between"><span>Pago</span><span className="tabular-nums text-emerald-600 font-semibold">—</span></div>
-                    <div className="flex justify-between"><span>Em aberto</span><span className="tabular-nums text-amber-600 font-semibold">—</span></div>
-                    <p className="pt-2 text-[11px] text-slate-400 border-t border-slate-100">
-                      Fase A · pré-visualização. Integração real na Fase B.
-                    </p>
+              <div className="min-h-[180px]">
+                {tab === "resumo" && <ResumoPanel proc={data.proc_titulo ?? null} />}
+                {tab === "financeiro" && <TabPlaceholder title="Financeiro">
+                  Total previsto, pago e em aberto — conectado no roadmap sem alterar as regras do módulo Financeiro clássico.
+                </TabPlaceholder>}
+                {tab === "docs" && <TabPlaceholder title="Documentos">
+                  Anamneses, receitas e atestados serão listados aqui.
+                </TabPlaceholder>}
+                {tab === "historico" && (
+                  <div className="rounded-xl border border-slate-100 bg-slate-50/40 p-4">
+                    {data.historico.length === 0 ? (
+                      <p className="text-xs text-slate-400">Sem eventos registrados.</p>
+                    ) : (
+                      <ol className="space-y-2">
+                        {data.historico.map((h, i) => (
+                          <li key={i} className="flex justify-between text-xs">
+                            <span className="text-slate-600">{h.etapa.replace(/_/g, " ")}</span>
+                            <span className="text-slate-400 tabular-nums">{new Date(h.timestamp).toLocaleString("pt-BR")}</span>
+                          </li>
+                        ))}
+                      </ol>
+                    )}
                   </div>
                 )}
-                {tab === "docs" && (<p>Anamneses, receitas e atestados serão listados aqui.</p>)}
-                {tab === "historico" && (
-                  <ol className="space-y-2">
-                    {data.historico.length === 0 ? (
-                      <p className="text-slate-400">Sem eventos registrados.</p>
-                    ) : data.historico.map((h, i) => (
-                      <li key={i} className="flex justify-between text-xs">
-                        <span>{h.etapa.replace(/_/g, " ")}</span>
-                        <span className="text-slate-400 tabular-nums">{new Date(h.timestamp).toLocaleString("pt-BR")}</span>
-                      </li>
-                    ))}
-                  </ol>
-                )}
-                {tab === "prontuario" && (<p>Últimas evoluções, exames e sinais vitais.</p>)}
+                {tab === "prontuario" && <TabPlaceholder title="Prontuário">
+                  Últimas evoluções, exames e sinais vitais.
+                </TabPlaceholder>}
               </div>
             </div>
-          </>
+
+            {openMs !== null && (
+              <div className="px-6 pb-4 -mt-2 text-[10px] text-slate-300 tabular-nums text-right">
+                aberto em {openMs}ms
+              </div>
+            )}
+          </div>
         )}
       </SheetContent>
     </Sheet>
+  );
+}
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-3">
+      {children}
+    </div>
+  );
+}
+
+function MetaChip({ label, muted, tabular }: { label: string; muted?: boolean; tabular?: boolean }) {
+  return (
+    <span className={cn(
+      "inline-flex items-center px-1.5 rounded",
+      tabular && "tabular-nums",
+      muted ? "text-slate-400" : "text-slate-600",
+    )}>
+      {label}
+    </span>
+  );
+}
+
+function JourneyLine({ currentIdx }: { currentIdx: number }) {
+  return (
+    <div className="relative">
+      {/* trilha */}
+      <div className="absolute top-3 left-3 right-3 h-px bg-slate-200/70" />
+      {/* trilha percorrida */}
+      {currentIdx > 0 && (
+        <div
+          className="absolute top-3 left-3 h-px bg-emerald-400/70 transition-all"
+          style={{ width: `calc(${(currentIdx / (ETAPAS.length - 1)) * 100}% - 24px * ${currentIdx / (ETAPAS.length - 1)})` }}
+        />
+      )}
+      <div className="relative grid" style={{ gridTemplateColumns: `repeat(${ETAPAS.length}, 1fr)` }}>
+        {ETAPAS.map((e, i) => {
+          const past = i < currentIdx;
+          const current = i === currentIdx;
+          return (
+            <div key={e.key} className="flex flex-col items-center gap-2">
+              <div className={cn(
+                "h-6 w-6 rounded-full flex items-center justify-center shrink-0 text-[10px] font-semibold z-10",
+                past && "bg-emerald-500 text-white",
+                current && "bg-indigo-500 text-white ring-4 ring-indigo-100",
+                !past && !current && "bg-white text-slate-400 border border-slate-200",
+              )}>
+                {past ? <Check className="h-3 w-3" /> : i + 1}
+              </div>
+              <div className={cn(
+                "text-[10px] leading-tight text-center max-w-full truncate px-1",
+                current ? "font-semibold text-slate-900" : past ? "text-slate-600" : "text-slate-400",
+              )}>
+                {e.label}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function QuickAction({ icon, label }: { icon: React.ReactNode; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={() =>
+        toast.info(label, {
+          description: "Ação será integrada nas próximas fases sem alterar as regras dos módulos existentes.",
+        })
+      }
+      className="flex flex-col items-center justify-center gap-1 h-14 rounded-xl border border-slate-200/70 bg-white hover:bg-slate-50 hover:border-slate-300 transition-colors text-slate-600 hover:text-slate-900"
+    >
+      <span className="text-slate-500">{icon}</span>
+      <span className="text-[10px] font-medium">{label}</span>
+    </button>
+  );
+}
+
+function AiChip({
+  icon, label, hint, tone,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  hint: string;
+  tone: "info" | "warn" | "danger";
+}) {
+  const toneCls =
+    tone === "warn" ? "bg-amber-50/60 border-amber-200/60 text-amber-800"
+    : tone === "danger" ? "bg-rose-50/60 border-rose-200/60 text-rose-800"
+    : "bg-slate-50 border-slate-200/60 text-slate-700";
+  const iconCls =
+    tone === "warn" ? "text-amber-500"
+    : tone === "danger" ? "text-rose-500"
+    : "text-indigo-500";
+  return (
+    <div className={cn("flex items-start gap-2 rounded-xl border px-3 py-2", toneCls)}>
+      <span className={cn("mt-0.5", iconCls)}>{icon}</span>
+      <div className="min-w-0 flex-1">
+        <div className="text-[12px] font-medium leading-tight">{label}</div>
+        <div className="text-[11px] text-slate-500 mt-0.5">{hint}</div>
+      </div>
+    </div>
+  );
+}
+
+function TabPlaceholder({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border border-slate-100 bg-slate-50/40 p-4 space-y-2">
+      <div className="text-[11px] font-semibold text-slate-700">{title}</div>
+      <p className="text-xs text-slate-500 leading-relaxed">{children}</p>
+      <div className="pt-2 space-y-2">
+        <Skeleton className="h-3 w-4/5" />
+        <Skeleton className="h-3 w-3/5" />
+        <Skeleton className="h-3 w-2/3" />
+      </div>
+    </div>
+  );
+}
+
+function ResumoPanel({ proc }: { proc: string | null }) {
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      <PanelCard icon={<ClipboardCheck className="h-3.5 w-3.5" />} title="Observações" body="Sem observações registradas." />
+      <PanelCard icon={<AlertTriangle className="h-3.5 w-3.5 text-rose-500" />} title="Alergias" body="Nenhuma alergia informada." tone="danger" />
+      <PanelCard icon={<Wallet className="h-3.5 w-3.5" />} title="Pendências" body="Sem pendências no momento." />
+      <PanelCard icon={<FileText className="h-3.5 w-3.5" />} title="Documentos" body="0 anexos" />
+      <PanelCard
+        icon={<Coffee className="h-3.5 w-3.5" />}
+        title="Preparo do exame"
+        body={proc ? `${proc} — verificar preparo.` : "Sem preparo específico."}
+      />
+      <PanelCard icon={<CalendarClock className="h-3.5 w-3.5" />} title="Retorno previsto" body="Sem retorno agendado." />
+    </div>
+  );
+}
+
+function PanelCard({
+  icon, title, body, tone,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  body: string;
+  tone?: "danger";
+}) {
+  return (
+    <div className={cn(
+      "rounded-xl border p-3 space-y-1",
+      tone === "danger" ? "border-rose-100 bg-rose-50/30" : "border-slate-100 bg-white",
+    )}>
+      <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+        <span className="text-slate-500">{icon}</span> {title}
+      </div>
+      <p className="text-[11px] text-slate-600 leading-snug">{body}</p>
+    </div>
   );
 }

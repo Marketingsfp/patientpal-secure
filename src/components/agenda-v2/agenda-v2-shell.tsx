@@ -337,14 +337,23 @@ export function AgendaV2Shell() {
     const chegada = primeiro.fluxo_atualizado_em
       ? new Date(primeiro.fluxo_atualizado_em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
       : null;
-    const partes = [
-      medicoNome ? medicoNome : null,
-      chegada ? `chegou ${chegada}` : null,
-    ].filter(Boolean);
     const hora = new Date(primeiro.inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    // Especialidade preferencial do médico (primeira do mapa).
+    let especialidade: string | null = null;
+    if (primeiro.medico_id && espData) {
+      const set = espData.medToEsps.get(primeiro.medico_id);
+      if (set && set.size > 0) {
+        const espId = Array.from(set)[0];
+        especialidade = espData.espMap.get(espId) ?? null;
+      }
+    }
     return {
+      paciente_id: primeiro.paciente_id,
       paciente_nome: primeiro.paciente_nome,
-      resumo_clinico: partes.length ? partes.join(" · ") : null,
+      medico_nome: medicoNome ?? null,
+      especialidade,
+      status: primeiro.status ?? null,
+      chegou_em: chegada,
       etapa_atual: primeiro.fluxo_etapa ?? "aguardando_recepcao",
       historico: primeiro.fluxo_atualizado_em
         ? [{ etapa: primeiro.fluxo_etapa ?? "aguardando_recepcao", timestamp: primeiro.fluxo_atualizado_em }]
@@ -352,7 +361,7 @@ export function AgendaV2Shell() {
       proc_titulo: primeiro.procedimento,
       hora,
     };
-  }, [drawerPacote, rows]);
+  }, [drawerPacote, rows, medicos, espData]);
 
   const navDia = (delta: number) => {
     const d = new Date(dia); d.setDate(d.getDate() + delta); setDia(d);
