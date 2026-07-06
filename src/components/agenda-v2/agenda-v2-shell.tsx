@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -15,12 +15,24 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { KpiBar, type Kpi } from "./kpi-bar";
 import { SessionCard, type SessionCardData, type SessionDensity } from "./session-card";
-import { AgendaV2Sidebar } from "./agenda-v2-sidebar";
-import { PatientDrawer, type DrawerPatientData } from "./patient-drawer";
-import { AiInsightsStrip } from "./ai-insights-strip";
-import { NovoAgendamentoWizard } from "./novo-agendamento-wizard";
+import type { DrawerPatientData } from "./patient-drawer";
 import { tipoDaSessao, type ProcMeta } from "@/lib/agenda-v2/session-detect";
 import { cn } from "@/lib/utils";
+
+// Lazy — só baixa quando efetivamente aparecem em tela.
+// Header + timeline + cards + KPIs permanecem no bundle crítico.
+const AgendaV2Sidebar = lazy(() =>
+  import("./agenda-v2-sidebar").then((m) => ({ default: m.AgendaV2Sidebar })),
+);
+const AiInsightsStrip = lazy(() =>
+  import("./ai-insights-strip").then((m) => ({ default: m.AiInsightsStrip })),
+);
+const PatientDrawer = lazy(() =>
+  import("./patient-drawer").then((m) => ({ default: m.PatientDrawer })),
+);
+const NovoAgendamentoWizard = lazy(() =>
+  import("./novo-agendamento-wizard").then((m) => ({ default: m.NovoAgendamentoWizard })),
+);
 
 const DENSITY_KEY = "agenda_v2_density";
 
