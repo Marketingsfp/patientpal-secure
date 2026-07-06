@@ -77,10 +77,29 @@ export function AgendaV2Shell() {
   });
   const [loadedMs, setLoadedMs] = useState<number | null>(null);
   const startedAtRef = useRef<number>(0);
+  const mountedAtRef = useRef<number>(performance.now());
+  const [renderMs, setRenderMs] = useState<number | null>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") window.localStorage.setItem(DENSITY_KEY, density);
   }, [density]);
+
+  // Mede o tempo até o primeiro paint útil (header + skeleton visível).
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      setRenderMs(Math.round(performance.now() - mountedAtRef.current));
+    });
+    // Prefetch idle de recursos secundários (wizard/drawer) —
+    // primeiro clique fica instantâneo, sem inflar o bundle crítico.
+    const idle = (cb: () => void) =>
+      (window as unknown as { requestIdleCallback?: (fn: () => void) => number })
+        .requestIdleCallback?.(cb) ?? window.setTimeout(cb, 800);
+    idle(() => {
+      void import("./novo-agendamento-wizard");
+      void import("./patient-drawer");
+      void import("./ai-insights-strip");
+    });
+  }, []);
 
   // Lookups (médicos / recursos / procedimentos) — cache por 10 min por clínica.
   // Não dependem do dia, então trocar a data não refaz essas queries.
