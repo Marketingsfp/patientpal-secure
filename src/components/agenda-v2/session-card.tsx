@@ -1,33 +1,27 @@
 import { useState } from "react";
 import {
-  ChevronDown, ChevronRight, Clock, User, MapPin,
-  Stethoscope, TestTube, ScanLine, HeartPulse, Activity, Scissors, ClipboardList,
-  type LucideIcon,
+  ChevronDown, ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { TIPO_SESSAO_ESTILO, TIPO_SESSAO_LABEL, type TipoSessao } from "@/lib/agenda-v2/session-detect";
 
-const TIPO_ICON: Record<TipoSessao, LucideIcon> = {
-  consulta: Stethoscope,
-  coleta_laboratorial: TestTube,
-  imagem: ScanLine,
-  cardiologica: HeartPulse,
-  endoscopia: Activity,
-  cirurgia: Scissors,
-  procedimento_ambulatorial: ClipboardList,
+// Chips de status — tom baixo, editorial.
+const STATUS_LABEL: Record<string, string> = {
+  agendado: "Aguardando",
+  confirmado: "Confirmado",
+  em_atendimento: "Em atendimento",
+  realizado: "Realizado",
+  cancelado: "Cancelado",
+  faltou: "Faltou",
 };
-
-// Chips de status — sólidos, alto contraste, pouca decoração.
-const STATUS_STYLE: Record<string, string> = {
-  agendado: "bg-slate-100 text-slate-600",
-  confirmado: "bg-blue-100 text-blue-700",
-  em_atendimento: "bg-indigo-100 text-indigo-700",
-  realizado: "bg-emerald-100 text-emerald-700",
-  cancelado: "bg-rose-100 text-rose-700",
-  faltou: "bg-rose-100 text-rose-700",
+const STATUS_DOT: Record<string, string> = {
+  agendado: "bg-slate-300",
+  confirmado: "bg-blue-400",
+  em_atendimento: "bg-indigo-500",
+  realizado: "bg-emerald-500",
+  cancelado: "bg-rose-400",
+  faltou: "bg-rose-400",
 };
 
 export interface SessionItem {
@@ -70,59 +64,47 @@ function initials(name: string) {
 }
 
 /**
- * Barra de progresso "vitrine": 4 segmentos (Confirmado · Check-in · Pago · Atendimento).
- * Segmentos ativos ganham cor sólida + halo suave; o mais recente pulsa levemente.
+ * Barra de jornada — 4 segmentos discretos: Confirmado · Check-in · Pago · Atendimento.
  */
-function ProgressTrack({
+function JourneyBar({
   steps,
   current,
 }: {
   steps: ReadonlyArray<{ label: string; done: boolean }>;
   current: boolean;
 }) {
-  const activeIdx = steps.reduce((acc, s, i) => (s.done ? i : acc), -1);
-  const color = current ? "bg-indigo-500" : "bg-emerald-500";
-  const glow = current ? "shadow-[0_0_10px_rgba(99,102,241,0.45)]" : "shadow-[0_0_8px_rgba(16,185,129,0.35)]";
   return (
     <div className="w-full">
-      <div className="flex items-center gap-1.5 h-1.5">
+      <div className="flex items-center gap-1 h-[3px]">
         {steps.map((s, i) => (
           <div
             key={s.label}
             className={cn(
               "flex-1 rounded-full transition-all",
-              s.done ? cn(color, glow) : "bg-slate-200/70",
-              current && i === activeIdx && "animate-pulse",
+              s.done
+                ? current && i === steps.findLastIndex((x) => x.done)
+                  ? "bg-indigo-500"
+                  : "bg-emerald-400/80"
+                : "bg-slate-200/60",
             )}
             title={s.label}
           />
-        ))}
-      </div>
-      <div className="mt-2 flex justify-between text-[9px] font-bold uppercase tracking-wider">
-        {steps.map((s, i) => (
-          <span
-            key={s.label}
-            className={cn(
-              "transition-colors",
-              s.done ? (current && i === activeIdx ? "text-indigo-600" : "text-emerald-600") : "text-slate-300",
-            )}
-          >
-            {s.label}
-          </span>
         ))}
       </div>
     </div>
   );
 }
 
-export type SessionDensity = "confortavel" | "compacto";
+export type SessionDensity = "confortavel" | "compacto" | "foco";
 
 /**
- * Card no visual "Calendário Premium":
- * - card pastel por tipo, cantos generosos (rounded-3xl), muito respiro
- * - tile de ícone colorido sólido com sombra suave (identidade forte do tipo)
- * - nome do paciente em negrito grande, procedimento na cor do tipo
- * - status como pílula superior direita, metadados como linha inferior
+ * Card rev.3 — paciente dominante, editorial calm:
+ * - foto grande à esquerda (56-64px)
+ * - nome em Inter Tight 600, dominante
+ * - hora tabular, secundária
+ * - procedimento + médico/sala em linha discreta
+ * - barra de jornada 4 segmentos
+ * - status como dot + texto slate
  */
 export function SessionCard({
   data,
@@ -137,163 +119,148 @@ export function SessionCard({
   const multi = data.items.length > 1;
   const isLab = data.tipo === "coleta_laboratorial";
   const est = TIPO_SESSAO_ESTILO[data.tipo];
-  const Icon = TIPO_ICON[data.tipo];
-  const compact = density === "compacto";
   const isCurrent = data.status === "em_atendimento";
 
   const titulo = isLab
     ? `${data.items.length} ${data.items.length === 1 ? "exame" : "exames"} · coleta única`
     : data.items[0]?.procedimento_nome ?? TIPO_SESSAO_LABEL[data.tipo];
 
-  const statusStyle = STATUS_STYLE[data.status] ?? STATUS_STYLE.agendado;
+  // Densidades:
+  // confortavel: card alto ~ 96px, foto 56, nome 20
+  // compacto:    mesma lógica, ~64px, foto 40, nome 15
+  // foco:        112px, foto 72, nome 24
+  const dim = density === "compacto"
+    ? { padY: "py-3", padX: "px-4", photo: 40, name: "text-[15px]", time: "text-[13px]", gap: "gap-3", radius: "rounded-2xl" }
+    : density === "foco"
+    ? { padY: "py-5", padX: "px-6", photo: 72, name: "text-2xl", time: "text-[16px]", gap: "gap-5", radius: "rounded-3xl" }
+    : { padY: "py-4", padX: "px-5", photo: 56, name: "text-xl", time: "text-[14px]", gap: "gap-4", radius: "rounded-2xl" };
 
   return (
     <div
       className={cn(
-        "group relative border transition-all",
-        "hover:shadow-lg hover:-translate-y-[1px] hover:border-slate-200",
-        est.cardBg,
-        compact ? "rounded-2xl p-3" : "rounded-3xl p-5",
-        isCurrent && "ring-2 ring-indigo-400/60 shadow-md shadow-indigo-100/60 animate-fade-in",
+        "group relative bg-white border border-slate-200/70 transition-all",
+        "hover:border-slate-300 hover:shadow-[0_4px_20px_-8px_rgba(15,23,42,0.08)]",
+        dim.radius, dim.padY, dim.padX,
+        isCurrent && "ring-1 ring-indigo-300/70 shadow-[0_0_0_4px_rgba(99,102,241,0.06)]",
       )}
     >
-      {isCurrent && (
-        <span className="absolute -top-2 left-5 inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white shadow-sm">
-          <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
-          Em atendimento agora
-        </span>
-      )}
-      <div className={cn("flex items-start", compact ? "gap-3" : "gap-4")}>
-        {/* Tile do ícone — identidade forte do tipo */}
-        <div
-          className={cn(
-            "flex items-center justify-center shrink-0",
-            est.iconWrap,
-            compact ? "h-10 w-10 rounded-xl" : "h-12 w-12 rounded-2xl",
-            "transition-transform group-hover:scale-105",
-          )}
+      <div className={cn("flex items-center", dim.gap)}>
+        {/* Foto do paciente — protagonista */}
+        <button
+          type="button"
+          onClick={() => onOpenTimeline(data.pacote_id)}
+          className="shrink-0 relative"
+          aria-label={`Abrir ${data.paciente_nome}`}
         >
-          <Icon className={cn(est.iconColor, compact ? "h-4 w-4" : "h-5 w-5")} strokeWidth={2} />
-        </div>
-
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 min-w-0">
-                {!compact && (
-                  <Avatar className="h-6 w-6 shrink-0 border border-white shadow-sm">
-                    {data.paciente_avatar_url && (
-                      <AvatarImage src={data.paciente_avatar_url} alt={data.paciente_nome} />
-                    )}
-                    <AvatarFallback className="text-[10px] font-semibold text-slate-500 bg-slate-100">
-                      {initials(data.paciente_nome)}
-                    </AvatarFallback>
-                  </Avatar>
-                )}
-                <button
-                  type="button"
-                  className={cn(
-                    "block max-w-full truncate text-left font-bold text-slate-800 hover:underline",
-                    compact ? "text-sm" : "text-lg leading-tight",
-                  )}
-                  onClick={() => onOpenTimeline(data.pacote_id)}
-                >
-                  {data.paciente_nome}
-                </button>
-              </div>
-              <p
-                className={cn("truncate font-medium", compact ? "text-xs" : "mt-0.5 text-sm")}
-                style={{ color: est.accent }}
-              >
-                {titulo}
-              </p>
-            </div>
-            <span
-              className={cn(
-                "shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wide",
-                statusStyle,
-              )}
+          <Avatar
+            className="border border-slate-200/70 shadow-sm"
+            style={{ width: dim.photo, height: dim.photo }}
+          >
+            {data.paciente_avatar_url && (
+              <AvatarImage src={data.paciente_avatar_url} alt={data.paciente_nome} />
+            )}
+            <AvatarFallback
+              className="font-semibold text-slate-500 bg-slate-50"
+              style={{ fontSize: dim.photo > 60 ? 20 : 14 }}
             >
-              {data.status.replace(/_/g, " ")}
-            </span>
-          </div>
+              {initials(data.paciente_nome)}
+            </AvatarFallback>
+          </Avatar>
+          <span
+            className={cn(
+              "absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white",
+              STATUS_DOT[data.status] ?? STATUS_DOT.agendado,
+            )}
+            aria-hidden
+          />
+        </button>
 
-          <div className={cn("flex flex-wrap items-center gap-x-5 gap-y-1.5", compact ? "mt-2" : "mt-3")}>
-            <div className="inline-flex items-center gap-1.5 font-bold tabular-nums text-slate-800">
-              <Clock className="h-3.5 w-3.5 text-slate-400" />
-              <span className="text-xs">
-                {fmt(data.inicio)}
-                {data.fim && data.fim !== data.inicio ? ` – ${fmt(data.fim)}` : ""}
-              </span>
+        {/* Corpo */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline justify-between gap-4">
+            <button
+              type="button"
+              className={cn(
+                "block max-w-full truncate text-left font-semibold text-slate-900 hover:text-slate-700",
+                dim.name,
+              )}
+              style={{ fontFamily: "'Inter Tight', Inter, sans-serif", letterSpacing: "-0.01em" }}
+              onClick={() => onOpenTimeline(data.pacote_id)}
+            >
+              {data.paciente_nome}
+            </button>
+            <div className={cn("shrink-0 tabular-nums text-slate-500 font-medium", dim.time)}>
+              {fmt(data.inicio)}
+              {data.fim && data.fim !== data.inicio ? (
+                <span className="text-slate-300"> – {fmt(data.fim)}</span>
+              ) : null}
             </div>
+          </div>
+
+          <div className="mt-1 flex items-center gap-2 min-w-0">
+            <span
+              className="h-1 w-1 rounded-full shrink-0"
+              style={{ background: est.accent }}
+              aria-hidden
+            />
+            <span className="text-xs text-slate-500 truncate">{titulo}</span>
             {data.medico_nome && (
-              <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
-                <User className="h-3.5 w-3.5 text-slate-400" /> {data.medico_nome}
-              </span>
+              <>
+                <span className="text-slate-300">·</span>
+                <span className="text-xs text-slate-500 truncate">{data.medico_nome}</span>
+              </>
             )}
-            {data.recurso_nome && (
-              <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
-                <MapPin className="h-3.5 w-3.5 text-slate-400" /> {data.recurso_nome}
-              </span>
+            {data.recurso_nome && density !== "compacto" && (
+              <>
+                <span className="text-slate-300">·</span>
+                <span className="text-xs text-slate-500 truncate">{data.recurso_nome}</span>
+              </>
             )}
-            <Badge variant="outline" className={cn("text-[10px] font-semibold", est.chip)}>
-              {TIPO_SESSAO_LABEL[data.tipo]}
-            </Badge>
             {data.is_encaixe && (
-              <Badge variant="outline" className="text-[10px] font-semibold bg-amber-100 text-amber-700 border-transparent">
-                <Clock className="h-2.5 w-2.5 mr-1" /> Encaixe
-              </Badge>
-            )}
-            {multi && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="-my-1 h-6 rounded-full px-2 text-xs text-slate-500 hover:bg-white/60 hover:text-slate-800"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setOpen((v) => !v);
-                }}
-                aria-expanded={open}
-              >
-                {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-                <span className="ml-0.5">{open ? "recolher" : `+${data.items.length} exames`}</span>
-              </Button>
+              <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200/60">
+                Encaixe
+              </span>
             )}
           </div>
 
-          {!compact && (
-            <div className="mt-4 border-t border-slate-200/60 pt-3">
-              <ProgressTrack
+          {density !== "compacto" && (
+            <div className="mt-3">
+              <JourneyBar
                 current={isCurrent}
                 steps={[
-                  { label: "Confirmado", done: !!data.confirmado || data.status !== "agendado" },
+                  { label: "Confirmado", done: !!data.confirmado || (data.status !== "agendado" && data.status !== "cancelado" && data.status !== "faltou") },
                   { label: "Check-in", done: !!data.checkin || data.status === "em_atendimento" || data.status === "realizado" },
                   { label: "Pago", done: !!data.pago },
                   { label: "Atendimento", done: data.status === "em_atendimento" || data.status === "realizado" },
                 ]}
               />
+              <div className="mt-1.5 flex items-center justify-between text-[10px] text-slate-400">
+                <span className="uppercase tracking-wider">
+                  {STATUS_LABEL[data.status] ?? data.status.replace(/_/g, " ")}
+                </span>
+                {multi && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+                    className="inline-flex items-center gap-0.5 hover:text-slate-700"
+                    aria-expanded={open}
+                  >
+                    {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                    {open ? "recolher" : `+${data.items.length} exames`}
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>
       </div>
 
-      {multi && open && (
-        <ul className={cn("mt-3 space-y-1.5 border-t border-slate-200/60 pt-3", compact ? "pl-13" : "pl-16")}>
+      {multi && open && density !== "compacto" && (
+        <ul className="mt-3 space-y-1 border-t border-slate-100 pt-3" style={{ paddingLeft: dim.photo + 16 }}>
           {data.items.map((it) => (
-            <li key={it.id} className="flex items-center gap-2 text-xs text-slate-600">
-              <span className="text-slate-400">›</span>
+            <li key={it.id} className="flex items-center gap-2 text-xs text-slate-500">
+              <span className="text-slate-300">›</span>
               <span className="truncate">{it.procedimento_nome}</span>
-              {it.status && (
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    "border-transparent text-[9px] font-semibold uppercase tracking-wide",
-                    STATUS_STYLE[it.status] ?? STATUS_STYLE.agendado,
-                  )}
-                >
-                  {it.status.replace(/_/g, " ")}
-                </Badge>
-              )}
             </li>
           ))}
         </ul>
