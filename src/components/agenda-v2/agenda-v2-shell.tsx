@@ -3,11 +3,12 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   ChevronLeft, ChevronRight, LayoutList, GanttChartSquare, CalendarDays,
-  Search, Rows3, Rows2, Focus, Sparkles, Plus, Keyboard,
+  Search, Rows3, Rows2, Focus, Sparkles, Plus, Keyboard, PanelLeft,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,6 +17,8 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import { KpiBar, type Kpi } from "./kpi-bar";
 import { SessionCard, type SessionCardData, type SessionDensity } from "./session-card";
 import type { DrawerPatientData } from "./patient-drawer";
