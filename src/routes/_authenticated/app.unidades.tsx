@@ -156,25 +156,25 @@ function ClinicasTab() {
             <DialogHeader><DialogTitle>{editingId ? "Editar unidade" : "Nova unidade"}</DialogTitle></DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-3">
               <div className="space-y-2">
-                <Label>Nome *</Label>
-                <Input required value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} />
+                <Label htmlFor="unidade-nome">Nome *</Label>
+                <Input id="unidade-nome" required value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2"><Label>CNPJ</Label>
-                  <Input value={form.cnpj} onChange={(e) => setForm({ ...form, cnpj: e.target.value })} /></div>
-                <div className="space-y-2"><Label>Telefone</Label>
-                  <Input value={form.telefone} onChange={(e) => setForm({ ...form, telefone: e.target.value })} /></div>
+                <div className="space-y-2"><Label htmlFor="unidade-cnpj">CNPJ</Label>
+                  <Input id="unidade-cnpj" value={form.cnpj} onChange={(e) => setForm({ ...form, cnpj: e.target.value })} /></div>
+                <div className="space-y-2"><Label htmlFor="unidade-telefone">Telefone</Label>
+                  <Input id="unidade-telefone" value={form.telefone} onChange={(e) => setForm({ ...form, telefone: e.target.value })} /></div>
               </div>
-              <div className="space-y-2"><Label>Endereço</Label>
-                <Input value={form.endereco} onChange={(e) => setForm({ ...form, endereco: e.target.value })} /></div>
+              <div className="space-y-2"><Label htmlFor="unidade-endereco">Endereço</Label>
+                <Input id="unidade-endereco" value={form.endereco} onChange={(e) => setForm({ ...form, endereco: e.target.value })} /></div>
               <div className="grid grid-cols-3 gap-3">
-                <div className="space-y-2"><Label>Cidade</Label>
-                  <Input value={form.cidade} onChange={(e) => setForm({ ...form, cidade: e.target.value })} /></div>
-                <div className="space-y-2"><Label>UF</Label>
-                  <Input maxLength={2} value={form.estado}
+                <div className="space-y-2"><Label htmlFor="unidade-cidade">Cidade</Label>
+                  <Input id="unidade-cidade" value={form.cidade} onChange={(e) => setForm({ ...form, cidade: e.target.value })} /></div>
+                <div className="space-y-2"><Label htmlFor="unidade-uf">UF</Label>
+                  <Input id="unidade-uf" maxLength={2} value={form.estado}
                     onChange={(e) => setForm({ ...form, estado: e.target.value.toUpperCase() })} /></div>
-                <div className="space-y-2"><Label>CEP</Label>
-                  <Input value={form.cep} onChange={(e) => setForm({ ...form, cep: e.target.value })} /></div>
+                <div className="space-y-2"><Label htmlFor="unidade-cep">CEP</Label>
+                  <Input id="unidade-cep" value={form.cep} onChange={(e) => setForm({ ...form, cep: e.target.value })} /></div>
               </div>
               <div className="border-t pt-3">
                 <div className="flex items-center justify-between mb-2">
@@ -184,12 +184,12 @@ function ClinicasTab() {
                   </Button>
                 </div>
                 <div className="grid grid-cols-3 gap-3">
-                  <div className="space-y-2"><Label className="text-xs">Latitude</Label>
-                    <Input value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} /></div>
-                  <div className="space-y-2"><Label className="text-xs">Longitude</Label>
-                    <Input value={form.longitude} onChange={(e) => setForm({ ...form, longitude: e.target.value })} /></div>
-                  <div className="space-y-2"><Label className="text-xs">Raio (m)</Label>
-                    <Input type="number" value={form.raio_metros}
+                  <div className="space-y-2"><Label htmlFor="unidade-latitude" className="text-xs">Latitude</Label>
+                    <Input id="unidade-latitude" value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} /></div>
+                  <div className="space-y-2"><Label htmlFor="unidade-longitude" className="text-xs">Longitude</Label>
+                    <Input id="unidade-longitude" value={form.longitude} onChange={(e) => setForm({ ...form, longitude: e.target.value })} /></div>
+                  <div className="space-y-2"><Label htmlFor="unidade-raio" className="text-xs">Raio (m)</Label>
+                    <Input id="unidade-raio" type="number" value={form.raio_metros}
                       onChange={(e) => setForm({ ...form, raio_metros: e.target.value })} /></div>
                 </div>
               </div>
