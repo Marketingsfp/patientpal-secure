@@ -147,9 +147,9 @@ export function PatientDrawer({
                     {data.especialidade && <MetaChip label={data.especialidade} />}
                     {data.hora && <MetaChip label={data.hora} tabular />}
                     {data.status && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 text-[11px] font-medium">
+                      <HhpChip tone="focus" variant="outline" size="sm">
                         {STATUS_LABEL[data.status] ?? data.status.replace(/_/g, " ")}
-                      </span>
+                      </HhpChip>
                     )}
                   </div>
                   {data.chegou_em && (
