@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -13,11 +13,12 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { SearchableSelect } from "@/components/ui/searchable-select";
-import { VirtualList } from "@/components/list-shell/virtual-list";
 import { KpiBar, type Kpi } from "./kpi-bar";
 import { SessionCard, type SessionCardData, type SessionDensity } from "./session-card";
+import { AgendaV2Sidebar } from "./agenda-v2-sidebar";
 import type { TimelineData } from "./patient-timeline-drawer";
 import { tipoDaSessao, type ProcMeta } from "@/lib/agenda-v2/session-detect";
+import { cn } from "@/lib/utils";
 
 // Drawer carrega só quando o usuário abrir — reduz JS crítico.
 const PatientTimelineDrawer = lazy(() =>
@@ -46,6 +47,7 @@ interface RawAg {
 export function AgendaV2Shell() {
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id ?? null;
+  const clinicaNome = clinicaAtual?.clinica?.nome ?? "Clínica";
 
   const [dia, setDia] = useState<Date>(() => {
     const d = new Date(); d.setHours(0, 0, 0, 0); return d;
@@ -63,6 +65,7 @@ export function AgendaV2Shell() {
     return (window.localStorage.getItem(DENSITY_KEY) as SessionDensity) ?? "confortavel";
   });
   const [loadedMs, setLoadedMs] = useState<number | null>(null);
+  const startedAtRef = useRef<number>(0);
 
   useEffect(() => {
     if (typeof window !== "undefined") window.localStorage.setItem(DENSITY_KEY, density);
@@ -138,7 +141,7 @@ export function AgendaV2Shell() {
     enabled: !!clinicaId,
     staleTime: 60 * 1000,
     queryFn: async () => {
-      const t0 = performance.now();
+      startedAtRef.current = performance.now();
       const start = new Date(diaKey);
       const end = new Date(diaKey); end.setHours(23, 59, 59, 999);
       const { data } = await supabase.from("agendamentos")
@@ -147,10 +150,17 @@ export function AgendaV2Shell() {
         .gte("inicio", start.toISOString())
         .lte("inicio", end.toISOString())
         .order("inicio", { ascending: true });
-      setLoadedMs(Math.round(performance.now() - t0));
       return (data ?? []) as RawAg[];
     },
   });
+
+  // Move setLoadedMs para efeito — evita re-render dentro do queryFn.
+  useEffect(() => {
+    if (agsQuery.isFetched && startedAtRef.current > 0) {
+      setLoadedMs(Math.round(performance.now() - startedAtRef.current));
+      startedAtRef.current = 0;
+    }
+  }, [agsQuery.isFetched, agsQuery.dataUpdatedAt]);
 
   const rows = agsQuery.data ?? null;
   const medicos = medicosQuery.data ?? new Map<string, string>();
@@ -227,6 +237,9 @@ export function AgendaV2Shell() {
   const filtradas = useMemo(() => {
     const norm = q.trim().toLowerCase();
     return sessoes.filter((s) => {
+      // Ocultar sessões "DISPONIVEL" — são horários livres, não pertencem
+      // ao fluxo operacional; ficam agrupadas em resumo por hora.
+      if (/dispon[íi]vel/i.test(s.paciente_nome ?? "")) return false;
       if (kpiFilter && kpiFilter !== "todos") {
         if (kpiFilter === "lab" && s.tipo !== "coleta_laboratorial") return false;
         if (kpiFilter !== "lab" && s.status !== kpiFilter) return false;
@@ -245,6 +258,17 @@ export function AgendaV2Shell() {
       return true;
     });
   }, [sessoes, q, kpiFilter, filtroMedico, filtroRecurso, filtroEspecialidade, espData]);
+
+  // Contagem de horários livres por hora (para o resumo discreto na timeline).
+  const livresPorHora = useMemo(() => {
+    const m = new Map<number, number>();
+    for (const s of sessoes) {
+      if (!/dispon[íi]vel/i.test(s.paciente_nome ?? "")) continue;
+      const h = new Date(s.inicio).getHours();
+      m.set(h, (m.get(h) ?? 0) + 1);
+    }
+    return m;
+  }, [sessoes]);
 
   const drawerData = useMemo<TimelineData | null>(() => {
     if (!drawerPacote || !rows) return null;
@@ -267,10 +291,53 @@ export function AgendaV2Shell() {
   const openDrawer = (id: string) => { setDrawerMounted(true); setDrawerPacote(id); };
   const compact = density === "compacto";
 
+  // Agrupar sessões por hora para render com régua de horas.
+  const porHora = useMemo(() => {
+    const map = new Map<number, SessionCardData[]>();
+    for (const s of filtradas) {
+      const h = new Date(s.inicio).getHours();
+      const arr = map.get(h) ?? [];
+      arr.push(s);
+      map.set(h, arr);
+    }
+    return Array.from(map.entries()).sort((a, b) => a[0] - b[0]);
+  }, [filtradas]);
+
+  // Recursos com ocupação (usados = sessões distintas do dia usando o recurso).
+  const recursosOcup = useMemo(() => {
+    const usados = new Map<string, number>();
+    for (const s of sessoes) if (s.recurso_id) usados.set(s.recurso_id, (usados.get(s.recurso_id) ?? 0) + 1);
+    return Array.from(recursos.entries()).map(([id, nome]) => ({
+      id, nome, usados: usados.get(id) ?? 0, total: Math.max(usados.get(id) ?? 0, 8),
+    }));
+  }, [recursos, sessoes]);
+
+  // Equipe on-line = médicos com sessões hoje (proxy simples e sem query nova).
+  const equipeOnline = useMemo(() => {
+    const ids = new Set<string>();
+    for (const s of sessoes) if (s.medico_id) ids.add(s.medico_id);
+    return Array.from(ids).map((id) => ({ id, nome: medicos.get(id) ?? "—" }));
+  }, [sessoes, medicos]);
+
+  // Hora atual (para "now-line") e turno atual.
+  const now = new Date();
+  const nowHour = now.getHours();
+  const nowMin = now.getMinutes();
+  const isToday = new Date(diaKey).toDateString() === new Date().toDateString();
+
   return (
-    <div className="h-full flex flex-col bg-[#FBFBFA]">
-      {/* Header — Calendário Premium: título em Instrument Serif itálico, muito respiro */}
-      <div className="border-b border-slate-100 bg-white/80 backdrop-blur-sm px-6 py-6 space-y-6 shrink-0">
+    <div className="h-full flex bg-[#FBFBFA]">
+      <AgendaV2Sidebar
+        clinicaNome={clinicaNome}
+        dia={dia}
+        sessoes={sessoes}
+        recursos={recursosOcup}
+        equipeOnline={equipeOnline}
+      />
+
+      <div className="flex-1 min-w-0 flex flex-col">
+      {/* Header */}
+      <div className="border-b border-slate-100 bg-white/80 backdrop-blur-sm px-6 py-5 space-y-5 shrink-0">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="space-y-1">
             <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
@@ -417,18 +484,52 @@ export function AgendaV2Shell() {
             <div>Nenhuma sessão para os filtros atuais.</div>
           </div>
         ) : (
-          <VirtualList
-            items={filtradas}
-            estimateSize={compact ? 84 : 132}
-            getKey={(s) => s.pacote_id}
-            className="px-6 pt-4"
-            renderItem={(s) => (
-              <div className="pb-3">
-                <SessionCard data={s} onOpenTimeline={openDrawer} density={density} />
-              </div>
-            )}
-          />
+          <div className="h-full overflow-y-auto px-6 pt-4 pb-8">
+            {porHora.map(([hora, lista]) => {
+              const isNowHour = isToday && hora === nowHour;
+              return (
+                <div key={hora} className="flex gap-4 relative">
+                  {/* Coluna de hora (régua) */}
+                  <div className="w-14 shrink-0 relative">
+                    <div className={cn(
+                      "sticky top-0 text-[11px] font-bold tabular-nums uppercase tracking-wider pt-1",
+                      isNowHour ? "text-rose-600" : "text-slate-400",
+                    )}>
+                      {String(hora).padStart(2, "0")}:00
+                    </div>
+                  </div>
+                  {/* Coluna de sessões */}
+                  <div className="flex-1 min-w-0 border-l border-slate-100 pl-6 pb-4 relative">
+                    {isNowHour && (
+                      <div
+                        className="absolute -left-[3px] right-0 flex items-center gap-2 z-10 pointer-events-none"
+                        style={{ top: `${(nowMin / 60) * 100}%` }}
+                      >
+                        <span className="h-1.5 w-1.5 rounded-full bg-rose-500 shadow-[0_0_0_3px_rgba(244,63,94,0.15)]" />
+                        <span className="flex-1 h-px bg-gradient-to-r from-rose-400 via-rose-200 to-transparent" />
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-rose-500 pr-2">
+                          agora · {String(nowHour).padStart(2, "0")}:{String(nowMin).padStart(2, "0")}
+                        </span>
+                      </div>
+                    )}
+                    <div className="space-y-3">
+                      {lista.map((s) => (
+                        <SessionCard key={s.pacote_id} data={s} onOpenTimeline={openDrawer} density={density} />
+                      ))}
+                      {livresPorHora.get(hora) && (
+                        <div className="flex items-center gap-2 text-[11px] text-slate-400 pl-1">
+                          <span className="h-1 w-1 rounded-full bg-slate-300" />
+                          {livresPorHora.get(hora)} horário{livresPorHora.get(hora)! > 1 ? "s" : ""} livre{livresPorHora.get(hora)! > 1 ? "s" : ""} nesta hora
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
+      </div>
       </div>
 
       {drawerMounted && (
