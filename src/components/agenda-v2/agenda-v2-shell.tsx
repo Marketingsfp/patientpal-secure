@@ -495,40 +495,76 @@ export function AgendaV2Shell() {
   const isToday = new Date(diaKey).toDateString() === new Date().toDateString();
 
   return (
-    <div className="h-full flex bg-[#FAFAF8]">
-      {!foco && (
-        <Suspense fallback={<div className="w-64 border-r border-slate-100 bg-white" />}>
-          <AgendaV2Sidebar
-            clinicaNome={clinicaNome}
-            dia={dia}
-            sessoes={sessoes}
-            recursos={recursosOcup}
-            equipeOnline={equipeOnline}
-          />
+    <div className="h-full flex bg-[#FAFAF8] overflow-hidden">
+      {/* Sidebar operacional — visível em md+, vira Sheet no mobile (botão Painel no header) */}
+      {!foco && !isMobile && (
+        <Suspense fallback={<div className="hidden md:block w-64 border-r border-slate-100 bg-white" />}>
+          <div className="hidden md:flex">
+            <AgendaV2Sidebar
+              clinicaNome={clinicaNome}
+              dia={dia}
+              sessoes={sessoes}
+              recursos={recursosOcup}
+              equipeOnline={equipeOnline}
+            />
+          </div>
         </Suspense>
+      )}
+      {!foco && isMobile && (
+        <Sheet open={sidePanelOpen} onOpenChange={setSidePanelOpen}>
+          <SheetContent side="left" className="p-0 w-[86vw] max-w-[320px] overflow-y-auto">
+            <VisuallyHidden.Root>
+              <SheetTitle>Painel da agenda</SheetTitle>
+              <SheetDescription>Resumo do turno, sessões por tipo, recursos e equipe.</SheetDescription>
+            </VisuallyHidden.Root>
+            <Suspense fallback={<div className="w-full h-40 bg-white" />}>
+              <AgendaV2Sidebar
+                clinicaNome={clinicaNome}
+                dia={dia}
+                sessoes={sessoes}
+                recursos={recursosOcup}
+                equipeOnline={equipeOnline}
+              />
+            </Suspense>
+          </SheetContent>
+        </Sheet>
       )}
 
       <div className="flex-1 min-w-0 flex flex-col">
       {/* Header */}
-      <div className="border-b border-slate-100 bg-white/80 backdrop-blur-sm px-6 py-5 space-y-5 shrink-0">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div className="space-y-1">
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+      <div className="border-b border-slate-100 bg-white/80 backdrop-blur-sm px-3 md:px-6 py-3 md:py-5 space-y-3 md:space-y-5 shrink-0">
+        <div className="flex items-start justify-between gap-2 md:gap-4 flex-wrap">
+          <div className="min-w-0 flex items-start gap-2">
+            {!foco && isMobile && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-xl hover:bg-slate-100 shrink-0 md:hidden"
+                onClick={() => setSidePanelOpen(true)}
+                aria-label="Abrir painel"
+              >
+                <PanelLeft className="h-4 w-4 text-slate-500" />
+              </Button>
+            )}
+            <div className="space-y-1 min-w-0">
+            <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-slate-900 truncate">
               Agenda do Dia
             </h1>
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 capitalize">
+            <p className="text-[10px] md:text-[11px] font-semibold uppercase tracking-widest text-slate-400 capitalize truncate">
               {format(dia, "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
             </p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
             <Button
               size="sm"
               onClick={() => setWizardOpen(true)}
               className="h-9 px-4 rounded-2xl gap-1.5 bg-slate-900 hover:bg-slate-800 text-white shadow-sm transition-all hover:shadow-md hover:-translate-y-[1px]"
             >
               <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
-              <span className="text-xs font-semibold">Nova sessão</span>
+              <span className="text-xs font-semibold hidden sm:inline">Nova sessão</span>
+              <span className="text-xs font-semibold sm:hidden">Nova</span>
             </Button>
 
             <ToggleGroup
