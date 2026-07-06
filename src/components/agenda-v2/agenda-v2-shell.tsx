@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { VirtualList } from "@/components/list-shell/virtual-list";
 import { KpiBar, type Kpi } from "./kpi-bar";
 import { SessionCard, type SessionCardData, type SessionDensity } from "./session-card";
@@ -52,6 +53,9 @@ export function AgendaV2Shell() {
   const [view, setView] = useState<ViewMode>("timeline");
   const [q, setQ] = useState("");
   const [kpiFilter, setKpiFilter] = useState<string | null>(null);
+  const [filtroMedico, setFiltroMedico] = useState<string>("");
+  const [filtroEspecialidade, setFiltroEspecialidade] = useState<string>("");
+  const [filtroRecurso, setFiltroRecurso] = useState<string>("");
   const [drawerPacote, setDrawerPacote] = useState<string | null>(null);
   const [drawerMounted, setDrawerMounted] = useState(false);
   const [density, setDensity] = useState<SessionDensity>(() => {
@@ -73,6 +77,29 @@ export function AgendaV2Shell() {
     queryFn: async () => {
       const { data } = await supabase.from("medicos").select("id,nome").eq("clinica_id", clinicaId!);
       return new Map((data ?? []).map((m) => [m.id, m.nome]));
+    },
+  });
+
+  const especialidadesQuery = useQuery({
+    queryKey: ["agenda-v2", "especialidades", clinicaId],
+    enabled: !!clinicaId,
+    staleTime: 10 * 60 * 1000,
+    queryFn: async () => {
+      const [esps, links] = await Promise.all([
+        supabase.from("especialidades").select("id,nome").order("nome"),
+        supabase.from("medico_especialidades")
+          .select("medico_id,especialidade_id,medicos!inner(clinica_id)")
+          .eq("medicos.clinica_id", clinicaId!),
+      ]);
+      const espMap = new Map<string, string>((esps.data ?? []).map((e: { id: string; nome: string }) => [e.id, e.nome]));
+      const medToEsps = new Map<string, Set<string>>();
+      for (const l of (links.data ?? []) as Array<{ medico_id: string; especialidade_id: string }>) {
+        if (!l.medico_id || !l.especialidade_id) continue;
+        const s = medToEsps.get(l.medico_id) ?? new Set<string>();
+        s.add(l.especialidade_id);
+        medToEsps.set(l.medico_id, s);
+      }
+      return { espMap, medToEsps };
     },
   });
 
@@ -129,6 +156,7 @@ export function AgendaV2Shell() {
   const medicos = medicosQuery.data ?? new Map<string, string>();
   const recursos = recursosQuery.data ?? new Map<string, string>();
   const procMeta = procMetaQuery.data ?? new Map<string, ProcMeta>();
+  const espData = especialidadesQuery.data;
 
   // Agrupar em sessões por pacote_id (ou id do próprio agendamento).
   const sessoes = useMemo<SessionCardData[]>(() => {
@@ -162,6 +190,8 @@ export function AgendaV2Shell() {
         pacote_id: key,
         paciente_nome: primeiro.paciente_nome,
         paciente_id: primeiro.paciente_id,
+        medico_id: primeiro.medico_id,
+        recurso_id: primeiro.enfermagem_recurso_id,
         medico_nome: primeiro.medico_id ? medicos.get(primeiro.medico_id) ?? null : null,
         recurso_nome: primeiro.enfermagem_recurso_id ? recursos.get(primeiro.enfermagem_recurso_id) ?? null : null,
         inicio: primeiro.inicio,
@@ -201,13 +231,20 @@ export function AgendaV2Shell() {
         if (kpiFilter === "lab" && s.tipo !== "coleta_laboratorial") return false;
         if (kpiFilter !== "lab" && s.status !== kpiFilter) return false;
       }
+      if (filtroMedico && s.medico_id !== filtroMedico) return false;
+      if (filtroRecurso && s.recurso_id !== filtroRecurso) return false;
+      if (filtroEspecialidade) {
+        const mid = s.medico_id;
+        const set = mid ? espData?.medToEsps.get(mid) : null;
+        if (!set || !set.has(filtroEspecialidade)) return false;
+      }
       if (norm) {
         const hay = `${s.paciente_nome} ${s.medico_nome ?? ""} ${s.recurso_nome ?? ""} ${s.items.map((i) => i.procedimento_nome).join(" ")}`.toLowerCase();
         if (!hay.includes(norm)) return false;
       }
       return true;
     });
-  }, [sessoes, q, kpiFilter]);
+  }, [sessoes, q, kpiFilter, filtroMedico, filtroRecurso, filtroEspecialidade, espData]);
 
   const drawerData = useMemo<TimelineData | null>(() => {
     if (!drawerPacote || !rows) return null;
@@ -311,6 +348,40 @@ export function AgendaV2Shell() {
               aria-label="Busca"
             />
           </div>
+          <SearchableSelect
+            options={[{ value: "", label: "Todos os profissionais" }, ...Array.from(medicos.entries()).map(([id, nome]) => ({ value: id, label: nome }))]}
+            value={filtroMedico}
+            onChange={setFiltroMedico}
+            placeholder="Profissional"
+            searchPlaceholder="Buscar profissional..."
+            className="h-10 rounded-2xl bg-slate-100 border-transparent min-w-48"
+          />
+          <SearchableSelect
+            options={[{ value: "", label: "Todas as especialidades" }, ...Array.from(espData?.espMap.entries() ?? []).map(([id, nome]) => ({ value: id, label: nome }))]}
+            value={filtroEspecialidade}
+            onChange={setFiltroEspecialidade}
+            placeholder="Especialidade"
+            searchPlaceholder="Buscar especialidade..."
+            className="h-10 rounded-2xl bg-slate-100 border-transparent min-w-44"
+          />
+          <SearchableSelect
+            options={[{ value: "", label: "Todas as salas" }, ...Array.from(recursos.entries()).map(([id, nome]) => ({ value: id, label: nome }))]}
+            value={filtroRecurso}
+            onChange={setFiltroRecurso}
+            placeholder="Sala / recurso"
+            searchPlaceholder="Buscar sala..."
+            className="h-10 rounded-2xl bg-slate-100 border-transparent min-w-40"
+          />
+          {(filtroMedico || filtroEspecialidade || filtroRecurso || kpiFilter) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 rounded-2xl text-xs text-slate-500 hover:text-slate-900"
+              onClick={() => { setFiltroMedico(""); setFiltroEspecialidade(""); setFiltroRecurso(""); setKpiFilter(null); }}
+            >
+              Limpar filtros
+            </Button>
+          )}
           <div className="text-xs text-slate-500 inline-flex items-center gap-2 ml-auto">
             <Sparkles className="h-3 w-3 text-slate-400" />
             <span className="tabular-nums">
