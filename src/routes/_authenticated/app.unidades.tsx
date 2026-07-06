@@ -180,7 +180,7 @@ function ClinicasTab() {
                 <Label htmlFor="unidade-nome">Nome *</Label>
                 <Input id="unidade-nome" required value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-2"><Label htmlFor="unidade-cnpj">CNPJ</Label>
                   <Input id="unidade-cnpj" inputMode="numeric" maxLength={18} placeholder="00.000.000/0000-00" value={form.cnpj} onChange={(e) => setForm({ ...form, cnpj: formatarCnpj(e.target.value) })} /></div>
                 <div className="space-y-2"><Label htmlFor="unidade-telefone">Telefone</Label>
@@ -188,7 +188,7 @@ function ClinicasTab() {
               </div>
               <div className="space-y-2"><Label htmlFor="unidade-endereco">Endereço</Label>
                 <Input id="unidade-endereco" value={form.endereco} onChange={(e) => setForm({ ...form, endereco: e.target.value })} /></div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-2"><Label htmlFor="unidade-cidade">Cidade</Label>
                   <Input id="unidade-cidade" value={form.cidade} onChange={(e) => setForm({ ...form, cidade: e.target.value })} /></div>
                 <div className="space-y-2"><Label htmlFor="unidade-uf">UF</Label>
@@ -204,7 +204,7 @@ function ClinicasTab() {
                     Usar minha localização
                   </Button>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="space-y-2"><Label htmlFor="unidade-latitude" className="text-xs">Latitude</Label>
                     <Input id="unidade-latitude" value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} /></div>
                   <div className="space-y-2"><Label htmlFor="unidade-longitude" className="text-xs">Longitude</Label>
