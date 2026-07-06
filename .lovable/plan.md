@@ -2,6 +2,11 @@
 
 Objetivo: fazer o wizard da Agenda V2 criar agendamentos reais no banco, reutilizando 100% das regras da Agenda clássica. Nenhuma regra nova, nenhuma migration, Agenda clássica intacta, flag `agenda_v2` OFF por padrão.
 
+> **Status Passo B (06/07/2026):** APROVADO. `criarAgendamento` é a fonte
+> única de criação/edição de agendamentos. Ver
+> `docs/agenda/criar-agendamento-shared.md`. Próxima etapa: planejamento da
+> Fase F propriamente dita (integração do wizard V2), sem implementação.
+
 ---
 
 ## 1. Funções e componentes atuais que serão reutilizados
