@@ -2421,85 +2421,16 @@ function AgendaPage() {
       toast.error("Selecione um paciente cadastrado na lista ou clique em \"Cadastrar agora\" para criar o cadastro antes de salvar.");
       return;
     }
-    // Bloqueia agendamento sem telefone e data de nascimento no cadastro do paciente
-    {
-      const { data: pacCheck } = await supabase
-        .from("pacientes")
-        .select("telefone,data_nascimento")
-        .eq("id", form.paciente_id)
-        .maybeSingle();
-      const semTel = !pacCheck?.telefone || !String(pacCheck.telefone).trim();
-      const semNasc = !pacCheck?.data_nascimento;
-      if (semTel || semNasc) {
-        const faltando = [semTel && "telefone", semNasc && "data de nascimento"].filter(Boolean).join(" e ");
-        toast.error(`Preencha ${faltando} do paciente (campos abaixo do nome) e clique em "Confirmar dados" antes de salvar.`);
-        return;
-      }
-    }
     if (!form.inicio || !form.fim) { toast.error("Defina início e fim"); return; }
     if (new Date(form.fim) <= new Date(form.inicio)) { toast.error("O horário final deve ser após o inicial"); return; }
     if (!form.procedimento.trim()) { toast.error("Selecione o serviço"); return; }
-    // Bloqueia criação/movimentação para um médico sem agenda aberta naquele dia
     const mudouHorarioOuMedico = !editing
       || editing.medico_id !== form.medico_id
       || new Date(editing.inicio).getTime() !== new Date(form.inicio).getTime()
       || new Date(editing.fim).getTime() !== new Date(form.fim).getTime();
-    if (form.medico_id && mudouHorarioOuMedico && !recursoIds.has(form.medico_id)) {
-      const di = new Date(form.inicio);
-      const df = new Date(form.fim);
-      const inicioDia = new Date(di.getFullYear(), di.getMonth(), di.getDate(), 0, 0, 0).toISOString();
-      const fimDia = new Date(di.getFullYear(), di.getMonth(), di.getDate(), 23, 59, 59).toISOString();
-      const q = supabase
-        .from("agendamentos")
-        .select("id,paciente_nome,inicio,fim", { count: "exact", head: false })
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("medico_id", form.medico_id)
-        .gte("inicio", inicioDia)
-        .lte("inicio", fimDia)
-        .limit(500);
-      const { data: slotsDia } = await q;
-      const lista = (slotsDia ?? []) as { id: string; paciente_nome: string; inicio: string; fim: string }[];
-      const excluindoEditing = editing ? lista.filter((x) => x.id !== editing.id) : lista;
-      if (excluindoEditing.length === 0) {
-        toast.error("Este médico não tem agenda aberta nessa data. Gere os horários em Disponibilidades antes de agendar.");
-        return;
-      }
-      // Precisa existir um slot livre que cubra o horário escolhido (ou conflito com o próprio agendamento em edição)
-      const inicioMs = di.getTime();
-      const fimMs = df.getTime();
-      const cobre = excluindoEditing.some((s) => {
-        if (!isSlotLivre(s.paciente_nome)) return false;
-        const sIni = new Date(s.inicio).getTime();
-        const sFim = new Date(s.fim).getTime();
-        return sIni <= inicioMs && sFim >= fimMs;
-      });
-      if (!cobre) {
-        toast.error("Não há horário livre desse médico cobrindo o intervalo escolhido. Escolha um slot DISPONÍVEL na agenda ou gere mais horários em Disponibilidades.");
-        return;
-      }
-    }
     if (editing && pagosSet.has(editing.id) && form.paciente_nome.trim() !== editing.paciente_nome) {
       toast.error("Não é permitido alterar o nome do paciente em agendamento já pago.");
       return;
-    }
-    // Bloqueio por mensalidade vencida em contrato de cartão benefícios (titular ou dependente).
-    // Só aplica quando o paciente vai usar o CONVÊNIO neste atendimento.
-    // Se escolheu Particular, o débito do cartão não bloqueia o agendamento.
-    if (form.paciente_id && form.tipo_atendimento === "convenio") {
-      const { data: blk } = await supabase.rpc("paciente_cartao_inadimplente", {
-        _paciente_id: form.paciente_id,
-        _clinica_id: clinicaAtual.clinica_id,
-      });
-      const info = (blk ?? {}) as { bloqueado?: boolean; total_aberto?: number; mensalidades?: Array<{ vencimento: string; valor: number; convenio_nome?: string }> };
-      if (info.bloqueado) {
-        const linhas = (info.mensalidades ?? [])
-          .slice(0, 5)
-          .map((m) => `• ${m.convenio_nome ?? "Cartão"} — venc. ${m.vencimento?.split("-").reverse().join("/")} R$ ${Number(m.valor).toFixed(2)}`)
-          .join("\n");
-        const msg = `Paciente com mensalidade(s) vencida(s) no cartão benefícios.\nTotal em aberto: R$ ${Number(info.total_aberto ?? 0).toFixed(2)}\n\n${linhas}\n\nAgendamento bloqueado até a regularização — ou troque o Tipo de atendimento para "Particular".`;
-        toast.error(msg, { duration: 10000 });
-        return;
-      }
     }
     setSaving(true);
     const ehRecurso = !!form.medico_id && recursoIds.has(form.medico_id);
@@ -2518,38 +2449,39 @@ function AgendaPage() {
       orcamento_id: form.orcamento_id || null,
       tipo_atendimento: form.tipo_atendimento,
     };
-    let novoId: string | null = editing?.id ?? null;
-    if (editing) {
-      const { error } = await supabase.from("agendamentos").update(payload).eq("id", editing.id);
-      if (error) { setSaving(false); mostrarErro(error); return; }
-    } else {
-      const { data: novo, error } = await supabase.from("agendamentos").insert(payload).select("id").single();
-      if (error || !novo) { setSaving(false); mostrarErro(error); return; }
-      novoId = novo.id;
-    }
-    // Grava vínculos com itens do orçamento (consome itens individualmente
-    // para permitir agendamentos parciais futuros).
-    if (payload.orcamento_id && novoId && pendingOrcItemIds.length > 0) {
-      const vinculos = pendingOrcItemIds.map((itemId) => ({
+    // Miolo server-side (validação de paciente completo, agenda aberta + slot livre,
+    // inadimplência de cartão, INSERT/UPDATE do agendamento e vínculos com
+    // agendamento_orcamento_itens) foi extraído para `criarAgendamento`
+    // (src/lib/agenda/criar-agendamento.functions.ts) — cópia 1:1 da lógica original.
+    const result = await fnCriarAgendamento({
+      data: {
         clinica_id: clinicaAtual.clinica_id,
-        agendamento_id: novoId!,
-        orcamento_id: payload.orcamento_id!,
-        orcamento_item_id: itemId,
-      }));
-      // Em update, primeiro limpa vínculos antigos do agendamento.
-      if (editing) {
-        await supabase
-          .from("agendamento_orcamento_itens")
-          .delete()
-          .eq("agendamento_id", editing.id);
+        editing_id: editing?.id ?? null,
+        payload: payload as never,
+        checagens: {
+          validar_paciente_completo: true,
+          validar_agenda_aberta: !!form.medico_id && mudouHorarioOuMedico && !recursoIds.has(form.medico_id),
+          validar_inadimplencia: !!form.paciente_id && form.tipo_atendimento === "convenio",
+        },
+        pending_orc_item_ids: pendingOrcItemIds,
+      },
+    });
+    if (!result.ok) {
+      setSaving(false);
+      if ("validation_error" in result) {
+        const opts = result.validation_error.toast_duration
+          ? { duration: result.validation_error.toast_duration }
+          : undefined;
+        toast.error(result.validation_error.message, opts);
+      } else {
+        mostrarErro(result.pg_error);
       }
-      const { error: vErr } = await supabase
-        .from("agendamento_orcamento_itens")
-        .insert(vinculos as never);
-      if (vErr) {
-        mostrarErro(vErr, "agendamento salvo, mas vínculo com itens do orçamento falhou");
-      }
+      return;
     }
+    if (result.vinculo_warning) {
+      mostrarErro(result.vinculo_warning.pg_error, "agendamento salvo, mas vínculo com itens do orçamento falhou");
+    }
+    const novoId: string | null = result.id;
     setPendingOrcItemIds([]);
     setSaving(false);
     toast.success("Salvo"); setOpen(false); await load();
