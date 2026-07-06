@@ -675,7 +675,10 @@ export function AgendaV2Shell() {
             <div>Nenhuma sessão para os filtros atuais.</div>
           </div>
         ) : (
-          <div className={cn("h-full overflow-y-auto pb-8", foco ? "px-10 pt-6 max-w-4xl mx-auto" : "px-6 pt-4")}>
+          <div className={cn(
+            "h-full overflow-y-auto pb-8 transition-[padding] duration-200",
+            foco ? "px-10 pt-6 max-w-4xl mx-auto" : "px-6 pt-4",
+          )}>
             {porHora.map(([hora, lista]) => {
               const isNowHour = isToday && hora === nowHour;
               return (
