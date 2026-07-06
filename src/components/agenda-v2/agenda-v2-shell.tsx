@@ -379,13 +379,17 @@ export function AgendaV2Shell() {
 
   return (
     <div className="h-full flex bg-[#FAFAF8]">
-      {!foco && <AgendaV2Sidebar
-        clinicaNome={clinicaNome}
-        dia={dia}
-        sessoes={sessoes}
-        recursos={recursosOcup}
-        equipeOnline={equipeOnline}
-      />}
+      {!foco && (
+        <Suspense fallback={<div className="w-64 border-r border-slate-100 bg-white" />}>
+          <AgendaV2Sidebar
+            clinicaNome={clinicaNome}
+            dia={dia}
+            sessoes={sessoes}
+            recursos={recursosOcup}
+            equipeOnline={equipeOnline}
+          />
+        </Suspense>
+      )}
 
       <div className="flex-1 min-w-0 flex flex-col">
       {/* Header */}
@@ -526,9 +530,11 @@ export function AgendaV2Shell() {
         />
       </div>
 
-      {/* Faixa de sugestões IA (visual) */}
+      {/* Faixa de sugestões IA (visual) — recurso secundário, carrega depois */}
       {rows !== null && filtradas.length > 0 && (
-        <AiInsightsStrip sessoes={filtradas} livresPorHora={livresPorHora} />
+        <Suspense fallback={null}>
+          <AiInsightsStrip sessoes={filtradas} livresPorHora={livresPorHora} />
+        </Suspense>
       )}
 
       {/* Corpo */}
@@ -600,13 +606,19 @@ export function AgendaV2Shell() {
       </div>
 
       {drawerMounted && (
-        <PatientDrawer
-          open={!!drawerPacote}
-          onOpenChange={(v) => { if (!v) setDrawerPacote(null); }}
-          data={drawerData}
-        />
+        <Suspense fallback={null}>
+          <PatientDrawer
+            open={!!drawerPacote}
+            onOpenChange={(v) => { if (!v) setDrawerPacote(null); }}
+            data={drawerData}
+          />
+        </Suspense>
       )}
-      <NovoAgendamentoWizard open={wizardOpen} onOpenChange={setWizardOpen} />
+      {wizardOpen && (
+        <Suspense fallback={null}>
+          <NovoAgendamentoWizard open={wizardOpen} onOpenChange={setWizardOpen} />
+        </Suspense>
+      )}
     </div>
   );
 }
