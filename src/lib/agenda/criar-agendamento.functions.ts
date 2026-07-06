@@ -47,7 +47,7 @@ export type CriarAgendamentoInput = {
     inicio: string;
     fim: string;
     procedimento: string | null;
-    status: string;
+    status: "agendado" | "cancelado" | "confirmado" | "faltou" | "realizado";
     observacoes: string | null;
     data_pagamento: string | null;
     orcamento_id: string | null;
