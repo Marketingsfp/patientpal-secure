@@ -2,10 +2,19 @@
 
 Objetivo: fazer o wizard da Agenda V2 criar agendamentos reais no banco, reutilizando 100% das regras da Agenda clássica. Nenhuma regra nova, nenhuma migration, Agenda clássica intacta, flag `agenda_v2` OFF por padrão.
 
-> **Status Passo B (06/07/2026):** APROVADO. `criarAgendamento` é a fonte
-> única de criação/edição de agendamentos. Ver
-> `docs/agenda/criar-agendamento-shared.md`. Próxima etapa: planejamento da
-> Fase F propriamente dita (integração do wizard V2), sem implementação.
+> **Status Fase F (06/07/2026):** ENCERRADA E APROVADA.
+> `criarAgendamento` (`src/lib/agenda/criar-agendamento.functions.ts`) é
+> oficialmente a **única fonte** de criação/edição de agendamentos para
+> qualquer interface — atual (Agenda clássica, Agenda V2) ou futura
+> (F.2 Orçamento, F.3 Laboratório, Recursos de Enfermagem, quaisquer novos
+> pontos de entrada de agendamento). É proibido reintroduzir INSERT/UPDATE
+> em `agendamentos` fora dessa função. Ver:
+> - `docs/agenda/criar-agendamento-shared.md` — contrato da função
+> - `docs/agenda/arquitetura.md` — arquitetura completa da Agenda (clássica + V2)
+>
+> Próxima etapa aprovada: **revisão geral da Agenda V2** (UX, performance,
+> simplificação) antes de qualquer nova funcionalidade. Fases de
+> infraestrutura da Agenda encerradas.
 
 ---
 
