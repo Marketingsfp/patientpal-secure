@@ -237,6 +237,9 @@ export function AgendaV2Shell() {
   const filtradas = useMemo(() => {
     const norm = q.trim().toLowerCase();
     return sessoes.filter((s) => {
+      // Ocultar sessões "DISPONIVEL" — são horários livres, não pertencem
+      // ao fluxo operacional; ficam agrupadas em resumo por hora.
+      if (/^disponivel$/i.test((s.paciente_nome ?? "").trim())) return false;
       if (kpiFilter && kpiFilter !== "todos") {
         if (kpiFilter === "lab" && s.tipo !== "coleta_laboratorial") return false;
         if (kpiFilter !== "lab" && s.status !== kpiFilter) return false;
@@ -255,6 +258,17 @@ export function AgendaV2Shell() {
       return true;
     });
   }, [sessoes, q, kpiFilter, filtroMedico, filtroRecurso, filtroEspecialidade, espData]);
+
+  // Contagem de horários livres por hora (para o resumo discreto na timeline).
+  const livresPorHora = useMemo(() => {
+    const m = new Map<number, number>();
+    for (const s of sessoes) {
+      if (!/^disponivel$/i.test((s.paciente_nome ?? "").trim())) continue;
+      const h = new Date(s.inicio).getHours();
+      m.set(h, (m.get(h) ?? 0) + 1);
+    }
+    return m;
+  }, [sessoes]);
 
   const drawerData = useMemo<TimelineData | null>(() => {
     if (!drawerPacote || !rows) return null;
@@ -502,6 +516,12 @@ export function AgendaV2Shell() {
                       {lista.map((s) => (
                         <SessionCard key={s.pacote_id} data={s} onOpenTimeline={openDrawer} density={density} />
                       ))}
+                      {livresPorHora.get(hora) && (
+                        <div className="flex items-center gap-2 text-[11px] text-slate-400 pl-1">
+                          <span className="h-1 w-1 rounded-full bg-slate-300" />
+                          {livresPorHora.get(hora)} horário{livresPorHora.get(hora)! > 1 ? "s" : ""} livre{livresPorHora.get(hora)! > 1 ? "s" : ""} nesta hora
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
