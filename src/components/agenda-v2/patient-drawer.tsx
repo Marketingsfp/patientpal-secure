@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { HhpChip } from "@/design-system/hhp";
 
 export interface DrawerPatientData {
   paciente_id?: string | null;
