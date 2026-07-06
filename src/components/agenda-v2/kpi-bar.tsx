@@ -1,5 +1,5 @@
-import { cn } from "@/lib/utils";
 import { Clock, Activity, CheckCircle2, XCircle, TestTube, Users, type LucideIcon } from "lucide-react";
+import { HhpKpiCard, HhpKpiRow, type HhpTone } from "@/design-system/hhp";
 
 export interface Kpi {
   key: string;
@@ -19,25 +19,9 @@ const ICONS: Record<string, LucideIcon> = {
   lab: TestTube,
 };
 
-const TONE_TEXT: Record<NonNullable<Kpi["tone"]>, string> = {
-  default: "text-slate-500",
-  warn: "text-amber-600",
-  danger: "text-rose-600",
-  ok: "text-emerald-600",
-  info: "text-blue-600",
-};
-
-const TONE_BG: Record<NonNullable<Kpi["tone"]>, string> = {
-  default: "bg-slate-100 text-slate-500",
-  warn: "bg-amber-100 text-amber-600",
-  danger: "bg-rose-100 text-rose-600",
-  ok: "bg-emerald-100 text-emerald-600",
-  info: "bg-blue-100 text-blue-600",
-};
-
 /**
- * KPIs em CARDS (padrão mockup V3): rótulo pequeno uppercase, número grande,
- * ícone no canto direito com fundo tonalizado. Todo o card é clicável.
+ * KPIs em CARDS (padrão mockup V3). Agora consome HhpKpiCard/HhpKpiRow
+ * do Design System (E.6). Aparência preservada.
  */
 export function KpiBar({
   items,
@@ -51,55 +35,26 @@ export function KpiBar({
   compact?: boolean;
 }) {
   return (
-    <div
-      className={cn(
-        // Mobile: rolagem horizontal com snap para não espremer os KPIs.
-        // ≥ md: grid tradicional.
-        "flex gap-3 overflow-x-auto snap-x snap-mandatory -mx-3 px-3 pb-1 md:mx-0 md:px-0 md:pb-0",
-        "md:grid",
-        compact ? "md:grid-cols-6" : "md:grid-cols-3 lg:grid-cols-6",
-      )}
-    >
+    <HhpKpiRow compact={compact}>
       {items.map((k) => {
-        const tone = k.tone ?? "default";
-        const active = activeKey === k.key;
+        const tone = (k.tone ?? "default") as HhpTone;
         const Icon = ICONS[k.key] ?? Activity;
         return (
-          <button
+          <HhpKpiCard
             key={k.key}
-            type="button"
-            onClick={() => onSelect?.(k.key)}
-            title={k.hint ?? k.label}
-            className={cn(
-              "group text-left rounded-2xl border bg-white transition-all shrink-0 snap-start",
-              "min-w-[8.5rem] md:min-w-0",
-              "hover:shadow-md hover:-translate-y-[1px] hover:border-slate-200",
-              compact ? "p-3" : "p-4",
-              active ? "border-slate-900 shadow-sm ring-1 ring-slate-900/5" : "border-slate-100",
-            )}
-            aria-pressed={active}
-          >
-            <div className="flex items-start justify-between gap-2">
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
-                {k.label}
-              </span>
-              <span className={cn("inline-flex h-6 w-6 items-center justify-center rounded-lg", TONE_BG[tone])}>
-                <Icon className="h-3 w-3" strokeWidth={2.5} />
-              </span>
-            </div>
-            <div className="mt-2 flex items-baseline gap-1.5">
-              <span className={cn("tabular-nums font-bold text-slate-900", compact ? "text-xl" : "text-3xl")}>
-                {k.value.toLocaleString("pt-BR")}
-              </span>
-              {k.delta !== undefined && k.delta !== 0 && (
-                <span className={cn("text-[10px] font-semibold tabular-nums", k.delta > 0 ? TONE_TEXT[tone] : "text-slate-400")}>
-                  {k.delta > 0 ? "+" : ""}{k.delta}
-                </span>
-              )}
-            </div>
-          </button>
+            label={k.label}
+            value={k.value}
+            icon={Icon}
+            tone={tone}
+            hint={k.hint}
+            delta={k.delta}
+            active={activeKey === k.key}
+            compact={compact}
+            onClick={onSelect ? () => onSelect(k.key) : undefined}
+            className="snap-start"
+          />
         );
       })}
-    </div>
+    </HhpKpiRow>
   );
 }
