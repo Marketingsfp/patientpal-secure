@@ -417,10 +417,11 @@ export function AgendaV2Shell() {
         if (drawerPacote) { setDrawerPacote(null); return; }
       }
       if (isTypingTarget(e.target)) return;
+      // "?" precisa de Shift em teclados US/BR — trata antes do filtro de modificadores.
+      if (e.key === "?") { e.preventDefault(); setShortcutsOpen((v) => !v); return; }
       if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
 
       const k = e.key.toLowerCase();
-      if (k === "?") { e.preventDefault(); setShortcutsOpen((v) => !v); return; }
       if (k === "f") { e.preventDefault(); setDensity("foco"); return; }
       if (k === "c") { e.preventDefault(); setDensity("compacto"); return; }
       if (k === "d") { e.preventDefault(); setDensity("confortavel"); return; }
