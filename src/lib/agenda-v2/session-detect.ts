@@ -23,15 +23,86 @@ export const TIPO_SESSAO_LABEL: Record<TipoSessao, string> = {
   procedimento_ambulatorial: "Procedimento Ambulatorial",
 };
 
-export const TIPO_SESSAO_COR: Record<TipoSessao, string> = {
-  consulta: "bg-blue-50 text-blue-900 border-blue-200",
-  coleta_laboratorial: "bg-emerald-50 text-emerald-900 border-emerald-200",
-  imagem: "bg-violet-50 text-violet-900 border-violet-200",
-  cardiologica: "bg-rose-50 text-rose-900 border-rose-200",
-  endoscopia: "bg-amber-50 text-amber-900 border-amber-200",
-  cirurgia: "bg-red-50 text-red-900 border-red-200",
-  procedimento_ambulatorial: "bg-slate-100 text-slate-900 border-slate-200",
+/** Estilos visuais por tipo — pensados para diferenciação clara e leveza. */
+export interface TipoSessaoEstilo {
+  /** cor sólida CSS usada no filete lateral esquerdo (a "identidade" do card). */
+  accent: string;
+  /** classes tailwind para o chip/badge do tipo (fundo claro + texto forte). */
+  chip: string;
+  /** classe tailwind para o círculo do ícone no card e no KPI. */
+  iconWrap: string;
+  /** cor de texto do ícone. */
+  iconColor: string;
+  /** fundo suave do card no modo confortável (gradient discreto). */
+  cardBg: string;
+  /** rótulo curto para UI. */
+  short: string;
+}
+
+// Paleta oklch alinhada aos tokens do design system. Mantida clara em ambos os modos.
+export const TIPO_SESSAO_ESTILO: Record<TipoSessao, TipoSessaoEstilo> = {
+  consulta: {
+    accent: "hsl(217 91% 60%)",
+    chip: "bg-sky-50 text-sky-800 border-sky-200",
+    iconWrap: "bg-sky-100",
+    iconColor: "text-sky-700",
+    cardBg: "bg-gradient-to-r from-sky-50/60 to-transparent",
+    short: "Consulta",
+  },
+  coleta_laboratorial: {
+    accent: "hsl(160 84% 39%)",
+    chip: "bg-emerald-50 text-emerald-800 border-emerald-200",
+    iconWrap: "bg-emerald-100",
+    iconColor: "text-emerald-700",
+    cardBg: "bg-gradient-to-r from-emerald-50/60 to-transparent",
+    short: "Laboratório",
+  },
+  imagem: {
+    accent: "hsl(262 83% 58%)",
+    chip: "bg-violet-50 text-violet-800 border-violet-200",
+    iconWrap: "bg-violet-100",
+    iconColor: "text-violet-700",
+    cardBg: "bg-gradient-to-r from-violet-50/60 to-transparent",
+    short: "Imagem",
+  },
+  cardiologica: {
+    accent: "hsl(346 77% 55%)",
+    chip: "bg-rose-50 text-rose-800 border-rose-200",
+    iconWrap: "bg-rose-100",
+    iconColor: "text-rose-700",
+    cardBg: "bg-gradient-to-r from-rose-50/60 to-transparent",
+    short: "Cardiologia",
+  },
+  endoscopia: {
+    accent: "hsl(38 92% 50%)",
+    chip: "bg-amber-50 text-amber-800 border-amber-200",
+    iconWrap: "bg-amber-100",
+    iconColor: "text-amber-700",
+    cardBg: "bg-gradient-to-r from-amber-50/60 to-transparent",
+    short: "Endoscopia",
+  },
+  cirurgia: {
+    accent: "hsl(0 84% 55%)",
+    chip: "bg-red-50 text-red-800 border-red-200",
+    iconWrap: "bg-red-100",
+    iconColor: "text-red-700",
+    cardBg: "bg-gradient-to-r from-red-50/60 to-transparent",
+    short: "Cirurgia",
+  },
+  procedimento_ambulatorial: {
+    accent: "hsl(220 9% 46%)",
+    chip: "bg-slate-100 text-slate-800 border-slate-200",
+    iconWrap: "bg-slate-100",
+    iconColor: "text-slate-700",
+    cardBg: "bg-gradient-to-r from-slate-50/60 to-transparent",
+    short: "Ambulatorial",
+  },
 };
+
+// Retro-compat: alguns lugares antigos importavam TIPO_SESSAO_COR.
+export const TIPO_SESSAO_COR: Record<TipoSessao, string> = Object.fromEntries(
+  (Object.keys(TIPO_SESSAO_ESTILO) as TipoSessao[]).map((k) => [k, TIPO_SESSAO_ESTILO[k].cardBg]),
+) as Record<TipoSessao, string>;
 
 export interface ProcMeta {
   nome: string | null;
