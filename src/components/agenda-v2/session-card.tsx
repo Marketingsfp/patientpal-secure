@@ -73,6 +73,8 @@ function JourneyBar({
   steps: ReadonlyArray<{ label: string; done: boolean }>;
   current: boolean;
 }) {
+  let lastDone = -1;
+  for (let i = 0; i < steps.length; i++) if (steps[i].done) lastDone = i;
   return (
     <div className="w-full">
       <div className="flex items-center gap-1 h-[3px]">
@@ -82,7 +84,7 @@ function JourneyBar({
             className={cn(
               "flex-1 rounded-full transition-all",
               s.done
-                ? current && i === steps.findLastIndex((x) => x.done)
+                ? current && i === lastDone
                   ? "bg-indigo-500"
                   : "bg-emerald-400/80"
                 : "bg-slate-200/60",
