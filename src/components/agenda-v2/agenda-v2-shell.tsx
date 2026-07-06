@@ -348,6 +348,40 @@ export function AgendaV2Shell() {
               aria-label="Busca"
             />
           </div>
+          <SearchableSelect
+            options={[{ value: "", label: "Todos os profissionais" }, ...Array.from(medicos.entries()).map(([id, nome]) => ({ value: id, label: nome }))]}
+            value={filtroMedico}
+            onChange={setFiltroMedico}
+            placeholder="Profissional"
+            searchPlaceholder="Buscar profissional..."
+            className="h-10 rounded-2xl bg-slate-100 border-transparent min-w-48"
+          />
+          <SearchableSelect
+            options={[{ value: "", label: "Todas as especialidades" }, ...Array.from(espData?.espMap.entries() ?? []).map(([id, nome]) => ({ value: id, label: nome }))]}
+            value={filtroEspecialidade}
+            onChange={setFiltroEspecialidade}
+            placeholder="Especialidade"
+            searchPlaceholder="Buscar especialidade..."
+            className="h-10 rounded-2xl bg-slate-100 border-transparent min-w-44"
+          />
+          <SearchableSelect
+            options={[{ value: "", label: "Todas as salas" }, ...Array.from(recursos.entries()).map(([id, nome]) => ({ value: id, label: nome }))]}
+            value={filtroRecurso}
+            onChange={setFiltroRecurso}
+            placeholder="Sala / recurso"
+            searchPlaceholder="Buscar sala..."
+            className="h-10 rounded-2xl bg-slate-100 border-transparent min-w-40"
+          />
+          {(filtroMedico || filtroEspecialidade || filtroRecurso || kpiFilter) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 rounded-2xl text-xs text-slate-500 hover:text-slate-900"
+              onClick={() => { setFiltroMedico(""); setFiltroEspecialidade(""); setFiltroRecurso(""); setKpiFilter(null); }}
+            >
+              Limpar filtros
+            </Button>
+          )}
           <div className="text-xs text-slate-500 inline-flex items-center gap-2 ml-auto">
             <Sparkles className="h-3 w-3 text-slate-400" />
             <span className="tabular-nums">
