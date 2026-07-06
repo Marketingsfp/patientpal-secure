@@ -14,11 +14,9 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { HhpSkeletonCard, HhpEmptyState } from "@/design-system/hhp";
 import { HhpPageHeader, HhpToolbar, HhpToolbarPill } from "@/design-system/hhp";
+import { HhpShortcutsDialog } from "@/design-system/hhp";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { SearchableSelect } from "@/components/ui/searchable-select";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import { KpiBar, type Kpi } from "./kpi-bar";
@@ -784,47 +782,31 @@ export function AgendaV2Shell() {
         </Suspense>
       )}
 
-      <Dialog open={shortcutsOpen} onOpenChange={setShortcutsOpen}>
-        <DialogContent className="max-w-md rounded-3xl">
-          <DialogHeader>
-            <DialogTitle className="text-base font-semibold tracking-tight">
-              Atalhos de teclado
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 text-sm">
-            <ShortcutRow k="?" label="Abrir / fechar este painel" />
-            <div className="border-t border-slate-100" />
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Modos de visualização</div>
-            <ShortcutRow k="D" label="Confortável" />
-            <ShortcutRow k="C" label="Compacto" />
-            <ShortcutRow k="F" label="Foco" />
-            <div className="border-t border-slate-100" />
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Navegação</div>
-            <ShortcutRow k="J" label="Próxima sessão" />
-            <ShortcutRow k="K" label="Sessão anterior" />
-            <ShortcutRow k="Enter" label="Abrir sessão selecionada" />
-            <ShortcutRow k="Esc" label="Fechar drawer" />
-            <div className="border-t border-slate-100" />
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Ações</div>
-            <ShortcutRow k="N" label="Nova sessão" />
-            <ShortcutRow k="Ctrl K" label="Focar busca do módulo" />
-          </div>
-          <p className="text-[11px] text-slate-400 pt-2">
-            Padrão Health Hub Pro — reutilizado em Caixa, Clientes, Orçamentos e Prontuário.
-          </p>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
-
-function ShortcutRow({ k, label }: { k: string; label: string }) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-slate-600">{label}</span>
-      <kbd className="inline-flex h-6 min-w-6 items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-1.5 text-[11px] font-mono text-slate-700">
-        {k}
-      </kbd>
+      <HhpShortcutsDialog
+        open={shortcutsOpen}
+        onOpenChange={setShortcutsOpen}
+        moduleName="Agenda"
+        groups={[
+          { group: "Geral", items: [
+            { k: "?", label: "Abrir / fechar este painel" },
+          ]},
+          { group: "Modos de visualização", items: [
+            { k: "D", label: "Confortável" },
+            { k: "C", label: "Compacto" },
+            { k: "F", label: "Foco" },
+          ]},
+          { group: "Navegação", items: [
+            { k: "J", label: "Próxima sessão" },
+            { k: "K", label: "Sessão anterior" },
+            { k: "Enter", label: "Abrir sessão selecionada" },
+            { k: "Esc", label: "Fechar drawer" },
+          ]},
+          { group: "Ações", items: [
+            { k: "N", label: "Nova sessão" },
+            { k: "Ctrl K", label: "Focar busca do módulo" },
+          ]},
+        ]}
+      />
     </div>
   );
 }
