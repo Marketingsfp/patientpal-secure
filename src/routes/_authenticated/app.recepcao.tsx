@@ -9,6 +9,7 @@ import { Bell, Check, X, ExternalLink } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/recepcao")({
   component: RecepcaoPage,
+  head: () => ({ meta: [{ title: "Recepção — ClinicaOS" }] }),
 });
 
 type Senha = {
