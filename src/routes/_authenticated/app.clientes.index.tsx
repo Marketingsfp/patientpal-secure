@@ -76,7 +76,7 @@ function ClientesV2Wrapper() {
     await supabase.from("profiles").update({ preferencias_ui: { ...prev, clientes } }).eq("id", u.user.id);
   };
   return (
-    <div className="h-[calc(100vh-56px)] -m-4 sm:-m-6">
+    <div className="h-[calc(100vh-64px)] -mx-3 -mt-1 -mb-3 sm:-mx-4 sm:-mt-1.5 sm:-mb-4 lg:-mx-6 lg:-mt-2 lg:-mb-6">
       <ClientesShellV2 compactPref={compact} onToggleCompact={(v) => void persistCompact(v)} />
     </div>
   );
