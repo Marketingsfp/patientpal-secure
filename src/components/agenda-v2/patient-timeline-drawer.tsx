@@ -41,7 +41,7 @@ export function PatientTimelineDrawer({
       onOpenChange={onOpenChange}
       title={data?.paciente_nome ?? "Linha do tempo do paciente"}
       description="Linha do tempo do paciente"
-      hiddenTitle
+      hiddenTitle={false}
       side="right"
       maxWidth="28rem"
     >
