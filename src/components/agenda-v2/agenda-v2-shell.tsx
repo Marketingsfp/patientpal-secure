@@ -231,43 +231,33 @@ export function AgendaV2Shell() {
   const compact = density === "compacto";
 
   return (
-    <div className="h-full flex flex-col bg-gradient-to-b from-muted/20 to-background">
-      {/* Header operacional — hierarquia clara, sem cara de sistema legado */}
-      <div className="border-b bg-card/80 backdrop-blur-sm px-5 py-4 space-y-4 shrink-0">
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navDia(-1)} aria-label="Dia anterior">
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/60 text-sm font-medium">
-              <CalendarDays className="h-4 w-4 text-primary" />
-              <span className="capitalize">{format(dia, "EEEE, dd 'de' MMMM", { locale: ptBR })}</span>
-              <span className="text-muted-foreground font-normal">· {format(dia, "yyyy")}</span>
-            </div>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navDia(1)} aria-label="Próximo dia">
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 rounded-full text-xs"
-              onClick={() => { const d = new Date(); d.setHours(0, 0, 0, 0); setDia(d); }}
+    <div className="h-full flex flex-col bg-[#FBFBFA]">
+      {/* Header — Calendário Premium: título em Instrument Serif itálico, muito respiro */}
+      <div className="border-b border-slate-100 bg-white/80 backdrop-blur-sm px-6 py-6 space-y-6 shrink-0">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="space-y-1">
+            <h1
+              className="text-3xl italic tracking-tight text-slate-800"
+              style={{ fontFamily: "'Instrument Serif', ui-serif, Georgia, serif" }}
             >
-              Hoje
-            </Button>
+              Agenda do Dia
+            </h1>
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 capitalize">
+              {format(dia, "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+            </p>
           </div>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="flex items-center gap-2">
             <ToggleGroup
               type="single"
               value={density}
               onValueChange={(v) => v && setDensity(v as SessionDensity)}
-              className="bg-muted/60 p-0.5 rounded-full"
+              className="bg-slate-100 p-1 rounded-2xl"
             >
-              <ToggleGroupItem value="confortavel" aria-label="Confortável" className="h-7 px-2.5 rounded-full data-[state=on]:bg-background data-[state=on]:shadow-sm">
+              <ToggleGroupItem value="confortavel" aria-label="Confortável" className="h-8 w-8 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm">
                 <Rows3 className="h-3.5 w-3.5" />
               </ToggleGroupItem>
-              <ToggleGroupItem value="compacto" aria-label="Compacto" className="h-7 px-2.5 rounded-full data-[state=on]:bg-background data-[state=on]:shadow-sm">
+              <ToggleGroupItem value="compacto" aria-label="Compacto" className="h-8 w-8 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm">
                 <Rows2 className="h-3.5 w-3.5" />
               </ToggleGroupItem>
             </ToggleGroup>
@@ -276,38 +266,55 @@ export function AgendaV2Shell() {
               type="single"
               value={view}
               onValueChange={(v) => v && setView(v as ViewMode)}
-              className="bg-muted/60 p-0.5 rounded-full"
+              className="bg-slate-100 p-1 rounded-2xl"
             >
-              <ToggleGroupItem value="timeline" aria-label="Timeline" className="h-7 px-2.5 gap-1.5 rounded-full data-[state=on]:bg-background data-[state=on]:shadow-sm">
+              <ToggleGroupItem value="timeline" aria-label="Timeline" className="h-8 px-3 gap-1.5 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm">
                 <GanttChartSquare className="h-3.5 w-3.5" /> <span className="hidden sm:inline text-xs">Timeline</span>
               </ToggleGroupItem>
-              <ToggleGroupItem value="list" aria-label="Lista" className="h-7 px-2.5 gap-1.5 rounded-full data-[state=on]:bg-background data-[state=on]:shadow-sm">
+              <ToggleGroupItem value="list" aria-label="Lista" className="h-8 px-3 gap-1.5 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm">
                 <LayoutList className="h-3.5 w-3.5" /> <span className="hidden sm:inline text-xs">Lista</span>
               </ToggleGroupItem>
             </ToggleGroup>
+
+            <div className="flex items-center gap-0.5 ml-1">
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl hover:bg-slate-100" onClick={() => navDia(-1)} aria-label="Dia anterior">
+                <ChevronLeft className="h-4 w-4 text-slate-400" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                onClick={() => { const d = new Date(); d.setHours(0, 0, 0, 0); setDia(d); }}
+              >
+                Hoje
+              </Button>
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl hover:bg-slate-100" onClick={() => navDia(1)} aria-label="Próximo dia">
+                <ChevronRight className="h-4 w-4 text-slate-400" />
+              </Button>
+            </div>
           </div>
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
           <div className="relative flex-1 min-w-64 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
             <Input
               placeholder="Buscar paciente, médico, sala, exame…"
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              className="pl-9 h-9 rounded-full bg-muted/40 border-transparent focus-visible:bg-background focus-visible:border-border"
+              className="pl-10 h-10 rounded-2xl bg-slate-100 border-transparent focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-slate-200 text-sm placeholder:text-slate-400"
               aria-label="Busca"
             />
           </div>
-          <div className="text-xs text-muted-foreground inline-flex items-center gap-2">
-            <Sparkles className="h-3 w-3 text-primary/70" />
+          <div className="text-xs text-slate-500 inline-flex items-center gap-2 ml-auto">
+            <Sparkles className="h-3 w-3 text-slate-400" />
             <span className="tabular-nums">
               {rows === null
                 ? "carregando…"
                 : `${filtradas.length} ${filtradas.length === 1 ? "sessão" : "sessões"}`}
             </span>
             {loadedMs !== null && (
-              <span className="text-muted-foreground/60 tabular-nums">· {loadedMs}ms</span>
+              <span className="text-slate-400 tabular-nums">· {loadedMs}ms</span>
             )}
           </div>
         </div>
@@ -323,24 +330,24 @@ export function AgendaV2Shell() {
       {/* Corpo */}
       <div className="flex-1 min-h-0 overflow-hidden">
         {rows === null ? (
-          <div className="p-4 space-y-2">
+          <div className="p-6 space-y-3">
             {Array.from({ length: 8 }).map((_, i) => (
-              <Skeleton key={i} className={compact ? "h-11 w-full rounded-xl" : "h-16 w-full rounded-xl"} />
+              <Skeleton key={i} className={compact ? "h-14 w-full rounded-2xl" : "h-24 w-full rounded-3xl"} />
             ))}
           </div>
         ) : filtradas.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-sm text-muted-foreground p-6 text-center gap-2">
-            <CalendarDays className="h-10 w-10 text-muted-foreground/40" />
+          <div className="h-full flex flex-col items-center justify-center text-sm text-slate-500 p-6 text-center gap-3">
+            <CalendarDays className="h-12 w-12 text-slate-300" />
             <div>Nenhuma sessão para os filtros atuais.</div>
           </div>
         ) : (
           <VirtualList
             items={filtradas}
-            estimateSize={compact ? 68 : (view === "timeline" ? 104 : 96)}
+            estimateSize={compact ? 84 : 132}
             getKey={(s) => s.pacote_id}
-            className="px-4 pt-3"
+            className="px-6 pt-4"
             renderItem={(s) => (
-              <div className="pb-2">
+              <div className="pb-3">
                 <SessionCard data={s} onOpenTimeline={openDrawer} density={density} />
               </div>
             )}
