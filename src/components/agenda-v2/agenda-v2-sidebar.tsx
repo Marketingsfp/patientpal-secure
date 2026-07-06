@@ -1,0 +1,168 @@
+import { useMemo } from "react";
+import { Clock, Sun, Moon, Sunrise, Users } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { TIPO_SESSAO_ESTILO, TIPO_SESSAO_LABEL, type TipoSessao } from "@/lib/agenda-v2/session-detect";
+import type { SessionCardData } from "./session-card";
+
+interface RecursoOcup {
+  id: string;
+  nome: string;
+  usados: number;
+  total: number;
+}
+
+interface Props {
+  clinicaNome: string;
+  dia: Date;
+  sessoes: SessionCardData[];
+  recursos: RecursoOcup[];
+  equipeOnline: { id: string; nome: string }[];
+}
+
+function turnoInfo(d: Date) {
+  const h = d.getHours();
+  if (h < 12) return { label: "Manhã", Icon: Sunrise, tone: "text-amber-500" };
+  if (h < 18) return { label: "Tarde", Icon: Sun, tone: "text-orange-500" };
+  return { label: "Noite", Icon: Moon, tone: "text-indigo-500" };
+}
+
+function initials(n: string) {
+  return n.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("");
+}
+
+export function AgendaV2Sidebar({ clinicaNome, dia, sessoes, recursos, equipeOnline }: Props) {
+  const turno = turnoInfo(new Date());
+  const TurnoIcon = turno.Icon;
+
+  const porTipo = useMemo(() => {
+    const m = new Map<TipoSessao, number>();
+    for (const s of sessoes) m.set(s.tipo, (m.get(s.tipo) ?? 0) + 1);
+    return Array.from(m.entries()).sort((a, b) => b[1] - a[1]);
+  }, [sessoes]);
+
+  const totalRecursos = recursos.reduce((a, r) => a + r.total, 0);
+  const usadosRecursos = recursos.reduce((a, r) => a + r.usados, 0);
+  const ocupacao = totalRecursos > 0 ? Math.round((usadosRecursos / totalRecursos) * 100) : 0;
+
+  return (
+    <aside className="w-64 shrink-0 border-r border-slate-100 bg-white/60 backdrop-blur-sm flex flex-col overflow-y-auto">
+      {/* Header clínica */}
+      <div className="px-5 py-5 border-b border-slate-100">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center text-sm font-bold">
+            {initials(clinicaNome)}
+          </div>
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-slate-900 truncate">{clinicaNome}</div>
+            <div className="text-[10px] text-slate-400 uppercase tracking-wider">
+              {dia.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Turno atual */}
+      <div className="px-5 py-5 border-b border-slate-100">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Turno atual</span>
+          <span className={cn("inline-flex items-center gap-1 text-[11px] font-semibold", turno.tone)}>
+            <TurnoIcon className="h-3 w-3" /> {turno.label}
+          </span>
+        </div>
+        <div className="flex items-end justify-between">
+          <div>
+            <div className="text-3xl font-bold text-slate-900 tabular-nums leading-none">{sessoes.length}</div>
+            <div className="text-[10px] text-slate-400 mt-1">sessões</div>
+          </div>
+          <div className="text-right">
+            <div className="text-2xl font-bold text-emerald-600 tabular-nums leading-none">{ocupacao}%</div>
+            <div className="text-[10px] text-slate-400 mt-1">ocupação</div>
+          </div>
+        </div>
+        <div className="mt-3 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+          <div className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 transition-all"
+            style={{ width: `${ocupacao}%` }} />
+        </div>
+      </div>
+
+      {/* Sessões por tipo */}
+      <div className="px-5 py-5 border-b border-slate-100">
+        <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-3">Sessões</div>
+        <ul className="space-y-2">
+          {porTipo.length === 0 && (
+            <li className="text-xs text-slate-400">Nenhuma sessão</li>
+          )}
+          {porTipo.map(([tipo, n]) => {
+            const est = TIPO_SESSAO_ESTILO[tipo];
+            return (
+              <li key={tipo} className="flex items-center justify-between text-xs">
+                <span className="inline-flex items-center gap-2 text-slate-600">
+                  <span className="h-2 w-2 rounded-full" style={{ background: est.accent }} />
+                  {TIPO_SESSAO_LABEL[tipo]}
+                </span>
+                <span className="tabular-nums font-semibold text-slate-800">{n}</span>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+
+      {/* Recursos com barras */}
+      <div className="px-5 py-5 border-b border-slate-100">
+        <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-3">Recursos</div>
+        <ul className="space-y-3">
+          {recursos.length === 0 && (
+            <li className="text-xs text-slate-400">Sem recursos cadastrados</li>
+          )}
+          {recursos.slice(0, 6).map((r) => {
+            const pct = r.total > 0 ? Math.round((r.usados / r.total) * 100) : 0;
+            const tone = pct >= 90 ? "bg-rose-500" : pct >= 60 ? "bg-amber-500" : "bg-emerald-500";
+            return (
+              <li key={r.id}>
+                <div className="flex items-center justify-between text-xs mb-1">
+                  <span className="text-slate-600 truncate mr-2">{r.nome}</span>
+                  <span className="tabular-nums text-slate-500 shrink-0">{r.usados}/{r.total}</span>
+                </div>
+                <div className="h-1 rounded-full bg-slate-100 overflow-hidden">
+                  <div className={cn("h-full transition-all", tone)} style={{ width: `${pct}%` }} />
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+
+      {/* Equipe online */}
+      <div className="px-5 py-5">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Equipe on-line</span>
+          <span className="inline-flex items-center gap-1 text-[10px] text-slate-500">
+            <Users className="h-3 w-3" /> {equipeOnline.length}
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {equipeOnline.slice(0, 8).map((m) => (
+            <div
+              key={m.id}
+              className="relative h-7 w-7 rounded-full bg-slate-100 border border-white shadow-sm flex items-center justify-center text-[10px] font-semibold text-slate-600"
+              title={m.nome}
+            >
+              {initials(m.nome)}
+              <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-500 border border-white" />
+            </div>
+          ))}
+          {equipeOnline.length > 8 && (
+            <div className="h-7 w-7 rounded-full bg-slate-900 text-white flex items-center justify-center text-[10px] font-semibold">
+              +{equipeOnline.length - 8}
+            </div>
+          )}
+          {equipeOnline.length === 0 && (
+            <div className="text-xs text-slate-400 inline-flex items-center gap-1">
+              <Clock className="h-3 w-3" /> ninguém on-line
+            </div>
+          )}
+        </div>
+      </div>
+    </aside>
+  );
+}
