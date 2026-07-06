@@ -529,13 +529,11 @@ export function AgendaV2Shell() {
       </div>
 
       {drawerMounted && (
-        <Suspense fallback={null}>
-          <PatientTimelineDrawer
-            open={!!drawerPacote}
-            onOpenChange={(v) => { if (!v) setDrawerPacote(null); }}
-            data={drawerData}
-          />
-        </Suspense>
+        <PatientTimelineDrawer
+          open={!!drawerPacote}
+          onOpenChange={(v) => { if (!v) setDrawerPacote(null); }}
+          data={drawerData}
+        />
       )}
     </div>
   );
