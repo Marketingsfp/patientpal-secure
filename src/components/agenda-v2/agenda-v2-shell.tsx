@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   ChevronLeft, ChevronRight, LayoutList, GanttChartSquare, CalendarDays,
-  Search, Rows3, Rows2, Focus, Sparkles, Plus,
+  Search, Rows3, Rows2, Focus, Sparkles, Plus, Keyboard,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,6 +13,10 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
 import { KpiBar, type Kpi } from "./kpi-bar";
 import { SessionCard, type SessionCardData, type SessionDensity } from "./session-card";
 import type { DrawerPatientData } from "./patient-drawer";
@@ -35,6 +39,18 @@ const NovoAgendamentoWizard = lazy(() =>
 );
 
 const DENSITY_KEY = "agenda_v2_density";
+
+function densityStorageKey(clinicaId: string | null) {
+  return clinicaId ? `${DENSITY_KEY}:${clinicaId}` : DENSITY_KEY;
+}
+function isTypingTarget(el: EventTarget | null): boolean {
+  if (!(el instanceof HTMLElement)) return false;
+  const t = el.tagName;
+  if (t === "INPUT" || t === "TEXTAREA" || t === "SELECT") return true;
+  if (el.isContentEditable) return true;
+  if (el.closest('[role="dialog"], [role="listbox"], [role="combobox"]')) return true;
+  return false;
+}
 
 type ViewMode = "timeline" | "list";
 
