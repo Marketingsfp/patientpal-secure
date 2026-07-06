@@ -44,6 +44,7 @@ export function AgendaV2Shell() {
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id ?? null;
   const clinicaNome = clinicaAtual?.clinica?.nome ?? "Clínica";
+  const queryClient = useQueryClient();
 
   const [dia, setDia] = useState<Date>(() => {
     const d = new Date(); d.setHours(0, 0, 0, 0); return d;
@@ -157,6 +158,34 @@ export function AgendaV2Shell() {
       startedAtRef.current = 0;
     }
   }, [agsQuery.isFetched, agsQuery.dataUpdatedAt]);
+
+  // Prefetch dos dias adjacentes (±1) em idle — troca de dia vira instantânea.
+  useEffect(() => {
+    if (!clinicaId || !agsQuery.isFetched) return;
+    const idle = (cb: () => void) =>
+      (window as unknown as { requestIdleCallback?: (fn: () => void) => number })
+        .requestIdleCallback?.(cb) ?? window.setTimeout(cb, 300);
+    const prefetchDay = (delta: number) => {
+      const d = new Date(diaKey); d.setDate(d.getDate() + delta); d.setHours(0, 0, 0, 0);
+      const key = d.toISOString();
+      void queryClient.prefetchQuery({
+        queryKey: ["agenda-v2", "ags", clinicaId, key],
+        staleTime: 60 * 1000,
+        queryFn: async () => {
+          const start = new Date(key);
+          const end = new Date(key); end.setHours(23, 59, 59, 999);
+          const { data } = await supabase.from("agendamentos")
+            .select("id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,pacote_id,enfermagem_recurso_id,fluxo_etapa,fluxo_atualizado_em")
+            .eq("clinica_id", clinicaId)
+            .gte("inicio", start.toISOString())
+            .lte("inicio", end.toISOString())
+            .order("inicio", { ascending: true });
+          return (data ?? []) as RawAg[];
+        },
+      });
+    };
+    idle(() => { prefetchDay(-1); prefetchDay(1); });
+  }, [clinicaId, diaKey, agsQuery.isFetched, queryClient]);
 
   const rows = agsQuery.data ?? null;
   const medicos = medicosQuery.data ?? new Map<string, string>();
