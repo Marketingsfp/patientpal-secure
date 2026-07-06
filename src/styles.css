@@ -338,3 +338,66 @@
   html.agenda-v2-fullbleed aside { display: none !important; }
   html.agenda-v2-fullbleed main { padding: 0 !important; }
 }
+
+/* =====================================================================
+ * Health Hub Pro — Design System tokens (HHP)
+ *
+ * Fonte oficial da identidade visual extraída da Agenda V2. Todos os
+ * módulos futuros (Prontuário V2, Financeiro V2, RH etc.) devem consumir
+ * estes tokens em vez de re-declarar cores/raios/sombras.
+ *
+ * Convenção: prefixo --hhp-* para evitar conflito com tokens shadcn base.
+ * Ver docs/design-system/health-hub-pro.md
+ * ===================================================================== */
+:root {
+  /* Superfícies */
+  --hhp-surface-page: #FAFAF8;
+  --hhp-surface-panel: #F7F7F5;
+  --hhp-surface-card: #FFFFFF;
+  --hhp-surface-muted: #F1F5F9;   /* slate-100 */
+
+  /* Traços / bordas */
+  --hhp-border-hair: rgba(15, 23, 42, 0.06);
+  --hhp-border-subtle: #E2E8F0;   /* slate-200 */
+
+  /* Texto */
+  --hhp-text-strong: #0F172A;     /* slate-900 */
+  --hhp-text-body: #334155;       /* slate-700 */
+  --hhp-text-muted: #64748B;      /* slate-500 */
+  --hhp-text-hint: #94A3B8;       /* slate-400 */
+
+  /* Tons semânticos */
+  --hhp-tone-info: #3B82F6;
+  --hhp-tone-ok: #10B981;
+  --hhp-tone-warn: #F59E0B;
+  --hhp-tone-danger: #F43F5E;
+  --hhp-tone-focus: #4F46E5;
+
+  /* Raios */
+  --hhp-radius-chip: 9999px;
+  --hhp-radius-control: 0.75rem;   /* 12px  */
+  --hhp-radius-card: 1rem;         /* 16px  */
+  --hhp-radius-card-lg: 1.5rem;    /* 24px  */
+  --hhp-radius-drawer: 1.5rem;
+
+  /* Sombras */
+  --hhp-shadow-hair: 0 1px 2px rgba(15, 23, 42, 0.03);
+  --hhp-shadow-card: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --hhp-shadow-lift: 0 8px 24px -12px rgba(15, 23, 42, 0.18);
+
+  /* Motion */
+  --hhp-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --hhp-dur-fast: 120ms;
+  --hhp-dur-base: 180ms;
+  --hhp-dur-slow: 260ms;
+
+  /* Densidades — controlam padding/gap de listas e cards */
+  --hhp-density-confortavel-gap: 0.625rem;   /* 10px */
+  --hhp-density-compacto-gap: 0.375rem;      /* 6px  */
+  --hhp-density-foco-gap: 1rem;              /* 16px */
+
+  /* Tipografia editorial (usada por headings do HHP) */
+  --hhp-font-display: "Inter Tight", Inter, system-ui, sans-serif;
+  --hhp-font-body: Inter, system-ui, sans-serif;
+  --hhp-font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
