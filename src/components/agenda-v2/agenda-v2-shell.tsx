@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { HhpSkeletonCard, HhpEmptyState } from "@/design-system/hhp";
-import { HhpPageHeader } from "@/design-system/hhp";
+import { HhpPageHeader, HhpToolbar, HhpToolbarPill } from "@/design-system/hhp";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
@@ -560,36 +560,38 @@ export function AgendaV2Shell() {
               <span className="text-xs font-semibold sm:hidden">Nova</span>
             </Button>
 
-            <ToggleGroup
-              type="single"
-              value={density}
-              onValueChange={(v) => v && setDensity(v as SessionDensity)}
-              className="bg-slate-100 p-1 rounded-2xl"
-            >
-              <ToggleGroupItem value="confortavel" aria-label="Confortável" className="h-8 w-8 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm">
-                <Rows3 className="h-3.5 w-3.5" />
-              </ToggleGroupItem>
-              <ToggleGroupItem value="compacto" aria-label="Compacto" className="h-8 w-8 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm">
-                <Rows2 className="h-3.5 w-3.5" />
-              </ToggleGroupItem>
-              <ToggleGroupItem value="foco" aria-label="Foco" className="h-8 w-8 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm">
-                <Focus className="h-3.5 w-3.5" />
-              </ToggleGroupItem>
-            </ToggleGroup>
+            <HhpToolbarPill>
+              <ToggleGroup
+                type="single"
+                value={density}
+                onValueChange={(v) => v && setDensity(v as SessionDensity)}
+              >
+                <ToggleGroupItem value="confortavel" aria-label="Confortável" className="h-8 w-8 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm">
+                  <Rows3 className="h-3.5 w-3.5" />
+                </ToggleGroupItem>
+                <ToggleGroupItem value="compacto" aria-label="Compacto" className="h-8 w-8 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm">
+                  <Rows2 className="h-3.5 w-3.5" />
+                </ToggleGroupItem>
+                <ToggleGroupItem value="foco" aria-label="Foco" className="h-8 w-8 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm">
+                  <Focus className="h-3.5 w-3.5" />
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </HhpToolbarPill>
 
-            <ToggleGroup
-              type="single"
-              value={view}
-              onValueChange={(v) => v && setView(v as ViewMode)}
-              className="bg-slate-100 p-1 rounded-2xl"
-            >
-              <ToggleGroupItem value="timeline" aria-label="Timeline" className="h-8 px-3 gap-1.5 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm">
-                <GanttChartSquare className="h-3.5 w-3.5" /> <span className="hidden sm:inline text-xs">Timeline</span>
-              </ToggleGroupItem>
-              <ToggleGroupItem value="list" aria-label="Lista" className="h-8 px-3 gap-1.5 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm">
-                <LayoutList className="h-3.5 w-3.5" /> <span className="hidden sm:inline text-xs">Lista</span>
-              </ToggleGroupItem>
-            </ToggleGroup>
+            <HhpToolbarPill>
+              <ToggleGroup
+                type="single"
+                value={view}
+                onValueChange={(v) => v && setView(v as ViewMode)}
+              >
+                <ToggleGroupItem value="timeline" aria-label="Timeline" className="h-8 px-3 gap-1.5 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm">
+                  <GanttChartSquare className="h-3.5 w-3.5" /> <span className="hidden sm:inline text-xs">Timeline</span>
+                </ToggleGroupItem>
+                <ToggleGroupItem value="list" aria-label="Lista" className="h-8 px-3 gap-1.5 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm">
+                  <LayoutList className="h-3.5 w-3.5" /> <span className="hidden sm:inline text-xs">Lista</span>
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </HhpToolbarPill>
 
             <div className="flex items-center gap-0.5 ml-1">
               <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl hover:bg-slate-100" onClick={() => navDia(-1)} aria-label="Dia anterior">
@@ -620,7 +622,7 @@ export function AgendaV2Shell() {
           </>
         )}
       >
-        <div className="flex items-center gap-2 md:gap-3 flex-wrap">
+        <HhpToolbar>
           <div className="relative flex-1 min-w-0 md:min-w-64 max-w-md w-full sm:w-auto">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
             <Input
@@ -679,7 +681,7 @@ export function AgendaV2Shell() {
               </span>
             )}
           </div>
-        </div>
+        </HhpToolbar>
 
         <KpiBar
           items={kpis}
