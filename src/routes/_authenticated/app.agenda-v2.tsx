@@ -30,6 +30,18 @@ function AgendaV2Page() {
   const [toggleMs, setToggleMs] = useState<number | null>(null);
   const toggleStartRef = useRef<number>(0);
 
+  // Modo full-bleed no mobile: recolhe o menu externo do app-shell e o padding
+  // do <main>, dando 100% da largura útil para a Agenda V2. Só ativa quando a
+  // flag está ligada (para não afetar a tela de aviso "Agenda V2 desligada").
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (!enabled) return;
+    document.documentElement.classList.add("agenda-v2-fullbleed");
+    return () => {
+      document.documentElement.classList.remove("agenda-v2-fullbleed");
+    };
+  }, [enabled]);
+
   useEffect(() => {
     if (enabled && toggleStartRef.current > 0) {
       // Mede do clique até o shell montar (próximo frame após enabled=true).
