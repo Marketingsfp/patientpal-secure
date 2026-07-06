@@ -395,7 +395,7 @@ function RelatoriosPage() {
 
       <Tabs defaultValue="dashboard">
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-3">
-          <TabsList>
+          <TabsList className="h-auto flex flex-wrap justify-start">
             <TabsTrigger value="dashboard" className="gap-2">
               <LayoutDashboard className="h-4 w-4" /> Dashboard
             </TabsTrigger>
@@ -409,7 +409,7 @@ function RelatoriosPage() {
               <Download className="h-4 w-4" /> Baixar planilhas
             </TabsTrigger>
           </TabsList>
-          <div className="flex items-end gap-2">
+          <div className="flex flex-wrap items-end gap-2">
             <div>
               <Label htmlFor="ini" className="text-xs text-muted-foreground">De</Label>
               <Input id="ini" type="date" value={ini} onChange={(e) => setIni(e.target.value)} className="h-9 w-36" />
