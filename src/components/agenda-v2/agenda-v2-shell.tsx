@@ -89,16 +89,29 @@ export function AgendaV2Shell() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [density, setDensity] = useState<SessionDensity>(() => {
     if (typeof window === "undefined") return "confortavel";
-    return (window.localStorage.getItem(DENSITY_KEY) as SessionDensity) ?? "confortavel";
+    // fallback: chave legada (sem clínica) para não perder preferência do usuário.
+    return ((window.localStorage.getItem(DENSITY_KEY) as SessionDensity) ??
+      "confortavel");
   });
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [loadedMs, setLoadedMs] = useState<number | null>(null);
   const startedAtRef = useRef<number>(0);
   const mountedAtRef = useRef<number>(performance.now());
   const [renderMs, setRenderMs] = useState<number | null>(null);
 
+  // Densidade persistida por usuário + clínica. Ao trocar de clínica,
+  // recarrega o modo salvo daquela clínica (fallback: chave global).
   useEffect(() => {
-    if (typeof window !== "undefined") window.localStorage.setItem(DENSITY_KEY, density);
-  }, [density]);
+    if (typeof window === "undefined") return;
+    const saved = window.localStorage.getItem(densityStorageKey(clinicaId));
+    if (saved && saved !== density) setDensity(saved as SessionDensity);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clinicaId]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(densityStorageKey(clinicaId), density);
+    window.localStorage.setItem(DENSITY_KEY, density); // fallback global
+  }, [density, clinicaId]);
 
   // Mede o tempo até o primeiro paint útil (header + skeleton visível).
   useEffect(() => {
