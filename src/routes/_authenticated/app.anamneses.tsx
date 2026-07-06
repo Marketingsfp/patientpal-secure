@@ -22,6 +22,8 @@ function AnamnesePage() {
       table="anamnese_modelos"
       selectColumns="id, nome, descricao, perguntas, ativo"
       title="Modelos de Anamnese"
+      newLabel="Novo modelo de anamnese"
+      editLabel="Editar modelo de anamnese"
       subtitle="Questionários enviados ao paciente para responder antes da consulta."
       icon={<ClipboardCheck className="h-6 w-6 text-primary" />}
       orderBy={{ column: "nome", ascending: true }}

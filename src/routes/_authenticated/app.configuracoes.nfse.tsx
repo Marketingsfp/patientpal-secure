@@ -95,6 +95,8 @@ function NfseConfigPage() {
       table="nfse_emitentes"
       selectColumns="id, nome, cnpj, razao_social, nome_fantasia, inscricao_municipal, cep, logradouro, numero, complemento, bairro, municipio, uf, codigo_municipio, telefone, email, regime_tributario, optante_simples, item_lista_servico, codigo_tributario_municipio, codigo_cnae, aliquota_iss, descricao_servico_padrao, focus_ambiente, rps_serie, rps_proximo_numero, ativo, padrao, usar_ambiente_nacional"
       title="Emitentes NFS-e"
+      newLabel="Novo emitente NFS-e"
+      editLabel="Editar emitente NFS-e"
       subtitle="CNPJs cadastrados para emissão de notas fiscais via Focus NFe."
       icon={<Building2 className="h-6 w-6 text-primary" />}
       orderBy={{ column: "created_at", ascending: false }}
