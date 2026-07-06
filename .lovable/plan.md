@@ -272,3 +272,82 @@ Aguardando seu retorno em um destes três formatos:
 - **"Mudar direção"** → refazemos o conceito antes de qualquer visual.
 
 Nenhuma implementação será iniciada sem sua aprovação explícita da direção visual final.
+
+---
+
+## 14. Refinamentos aprovados (rev. 3) — pré-implementação
+
+Ajustes incorporados sobre a direção híbrida (Editorial Calm + Focus Rail + acabamento Warm Clinical):
+
+1. **Wizard "Novo Agendamento"** — mantido exatamente na direção aprovada (4 etapas, cards/avatares/chips, barra indigo, sem formulário tradicional).
+2. **Drawer do paciente é padrão** — abre por default ao clicar no card. Abaixo do nome do paciente, um **resumo clínico compacto**:
+   `42a · Unimed · Cardiologia · Dra. Ana · chegou 09:28`
+   Tipografia slate-500, tabular numbers para idade e horário. Uma única linha, sem ícones decorativos.
+3. **Paciente dominante na timeline** — hierarquia visual invertida:
+   - Nome do paciente: Inter Display 600, 22–24px, slate-900 (dominante).
+   - Horário: 14px tabular slate-500 (secundário), canto superior direito.
+   - Foto 56–64px continua à esquerda.
+   - Barra de jornada abaixo do nome.
+4. **Modo Compacto = mesma timeline, mais densa** — não é uma UI paralela. Reaproveita o layout da Agenda principal, apenas:
+   - Card 64px (vs 96px do Confortável).
+   - Gap 6px (vs 12px).
+   - Rail 56px (vs 80px).
+   - Nome do paciente ainda dominante, apenas menor (18px).
+   - Zero re-design; só re-densidade.
+5. **Linha "AGORA" mais discreta** — indigo `#4F46E5` com opacity 0.55, sem glow, sem pulso agressivo. Marcador de 6px à esquerda + linha de 1px. Pulso reduzido para opacity 0.55↔0.75 a cada 3s.
+6. **Camada de inteligência operacional (IA)** — nova faixa "Sugestões" acima da timeline (colapsável, default aberta na 1ª sessão do dia):
+   - **Atrasos previstos:** "3 pacientes com risco de atraso após 10:30 (média de 8min)."
+   - **Encaixes possíveis:** "Janela de 20min às 11:10 na Sala 2."
+   - **Salas ociosas:** "Sala 3 sem sessões entre 14:00 e 16:00."
+   - **Próximos atendimentos:** "Próximo: João Pedro em 12min — chegou."
+   - Cada sugestão é um chip discreto (slate-50 bg, border slate-200/60). Clicar em um chip filtra a timeline ou abre o drawer relevante. **Zero regra nova** — apenas leitura de dados já existentes (`agendamentos`, `pacote_id`, `fluxo_etapa`, disponibilidades).
+
+**Contrato reforçado:** nenhuma alteração em regras de negócio. Flag `agenda_v2` OFF por padrão. `/app/agenda` clássica intocada até aprovação final.
+
+---
+
+## 15. Plano de implementação (fases, atrás de flag)
+
+Toda a implementação ocorre em `/app/agenda-v2` e componentes dedicados em `src/components/agenda-v2/`. A agenda clássica não é tocada.
+
+### Fase A — Fundação visual (2–3 sessões)
+- Tokens de tipografia (Inter Display, tabular-nums) e paleta refinada em `src/styles.css`.
+- `<AgendaShell>` (header fino, sidebar clara, rail, timeline, drawer slot).
+- Rail de horas com linha "AGORA" (versão discreta rev. 3).
+- Skeletons finos.
+
+### Fase B — Card paciente-dominante + agrupamento
+- `<SessionCard>` reescrito com nome dominante, horário secundário, barra de jornada 4 segmentos, foto/iniciais.
+- Agrupamento "1 coleta = 1 sessão" na UI (dados já existem).
+- Hover reveal: Abrir · Reagendar · Pagar.
+
+### Fase C — Drawer contextual padrão
+- `<PatientDrawer>` abre por default no clique.
+- Cabeçalho: foto 96px, nome 24px, **resumo clínico compacto** (rev. 3).
+- Timeline da jornada, botão "Iniciar atendimento", abas Financeiro/Docs/Histórico/Prontuário (reaproveitam telas existentes em iframe/rota embedada — sem duplicar lógica).
+
+### Fase D — Modos de densidade
+- Alternador Confortável/Compacto/Foco no header, persistido em `profiles.preferencias_ui`.
+- Compacto = mesma timeline, só re-densidade (rev. 3).
+- Foco = médico, sem sidebar operacional, atalhos `J/K/N/Enter`.
+
+### Fase E — Wizard "Novo Agendamento"
+- Modal 4 etapas (Paciente · Serviço · Horário · Confirmação).
+- Reaproveita **integralmente** as funções de criação existentes; só a UI muda.
+- Barra de progresso indigo, botões ghost/primary.
+
+### Fase F — `⌘K` e KPIs clicáveis
+- Command palette (reaproveita `CommandPalette` do list-shell).
+- KPIs do header viram filtros (Aguardando, Atraso, Encaixe).
+
+### Fase G — Camada de IA operacional
+- `<OperationalInsights>` acima da timeline, colapsável.
+- Regras derivadas 100% dos dados existentes; nenhum campo novo em banco.
+- 4 tipos de sugestão (atrasos, encaixes, ociosas, próximos).
+
+### Fase H — Validação e promoção
+- Testes visuais em desktop 1920, notebook 1280, tablet 1024.
+- Medição de performance vs clássica (meta ≤ 3.0s cold-start).
+- Aprovação final → decisão sobre promover flag `agenda_v2` para ON por padrão (rito idêntico ao Caixa/Orçamentos/Clientes).
+
+**Nenhuma fase toca:** dados, RLS, caixa, financeiro, orçamentos, check-in, Nina, permissões, integrações, rotas existentes.
