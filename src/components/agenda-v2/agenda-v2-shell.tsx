@@ -536,7 +536,9 @@ export function AgendaV2Shell() {
                 : `${filtradas.length} ${filtradas.length === 1 ? "sessão" : "sessões"}`}
             </span>
             {loadedMs !== null && (
-              <span className="text-slate-400 tabular-nums">· {loadedMs}ms</span>
+              <span className="text-slate-400 tabular-nums">
+                · query {loadedMs}ms{renderMs !== null && ` · render ${renderMs}ms`}
+              </span>
             )}
           </div>
         </div>
