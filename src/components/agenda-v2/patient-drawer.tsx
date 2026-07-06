@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
@@ -13,6 +11,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { HhpChip } from "@/design-system/hhp";
+import { HhpDrawer } from "@/design-system/hhp/drawer";
 
 export interface DrawerPatientData {
   paciente_id?: string | null;
@@ -114,16 +113,13 @@ export function PatientDrawer({
   const idade = detalhesQuery.data?.idade ?? null;
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="right"
-        className="w-full sm:max-w-[520px] overflow-y-auto p-0 bg-white transition-transform duration-150"
-      >
-        <VisuallyHidden.Root>
-          <SheetTitle>{data?.paciente_nome ?? "Paciente"}</SheetTitle>
-          <SheetDescription>Centro de Atendimento do paciente: jornada, ações rápidas e sugestões.</SheetDescription>
-        </VisuallyHidden.Root>
-        {data && (
+    <HhpDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title={data?.paciente_nome ?? "Paciente"}
+      description="Centro de Atendimento do paciente: jornada, ações rápidas e sugestões."
+    >
+      {data && (
           <div className="animate-in fade-in duration-150">
             {/* 1. Cabeçalho */}
             <div className="px-6 pt-7 pb-5 border-b border-slate-100">
@@ -275,9 +271,8 @@ export function PatientDrawer({
               </div>
             )}
           </div>
-        )}
-      </SheetContent>
-    </Sheet>
+      )}
+    </HhpDrawer>
   );
 }
 
