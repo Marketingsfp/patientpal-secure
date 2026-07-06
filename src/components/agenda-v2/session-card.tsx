@@ -42,6 +42,8 @@ export interface SessionCardData {
   paciente_nome: string;
   paciente_id: string | null;
   paciente_avatar_url?: string | null;
+  medico_id?: string | null;
+  recurso_id?: string | null;
   medico_nome: string | null;
   recurso_nome: string | null;
   inicio: string;
