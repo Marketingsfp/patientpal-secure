@@ -15,6 +15,27 @@ import { MapPin, Plus, Pencil, Building2, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 
+const somenteDigitos = (value: string) => value.replace(/\D/g, "");
+const formatarCnpj = (value: string) => {
+  const d = somenteDigitos(value).slice(0, 14);
+  if (d.length > 12) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
+  if (d.length > 8) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8)}`;
+  if (d.length > 5) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5)}`;
+  if (d.length > 2) return `${d.slice(0, 2)}.${d.slice(2)}`;
+  return d;
+};
+const formatarTelefone = (value: string) => {
+  const d = somenteDigitos(value).slice(0, 11);
+  if (d.length > 10) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length > 6) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  if (d.length > 2) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  return d.length ? `(${d}` : "";
+};
+const formatarCep = (value: string) => {
+  const d = somenteDigitos(value).slice(0, 8);
+  return d.length > 5 ? `${d.slice(0, 5)}-${d.slice(5)}` : d;
+};
+
 export const Route = createFileRoute("/_authenticated/app/unidades")({
   component: UnidadesPage,
   head: () => ({ meta: [{ title: "Unidades — ClinicaOS" }] }),
@@ -73,12 +94,12 @@ function ClinicasTab() {
     setEditingId(id);
     setForm({
       nome: data.nome ?? "",
-      cnpj: data.cnpj ?? "",
+      cnpj: formatarCnpj(data.cnpj ?? ""),
       endereco: (data as any).endereco ?? "",
       cidade: data.cidade ?? "",
       estado: data.estado ?? "",
-      cep: (data as any).cep ?? "",
-      telefone: data.telefone ?? "",
+      cep: formatarCep((data as any).cep ?? ""),
+      telefone: formatarTelefone(data.telefone ?? ""),
       latitude: (data as any).latitude?.toString() ?? "",
       longitude: (data as any).longitude?.toString() ?? "",
       raio_metros: (data as any).raio_metros?.toString() ?? "200",
@@ -101,7 +122,7 @@ function ClinicasTab() {
 
   const extras = () => ({
     endereco: form.endereco.trim() || null,
-    cep: form.cep.trim() || null,
+    cep: form.cep.trim() ? somenteDigitos(form.cep) : null,
     latitude: form.latitude ? Number(form.latitude) : null,
     longitude: form.longitude ? Number(form.longitude) : null,
     raio_metros: form.raio_metros ? Number(form.raio_metros) : 200,
@@ -115,8 +136,8 @@ function ClinicasTab() {
     if (editingId) {
       const { error } = await supabase.from("clinicas").update({
         nome: form.nome.trim(),
-        cnpj: form.cnpj.trim() || null,
-        telefone: form.telefone.trim() || null,
+        cnpj: form.cnpj.trim() ? somenteDigitos(form.cnpj) : null,
+        telefone: form.telefone.trim() ? somenteDigitos(form.telefone) : null,
         cidade: form.cidade.trim() || null,
         estado: form.estado.trim() || null,
         ...extras(),
@@ -129,8 +150,8 @@ function ClinicasTab() {
     }
     const { data: clinicaId, error } = await supabase.rpc("criar_clinica_com_admin", {
       _nome: form.nome.trim(),
-      _cnpj: form.cnpj.trim() || undefined,
-      _telefone: form.telefone.trim() || undefined,
+      _cnpj: form.cnpj.trim() ? somenteDigitos(form.cnpj) : undefined,
+      _telefone: form.telefone.trim() ? somenteDigitos(form.telefone) : undefined,
       _cidade: form.cidade.trim() || undefined,
       _estado: form.estado.trim() || undefined,
     });
@@ -161,9 +182,9 @@ function ClinicasTab() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2"><Label htmlFor="unidade-cnpj">CNPJ</Label>
-                  <Input id="unidade-cnpj" value={form.cnpj} onChange={(e) => setForm({ ...form, cnpj: e.target.value })} /></div>
+                  <Input id="unidade-cnpj" inputMode="numeric" maxLength={18} placeholder="00.000.000/0000-00" value={form.cnpj} onChange={(e) => setForm({ ...form, cnpj: formatarCnpj(e.target.value) })} /></div>
                 <div className="space-y-2"><Label htmlFor="unidade-telefone">Telefone</Label>
-                  <Input id="unidade-telefone" value={form.telefone} onChange={(e) => setForm({ ...form, telefone: e.target.value })} /></div>
+                  <Input id="unidade-telefone" inputMode="tel" maxLength={15} placeholder="(00) 00000-0000" value={form.telefone} onChange={(e) => setForm({ ...form, telefone: formatarTelefone(e.target.value) })} /></div>
               </div>
               <div className="space-y-2"><Label htmlFor="unidade-endereco">Endereço</Label>
                 <Input id="unidade-endereco" value={form.endereco} onChange={(e) => setForm({ ...form, endereco: e.target.value })} /></div>
@@ -174,7 +195,7 @@ function ClinicasTab() {
                   <Input id="unidade-uf" maxLength={2} value={form.estado}
                     onChange={(e) => setForm({ ...form, estado: e.target.value.toUpperCase() })} /></div>
                 <div className="space-y-2"><Label htmlFor="unidade-cep">CEP</Label>
-                  <Input id="unidade-cep" value={form.cep} onChange={(e) => setForm({ ...form, cep: e.target.value })} /></div>
+                  <Input id="unidade-cep" inputMode="numeric" maxLength={9} placeholder="00000-000" value={form.cep} onChange={(e) => setForm({ ...form, cep: formatarCep(e.target.value) })} /></div>
               </div>
               <div className="border-t pt-3">
                 <div className="flex items-center justify-between mb-2">
