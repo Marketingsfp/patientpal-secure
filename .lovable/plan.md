@@ -1,214 +1,229 @@
-# Fase F — Conectar wizard "Nova sessão" ao fluxo real
 
-Objetivo: fazer o wizard da Agenda V2 criar agendamentos reais no banco, reutilizando 100% das regras da Agenda clássica. Nenhuma regra nova, nenhuma migration, Agenda clássica intacta, flag `agenda_v2` OFF por padrão.
+# Roadmap Executivo — Agenda V2
 
-> **Status Fase F (06/07/2026):** ENCERRADA E APROVADA.
-> `criarAgendamento` (`src/lib/agenda/criar-agendamento.functions.ts`) é
-> oficialmente a **única fonte** de criação/edição de agendamentos para
-> qualquer interface — atual (Agenda clássica, Agenda V2) ou futura
-> (F.2 Orçamento, F.3 Laboratório, Recursos de Enfermagem, quaisquer novos
-> pontos de entrada de agendamento). É proibido reintroduzir INSERT/UPDATE
-> em `agendamentos` fora dessa função. Ver:
-> - `docs/agenda/criar-agendamento-shared.md` — contrato da função
-> - `docs/agenda/arquitetura.md` — arquitetura completa da Agenda (clássica + V2)
->
-> Próxima etapa aprovada: **revisão geral da Agenda V2** (UX, performance,
-> simplificação) antes de qualquer nova funcionalidade. Fases de
-> infraestrutura da Agenda encerradas.
+Transformação da auditoria em plano de decisão. **Nenhum código será escrito nesta etapa.**
+
+Legenda de esforço: **XS** ≤ 2h · **S** ≤ ½ dia · **M** 1–2 dias · **L** 3–5 dias.
+Frequência estimada com base em clínica média (150–300 sessões/dia, 3–5 recepcionistas, 4–8 médicos).
 
 ---
 
-## 1. Funções e componentes atuais que serão reutilizados
+## 1. Detalhamento por item
 
-Todos vivem na Agenda clássica ou em módulos compartilhados. Nenhum será modificado — apenas consumidos.
+### 🔴 P0 — Bloqueadores de adoção
 
-| Fonte | O que será reutilizado |
-|---|---|
-| `src/routes/_authenticated/app.agenda.tsx:2410` (`submit`) | Referência das regras — não será chamado diretamente (é local ao componente). Será extraída a lógica para um helper puro (ver seção "Extração mínima"). |
-| `src/routes/_authenticated/app.agenda.tsx:2120` (`buscarOrcamento`) | Idem — referência para o path de orçamento. |
-| `src/components/agenda/dividir-orcamento-dialog.tsx` | Reutilizado **como está** para o caso "orçamento com múltiplos grupos" — o wizard V2 abrirá esse mesmo dialog quando detectar > 1 grupo. |
-| `src/components/patient-search-input.tsx` | Reutilizado no step "paciente" do wizard V2 (substitui a lista mockada). |
-| `src/components/agenda/procedimento-picker.tsx` | Reutilizado no step "serviço" (substitui grid mockado). |
-| RPC `paciente_cartao_inadimplente` (Supabase) | Chamada igual à clássica quando `tipo_atendimento = "convenio"`. |
-| `@/integrations/supabase/client` | Mesmo cliente já usado em toda a V2. |
-| `use-clinica`, `use-medico-context`, `use-auth` | Contextos já disponíveis. |
+#### P0-1 · Ações de status no card e no drawer (Confirmar / Check-in / Cancelar / Faltou / Salvar e cobrar)
+- **Problema:** o drawer só mostra dados; nenhum botão muda status. Card idem.
+- **Impacto usuário:** recepção volta à Agenda clássica para qualquer mudança de estado.
+- **Frequência:** 80–150×/dia por recepcionista (confirmações + check-ins + cancelamentos).
+- **Risco de manter:** V2 nunca substitui a clássica; adoção zero.
+- **Complexidade:** Média (mutations já existem na clássica, precisa reusar).
+- **Dependências:** nenhuma bloqueante; reaproveita RPCs da clássica.
+- **Benefício:** paridade operacional mínima para recepção e médico.
+- **Tempo:** M (1–2 dias).
+- **Recomendação:** **Implementar agora**.
 
-### Extração mínima (única mudança fora da V2)
+#### P0-2 · Reagendar / mover horário
+- **Problema:** só é possível cancelar e recriar; wizard não move `pacote_id`.
+- **Impacto:** recepção volta à clássica sempre que paciente pede novo horário.
+- **Frequência:** 20–40×/dia por clínica.
+- **Risco:** perda de histórico, duplicidade de agendamentos, retrabalho.
+- **Complexidade:** Média (reusar `criarAgendamento` no modo UPDATE preservando id).
+- **Dependências:** P0-1 (fluxo de status coerente).
+- **Benefício:** fecha o gap crítico com a clássica.
+- **Tempo:** M.
+- **Recomendação:** **Implementar agora**.
 
-Para evitar duplicar as regras, extrair da `app.agenda.tsx` uma função **pura** de validação + persistência em `src/lib/agenda/criar-agendamento.functions.ts` (novo arquivo). A `app.agenda.tsx` clássica passa a chamar essa função dentro do seu `submit` — comportamento idêntico, zero mudança visual/funcional na clássica.
+#### P0-3 · Click-on-slot pré-preenche o wizard
+- **Problema:** slot livre é decorativo; clicar não abre nada.
+- **Impacto:** 7 cliques vs 4–5 da clássica.
+- **Frequência:** 30–60 agendamentos/dia por clínica.
+- **Risco:** percepção de que "V2 é mais lenta".
+- **Complexidade:** Baixa (passar médico+horário como initialValues).
+- **Dependências:** wizard já existe.
+- **Benefício:** –3 cliques/agendamento; motivo de existir da timeline.
+- **Tempo:** S.
+- **Recomendação:** **Implementar agora**.
 
-Assinatura proposta (server function `createServerFn` + `requireSupabaseAuth`):
+#### P0-4 · Auto-scroll para hora atual ao abrir
+- **Problema:** médico chega às 14h e vê 08h no topo.
+- **Frequência:** toda abertura da tela (dezenas de vezes/dia por usuário).
+- **Risco:** atrito diário permanente.
+- **Complexidade:** Baixa (XS).
+- **Dependências:** nenhuma.
+- **Benefício:** altíssimo, custo mínimo.
+- **Recomendação:** **Implementar agora**.
 
-```
-criarAgendamento({
-  clinica_id, paciente_id, paciente_nome,
-  medico_id | enfermagem_recurso_id,
-  inicio, fim, procedimento,
-  tipo_atendimento, observacoes?, orcamento_id?,
-  agenda_id?, pacote_id?,
-  orcamento_item_ids?: string[],
-}) -> { id }
-```
+#### P0-5 · Distinção visual Cancelado ≠ Faltou
+- **Problema:** ambos usam `rose-400`, indistinguíveis.
+- **Risco:** erro operacional grave (cobrar quem faltou como se tivesse cancelado, ou vice-versa) — impacto **financeiro e jurídico**.
+- **Frequência:** leitura em cada card, o dia inteiro.
+- **Complexidade:** XS (cor + ícone).
+- **Recomendação:** **Implementar agora**.
 
-Toda a validação (telefone/nascimento, fim>início, slot livre, agenda aberta, inadimplência, procedimento vs. perfil do médico) roda **dentro** dessa função. O wizard V2 e a Agenda clássica chamam o mesmo ponto.
+#### P0-6 · Rótulo "Equipe on-line" → "Escala do dia"
+- **Problema:** métrica derivada de "tem sessão hoje", não presença real.
+- **Impacto:** gestor toma decisão com informação errada.
+- **Frequência:** consulta gerencial diária.
+- **Complexidade:** XS.
+- **Recomendação:** **Implementar agora**.
 
-Justificativa: sem essa extração, o wizard V2 duplicaria as regras — o que quebra o princípio "zero regra de negócio nova/alterada".
+#### P0-7 · Auditar/remover `patient-timeline-drawer.tsx`
+- **Problema:** possível código morto (148 ln) duplicando `patient-drawer.tsx`.
+- **Risco:** confusão em manutenções futuras; bundle inflado.
+- **Complexidade:** XS.
+- **Recomendação:** **Implementar agora** junto do P0-1 (mesma área).
 
 ---
 
-## 2. Regras do agendamento clássico preservadas (todas)
+### 🟡 P1 — Necessário nas próximas 2–3 versões
 
-| Regra | Origem |
-|---|---|
-| Paciente precisa ter telefone e data_nascimento | `app.agenda.tsx:2422–2435` |
-| `fim > inicio` | `app.agenda.tsx:2438` |
-| Procedimento obrigatório | `app.agenda.tsx:2439` |
-| Médico precisa ter agenda aberta no dia | `app.agenda.tsx:2445–2477` |
-| Slot livre `DISPONÍVEL` deve cobrir o intervalo | `app.agenda.tsx:2465–2476` |
-| Bypass de slot para recursos de enfermagem | `app.agenda.tsx:2445` |
-| Inadimplência em cartão benefícios bloqueia (`tipo_atendimento = "convenio"`) | `app.agenda.tsx:2486–2500` |
-| Status inicial sempre `"agendado"` | `app.agenda.tsx:2513` |
-| Orçamento cancelado não pode ser agendado | `app.agenda.tsx:2134` |
-| Itens já consumidos por agendamentos ativos são excluídos | `app.agenda.tsx:2143–2161` |
-| Profissional restrito ao perfil (procedimentos autorizados) | `dividir-orcamento-dialog.tsx:378–385` |
-| Slots `DISPONÍVEL` reutilizados via UPDATE em vez de INSERT | `dividir-orcamento-dialog.tsx:416–423` |
-| `agendamento_orcamento_itens` gravado após INSERT do agendamento | `app.agenda.tsx:2530–2546` |
-
-Nenhuma regra nova. Nenhuma regra removida.
+| ID | Problema | Freq. | Risco | Complex. | Deps | Benefício | Tempo | Recom. |
+|---|---|---|---|---|---|---|---|---|
+| P1-1 | Shell de 812 ln inviabiliza F.2/F.3 | contínuo (dev) | débito técnico crescente | Alta | — | destrava próximas fases | L | Implementar após P0 |
+| P1-2 | 6 round-trips no first paint | toda abertura | ~300ms de espera | Média | migration RPC | first paint mais rápido | M | Implementar |
+| P1-3 | `SessionCard` re-renderiza a cada tecla | contínuo | jank em busca | Baixa | — | –80% renders | S | Implementar |
+| P1-4 | Sem virtualização (300+ cards) | clínicas grandes | trava scroll | Média | P1-3 | fluidez | M | Implementar |
+| P1-5 | Filtro "meus pacientes" manual | toda abertura por médico | atrito diário | Baixa | — | 1-clique para médico | S | Implementar |
+| P1-6 | KPIs só operacionais, sem financeiro | reunião diária | gestor ignora tela | Média | — | tela vira ferramenta de gestão | M | Implementar |
+| P1-7 | Sem Realtime (60s stale) | multi-atendente | conflitos, F5 | Média | — | colaboração ao vivo | M | Implementar |
+| P1-8 | AI Strip sempre aberta | permanente | ruído visual | Baixa | — | +200px verticais | XS | Implementar |
+| P1-9 | Cores hardcoded fora do DS | dev | inconsistência | Média | — | dark mode, temas | M | Adiar 1 sprint |
+| P1-10 | KpiBar reimplementa `HhpKpiCard` | dev | duplicação | Baixa | — | 1 componente único | S | Implementar |
+| P1-11 | Cadastro rápido de paciente inline no wizard | 5–10×/dia | troca de contexto | Média | P0-3 | fluxo contínuo | M | Implementar |
 
 ---
 
-## 3. Como o wizard V2 criará um agendamento comum
+### 🟢 P2 — Polimento futuro
 
-Novos/ajustados steps do wizard V2:
+| ID | Item | Complex. | Recomendação |
+|---|---|---|---|
+| P2-1 | Split `patient-drawer` em 5 tabs | Média | Adiar (fazer junto de F.2/F.3) |
+| P2-2 | Split wizard em `step-*` | Média | Adiar (pré-requisito de F.2) |
+| P2-3 | Modo Foco esconde régua fora ±1h | Baixa | Adiar |
+| P2-4 | Toggle "mostrar horários livres" | Baixa | Adiar |
+| P2-5 | Ocupação real de recurso | Média | Adiar (depende de dado real de capacidade) |
+| P2-6 | Percentis para analytics | Baixa | Adiar |
+| P2-7 | Mover `initials()` para utils | XS | Fazer oportunisticamente |
+| P2-8 | `useIsMobile` → CSS puro | Baixa | Descartar (ganho marginal) |
+| P2-9 | `procedimentos.ativo=true` | XS | Fazer junto do P1-2 |
+| P2-10 | Prefetch paciente no hover | Baixa | Adiar |
+| P2-11 | Toast ao trocar densidade | XS | Descartar (poluição) |
+
+---
+
+## 2. Matriz Impacto × Esforço
+
+Impacto ponderado por valor real para **recepção, coordenação, médico e gestor** — não apenas por dificuldade.
 
 ```text
-Step 1  Paciente        -> patient-search-input (BD real)  → paciente_id + nome
-Step 2  Serviço         -> procedimento-picker             → procedimento + duração + tipo
-Step 3  Profissional    -> select de médicos/recursos      → medico_id ou enfermagem_recurso_id
-Step 4  Data e horário  -> date + slots reais              → inicio/fim ISO
-Step 5  Confirmação     -> resumo + tipo_atendimento       → chama criarAgendamento()
+                           ESFORÇO
+                XS/S              M                  L
+        ┌───────────────────┬──────────────────┬─────────────────┐
+  ALTO  │ P0-3 click-slot   │ P0-1 status      │ P1-1 refactor   │
+IMPACTO │ P0-4 auto-scroll  │ P0-2 reagendar   │   shell         │
+        │ P0-5 cor cancel   │ P1-6 KPIs gestão │                 │
+        │ P1-3 memo card    │ P1-7 realtime    │                 │
+        │ P1-5 meus pac.    │ P1-2 RPC boot    │                 │
+        │ P1-8 AI strip     │ P1-4 virtualizar │                 │
+        │ P1-10 KpiBar HHP  │ P1-11 pac. rápido│                 │
+        ├───────────────────┼──────────────────┼─────────────────┤
+  MÉDIO │ P0-6 rótulo escala│ P1-9 tokens cor  │ P2-1 split      │
+        │ P0-7 drawer morto │                  │   drawer        │
+        │ P2-9 ativo=true   │ P2-5 ocupação    │                 │
+        ├───────────────────┼──────────────────┼─────────────────┤
+  BAIXO │ P2-7 initials     │ P2-2 split wiz.  │                 │
+        │ P2-6 analytics    │                  │                 │
+        │ P2-3, P2-4, P2-10 │                  │                 │
+        └───────────────────┴──────────────────┴─────────────────┘
+
+  Descartar: P2-8 (useIsMobile), P2-11 (toast densidade)
 ```
 
-- `clinica_id` vem do `use-clinica`.
-- `tipo_atendimento` default = `"particular"`; toggle para `"convenio"` no step 5.
-- No submit: chama `criarAgendamento(...)`, mostra toast de sucesso, fecha wizard, invalida `queryKey ["agenda-v2","ags",clinicaId,diaKey]`.
-- Erros de validação viram toast com a mesma mensagem da clássica.
+**Ordem sugerida por valor (não por dificuldade):**
+Recepção → Médico → Gestor → Dev (débito técnico) → Polimento.
 
 ---
 
-## 4. Sessão Laboratorial com vários exames
+## 3. Cronograma em sprints independentes
 
-Modelo idêntico ao clássico: **um único agendamento** com `procedimento` = string composta e N vínculos em `agendamento_orcamento_itens`.
+Cada sprint é **fechado e utilizável em produção**. Nenhuma sprint deixa funcionalidade parcial.
 
-- Detecção: `procedimentos.grupo === "LABORATORIO"` OU `procedimentos.tipo IN ("EXAME","LABORATORIO")` (`app.agenda.tsx:2183–2190`).
-- Quando o usuário selecionar múltiplos itens de laboratório no step "Serviço" (ou vier de orçamento), o wizard monta a string:
-  `LABORATÓRIO (N EXAMES): nome1, nome2, ...` (`app.agenda.tsx:2195–2197`).
-- Após o INSERT do agendamento, insere N linhas em `agendamento_orcamento_itens` com o mesmo `orcamento_item_ids` — igual ao fluxo clássico.
+### 🚀 Sprint 1 — "Paridade com a clássica" (recepção + médico)
+**Duração estimada:** 3–4 dias · **Foco:** recepção deixa de voltar para `/app/agenda`.
+- P0-3 Click-on-slot pré-preenche wizard
+- P0-4 Auto-scroll para hora atual
+- P0-5 Cancelado ≠ Faltou (cor + ícone)
+- P0-6 Rótulo "Escala do dia"
+- P0-7 Auditoria e remoção do drawer morto
 
----
-
-## 5. Orçamento vinculado
-
-Duas variantes, iguais à clássica:
-
-### 5a. Orçamento com 1 grupo
-- Wizard aceita `orcamento_numero` como entrada opcional (ex.: `?orcamento=12345` ou botão "carregar orçamento" no step 1).
-- Roda a mesma `buscarOrcamento` (extraída junto para `src/lib/agenda/orcamento.functions.ts`), filtra itens consumidos.
-- Preenche steps 1–4 automaticamente; usuário só ajusta horário/profissional.
-- Submit chama `criarAgendamento({ orcamento_id, orcamento_item_ids, procedimento })`.
-
-### 5b. Orçamento com múltiplos grupos
-- Wizard detecta `gruposDistintos.size > 1` e **abre o `DividirOrcamentoDialog` existente** (não reimplementa). Fecha o wizard V2, delega ao dialog clássico, que já faz INSERT em lote com `pacote_id` compartilhado.
-- Justificativa: reusar exatamente o mesmo componente evita divergência de comportamento em um caso complexo.
+**Entregável:** V2 já é mais rápida que a clássica em criar agendamento e não confunde estados. Recepção pode usar sem risco de erro de cobrança.
 
 ---
 
-## 6. Encaixe
+### 🚀 Sprint 2 — "Operação completa" (recepção + médico)
+**Duração:** 4–5 dias · **Foco:** V2 substitui a clássica para o fluxo diário.
+- P0-1 Ações de status (Confirmar / Check-in / Cancelar / Faltou / Salvar e cobrar) no card e drawer
+- P0-2 Reagendar / mover horário via wizard em modo UPDATE
+- P1-5 Filtro "meus pacientes" persistido por médico
 
-O relatório de mapeamento confirmou que **não existe suporte a encaixe na Agenda clássica hoje**. Nenhum bypass de conflito, nenhuma flag.
-
-Decisão para a Fase F: **não introduzir encaixe agora**. O wizard V2 seguirá exatamente a regra clássica — sem encaixe. Se o usuário tentar agendar em horário sem slot `DISPONÍVEL`, recebe o mesmo erro da clássica.
-
-Registrar como pendência técnica: "Encaixe (overbooking) — funcionalidade nova, fora do escopo da Fase F. Requer especificação de regra (flag, quem autoriza, se conta ocupação) antes de implementar."
-
----
-
-## 7. Rollback
-
-Três camadas, do mais leve ao mais completo:
-
-1. **Instantâneo (usuário-a-usuário):** flag `agenda_v2 = OFF` em `profiles.preferencias_ui.flags.agenda_v2`. Wizard V2 deixa de ser acessível; clássica continua funcionando.
-2. **Reverter apenas a UI da Fase F:** reverter o commit do `novo-agendamento-wizard.tsx` — volta ao wizard visual (mock), sem afetar `criarAgendamento` (que continua sendo chamado apenas pela clássica via extração da seção 1).
-3. **Reverter a extração:** reverter o commit que criou `src/lib/agenda/criar-agendamento.functions.ts` e restaurar o `submit` inline em `app.agenda.tsx`. Comportamento da clássica permanece idêntico (a extração é 1:1).
-
-**Sem migration**, portanto sem rollback de banco. Agendamentos criados pelo wizard V2 são registros normais em `agendamentos` — se necessário identificar-los, marcar via campo `observacoes` prefixado com `[V2]` durante a Fase F (opcional; pergunto se aprovado). Assim, um `DELETE FROM agendamentos WHERE observacoes LIKE '[V2]%'` reverte dados criados pelo wizard.
+**Entregável:** paridade funcional 100% com a clássica para o dia-a-dia. Coordenação pode migrar plantões.
 
 ---
 
-## 8. Riscos
+### 🚀 Sprint 3 — "Performance e colaboração"
+**Duração:** 4–5 dias · **Foco:** clínicas grandes e multi-atendente.
+- P1-3 `React.memo` em `SessionCard`
+- P1-4 Virtualização da timeline
+- P1-7 Realtime em `agendamentos`
+- P1-8 AI Strip colapsada por padrão
+- P1-10 KpiBar unificada com `HhpKpiCard`
 
-| # | Risco | Mitigação |
-|---|---|---|
-| R1 | Divergência entre wizard V2 e clássica ao evoluir regras | Extração para função única em `criar-agendamento.functions.ts` — os dois consomem o mesmo ponto |
-| R2 | Extração introduz regressão na clássica | Extração 1:1 sem mudar lógica; typecheck + Playwright na clássica (criar 1 agendamento simples + 1 com orçamento) antes de merge |
-| R3 | Wizard grava payload incompleto e cria "buracos" na visão clássica | Função extraída valida todos os campos; wizard só chama após todos os steps preenchidos |
-| R4 | `agendamento_orcamento_itens` órfãos (INSERT do agendamento OK, INSERT dos itens falha) | Mesma limitação da clássica (não há transação atômica hoje). Registrar como pendência técnica; tratar erro do 2º INSERT com toast + botão "tentar novamente" |
-| R5 | Realtime da clássica flasha ao ver INSERT do V2 | Comportamento correto — clássica se atualiza; não é bug |
-| R6 | Concorrência: dois usuários criam agendamento no mesmo slot ao mesmo tempo | Já é limitação da clássica; a validação de slot livre no servidor mitiga majoritariamente. Sem mudança |
-| R7 | Extração quebra imports circulares | Novo arquivo em `src/lib/agenda/` (fora do route file); testado com typecheck |
-| R8 | `DividirOrcamentoDialog` acoplado ao estado da `app.agenda.tsx` | Verificar props na fase de execução — se o dialog depende de callbacks locais da clássica, mover para prop-based ou registrar como impedimento antes de codar |
+**Entregável:** V2 pronta para clínicas com 300+ sessões/dia e mesa de trabalho compartilhada.
 
 ---
 
-## 9. Testes Playwright (persistidos no repositório)
+### 🚀 Sprint 4 — "Visão do gestor"
+**Duração:** 3–4 dias · **Foco:** tela passa a ser ferramenta gerencial.
+- P1-6 KPIs reformulados (Taxa confirmação · No-show · Ocupação · Receita prevista)
+- P1-2 RPC `agenda_v2_bootstrap` (–4 round-trips)
+- P2-9 `procedimentos.ativo=true` (aproveita a migration do RPC)
 
-Endereçando também a pendência técnica de "Playwright ad-hoc". Criar `tests/agenda-v2/` com:
-
-| Teste | Cenário | Assert |
-|---|---|---|
-| `criar-agendamento-simples.spec.ts` | Login → flag ON → wizard → paciente real + serviço real + médico + horário → confirmar | Agendamento aparece na grade V2; existe linha em `agendamentos`; toast sucesso |
-| `criar-agendamento-orcamento-1grupo.spec.ts` | Wizard com `orcamento_numero` → steps auto-preenchidos → confirmar | `orcamento_id` gravado; itens em `agendamento_orcamento_itens` |
-| `criar-agendamento-orcamento-multigrupo.spec.ts` | Wizard com orçamento >1 grupo → abre `DividirOrcamentoDialog` → confirmar divisão | N agendamentos com mesmo `pacote_id` |
-| `criar-sessao-laboratorial.spec.ts` | Selecionar N exames laboratoriais | `procedimento` = `"LABORATÓRIO (N EXAMES): ..."`; N linhas em `agendamento_orcamento_itens` |
-| `validacao-paciente-incompleto.spec.ts` | Paciente sem telefone/nascimento | Toast de erro; nenhum INSERT |
-| `validacao-slot-ocupado.spec.ts` | Horário sem slot `DISPONÍVEL` | Toast de erro; nenhum INSERT |
-| `regressao-agenda-classica.spec.ts` | Flag OFF → criar agendamento pela clássica | Fluxo clássico funciona idêntico ao pré-extração |
-
-Além dos Playwright, `bunx tsgo --noEmit` deve permanecer em zero erro.
+**Entregável:** gestor acompanha operação e financeiro do dia sem sair da tela; first paint mais rápido.
 
 ---
 
-## 10. Confirmações que serão validadas ao final da Fase F
+### 🚀 Sprint 5 — "Preparar F.2 / F.3" (dev)
+**Duração:** 5–7 dias · **Foco:** destravar próximas fases funcionais.
+- P1-1 Extrair `use-agenda-v2-data.ts` + `agenda-v2-toolbar.tsx` + `agenda-v2-timeline.tsx`
+- P1-11 Cadastro rápido de paciente inline no wizard
+- P1-9 Tokens de cor HHP (substituir hardcoded)
+- P2-7 `initials()` → `@/lib/utils`
 
-- Agenda clássica intacta (Playwright `regressao-agenda-classica.spec.ts`).
-- Flag `agenda_v2` OFF por padrão (sem mudança no `use-agenda-v2-flag`).
-- Zero regra de negócio nova (todas as regras vêm da extração 1:1).
-- Zero migration.
-- Zero alteração em Caixa, Financeiro, Orçamentos, Prontuário, NFS-e, Nina, Check-in.
-
----
-
-## Arquivos que serão alterados/criados
-
-**Criados**
-- `src/lib/agenda/criar-agendamento.functions.ts` (server function extraída — chamada por clássica e V2)
-- `src/lib/agenda/orcamento.functions.ts` (extração de `buscarOrcamento` — opcional; se acoplamento for alto, mantém inline na clássica e V2 usa cópia mínima)
-- `tests/agenda-v2/*.spec.ts` (7 arquivos)
-
-**Alterados**
-- `src/routes/_authenticated/app.agenda.tsx` (substitui corpo do `submit` por chamada à função extraída — comportamento idêntico)
-- `src/components/agenda-v2/novo-agendamento-wizard.tsx` (steps reais + chamada da função extraída + invalidação de query)
-
-**Nada mais.** Sem tocar em Caixa, Financeiro, Orçamentos, Prontuário, NFS-e, Nina, Check-in, Agenda clássica além do ponto de extração.
+**Entregável:** shell abaixo de 400 ln, DS 100% coerente, wizard preparado para receber orçamento (F.2) e sessão laboratorial (F.3).
 
 ---
 
-## O que preciso de decisão antes de codar
+### 🌿 Backlog (P2, sem sprint reservada)
+Fazer oportunisticamente durante F.2/F.3 ou em janela de polimento:
+P2-1, P2-2, P2-3, P2-4, P2-5, P2-6, P2-10.
 
-1. **Aprovar a extração de `submit` para função compartilhada** (ponto único de risco na clássica).
-2. **Aprovar prefixo `[V2]` em `observacoes`** para rastreabilidade opcional (facilita rollback de dados).
-3. **Aprovar reuso do `DividirOrcamentoDialog` como está** para múltiplos grupos (evita reimplementar).
-4. **Aprovar criação da pasta `tests/agenda-v2/`** com Playwright persistido no repo.
+### ❌ Descartados
+- **P2-8** `useIsMobile` → CSS puro: ganho marginal, risco de regressão.
+- **P2-11** Toast ao trocar densidade: poluição visual sem valor.
 
-Aguardando aprovação do plano antes de iniciar qualquer alteração.
+---
+
+## 4. Regras do cronograma
+
+1. Cada sprint é **liberada com flag `agenda_v2` OFF por padrão** — validação admin/gestor antes de expansão.
+2. Nenhuma sprint altera `criarAgendamento` sem aprovação explícita (governança da Fase F).
+3. Toda sprint termina com: Playwright + SELECTs de verificação + rollback documentado.
+4. F.2 (Orçamento) e F.3 (Laboratório) **só começam após a Sprint 5**, quando o shell estiver refatorado.
+5. Se durante uma sprint surgir necessidade de migration, o item é pausado e volta para aprovação.
+
+---
+
+## 5. Próximo passo
+
+Aprovar o roadmap acima (ou pedir ajustes de escopo/ordem) para iniciar a **Sprint 1**.
