@@ -400,6 +400,61 @@ export function AgendaV2Shell() {
   const compact = density === "compacto";
   const foco = density === "foco";
 
+  // ==== Fase D · Atalhos de teclado (padrão Health Hub Pro) ====
+  // F = Foco · C = Compacto · D = Confortável · J/K = próx/ant · Enter = abrir
+  // Esc = fechar drawer · N = nova sessão · ? = ajuda · Ctrl/⌘+K = busca
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // Ctrl/⌘+K → foca busca (Busca Universal do módulo)
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+        return;
+      }
+      // Esc fecha drawer (Dialog do drawer também trata, mas garantimos aqui)
+      if (e.key === "Escape") {
+        if (drawerPacote) { setDrawerPacote(null); return; }
+      }
+      if (isTypingTarget(e.target)) return;
+      if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+
+      const k = e.key.toLowerCase();
+      if (k === "?") { e.preventDefault(); setShortcutsOpen((v) => !v); return; }
+      if (k === "f") { e.preventDefault(); setDensity("foco"); return; }
+      if (k === "c") { e.preventDefault(); setDensity("compacto"); return; }
+      if (k === "d") { e.preventDefault(); setDensity("confortavel"); return; }
+      if (k === "n") { e.preventDefault(); setWizardOpen(true); return; }
+      if (k === "j" || k === "k" || e.key === "Enter") {
+        if (filtradas.length === 0) return;
+        const idx = drawerPacote
+          ? filtradas.findIndex((s) => s.pacote_id === drawerPacote)
+          : -1;
+        if (e.key === "Enter") {
+          e.preventDefault();
+          const target = idx >= 0 ? filtradas[idx] : filtradas[0];
+          if (target) openDrawer(target.pacote_id);
+          return;
+        }
+        e.preventDefault();
+        let next = idx;
+        if (k === "j") next = idx < 0 ? 0 : Math.min(filtradas.length - 1, idx + 1);
+        if (k === "k") next = idx < 0 ? 0 : Math.max(0, idx - 1);
+        const target = filtradas[next];
+        if (target) openDrawer(target.pacote_id);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [filtradas, drawerPacote]);
+
+  // Feedback discreto ao trocar densidade via teclado.
+  const setDensityWithToast = (d: SessionDensity) => {
+    setDensity(d);
+  };
+  void setDensityWithToast;
+
   // Agrupar sessões por hora para render com régua de horas.
   const porHora = useMemo(() => {
     const map = new Map<number, SessionCardData[]>();
