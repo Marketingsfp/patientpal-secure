@@ -1,11 +1,11 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   ChevronLeft, ChevronRight, LayoutList, GanttChartSquare, CalendarDays,
   Search, Rows3, Rows2, Sparkles, Plus,
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Button } from "@/components/ui/button";
@@ -17,13 +17,9 @@ import { KpiBar, type Kpi } from "./kpi-bar";
 import { SessionCard, type SessionCardData, type SessionDensity } from "./session-card";
 import { AgendaV2Sidebar } from "./agenda-v2-sidebar";
 import type { TimelineData } from "./patient-timeline-drawer";
+import { PatientTimelineDrawer } from "./patient-timeline-drawer";
 import { tipoDaSessao, type ProcMeta } from "@/lib/agenda-v2/session-detect";
 import { cn } from "@/lib/utils";
-
-// Drawer carrega só quando o usuário abrir — reduz JS crítico.
-const PatientTimelineDrawer = lazy(() =>
-  import("./patient-timeline-drawer").then((m) => ({ default: m.PatientTimelineDrawer })),
-);
 
 const DENSITY_KEY = "agenda_v2_density";
 
