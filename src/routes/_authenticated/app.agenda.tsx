@@ -971,6 +971,7 @@ function AgendaPage() {
   const fnListarEquipe = useServerFn(listarEquipe);
   const emitirNfseFn = useServerFn(emitirNfse);
   const consultarNfseFn = useServerFn(consultarNfse);
+  const fnCriarAgendamento = useServerFn(criarAgendamento);
   const carregarEquipe = async () => {
     if (!clinicaAtual || equipeList.length > 0) return;
     try {
