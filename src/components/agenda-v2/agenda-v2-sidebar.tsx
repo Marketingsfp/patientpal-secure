@@ -44,16 +44,19 @@ export function AgendaV2Sidebar({ clinicaNome, dia, sessoes, recursos, equipeOnl
   const usadosRecursos = recursos.reduce((a, r) => a + r.usados, 0);
   const ocupacao = totalRecursos > 0 ? Math.round((usadosRecursos / totalRecursos) * 100) : 0;
 
+  const cardCls = "rounded-2xl border border-slate-200/70 bg-white/80 backdrop-blur-sm px-4 py-4 shadow-[0_1px_2px_rgba(15,23,42,0.03)]";
+  const labelCls = "text-[10px] font-semibold uppercase tracking-widest text-slate-400";
+
   return (
-    <aside className="w-64 shrink-0 border-r border-slate-100 bg-white/60 backdrop-blur-sm flex flex-col overflow-y-auto">
-      {/* Header clínica */}
-      <div className="px-5 py-5 border-b border-slate-100">
+    <aside className="w-64 shrink-0 bg-[#F7F7F5] border-r border-slate-200/60 flex flex-col overflow-y-auto">
+      {/* Header clínica — leve, sem bloco escuro */}
+      <div className="px-4 pt-5 pb-3">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center text-sm font-bold">
+          <div className="h-9 w-9 rounded-xl bg-white border border-slate-200 text-slate-700 flex items-center justify-center text-[11px] font-bold shadow-sm">
             {initials(clinicaNome)}
           </div>
           <div className="min-w-0">
-            <div className="text-sm font-semibold text-slate-900 truncate">{clinicaNome}</div>
+            <div className="text-sm font-semibold text-slate-800 truncate">{clinicaNome}</div>
             <div className="text-[10px] text-slate-400 uppercase tracking-wider">
               {dia.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
             </div>
@@ -61,107 +64,108 @@ export function AgendaV2Sidebar({ clinicaNome, dia, sessoes, recursos, equipeOnl
         </div>
       </div>
 
-      {/* Turno atual */}
-      <div className="px-5 py-5 border-b border-slate-100">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Turno atual</span>
-          <span className={cn("inline-flex items-center gap-1 text-[11px] font-semibold", turno.tone)}>
-            <TurnoIcon className="h-3 w-3" /> {turno.label}
-          </span>
-        </div>
-        <div className="flex items-end justify-between">
-          <div>
-            <div className="text-3xl font-bold text-slate-900 tabular-nums leading-none">{sessoes.length}</div>
-            <div className="text-[10px] text-slate-400 mt-1">sessões</div>
+      <div className="px-4 pb-5 space-y-3">
+        {/* Card — Turno */}
+        <section className={cardCls}>
+          <div className="flex items-center justify-between mb-3">
+            <span className={labelCls}>Turno</span>
+            <span className={cn("inline-flex items-center gap-1 text-[11px] font-semibold", turno.tone)}>
+              <TurnoIcon className="h-3 w-3" /> {turno.label}
+            </span>
           </div>
-          <div className="text-right">
-            <div className="text-2xl font-bold text-emerald-600 tabular-nums leading-none">{ocupacao}%</div>
-            <div className="text-[10px] text-slate-400 mt-1">ocupação</div>
+          <div className="flex items-end justify-between">
+            <div>
+              <div className="text-2xl font-semibold text-slate-800 tabular-nums leading-none">{sessoes.length}</div>
+              <div className="text-[10px] text-slate-400 mt-1.5">sessões</div>
+            </div>
+            <div className="text-right">
+              <div className="text-xl font-semibold text-emerald-600 tabular-nums leading-none">{ocupacao}%</div>
+              <div className="text-[10px] text-slate-400 mt-1.5">ocupação</div>
+            </div>
           </div>
-        </div>
-        <div className="mt-3 h-1.5 rounded-full bg-slate-100 overflow-hidden">
-          <div className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 transition-all"
-            style={{ width: `${ocupacao}%` }} />
-        </div>
-      </div>
+          <div className="mt-3 h-1 rounded-full bg-slate-100 overflow-hidden">
+            <div className="h-full bg-emerald-400/80 transition-all" style={{ width: `${ocupacao}%` }} />
+          </div>
+        </section>
 
-      {/* Sessões por tipo */}
-      <div className="px-5 py-5 border-b border-slate-100">
-        <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-3">Sessões</div>
-        <ul className="space-y-2">
-          {porTipo.length === 0 && (
-            <li className="text-xs text-slate-400">Nenhuma sessão</li>
-          )}
-          {porTipo.map(([tipo, n]) => {
-            const est = TIPO_SESSAO_ESTILO[tipo];
-            return (
-              <li key={tipo} className="flex items-center justify-between text-xs">
-                <span className="inline-flex items-center gap-2 text-slate-600">
-                  <span className="h-2 w-2 rounded-full" style={{ background: est.accent }} />
-                  {TIPO_SESSAO_LABEL[tipo]}
-                </span>
-                <span className="tabular-nums font-semibold text-slate-800">{n}</span>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
+        {/* Card — Sessões por tipo */}
+        <section className={cardCls}>
+          <div className={cn(labelCls, "mb-3")}>Sessões</div>
+          <ul className="space-y-2">
+            {porTipo.length === 0 && (
+              <li className="text-xs text-slate-400">Nenhuma sessão</li>
+            )}
+            {porTipo.map(([tipo, n]) => {
+              const est = TIPO_SESSAO_ESTILO[tipo];
+              return (
+                <li key={tipo} className="flex items-center justify-between text-xs">
+                  <span className="inline-flex items-center gap-2 text-slate-600">
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: est.accent }} />
+                    {TIPO_SESSAO_LABEL[tipo]}
+                  </span>
+                  <span className="tabular-nums font-semibold text-slate-700">{n}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
 
-      {/* Recursos com barras */}
-      <div className="px-5 py-5 border-b border-slate-100">
-        <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-3">Recursos</div>
-        <ul className="space-y-3">
-          {recursos.length === 0 && (
-            <li className="text-xs text-slate-400">Sem recursos cadastrados</li>
-          )}
-          {recursos.slice(0, 6).map((r) => {
-            const pct = r.total > 0 ? Math.round((r.usados / r.total) * 100) : 0;
-            const tone = pct >= 90 ? "bg-rose-500" : pct >= 60 ? "bg-amber-500" : "bg-emerald-500";
-            return (
-              <li key={r.id}>
-                <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="text-slate-600 truncate mr-2">{r.nome}</span>
-                  <span className="tabular-nums text-slate-500 shrink-0">{r.usados}/{r.total}</span>
-                </div>
-                <div className="h-1 rounded-full bg-slate-100 overflow-hidden">
-                  <div className={cn("h-full transition-all", tone)} style={{ width: `${pct}%` }} />
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
+        {/* Card — Recursos */}
+        <section className={cardCls}>
+          <div className={cn(labelCls, "mb-3")}>Recursos</div>
+          <ul className="space-y-3">
+            {recursos.length === 0 && (
+              <li className="text-xs text-slate-400">Sem recursos cadastrados</li>
+            )}
+            {recursos.slice(0, 6).map((r) => {
+              const pct = r.total > 0 ? Math.round((r.usados / r.total) * 100) : 0;
+              const tone = pct >= 90 ? "bg-rose-400" : pct >= 60 ? "bg-amber-400" : "bg-emerald-400";
+              return (
+                <li key={r.id}>
+                  <div className="flex items-center justify-between text-[11px] mb-1">
+                    <span className="text-slate-600 truncate mr-2">{r.nome}</span>
+                    <span className="tabular-nums text-slate-400 shrink-0">{r.usados}/{r.total}</span>
+                  </div>
+                  <div className="h-[3px] rounded-full bg-slate-100 overflow-hidden">
+                    <div className={cn("h-full transition-all", tone)} style={{ width: `${pct}%` }} />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
 
-      {/* Equipe online */}
-      <div className="px-5 py-5">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Equipe on-line</span>
-          <span className="inline-flex items-center gap-1 text-[10px] text-slate-500">
-            <Users className="h-3 w-3" /> {equipeOnline.length}
-          </span>
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          {equipeOnline.slice(0, 8).map((m) => (
-            <div
-              key={m.id}
-              className="relative h-7 w-7 rounded-full bg-slate-100 border border-white shadow-sm flex items-center justify-center text-[10px] font-semibold text-slate-600"
-              title={m.nome}
-            >
-              {initials(m.nome)}
-              <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-500 border border-white" />
-            </div>
-          ))}
-          {equipeOnline.length > 8 && (
-            <div className="h-7 w-7 rounded-full bg-slate-900 text-white flex items-center justify-center text-[10px] font-semibold">
-              +{equipeOnline.length - 8}
-            </div>
-          )}
-          {equipeOnline.length === 0 && (
-            <div className="text-xs text-slate-400 inline-flex items-center gap-1">
-              <Clock className="h-3 w-3" /> ninguém on-line
-            </div>
-          )}
-        </div>
+        {/* Card — Equipe on-line */}
+        <section className={cardCls}>
+          <div className="flex items-center justify-between mb-3">
+            <span className={labelCls}>Equipe on-line</span>
+            <span className="inline-flex items-center gap-1 text-[10px] text-slate-400">
+              <Users className="h-3 w-3" /> {equipeOnline.length}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {equipeOnline.slice(0, 8).map((m) => (
+              <div
+                key={m.id}
+                className="relative h-7 w-7 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center text-[10px] font-semibold text-slate-500"
+                title={m.nome}
+              >
+                {initials(m.nome)}
+                <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-400 border-2 border-white" />
+              </div>
+            ))}
+            {equipeOnline.length > 8 && (
+              <div className="h-7 w-7 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-[10px] font-semibold border border-slate-200">
+                +{equipeOnline.length - 8}
+              </div>
+            )}
+            {equipeOnline.length === 0 && (
+              <div className="text-xs text-slate-400 inline-flex items-center gap-1">
+                <Clock className="h-3 w-3" /> ninguém on-line
+              </div>
+            )}
+          </div>
+        </section>
       </div>
     </aside>
   );
