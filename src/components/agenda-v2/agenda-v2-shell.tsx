@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   ChevronLeft, ChevronRight, LayoutList, GanttChartSquare, CalendarDays,
-  Search, Rows3, Rows2, Focus, Sparkles, Plus,
+  Search, Rows3, Rows2, Focus, Sparkles, Plus, Keyboard,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,6 +13,9 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 import { KpiBar, type Kpi } from "./kpi-bar";
 import { SessionCard, type SessionCardData, type SessionDensity } from "./session-card";
 import type { DrawerPatientData } from "./patient-drawer";
@@ -35,6 +38,18 @@ const NovoAgendamentoWizard = lazy(() =>
 );
 
 const DENSITY_KEY = "agenda_v2_density";
+
+function densityStorageKey(clinicaId: string | null) {
+  return clinicaId ? `${DENSITY_KEY}:${clinicaId}` : DENSITY_KEY;
+}
+function isTypingTarget(el: EventTarget | null): boolean {
+  if (!(el instanceof HTMLElement)) return false;
+  const t = el.tagName;
+  if (t === "INPUT" || t === "TEXTAREA" || t === "SELECT") return true;
+  if (el.isContentEditable) return true;
+  if (el.closest('[role="dialog"], [role="listbox"], [role="combobox"]')) return true;
+  return false;
+}
 
 type ViewMode = "timeline" | "list";
 
@@ -73,16 +88,29 @@ export function AgendaV2Shell() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [density, setDensity] = useState<SessionDensity>(() => {
     if (typeof window === "undefined") return "confortavel";
-    return (window.localStorage.getItem(DENSITY_KEY) as SessionDensity) ?? "confortavel";
+    // fallback: chave legada (sem clínica) para não perder preferência do usuário.
+    return ((window.localStorage.getItem(DENSITY_KEY) as SessionDensity) ??
+      "confortavel");
   });
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [loadedMs, setLoadedMs] = useState<number | null>(null);
   const startedAtRef = useRef<number>(0);
   const mountedAtRef = useRef<number>(performance.now());
   const [renderMs, setRenderMs] = useState<number | null>(null);
 
+  // Densidade persistida por usuário + clínica. Ao trocar de clínica,
+  // recarrega o modo salvo daquela clínica (fallback: chave global).
   useEffect(() => {
-    if (typeof window !== "undefined") window.localStorage.setItem(DENSITY_KEY, density);
-  }, [density]);
+    if (typeof window === "undefined") return;
+    const saved = window.localStorage.getItem(densityStorageKey(clinicaId));
+    if (saved && saved !== density) setDensity(saved as SessionDensity);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clinicaId]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(densityStorageKey(clinicaId), density);
+    window.localStorage.setItem(DENSITY_KEY, density); // fallback global
+  }, [density, clinicaId]);
 
   // Mede o tempo até o primeiro paint útil (header + skeleton visível).
   useEffect(() => {
@@ -371,6 +399,61 @@ export function AgendaV2Shell() {
   const compact = density === "compacto";
   const foco = density === "foco";
 
+  // ==== Fase D · Atalhos de teclado (padrão Health Hub Pro) ====
+  // F = Foco · C = Compacto · D = Confortável · J/K = próx/ant · Enter = abrir
+  // Esc = fechar drawer · N = nova sessão · ? = ajuda · Ctrl/⌘+K = busca
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // Ctrl/⌘+K → foca busca (Busca Universal do módulo)
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+        return;
+      }
+      // Esc fecha drawer (Dialog do drawer também trata, mas garantimos aqui)
+      if (e.key === "Escape") {
+        if (drawerPacote) { setDrawerPacote(null); return; }
+      }
+      if (isTypingTarget(e.target)) return;
+      if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+
+      const k = e.key.toLowerCase();
+      if (k === "?") { e.preventDefault(); setShortcutsOpen((v) => !v); return; }
+      if (k === "f") { e.preventDefault(); setDensity("foco"); return; }
+      if (k === "c") { e.preventDefault(); setDensity("compacto"); return; }
+      if (k === "d") { e.preventDefault(); setDensity("confortavel"); return; }
+      if (k === "n") { e.preventDefault(); setWizardOpen(true); return; }
+      if (k === "j" || k === "k" || e.key === "Enter") {
+        if (filtradas.length === 0) return;
+        const idx = drawerPacote
+          ? filtradas.findIndex((s) => s.pacote_id === drawerPacote)
+          : -1;
+        if (e.key === "Enter") {
+          e.preventDefault();
+          const target = idx >= 0 ? filtradas[idx] : filtradas[0];
+          if (target) openDrawer(target.pacote_id);
+          return;
+        }
+        e.preventDefault();
+        let next = idx;
+        if (k === "j") next = idx < 0 ? 0 : Math.min(filtradas.length - 1, idx + 1);
+        if (k === "k") next = idx < 0 ? 0 : Math.max(0, idx - 1);
+        const target = filtradas[next];
+        if (target) openDrawer(target.pacote_id);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [filtradas, drawerPacote]);
+
+  // Feedback discreto ao trocar densidade via teclado.
+  const setDensityWithToast = (d: SessionDensity) => {
+    setDensity(d);
+  };
+  void setDensityWithToast;
+
   // Agrupar sessões por hora para render com régua de horas.
   const porHora = useMemo(() => {
     const map = new Map<number, SessionCardData[]>();
@@ -488,6 +571,16 @@ export function AgendaV2Shell() {
               <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl hover:bg-slate-100" onClick={() => navDia(1)} aria-label="Próximo dia">
                 <ChevronRight className="h-4 w-4 text-slate-400" />
               </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-xl hover:bg-slate-100 ml-1"
+                onClick={() => setShortcutsOpen(true)}
+                aria-label="Atalhos de teclado"
+                title="Atalhos (?)"
+              >
+                <Keyboard className="h-4 w-4 text-slate-400" />
+              </Button>
             </div>
           </div>
         </div>
@@ -499,7 +592,8 @@ export function AgendaV2Shell() {
               placeholder="Buscar paciente, médico, sala, exame…"
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              className="pl-10 h-10 rounded-2xl bg-slate-100 border-transparent focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-slate-200 text-sm placeholder:text-slate-400"
+              ref={searchInputRef}
+              className="pl-10 h-10 rounded-2xl bg-slate-100 border-transparent focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-slate-200 text-sm placeholder:text-slate-400 transition-colors duration-150"
               aria-label="Busca"
             />
           </div>
@@ -581,7 +675,10 @@ export function AgendaV2Shell() {
             <div>Nenhuma sessão para os filtros atuais.</div>
           </div>
         ) : (
-          <div className={cn("h-full overflow-y-auto pb-8", foco ? "px-10 pt-6 max-w-4xl mx-auto" : "px-6 pt-4")}>
+          <div className={cn(
+            "h-full overflow-y-auto pb-8 transition-[padding] duration-200",
+            foco ? "px-10 pt-6 max-w-4xl mx-auto" : "px-6 pt-4",
+          )}>
             {porHora.map(([hora, lista]) => {
               const isNowHour = isToday && hora === nowHour;
               return (
@@ -649,6 +746,48 @@ export function AgendaV2Shell() {
           <NovoAgendamentoWizard open={wizardOpen} onOpenChange={setWizardOpen} />
         </Suspense>
       )}
+
+      <Dialog open={shortcutsOpen} onOpenChange={setShortcutsOpen}>
+        <DialogContent className="max-w-md rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-base font-semibold tracking-tight">
+              Atalhos de teclado
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 text-sm">
+            <ShortcutRow k="?" label="Abrir / fechar este painel" />
+            <div className="border-t border-slate-100" />
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Modos de visualização</div>
+            <ShortcutRow k="D" label="Confortável" />
+            <ShortcutRow k="C" label="Compacto" />
+            <ShortcutRow k="F" label="Foco" />
+            <div className="border-t border-slate-100" />
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Navegação</div>
+            <ShortcutRow k="J" label="Próxima sessão" />
+            <ShortcutRow k="K" label="Sessão anterior" />
+            <ShortcutRow k="Enter" label="Abrir sessão selecionada" />
+            <ShortcutRow k="Esc" label="Fechar drawer" />
+            <div className="border-t border-slate-100" />
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Ações</div>
+            <ShortcutRow k="N" label="Nova sessão" />
+            <ShortcutRow k="Ctrl K" label="Focar busca do módulo" />
+          </div>
+          <p className="text-[11px] text-slate-400 pt-2">
+            Padrão Health Hub Pro — reutilizado em Caixa, Clientes, Orçamentos e Prontuário.
+          </p>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function ShortcutRow({ k, label }: { k: string; label: string }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-slate-600">{label}</span>
+      <kbd className="inline-flex h-6 min-w-6 items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-1.5 text-[11px] font-mono text-slate-700">
+        {k}
+      </kbd>
     </div>
   );
 }
