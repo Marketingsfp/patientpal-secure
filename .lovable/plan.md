@@ -4,6 +4,17 @@
 > Documento **conceitual**. Nenhuma linha de código será escrita antes da sua aprovação explícita deste estudo.
 > Nada em regras de negócio, banco, financeiro, caixa, orçamentos, check-in, Nina, permissões ou integrações será alterado. **Só muda a experiência de uso.**
 
+> **Ajustes aprovados (rev. 2):**
+> 1. Trabalho continua isolado em `/app/agenda-v2`. `/app/agenda` clássica **intocada**. Flag `agenda_v2` OFF por padrão. Promoção só após aprovação visual explícita (mesmo rito do Caixa, Orçamentos e Clientes).
+> 2. Foco desta fase é **UX e design**, não novas funcionalidades. Meta: tela mais bonita do sistema.
+> 3. Recepção deve conseguir passar o dia inteiro na Agenda — tudo abre em drawer/modal, sem troca de rota.
+> 4. **Modal "Novo Agendamento" também será redesenhado** como wizard em etapas (poucos campos por vez), mesma identidade visual da Agenda V2. Não haverá "Agenda bonita + formulário antigo".
+> 5. Laboratório mantém regra dura: **1 coleta = 1 sessão**, N exames dentro.
+> 6. Zero alteração em regra de negócio. Apenas UX, organização visual e navegação.
+> 7. **Processo obrigatório para toda tela nova a partir daqui:**
+>    `Estudo → Mockups (desktop + notebook + tablet) → Aprovação → Implementação → Validação → Promoção.`
+>    Nenhuma tela é implementada antes da aprovação do mockup correspondente.
+
 ---
 
 ## 1. Princípios de design (norte fixo)
