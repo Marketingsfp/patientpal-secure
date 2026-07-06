@@ -1,11 +1,10 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Check, ChevronRight, Search, User, Stethoscope, Clock, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { HhpWizardShell } from "@/design-system/hhp";
 
 const STEPS = [
   { key: "paciente", label: "Paciente", Icon: User },
@@ -55,43 +54,15 @@ export function NovoAgendamentoWizard({ open, onOpenChange }: { open: boolean; o
     onOpenChange(false);
   };
 
-  return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}>
-      <DialogContent className="w-[calc(100vw-1.5rem)] max-w-[720px] max-h-[90vh] overflow-y-auto p-0 gap-0 rounded-3xl border-slate-200 bg-white">
-        <VisuallyHidden.Root>
-          <DialogTitle>Novo agendamento</DialogTitle>
-          <DialogDescription>Assistente em 4 passos para criar um novo agendamento.</DialogDescription>
-        </VisuallyHidden.Root>
-        <div className="px-5 md:px-8 pt-6 md:pt-8 pb-4">
-          <div className="text-[10px] font-semibold uppercase tracking-widest text-indigo-500">
-            Passo {stepIdx + 1} de {STEPS.length}
-          </div>
-          <h2
-            className="mt-1 text-2xl font-semibold text-slate-900"
-            style={{ fontFamily: "'Inter Tight', Inter, sans-serif", letterSpacing: "-0.01em" }}
-          >
-            {step === "paciente" && "Quem é o paciente?"}
-            {step === "servico" && "Qual o serviço?"}
-            {step === "horario" && "Quando será?"}
-            {step === "confirmar" && "Tudo certo?"}
-          </h2>
+  const heading =
+    step === "paciente" ? "Quem é o paciente?" :
+    step === "servico" ? "Qual o serviço?" :
+    step === "horario" ? "Quando será?" :
+    "Tudo certo?";
 
-          {/* Progresso */}
-          <div className="mt-5 flex items-center gap-1.5">
-            {STEPS.map((_, i) => (
-              <div
-                key={i}
-                className={cn(
-                  "h-1 rounded-full flex-1 transition-all",
-                  i <= stepIdx ? "bg-indigo-500" : "bg-slate-100",
-                )}
-              />
-            ))}
-          </div>
-        </div>
-
-        <div className="px-5 md:px-8 py-6 min-h-[320px] md:min-h-[380px]">
-          {step === "paciente" && (
+  const body = (
+    <>
+      {step === "paciente" && (
             <div>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -207,10 +178,12 @@ export function NovoAgendamentoWizard({ open, onOpenChange }: { open: boolean; o
               </p>
             </div>
           )}
-        </div>
+    </>
+  );
 
-        <div className="px-5 md:px-8 py-4 md:py-5 border-t border-slate-100 flex items-center justify-between bg-slate-50/40">
-          <button
+  const footer = (
+    <>
+      <button
             type="button"
             onClick={() => (stepIdx === 0 ? onOpenChange(false) : setStepIdx((i) => i - 1))}
             className="text-sm text-slate-500 hover:text-slate-900 font-medium"
@@ -229,8 +202,22 @@ export function NovoAgendamentoWizard({ open, onOpenChange }: { open: boolean; o
             {stepIdx === STEPS.length - 1 ? "Confirmar" : "Continuar"}
             {stepIdx < STEPS.length - 1 && <ChevronRight className="h-3.5 w-3.5" />}
           </button>
-        </div>
-      </DialogContent>
-    </Dialog>
+    </>
+  );
+
+  return (
+    <HhpWizardShell
+      open={open}
+      onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}
+      title="Novo agendamento"
+      description="Assistente em 4 passos para criar um novo agendamento."
+      stepLabel={`Passo ${stepIdx + 1} de ${STEPS.length}`}
+      stepIndex={stepIdx}
+      stepsCount={STEPS.length}
+      heading={heading}
+      footer={footer}
+    >
+      {body}
+    </HhpWizardShell>
   );
 }
