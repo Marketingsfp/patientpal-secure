@@ -2,9 +2,28 @@
 name: Backlog — auditoria de duplicidades no menu
 description: Ajustes de organização do menu registrados como próximo trabalho após o encerramento de Clientes V2 e antes de iniciar Agenda V2. Não implementar sem retomada explícita.
 type: preference
+status: concluido
 ---
 
-Registrado pelo usuário como próximo ajuste de organização do menu, **fora de qualquer módulo do roadmap** e **sem implementação imediata**.
+**CONCLUÍDO — Opção A aplicada nos dois blocos (aditivo, sem migration, sem alteração de regra).**
+
+## Executado
+
+### Cartão de Benefícios
+- Menu lateral colapsado para uma única entrada `Cartão de Benefícios` → `/app/cartao-beneficios/contratos`.
+- Sub-navegação agora vive nas abas do layout `/app/cartao-beneficios`: Vendas · Convênios · **Benefícios (regras)** · **Modelos** · Dependentes · Relatórios (BI).
+- `Empresas Associadas` mantido no centro Cartão (aponta para `/app/financeiro/empresas`).
+- Zero mudança em `cb_beneficios`, `cb_convenio_regras`, RPCs ou regras de cálculo.
+
+### Exames × Procedimentos
+- Rótulos renomeados no menu e nos titles das rotas:
+  - `Procedimentos` → **Catálogo de Serviços** (`/app/procedimentos` — fonte de verdade: preços, agenda, orçamento, caixa, conversão).
+  - `Exames` → **Resultados de Exames / Laudos IA** (`/app/exames-resultados` — workflow clínico/IA).
+- Nenhuma tabela, coluna, RPC ou fluxo alterado.
+
+## Histórico
+
+Registrado originalmente como próximo ajuste de organização do menu, fora de qualquer módulo do roadmap.
 
 ## Ordem de execução
 
