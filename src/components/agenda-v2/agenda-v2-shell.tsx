@@ -156,6 +156,7 @@ export function AgendaV2Shell() {
   const medicos = medicosQuery.data ?? new Map<string, string>();
   const recursos = recursosQuery.data ?? new Map<string, string>();
   const procMeta = procMetaQuery.data ?? new Map<string, ProcMeta>();
+  const espData = especialidadesQuery.data;
 
   // Agrupar em sessões por pacote_id (ou id do próprio agendamento).
   const sessoes = useMemo<SessionCardData[]>(() => {
@@ -189,6 +190,8 @@ export function AgendaV2Shell() {
         pacote_id: key,
         paciente_nome: primeiro.paciente_nome,
         paciente_id: primeiro.paciente_id,
+        medico_id: primeiro.medico_id,
+        recurso_id: primeiro.enfermagem_recurso_id,
         medico_nome: primeiro.medico_id ? medicos.get(primeiro.medico_id) ?? null : null,
         recurso_nome: primeiro.enfermagem_recurso_id ? recursos.get(primeiro.enfermagem_recurso_id) ?? null : null,
         inicio: primeiro.inicio,
@@ -228,13 +231,20 @@ export function AgendaV2Shell() {
         if (kpiFilter === "lab" && s.tipo !== "coleta_laboratorial") return false;
         if (kpiFilter !== "lab" && s.status !== kpiFilter) return false;
       }
+      if (filtroMedico && s.medico_id !== filtroMedico) return false;
+      if (filtroRecurso && s.recurso_id !== filtroRecurso) return false;
+      if (filtroEspecialidade) {
+        const mid = s.medico_id;
+        const set = mid ? espData?.medToEsps.get(mid) : null;
+        if (!set || !set.has(filtroEspecialidade)) return false;
+      }
       if (norm) {
         const hay = `${s.paciente_nome} ${s.medico_nome ?? ""} ${s.recurso_nome ?? ""} ${s.items.map((i) => i.procedimento_nome).join(" ")}`.toLowerCase();
         if (!hay.includes(norm)) return false;
       }
       return true;
     });
-  }, [sessoes, q, kpiFilter]);
+  }, [sessoes, q, kpiFilter, filtroMedico, filtroRecurso, filtroEspecialidade, espData]);
 
   const drawerData = useMemo<TimelineData | null>(() => {
     if (!drawerPacote || !rows) return null;
