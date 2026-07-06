@@ -430,7 +430,7 @@ function AtendimentoEditorPage() {
                 Envie o paciente ao caixa antes de iniciar o atendimento.
                 O prontuário fica disponível somente após a confirmação do pagamento.
               </p>
-              <div className="mt-2 flex gap-2">
+              <div className="mt-2 flex flex-wrap gap-2">
                 <Button size="sm" asChild>
                   <Link to="/app/caixa">Abrir caixa</Link>
                 </Button>

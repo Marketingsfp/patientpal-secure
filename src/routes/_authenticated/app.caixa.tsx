@@ -1225,7 +1225,7 @@ function Page() {
               </div>
             )}
             {openMov && (openMov.tipo === "recebimento" || openMov.tipo === "despesa") && (movForma === "credito" || movForma === "debito") && (
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <Label>Bandeira *</Label>
                   <Select value={movBandeira} onValueChange={setMovBandeira}>
@@ -1325,7 +1325,7 @@ function Page() {
                       </Button>
                     )}
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
                       <Label>Forma</Label>
                       <Select value={l.forma} onValueChange={(v) => setCobrancaLinhas(prev => prev.map((x, i) => i === idx ? { ...x, forma: v, bandeira: "", parcelas: "1" } : x))}>
@@ -1345,7 +1345,7 @@ function Page() {
                     </div>
                   </div>
                   {(l.forma === "credito" || l.forma === "debito") && (
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div>
                         <Label>Bandeira *</Label>
                         <Select value={l.bandeira} onValueChange={(v) => setCobrancaLinhas(prev => prev.map((x, i) => i === idx ? { ...x, bandeira: v } : x))}>

@@ -325,7 +325,7 @@ function OrcamentosPage() {
   };
 
   return (
-    <div className="p-6 space-y-4 max-w-7xl mx-auto">
+    <div className="p-3 sm:p-6 space-y-4 max-w-7xl mx-auto">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-md bg-primary/10"><FileText className="h-6 w-6 text-primary" /></div>
@@ -334,7 +334,7 @@ function OrcamentosPage() {
             <p className="text-sm text-muted-foreground">Orçamentos rápidos com impressão térmica 80mm</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
             onClick={() => navigate({ to: "/app/orcamentos-agenda", search: { orc: undefined } })}
@@ -355,7 +355,7 @@ function OrcamentosPage() {
           <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input className="pl-9" placeholder="Buscar por paciente, número ou médico…" value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
-        <div className="flex items-center gap-1 rounded-md border bg-card p-0.5 text-xs">
+        <div className="flex flex-wrap items-center gap-1 rounded-md border bg-card p-0.5 text-xs">
           {([
             ["hoje", "Dia"],
             ["semana", "Semana"],
@@ -375,13 +375,13 @@ function OrcamentosPage() {
           ))}
         </div>
         {periodo === "personalizado" && (
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1">
             <Input type="date" value={dataIni} onChange={(e) => setDataIni(e.target.value)} className="h-8 w-[150px] text-xs" />
             <span className="text-xs text-muted-foreground">até</span>
             <Input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)} className="h-8 w-[150px] text-xs" />
           </div>
         )}
-        <div className="flex items-center gap-1 rounded-md border bg-card p-0.5 text-xs">
+        <div className="flex flex-wrap items-center gap-1 rounded-md border bg-card p-0.5 text-xs">
           {([
             ["todos", "Todos"],
             ["realizados", "Realizados"],
@@ -405,7 +405,7 @@ function OrcamentosPage() {
         </div>
       </div>
 
-      <div className="rounded-md border bg-card">
+      <div className="rounded-md border bg-card overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-muted/50">
             <tr className="text-left">
