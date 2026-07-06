@@ -11,6 +11,7 @@ Antes de implementar uma feature, declarar: impacto financeiro, operacional, exp
 Prioridade máxima: reduzir cliques/tempo da recepção, evitar retrabalho e informações repetidas ao paciente.
 Sem convênios externos. Modalidades: Paciente Particular, Paciente Associado, Cartão de Benefícios. Em UI/menu/busca usar "Cartão de Benefícios", "Associados", "Regras do Cartão", "Empresas associadas" — nunca "Convênios".
 Identificadores legados de pacientes (codigo_prontuario, codigo_prontuario_anterior, numero_pasta, número de ficha) são IMUTÁVEIS: só leitura/busca/filtro. Proibido UPDATE, normalização, renumeração, trigger ou merge automático sem aprovação explícita.
+Política permanente: dados históricos (identificadores legados de pacientes, histórico financeiro, movimentações de caixa, NFS-e/boletos emitidos, audit_log, criado_por/atualizado_por/created_at) são IMUTÁVEIS — nenhuma migration/trigger/RPC/IA/script/dedup altera automaticamente. Migration estrutural exige relatório + aprovação. Evolução: flag → preview → playwright → validação → promoção → rollback. Nunca remover clássico enquanto V2 vive. Remoção destrutiva só com autorização; preferir aditivo. Em dúvida, parar e perguntar.
 
 ## Memories
 - [Governança de mudanças](mem://preferences/governanca) — Framework dos 4 eixos + checklist pré-implementação
@@ -18,3 +19,4 @@ Identificadores legados de pacientes (codigo_prontuario, codigo_prontuario_anter
 - [Repasse cartão consulta](mem://features/repasse-cartao-consulta) — Regras de repasse
 - [Testes clientes pendentes](mem://tests/clientes-pendentes) — Notas de teste
 - [Identificadores legados de pacientes](mem://constraints/identificadores-legados-pacientes) — Campos protegidos, permitido/proibido
+- [Governança e dados imutáveis](mem://constraints/governanca-dados-imutaveis) — Política permanente: dados protegidos (pacientes/financeiro/auditoria), governança de migrations, padrão flag→preview→promoção, compatibilidade V2/clássico, alterações destrutivas
