@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Play, DollarSign, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -52,6 +53,10 @@ export function PatientDrawer({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-[480px] overflow-y-auto p-0 bg-white">
+        <VisuallyHidden.Root>
+          <SheetTitle>{data?.paciente_nome ?? "Paciente"}</SheetTitle>
+          <SheetDescription>Resumo clínico, jornada e ações rápidas.</SheetDescription>
+        </VisuallyHidden.Root>
         {data && (
           <>
             <div className="px-6 pt-8 pb-5 border-b border-slate-100">
