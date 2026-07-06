@@ -1,11 +1,18 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { AlertCircle, Shield } from "lucide-react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAgendaV2Flag } from "@/hooks/use-agenda-v2-flag";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { AgendaV2Shell } from "@/components/agenda-v2/agenda-v2-shell";
+import { Skeleton } from "@/components/ui/skeleton";
+
+// Lazy — só baixa o bundle da agenda-v2 quando a flag for ligada.
+// Isso corta o cold-start da rota (que antes carregava tudo mesmo com flag OFF).
+const AgendaV2Shell = lazy(() =>
+  import("@/components/agenda-v2/agenda-v2-shell").then((m) => ({ default: m.AgendaV2Shell })),
+);
 
 export const Route = createFileRoute("/_authenticated/app/agenda-v2")({
   component: AgendaV2Page,
@@ -20,6 +27,18 @@ export const Route = createFileRoute("/_authenticated/app/agenda-v2")({
 function AgendaV2Page() {
   const { clinicaAtual } = useClinica();
   const { enabled, loading, setEnabled } = useAgendaV2Flag();
+  const [toggleMs, setToggleMs] = useState<number | null>(null);
+  const toggleStartRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (enabled && toggleStartRef.current > 0) {
+      // Mede do clique até o shell montar (próximo frame após enabled=true).
+      requestAnimationFrame(() => {
+        setToggleMs(Math.round(performance.now() - toggleStartRef.current));
+        toggleStartRef.current = 0;
+      });
+    }
+  }, [enabled]);
 
   const role = clinicaAtual?.role ?? null;
   const podeVer = role === "admin" || role === "gestor";
@@ -51,6 +70,9 @@ function AgendaV2Page() {
             <b>Piloto isolado</b> — rota <code>/app/agenda-v2</code>. A agenda clássica em{" "}
             <code>/app/agenda</code> continua intacta.
           </span>
+          {toggleMs !== null && (
+            <span className="ml-2 text-[10px] text-slate-400 tabular-nums">toggle {toggleMs}ms</span>
+          )}
         </div>
         <div className="flex items-center gap-3">
           <Label className="text-xs flex items-center gap-2">
@@ -58,7 +80,10 @@ function AgendaV2Page() {
             <Switch
               checked={enabled}
               disabled={loading}
-              onCheckedChange={(v) => void setEnabled(v)}
+              onCheckedChange={(v) => {
+                if (v) toggleStartRef.current = performance.now();
+                void setEnabled(v);
+              }}
               data-testid="flag-agenda-v2"
             />
           </Label>
@@ -70,7 +95,9 @@ function AgendaV2Page() {
 
       <div className="flex-1 min-h-0">
         {enabled ? (
-          <AgendaV2Shell />
+          <Suspense fallback={<ShellFallback />}>
+            <AgendaV2Shell />
+          </Suspense>
         ) : (
           <div className="h-full flex items-center justify-center p-6">
             <div className="max-w-md text-center space-y-3">
@@ -86,6 +113,36 @@ function AgendaV2Page() {
             </div>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function ShellFallback() {
+  return (
+    <div className="h-full flex bg-[#FAFAF8]">
+      <div className="hidden md:block w-64 border-r border-slate-100 bg-white p-4 space-y-3">
+        <Skeleton className="h-6 w-32" />
+        <Skeleton className="h-4 w-40" />
+        <Skeleton className="h-24 w-full rounded-2xl" />
+      </div>
+      <div className="flex-1 p-6 space-y-4">
+        <Skeleton className="h-8 w-56" />
+        <div className="flex gap-2">
+          <Skeleton className="h-10 flex-1 max-w-md" />
+          <Skeleton className="h-10 w-40" />
+          <Skeleton className="h-10 w-40" />
+        </div>
+        <div className="flex gap-2">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-14 w-28 rounded-2xl" />
+          ))}
+        </div>
+        <div className="space-y-2 pt-2">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 w-full rounded-3xl" />
+          ))}
+        </div>
       </div>
     </div>
   );

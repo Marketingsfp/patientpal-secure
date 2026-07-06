@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -15,12 +15,24 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { KpiBar, type Kpi } from "./kpi-bar";
 import { SessionCard, type SessionCardData, type SessionDensity } from "./session-card";
-import { AgendaV2Sidebar } from "./agenda-v2-sidebar";
-import { PatientDrawer, type DrawerPatientData } from "./patient-drawer";
-import { AiInsightsStrip } from "./ai-insights-strip";
-import { NovoAgendamentoWizard } from "./novo-agendamento-wizard";
+import type { DrawerPatientData } from "./patient-drawer";
 import { tipoDaSessao, type ProcMeta } from "@/lib/agenda-v2/session-detect";
 import { cn } from "@/lib/utils";
+
+// Lazy — só baixa quando efetivamente aparecem em tela.
+// Header + timeline + cards + KPIs permanecem no bundle crítico.
+const AgendaV2Sidebar = lazy(() =>
+  import("./agenda-v2-sidebar").then((m) => ({ default: m.AgendaV2Sidebar })),
+);
+const AiInsightsStrip = lazy(() =>
+  import("./ai-insights-strip").then((m) => ({ default: m.AiInsightsStrip })),
+);
+const PatientDrawer = lazy(() =>
+  import("./patient-drawer").then((m) => ({ default: m.PatientDrawer })),
+);
+const NovoAgendamentoWizard = lazy(() =>
+  import("./novo-agendamento-wizard").then((m) => ({ default: m.NovoAgendamentoWizard })),
+);
 
 const DENSITY_KEY = "agenda_v2_density";
 
@@ -65,10 +77,29 @@ export function AgendaV2Shell() {
   });
   const [loadedMs, setLoadedMs] = useState<number | null>(null);
   const startedAtRef = useRef<number>(0);
+  const mountedAtRef = useRef<number>(performance.now());
+  const [renderMs, setRenderMs] = useState<number | null>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") window.localStorage.setItem(DENSITY_KEY, density);
   }, [density]);
+
+  // Mede o tempo até o primeiro paint útil (header + skeleton visível).
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      setRenderMs(Math.round(performance.now() - mountedAtRef.current));
+    });
+    // Prefetch idle de recursos secundários (wizard/drawer) —
+    // primeiro clique fica instantâneo, sem inflar o bundle crítico.
+    const idle = (cb: () => void) =>
+      (window as unknown as { requestIdleCallback?: (fn: () => void) => number })
+        .requestIdleCallback?.(cb) ?? window.setTimeout(cb, 800);
+    idle(() => {
+      void import("./novo-agendamento-wizard");
+      void import("./patient-drawer");
+      void import("./ai-insights-strip");
+    });
+  }, []);
 
   // Lookups (médicos / recursos / procedimentos) — cache por 10 min por clínica.
   // Não dependem do dia, então trocar a data não refaz essas queries.
@@ -367,13 +398,17 @@ export function AgendaV2Shell() {
 
   return (
     <div className="h-full flex bg-[#FAFAF8]">
-      {!foco && <AgendaV2Sidebar
-        clinicaNome={clinicaNome}
-        dia={dia}
-        sessoes={sessoes}
-        recursos={recursosOcup}
-        equipeOnline={equipeOnline}
-      />}
+      {!foco && (
+        <Suspense fallback={<div className="w-64 border-r border-slate-100 bg-white" />}>
+          <AgendaV2Sidebar
+            clinicaNome={clinicaNome}
+            dia={dia}
+            sessoes={sessoes}
+            recursos={recursosOcup}
+            equipeOnline={equipeOnline}
+          />
+        </Suspense>
+      )}
 
       <div className="flex-1 min-w-0 flex flex-col">
       {/* Header */}
@@ -501,7 +536,9 @@ export function AgendaV2Shell() {
                 : `${filtradas.length} ${filtradas.length === 1 ? "sessão" : "sessões"}`}
             </span>
             {loadedMs !== null && (
-              <span className="text-slate-400 tabular-nums">· {loadedMs}ms</span>
+              <span className="text-slate-400 tabular-nums">
+                · query {loadedMs}ms{renderMs !== null && ` · render ${renderMs}ms`}
+              </span>
             )}
           </div>
         </div>
@@ -514,9 +551,11 @@ export function AgendaV2Shell() {
         />
       </div>
 
-      {/* Faixa de sugestões IA (visual) */}
+      {/* Faixa de sugestões IA (visual) — recurso secundário, carrega depois */}
       {rows !== null && filtradas.length > 0 && (
-        <AiInsightsStrip sessoes={filtradas} livresPorHora={livresPorHora} />
+        <Suspense fallback={null}>
+          <AiInsightsStrip sessoes={filtradas} livresPorHora={livresPorHora} />
+        </Suspense>
       )}
 
       {/* Corpo */}
@@ -588,13 +627,19 @@ export function AgendaV2Shell() {
       </div>
 
       {drawerMounted && (
-        <PatientDrawer
-          open={!!drawerPacote}
-          onOpenChange={(v) => { if (!v) setDrawerPacote(null); }}
-          data={drawerData}
-        />
+        <Suspense fallback={null}>
+          <PatientDrawer
+            open={!!drawerPacote}
+            onOpenChange={(v) => { if (!v) setDrawerPacote(null); }}
+            data={drawerData}
+          />
+        </Suspense>
       )}
-      <NovoAgendamentoWizard open={wizardOpen} onOpenChange={setWizardOpen} />
+      {wizardOpen && (
+        <Suspense fallback={null}>
+          <NovoAgendamentoWizard open={wizardOpen} onOpenChange={setWizardOpen} />
+        </Suspense>
+      )}
     </div>
   );
 }
