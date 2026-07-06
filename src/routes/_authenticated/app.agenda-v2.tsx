@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { HhpSkeletonCard } from "@/design-system/hhp";
 
 // Lazy — só baixa o bundle da agenda-v2 quando a flag for ligada.
 // Isso corta o cold-start da rota (que antes carregava tudo mesmo com flag OFF).
@@ -152,7 +153,7 @@ function ShellFallback() {
         </div>
         <div className="space-y-2 pt-2">
           {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-24 w-full rounded-3xl" />
+            <HhpSkeletonCard key={i} density="confortavel" />
           ))}
         </div>
       </div>
