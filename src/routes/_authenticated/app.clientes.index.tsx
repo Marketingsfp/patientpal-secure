@@ -16,11 +16,71 @@ import {
 } from "@/components/ui/table";
 import { ClienteForm } from "@/components/clientes/cliente-form";
 import { IdadeIcon, calcIdadeAnos } from "@/components/idade-icon";
+import { ClientesShellV2 } from "@/components/clientes-v2/clientes-shell";
+import { useClientesV2Flag } from "@/hooks/use-clientes-v2-flag";
+import { useClinica as useClinicaGate } from "@/hooks/use-clinica";
 
 export const Route = createFileRoute("/_authenticated/app/clientes/")({
-  component: ClientesPage,
+  component: ClientesPageGate,
   head: () => ({ meta: [{ title: "Clientes — ClinicaOS" }] }),
 });
+
+/**
+ * Gate de promoção do Clientes V2 (mantendo o clássico como fallback).
+ *
+ * Regras (aprovadas pelo usuário):
+ * - Somente `admin` e `gestor` recebem o V2.
+ * - Feature flag `clientes_v2` continua ligada por usuário (opt-in).
+ * - Recepção, caixa, médico, enfermeiro, financeiro e qualquer outro papel
+ *   permanecem no clássico — sem exceção.
+ * - Enquanto o role/flag carrega, mostramos o clássico (fail-safe).
+ * - Rollback imediato: basta desligar a flag no perfil.
+ *
+ * A promoção é apenas de UI: nenhum dado é escrito, migrado, normalizado
+ * ou recalculado. Campos legados (prontuário, pasta, ficha) continuam
+ * somente-leitura no V2, conforme política de dados imutáveis.
+ */
+function ClientesPageGate() {
+  const { clinicaAtual } = useClinicaGate();
+  const { enabled, loading: flagLoading } = useClientesV2Flag();
+  const role = clinicaAtual?.role ?? null;
+  const elegivel = role === "admin" || role === "gestor";
+
+  if (!clinicaAtual || flagLoading) return <ClientesPage />;
+  if (elegivel && enabled) return <ClientesV2Wrapper />;
+  return <ClientesPage />;
+}
+
+function ClientesV2Wrapper() {
+  const [compact, setCompact] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return;
+      const { data } = await supabase.from("profiles")
+        .select("preferencias_ui").eq("id", u.user.id).maybeSingle();
+      const p = (data?.preferencias_ui ?? {}) as { clientes?: { compact?: boolean } };
+      if (alive && typeof p.clientes?.compact === "boolean") setCompact(p.clientes.compact);
+    })();
+    return () => { alive = false; };
+  }, []);
+  const persistCompact = async (v: boolean) => {
+    setCompact(v);
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) return;
+    const { data } = await supabase.from("profiles")
+      .select("preferencias_ui").eq("id", u.user.id).maybeSingle();
+    const prev = (data?.preferencias_ui ?? {}) as Record<string, unknown>;
+    const clientes = { ...((prev.clientes as object) ?? {}), compact: v };
+    await supabase.from("profiles").update({ preferencias_ui: { ...prev, clientes } }).eq("id", u.user.id);
+  };
+  return (
+    <div className="h-[calc(100vh-64px)] -mx-3 -mt-1 -mb-3 sm:-mx-4 sm:-mt-1.5 sm:-mb-4 lg:-mx-6 lg:-mt-2 lg:-mb-6">
+      <ClientesShellV2 compactPref={compact} onToggleCompact={(v) => void persistCompact(v)} />
+    </div>
+  );
+}
 
 function fmtNasc(d: string | null): string {
   if (!d) return "—";
