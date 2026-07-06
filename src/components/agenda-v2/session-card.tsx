@@ -1,7 +1,8 @@
 import { useState } from "react";
 import {
-  ChevronDown, ChevronRight,
+  ChevronDown, ChevronRight, ArrowUpRight, CalendarClock, DollarSign,
 } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { TIPO_SESSAO_ESTILO, TIPO_SESSAO_LABEL, type TipoSessao } from "@/lib/agenda-v2/session-detect";
@@ -257,6 +258,44 @@ export function SessionCard({
         </div>
       </div>
 
+      {/* Hover reveal — Abrir · Reagendar · Pagar (visual, Fase B) */}
+      {density !== "compacto" && (
+        <div
+          className={cn(
+            "absolute top-2 right-2 flex items-center gap-1",
+            "opacity-0 translate-y-[-2px] pointer-events-none",
+            "group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto",
+            "focus-within:opacity-100 focus-within:pointer-events-auto",
+            "transition-all duration-150",
+          )}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <QuickAction
+            icon={<ArrowUpRight className="h-3 w-3" />}
+            label="Abrir"
+            onClick={() => onOpenTimeline(data.pacote_id)}
+          />
+          <QuickAction
+            icon={<CalendarClock className="h-3 w-3" />}
+            label="Reagendar"
+            onClick={() =>
+              toast.info("Reagendar", {
+                description: "Fluxo será conectado na Fase E (wizard).",
+              })
+            }
+          />
+          <QuickAction
+            icon={<DollarSign className="h-3 w-3" />}
+            label="Pagar"
+            onClick={() =>
+              toast.info("Pagar", {
+                description: "Abre o Caixa clássico na Fase E.",
+              })
+            }
+          />
+        </div>
+      )}
+
       {multi && open && density !== "compacto" && (
         <ul className="mt-3 space-y-1 border-t border-slate-100 pt-3" style={{ paddingLeft: dim.photo + 16 }}>
           {data.items.map((it) => (
@@ -268,5 +307,30 @@ export function SessionCard({
         </ul>
       )}
     </div>
+  );
+}
+
+function QuickAction({
+  icon, label, onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-center gap-1 h-7 px-2 rounded-lg",
+        "bg-white/95 backdrop-blur-sm border border-slate-200/70 shadow-sm",
+        "text-[11px] font-medium text-slate-600",
+        "hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-colors",
+      )}
+      aria-label={label}
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
   );
 }
