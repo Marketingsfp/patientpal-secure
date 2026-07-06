@@ -330,3 +330,11 @@
 .rt-img-handle-se { right: -6px; bottom: -6px; cursor: nwse-resize; }
 /* Espacinho entre imagens inline lado a lado */
 .rt-editor .rt-img-wrap + .rt-img-wrap { margin-left: 4px; }
+
+/* Agenda V2 — modo full-bleed no mobile.
+ * Quando a rota /app/agenda-v2 monta com viewport < md, o outer app-shell
+ * (aside do menu + padding do <main>) é recolhido para dar 100% da largura útil. */
+@media (max-width: 767px) {
+  html.agenda-v2-fullbleed aside { display: none !important; }
+  html.agenda-v2-fullbleed main { padding: 0 !important; }
+}
