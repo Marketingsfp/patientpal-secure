@@ -57,12 +57,12 @@ export function NovoAgendamentoWizard({ open, onOpenChange }: { open: boolean; o
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}>
-      <DialogContent className="max-w-[720px] p-0 gap-0 rounded-3xl border-slate-200 bg-white overflow-hidden">
+      <DialogContent className="w-[calc(100vw-1.5rem)] max-w-[720px] max-h-[90vh] overflow-y-auto p-0 gap-0 rounded-3xl border-slate-200 bg-white">
         <VisuallyHidden.Root>
           <DialogTitle>Novo agendamento</DialogTitle>
           <DialogDescription>Assistente em 4 passos para criar um novo agendamento.</DialogDescription>
         </VisuallyHidden.Root>
-        <div className="px-8 pt-8 pb-4">
+        <div className="px-5 md:px-8 pt-6 md:pt-8 pb-4">
           <div className="text-[10px] font-semibold uppercase tracking-widest text-indigo-500">
             Passo {stepIdx + 1} de {STEPS.length}
           </div>
