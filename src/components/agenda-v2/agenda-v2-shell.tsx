@@ -1,11 +1,11 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   ChevronLeft, ChevronRight, LayoutList, GanttChartSquare, CalendarDays,
   Search, Rows3, Rows2, Sparkles, Plus,
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Button } from "@/components/ui/button";
@@ -17,13 +17,9 @@ import { KpiBar, type Kpi } from "./kpi-bar";
 import { SessionCard, type SessionCardData, type SessionDensity } from "./session-card";
 import { AgendaV2Sidebar } from "./agenda-v2-sidebar";
 import type { TimelineData } from "./patient-timeline-drawer";
+import { PatientTimelineDrawer } from "./patient-timeline-drawer";
 import { tipoDaSessao, type ProcMeta } from "@/lib/agenda-v2/session-detect";
 import { cn } from "@/lib/utils";
-
-// Drawer carrega só quando o usuário abrir — reduz JS crítico.
-const PatientTimelineDrawer = lazy(() =>
-  import("./patient-timeline-drawer").then((m) => ({ default: m.PatientTimelineDrawer })),
-);
 
 const DENSITY_KEY = "agenda_v2_density";
 
@@ -48,6 +44,7 @@ export function AgendaV2Shell() {
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id ?? null;
   const clinicaNome = clinicaAtual?.clinica?.nome ?? "Clínica";
+  const queryClient = useQueryClient();
 
   const [dia, setDia] = useState<Date>(() => {
     const d = new Date(); d.setHours(0, 0, 0, 0); return d;
@@ -161,6 +158,34 @@ export function AgendaV2Shell() {
       startedAtRef.current = 0;
     }
   }, [agsQuery.isFetched, agsQuery.dataUpdatedAt]);
+
+  // Prefetch dos dias adjacentes (±1) em idle — troca de dia vira instantânea.
+  useEffect(() => {
+    if (!clinicaId || !agsQuery.isFetched) return;
+    const idle = (cb: () => void) =>
+      (window as unknown as { requestIdleCallback?: (fn: () => void) => number })
+        .requestIdleCallback?.(cb) ?? window.setTimeout(cb, 300);
+    const prefetchDay = (delta: number) => {
+      const d = new Date(diaKey); d.setDate(d.getDate() + delta); d.setHours(0, 0, 0, 0);
+      const key = d.toISOString();
+      void queryClient.prefetchQuery({
+        queryKey: ["agenda-v2", "ags", clinicaId, key],
+        staleTime: 60 * 1000,
+        queryFn: async () => {
+          const start = new Date(key);
+          const end = new Date(key); end.setHours(23, 59, 59, 999);
+          const { data } = await supabase.from("agendamentos")
+            .select("id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,pacote_id,enfermagem_recurso_id,fluxo_etapa,fluxo_atualizado_em")
+            .eq("clinica_id", clinicaId)
+            .gte("inicio", start.toISOString())
+            .lte("inicio", end.toISOString())
+            .order("inicio", { ascending: true });
+          return (data ?? []) as RawAg[];
+        },
+      });
+    };
+    idle(() => { prefetchDay(-1); prefetchDay(1); });
+  }, [clinicaId, diaKey, agsQuery.isFetched, queryClient]);
 
   const rows = agsQuery.data ?? null;
   const medicos = medicosQuery.data ?? new Map<string, string>();
@@ -533,13 +558,11 @@ export function AgendaV2Shell() {
       </div>
 
       {drawerMounted && (
-        <Suspense fallback={null}>
-          <PatientTimelineDrawer
-            open={!!drawerPacote}
-            onOpenChange={(v) => { if (!v) setDrawerPacote(null); }}
-            data={drawerData}
-          />
-        </Suspense>
+        <PatientTimelineDrawer
+          open={!!drawerPacote}
+          onOpenChange={(v) => { if (!v) setDrawerPacote(null); }}
+          data={drawerData}
+        />
       )}
     </div>
   );
