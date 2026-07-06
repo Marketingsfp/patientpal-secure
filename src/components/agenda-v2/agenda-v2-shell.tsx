@@ -96,6 +96,8 @@ export function AgendaV2Shell() {
       "confortavel");
   });
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [sidePanelOpen, setSidePanelOpen] = useState(false);
+  const isMobile = useIsMobile();
   const [loadedMs, setLoadedMs] = useState<number | null>(null);
   const startedAtRef = useRef<number>(0);
   const mountedAtRef = useRef<number>(performance.now());
