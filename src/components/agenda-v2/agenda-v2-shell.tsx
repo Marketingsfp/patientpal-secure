@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   ChevronLeft, ChevronRight, LayoutList, GanttChartSquare, CalendarDays,
-  Search, Rows3, Rows2, Sparkles,
+  Search, Rows3, Rows2, Sparkles, Plus,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -236,10 +236,7 @@ export function AgendaV2Shell() {
       <div className="border-b border-slate-100 bg-white/80 backdrop-blur-sm px-6 py-6 space-y-6 shrink-0">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="space-y-1">
-            <h1
-              className="text-3xl italic tracking-tight text-slate-800"
-              style={{ fontFamily: "'Instrument Serif', ui-serif, Georgia, serif" }}
-            >
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
               Agenda do Dia
             </h1>
             <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 capitalize">
@@ -248,6 +245,14 @@ export function AgendaV2Shell() {
           </div>
 
           <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              className="h-9 px-4 rounded-2xl gap-1.5 bg-slate-900 hover:bg-slate-800 text-white shadow-sm transition-all hover:shadow-md hover:-translate-y-[1px]"
+            >
+              <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
+              <span className="text-xs font-semibold">Nova sessão</span>
+            </Button>
+
             <ToggleGroup
               type="single"
               value={density}
