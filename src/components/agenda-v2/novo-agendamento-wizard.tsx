@@ -90,7 +90,7 @@ export function NovoAgendamentoWizard({ open, onOpenChange }: { open: boolean; o
           </div>
         </div>
 
-        <div className="px-8 py-6 min-h-[380px]">
+        <div className="px-5 md:px-8 py-6 min-h-[320px] md:min-h-[380px]">
           {step === "paciente" && (
             <div>
               <div className="relative">
@@ -209,7 +209,7 @@ export function NovoAgendamentoWizard({ open, onOpenChange }: { open: boolean; o
           )}
         </div>
 
-        <div className="px-8 py-5 border-t border-slate-100 flex items-center justify-between bg-slate-50/40">
+        <div className="px-5 md:px-8 py-4 md:py-5 border-t border-slate-100 flex items-center justify-between bg-slate-50/40">
           <button
             type="button"
             onClick={() => (stepIdx === 0 ? onOpenChange(false) : setStepIdx((i) => i - 1))}
