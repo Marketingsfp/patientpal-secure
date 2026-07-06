@@ -3,11 +3,12 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   ChevronLeft, ChevronRight, LayoutList, GanttChartSquare, CalendarDays,
-  Search, Rows3, Rows2, Focus, Sparkles, Plus, Keyboard,
+  Search, Rows3, Rows2, Focus, Sparkles, Plus, Keyboard, PanelLeft,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,6 +17,8 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import { KpiBar, type Kpi } from "./kpi-bar";
 import { SessionCard, type SessionCardData, type SessionDensity } from "./session-card";
 import type { DrawerPatientData } from "./patient-drawer";
@@ -93,6 +96,8 @@ export function AgendaV2Shell() {
       "confortavel");
   });
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [sidePanelOpen, setSidePanelOpen] = useState(false);
+  const isMobile = useIsMobile();
   const [loadedMs, setLoadedMs] = useState<number | null>(null);
   const startedAtRef = useRef<number>(0);
   const mountedAtRef = useRef<number>(performance.now());
@@ -490,40 +495,76 @@ export function AgendaV2Shell() {
   const isToday = new Date(diaKey).toDateString() === new Date().toDateString();
 
   return (
-    <div className="h-full flex bg-[#FAFAF8]">
-      {!foco && (
-        <Suspense fallback={<div className="w-64 border-r border-slate-100 bg-white" />}>
-          <AgendaV2Sidebar
-            clinicaNome={clinicaNome}
-            dia={dia}
-            sessoes={sessoes}
-            recursos={recursosOcup}
-            equipeOnline={equipeOnline}
-          />
+    <div className="h-full flex bg-[#FAFAF8] overflow-hidden">
+      {/* Sidebar operacional — visível em md+, vira Sheet no mobile (botão Painel no header) */}
+      {!foco && !isMobile && (
+        <Suspense fallback={<div className="hidden md:block w-64 border-r border-slate-100 bg-white" />}>
+          <div className="hidden md:flex">
+            <AgendaV2Sidebar
+              clinicaNome={clinicaNome}
+              dia={dia}
+              sessoes={sessoes}
+              recursos={recursosOcup}
+              equipeOnline={equipeOnline}
+            />
+          </div>
         </Suspense>
+      )}
+      {!foco && isMobile && (
+        <Sheet open={sidePanelOpen} onOpenChange={setSidePanelOpen}>
+          <SheetContent side="left" className="p-0 w-[86vw] max-w-[320px] overflow-y-auto">
+            <VisuallyHidden.Root>
+              <SheetTitle>Painel da agenda</SheetTitle>
+              <SheetDescription>Resumo do turno, sessões por tipo, recursos e equipe.</SheetDescription>
+            </VisuallyHidden.Root>
+            <Suspense fallback={<div className="w-full h-40 bg-white" />}>
+              <AgendaV2Sidebar
+                clinicaNome={clinicaNome}
+                dia={dia}
+                sessoes={sessoes}
+                recursos={recursosOcup}
+                equipeOnline={equipeOnline}
+              />
+            </Suspense>
+          </SheetContent>
+        </Sheet>
       )}
 
       <div className="flex-1 min-w-0 flex flex-col">
       {/* Header */}
-      <div className="border-b border-slate-100 bg-white/80 backdrop-blur-sm px-6 py-5 space-y-5 shrink-0">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div className="space-y-1">
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+      <div className="border-b border-slate-100 bg-white/80 backdrop-blur-sm px-3 md:px-6 py-3 md:py-5 space-y-3 md:space-y-5 shrink-0">
+        <div className="flex items-start justify-between gap-2 md:gap-4 flex-wrap">
+          <div className="min-w-0 flex items-start gap-2">
+            {!foco && isMobile && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-xl hover:bg-slate-100 shrink-0 md:hidden"
+                onClick={() => setSidePanelOpen(true)}
+                aria-label="Abrir painel"
+              >
+                <PanelLeft className="h-4 w-4 text-slate-500" />
+              </Button>
+            )}
+            <div className="space-y-1 min-w-0">
+            <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-slate-900 truncate">
               Agenda do Dia
             </h1>
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 capitalize">
+            <p className="text-[10px] md:text-[11px] font-semibold uppercase tracking-widest text-slate-400 capitalize truncate">
               {format(dia, "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
             </p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
             <Button
               size="sm"
               onClick={() => setWizardOpen(true)}
               className="h-9 px-4 rounded-2xl gap-1.5 bg-slate-900 hover:bg-slate-800 text-white shadow-sm transition-all hover:shadow-md hover:-translate-y-[1px]"
             >
               <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
-              <span className="text-xs font-semibold">Nova sessão</span>
+              <span className="text-xs font-semibold hidden sm:inline">Nova sessão</span>
+              <span className="text-xs font-semibold sm:hidden">Nova</span>
             </Button>
 
             <ToggleGroup
@@ -586,8 +627,8 @@ export function AgendaV2Shell() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="relative flex-1 min-w-64 max-w-md">
+        <div className="flex items-center gap-2 md:gap-3 flex-wrap">
+          <div className="relative flex-1 min-w-0 md:min-w-64 max-w-md w-full sm:w-auto">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
             <Input
               placeholder="Buscar paciente, médico, sala, exame…"
@@ -604,7 +645,7 @@ export function AgendaV2Shell() {
             onChange={setFiltroMedico}
             placeholder="Profissional"
             searchPlaceholder="Buscar profissional..."
-            className="h-10 rounded-2xl bg-slate-100 border-transparent min-w-48"
+            className="h-10 rounded-2xl bg-slate-100 border-transparent min-w-0 flex-1 sm:flex-none sm:min-w-48"
           />
           <SearchableSelect
             options={[{ value: "", label: "Todas as especialidades" }, ...Array.from(espData?.espMap.entries() ?? []).map(([id, nome]) => ({ value: id, label: nome }))]}
@@ -612,7 +653,7 @@ export function AgendaV2Shell() {
             onChange={setFiltroEspecialidade}
             placeholder="Especialidade"
             searchPlaceholder="Buscar especialidade..."
-            className="h-10 rounded-2xl bg-slate-100 border-transparent min-w-44"
+            className="h-10 rounded-2xl bg-slate-100 border-transparent min-w-0 flex-1 sm:flex-none sm:min-w-44"
           />
           <SearchableSelect
             options={[{ value: "", label: "Todas as salas" }, ...Array.from(recursos.entries()).map(([id, nome]) => ({ value: id, label: nome }))]}
@@ -620,7 +661,7 @@ export function AgendaV2Shell() {
             onChange={setFiltroRecurso}
             placeholder="Sala / recurso"
             searchPlaceholder="Buscar sala..."
-            className="h-10 rounded-2xl bg-slate-100 border-transparent min-w-40"
+            className="h-10 rounded-2xl bg-slate-100 border-transparent min-w-0 flex-1 sm:flex-none sm:min-w-40"
           />
           {(filtroMedico || filtroEspecialidade || filtroRecurso || kpiFilter) && (
             <Button
@@ -678,14 +719,14 @@ export function AgendaV2Shell() {
         ) : (
           <div className={cn(
             "h-full overflow-y-auto pb-8 transition-[padding] duration-200",
-            foco ? "px-10 pt-6 max-w-4xl mx-auto" : "px-6 pt-4",
+            foco ? "px-4 md:px-10 pt-6 max-w-4xl mx-auto" : "px-3 md:px-6 pt-4",
           )}>
             {porHora.map(([hora, lista]) => {
               const isNowHour = isToday && hora === nowHour;
               return (
-                <div key={hora} className="flex gap-4 relative">
+                <div key={hora} className="flex gap-2 md:gap-4 relative">
                   {/* Coluna de hora (régua) */}
-                  <div className={cn("shrink-0 relative", foco ? "w-16" : "w-14")}>
+                  <div className={cn("shrink-0 relative", foco ? "w-12 md:w-16" : "w-11 md:w-14")}>
                     <div className={cn(
                       "sticky top-0 tabular-nums pt-1",
                       foco ? "text-[13px] font-semibold text-slate-500" : "text-[11px] font-bold uppercase tracking-wider text-slate-400",
@@ -694,7 +735,7 @@ export function AgendaV2Shell() {
                     </div>
                   </div>
                   {/* Coluna de sessões */}
-                  <div className={cn("flex-1 min-w-0 border-l border-slate-100 pb-4 relative", foco ? "pl-8" : "pl-6")}>
+                  <div className={cn("flex-1 min-w-0 border-l border-slate-100 pb-4 relative", foco ? "pl-4 md:pl-8" : "pl-3 md:pl-6")}>
                     {isNowHour && (
                       <div
                         className="absolute -left-[3px] right-0 flex items-center gap-2 z-10 pointer-events-none"
