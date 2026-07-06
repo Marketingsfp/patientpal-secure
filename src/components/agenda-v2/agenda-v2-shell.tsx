@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { VirtualList } from "@/components/list-shell/virtual-list";
 import { KpiBar, type Kpi } from "./kpi-bar";
 import { SessionCard, type SessionCardData, type SessionDensity } from "./session-card";
@@ -52,6 +53,9 @@ export function AgendaV2Shell() {
   const [view, setView] = useState<ViewMode>("timeline");
   const [q, setQ] = useState("");
   const [kpiFilter, setKpiFilter] = useState<string | null>(null);
+  const [filtroMedico, setFiltroMedico] = useState<string>("");
+  const [filtroEspecialidade, setFiltroEspecialidade] = useState<string>("");
+  const [filtroRecurso, setFiltroRecurso] = useState<string>("");
   const [drawerPacote, setDrawerPacote] = useState<string | null>(null);
   const [drawerMounted, setDrawerMounted] = useState(false);
   const [density, setDensity] = useState<SessionDensity>(() => {
@@ -73,6 +77,29 @@ export function AgendaV2Shell() {
     queryFn: async () => {
       const { data } = await supabase.from("medicos").select("id,nome").eq("clinica_id", clinicaId!);
       return new Map((data ?? []).map((m) => [m.id, m.nome]));
+    },
+  });
+
+  const especialidadesQuery = useQuery({
+    queryKey: ["agenda-v2", "especialidades", clinicaId],
+    enabled: !!clinicaId,
+    staleTime: 10 * 60 * 1000,
+    queryFn: async () => {
+      const [esps, links] = await Promise.all([
+        supabase.from("especialidades").select("id,nome").order("nome"),
+        supabase.from("medico_especialidades")
+          .select("medico_id,especialidade_id,medicos!inner(clinica_id)")
+          .eq("medicos.clinica_id", clinicaId!),
+      ]);
+      const espMap = new Map<string, string>((esps.data ?? []).map((e: { id: string; nome: string }) => [e.id, e.nome]));
+      const medToEsps = new Map<string, Set<string>>();
+      for (const l of (links.data ?? []) as Array<{ medico_id: string; especialidade_id: string }>) {
+        if (!l.medico_id || !l.especialidade_id) continue;
+        const s = medToEsps.get(l.medico_id) ?? new Set<string>();
+        s.add(l.especialidade_id);
+        medToEsps.set(l.medico_id, s);
+      }
+      return { espMap, medToEsps };
     },
   });
 
