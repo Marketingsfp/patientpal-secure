@@ -18,6 +18,7 @@ import { SessionCard, type SessionCardData, type SessionDensity } from "./sessio
 import { AgendaV2Sidebar } from "./agenda-v2-sidebar";
 import type { TimelineData } from "./patient-timeline-drawer";
 import { tipoDaSessao, type ProcMeta } from "@/lib/agenda-v2/session-detect";
+import { cn } from "@/lib/utils";
 
 // Drawer carrega só quando o usuário abrir — reduz JS crítico.
 const PatientTimelineDrawer = lazy(() =>
@@ -46,7 +47,7 @@ interface RawAg {
 export function AgendaV2Shell() {
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id ?? null;
-  const clinicaNome = clinicaAtual?.clinica_nome ?? "Clínica";
+  const clinicaNome = clinicaAtual?.clinica?.nome ?? "Clínica";
 
   const [dia, setDia] = useState<Date>(() => {
     const d = new Date(); d.setHours(0, 0, 0, 0); return d;
