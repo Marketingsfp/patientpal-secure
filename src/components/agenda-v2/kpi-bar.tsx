@@ -51,7 +51,15 @@ export function KpiBar({
   compact?: boolean;
 }) {
   return (
-    <div className={cn("grid gap-3", compact ? "grid-cols-3 md:grid-cols-6" : "grid-cols-2 md:grid-cols-3 lg:grid-cols-6")}>
+    <div
+      className={cn(
+        // Mobile: rolagem horizontal com snap para não espremer os KPIs.
+        // ≥ md: grid tradicional.
+        "flex gap-3 overflow-x-auto snap-x snap-mandatory -mx-3 px-3 pb-1 md:mx-0 md:px-0 md:pb-0",
+        "md:grid",
+        compact ? "md:grid-cols-6" : "md:grid-cols-3 lg:grid-cols-6",
+      )}
+    >
       {items.map((k) => {
         const tone = k.tone ?? "default";
         const active = activeKey === k.key;
@@ -63,7 +71,8 @@ export function KpiBar({
             onClick={() => onSelect?.(k.key)}
             title={k.hint ?? k.label}
             className={cn(
-              "group text-left rounded-2xl border bg-white transition-all",
+              "group text-left rounded-2xl border bg-white transition-all shrink-0 snap-start",
+              "min-w-[8.5rem] md:min-w-0",
               "hover:shadow-md hover:-translate-y-[1px] hover:border-slate-200",
               compact ? "p-3" : "p-4",
               active ? "border-slate-900 shadow-sm ring-1 ring-slate-900/5" : "border-slate-100",
