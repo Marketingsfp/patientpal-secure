@@ -1,13 +1,13 @@
 import { useState } from "react";
 import {
-  ChevronDown, ChevronRight, Clock, User, MapPin, Check,
+  ChevronDown, ChevronRight, Clock, User, MapPin,
   Stethoscope, TestTube, ScanLine, HeartPulse, Activity, Scissors, ClipboardList,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { TIPO_SESSAO_ESTILO, TIPO_SESSAO_LABEL, type TipoSessao } from "@/lib/agenda-v2/session-detect";
 
 const TIPO_ICON: Record<TipoSessao, LucideIcon> = {
@@ -69,25 +69,49 @@ function initials(name: string) {
     .join("");
 }
 
-function ProgressStep({ active, label }: { active: boolean; label: string }) {
+/**
+ * Barra de progresso "vitrine": 4 segmentos (Confirmado · Check-in · Pago · Atendimento).
+ * Segmentos ativos ganham cor sólida + halo suave; o mais recente pulsa levemente.
+ */
+function ProgressTrack({
+  steps,
+  current,
+}: {
+  steps: ReadonlyArray<{ label: string; done: boolean }>;
+  current: boolean;
+}) {
+  const activeIdx = steps.reduce((acc, s, i) => (s.done ? i : acc), -1);
+  const color = current ? "bg-indigo-500" : "bg-emerald-500";
+  const glow = current ? "shadow-[0_0_10px_rgba(99,102,241,0.45)]" : "shadow-[0_0_8px_rgba(16,185,129,0.35)]";
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide transition-colors",
-        active ? "text-emerald-600" : "text-slate-300",
-      )}
-      title={label}
-    >
-      <span
-        className={cn(
-          "inline-flex h-3 w-3 items-center justify-center rounded-full border transition-all",
-          active ? "bg-emerald-500 border-emerald-500" : "bg-white border-slate-200",
-        )}
-      >
-        {active && <Check className="h-2 w-2 text-white" strokeWidth={3.5} />}
-      </span>
-      {label}
-    </span>
+    <div className="w-full">
+      <div className="flex items-center gap-1.5 h-1.5">
+        {steps.map((s, i) => (
+          <div
+            key={s.label}
+            className={cn(
+              "flex-1 rounded-full transition-all",
+              s.done ? cn(color, glow) : "bg-slate-200/70",
+              current && i === activeIdx && "animate-pulse",
+            )}
+            title={s.label}
+          />
+        ))}
+      </div>
+      <div className="mt-2 flex justify-between text-[9px] font-bold uppercase tracking-wider">
+        {steps.map((s, i) => (
+          <span
+            key={s.label}
+            className={cn(
+              "transition-colors",
+              s.done ? (current && i === activeIdx ? "text-indigo-600" : "text-emerald-600") : "text-slate-300",
+            )}
+          >
+            {s.label}
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -158,6 +182,9 @@ export function SessionCard({
               <div className="flex items-center gap-2 min-w-0">
                 {!compact && (
                   <Avatar className="h-6 w-6 shrink-0 border border-white shadow-sm">
+                    {data.paciente_avatar_url && (
+                      <AvatarImage src={data.paciente_avatar_url} alt={data.paciente_nome} />
+                    )}
                     <AvatarFallback className="text-[10px] font-semibold text-slate-500 bg-slate-100">
                       {initials(data.paciente_nome)}
                     </AvatarFallback>
@@ -235,14 +262,16 @@ export function SessionCard({
           </div>
 
           {!compact && (
-            <div className="mt-3 flex items-center gap-3 border-t border-slate-200/60 pt-2.5">
-              <ProgressStep active={!!data.confirmado || data.status !== "agendado"} label="Confirmado" />
-              <span className="h-px w-4 bg-slate-200" />
-              <ProgressStep active={!!data.checkin || data.status === "em_atendimento" || data.status === "realizado"} label="Check-in" />
-              <span className="h-px w-4 bg-slate-200" />
-              <ProgressStep active={!!data.pago} label="Pago" />
-              <span className="h-px w-4 bg-slate-200" />
-              <ProgressStep active={data.status === "em_atendimento" || data.status === "realizado"} label="Atendimento" />
+            <div className="mt-4 border-t border-slate-200/60 pt-3">
+              <ProgressTrack
+                current={isCurrent}
+                steps={[
+                  { label: "Confirmado", done: !!data.confirmado || data.status !== "agendado" },
+                  { label: "Check-in", done: !!data.checkin || data.status === "em_atendimento" || data.status === "realizado" },
+                  { label: "Pago", done: !!data.pago },
+                  { label: "Atendimento", done: data.status === "em_atendimento" || data.status === "realizado" },
+                ]}
+              />
             </div>
           )}
         </div>
