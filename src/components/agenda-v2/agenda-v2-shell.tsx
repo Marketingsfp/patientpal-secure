@@ -12,7 +12,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { HhpSkeletonCard } from "@/design-system/hhp";
+import { HhpSkeletonCard, HhpEmptyState } from "@/design-system/hhp";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
@@ -713,10 +713,10 @@ export function AgendaV2Shell() {
             ))}
           </div>
         ) : filtradas.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-sm text-slate-500 p-6 text-center gap-3">
-            <CalendarDays className="h-12 w-12 text-slate-300" />
-            <div>Nenhuma sessão para os filtros atuais.</div>
-          </div>
+          <HhpEmptyState
+            icon={CalendarDays}
+            title="Nenhuma sessão para os filtros atuais."
+          />
         ) : (
           <div className={cn(
             "h-full overflow-y-auto pb-8 transition-[padding] duration-200",
