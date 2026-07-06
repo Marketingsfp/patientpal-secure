@@ -1,7 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Filter, LayoutList, GanttChartSquare, CalendarDays } from "lucide-react";
+import {
+  ChevronLeft, ChevronRight, LayoutList, GanttChartSquare, CalendarDays,
+  Search, Rows3, Rows2, Sparkles,
+} from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Button } from "@/components/ui/button";
@@ -10,9 +14,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { VirtualList } from "@/components/list-shell/virtual-list";
 import { KpiBar, type Kpi } from "./kpi-bar";
-import { SessionCard, type SessionCardData } from "./session-card";
-import { PatientTimelineDrawer, type TimelineData } from "./patient-timeline-drawer";
+import { SessionCard, type SessionCardData, type SessionDensity } from "./session-card";
+import type { TimelineData } from "./patient-timeline-drawer";
 import { tipoDaSessao, type ProcMeta } from "@/lib/agenda-v2/session-detect";
+
+// Drawer carrega só quando o usuário abrir — reduz JS crítico.
+const PatientTimelineDrawer = lazy(() =>
+  import("./patient-timeline-drawer").then((m) => ({ default: m.PatientTimelineDrawer })),
+);
+
+const DENSITY_KEY = "agenda_v2_density";
 
 type ViewMode = "timeline" | "list";
 
@@ -41,48 +52,83 @@ export function AgendaV2Shell() {
   const [view, setView] = useState<ViewMode>("timeline");
   const [q, setQ] = useState("");
   const [kpiFilter, setKpiFilter] = useState<string | null>(null);
-  const [rows, setRows] = useState<RawAg[] | null>(null);
-  const [medicos, setMedicos] = useState<Map<string, string>>(new Map());
-  const [recursos, setRecursos] = useState<Map<string, string>>(new Map());
-  const [procMeta, setProcMeta] = useState<Map<string, ProcMeta>>(new Map());
   const [drawerPacote, setDrawerPacote] = useState<string | null>(null);
-  const [loadStart, setLoadStart] = useState<number>(0);
+  const [drawerMounted, setDrawerMounted] = useState(false);
+  const [density, setDensity] = useState<SessionDensity>(() => {
+    if (typeof window === "undefined") return "confortavel";
+    return (window.localStorage.getItem(DENSITY_KEY) as SessionDensity) ?? "confortavel";
+  });
   const [loadedMs, setLoadedMs] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!clinicaId) return;
-    setRows(null);
-    setLoadedMs(null);
-    const t0 = performance.now();
-    setLoadStart(t0);
+    if (typeof window !== "undefined") window.localStorage.setItem(DENSITY_KEY, density);
+  }, [density]);
 
-    const start = new Date(dia); start.setHours(0, 0, 0, 0);
-    const end = new Date(dia); end.setHours(23, 59, 59, 999);
+  // Lookups (médicos / recursos / procedimentos) — cache por 10 min por clínica.
+  // Não dependem do dia, então trocar a data não refaz essas queries.
+  const medicosQuery = useQuery({
+    queryKey: ["agenda-v2", "medicos", clinicaId],
+    enabled: !!clinicaId,
+    staleTime: 10 * 60 * 1000,
+    queryFn: async () => {
+      const { data } = await supabase.from("medicos").select("id,nome").eq("clinica_id", clinicaId!);
+      return new Map((data ?? []).map((m) => [m.id, m.nome]));
+    },
+  });
 
-    void (async () => {
-      const [ags, meds, recs, procs] = await Promise.all([
-        supabase.from("agendamentos")
-          .select("id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,pacote_id,enfermagem_recurso_id,fluxo_etapa,fluxo_atualizado_em")
-          .eq("clinica_id", clinicaId)
-          .gte("inicio", start.toISOString())
-          .lte("inicio", end.toISOString())
-          .order("inicio", { ascending: true }),
-        supabase.from("medicos").select("id,nome").eq("clinica_id", clinicaId),
-        supabase.from("enfermagem_recursos").select("id,nome").eq("clinica_id", clinicaId),
-        supabase.from("procedimentos").select("id,nome,tipo,grupo").eq("clinica_id", clinicaId),
-      ]);
+  const recursosQuery = useQuery({
+    queryKey: ["agenda-v2", "recursos", clinicaId],
+    enabled: !!clinicaId,
+    staleTime: 10 * 60 * 1000,
+    queryFn: async () => {
+      const { data } = await supabase.from("enfermagem_recursos").select("id,nome").eq("clinica_id", clinicaId!);
+      return new Map((data ?? []).map((r) => [r.id, r.nome]));
+    },
+  });
 
-      setMedicos(new Map((meds.data ?? []).map((m) => [m.id, m.nome])));
-      setRecursos(new Map((recs.data ?? []).map((r) => [r.id, r.nome])));
+  const procMetaQuery = useQuery({
+    queryKey: ["agenda-v2", "proc-meta", clinicaId],
+    enabled: !!clinicaId,
+    staleTime: 10 * 60 * 1000,
+    queryFn: async () => {
+      const { data } = await supabase.from("procedimentos")
+        .select("nome,tipo,grupo").eq("clinica_id", clinicaId!);
       const pm = new Map<string, ProcMeta>();
-      for (const p of procs.data ?? []) {
-        pm.set(p.nome.toLowerCase(), { nome: p.nome, tipo: p.tipo, grupo: p.grupo });
+      for (const p of data ?? []) {
+        if (p.nome) pm.set(p.nome.toLowerCase(), { nome: p.nome, tipo: p.tipo, grupo: p.grupo });
       }
-      setProcMeta(pm);
-      setRows((ags.data ?? []) as RawAg[]);
+      return pm;
+    },
+  });
+
+  // Agendamentos do dia — única query que muda com a data.
+  const diaKey = useMemo(() => {
+    const d = new Date(dia); d.setHours(0, 0, 0, 0); return d.toISOString();
+  }, [dia]);
+
+  const agsQuery = useQuery<RawAg[]>({
+    queryKey: ["agenda-v2", "ags", clinicaId, diaKey],
+    enabled: !!clinicaId,
+    staleTime: 60 * 1000,
+    queryFn: async () => {
+      const t0 = performance.now();
+      const start = new Date(diaKey);
+      const end = new Date(diaKey); end.setHours(23, 59, 59, 999);
+      const { data } = await supabase.from("agendamentos")
+        .select("id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,pacote_id,enfermagem_recurso_id,fluxo_etapa,fluxo_atualizado_em")
+        .eq("clinica_id", clinicaId!)
+        .gte("inicio", start.toISOString())
+        .lte("inicio", end.toISOString())
+        .order("inicio", { ascending: true });
       setLoadedMs(Math.round(performance.now() - t0));
-    })();
-  }, [clinicaId, dia]);
+      return (data ?? []) as RawAg[];
+    },
+  });
+
+  const rows = agsQuery.data ?? null;
+  const medicos = medicosQuery.data ?? new Map<string, string>();
+  const recursos = recursosQuery.data ?? new Map<string, string>();
+  const procMeta = procMetaQuery.data ?? new Map<string, ProcMeta>();
 
   // Agrupar em sessões por pacote_id (ou id do próprio agendamento).
   const sessoes = useMemo<SessionCardData[]>(() => {
@@ -139,12 +185,12 @@ export function AgendaV2Shell() {
       if (s.tipo === "coleta_laboratorial") c.lab++;
     }
     return [
-      { key: "todos", label: "Todos", value: c.total },
+      { key: "todos", label: "Total", value: c.total, tone: "info" },
       { key: "agendado", label: "Aguardando", value: c.aguardando, tone: "warn" },
-      { key: "confirmado", label: "Confirmados", value: c.confirmados, tone: "default" },
+      { key: "confirmado", label: "Confirmados", value: c.confirmados, tone: "info" },
       { key: "realizado", label: "Realizados", value: c.realizados, tone: "ok" },
       { key: "cancelado", label: "Cancel./Falta", value: c.cancelados, tone: "danger" },
-      { key: "lab", label: "Coletas Lab", value: c.lab, tone: "default" },
+      { key: "lab", label: "Coletas lab.", value: c.lab, tone: "ok" },
     ];
   }, [sessoes]);
 
@@ -181,84 +227,136 @@ export function AgendaV2Shell() {
     const d = new Date(dia); d.setDate(d.getDate() + delta); setDia(d);
   };
 
+  const openDrawer = (id: string) => { setDrawerMounted(true); setDrawerPacote(id); };
+  const compact = density === "compacto";
+
   return (
-    <div className="h-full flex flex-col">
-      {/* Header operacional */}
-      <div className="border-b bg-card p-3 space-y-3 shrink-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" size="icon" onClick={() => navDia(-1)} aria-label="Dia anterior">
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <div className="flex items-center gap-2 px-3 py-1.5 border rounded-md text-sm">
-            <CalendarDays className="h-4 w-4 text-muted-foreground" />
-            {format(dia, "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+    <div className="h-full flex flex-col bg-gradient-to-b from-muted/20 to-background">
+      {/* Header operacional — hierarquia clara, sem cara de sistema legado */}
+      <div className="border-b bg-card/80 backdrop-blur-sm px-5 py-4 space-y-4 shrink-0">
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navDia(-1)} aria-label="Dia anterior">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/60 text-sm font-medium">
+              <CalendarDays className="h-4 w-4 text-primary" />
+              <span className="capitalize">{format(dia, "EEEE, dd 'de' MMMM", { locale: ptBR })}</span>
+              <span className="text-muted-foreground font-normal">· {format(dia, "yyyy")}</span>
+            </div>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navDia(1)} aria-label="Próximo dia">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 rounded-full text-xs"
+              onClick={() => { const d = new Date(); d.setHours(0, 0, 0, 0); setDia(d); }}
+            >
+              Hoje
+            </Button>
           </div>
-          <Button variant="outline" size="icon" onClick={() => navDia(1)} aria-label="Próximo dia">
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => { const d = new Date(); d.setHours(0,0,0,0); setDia(d); }}>Hoje</Button>
 
           <div className="ml-auto flex items-center gap-2">
-            <ToggleGroup type="single" value={view} onValueChange={(v) => v && setView(v as ViewMode)}>
-              <ToggleGroupItem value="timeline" aria-label="Timeline" className="gap-1.5">
-                <GanttChartSquare className="h-4 w-4" /> <span className="hidden sm:inline text-xs">Timeline</span>
+            <ToggleGroup
+              type="single"
+              value={density}
+              onValueChange={(v) => v && setDensity(v as SessionDensity)}
+              className="bg-muted/60 p-0.5 rounded-full"
+            >
+              <ToggleGroupItem value="confortavel" aria-label="Confortável" className="h-7 px-2.5 rounded-full data-[state=on]:bg-background data-[state=on]:shadow-sm">
+                <Rows3 className="h-3.5 w-3.5" />
               </ToggleGroupItem>
-              <ToggleGroupItem value="list" aria-label="Lista" className="gap-1.5">
-                <LayoutList className="h-4 w-4" /> <span className="hidden sm:inline text-xs">Lista</span>
+              <ToggleGroupItem value="compacto" aria-label="Compacto" className="h-7 px-2.5 rounded-full data-[state=on]:bg-background data-[state=on]:shadow-sm">
+                <Rows2 className="h-3.5 w-3.5" />
+              </ToggleGroupItem>
+            </ToggleGroup>
+
+            <ToggleGroup
+              type="single"
+              value={view}
+              onValueChange={(v) => v && setView(v as ViewMode)}
+              className="bg-muted/60 p-0.5 rounded-full"
+            >
+              <ToggleGroupItem value="timeline" aria-label="Timeline" className="h-7 px-2.5 gap-1.5 rounded-full data-[state=on]:bg-background data-[state=on]:shadow-sm">
+                <GanttChartSquare className="h-3.5 w-3.5" /> <span className="hidden sm:inline text-xs">Timeline</span>
+              </ToggleGroupItem>
+              <ToggleGroupItem value="list" aria-label="Lista" className="h-7 px-2.5 gap-1.5 rounded-full data-[state=on]:bg-background data-[state=on]:shadow-sm">
+                <LayoutList className="h-3.5 w-3.5" /> <span className="hidden sm:inline text-xs">Lista</span>
               </ToggleGroupItem>
             </ToggleGroup>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-3 flex-wrap">
           <div className="relative flex-1 min-w-64 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
             <Input
               placeholder="Buscar paciente, médico, sala, exame…"
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              className="pl-3"
+              className="pl-9 h-9 rounded-full bg-muted/40 border-transparent focus-visible:bg-background focus-visible:border-border"
               aria-label="Busca"
             />
           </div>
-          <div className="text-xs text-muted-foreground inline-flex items-center gap-1">
-            <Filter className="h-3 w-3" />
-            {loadedMs !== null ? `${filtradas.length} sessões · ${loadedMs}ms` : "carregando…"}
+          <div className="text-xs text-muted-foreground inline-flex items-center gap-2">
+            <Sparkles className="h-3 w-3 text-primary/70" />
+            <span className="tabular-nums">
+              {rows === null
+                ? "carregando…"
+                : `${filtradas.length} ${filtradas.length === 1 ? "sessão" : "sessões"}`}
+            </span>
+            {loadedMs !== null && (
+              <span className="text-muted-foreground/60 tabular-nums">· {loadedMs}ms</span>
+            )}
           </div>
         </div>
 
-        <KpiBar items={kpis} activeKey={kpiFilter} onSelect={(k) => setKpiFilter(kpiFilter === k ? null : k)} />
+        <KpiBar
+          items={kpis}
+          activeKey={kpiFilter}
+          onSelect={(k) => setKpiFilter(kpiFilter === k ? null : k)}
+          compact={compact}
+        />
       </div>
 
       {/* Corpo */}
       <div className="flex-1 min-h-0 overflow-hidden">
         {rows === null ? (
-          <div className="p-3 space-y-2">
-            {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}
+          <div className="p-4 space-y-2">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <Skeleton key={i} className={compact ? "h-11 w-full rounded-xl" : "h-16 w-full rounded-xl"} />
+            ))}
           </div>
         ) : filtradas.length === 0 ? (
-          <div className="h-full flex items-center justify-center text-sm text-muted-foreground p-6 text-center">
-            Nenhuma sessão para os filtros atuais.
+          <div className="h-full flex flex-col items-center justify-center text-sm text-muted-foreground p-6 text-center gap-2">
+            <CalendarDays className="h-10 w-10 text-muted-foreground/40" />
+            <div>Nenhuma sessão para os filtros atuais.</div>
           </div>
         ) : (
           <VirtualList
             items={filtradas}
-            estimateSize={view === "timeline" ? 110 : 92}
+            estimateSize={compact ? 68 : (view === "timeline" ? 104 : 96)}
             getKey={(s) => s.pacote_id}
-            className="p-3"
+            className="px-4 pt-3"
             renderItem={(s) => (
-              <div className="pb-2 pr-2">
-                <SessionCard data={s} onOpenTimeline={setDrawerPacote} />
+              <div className="pb-2">
+                <SessionCard data={s} onOpenTimeline={openDrawer} density={density} />
               </div>
             )}
           />
         )}
       </div>
 
-      <PatientTimelineDrawer
-        open={!!drawerPacote}
-        onOpenChange={(v) => { if (!v) setDrawerPacote(null); }}
-        data={drawerData}
-      />
+      {drawerMounted && (
+        <Suspense fallback={null}>
+          <PatientTimelineDrawer
+            open={!!drawerPacote}
+            onOpenChange={(v) => { if (!v) setDrawerPacote(null); }}
+            data={drawerData}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }
