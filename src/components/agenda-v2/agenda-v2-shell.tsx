@@ -16,7 +16,6 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { toast } from "sonner";
 import { KpiBar, type Kpi } from "./kpi-bar";
 import { SessionCard, type SessionCardData, type SessionDensity } from "./session-card";
 import type { DrawerPatientData } from "./patient-drawer";
@@ -583,7 +582,8 @@ export function AgendaV2Shell() {
               placeholder="Buscar paciente, médico, sala, exame…"
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              className="pl-10 h-10 rounded-2xl bg-slate-100 border-transparent focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-slate-200 text-sm placeholder:text-slate-400"
+              ref={searchInputRef}
+              className="pl-10 h-10 rounded-2xl bg-slate-100 border-transparent focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-slate-200 text-sm placeholder:text-slate-400 transition-colors duration-150"
               aria-label="Busca"
             />
           </div>
