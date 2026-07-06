@@ -1219,7 +1219,7 @@ function Page() {
           </CardContent>
         </Card>
       )}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold leading-tight">Atendimentos</h1>
           <p className="text-xs text-muted-foreground">
@@ -1228,7 +1228,7 @@ function Page() {
               : "Serviços realizados com repasse automático (inclui pagamentos da agenda)"}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
             onClick={() => {
@@ -1294,7 +1294,7 @@ function Page() {
                 <DialogTitle>{editing ? "Editar" : "Novo"} atendimento</DialogTitle>
               </DialogHeader>
               <form onSubmit={submit} className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label>Data</Label>
                     <Input
@@ -1363,7 +1363,7 @@ function Page() {
                     onChange={(e) => setForm({ ...form, procedimento: e.target.value })}
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label>Valor total *</Label>
                     <CurrencyInput value={form.valor_total} onChange={(v) => setForm({ ...form, valor_total: v })} />

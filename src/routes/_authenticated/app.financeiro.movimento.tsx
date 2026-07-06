@@ -173,7 +173,7 @@ function Page() {
           <DialogContent className="max-w-lg">
             <DialogHeader><DialogTitle>{editing ? "Editar" : "Novo"} lançamento</DialogTitle></DialogHeader>
             <form onSubmit={submit} className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-2"><Label>Tipo</Label>
                   <Select value={form.tipo} onValueChange={(v) => setForm({ ...form, tipo: v as "receita" | "despesa", categoria_id: "" })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
@@ -187,7 +187,7 @@ function Page() {
               </div>
               <div className="space-y-2"><Label>Descrição *</Label>
                 <Input required value={form.descricao} onChange={(e) => setForm({ ...form, descricao: e.target.value })} /></div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-2"><Label>Valor (R$) *</Label>
                   <CurrencyInput value={form.valor} onChange={(v) => setForm({ ...form, valor: v })} /></div>
                 <div className="space-y-2"><Label>Status</Label>
@@ -200,7 +200,7 @@ function Page() {
                     </SelectContent>
                   </Select></div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-2"><Label>Categoria</Label>
                   <Select value={form.categoria_id || "none"} onValueChange={(v) => setForm({ ...form, categoria_id: v === "none" ? "" : v })}>
                     <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>

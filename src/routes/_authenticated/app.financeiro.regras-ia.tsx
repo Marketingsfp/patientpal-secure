@@ -85,7 +85,7 @@ function Page() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div><h1 className="text-2xl font-semibold flex items-center gap-2"><Sparkles className="h-6 w-6 text-primary" />Regras de IA</h1>
           <p className="text-sm text-muted-foreground">Categorização automática de lançamentos por padrão</p></div>
         <Dialog open={open} onOpenChange={setOpen}>
@@ -97,7 +97,7 @@ function Page() {
                 <Input required value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} placeholder="Ex.: Aluguel" /></div>
               <div className="space-y-2"><Label>Padrão na descrição</Label>
                 <Input value={form.padrao_descricao} onChange={(e) => setForm({ ...form, padrao_descricao: e.target.value })} placeholder="Ex.: aluguel, locação" /></div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-2"><Label>Categoria</Label>
                   <Select value={form.categoria_id || "none"} onValueChange={(v) => setForm({ ...form, categoria_id: v === "none" ? "" : v })}>
                     <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>

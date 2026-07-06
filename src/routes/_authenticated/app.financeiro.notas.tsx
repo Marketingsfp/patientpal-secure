@@ -183,7 +183,7 @@ function Page() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div><h1 className="text-2xl font-semibold">Notas dos pacientes</h1>
           <p className="text-sm text-muted-foreground">Registro e controle de NFs emitidas</p></div>
         <Dialog open={open} onOpenChange={setOpen}>
@@ -191,7 +191,7 @@ function Page() {
           <DialogContent>
             <DialogHeader><DialogTitle>{editing ? "Editar" : "Nova"} nota</DialogTitle></DialogHeader>
             <form onSubmit={submit} className="space-y-3">
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-2"><Label>Número</Label>
                   <Input value={form.numero} onChange={(e) => setForm({ ...form, numero: e.target.value })} /></div>
                 <div className="space-y-2"><Label>Série</Label>
@@ -199,7 +199,7 @@ function Page() {
                 <div className="space-y-2"><Label>Data</Label>
                   <Input type="date" required value={form.data_emissao} onChange={(e) => setForm({ ...form, data_emissao: e.target.value })} /></div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-2"><Label>Valor *</Label>
                   <CurrencyInput value={form.valor} onChange={(v) => setForm({ ...form, valor: v })} /></div>
                 <div className="space-y-2"><Label>Status</Label>

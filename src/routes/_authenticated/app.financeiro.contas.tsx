@@ -79,7 +79,7 @@ function Page() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div><h1 className="text-2xl font-semibold">Contas</h1>
           <p className="text-sm text-muted-foreground">Contas bancárias, caixa e cartões</p></div>
         <Dialog open={open} onOpenChange={setOpen}>
@@ -89,7 +89,7 @@ function Page() {
             <form onSubmit={submit} className="space-y-4">
               <div className="space-y-2"><Label>Nome *</Label>
                 <Input required value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} /></div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-2"><Label>Tipo</Label>
                   <Select value={form.tipo} onValueChange={(v) => setForm({ ...form, tipo: v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
@@ -103,7 +103,7 @@ function Page() {
                 <div className="space-y-2"><Label>Saldo inicial</Label>
                   <CurrencyInput value={form.saldo_inicial} onChange={(v) => setForm({ ...form, saldo_inicial: v })} /></div>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-2"><Label>Banco</Label>
                   <Input value={form.banco} onChange={(e) => setForm({ ...form, banco: e.target.value })} /></div>
                 <div className="space-y-2"><Label>Agência</Label>

@@ -78,7 +78,7 @@ function Page() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div><h1 className="text-2xl font-semibold">Lembretes</h1>
           <p className="text-sm text-muted-foreground">Vencimentos e tarefas financeiras</p></div>
         <Dialog open={open} onOpenChange={setOpen}>
@@ -90,7 +90,7 @@ function Page() {
                 <Input required value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })} /></div>
               <div className="space-y-2"><Label>Descrição</Label>
                 <Textarea rows={3} value={form.descricao} onChange={(e) => setForm({ ...form, descricao: e.target.value })} /></div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-2"><Label>Data</Label>
                   <Input type="date" required value={form.data_lembrete} onChange={(e) => setForm({ ...form, data_lembrete: e.target.value })} /></div>
                 <div className="space-y-2"><Label>Prioridade</Label>
