@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { HhpSkeletonCard, HhpEmptyState } from "@/design-system/hhp";
+import { HhpPageHeader } from "@/design-system/hhp";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
@@ -533,31 +534,22 @@ export function AgendaV2Shell() {
 
       <div className="flex-1 min-w-0 flex flex-col">
       {/* Header */}
-      <div className="border-b border-slate-100 bg-white/80 backdrop-blur-sm px-3 md:px-6 py-3 md:py-5 space-y-3 md:space-y-5 shrink-0">
-        <div className="flex items-start justify-between gap-2 md:gap-4 flex-wrap">
-          <div className="min-w-0 flex items-start gap-2">
-            {!foco && isMobile && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 rounded-xl hover:bg-slate-100 shrink-0 md:hidden"
-                onClick={() => setSidePanelOpen(true)}
-                aria-label="Abrir painel"
-              >
-                <PanelLeft className="h-4 w-4 text-slate-500" />
-              </Button>
-            )}
-            <div className="space-y-1 min-w-0">
-            <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-slate-900 truncate">
-              Agenda do Dia
-            </h1>
-            <p className="text-[10px] md:text-[11px] font-semibold uppercase tracking-widest text-slate-400 capitalize truncate">
-              {format(dia, "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
-            </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
+      <HhpPageHeader
+        title="Agenda do Dia"
+        eyebrow={format(dia, "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+        leading={!foco && isMobile ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 rounded-xl hover:bg-slate-100 shrink-0 md:hidden"
+            onClick={() => setSidePanelOpen(true)}
+            aria-label="Abrir painel"
+          >
+            <PanelLeft className="h-4 w-4 text-slate-500" />
+          </Button>
+        ) : null}
+        actions={(
+          <>
             <Button
               size="sm"
               onClick={() => setWizardOpen(true)}
@@ -625,9 +617,9 @@ export function AgendaV2Shell() {
                 <Keyboard className="h-4 w-4 text-slate-400" />
               </Button>
             </div>
-          </div>
-        </div>
-
+          </>
+        )}
+      >
         <div className="flex items-center gap-2 md:gap-3 flex-wrap">
           <div className="relative flex-1 min-w-0 md:min-w-64 max-w-md w-full sm:w-auto">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
@@ -695,7 +687,7 @@ export function AgendaV2Shell() {
           onSelect={(k) => setKpiFilter(kpiFilter === k ? null : k)}
           compact={compact}
         />
-      </div>
+      </HhpPageHeader>
 
       {/* Faixa de sugestões IA (visual) — recurso secundário, carrega depois */}
       {rows !== null && filtradas.length > 0 && (
