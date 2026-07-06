@@ -571,6 +571,16 @@ export function AgendaV2Shell() {
               <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl hover:bg-slate-100" onClick={() => navDia(1)} aria-label="Próximo dia">
                 <ChevronRight className="h-4 w-4 text-slate-400" />
               </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-xl hover:bg-slate-100 ml-1"
+                onClick={() => setShortcutsOpen(true)}
+                aria-label="Atalhos de teclado"
+                title="Atalhos (?)"
+              >
+                <Keyboard className="h-4 w-4 text-slate-400" />
+              </Button>
             </div>
           </div>
         </div>
