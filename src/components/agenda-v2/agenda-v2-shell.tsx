@@ -627,8 +627,8 @@ export function AgendaV2Shell() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="relative flex-1 min-w-64 max-w-md">
+        <div className="flex items-center gap-2 md:gap-3 flex-wrap">
+          <div className="relative flex-1 min-w-0 md:min-w-64 max-w-md w-full sm:w-auto">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
             <Input
               placeholder="Buscar paciente, médico, sala, exame…"
@@ -645,7 +645,7 @@ export function AgendaV2Shell() {
             onChange={setFiltroMedico}
             placeholder="Profissional"
             searchPlaceholder="Buscar profissional..."
-            className="h-10 rounded-2xl bg-slate-100 border-transparent min-w-48"
+            className="h-10 rounded-2xl bg-slate-100 border-transparent min-w-0 flex-1 sm:flex-none sm:min-w-48"
           />
           <SearchableSelect
             options={[{ value: "", label: "Todas as especialidades" }, ...Array.from(espData?.espMap.entries() ?? []).map(([id, nome]) => ({ value: id, label: nome }))]}
@@ -653,7 +653,7 @@ export function AgendaV2Shell() {
             onChange={setFiltroEspecialidade}
             placeholder="Especialidade"
             searchPlaceholder="Buscar especialidade..."
-            className="h-10 rounded-2xl bg-slate-100 border-transparent min-w-44"
+            className="h-10 rounded-2xl bg-slate-100 border-transparent min-w-0 flex-1 sm:flex-none sm:min-w-44"
           />
           <SearchableSelect
             options={[{ value: "", label: "Todas as salas" }, ...Array.from(recursos.entries()).map(([id, nome]) => ({ value: id, label: nome }))]}
@@ -661,7 +661,7 @@ export function AgendaV2Shell() {
             onChange={setFiltroRecurso}
             placeholder="Sala / recurso"
             searchPlaceholder="Buscar sala..."
-            className="h-10 rounded-2xl bg-slate-100 border-transparent min-w-40"
+            className="h-10 rounded-2xl bg-slate-100 border-transparent min-w-0 flex-1 sm:flex-none sm:min-w-40"
           />
           {(filtroMedico || filtroEspecialidade || filtroRecurso || kpiFilter) && (
             <Button
@@ -719,14 +719,14 @@ export function AgendaV2Shell() {
         ) : (
           <div className={cn(
             "h-full overflow-y-auto pb-8 transition-[padding] duration-200",
-            foco ? "px-10 pt-6 max-w-4xl mx-auto" : "px-6 pt-4",
+            foco ? "px-4 md:px-10 pt-6 max-w-4xl mx-auto" : "px-3 md:px-6 pt-4",
           )}>
             {porHora.map(([hora, lista]) => {
               const isNowHour = isToday && hora === nowHour;
               return (
-                <div key={hora} className="flex gap-4 relative">
+                <div key={hora} className="flex gap-2 md:gap-4 relative">
                   {/* Coluna de hora (régua) */}
-                  <div className={cn("shrink-0 relative", foco ? "w-16" : "w-14")}>
+                  <div className={cn("shrink-0 relative", foco ? "w-12 md:w-16" : "w-11 md:w-14")}>
                     <div className={cn(
                       "sticky top-0 tabular-nums pt-1",
                       foco ? "text-[13px] font-semibold text-slate-500" : "text-[11px] font-bold uppercase tracking-wider text-slate-400",
@@ -735,7 +735,7 @@ export function AgendaV2Shell() {
                     </div>
                   </div>
                   {/* Coluna de sessões */}
-                  <div className={cn("flex-1 min-w-0 border-l border-slate-100 pb-4 relative", foco ? "pl-8" : "pl-6")}>
+                  <div className={cn("flex-1 min-w-0 border-l border-slate-100 pb-4 relative", foco ? "pl-4 md:pl-8" : "pl-3 md:pl-6")}>
                     {isNowHour && (
                       <div
                         className="absolute -left-[3px] right-0 flex items-center gap-2 z-10 pointer-events-none"
