@@ -23,3 +23,5 @@ Roadmap fixo (um módulo por vez, não abrir frentes fora de ordem): 1) Clientes
 - [Governança e dados imutáveis](mem://constraints/governanca-dados-imutaveis) — Política permanente: dados protegidos (pacientes/financeiro/auditoria), governança de migrations, padrão flag→preview→promoção, compatibilidade V2/clássico, alterações destrutivas
 - [Roadmap de módulos](mem://preferences/roadmap-modulos) — Ordem obrigatória dos 7 módulos, ciclo de 8 etapas por módulo e relatório de encerramento
 - [Backlog — auditoria de duplicidades no menu](mem://preferences/backlog-organizacao-menu) — Benefícios × Relatórios do Cartão; Exames × Procedimentos. Executar entre encerramento do Clientes V2 e início da Agenda V2. Não implementar sem retomada explícita.
+- [Clientes V2 — encerrado](mem://features/clientes-v2-encerrado) — Módulo 1 do roadmap concluído e aprovado. Flag OFF por padrão, admin/gestor, recepção no clássico. Escopo entregue, promoção controlada, rollback disponível.
+- [Auditoria de duplicidades — relatório](docs/auditorias/duplicidades-menu.md) — Relatório completo Cartão×Relatórios do Cartão e Exames×Procedimentos. Sem implementação até aprovação.
