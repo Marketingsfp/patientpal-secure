@@ -47,12 +47,19 @@ export function tipoDoProcedimento(p: ProcMeta): TipoSessao {
   const g = p.grupo ?? "";
   const t = p.tipo ?? "";
   const n = p.nome ?? "";
-  if (has(g, "laborat") || has(n, "coleta")) return "coleta_laboratorial";
-  if (has(g, "endoscop") || has(g, "colonoscop")) return "endoscopia";
-  if (has(g, "cardio")) return "cardiologica";
-  if (has(g, "imagem") || has(g, "tomograf") || has(g, "ultrass") || has(g, "densitomet") || has(g, "raio") || has(g, "ressonan")) return "imagem";
+  // Nome tem prioridade (o texto livre do agendamento costuma trazer o tipo entre parênteses).
+  if (has(g, "laborat") || has(n, "laborat") || has(n, "coleta")) return "coleta_laboratorial";
+  if (has(g, "endoscop") || has(g, "colonoscop") || has(n, "endoscop") || has(n, "colonoscop")) return "endoscopia";
+  if (has(g, "cardio") || has(n, "eletrocardio") || has(n, "ecocardio")) return "cardiologica";
+  if (
+    has(g, "imagem") || has(g, "tomograf") || has(g, "ultrass") || has(g, "densitomet") ||
+    has(g, "raio") || has(g, "ressonan") ||
+    has(n, "raio-x") || has(n, "raio x") || has(n, "tomograf") || has(n, "ultrass") ||
+    has(n, "densitomet") || has(n, "ressonan") || has(n, "mamograf")
+  ) return "imagem";
   if (has(g, "cirurg") || has(n, "cirurgia")) return "cirurgia";
   if (has(t, "consulta")) return "consulta";
+  if (has(t, "exame")) return "procedimento_ambulatorial";
   if (has(t, "procedimento")) return "procedimento_ambulatorial";
   return "consulta";
 }
