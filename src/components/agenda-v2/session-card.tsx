@@ -19,13 +19,14 @@ const TIPO_ICON: Record<TipoSessao, LucideIcon> = {
   procedimento_ambulatorial: ClipboardList,
 };
 
+// Chips de status — sólidos, alto contraste, pouca decoração.
 const STATUS_STYLE: Record<string, string> = {
-  agendado: "bg-slate-50 text-slate-700 border-slate-200",
-  confirmado: "bg-sky-50 text-sky-700 border-sky-200",
-  em_atendimento: "bg-indigo-50 text-indigo-700 border-indigo-200",
-  realizado: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  cancelado: "bg-rose-50 text-rose-700 border-rose-200",
-  faltou: "bg-rose-50 text-rose-700 border-rose-200",
+  agendado: "bg-slate-100 text-slate-600",
+  confirmado: "bg-blue-100 text-blue-700",
+  em_atendimento: "bg-indigo-100 text-indigo-700",
+  realizado: "bg-emerald-100 text-emerald-700",
+  cancelado: "bg-rose-100 text-rose-700",
+  faltou: "bg-rose-100 text-rose-700",
 };
 
 export interface SessionItem {
@@ -54,6 +55,13 @@ const fmt = (iso: string) =>
 
 export type SessionDensity = "confortavel" | "compacto";
 
+/**
+ * Card no visual "Calendário Premium":
+ * - card pastel por tipo, cantos generosos (rounded-3xl), muito respiro
+ * - tile de ícone colorido sólido com sombra suave (identidade forte do tipo)
+ * - nome do paciente em negrito grande, procedimento na cor do tipo
+ * - status como pílula superior direita, metadados como linha inferior
+ */
 export function SessionCard({
   data,
   onOpenTimeline,
@@ -79,99 +87,113 @@ export function SessionCard({
   return (
     <div
       className={cn(
-        "group relative overflow-hidden rounded-xl border border-border/60 bg-card",
-        "shadow-[0_1px_2px_rgba(0,0,0,0.02)] hover:shadow-md hover:border-border transition-all",
+        "group relative border transition-all",
+        "hover:shadow-lg hover:-translate-y-[1px]",
         est.cardBg,
-        compact ? "py-2 pl-4 pr-3" : "py-3 pl-5 pr-4",
+        compact ? "rounded-2xl p-3" : "rounded-3xl p-5",
       )}
     >
-      {/* filete lateral colorido = identidade do tipo */}
-      <span
-        aria-hidden
-        className="absolute inset-y-0 left-0 w-1"
-        style={{ backgroundColor: est.accent }}
-      />
-
-      <div className={cn("flex items-start", compact ? "gap-2.5" : "gap-3")}>
-        {/* horário + ícone do tipo */}
-        <div className="shrink-0 flex flex-col items-center gap-1.5">
-          <div
-            className={cn(
-              "rounded-full flex items-center justify-center",
-              est.iconWrap,
-              compact ? "h-7 w-7" : "h-9 w-9",
-            )}
-          >
-            <Icon className={cn(est.iconColor, compact ? "h-3.5 w-3.5" : "h-4 w-4")} />
-          </div>
-          <div className={cn("tabular-nums font-medium text-foreground/90", compact ? "text-[10px]" : "text-xs")}>
-            {fmt(data.inicio)}
-          </div>
+      <div className={cn("flex items-start", compact ? "gap-3" : "gap-4")}>
+        {/* Tile do ícone — identidade forte do tipo */}
+        <div
+          className={cn(
+            "flex items-center justify-center shrink-0",
+            est.iconWrap,
+            compact ? "h-10 w-10 rounded-xl" : "h-12 w-12 rounded-2xl",
+          )}
+        >
+          <Icon className={cn(est.iconColor, compact ? "h-4 w-4" : "h-5 w-5")} strokeWidth={2} />
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              type="button"
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <button
+                type="button"
+                className={cn(
+                  "block max-w-full truncate text-left font-bold text-slate-800 hover:underline",
+                  compact ? "text-sm" : "text-lg leading-tight",
+                )}
+                onClick={() => onOpenTimeline(data.pacote_id)}
+              >
+                {data.paciente_nome}
+              </button>
+              <p
+                className={cn("truncate font-medium", compact ? "text-xs" : "mt-0.5 text-sm")}
+                style={{ color: est.accent }}
+              >
+                {titulo}
+              </p>
+            </div>
+            <span
               className={cn(
-                "font-semibold truncate hover:underline text-left text-foreground",
-                compact ? "text-sm" : "text-[15px]",
+                "shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wide",
+                statusStyle,
               )}
-              onClick={() => onOpenTimeline(data.pacote_id)}
             >
-              {data.paciente_nome}
-            </button>
-            <Badge variant="outline" className={cn("text-[10px] font-medium", est.chip)}>
-              {TIPO_SESSAO_LABEL[data.tipo]}
-            </Badge>
-            {data.is_encaixe && (
-              <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-800 border-amber-200">
-                <Clock className="h-2.5 w-2.5 mr-1" /> Encaixe
-              </Badge>
-            )}
-            <Badge variant="outline" className={cn("text-[10px] capitalize font-normal", statusStyle)}>
               {data.status.replace(/_/g, " ")}
-            </Badge>
+            </span>
           </div>
-          <div className={cn("mt-1 flex items-center gap-x-4 gap-y-1 flex-wrap text-muted-foreground", compact ? "text-[11px]" : "text-xs")}>
-            <span className="truncate max-w-[280px] text-foreground/70">{titulo}</span>
+
+          <div className={cn("flex flex-wrap items-center gap-x-5 gap-y-1.5", compact ? "mt-2" : "mt-3")}>
+            <div className="inline-flex items-center gap-1.5 font-bold tabular-nums text-slate-800">
+              <Clock className="h-3.5 w-3.5 text-slate-400" />
+              <span className="text-xs">
+                {fmt(data.inicio)}
+                {data.fim && data.fim !== data.inicio ? ` – ${fmt(data.fim)}` : ""}
+              </span>
+            </div>
             {data.medico_nome && (
-              <span className="inline-flex items-center gap-1">
-                <User className="h-3 w-3" /> {data.medico_nome}
+              <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
+                <User className="h-3.5 w-3.5 text-slate-400" /> {data.medico_nome}
               </span>
             )}
             {data.recurso_nome && (
-              <span className="inline-flex items-center gap-1">
-                <MapPin className="h-3 w-3" /> {data.recurso_nome}
+              <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
+                <MapPin className="h-3.5 w-3.5 text-slate-400" /> {data.recurso_nome}
               </span>
+            )}
+            <Badge variant="outline" className={cn("text-[10px] font-semibold", est.chip)}>
+              {TIPO_SESSAO_LABEL[data.tipo]}
+            </Badge>
+            {data.is_encaixe && (
+              <Badge variant="outline" className="text-[10px] font-semibold bg-amber-100 text-amber-700 border-transparent">
+                <Clock className="h-2.5 w-2.5 mr-1" /> Encaixe
+              </Badge>
+            )}
+            {multi && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="-my-1 h-6 rounded-full px-2 text-xs text-slate-500 hover:bg-white/60 hover:text-slate-800"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setOpen((v) => !v);
+                }}
+                aria-expanded={open}
+              >
+                {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                <span className="ml-0.5">{open ? "recolher" : `+${data.items.length} exames`}</span>
+              </Button>
             )}
           </div>
         </div>
-
-        {multi && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 px-2 -mr-1 text-muted-foreground hover:text-foreground"
-            onClick={() => setOpen((v) => !v)}
-            aria-expanded={open}
-          >
-            {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-            <span className="text-[11px] ml-1">
-              {open ? "recolher" : `+${data.items.length}`}
-            </span>
-          </Button>
-        )}
       </div>
 
       {multi && open && (
-        <ul className={cn("mt-2 space-y-1 border-t border-border/50 pt-2", compact ? "pl-[52px]" : "pl-[60px]")}>
+        <ul className={cn("mt-3 space-y-1.5 border-t border-slate-200/60 pt-3", compact ? "pl-13" : "pl-16")}>
           {data.items.map((it) => (
-            <li key={it.id} className="text-xs flex items-center gap-2 text-foreground/80">
-              <span className="text-muted-foreground/60">›</span>
+            <li key={it.id} className="flex items-center gap-2 text-xs text-slate-600">
+              <span className="text-slate-400">›</span>
               <span className="truncate">{it.procedimento_nome}</span>
               {it.status && (
-                <Badge variant="outline" className={cn("text-[9px] capitalize font-normal", STATUS_STYLE[it.status] ?? STATUS_STYLE.agendado)}>
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "border-transparent text-[9px] font-semibold uppercase tracking-wide",
+                    STATUS_STYLE[it.status] ?? STATUS_STYLE.agendado,
+                  )}
+                >
                   {it.status.replace(/_/g, " ")}
                 </Badge>
               )}

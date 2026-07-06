@@ -15,15 +15,7 @@ const DOT: Record<NonNullable<Kpi["tone"]>, string> = {
   warn: "bg-amber-500",
   danger: "bg-rose-500",
   ok: "bg-emerald-500",
-  info: "bg-sky-500",
-};
-
-const ACTIVE_RING: Record<NonNullable<Kpi["tone"]>, string> = {
-  default: "ring-2 ring-slate-400/60 border-slate-300",
-  warn: "ring-2 ring-amber-400/60 border-amber-300",
-  danger: "ring-2 ring-rose-400/60 border-rose-300",
-  ok: "ring-2 ring-emerald-400/60 border-emerald-300",
-  info: "ring-2 ring-sky-400/60 border-sky-300",
+  info: "bg-blue-500",
 };
 
 export function KpiBar({
@@ -38,7 +30,7 @@ export function KpiBar({
   compact?: boolean;
 }) {
   return (
-    <div className={cn("flex flex-wrap", compact ? "gap-1.5" : "gap-2")}>
+    <div className={cn("inline-flex flex-wrap items-center rounded-2xl bg-slate-100 p-1.5", compact ? "gap-0.5" : "gap-1")}>
       {items.map((k) => {
         const tone = k.tone ?? "default";
         const active = activeKey === k.key;
@@ -49,18 +41,19 @@ export function KpiBar({
             onClick={() => onSelect?.(k.key)}
             title={k.hint ?? k.label}
             className={cn(
-              "group flex items-center gap-2 rounded-full border bg-card/60 backdrop-blur-sm",
-              "transition-all hover:bg-card hover:shadow-sm hover:-translate-y-[1px]",
-              compact ? "px-2.5 py-1" : "px-3.5 py-1.5",
-              active ? ACTIVE_RING[tone] : "border-border/60",
+              "group flex items-center gap-2 rounded-xl transition-all",
+              compact ? "px-2.5 py-1.5" : "px-3.5 py-2",
+              active
+                ? "bg-white shadow-sm text-slate-800 font-semibold"
+                : "text-slate-500 hover:text-slate-800 hover:bg-white/50 font-medium",
             )}
             aria-pressed={active}
           >
             <span className={cn("h-2 w-2 rounded-full shrink-0", DOT[tone])} />
-            <span className={cn("font-semibold tabular-nums text-foreground", compact ? "text-sm" : "text-base leading-none")}>
+            <span className={cn("tabular-nums font-semibold text-slate-800", compact ? "text-xs" : "text-sm")}>
               {k.value.toLocaleString("pt-BR")}
             </span>
-            <span className={cn("text-muted-foreground", compact ? "text-[11px]" : "text-xs")}>
+            <span className={cn(compact ? "text-[11px]" : "text-xs")}>
               {k.label}
             </span>
           </button>
