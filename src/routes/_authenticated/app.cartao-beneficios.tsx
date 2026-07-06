@@ -1,5 +1,5 @@
 import { createFileRoute, Link, Outlet, useLocation, redirect } from "@tanstack/react-router";
-import { CreditCard, FileSignature, BarChart3, ShieldCheck, Users } from "lucide-react";
+import { CreditCard, FileSignature, BarChart3, ShieldCheck, Users, Gift, LayoutGrid } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/cartao-beneficios")({
   beforeLoad: ({ location }) => {
@@ -14,8 +14,10 @@ export const Route = createFileRoute("/_authenticated/app/cartao-beneficios")({
 const tabs = [
   { to: "/app/cartao-beneficios/contratos", label: "Vendas", icon: FileSignature },
   { to: "/app/cartao-beneficios/convenios", label: "Convênios", icon: ShieldCheck },
+  { to: "/app/cartao-beneficios/beneficios", label: "Benefícios (regras)", icon: Gift },
+  { to: "/app/cartao-beneficios/modelos", label: "Modelos", icon: LayoutGrid },
   { to: "/app/cartao-beneficios/dependentes", label: "Dependentes", icon: Users },
-  { to: "/app/cartao-beneficios/relatorios", label: "Relatórios", icon: BarChart3 },
+  { to: "/app/cartao-beneficios/relatorios", label: "Relatórios (BI)", icon: BarChart3 },
 ];
 
 function CartaoBeneficiosLayout() {

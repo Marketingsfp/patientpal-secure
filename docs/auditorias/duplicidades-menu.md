@@ -1,3 +1,8 @@
+> **STATUS — Opção A aprovada e aplicada em ambos os blocos (sem migration, sem alteração de regra de negócio).**
+>
+> - Cartão de Benefícios: menu lateral colapsado (uma entrada única); sub-navegação nas abas do layout `/app/cartao-beneficios` — Vendas · Convênios · Benefícios (regras) · Modelos · Dependentes · Relatórios (BI).
+> - Clínico: `Procedimentos` → **Catálogo de Serviços**; `Exames` → **Resultados de Exames / Laudos IA**. Rotas, tabelas e regras inalteradas.
+
 # Auditoria de Duplicidades no Menu
 
 **Data:** 2026-07-06
