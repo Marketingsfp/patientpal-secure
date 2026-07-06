@@ -1,4 +1,4 @@
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { HhpDrawer } from "@/design-system/hhp";
 import { Badge } from "@/components/ui/badge";
 import {
   Check, Clock, User, Stethoscope, TestTube, FileText, LogOut, Info,
@@ -36,18 +36,25 @@ export function PatientTimelineDrawer({
     : 0;
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto p-0">
+    <HhpDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title={data?.paciente_nome ?? "Linha do tempo do paciente"}
+      description="Linha do tempo do paciente"
+      hiddenTitle
+      side="right"
+      maxWidth="28rem"
+    >
         {/* Cabeçalho com identidade forte */}
         <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-5 border-b">
-          <SheetHeader className="text-left space-y-1">
+          <div className="text-left space-y-1">
             <div className="text-[11px] uppercase tracking-wider text-primary font-semibold">
               Linha do tempo do paciente
             </div>
-            <SheetTitle className="text-xl">
+            <div className="text-xl font-semibold">
               {data?.paciente_nome ?? "—"}
-            </SheetTitle>
-          </SheetHeader>
+            </div>
+          </div>
           {data && (
             <div className="mt-4">
               <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-1.5">
@@ -137,7 +144,6 @@ export function PatientTimelineDrawer({
             </div>
           </div>
         </div>
-      </SheetContent>
-    </Sheet>
+    </HhpDrawer>
   );
 }
