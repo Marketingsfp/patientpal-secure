@@ -530,12 +530,17 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     // Se não houver sessão aberta, abre uma automaticamente com valor 0.
     try {
       if (user?.id && Number(valor) > 0) {
+        // Pode existir mais de uma sessão aberta por histórico — pega a mais recente
+        // em vez de usar maybeSingle() (que retorna erro/null quando há múltiplas)
+        // e acabar abrindo uma nova a cada lançamento.
         let { data: sess } = await supabase
           .from("caixa_sessoes")
           .select("id")
           .eq("clinica_id", clinicaAtual.clinica_id)
           .eq("user_id", user.id)
           .eq("status", "aberto")
+          .order("aberto_em", { ascending: false })
+          .limit(1)
           .maybeSingle();
         if (!sess) {
           const nome = (user.user_metadata as { nome?: string } | null)?.nome ?? user.email ?? null;
