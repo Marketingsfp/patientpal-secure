@@ -239,7 +239,7 @@ export function AgendaV2Shell() {
     return sessoes.filter((s) => {
       // Ocultar sessões "DISPONIVEL" — são horários livres, não pertencem
       // ao fluxo operacional; ficam agrupadas em resumo por hora.
-      if (/^disponivel$/i.test((s.paciente_nome ?? "").trim())) return false;
+      if (/dispon[íi]vel/i.test(s.paciente_nome ?? "")) return false;
       if (kpiFilter && kpiFilter !== "todos") {
         if (kpiFilter === "lab" && s.tipo !== "coleta_laboratorial") return false;
         if (kpiFilter !== "lab" && s.status !== kpiFilter) return false;
@@ -263,7 +263,7 @@ export function AgendaV2Shell() {
   const livresPorHora = useMemo(() => {
     const m = new Map<number, number>();
     for (const s of sessoes) {
-      if (!/^disponivel$/i.test((s.paciente_nome ?? "").trim())) continue;
+      if (!/dispon[íi]vel/i.test(s.paciente_nome ?? "")) continue;
       const h = new Date(s.inicio).getHours();
       m.set(h, (m.get(h) ?? 0) + 1);
     }
