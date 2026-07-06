@@ -1,7 +1,7 @@
 import {
   CalendarDays, Users, ClipboardList, FileHeart, HeartPulse, MessageCircle, Send,
   Wallet, FileText, DollarSign, Receipt, Building2, ArrowRightLeft, BarChart3,
-  CreditCard, Gift, Contact, Briefcase,
+  CreditCard, Contact, Briefcase,
   Stethoscope, FlaskConical, BookOpen, LayoutGrid, Activity,
   LayoutDashboard, Target, Megaphone, ShieldCheck, Inbox,
   Settings, KeyRound, MapPin, BadgeCheck,
