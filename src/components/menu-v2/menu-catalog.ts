@@ -82,9 +82,7 @@ export const CENTROS: Centro[] = [
       { path: "/app/prontuario-modelos", label: "Modelos de Prontuário", icon: BookOpen },
       { path: "/app/odontologia", label: "Odontograma", icon: Activity, modulo: "odontologia" },
       { path: "/app/medicos", label: "Médicos", icon: Stethoscope },
-      { path: "/app/especialidades", label: "Especialidades", icon: BadgeCheck },
       { path: "/app/disponibilidades", label: "Disponibilidades", icon: CalendarDays },
-      { path: "/app/enfermagem-recursos", label: "Enfermagem", icon: Activity },
     ],
   },
   {
