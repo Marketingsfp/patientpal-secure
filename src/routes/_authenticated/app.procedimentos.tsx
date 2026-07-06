@@ -30,7 +30,7 @@ import { findRegra, computeValor, type CbRegra } from "@/lib/cb-regras";
 
 export const Route = createFileRoute("/_authenticated/app/procedimentos")({
   component: ProcedimentosPageWithTabs,
-  head: () => ({ meta: [{ title: "Exames / Procedimentos — ClinicaOS" }] }),
+  head: () => ({ meta: [{ title: "Catálogo de Serviços — ClinicaOS" }] }),
 });
 
 type Tipo = string;

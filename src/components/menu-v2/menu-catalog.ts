@@ -68,12 +68,8 @@ export const CENTROS: Centro[] = [
     label: "Cartão de Benefícios",
     icon: CreditCard,
     items: [
-      { path: "/app/cartao-beneficios/contratos", label: "Contratos", icon: FileText, modulo: "cartao-beneficios" },
-      { path: "/app/cartao-beneficios/dependentes", label: "Dependentes", icon: Users },
-      { path: "/app/cartao-beneficios/modelos", label: "Regras / Modelos", icon: ShieldCheck },
+      { path: "/app/cartao-beneficios/contratos", label: "Cartão de Benefícios", icon: CreditCard, modulo: "cartao-beneficios" },
       { path: "/app/financeiro/empresas", label: "Empresas Associadas", icon: Briefcase },
-      { path: "/app/cartao-beneficios/beneficios", label: "Benefícios", icon: Gift },
-      { path: "/app/cartao-beneficios/relatorios", label: "Relatórios Cartão", icon: BarChart3 },
     ],
   },
   {
@@ -81,8 +77,8 @@ export const CENTROS: Centro[] = [
     label: "Clínico",
     icon: Stethoscope,
     items: [
-      { path: "/app/procedimentos", label: "Procedimentos", icon: LayoutGrid },
-      { path: "/app/exames-resultados", label: "Exames", icon: FlaskConical, modulo: "exames-resultados" },
+      { path: "/app/procedimentos", label: "Catálogo de Serviços", icon: LayoutGrid },
+      { path: "/app/exames-resultados", label: "Resultados de Exames / Laudos IA", icon: FlaskConical, modulo: "exames-resultados" },
       { path: "/app/prontuario-modelos", label: "Modelos de Prontuário", icon: BookOpen },
       { path: "/app/odontologia", label: "Odontograma", icon: Activity, modulo: "odontologia" },
       { path: "/app/medicos", label: "Médicos", icon: Stethoscope },

@@ -17,7 +17,7 @@ import { classificarResultadoExame, extrairTextoExameDeArquivo, type Classificac
 
 export const Route = createFileRoute("/_authenticated/app/exames-resultados")({
   component: ExamesResultadosPage,
-  head: () => ({ meta: [{ title: "Resultados de Exames — ClinicaOS" }] }),
+  head: () => ({ meta: [{ title: "Resultados de Exames / Laudos IA — ClinicaOS" }] }),
 });
 
 type Paciente = {
