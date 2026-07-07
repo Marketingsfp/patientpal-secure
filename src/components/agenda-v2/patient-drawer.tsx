@@ -6,12 +6,13 @@ import { toast } from "sonner";
 import {
   Check, FileText, CalendarClock, Wallet, FileSignature,
   MessageCircle, History, Stethoscope, Sparkles, AlertTriangle,
-  Coffee, DollarSign, Clock, ClipboardCheck,
+  Coffee, DollarSign, Clock, ClipboardCheck, LogIn, XCircle, UserX,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { HhpChip } from "@/design-system/hhp";
 import { HhpDrawer } from "@/design-system/hhp/drawer";
+import type { StatusAgendamento } from "@/lib/agenda/status-agendamento.functions";
 
 export interface DrawerPatientData {
   paciente_id?: string | null;
@@ -25,6 +26,8 @@ export interface DrawerPatientData {
   historico: Array<{ etapa: string; timestamp: string }>;
   proc_titulo?: string | null;
   hora?: string | null;
+  /** Ids dos agendamentos da sessão — usado para alteração de status (S2-A). */
+  agendamento_ids?: string[];
 }
 
 // 6 etapas rev.3 (rev. paciente).
@@ -73,11 +76,12 @@ function idadeFromDob(dob: string | null | undefined): number | null {
  * - Abertura instantânea; detalhes do paciente carregam em segundo plano.
  */
 export function PatientDrawer({
-  open, onOpenChange, data,
+  open, onOpenChange, data, onChangeStatus,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   data: DrawerPatientData | null;
+  onChangeStatus?: (agendamentoIds: string[], novoStatus: StatusAgendamento) => void;
 }) {
   const [tab, setTab] = useState<Tab>("resumo");
   const openedAtRef = useRef<number>(0);
@@ -166,6 +170,12 @@ export function PatientDrawer({
 
             {/* 4. Ações rápidas */}
             <div className="px-6 py-4 border-b border-slate-100">
+              {onChangeStatus && data.agendamento_ids && data.agendamento_ids.length > 0 && (
+                <StatusActions
+                  status={data.status ?? "agendado"}
+                  onChange={(novo) => onChangeStatus(data.agendamento_ids!, novo)}
+                />
+              )}
               <SectionTitle>Ações rápidas</SectionTitle>
               <div className="grid grid-cols-4 gap-2">
                 <QuickAction icon={<Stethoscope className="h-4 w-4" />} label="Prontuário" />
