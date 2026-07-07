@@ -51,7 +51,6 @@ export const CENTROS: Centro[] = [
     icon: Wallet,
     items: [
       { path: "/app/caixa", label: "Caixa", icon: Wallet, modulo: "caixa" },
-      { path: "/app/orcamentos", label: "Orçamentos", icon: FileSignature },
       { path: "/app/boletos", label: "Boletos", icon: FileText },
       { path: "/app/nfse", label: "NFS-e", icon: Receipt },
       { path: "/app/financeiro/atendimentos", label: "Lançamentos", icon: DollarSign, modulo: "financeiro" },
@@ -92,7 +91,6 @@ export const CENTROS: Centro[] = [
       { path: "/app/atendimento-ia", label: "Atendimento IA", icon: Sparkles },
       { path: "/app/consulta-rapida", label: "Consulta Rápida", icon: Zap },
       { path: "/app/alertas-enfermagem", label: "Alertas Enfermagem", icon: Bell },
-      { path: "/app/nina", label: "Nina / WhatsApp", icon: Send },
     ],
   },
   {
