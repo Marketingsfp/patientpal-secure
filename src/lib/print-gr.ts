@@ -776,7 +776,11 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     prestador = Math.min(prestador, valor);
     const clin = +(valor - prestador).toFixed(2);
 
-    const key = a.medico_id ?? "__sem_medico__";
+    // GR separada por serviço: cada agendamento vira sua própria guia,
+    // com seu próprio valor/clínica/prestador. Assim, quando o paciente faz
+    // vários serviços (ex.: USG mama + USG abdominal), cada um imprime uma
+    // GR independente com o repasse calculado só para aquele serviço.
+    const key = a.id;
     const medicoNome = a.medico_id ? (medById.get(a.medico_id)?.nome ?? "—") : "SEM PROFISSIONAL";
     const g: Grupo = grupos.get(key) ?? { medicoId: a.medico_id ?? null, agendaId: (a as any).agenda_id ?? null, agIdRef: a.id, medicoNome, itens: [] as Item[], subtotal: 0, prestador: 0, clinica: 0, inicioRef: a.inicio };
     g.itens.push({ procNome, valor, prestador, clinica: clin, inicio: a.inicio });
@@ -849,7 +853,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   // Uma GR completa por médico, separadas por linha tracejada bem visível
   const grsHtml = gruposArr.map((g, idx) => {
     const isLast = idx === gruposArr.length - 1;
-    const key = g.medicoId ?? "__sem_medico__";
+    const key = g.agIdRef;
     const ficha = (() => {
       const num = fichaByGrupo.get(key) ?? 0;
       if (num > 0) return String(num).padStart(3, "0");
