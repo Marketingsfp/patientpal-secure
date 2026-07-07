@@ -2973,8 +2973,11 @@ function AgendaPage() {
     setPagamentoForma(op.forma);
     setPagamentoAgId(principal);
     setPagamentoExtraIds(extras);
-    setFormaPagOpen(false);
+    // Abre o diálogo de pagamento ANTES de fechar o de forma de pagamento.
+    // Assim o Radix mantém o overlay/scroll-lock contínuo e a agenda por
+    // baixo não pisca nem redimensiona (evita o "desconfigurar" por segundos).
     setPagamentoOpen(true);
+    requestAnimationFrame(() => setFormaPagOpen(false));
   };
 
   const escolherMisto = () => {
@@ -2990,8 +2993,8 @@ function AgendaPage() {
     setPagamentoForma("__misto__");
     setPagamentoAgId(principal);
     setPagamentoExtraIds(extras);
-    setFormaPagOpen(false);
     setPagamentoOpen(true);
+    requestAnimationFrame(() => setFormaPagOpen(false));
   };
 
   // Atalhos de teclado no diálogo "Forma de pagamento":
