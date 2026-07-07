@@ -584,8 +584,8 @@ export function AgendaV2Shell() {
       procedimento: primeiro.procedimento_nome,
       inicio: data.inicio,
       fim: data.fim,
-      medico_id: data.medico_id,
-      medico_nome: data.medico_nome,
+      medico_id: data.medico_id ?? null,
+      medico_nome: data.medico_nome ?? null,
     });
   };
   const handleOpenReagendarFromDrawer = () => {
