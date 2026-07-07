@@ -671,6 +671,12 @@ export function AgendaV2Shell() {
   // F = Foco · C = Compacto · D = Confortável · J/K = próx/ant · Enter = abrir
   // Esc = fechar drawer · N = nova sessão · ? = ajuda · Ctrl/⌘+K = busca
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  // Ref para o último handler de prontuário — evita re-attach do keydown a
+  // cada render (a função é recriada por causa dos setters de snapshot).
+  const openProntuarioRef = useRef<(id: string) => void>(() => {});
+  useEffect(() => {
+    openProntuarioRef.current = handleOpenProntuario;
+  });
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // Ctrl/⌘+K → foca busca (Busca Universal do módulo)
@@ -701,7 +707,7 @@ export function AgendaV2Shell() {
           : -1;
         const target = idx >= 0 ? filtradas[idx] : filtradas[0];
         const primeiroId = target?.items?.[0]?.id ?? null;
-        if (primeiroId) { e.preventDefault(); handleOpenProntuario(primeiroId); }
+        if (primeiroId) { e.preventDefault(); openProntuarioRef.current(primeiroId); }
         return;
       }
       const isArrowNav = e.key === "ArrowUp" || e.key === "ArrowDown";
@@ -728,7 +734,7 @@ export function AgendaV2Shell() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [filtradas, drawerPacote, handleOpenProntuario]);
+  }, [filtradas, drawerPacote]);
 
   // Feedback discreto ao trocar densidade via teclado.
   const setDensityWithToast = (d: SessionDensity) => {
