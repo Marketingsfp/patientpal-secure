@@ -89,6 +89,11 @@ export function AgendaV2Shell() {
   const [drawerPacote, setDrawerPacote] = useState<string | null>(null);
   const [drawerMounted, setDrawerMounted] = useState(false);
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardInitial, setWizardInitial] = useState<{
+    medicoId?: string | null;
+    dia?: Date | null;
+    hour?: number | null;
+  } | null>(null);
   const [density, setDensity] = useState<SessionDensity>(() => {
     if (typeof window === "undefined") return "confortavel";
     // fallback: chave legada (sem clínica) para não perder preferência do usuário.
