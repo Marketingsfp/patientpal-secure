@@ -99,10 +99,10 @@ export const criarAtendimentoMultiplo = createServerFn({ method: "POST" })
     if (medicoIds.length > 0) {
       const { data: agendas } = await supabase
         .from("medico_agendas")
-        .select("id, medico_id, ativa")
+        .select("id, medico_id, ativo")
         .in("medico_id", medicoIds)
         .eq("clinica_id", clinica_id)
-        .eq("ativa", true);
+        .eq("ativo", true);
       const agendaByMedico = new Map<string, string>();
       for (const a of (agendas ?? []) as Array<{ id: string; medico_id: string }>) {
         if (!agendaByMedico.has(a.medico_id)) agendaByMedico.set(a.medico_id, a.id);
