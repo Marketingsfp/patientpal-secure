@@ -854,7 +854,14 @@ export function AgendaV2Shell() {
       )}
       {wizardOpen && (
         <Suspense fallback={null}>
-          <NovoAgendamentoWizard open={wizardOpen} onOpenChange={setWizardOpen} />
+          <NovoAgendamentoWizard
+            open={wizardOpen}
+            onOpenChange={(v) => {
+              setWizardOpen(v);
+              if (!v) setWizardInitial(null);
+            }}
+            initial={wizardInitial}
+          />
         </Suspense>
       )}
 
