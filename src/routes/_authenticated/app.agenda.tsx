@@ -3533,124 +3533,43 @@ function AgendaPage() {
                 ) : (
                   <p className="text-[11px] text-slate-500">Selecione um médico para ver os serviços disponíveis.</p>
                 )}
-                <SearchableSelect
-                  value={form.procedimento || "none"}
-                  onChange={(v) => setForm(f => ({ ...f, procedimento: v === "none" ? "" : v }))}
-                  placeholder="Selecione o serviço"
-                  searchPlaceholder="Buscar serviço..."
-                  options={(() => {
-                    const base: { value: string; label: string }[] = [{ value: "none", label: "— Selecione —" }];
-                    if (!form.medico_id) return base;
-                    const opts = opcoesProcedimentoMedico(
-                      form.medico_id,
-                      editing?.agenda_id ?? (filtroAgenda !== "todos" ? filtroAgenda : null),
-                    ).map((p) => ({ value: p.nome, label: p.nome }));
-                    // Sempre garantir que o serviço principal do médico apareça como opção,
-                    // mesmo quando ele não tem serviços vinculados no cadastro.
-                    const padrao = procedimentoPadraoDoMedico(form.medico_id);
-                    if (padrao && !opts.some((o) => normalizar(o.value) === normalizar(padrao))) {
-                      opts.unshift({ value: padrao, label: `${padrao} (principal)` });
-                    }
-                    // Se o valor atual não estiver na lista (ex.: procedimento legado), inclui também.
-                    // Exceção: não recria a especialidade do médico como se fosse serviço real
-                    // (ex.: agenda ENFERMAGEM gerando opção "ENFERMAGEM" sem existir no cadastro de serviços).
-                    const atual = (form.procedimento ?? "").trim();
-                    const especialidadeMedico = medicos.find((m) => m.id === form.medico_id)?.especialidade_nome ?? "";
-                    const atualEhEspecialidadeSintetica = especialidadeMedico && normalizar(atual) === normalizar(especialidadeMedico);
-                    if (atual && !atualEhEspecialidadeSintetica && !opts.some((o) => normalizar(o.value) === normalizar(atual))) {
-                      opts.push({ value: atual, label: atual });
-                    }
-                    // ── Top 10 por modalidade (USG/RX/TC/RM) com base no
-                    // histórico de uso da clínica nos últimos 365 dias.
-                    // Quando não houver histórico, usa uma lista curada
-                    // dos exames mais solicitados no Brasil.
-                    const detectModalidade = (label: string): "us" | "rx" | "tc" | "rm" | null => {
-                      const u = label.toUpperCase();
-                      if (u.includes("ULTRASS") || /\bUSG\b|\bUS\b/.test(u)) return "us";
-                      if (u.includes("TOMOGRAF") || /\bTC\b/.test(u)) return "tc";
-                      if (u.includes("RESSON") || /\bRM\b|\bRNM\b|\bMRI\b/.test(u)) return "rm";
-                      if (u.includes("RAIO") || u.includes("RADIOGRAF") || /\bRX\b|\bR-X\b/.test(u)) return "rx";
-                      return null;
-                    };
-                    // Lista curada (peso de popularidade) — usada como fallback
-                    // quando ainda não há histórico para o exame.
-                    // Cada item do top 10 pode exigir 1+ palavras-chave (todas presentes)
-                    // e opcionalmente excluir labels que contenham certas palavras.
-                    type Curado = { all: string[]; not?: string[] };
-                    const curadosPorModalidade: Record<"us" | "rx" | "tc" | "rm", Curado[]> = {
-                      // Top 10 oficial de USG (ordem = ranking). 1º = maior peso.
-                      us: [
-                        { all: ["OBSTETRIC", "1"], not: ["MORFOLOG", "DOPPLER"] },        // 1. Obstétrico 1º Trim.
-                        { all: ["MORFOLOG", "1"], not: ["GEMELAR", "DOPPLER"] },          // 2. Morfológico 1º Trim.
-                        { all: ["MORFOLOG", "2"], not: ["GEMELAR", "DOPPLER"] },          // 3. Morfológico 2º Trim.
-                        { all: ["OBSTETRIC", "DOPPLER"], not: ["MORFOLOG"] },             // 4. Obstétrico c/ Doppler
-                        { all: ["TRANSVAGINAL"] },                                        // 5. Transvaginal
-                        { all: ["MAMA"] },                                                // 6. Mamas
-                        { all: ["ABDOME TOTAL"] },                                        // 7. Abdome Total
-                        { all: ["PELV"], not: ["TRANSVAGINAL"] },                         // 8. Pélvica
-                        { all: ["VIAS URINARIAS"] },                                      // 9. Vias Urinárias
-                        { all: ["TIREOIDE"] },                                            // 10. Tireoide
-                        { all: ["PROSTATA"] },
-                        { all: ["RINS"] },
-                      ],
-                      rx: [
-                        { all: ["TORAX"] }, { all: ["COLUNA LOMBAR"] }, { all: ["COLUNA CERVICAL"] },
-                        { all: ["JOELHO"] }, { all: ["MAO"] }, { all: ["PE"] }, { all: ["PUNHO"] },
-                        { all: ["BACIA"] }, { all: ["CRANIO"] }, { all: ["ABDOME"] },
-                      ],
-                      tc: [
-                        { all: ["CRANIO"] }, { all: ["TORAX"], not: ["CONTRASTE"] }, { all: ["ABDOME TOTAL"] },
-                        { all: ["COLUNA LOMBAR"] }, { all: ["SEIOS DA FACE"] }, { all: ["COLUNA CERVICAL"] },
-                        { all: ["ABDOME SUPERIOR"] }, { all: ["PESCOCO"] }, { all: ["TORAX", "CONTRASTE"] }, { all: ["PELVE"] },
-                      ],
-                      rm: [
-                        { all: ["CRANIO"] }, { all: ["COLUNA LOMBAR"] }, { all: ["COLUNA CERVICAL"] },
-                        { all: ["JOELHO"] }, { all: ["OMBRO"] }, { all: ["ABDOME"] },
-                        { all: ["COLUNA TORACICA"] }, { all: ["PELVE"] }, { all: ["QUADRIL"] }, { all: ["TORNOZELO"] },
-                      ],
-                    };
-                    const scoreCurado = (label: string, mod: "us" | "rx" | "tc" | "rm") => {
-                      const L = normalizar(label).toUpperCase();
-                      const lista = curadosPorModalidade[mod];
-                      for (let i = 0; i < lista.length; i++) {
-                        const c = lista[i];
-                        if (c.not && c.not.some((n) => L.includes(n))) continue;
-                        if (c.all.every((k) => L.includes(k))) return lista.length - i;
-                      }
-                      return 0;
-                    };
-                    // Anexa "score" a cada opção (uso real + bônus do curado)
-                    type ScoredOpt = { value: string; label: string; mod: ReturnType<typeof detectModalidade>; score: number; curado: number };
-                    const scored: ScoredOpt[] = opts.map((o) => {
-                      const mod = detectModalidade(o.label);
-                      const uso = procedimentoUsoMap.get(normalizar(o.value)) ?? 0;
-                      const curado = mod ? scoreCurado(o.label, mod) : 0;
-                      // curado define quem entra no top; uso só desempata dentro da lista curada
-                      return { ...o, mod, curado, score: curado * 1000 + uso };
-                    });
-                    // Para cada modalidade alvo, seleciona top 10 (por score desc)
-                    // e atribui a posição global 1..N na ordem em que aparecerão.
-                    const rankByValue = new Map<string, number>();
-                    const topOrdenado: ScoredOpt[] = [];
-                    (["us", "rx", "tc", "rm"] as const).forEach((mod) => {
-                      const lista = scored
-                        .filter((s) => s.mod === mod && s.curado > 0)
-                        .sort((a, b) => b.score - a.score)
-                        .slice(0, 10);
-                      lista.forEach((s) => topOrdenado.push(s));
-                    });
-                    topOrdenado.forEach((s, i) => rankByValue.set(s.value, i + 1));
-                    const topOpts = topOrdenado.map((s) => ({
-                      value: s.value,
-                      label: `${rankByValue.get(s.value)}. ${s.label}`,
-                    }));
-                    const restoOpts = scored
-                      .filter((s) => !rankByValue.has(s.value))
-                      .map((s) => ({ value: s.value, label: s.label }))
-                      .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
-                    return [...base, ...topOpts, ...restoOpts];
-                  })()}
-                />
+                {(() => {
+                  const opts = opcoesServicoFormulario();
+                  const permiteMulti = !!form.medico_id
+                    && (medicoEhLaboratorioFormulario(form.medico_id) || opts.some((o) => procedimentoEhImagem(o.label)));
+                  return permiteMulti ? (
+                    <>
+                      <SearchableMultiSelect
+                        value={form.procedimentos.length > 0 ? form.procedimentos : (form.procedimento ? [form.procedimento] : [])}
+                        onChange={(values) => setForm((f) => ({
+                          ...f,
+                          procedimentos: values,
+                          procedimento: values.join(" + "),
+                        }))}
+                        placeholder="Selecione um ou mais serviços"
+                        searchPlaceholder="Buscar serviço..."
+                        options={opts.filter((o) => o.value !== "none")}
+                      />
+                      {form.procedimentos.length > 1 && (
+                        <p className="text-[11px] text-emerald-700">
+                          {form.procedimentos.length} exames selecionados.
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <SearchableSelect
+                      value={form.procedimento || "none"}
+                      onChange={(v) => setForm(f => ({
+                        ...f,
+                        procedimento: v === "none" ? "" : v,
+                        procedimentos: v === "none" ? [] : [v],
+                      }))}
+                      placeholder="Selecione o serviço"
+                      searchPlaceholder="Buscar serviço..."
+                      options={opts}
+                    />
+                  );
+                })()}
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-slate-700">Status</Label>
