@@ -48,6 +48,10 @@ const PatientDrawer = lazy(() =>
 const NovoAgendamentoWizard = lazy(() =>
   import("./novo-agendamento-wizard").then((m) => ({ default: m.NovoAgendamentoWizard })),
 );
+const ReagendarModal = lazy(() =>
+  import("./reagendar-modal").then((m) => ({ default: m.ReagendarModal })),
+);
+import type { ReagendarModalSessao } from "./reagendar-modal";
 
 const DENSITY_KEY = "agenda_v2_density";
 const MEUS_PACIENTES_KEY = "agenda_v2_meus_pacientes";
