@@ -28,7 +28,7 @@ export function HhpPageHeader({
           <div className="space-y-1 min-w-0">
             <h1
               className="text-xl md:text-2xl font-semibold tracking-tight text-slate-900 truncate"
-              style={{ fontFamily: "'Inter Tight', Inter, sans-serif", letterSpacing: "-0.01em" }}
+              style={{ fontFamily: "var(--hhp-font-display)", letterSpacing: "-0.015em" }}
             >
               {title}
             </h1>
