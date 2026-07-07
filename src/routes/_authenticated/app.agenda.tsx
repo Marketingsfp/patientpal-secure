@@ -1640,6 +1640,12 @@ function AgendaPage() {
     return atual;
   };
 
+  const procedimentosFormulario = (medicoId: string | null | undefined, procedimento: string | null | undefined) => {
+    const texto = procedimentoFormulario(medicoId, procedimento).trim();
+    if (!texto) return [];
+    return texto.split(/\s+\+\s+/).map((p) => p.trim()).filter(Boolean);
+  };
+
   const medicoEhLaboratorioFormulario = (medicoId: string | null | undefined) => {
     if (!medicoId) return false;
     const med = medicos.find((m) => m.id === medicoId);
@@ -2442,7 +2448,7 @@ function AgendaPage() {
       medico_id: a.medico_id ?? "",
       inicio: toLocalInput(a.inicio), fim: toLocalInput(a.fim),
       procedimento: procedimentoFormulario(a.medico_id, a.procedimento),
-      procedimentos: procedimentoFormulario(a.medico_id, a.procedimento) ? [procedimentoFormulario(a.medico_id, a.procedimento)] : [],
+      procedimentos: procedimentosFormulario(a.medico_id, a.procedimento),
       status: "agendado",
       observacoes: a.observacoes ?? "",
       data_pagamento: a.data_pagamento ?? "",
@@ -2511,7 +2517,7 @@ function AgendaPage() {
       medico_id: a.medico_id ?? "",
       inicio: toLocalInput(a.inicio), fim: toLocalInput(a.fim),
       procedimento: procedimentoFormulario(a.medico_id, a.procedimento),
-      procedimentos: procedimentoFormulario(a.medico_id, a.procedimento) ? [procedimentoFormulario(a.medico_id, a.procedimento)] : [],
+      procedimentos: procedimentosFormulario(a.medico_id, a.procedimento),
       status: a.status,
       observacoes: a.observacoes ?? "",
       data_pagamento: a.data_pagamento ?? "",
