@@ -1039,9 +1039,10 @@ export function AgendaV2Shell() {
               className={cn(
                 "h-9 rounded-2xl gap-1.5 text-xs",
                 meusPacientes
-                  ? "bg-indigo-600 hover:bg-indigo-700 text-white border-transparent"
+                  ? "border-transparent text-[color:var(--clinic-accent-fg)] shadow-sm"
                   : "bg-slate-100 border-transparent text-slate-600 hover:bg-slate-200",
               )}
+              style={meusPacientes ? { background: "var(--clinic-accent)" } : undefined}
               aria-pressed={meusPacientes}
               title="Mostrar apenas os pacientes do médico logado"
             >
