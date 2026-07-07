@@ -365,11 +365,8 @@ function AtendimentoMultiploPage() {
         <div className="space-y-3">
           {itens.map((it, idx) => {
             const buscaAtual = buscaProc[it.key] ?? "";
-            const filtrados = buscaAtual.trim().length >= 2
-              ? procedimentos
-                  .filter((p) => p.nome.toLowerCase().includes(buscaAtual.toLowerCase()))
-                  .slice(0, 8)
-              : [];
+            const filtrados: Procedimento[] =
+              buscaAtual.trim().length >= 2 ? (procResultados[it.key] ?? []) : [];
             return (
               <div key={it.key} className="border rounded-lg p-3 space-y-3 bg-card">
                 <div className="flex items-center justify-between">
