@@ -108,6 +108,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     items: [
     { to: "/app/agenda", label: "Agenda", icon: CalendarDays },
     { to: "/app/agenda/express", label: "Agenda Express", icon: Zap },
+    { to: "/app/atendimento-multiplo", label: "Atendimento Múltiplo", icon: ClipboardList },
     { to: "/app/checkin", label: "Check-in", icon: BadgeCheck },
     { to: "/app/caixa", label: "Caixa", icon: Wallet },
     { to: "/app/financeiro/atendimentos", label: "Repasse médico", icon: HandCoins },
