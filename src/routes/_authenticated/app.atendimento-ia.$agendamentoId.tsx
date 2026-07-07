@@ -25,6 +25,9 @@ import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 export const Route = createFileRoute("/_authenticated/app/atendimento-ia/$agendamentoId")({
   component: AtendimentoEditorPage,
   head: () => ({ meta: [{ title: "Atendimento — ClinicaOS" }] }),
+  validateSearch: (s: Record<string, unknown>) => ({
+    from: s.from === "agenda-v2" ? ("agenda-v2" as const) : undefined,
+  }),
 });
 
 type Modelo = { id: string; nome: string; prompt_ia: string | null };
@@ -72,6 +75,10 @@ const EMPTY: Soap = { queixa_principal: "", historia_doenca: "", exame_fisico: "
 
 function AtendimentoEditorPage() {
   const { agendamentoId } = Route.useParams();
+  const { from } = Route.useSearch();
+  const cameFromAgendaV2 = from === "agenda-v2";
+  const backTo = cameFromAgendaV2 ? "/app/agenda-v2" : "/app/atendimento-ia";
+  const backLabel = cameFromAgendaV2 ? "Voltar para Agenda V2" : "Voltar para fila";
   const navigate = useNavigate();
   const { clinicaAtual } = useClinica();
   const estruturar = useServerFn(gerarAnamneseEstruturada);
@@ -408,8 +415,8 @@ function AtendimentoEditorPage() {
             O atendimento de <b className="text-foreground uppercase">{pacienteNome}</b> foi registrado.
             {salvo.valorMedico > 0 && <> Repasse médico: <b className="text-foreground">R$ {salvo.valorMedico.toFixed(2)}</b>.</>}
           </p>
-          <Button size="lg" onClick={() => navigate({ to: "/app/atendimento-ia" })}>
-            <ArrowLeft className="h-4 w-4" /> Voltar para fila de atendimento
+          <Button size="lg" onClick={() => navigate({ to: backTo })}>
+            <ArrowLeft className="h-4 w-4" /> {cameFromAgendaV2 ? backLabel : "Voltar para fila de atendimento"}
           </Button>
         </Card>
       </div>
@@ -435,7 +442,7 @@ function AtendimentoEditorPage() {
                   <Link to="/app/caixa">Abrir caixa</Link>
                 </Button>
                 <Button size="sm" variant="outline" asChild>
-                  <Link to="/app/atendimento-ia">Voltar para fila</Link>
+                  <Link to={backTo}>{backLabel}</Link>
                 </Button>
               </div>
             </div>
@@ -456,7 +463,7 @@ function AtendimentoEditorPage() {
           </div>
         </div>
         <Button variant="outline" asChild>
-          <Link to="/app/atendimento-ia"><ArrowLeft className="h-4 w-4" /> Voltar para fila</Link>
+          <Link to={backTo}><ArrowLeft className="h-4 w-4" /> {backLabel}</Link>
         </Button>
       </div>
 
