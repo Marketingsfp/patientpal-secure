@@ -22,8 +22,11 @@ const STATUS_DOT: Record<string, string> = {
   confirmado: "bg-blue-400",
   em_atendimento: "bg-indigo-500",
   realizado: "bg-emerald-500",
-  cancelado: "bg-rose-400",
-  faltou: "bg-rose-400",
+  // Cancelado (paciente/clínica cancelou) e Faltou (no-show) precisam
+  // ser visualmente distintos — impacto financeiro/jurídico diferente
+  // (cobrança de multa, retorno de crédito etc.). Sprint 1 · S1-C.
+  cancelado: "bg-rose-500",
+  faltou: "bg-amber-500",
 };
 
 export interface SessionItem {
