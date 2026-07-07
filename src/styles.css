@@ -116,14 +116,15 @@
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.945 0.006 250);
-  --sidebar-foreground: oklch(0.32 0.035 258);
-  --sidebar-primary: oklch(0.555 0.215 261);
-  --sidebar-primary-foreground: oklch(0.99 0 0);
-  --sidebar-accent: oklch(0.895 0.018 255);
-  --sidebar-accent-foreground: oklch(0.3 0.07 261);
-  --sidebar-border: oklch(0.86 0.014 255);
-  --sidebar-ring: oklch(0.555 0.215 261);
+  /* Sidebar — mid navy (#2E5B94), sofisticado sem ser escuro demais */
+  --sidebar: oklch(0.44 0.11 258);
+  --sidebar-foreground: oklch(0.97 0.01 250);
+  --sidebar-primary: oklch(0.72 0.14 240);
+  --sidebar-primary-foreground: oklch(0.14 0.06 258);
+  --sidebar-accent: oklch(0.50 0.11 258);
+  --sidebar-accent-foreground: oklch(0.99 0 0);
+  --sidebar-border: oklch(0.38 0.10 258);
+  --sidebar-ring: oklch(0.72 0.14 240);
   /* Status tokens (Caixa v2 painel operacional) */
   --status-paid: oklch(0.72 0.17 145);
   --status-waiting: oklch(0.82 0.16 90);
@@ -472,6 +473,17 @@ html.agenda-v2-active .agenda-v2-scope .rounded-2xl.border,
 html.agenda-v2-active .agenda-v2-scope .rounded-xl.border,
 html.agenda-v2-active .agenda-v2-scope .rounded-lg.border {
   border-color: var(--hhp-border-subtle);
+  border-width: 1px;
+  box-shadow: var(--hhp-shadow-hair);
+  transition: border-color var(--hhp-dur-base) var(--hhp-ease),
+              box-shadow var(--hhp-dur-base) var(--hhp-ease);
+}
+/* Hover discreto — borda azul sinaliza afordância sem sombra pesada. */
+html.agenda-v2-active .agenda-v2-scope [data-slot="card"]:hover,
+html.agenda-v2-active .agenda-v2-scope .rounded-2xl.border:hover,
+html.agenda-v2-active .agenda-v2-scope .rounded-xl.border:hover,
+html.agenda-v2-active .agenda-v2-scope .rounded-lg.border:hover {
+  border-color: #3B82F6;
 }
 /* Hover consistente em superfícies clicáveis dentro da Agenda V2. */
 html.agenda-v2-active .agenda-v2-scope button:not(:disabled):hover,
@@ -484,12 +496,45 @@ html.agenda-v2-active .agenda-v2-scope {
   font-family: var(--hhp-font-body);
   background-color: var(--hhp-surface-page);
 }
+/* Números em tabular — leitura consistente em KPIs, timeline, chips numéricos. */
+html.agenda-v2-active .agenda-v2-scope,
+html.agenda-v2-active .agenda-v2-scope * {
+  font-variant-numeric: tabular-nums;
+}
+/* Header interno da Agenda V2 — branco puro + hairline slate-200. */
+html.agenda-v2-active .agenda-v2-scope header {
+  background-color: #FFFFFF;
+  border-bottom: 1px solid #E2E8F0;
+}
 html.agenda-v2-active .agenda-v2-scope h1,
 html.agenda-v2-active .agenda-v2-scope h2,
 html.agenda-v2-active .agenda-v2-scope h3 {
   font-family: var(--hhp-font-display);
   letter-spacing: -0.02em;
   font-feature-settings: "cv11", "ss01";
+}
+
+/* =====================================================================
+ * MenuV2 sidebar — legibilidade em fundo navy
+ * A sidebar agora é mid-navy; o markup interno usa text-muted-foreground
+ * (que no tema light é escuro). Redefinimos os tokens *dentro* da aside
+ * para tons claros, sem afetar o resto do app.
+ * ===================================================================== */
+[data-testid="menu-v2"] {
+  --muted-foreground: oklch(0.88 0.02 250);
+  --foreground: oklch(0.99 0 0);
+  --border: oklch(0.38 0.10 258);
+  --primary: oklch(0.86 0.10 240);
+  --ring: oklch(0.86 0.10 240);
+  color: var(--sidebar-foreground);
+}
+[data-testid="menu-v2"] input {
+  background-color: color-mix(in oklab, white 8%, transparent);
+  color: var(--sidebar-foreground);
+  border-color: var(--sidebar-border);
+}
+[data-testid="menu-v2"] input::placeholder {
+  color: color-mix(in oklab, white 55%, transparent);
 }
 
 /* Utilitário de "count-up" sutil para KPIs (visual apenas). */
