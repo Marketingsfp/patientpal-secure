@@ -1174,9 +1174,10 @@ export function AgendaV2Shell() {
             { k: "F", label: "Foco" },
           ]},
           { group: "Navegação", items: [
-            { k: "J", label: "Próxima sessão" },
-            { k: "K", label: "Sessão anterior" },
+            { k: "J / ↓", label: "Próxima sessão" },
+            { k: "K / ↑", label: "Sessão anterior" },
             { k: "Enter", label: "Abrir sessão selecionada" },
+            { k: "P", label: "Abrir prontuário da sessão" },
             { k: "Esc", label: "Fechar drawer" },
           ]},
           { group: "Ações", items: [
