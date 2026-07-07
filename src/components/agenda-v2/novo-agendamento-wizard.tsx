@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -58,7 +58,27 @@ function fmtHora(iso: string) {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
-export function NovoAgendamentoWizard({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+/**
+ * Sprint 1 · S1-A — `initial` (opcional) permite abrir o wizard já com
+ * médico + data + hora pré-selecionados a partir de um clique em slot
+ * livre da timeline. Não pula passos (paciente/serviço continuam
+ * obrigatórios), apenas evita re-selecionar o que o usuário já indicou.
+ */
+export interface WizardInitial {
+  medicoId?: string | null;
+  dia?: Date | null;
+  hour?: number | null;
+}
+
+export function NovoAgendamentoWizard({
+  open,
+  onOpenChange,
+  initial,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  initial?: WizardInitial | null;
+}) {
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id ?? null;
   const queryClient = useQueryClient();
@@ -85,6 +105,32 @@ export function NovoAgendamentoWizard({ open, onOpenChange }: { open: boolean; o
     setTipoAtendimento("particular");
     setSaving(false);
   };
+
+  // Aplica `initial` quando o wizard abre e quando os médicos carregam
+  // (necessário porque `medico` precisa vir da lista já carregada).
+  useEffect(() => {
+    if (!open || !initial) return;
+    if (initial.dia) setDataDia(toLocalDateKey(initial.dia));
+    if (initial.medicoId && medicosQuery.data) {
+      const m = medicosQuery.data.find((x) => x.id === initial.medicoId);
+      if (m && medico?.id !== m.id) {
+        setMedico(m);
+        setSlot(null);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initial?.medicoId, initial?.dia, medicosQuery.data]);
+
+  // Pré-seleciona o primeiro slot dentro da hora indicada assim que os
+  // slots do médico carregam. Só age se o usuário ainda não escolheu slot.
+  useEffect(() => {
+    if (!open || !initial || initial.hour == null || slot) return;
+    const hit = (slotsQuery.data ?? []).find(
+      (s) => new Date(s.inicio).getHours() === initial.hour,
+    );
+    if (hit) setSlot(hit);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initial?.hour, slotsQuery.data]);
 
   // ---------- Query: médicos ativos da clínica (mesma da clássica) ----------
   const medicosQuery = useQuery({
