@@ -1,20 +1,26 @@
 /**
- * Regra de contagem de atendimentos (aprovada 2026-07-07):
+ * Regra de contagem de atendimentos (aprovada 2026-07-07, revisada para
+ * usar `procedimentos.tipo_procedimento` como fonte da verdade):
  *
- * - **Laboratório** (especialidade cujo nome contém "laborat"): N exames do
+ * - **Laboratório** (categoria `laboratorio` do procedimento): N exames do
  *   mesmo paciente no mesmo dia contam como **1 atendimento**.
- * - **Demais especialidades** (imagem, consulta, procedimento): **1 linha =
- *   1 atendimento**.
+ * - **Demais categorias** (imagem, consulta, procedimento, cirurgia):
+ *   **1 linha = 1 atendimento**.
  *
- * O helper recebe uma lista de agendamentos e os mapas auxiliares que
- * permitem descobrir se o médico é de laboratório.
+ * O helper aceita um resolver por texto de procedimento (recomendado) e,
+ * como fallback compatível com o código anterior, a heurística "médico de
+ * laboratório" para agendamentos sem procedimento cadastrado.
  */
+
+import type { CategoriaResolver } from "@/lib/procedimento/categoria";
 
 export type AgendamentoContavel = {
   id: string;
   medico_id: string | null;
   paciente_id: string | null;
   inicio: string | null;
+  /** Texto livre do agendamento — pode conter "A + B" para laboratório. */
+  procedimento?: string | null;
 };
 
 export type EspecialidadeMin = { id: string; nome: string | null };
@@ -45,17 +51,25 @@ export function laboratorioMedicoIdsFrom(
 export function contarAtendimentos(
   ags: AgendamentoContavel[],
   labMedicoIds: Set<string>,
+  resolver?: CategoriaResolver | null,
 ): number {
   let naoLab = 0;
   const grupos = new Set<string>();
   for (const a of ags) {
-    const isLab = !!a.medico_id && labMedicoIds.has(a.medico_id);
+    // 1) Fonte primária: categoria do procedimento (via resolver).
+    let isLab = false;
+    if (resolver && a.procedimento) {
+      isLab = resolver.categoriaDoTexto(a.procedimento) === "laboratorio";
+    }
+    // 2) Fallback: procedimento vazio/não cadastrado — usa heurística por médico.
+    if (!isLab && (!resolver || !a.procedimento)) {
+      isLab = !!a.medico_id && labMedicoIds.has(a.medico_id);
+    }
     if (!isLab) {
       naoLab++;
       continue;
     }
     const dia = (a.inicio ?? "").slice(0, 10);
-    // 1 grupo = 1 paciente + 1 dia (sem paciente_id, cai para o próprio id)
     grupos.add(`${a.paciente_id ?? a.id}|${dia}`);
   }
   return naoLab + grupos.size;

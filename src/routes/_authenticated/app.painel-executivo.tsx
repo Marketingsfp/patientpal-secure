@@ -16,6 +16,7 @@ import { HhpKpiCard, HhpKpiRow } from "@/design-system/hhp/kpi-card";
 import type { HhpTone } from "@/design-system/hhp/tokens";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { laboratorioMedicoIdsFrom, contarAtendimentos } from "@/lib/agenda/contagem";
+import { buildCategoriaResolver } from "@/lib/procedimento/categoria";
 
 export const Route = createFileRoute("/_authenticated/app/painel-executivo")({
   component: PainelExecutivoPage,
@@ -84,7 +85,7 @@ async function carregarBloco(cid: string, periodo: Periodo): Promise<Bloco & { p
   const ini = new Date(`${periodo.de}T00:00:00`).toISOString();
   const fim = new Date(`${periodo.ate}T23:59:59`).toISOString();
 
-  const [agsR, lancR, atendR, medicosR, dispR, orcR, especR, medEspR] = await Promise.all([
+  const [agsR, lancR, atendR, medicosR, dispR, orcR, especR, medEspR, procR] = await Promise.all([
     supabase.from("agendamentos").select("id,status,medico_id,paciente_id,inicio,fim,executado_em,fluxo_etapa,procedimento,tipo_atendimento,orcamento_id").eq("clinica_id", cid).gte("inicio", ini).lte("inicio", fim),
     supabase.from("fin_lancamentos").select("id,tipo,status,valor,data,data_vencimento,empresa_id").eq("clinica_id", cid).or(`and(data.gte.${periodo.de},data.lte.${periodo.ate}),and(data_vencimento.gte.${periodo.de},data_vencimento.lte.${periodo.ate})`),
     supabase.from("fin_atendimentos").select("id,valor_total,valor_medico,valor_laudo,medico_id,status,procedimento,data").eq("clinica_id", cid).gte("data", periodo.de).lte("data", periodo.ate),
@@ -93,6 +94,7 @@ async function carregarBloco(cid: string, periodo: Periodo): Promise<Bloco & { p
     supabase.from("orcamentos").select("id,status,paciente_id,created_at").eq("clinica_id", cid).gte("created_at", ini).lte("created_at", fim),
     supabase.from("especialidades").select("id,nome"),
     supabase.from("medico_especialidades").select("medico_id,especialidade_id"),
+    supabase.from("procedimentos").select("nome,tipo_procedimento").eq("clinica_id", cid).eq("ativo", true),
   ]);
 
   const ags = (agsR.data ?? []) as Ag[];
@@ -109,6 +111,7 @@ async function carregarBloco(cid: string, periodo: Periodo): Promise<Bloco & { p
   const medEspIdx: Record<string, string[]> = {};
   for (const me of medEsp) (medEspIdx[me.medico_id] ||= []).push(me.especialidade_id);
   const labMedicoIds = laboratorioMedicoIdsFrom(espLista, medEsp);
+  const catResolver = buildCategoriaResolver((procR.data ?? []) as { nome: string; tipo_procedimento: string | null }[]);
 
   // --- Produção ---
   const naoCancelados = ags.filter(a => a.status !== "cancelado");
@@ -118,11 +121,11 @@ async function carregarBloco(cid: string, periodo: Periodo): Promise<Bloco & { p
   const confirmadosArr = ags.filter(a => ["confirmado", "realizado", "faltou"].includes(a.status) || (a.fluxo_etapa && a.fluxo_etapa !== "aguardando"));
 
   // Regra de contagem (lab = 1 por paciente/dia, imagem/consulta = 1 por linha)
-  const cAgendados = contarAtendimentos(naoCancelados, labMedicoIds);
-  const cConfirmados = contarAtendimentos(confirmadosArr, labMedicoIds);
-  const cCompareceram = contarAtendimentos(realizadosArr, labMedicoIds);
-  const cFaltaram = contarAtendimentos(faltasArr, labMedicoIds);
-  const cCancelaram = contarAtendimentos(canceladosArr, labMedicoIds);
+  const cAgendados = contarAtendimentos(naoCancelados, labMedicoIds, catResolver);
+  const cConfirmados = contarAtendimentos(confirmadosArr, labMedicoIds, catResolver);
+  const cCompareceram = contarAtendimentos(realizadosArr, labMedicoIds, catResolver);
+  const cFaltaram = contarAtendimentos(faltasArr, labMedicoIds, catResolver);
+  const cCancelaram = contarAtendimentos(canceladosArr, labMedicoIds, catResolver);
 
   // Capacidade em minutos no período (soma de janelas de disponibilidade por dia)
   const iniDt = new Date(`${periodo.de}T00:00:00`);
@@ -163,8 +166,8 @@ async function carregarBloco(cid: string, periodo: Periodo): Promise<Bloco & { p
   // Reaplica regra por médico: se lab, agrupa por (paciente,dia).
   const porMedicoAj = [...porMedicoMap.keys()].map((id) => {
     const doMed = ags.filter((a) => a.medico_id === id);
-    const total = contarAtendimentos(doMed.filter((a) => a.status !== "cancelado"), labMedicoIds);
-    const realizados = contarAtendimentos(doMed.filter((a) => a.status === "realizado" || a.executado_em), labMedicoIds);
+    const total = contarAtendimentos(doMed.filter((a) => a.status !== "cancelado"), labMedicoIds, catResolver);
+    const realizados = contarAtendimentos(doMed.filter((a) => a.status === "realizado" || a.executado_em), labMedicoIds, catResolver);
     return { nome: medNome.get(id) ?? "—", total, realizados };
   }).sort((a, b) => b.total - a.total).slice(0, 12);
 

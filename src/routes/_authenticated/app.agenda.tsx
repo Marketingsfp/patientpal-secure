@@ -82,7 +82,7 @@ type Medico = { id: string; nome: string; sexo?: string | null; usa_sistema?: bo
 type RecursoEnf = { id: string; nome: string };
 type Especialidade = { id: string; nome: string };
 type Paciente = { id: string; nome: string };
-type ProcedimentoRef = { id: string; nome: string; tipo: string | null; grupo?: string | null };
+type ProcedimentoRef = { id: string; nome: string; tipo: string | null; grupo?: string | null; tipo_procedimento?: string | null };
 type MedicoProcedimentoRef = { medico_id: string | null; procedimento_id: string; especialidade_id?: string | null; created_at?: string | null };
 
 const STATUS_LABEL: Record<Status, string> = {
@@ -214,7 +214,7 @@ async function fetchProcedimentosAgenda(clinicaId: string): Promise<Procedimento
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await supabase
       .from("procedimentos")
-      .select("id,nome,tipo,grupo")
+      .select("id,nome,tipo,grupo,tipo_procedimento")
       .eq("clinica_id", clinicaId)
       .eq("ativo", true)
       .order("nome")
@@ -667,7 +667,7 @@ function AgendaPage() {
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [recursoIds, setRecursoIds] = useState<Set<string>>(new Set());
   const [exames, setExames] = useState<{ id: string; nome: string }[]>([]);
-  const [procedimentosList, setProcedimentosList] = useState<{ id: string; nome: string }[]>([]);
+  const [procedimentosList, setProcedimentosList] = useState<{ id: string; nome: string; tipo_procedimento?: string | null }[]>([]);
   const [procPorMedico, setProcPorMedico] = useState<Map<string, Set<string>>>(new Map());
   const [procOpcoesPorMedico, setProcOpcoesPorMedico] = useState<Map<string, { id: string; nome: string }[]>>(new Map());
   const [procNomesPorMedico, setProcNomesPorMedico] = useState<Map<string, Set<string>>>(new Map());
@@ -1350,7 +1350,7 @@ function AgendaPage() {
       }
       setExames(unicos);
     }
-    setProcedimentosList(todos.map(({ id, nome }) => ({ id, nome })));
+    setProcedimentosList(todos.map(({ id, nome, tipo_procedimento }) => ({ id, nome, tipo_procedimento: tipo_procedimento ?? null })));
     const map = new Map<string, Set<string>>();
     for (const r of (me.data ?? []) as Array<{ medico_id: string; especialidade_id: string }>) {
       if (!map.has(r.medico_id)) map.set(r.medico_id, new Set());
@@ -1649,6 +1649,13 @@ function AgendaPage() {
   const medicoEhLaboratorioFormulario = (medicoId: string | null | undefined) => {
     if (!medicoId) return false;
     const med = medicos.find((m) => m.id === medicoId);
+    // Preferência: se qualquer procedimento configurado para o médico é
+    // laboratório (`tipo_procedimento='laboratorio'`), assume lab.
+    const opts = opcoesProcedimentoMedico(medicoId, editing?.agenda_id ?? (filtroAgenda !== "todos" ? filtroAgenda : null));
+    if (opts.some((o) => {
+      const p = procedimentosList.find((pp) => pp.id === o.id);
+      return (p?.tipo_procedimento ?? "").toLowerCase() === "laboratorio";
+    })) return true;
     if (normalizar(med?.especialidade_nome ?? "").includes("laborat")) return true;
     const espIds = medicoEspec.get(medicoId);
     if (!espIds || espIds.size === 0) return false;
@@ -1656,6 +1663,12 @@ function AgendaPage() {
   };
 
   const procedimentoEhImagem = (label: string) => {
+    // Preferência: consulta a categoria no cadastro do procedimento.
+    const alvo = normalizar(label);
+    const p = procedimentosList.find((pp) => normalizar(pp.nome) === alvo);
+    const tp = (p?.tipo_procedimento ?? "").toLowerCase();
+    if (tp === "imagem") return true;
+    if (tp === "laboratorio" || tp === "consulta" || tp === "cirurgia" || tp === "procedimento") return false;
     const u = normalizar(label).toUpperCase();
     return u.includes("ULTRASS")
       || /\bUSG\b|\bUS\b/.test(u)
