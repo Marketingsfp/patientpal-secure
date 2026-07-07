@@ -7,6 +7,7 @@ import {
   Check, FileText, CalendarClock, Wallet, FileSignature,
   MessageCircle, History, Stethoscope, Sparkles, AlertTriangle,
   Coffee, DollarSign, Clock, ClipboardCheck, LogIn, XCircle, UserX,
+  ArrowUpRight,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
@@ -76,12 +77,20 @@ function idadeFromDob(dob: string | null | undefined): number | null {
  * - Abertura instantânea; detalhes do paciente carregam em segundo plano.
  */
 export function PatientDrawer({
-  open, onOpenChange, data, onChangeStatus,
+  open, onOpenChange, data, onChangeStatus, onOpenProntuario,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   data: DrawerPatientData | null;
   onChangeStatus?: (agendamentoIds: string[], novoStatus: StatusAgendamento) => void;
+  /**
+   * Sprint 3 · S3-A — abre o prontuário/atendimento IA para o
+   * primeiro agendamento da sessão. A rota destino é
+   * `/app/atendimento-ia/$agendamentoId`; a navegação em si acontece
+   * no shell para preservar o contexto (data, filtros, densidade,
+   * scroll, paciente selecionado) ao retornar.
+   */
+  onOpenProntuario?: (agendamentoId: string) => void;
 }) {
   const [tab, setTab] = useState<Tab>("resumo");
   const openedAtRef = useRef<number>(0);
@@ -115,6 +124,12 @@ export function PatientDrawer({
   });
 
   const idade = detalhesQuery.data?.idade ?? null;
+
+  const primeiroAgendamentoId = data?.agendamento_ids?.[0] ?? null;
+  const abrirProntuario = () => {
+    if (!onOpenProntuario || !primeiroAgendamentoId) return;
+    onOpenProntuario(primeiroAgendamentoId);
+  };
 
   return (
     <HhpDrawer
@@ -178,7 +193,11 @@ export function PatientDrawer({
               )}
               <SectionTitle>Ações rápidas</SectionTitle>
               <div className="grid grid-cols-4 gap-2">
-                <QuickAction icon={<Stethoscope className="h-4 w-4" />} label="Prontuário" />
+                <QuickAction
+                  icon={<Stethoscope className="h-4 w-4" />}
+                  label="Prontuário"
+                  onClick={onOpenProntuario && primeiroAgendamentoId ? abrirProntuario : undefined}
+                />
                 <QuickAction icon={<CalendarClock className="h-4 w-4" />} label="Reagendar" />
                 <QuickAction icon={<Wallet className="h-4 w-4" />} label="Financeiro" />
                 <QuickAction icon={<FileSignature className="h-4 w-4" />} label="Orçamento" />
@@ -269,9 +288,13 @@ export function PatientDrawer({
                     )}
                   </div>
                 )}
-                {tab === "prontuario" && <TabPlaceholder title="Prontuário">
-                  Últimas evoluções, exames e sinais vitais.
-                </TabPlaceholder>}
+                {tab === "prontuario" && (
+                  <ProntuarioPanel
+                    proc={data.proc_titulo ?? null}
+                    canOpen={!!onOpenProntuario && !!primeiroAgendamentoId}
+                    onOpen={abrirProntuario}
+                  />
+                )}
               </div>
             </div>
 
@@ -346,20 +369,79 @@ function JourneyLine({ currentIdx }: { currentIdx: number }) {
   );
 }
 
-function QuickAction({ icon, label }: { icon: React.ReactNode; label: string }) {
+function QuickAction({
+  icon,
+  label,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick?: () => void;
+}) {
   return (
     <button
       type="button"
-      onClick={() =>
-        toast.info(label, {
-          description: "Ação será integrada nas próximas fases sem alterar as regras dos módulos existentes.",
-        })
+      onClick={
+        onClick ??
+        (() =>
+          toast.info(label, {
+            description:
+              "Ação será integrada nas próximas fases sem alterar as regras dos módulos existentes.",
+          }))
       }
       className="flex flex-col items-center justify-center gap-1 h-14 rounded-xl border border-slate-200/70 bg-white hover:bg-slate-50 hover:border-slate-300 transition-colors text-slate-600 hover:text-slate-900"
     >
       <span className="text-slate-500">{icon}</span>
       <span className="text-[10px] font-medium">{label}</span>
     </button>
+  );
+}
+
+// Sprint 3 · S3-A — painel do Prontuário no drawer. Substitui o
+// placeholder por um resumo do procedimento atual + CTA que abre o
+// Atendimento IA daquele agendamento (mesma rota da Agenda Express).
+function ProntuarioPanel({
+  proc,
+  canOpen,
+  onOpen,
+}: {
+  proc: string | null;
+  canOpen: boolean;
+  onOpen: () => void;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-100 bg-white p-4 space-y-3">
+      <div className="flex items-start gap-2">
+        <Stethoscope className="h-4 w-4 text-indigo-500 mt-0.5" />
+        <div className="min-w-0 flex-1">
+          <div className="text-[11px] font-semibold text-slate-700">
+            Prontuário do atendimento
+          </div>
+          <p className="text-[11px] text-slate-500 leading-relaxed mt-0.5">
+            {proc
+              ? `Abrir o prontuário deste atendimento (${proc}) para registrar evolução, exames e conduta.`
+              : "Abrir o prontuário deste atendimento para registrar evolução, exames e conduta."}
+          </p>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onOpen}
+        disabled={!canOpen}
+        className={cn(
+          "inline-flex items-center gap-1.5 h-9 px-3 rounded-xl text-[12px] font-medium",
+          "bg-slate-900 text-white hover:bg-slate-800 transition-colors",
+          "disabled:opacity-40 disabled:cursor-not-allowed",
+        )}
+      >
+        <ArrowUpRight className="h-3.5 w-3.5" />
+        Abrir prontuário completo
+      </button>
+      <p className="text-[10px] text-slate-400 leading-relaxed">
+        A tela do prontuário abre no mesmo destino usado pela Agenda clássica e
+        pela fila de Atendimento IA — nenhuma regra clínica é alterada.
+      </p>
+    </div>
   );
 }
 
