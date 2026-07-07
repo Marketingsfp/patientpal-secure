@@ -64,10 +64,11 @@ export const atualizarStatusAgendamento = createServerFn({ method: "POST" })
     // Regras 1 e 2 — "Realizado".
     if (novo_status === "realizado") {
       const { data: link } = await supabase
-        .from("clinica_usuarios")
+        .from("clinica_memberships")
         .select("role")
         .eq("clinica_id", ag.clinica_id)
         .eq("user_id", userId)
+        .eq("ativo", true)
         .maybeSingle();
       const role = (link?.role ?? "").toLowerCase();
       const podeRealizar =
