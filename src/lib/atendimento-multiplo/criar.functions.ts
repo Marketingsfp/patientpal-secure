@@ -90,6 +90,30 @@ export const criarAtendimentoMultiplo = createServerFn({ method: "POST" })
       atendimento_grupo_id: grupoId,
     }));
 
+    // Backfill de agenda_id — para cada item com médico, tenta localizar a
+    // `medico_agenda` ativa no dia. Sem isso, o filtro "por agenda" da agenda
+    // clássica esconde os agendamentos criados aqui.
+    const medicoIds = Array.from(
+      new Set(itens.map((it) => it.medico_id).filter((x): x is string => !!x)),
+    );
+    if (medicoIds.length > 0) {
+      const { data: agendas } = await supabase
+        .from("medico_agendas")
+        .select("id, medico_id, ativa")
+        .in("medico_id", medicoIds)
+        .eq("clinica_id", clinica_id)
+        .eq("ativa", true);
+      const agendaByMedico = new Map<string, string>();
+      for (const a of (agendas ?? []) as Array<{ id: string; medico_id: string }>) {
+        if (!agendaByMedico.has(a.medico_id)) agendaByMedico.set(a.medico_id, a.id);
+      }
+      for (const r of rows) {
+        if (r.medico_id && agendaByMedico.has(r.medico_id)) {
+          (r as Record<string, unknown>).agenda_id = agendaByMedico.get(r.medico_id);
+        }
+      }
+    }
+
     const { data: novos, error } = await supabase
       .from("agendamentos")
       .insert(rows)
