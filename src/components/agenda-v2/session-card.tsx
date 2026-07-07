@@ -1,12 +1,22 @@
 import { useState } from "react";
 import {
   ChevronDown, ChevronRight, ArrowUpRight, CalendarClock, DollarSign,
+  MoreHorizontal, Check, LogIn, ClipboardCheck, XCircle, UserX,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { TIPO_SESSAO_ESTILO, TIPO_SESSAO_LABEL, type TipoSessao } from "@/lib/agenda-v2/session-detect";
 import { HhpChip } from "@/design-system/hhp";
+import type { StatusAgendamento } from "@/lib/agenda/status-agendamento.functions";
 
 // Chips de status — tom baixo, editorial.
 const STATUS_LABEL: Record<string, string> = {
@@ -116,10 +126,12 @@ export type SessionDensity = "confortavel" | "compacto" | "foco";
 export function SessionCard({
   data,
   onOpenTimeline,
+  onChangeStatus,
   density = "confortavel",
 }: {
   data: SessionCardData;
   onOpenTimeline: (pacoteId: string) => void;
+  onChangeStatus?: (data: SessionCardData, novoStatus: StatusAgendamento) => void;
   density?: SessionDensity;
 }) {
   const [open, setOpen] = useState(false);
@@ -284,7 +296,7 @@ export function SessionCard({
             label="Reagendar"
             onClick={() =>
               toast.info("Reagendar", {
-                description: "Fluxo será conectado na Fase E (wizard).",
+                description: "Sprint dedicada de reagendamento — em breve.",
               })
             }
           />
@@ -297,6 +309,9 @@ export function SessionCard({
               })
             }
           />
+          {onChangeStatus && (
+            <StatusMenu data={data} onChangeStatus={onChangeStatus} />
+          )}
         </div>
       )}
 
@@ -336,5 +351,76 @@ function QuickAction({
       {icon}
       <span>{label}</span>
     </button>
+  );
+}
+
+// Sprint 2 · S2-A — menu de mudança de status, espelhando as transições
+// disponíveis na Agenda clássica (dropdown do card, `mudarStatus`).
+function StatusMenu({
+  data,
+  onChangeStatus,
+}: {
+  data: SessionCardData;
+  onChangeStatus: (data: SessionCardData, novoStatus: StatusAgendamento) => void;
+}) {
+  const s = data.status;
+  const podeConfirmar = s === "agendado";
+  const podeCheckin = s === "agendado" || s === "confirmado";
+  const podeRealizar = s === "agendado" || s === "confirmado" || s === "em_atendimento";
+  const podeCancelar = s !== "cancelado" && s !== "realizado";
+  const podeFaltou = s !== "faltou" && s !== "cancelado" && s !== "realizado";
+  const semAcoes = !podeConfirmar && !podeCheckin && !podeRealizar && !podeCancelar && !podeFaltou;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            "inline-flex items-center justify-center h-7 w-7 rounded-lg",
+            "bg-white/95 backdrop-blur-sm border border-slate-200/70 shadow-sm",
+            "text-slate-600 hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-colors",
+          )}
+          aria-label="Alterar status"
+          disabled={semAcoes}
+        >
+          <MoreHorizontal className="h-3.5 w-3.5" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-52">
+        <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-slate-400">
+          Alterar status
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {podeConfirmar && (
+          <DropdownMenuItem onClick={() => onChangeStatus(data, "confirmado")}>
+            <Check className="h-3.5 w-3.5 mr-2 text-blue-500" /> Confirmar
+          </DropdownMenuItem>
+        )}
+        {podeCheckin && (
+          <DropdownMenuItem onClick={() => onChangeStatus(data, "em_atendimento")}>
+            <LogIn className="h-3.5 w-3.5 mr-2 text-indigo-500" /> Check-in
+          </DropdownMenuItem>
+        )}
+        {podeRealizar && (
+          <DropdownMenuItem onClick={() => onChangeStatus(data, "realizado")}>
+            <ClipboardCheck className="h-3.5 w-3.5 mr-2 text-emerald-500" /> Realizar
+          </DropdownMenuItem>
+        )}
+        {(podeCancelar || podeFaltou) && <DropdownMenuSeparator />}
+        {podeFaltou && (
+          <DropdownMenuItem onClick={() => onChangeStatus(data, "faltou")}>
+            <UserX className="h-3.5 w-3.5 mr-2 text-amber-500" /> Faltou
+          </DropdownMenuItem>
+        )}
+        {podeCancelar && (
+          <DropdownMenuItem
+            onClick={() => onChangeStatus(data, "cancelado")}
+            className="text-rose-600 focus:text-rose-700"
+          >
+            <XCircle className="h-3.5 w-3.5 mr-2" /> Cancelar
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
