@@ -1149,6 +1149,7 @@ export function AgendaV2Shell() {
                           onOpenTimeline={openDrawer}
                           onChangeStatus={onChangeStatusCard}
                           onOpenProntuario={handleOpenProntuario}
+                          onReagendar={handleOpenReagendar}
                           density={density}
                         />
                       ))}
