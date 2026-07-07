@@ -69,21 +69,27 @@ function Row({
 }
 
 function CentroGroup({
-  centro, currentPath, open, onToggleOpen, prefs, onPin, onFav,
+  centro, currentPath, open, onToggleOpen, prefs, onPin, onFav, hidePaths,
 }: {
   centro: Centro; currentPath: string; open: boolean; onToggleOpen: () => void;
   prefs: { pinned: string[]; favorites: string[] };
   onPin: (p: string) => void; onFav: (p: string) => void;
+  /** paths a esconder dentro do centro (ex.: já mostrados em "Fixados") */
+  hidePaths?: ReadonlyArray<string>;
 }) {
   const [query, setQuery] = useState("");
-  const visible = centro.items.slice(0, MAX_INLINE);
-  const hasMore = centro.items.length > MAX_INLINE;
+  const hide = new Set(hidePaths ?? []);
+  const itemsDisponiveis = centro.items.filter((i) => !hide.has(i.path));
+  const visible = itemsDisponiveis.slice(0, MAX_INLINE);
+  const hasMore = itemsDisponiveis.length > MAX_INLINE;
   const Icon = centro.icon;
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return centro.items;
-    return centro.items.filter((i) => i.label.toLowerCase().includes(q));
-  }, [centro.items, query]);
+    if (!q) return itemsDisponiveis;
+    return itemsDisponiveis.filter((i) => i.label.toLowerCase().includes(q));
+  }, [itemsDisponiveis, query]);
+
+  if (itemsDisponiveis.length === 0) return null;
 
   return (
     <div className="mb-1">
@@ -189,6 +195,9 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
 
   const recentesFiltrados = prefs.recent
     .filter((r) => !effectivePinned.includes(r.path) && r.path !== currentPath)
+    // remove itens que já aparecem em algum centro visível — evita mostrar a
+    // mesma coisa em "Recentes" e no grupo do centro logo acima.
+    .filter((r) => !centrosVisiveis.some((c) => c.items.some((i) => i.path === r.path)))
     .slice(0, 5);
 
   const favoritos = prefs.favorites
@@ -316,6 +325,7 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
                 prefs={{ pinned: effectivePinned, favorites: prefs.favorites }}
                 onPin={togglePin}
                 onFav={toggleFavorite}
+                hidePaths={effectivePinned}
               />
             ))}
           </div>
