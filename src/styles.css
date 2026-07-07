@@ -397,7 +397,80 @@
   --hhp-density-foco-gap: 1rem;              /* 16px */
 
   /* Tipografia editorial (usada por headings do HHP) */
-  --hhp-font-display: "Inter Tight", Inter, system-ui, sans-serif;
-  --hhp-font-body: Inter, system-ui, sans-serif;
+  --hhp-font-display: "Sora", "Inter Tight", Inter, system-ui, sans-serif;
+  --hhp-font-body: "Manrope", Inter, system-ui, sans-serif;
   --hhp-font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* =====================================================================
+ * Sprint Beauty — Agenda V2 · Sistema de skin por clínica
+ *
+ * Um único visual (Azure Institutional), três skins temáveis via
+ * CSS variables. Aplicado por `useClinicSkin` em <html> enquanto a
+ * Agenda V2 está montada.
+ *
+ * Regra dura: nenhum componente hardcode `text-blue-500` / `bg-indigo-*`
+ * para intenção "cor da clínica" — usar `var(--clinic-accent)`.
+ * ===================================================================== */
+:root {
+  /* Default = Azure (skin institucional). */
+  --clinic-accent: #0284c7;
+  --clinic-accent-strong: #0369a1;
+  --clinic-accent-soft: #e0f2fe;
+  --clinic-accent-fg: #ffffff;
+  --clinic-accent-glow: rgba(2, 132, 199, 0.18);
+}
+html.clinic-skin-azure {
+  --clinic-accent: #0284c7;
+  --clinic-accent-strong: #0369a1;
+  --clinic-accent-soft: #e0f2fe;
+  --clinic-accent-fg: #ffffff;
+  --clinic-accent-glow: rgba(2, 132, 199, 0.18);
+}
+html.clinic-skin-emerald {
+  --clinic-accent: #059669;
+  --clinic-accent-strong: #047857;
+  --clinic-accent-soft: #d1fae5;
+  --clinic-accent-fg: #ffffff;
+  --clinic-accent-glow: rgba(5, 150, 105, 0.18);
+}
+html.clinic-skin-violet {
+  --clinic-accent: #7c3aed;
+  --clinic-accent-strong: #6d28d9;
+  --clinic-accent-soft: #ede9fe;
+  --clinic-accent-fg: #ffffff;
+  --clinic-accent-glow: rgba(124, 58, 237, 0.18);
+}
+html.clinic-skin-orange {
+  --clinic-accent: #ea580c;
+  --clinic-accent-strong: #c2410c;
+  --clinic-accent-soft: #ffedd5;
+  --clinic-accent-fg: #ffffff;
+  --clinic-accent-glow: rgba(234, 88, 12, 0.18);
+}
+
+/* Sprint Beauty — refinos visuais escopados à Agenda V2.
+ * Não afeta a agenda clássica nem outras telas. */
+html.agenda-v2-active {
+  --hhp-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px -6px rgba(15, 23, 42, 0.08);
+  --hhp-shadow-lift: 0 10px 32px -18px rgba(15, 23, 42, 0.22);
+  --hhp-border-hair: rgba(15, 23, 42, 0.05);
+}
+html.agenda-v2-active .agenda-v2-scope {
+  font-family: var(--hhp-font-body);
+}
+html.agenda-v2-active .agenda-v2-scope h1,
+html.agenda-v2-active .agenda-v2-scope h2,
+html.agenda-v2-active .agenda-v2-scope h3 {
+  font-family: var(--hhp-font-display);
+  letter-spacing: -0.015em;
+}
+
+/* Utilitário de "count-up" sutil para KPIs (visual apenas). */
+@keyframes hhp-kpi-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.hhp-kpi-anim {
+  animation: hhp-kpi-in 320ms var(--hhp-ease, cubic-bezier(0.32, 0.72, 0, 1)) both;
 }
