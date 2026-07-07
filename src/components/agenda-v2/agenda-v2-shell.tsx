@@ -1188,6 +1188,7 @@ export function AgendaV2Shell() {
             data={drawerData}
             onChangeStatus={onChangeStatusDrawer}
             onOpenProntuario={handleOpenProntuario}
+            onReagendar={handleOpenReagendarFromDrawer}
           />
         </Suspense>
       )}
