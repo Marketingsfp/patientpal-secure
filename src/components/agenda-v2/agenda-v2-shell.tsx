@@ -1204,6 +1204,17 @@ export function AgendaV2Shell() {
           />
         </Suspense>
       )}
+      {reagendarSessao && clinicaId && (
+        <Suspense fallback={null}>
+          <ReagendarModal
+            open={!!reagendarSessao}
+            onOpenChange={(v) => { if (!v) setReagendarSessao(null); }}
+            sessao={reagendarSessao}
+            clinicaId={clinicaId}
+            medicoOptions={medicoOptionsForReagendar}
+          />
+        </Suspense>
+      )}
 
       <HhpShortcutsDialog
         open={shortcutsOpen}
