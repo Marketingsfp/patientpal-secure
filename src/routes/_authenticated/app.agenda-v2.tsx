@@ -75,7 +75,7 @@ function AgendaV2Page() {
   }
 
   return (
-    <div className="h-[calc(100vh-56px)] flex flex-col">
+    <div className="h-[calc(100vh-56px)] flex flex-col bg-[color:var(--hhp-surface-page)]">
       <div className="border-b bg-muted/30 px-4 py-2 flex items-center justify-between gap-4 flex-wrap shrink-0">
         <div className="text-xs text-muted-foreground flex items-center gap-2">
           <AlertCircle className="h-3.5 w-3.5" />
@@ -133,7 +133,7 @@ function AgendaV2Page() {
 
 function ShellFallback() {
   return (
-    <div className="h-full flex bg-[#FAFAF8]">
+    <div className="h-full flex bg-[color:var(--hhp-surface-page)]">
       <div className="hidden md:block w-64 border-r border-slate-100 bg-white p-4 space-y-3">
         <Skeleton className="h-6 w-32" />
         <Skeleton className="h-4 w-40" />

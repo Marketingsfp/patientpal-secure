@@ -360,6 +360,7 @@
   /* Traços / bordas */
   --hhp-border-hair: rgba(15, 23, 42, 0.08);
   --hhp-border-subtle: #CBD5E1;   /* slate-300 — contorno mais visível */
+  --hhp-card-border-strong: #334155; /* slate-700 — cards com leitura mais firme */
 
   /* Texto */
   --hhp-text-strong: #0F172A;     /* slate-900 */
@@ -454,13 +455,17 @@ html.clinic-skin-orange {
  * Não afeta a agenda clássica nem outras telas. */
 html.agenda-v2-active {
   /* Fundo neutro premium — remove qualquer tom rosado/bege herdado. */
+  --background: oklch(0.985 0.003 240);
+  --muted: oklch(0.97 0.006 240);
+  --accent: oklch(0.955 0.008 240);
   --hhp-surface-page: #F8FAFC;
   --hhp-surface-panel: #FFFFFF;
   --hhp-surface-card: #FFFFFF;
 
   /* Contornos discretos porém visíveis (contraste ~AA em fundo branco). */
-  --hhp-border-hair: rgba(15, 23, 42, 0.08);
-  --hhp-border-subtle: #E2E8F0;
+  --hhp-border-hair: rgba(15, 23, 42, 0.18);
+  --hhp-border-subtle: #475569;
+  --hhp-card-border-strong: #334155;
 
   /* Sombras mais limpas — evita halo cinza no fundo claro. */
   --hhp-shadow-hair: 0 1px 2px rgba(15, 23, 42, 0.04);
@@ -472,7 +477,7 @@ html.agenda-v2-active .agenda-v2-scope [data-slot="card"],
 html.agenda-v2-active .agenda-v2-scope .rounded-2xl.border,
 html.agenda-v2-active .agenda-v2-scope .rounded-xl.border,
 html.agenda-v2-active .agenda-v2-scope .rounded-lg.border {
-  border-color: #475569;         /* slate-600 — contorno bem escuro */
+  border-color: var(--hhp-card-border-strong); /* contorno bem escuro */
   border-width: 1.5px;
   box-shadow: none;              /* apar\u00eancia "planilha organizada" */
   transition: border-color var(--hhp-dur-base) var(--hhp-ease),

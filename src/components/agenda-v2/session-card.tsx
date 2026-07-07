@@ -167,8 +167,8 @@ export function SessionCard({
   return (
     <div
       className={cn(
-        "group relative bg-white border border-slate-200/70 transition-all",
-        "hover:border-slate-300 hover:shadow-[0_8px_28px_-12px_rgba(15,23,42,0.12)]",
+        "group relative bg-white border-[1.5px] border-[color:var(--hhp-card-border-strong)] transition-all",
+        "hover:border-[color:var(--clinic-accent)]",
         dim.radius, dim.padY, dim.padX,
         isCurrent && "ring-2 shadow-[0_0_0_4px_var(--clinic-accent-glow)]",
       )}
