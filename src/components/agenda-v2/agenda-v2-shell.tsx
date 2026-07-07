@@ -33,6 +33,7 @@ import {
   type StatusAgendamento,
 } from "@/lib/agenda/status-agendamento.functions";
 import { cn } from "@/lib/utils";
+import { useClinicSkin } from "@/hooks/use-clinic-skin";
 
 // Lazy — só baixa quando efetivamente aparecem em tela.
 // Header + timeline + cards + KPIs permanecem no bundle crítico.
@@ -132,6 +133,9 @@ export function AgendaV2Shell() {
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id ?? null;
   const clinicaNome = clinicaAtual?.clinica?.nome ?? "Clínica";
+  // Sprint Beauty — ativa o skin de cor da clínica (azure/emerald/violet)
+  // enquanto a Agenda V2 está montada. Zero impacto em lógica de negócio.
+  useClinicSkin();
   const queryClient = useQueryClient();
   const { medicoId: usuarioMedicoId, loading: medicoLoading } = useMedicoContext();
   const atualizarStatusFn = useServerFn(atualizarStatusAgendamento);
@@ -865,7 +869,7 @@ export function AgendaV2Shell() {
   }, [returnSnapshot, rows, diaKey]);
 
   return (
-    <div className="h-full flex bg-[#FAFAF8] overflow-hidden">
+    <div className="agenda-v2-scope h-full flex bg-[#FAFAF8] overflow-hidden">
       {/* Sidebar operacional — visível em md+, vira Sheet no mobile (botão Painel no header) */}
       {!foco && !isMobile && (
         <Suspense fallback={<div className="hidden md:block w-64 border-r border-slate-100 bg-white" />}>
