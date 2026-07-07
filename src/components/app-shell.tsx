@@ -114,6 +114,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     { to: "/app/chat", label: "Chat interno", icon: MessageCircle },
     { to: "/app/clientes", label: "Clientes", icon: Contact },
     { to: "/app/painel", label: "Dashboard", icon: LayoutDashboard },
+    { to: "/app/painel-executivo", label: "Painel Executivo", icon: LayoutDashboard },
     { to: "/app/fluxo", label: "Fluxo do paciente", icon: Workflow },
     { to: "/app/orcamentos", label: "Orçamentos", icon: FileText },
     { to: "/app/recepcao", label: "Recepção / Filas", icon: ConciergeBell },
