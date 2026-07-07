@@ -159,7 +159,7 @@ function CentroGroup({
   );
 }
 
-export function MenuV2({ perfil = "gestor" }: { perfil?: PerfilKey }) {
+export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey; clinicColor?: string }) {
   const { prefs, loading, togglePin, toggleFavorite, toggleGroup, pushRecent } = useMenuPrefs();
   const currentPath = useRouterState({ select: (s) => s.location.pathname });
   const defaults = PERFIL_DEFAULTS[perfil];
@@ -207,6 +207,7 @@ export function MenuV2({ perfil = "gestor" }: { perfil?: PerfilKey }) {
           "shrink-0 bg-sidebar text-sidebar-foreground border-r border-border h-full flex flex-col transition-all duration-200",
           collapsed ? "w-16" : "w-64",
         )}
+        style={clinicColor ? { backgroundColor: clinicColor, color: "#ffffff" } : undefined}
       >
         {/* Header com marca + botão recolher */}
         <div className={cn("flex items-center gap-2 border-b border-sidebar-border/40 h-12 shrink-0", collapsed ? "px-2 justify-center" : "px-3")}>
