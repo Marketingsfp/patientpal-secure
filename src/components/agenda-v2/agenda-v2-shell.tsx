@@ -594,6 +594,7 @@ export function AgendaV2Shell() {
     void navigate({
       to: "/app/atendimento-ia/$agendamentoId",
       params: { agendamentoId },
+      search: { from: "agenda-v2" },
     });
   };
 
