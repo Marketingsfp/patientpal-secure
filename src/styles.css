@@ -473,6 +473,17 @@ html.agenda-v2-active .agenda-v2-scope .rounded-2xl.border,
 html.agenda-v2-active .agenda-v2-scope .rounded-xl.border,
 html.agenda-v2-active .agenda-v2-scope .rounded-lg.border {
   border-color: var(--hhp-border-subtle);
+  border-width: 1px;
+  box-shadow: var(--hhp-shadow-hair);
+  transition: border-color var(--hhp-dur-base) var(--hhp-ease),
+              box-shadow var(--hhp-dur-base) var(--hhp-ease);
+}
+/* Hover discreto — borda azul sinaliza afordância sem sombra pesada. */
+html.agenda-v2-active .agenda-v2-scope [data-slot="card"]:hover,
+html.agenda-v2-active .agenda-v2-scope .rounded-2xl.border:hover,
+html.agenda-v2-active .agenda-v2-scope .rounded-xl.border:hover,
+html.agenda-v2-active .agenda-v2-scope .rounded-lg.border:hover {
+  border-color: #3B82F6;
 }
 /* Hover consistente em superfícies clicáveis dentro da Agenda V2. */
 html.agenda-v2-active .agenda-v2-scope button:not(:disabled):hover,
@@ -484,6 +495,16 @@ html.agenda-v2-active .agenda-v2-scope [role="button"]:not([aria-disabled="true"
 html.agenda-v2-active .agenda-v2-scope {
   font-family: var(--hhp-font-body);
   background-color: var(--hhp-surface-page);
+}
+/* Números em tabular — leitura consistente em KPIs, timeline, chips numéricos. */
+html.agenda-v2-active .agenda-v2-scope,
+html.agenda-v2-active .agenda-v2-scope * {
+  font-variant-numeric: tabular-nums;
+}
+/* Header interno da Agenda V2 — branco puro + hairline slate-200. */
+html.agenda-v2-active .agenda-v2-scope header {
+  background-color: #FFFFFF;
+  border-bottom: 1px solid #E2E8F0;
 }
 html.agenda-v2-active .agenda-v2-scope h1,
 html.agenda-v2-active .agenda-v2-scope h2,
