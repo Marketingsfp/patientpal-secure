@@ -853,7 +853,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   // Uma GR completa por médico, separadas por linha tracejada bem visível
   const grsHtml = gruposArr.map((g, idx) => {
     const isLast = idx === gruposArr.length - 1;
-    const key = g.medicoId ?? "__sem_medico__";
+    const key = g.agIdRef;
     const ficha = (() => {
       const num = fichaByGrupo.get(key) ?? 0;
       if (num > 0) return String(num).padStart(3, "0");
