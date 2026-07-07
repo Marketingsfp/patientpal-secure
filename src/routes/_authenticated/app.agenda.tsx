@@ -655,6 +655,7 @@ function AgendaPage() {
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [filtroCliente, setFiltroCliente] = useState("");
   const [filtroFicha, setFiltroFicha] = useState("");
+  const [filtroApenasMultiplo, setFiltroApenasMultiplo] = useState<boolean>(false);
   const [page, setPage] = useState(1);
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [items, setItems] = useState<Agendamento[]>([]);
