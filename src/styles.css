@@ -351,14 +351,14 @@
  * ===================================================================== */
 :root {
   /* Superfícies */
-  --hhp-surface-page: #FAFAF8;
-  --hhp-surface-panel: #F7F7F5;
+  --hhp-surface-page: #F8FAFC;   /* slate-50 — neutro frio, sem tom bege */
+  --hhp-surface-panel: #F1F5F9;  /* slate-100 */
   --hhp-surface-card: #FFFFFF;
   --hhp-surface-muted: #F1F5F9;   /* slate-100 */
 
   /* Traços / bordas */
-  --hhp-border-hair: rgba(15, 23, 42, 0.06);
-  --hhp-border-subtle: #E2E8F0;   /* slate-200 */
+  --hhp-border-hair: rgba(15, 23, 42, 0.08);
+  --hhp-border-subtle: #CBD5E1;   /* slate-300 — contorno mais visível */
 
   /* Texto */
   --hhp-text-strong: #0F172A;     /* slate-900 */
@@ -397,8 +397,8 @@
   --hhp-density-foco-gap: 1rem;              /* 16px */
 
   /* Tipografia editorial (usada por headings do HHP) */
-  --hhp-font-display: "Sora", "Inter Tight", Inter, system-ui, sans-serif;
-  --hhp-font-body: "Manrope", Inter, system-ui, sans-serif;
+  --hhp-font-display: "Inter Tight", Inter, system-ui, sans-serif;
+  --hhp-font-body: "Inter", "Manrope", system-ui, sans-serif;
   --hhp-font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
@@ -452,18 +452,44 @@ html.clinic-skin-orange {
 /* Sprint Beauty — refinos visuais escopados à Agenda V2.
  * Não afeta a agenda clássica nem outras telas. */
 html.agenda-v2-active {
-  --hhp-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px -6px rgba(15, 23, 42, 0.08);
-  --hhp-shadow-lift: 0 10px 32px -18px rgba(15, 23, 42, 0.22);
-  --hhp-border-hair: rgba(15, 23, 42, 0.05);
+  /* Fundo neutro premium — remove qualquer tom rosado/bege herdado. */
+  --hhp-surface-page: #F8FAFC;
+  --hhp-surface-panel: #FFFFFF;
+  --hhp-surface-card: #FFFFFF;
+
+  /* Contornos discretos porém visíveis (contraste ~AA em fundo branco). */
+  --hhp-border-hair: rgba(15, 23, 42, 0.08);
+  --hhp-border-subtle: #E2E8F0;
+
+  /* Sombras mais limpas — evita halo cinza no fundo claro. */
+  --hhp-shadow-hair: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --hhp-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 6px 16px -10px rgba(15, 23, 42, 0.10);
+  --hhp-shadow-lift: 0 12px 32px -18px rgba(15, 23, 42, 0.20);
+}
+/* Reforça bordas de cards shadcn dentro da Agenda V2 sem tocar componentes. */
+html.agenda-v2-active .agenda-v2-scope [data-slot="card"],
+html.agenda-v2-active .agenda-v2-scope .rounded-2xl.border,
+html.agenda-v2-active .agenda-v2-scope .rounded-xl.border,
+html.agenda-v2-active .agenda-v2-scope .rounded-lg.border {
+  border-color: var(--hhp-border-subtle);
+}
+/* Hover consistente em superfícies clicáveis dentro da Agenda V2. */
+html.agenda-v2-active .agenda-v2-scope button:not(:disabled):hover,
+html.agenda-v2-active .agenda-v2-scope [role="button"]:not([aria-disabled="true"]):hover {
+  transition: box-shadow var(--hhp-dur-base) var(--hhp-ease),
+              border-color var(--hhp-dur-base) var(--hhp-ease),
+              background-color var(--hhp-dur-base) var(--hhp-ease);
 }
 html.agenda-v2-active .agenda-v2-scope {
   font-family: var(--hhp-font-body);
+  background-color: var(--hhp-surface-page);
 }
 html.agenda-v2-active .agenda-v2-scope h1,
 html.agenda-v2-active .agenda-v2-scope h2,
 html.agenda-v2-active .agenda-v2-scope h3 {
   font-family: var(--hhp-font-display);
-  letter-spacing: -0.015em;
+  letter-spacing: -0.02em;
+  font-feature-settings: "cv11", "ss01";
 }
 
 /* Utilitário de "count-up" sutil para KPIs (visual apenas). */

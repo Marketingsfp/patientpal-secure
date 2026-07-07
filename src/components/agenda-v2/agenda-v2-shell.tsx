@@ -869,7 +869,7 @@ export function AgendaV2Shell() {
   }, [returnSnapshot, rows, diaKey]);
 
   return (
-    <div className="agenda-v2-scope h-full flex bg-[#FAFAF8] overflow-hidden">
+    <div className="agenda-v2-scope h-full flex bg-[color:var(--hhp-surface-page)] overflow-hidden">
       {/* Sidebar operacional — visível em md+, vira Sheet no mobile (botão Painel no header) */}
       {!foco && !isMobile && (
         <Suspense fallback={<div className="hidden md:block w-64 border-r border-slate-100 bg-white" />}>
