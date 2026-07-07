@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import {
   Zap, LogIn, Workflow, ListChecks, Brain, Sparkles, Bell, FileSignature,
+  TrendingUp,
 } from "lucide-react";
 
 export type MenuItem = {
@@ -98,6 +99,7 @@ export const CENTROS: Centro[] = [
     label: "Gestão",
     icon: LayoutDashboard,
     items: [
+      { path: "/app/painel-executivo", label: "Painel de Indicadores", icon: TrendingUp },
       { path: "/app/painel", label: "Dashboard", icon: LayoutDashboard, modulo: "painel" },
       { path: "/app/relatorios", label: "Relatórios", icon: BarChart3 },
       { path: "/app/crm", label: "CRM", icon: Target, modulo: "crm" },
@@ -149,11 +151,11 @@ export const PERFIL_DEFAULTS: Record<PerfilKey, { pinned: string[]; centros: str
     centros: ["financeiro", "gestao"],
   },
   gestor: {
-    pinned: ["/app/painel", "/app/relatorios", "/app/agenda", "/app/orcamentos"],
+    pinned: ["/app/painel-executivo", "/app/painel", "/app/relatorios", "/app/agenda"],
     centros: ["atendimento", "financeiro", "cartao", "clinico", "inteligencia", "gestao"],
   },
   admin: {
-    pinned: ["/app/painel", "/app/clinicas", "/app/equipe"],
+    pinned: ["/app/painel-executivo", "/app/painel", "/app/clinicas", "/app/equipe"],
     centros: ["atendimento", "financeiro", "cartao", "clinico", "inteligencia", "gestao", "config"],
   },
 };
