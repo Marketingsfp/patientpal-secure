@@ -116,15 +116,15 @@
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  /* Sidebar — mid navy (#2E5B94), sofisticado sem ser escuro demais */
-  --sidebar: oklch(0.44 0.11 258);
-  --sidebar-foreground: oklch(0.97 0.01 250);
-  --sidebar-primary: oklch(0.72 0.14 240);
-  --sidebar-primary-foreground: oklch(0.14 0.06 258);
-  --sidebar-accent: oklch(0.50 0.11 258);
+  /* Sidebar tokens — default = Classic Azure. Trocáveis via html.theme-* */
+  --sidebar: oklch(0.55 0.11 258);
+  --sidebar-foreground: oklch(0.98 0.005 250);
+  --sidebar-primary: oklch(0.86 0.10 240);
+  --sidebar-primary-foreground: oklch(0.20 0.06 258);
+  --sidebar-accent: oklch(0.62 0.11 258);
   --sidebar-accent-foreground: oklch(0.99 0 0);
-  --sidebar-border: oklch(0.38 0.10 258);
-  --sidebar-ring: oklch(0.72 0.14 240);
+  --sidebar-border: oklch(0.48 0.10 258);
+  --sidebar-ring: oklch(0.86 0.10 240);
   /* Status tokens (Caixa v2 painel operacional) */
   --status-paid: oklch(0.72 0.17 145);
   --status-waiting: oklch(0.82 0.16 90);
@@ -472,9 +472,9 @@ html.agenda-v2-active .agenda-v2-scope [data-slot="card"],
 html.agenda-v2-active .agenda-v2-scope .rounded-2xl.border,
 html.agenda-v2-active .agenda-v2-scope .rounded-xl.border,
 html.agenda-v2-active .agenda-v2-scope .rounded-lg.border {
-  border-color: var(--hhp-border-subtle);
-  border-width: 1px;
-  box-shadow: var(--hhp-shadow-hair);
+  border-color: #94A3B8;         /* slate-400 — contorno forte */
+  border-width: 1.5px;
+  box-shadow: none;              /* apar\u00eancia "planilha organizada" */
   transition: border-color var(--hhp-dur-base) var(--hhp-ease),
               box-shadow var(--hhp-dur-base) var(--hhp-ease);
 }
@@ -483,7 +483,7 @@ html.agenda-v2-active .agenda-v2-scope [data-slot="card"]:hover,
 html.agenda-v2-active .agenda-v2-scope .rounded-2xl.border:hover,
 html.agenda-v2-active .agenda-v2-scope .rounded-xl.border:hover,
 html.agenda-v2-active .agenda-v2-scope .rounded-lg.border:hover {
-  border-color: #3B82F6;
+  border-color: var(--clinic-accent, #3B82F6);
 }
 /* Hover consistente em superfícies clicáveis dentro da Agenda V2. */
 html.agenda-v2-active .agenda-v2-scope button:not(:disabled):hover,
@@ -535,6 +535,60 @@ html.agenda-v2-active .agenda-v2-scope h3 {
 }
 [data-testid="menu-v2"] input::placeholder {
   color: color-mix(in oklab, white 55%, transparent);
+}
+
+/* =====================================================================
+ * Paletas institucionais — troc\u00e1veis via html.theme-*
+ * Aplicadas globalmente (background + sidebar). O accent tamb\u00e9m sobrescreve
+ * o --clinic-accent default para manter coer\u00eancia com skins de cl\u00ednica.
+ * ===================================================================== */
+html.theme-classic {
+  --background: oklch(0.985 0.004 250);   /* #F8FAFC */
+  --sidebar: oklch(0.48 0.10 258);        /* ~#3B5F8A */
+  --sidebar-foreground: oklch(0.98 0.005 250);
+  --sidebar-accent: oklch(0.55 0.10 258);
+  --sidebar-border: oklch(0.40 0.09 258);
+  --sidebar-primary: oklch(0.86 0.10 240);
+  --sidebar-ring: oklch(0.86 0.10 240);
+  --clinic-accent: #0284C7;
+  --clinic-accent-strong: #0369A1;
+  --clinic-accent-soft: #E0F2FE;
+}
+html.theme-ocean {
+  --background: oklch(0.985 0.005 200);   /* #F6F9FA */
+  --sidebar: oklch(0.50 0.07 210);        /* ~#2E6B7A */
+  --sidebar-foreground: oklch(0.98 0.005 200);
+  --sidebar-accent: oklch(0.57 0.07 210);
+  --sidebar-border: oklch(0.42 0.06 210);
+  --sidebar-primary: oklch(0.82 0.12 190);
+  --sidebar-ring: oklch(0.82 0.12 190);
+  --clinic-accent: #0EA5A4;
+  --clinic-accent-strong: #0F766E;
+  --clinic-accent-soft: #CCFBF1;
+}
+html.theme-slate {
+  --background: oklch(0.98 0.003 250);    /* #F7F8FA */
+  --sidebar: oklch(0.52 0.03 258);        /* ~#475569 */
+  --sidebar-foreground: oklch(0.98 0.003 250);
+  --sidebar-accent: oklch(0.60 0.03 258);
+  --sidebar-border: oklch(0.42 0.03 258);
+  --sidebar-primary: oklch(0.78 0.11 275);
+  --sidebar-ring: oklch(0.78 0.11 275);
+  --clinic-accent: #6366F1;
+  --clinic-accent-strong: #4F46E5;
+  --clinic-accent-soft: #E0E7FF;
+}
+html.theme-emerald {
+  --background: oklch(0.985 0.005 155);   /* #F7FAF8 */
+  --sidebar: oklch(0.50 0.08 155);        /* ~#2F6B4E */
+  --sidebar-foreground: oklch(0.98 0.005 155);
+  --sidebar-accent: oklch(0.57 0.08 155);
+  --sidebar-border: oklch(0.42 0.07 155);
+  --sidebar-primary: oklch(0.80 0.15 155);
+  --sidebar-ring: oklch(0.80 0.15 155);
+  --clinic-accent: #059669;
+  --clinic-accent-strong: #047857;
+  --clinic-accent-soft: #D1FAE5;
 }
 
 /* Utilitário de "count-up" sutil para KPIs (visual apenas). */
