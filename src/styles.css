@@ -543,7 +543,7 @@ html.agenda-v2-active .agenda-v2-scope h3 {
  * o --clinic-accent default para manter coer\u00eancia com skins de cl\u00ednica.
  * ===================================================================== */
 html.theme-classic {
-  --background: oklch(0.985 0.004 250);   /* #F8FAFC */
+  --background: oklch(0.985 0.003 240);   /* neutro frio */
   --sidebar: oklch(0.48 0.10 258);        /* ~#3B5F8A */
   --sidebar-foreground: oklch(0.98 0.005 250);
   --sidebar-accent: oklch(0.55 0.10 258);
