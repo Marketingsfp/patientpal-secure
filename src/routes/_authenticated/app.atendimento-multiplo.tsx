@@ -117,7 +117,6 @@ function AtendimentoMultiploPage() {
   const [paciente, setPaciente] = useState<Paciente | null>(null);
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [recursos, setRecursos] = useState<Recurso[]>([]);
-  const [procedimentos, setProcedimentos] = useState<Procedimento[]>([]);
   const [buscaProc, setBuscaProc] = useState<Record<string, string>>({});
   const [procResultados, setProcResultados] = useState<Record<string, Procedimento[]>>({});
   const [itens, setItens] = useState<Item[]>([novoItem(dataInicial)]);
