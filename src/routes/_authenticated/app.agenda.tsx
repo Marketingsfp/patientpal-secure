@@ -3192,34 +3192,40 @@ function AgendaPage() {
               <Plus className="h-3 w-3 mr-1.5" /> Adicionar Encaixe
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg max-h-[95vh] overflow-y-auto p-4 gap-2">
-            <DialogHeader className="space-y-0">
-              <DialogTitle>
+          <DialogContent className="max-w-xl max-h-[95vh] overflow-y-auto p-0 gap-0 rounded-2xl border-slate-200 shadow-2xl">
+            <DialogHeader className="space-y-1 px-6 pt-5 pb-4 border-b border-slate-100 bg-gradient-to-b from-slate-50/60 to-transparent">
+              <DialogTitle className="text-lg font-semibold tracking-tight text-slate-900">
                 {editing
-                  ? (pagosSet.has(editing.id) ? "Visualizar agendamento (pago)" : "Editar agendamento")
+                  ? (pagosSet.has(editing.id) ? "Visualizar agendamento" : "Editar agendamento")
                   : "Novo agendamento"}
               </DialogTitle>
+              <p className="text-xs text-slate-500">
+                {editing && pagosSet.has(editing.id)
+                  ? "Este agendamento já foi pago. Alterações exigem estorno."
+                  : "Preencha os dados abaixo. Campos com * são obrigatórios."}
+              </p>
             </DialogHeader>
-            <form onSubmit={submit} className="space-y-2">
+            <form onSubmit={submit} className="space-y-4 px-6 py-5">
               {editing && pagosSet.has(editing.id) && (
-                <div className="rounded-md border border-amber-300 bg-amber-50 text-amber-800 px-3 py-2 text-xs">
+                <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 text-amber-900 px-3 py-2 text-xs">
+                  <span className="mt-0.5">⚠️</span>
                   Este agendamento já foi pago. Para alterações, estorne o pagamento no Financeiro.
                 </div>
               )}
               <fieldset
                 disabled={editing ? pagosSet.has(editing.id) : false}
-                className="space-y-2 contents disabled:opacity-90"
+                className="space-y-4 contents disabled:opacity-90"
               >
-              <div className="space-y-1 rounded-md border border-dashed border-primary/40 bg-primary/5 p-2 text-xs">
-                <div className="flex items-center gap-2">
-                  <Label className="text-xs uppercase whitespace-nowrap">Nº do orçamento</Label>
+              <div className="space-y-1.5 rounded-xl border border-primary/25 bg-primary/[0.04] p-3 text-xs">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Label className="text-[10px] font-semibold uppercase tracking-widest text-primary whitespace-nowrap">Nº do orçamento</Label>
                   <Input
                     inputMode="numeric"
                     placeholder="Ex.: 123"
                     value={form.orcamento_numero}
                     onChange={(e) => setForm(f => ({ ...f, orcamento_numero: e.target.value.replace(/\D/g, "") }))}
                     disabled={!!form.orcamento_id || (editing ? pagosSet.has(editing.id) : false)}
-                    className="max-w-[120px] h-8"
+                    className="max-w-[110px] h-8 bg-white"
                   />
                   {form.orcamento_id ? (
                     <Button type="button" variant="outline" size="sm" onClick={limparOrcamento}
@@ -3232,26 +3238,26 @@ function AgendaPage() {
                     </Button>
                   )}
                   {!form.orcamento_id && (
-                    <span className="text-[10px] text-muted-foreground leading-tight flex-1">
+                    <span className="text-[11px] text-slate-500 leading-snug flex-1 min-w-[140px]">
                       Opcional — vincula qualquer orçamento (exames, consultas, procedimentos) em uma única ficha.
                     </span>
                   )}
                 </div>
                 {form.orcamento_id && (
-                  <div className="text-xs text-muted-foreground space-y-1 pt-1">
-                    <p className="font-medium text-foreground">
+                  <div className="text-xs text-slate-600 space-y-1 pt-1 border-t border-primary/15">
+                    <p className="font-medium text-slate-900">
                       Marcando {form.orcamento_itens.length} exame(s) em uma única ficha. Pagamento continua pelo orçamento.
                     </p>
                     {form.orcamento_itens.length > 0 && (
-                      <ul className="list-disc list-inside max-h-24 overflow-y-auto">
+                      <ul className="list-disc list-inside max-h-24 overflow-y-auto pl-1">
                         {form.orcamento_itens.map((n, i) => <li key={i}>{n}</li>)}
                       </ul>
                     )}
                   </div>
                 )}
               </div>
-              <div className="space-y-1">
-                <Label>Paciente</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Paciente <span className="text-rose-500">*</span></Label>
                 <div className="flex gap-2">
                   <div className="flex-1">
                     <PatientSearchInput
@@ -3308,8 +3314,8 @@ function AgendaPage() {
                 )}
               </div>
               {contratoPacienteInfo && (
-                <div className="space-y-1">
-                  <Label>Tipo de atendimento</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-slate-700">Tipo de atendimento</Label>
                   <Select
                     value={form.tipo_atendimento}
                     onValueChange={(v) => setForm((f) => ({ ...f, tipo_atendimento: v as TipoAtendimento }))}
@@ -3336,8 +3342,8 @@ function AgendaPage() {
                   )}
                 </div>
               )}
-              <div className="space-y-1">
-                <Label>Médico ou Exame</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Médico ou Exame <span className="text-rose-500">*</span></Label>
                 <SearchableSelect
                   value={form.medico_id || "none"}
                   disabled={!!editing}
@@ -3373,14 +3379,14 @@ function AgendaPage() {
                   ]}
                 />
               </div>
-              <div className="space-y-1">
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Data consulta/exame</Label>
+              <div className="space-y-1.5">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-slate-700">Data consulta/exame <span className="text-rose-500">*</span></Label>
                     <Input type="datetime-local" value={form.inicio} onChange={(e) => setForm(f => ({ ...f, inicio: e.target.value, fim: calcFimAuto(e.target.value, f.medico_id) }))} required />
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Data de pagamento</Label>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-slate-700">Data de pagamento</Label>
                     <Input
                       type="text"
                       value={form.data_pagamento
@@ -3389,21 +3395,21 @@ function AgendaPage() {
                       readOnly
                       disabled
                       tabIndex={-1}
-                      className="bg-muted/40 cursor-not-allowed"
+                      className="bg-slate-50 cursor-not-allowed text-slate-500"
                     />
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-[11px] text-slate-500 pt-0.5">
                   Preenchida automaticamente pelo sistema quando o pagamento for registrado.
                 </p>
               </div>
-              <div className="space-y-1">
-                <Label>Serviço</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Serviço</Label>
                 {form.medico_id ? (
                   (procOpcoesPorMedico.get(form.medico_id)?.length || procPorMedico.get(form.medico_id)?.size || procNomesPorMedico.get(form.medico_id)?.size) ? (
-                    <p className="text-xs text-muted-foreground">Mostrando apenas serviços configurados para este médico.</p>
+                    <p className="text-[11px] text-slate-500">Mostrando apenas serviços configurados para este médico.</p>
                   ) : procedimentoPadraoDoMedico(form.medico_id) ? (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-[11px] text-slate-500">
                       Mostrando o serviço principal do médico. Cadastre mais serviços no cadastro do médico, se necessário.
                     </p>
                   ) : (
@@ -3412,7 +3418,7 @@ function AgendaPage() {
                     </p>
                   )
                 ) : (
-                  <p className="text-xs text-muted-foreground">Selecione um médico para ver os serviços disponíveis.</p>
+                  <p className="text-[11px] text-slate-500">Selecione um médico para ver os serviços disponíveis.</p>
                 )}
                 <SearchableSelect
                   value={form.procedimento || "none"}
@@ -3533,8 +3539,8 @@ function AgendaPage() {
                   })()}
                 />
               </div>
-              <div className="space-y-1">
-                <Label>Status</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Status</Label>
                 {editing && !isSlotLivre(editing.paciente_nome) ? (
                   <Select value={form.status} onValueChange={(v) => setForm(f => ({ ...f, status: v as Status }))}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
@@ -3545,15 +3551,15 @@ function AgendaPage() {
                     </SelectContent>
                   </Select>
                 ) : (
-                  <Input value={STATUS_LABEL[form.status]} disabled readOnly />
+                  <Input value={STATUS_LABEL[form.status]} disabled readOnly className="bg-slate-50 text-slate-500" />
                 )}
                 {(!editing || isSlotLivre(editing.paciente_nome)) && (
-                  <p className="text-xs text-muted-foreground">Status definido automaticamente. Pode ser alterado depois pelo menu de ações.</p>
+                  <p className="text-[11px] text-slate-500">Status definido automaticamente. Pode ser alterado depois pelo menu de ações.</p>
                 )}
               </div>
-              <div className="space-y-1">
+              <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <Label>Observações</Label>
+                  <Label className="text-xs font-semibold text-slate-700">Observações</Label>
                   <VoiceInput
                     size="sm"
                     currentValue={form.observacoes}
@@ -3561,10 +3567,10 @@ function AgendaPage() {
                     title="Ditar observações"
                   />
                 </div>
-                <Textarea value={form.observacoes} onChange={(e) => setForm(f => ({ ...f, observacoes: e.target.value }))} rows={2} />
+                <Textarea value={form.observacoes} onChange={(e) => setForm(f => ({ ...f, observacoes: e.target.value }))} rows={2} className="resize-none" placeholder="Anotações internas (opcional)…" />
               </div>
               </fieldset>
-              <DialogFooter className="sticky bottom-0 bg-background pt-2 -mx-4 px-4 border-t mt-2">
+              <DialogFooter className="sticky bottom-0 bg-white/95 backdrop-blur pt-3 pb-1 -mx-6 px-6 border-t border-slate-100 mt-4 flex-wrap gap-2">
                 {editing && pagosSet.has(editing.id) ? (
                   <Button type="button" variant="outline" onClick={() => setOpen(false)}>Fechar</Button>
                 ) : (
@@ -3582,7 +3588,7 @@ function AgendaPage() {
                         });
                         setDescontoDlgOpen(true);
                       }}
-                      className={descontoPendente ? "border-amber-500 text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30" : ""}
+                      className={"mr-auto " + (descontoPendente ? "border-amber-500 text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30" : "")}
                       title="Aplicar desconto (exige autorização da supervisão)"
                     >
                       {descontoPendente
