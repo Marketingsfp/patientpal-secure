@@ -397,21 +397,65 @@ export function AgendaV2Shell() {
   }, [rows, procMeta, medicos, recursos]);
 
   const kpis = useMemo<Kpi[]>(() => {
-    const c = { total: sessoes.length, aguardando: 0, confirmados: 0, realizados: 0, cancelados: 0, lab: 0 };
+    // S3-D — KPIs gerenciais (Confirmação, No-show, Ocupação).
+    // 100% client-side sobre o dataset já carregado. Zero query nova,
+    // zero migration, zero alteração em regras de negócio.
+    let agendados = 0;
+    let confirmados = 0;
+    let realizados = 0;
+    let faltou = 0;
+    let cancelados = 0;
+    let ocupadoMs = 0;
+    const medicosAtivos = new Set<string>();
     for (const s of sessoes) {
-      if (s.status === "agendado") c.aguardando++;
-      if (s.status === "confirmado") c.confirmados++;
-      if (s.status === "realizado") c.realizados++;
-      if (s.status === "cancelado" || s.status === "faltou") c.cancelados++;
-      if (s.tipo === "coleta_laboratorial") c.lab++;
+      // Sessões "DISPONIVEL" não entram — são horários livres.
+      if (/dispon[íi]vel/i.test(s.paciente_nome ?? "")) continue;
+      if (s.status === "agendado") agendados++;
+      else if (s.status === "confirmado") confirmados++;
+      else if (s.status === "realizado") realizados++;
+      else if (s.status === "faltou") faltou++;
+      else if (s.status === "cancelado") cancelados++;
+      if (s.status !== "cancelado") {
+        const ini = new Date(s.inicio).getTime();
+        const fim = new Date(s.fim).getTime();
+        if (Number.isFinite(ini) && Number.isFinite(fim) && fim > ini) ocupadoMs += fim - ini;
+        if (s.medico_id) medicosAtivos.add(s.medico_id);
+      }
     }
+    // Taxa de confirmação = confirmados / (total − cancelados).
+    const baseConfirm = agendados + confirmados + realizados + faltou;
+    const taxaConf = baseConfirm > 0 ? (confirmados + realizados) / baseConfirm : null;
+    // Taxa de no-show = faltou / (realizados + faltou).
+    const baseNoShow = realizados + faltou;
+    const taxaNoShow = baseNoShow > 0 ? faltou / baseNoShow : null;
+    // Ocupação da grade = minutos ocupados / (médicos ativos × 8h × 60).
+    // Proxy razoável sem query nova: janela de 8h por médico do dia.
+    const disponMin = medicosAtivos.size * 8 * 60;
+    const ocupadoMin = ocupadoMs / 60000;
+    const ocupacao = disponMin > 0 ? Math.min(1, ocupadoMin / disponMin) : null;
+    const pct = (v: number | null) => v === null ? "—" : `${Math.round(v * 100)}%`;
     return [
-      { key: "todos", label: "Total", value: c.total, tone: "info" },
-      { key: "agendado", label: "Aguardando", value: c.aguardando, tone: "warn" },
-      { key: "confirmado", label: "Confirmados", value: c.confirmados, tone: "info" },
-      { key: "realizado", label: "Realizados", value: c.realizados, tone: "ok" },
-      { key: "cancelado", label: "Cancel./Falta", value: c.cancelados, tone: "danger" },
-      { key: "lab", label: "Coletas lab.", value: c.lab, tone: "ok" },
+      {
+        key: "confirmacao",
+        label: "Confirmação",
+        value: pct(taxaConf),
+        tone: "ok",
+        hint: "Confirmados + realizados ÷ agendamentos não cancelados do dia",
+      },
+      {
+        key: "noshow",
+        label: "No-show",
+        value: pct(taxaNoShow),
+        tone: taxaNoShow !== null && taxaNoShow >= 0.15 ? "danger" : "warn",
+        hint: "Faltas ÷ (realizados + faltas) do dia",
+      },
+      {
+        key: "ocupacao",
+        label: "Ocupação",
+        value: pct(ocupacao),
+        tone: "info",
+        hint: "Minutos ocupados ÷ (médicos ativos × 8h). Proxy do dia.",
+      },
     ];
   }, [sessoes]);
 
