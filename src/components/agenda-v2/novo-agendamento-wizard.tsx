@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Check, ChevronRight, User, Stethoscope, UserRound, Clock, CheckCircle2, Loader2 } from "lucide-react";
+import { Check, ChevronRight, User, Stethoscope, UserRound, Clock, CheckCircle2, Loader2, UserPlus, X } from "lucide-react";
 import { HhpWizardShell } from "@/design-system/hhp";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 import { ProcedimentoPicker, type ProcedimentoOption } from "@/components/agenda/procedimento-picker";
@@ -95,6 +95,32 @@ export function NovoAgendamentoWizard({
   const [tipoAtendimento, setTipoAtendimento] = useState<TipoAtendimento>("particular");
   const [saving, setSaving] = useState(false);
 
+  // -------------------------------------------------------------------------
+  // Sprint 3 · S3-B — Cadastro rápido de paciente dentro do Wizard.
+  // Não cria rota nem função de servidor nova: insere direto em `pacientes`
+  // (mesmo INSERT que a tela de clientes usa), reusando as políticas RLS
+  // existentes. Ao salvar, o paciente recém-criado já vem selecionado e o
+  // usuário avança normalmente no wizard.
+  //
+  // Campos exigidos são deliberadamente os MESMOS que a `criarAgendamento`
+  // valida (telefone + data_nascimento) mais o único NOT NULL sem default
+  // no schema (`sexo`). CPF fica opcional para não bloquear casos comuns
+  // de walk-in.
+  // -------------------------------------------------------------------------
+  const [showQuickCreate, setShowQuickCreate] = useState(false);
+  const [qcNome, setQcNome] = useState("");
+  const [qcSexo, setQcSexo] = useState<"M" | "F">("F");
+  const [qcNasc, setQcNasc] = useState("");
+  const [qcTel, setQcTel] = useState("");
+  const [qcCpf, setQcCpf] = useState("");
+  const [qcSaving, setQcSaving] = useState(false);
+
+  const resetQuickCreate = () => {
+    setShowQuickCreate(false);
+    setQcNome(""); setQcSexo("F"); setQcNasc(""); setQcTel(""); setQcCpf("");
+    setQcSaving(false);
+  };
+
   const reset = () => {
     setStepIdx(0);
     setPaciente(null);
@@ -104,6 +130,7 @@ export function NovoAgendamentoWizard({
     setSlot(null);
     setTipoAtendimento("particular");
     setSaving(false);
+    resetQuickCreate();
   };
 
   // ---------- Query: médicos ativos da clínica (mesma da clássica) ----------
@@ -183,6 +210,50 @@ export function NovoAgendamentoWizard({
     (step === "horario" && !!slot) ||
     step === "confirmar";
 
+  async function handleQuickCreatePaciente() {
+    if (!clinicaId) return;
+    const nome = qcNome.trim();
+    const nasc = qcNasc.trim();
+    const telDigits = qcTel.replace(/\D/g, "");
+    const cpfDigits = qcCpf.replace(/\D/g, "");
+    if (nome.length < 3) { toast.error("Informe o nome completo"); return; }
+    if (!nasc) { toast.error("Data de nascimento é obrigatória"); return; }
+    if (telDigits.length < 10) { toast.error("Telefone com DDD é obrigatório"); return; }
+    if (cpfDigits && cpfDigits.length !== 11) { toast.error("CPF inválido"); return; }
+    setQcSaving(true);
+    try {
+      const { data, error } = await supabase
+        .from("pacientes")
+        .insert({
+          clinica_id: clinicaId,
+          nome,
+          sexo: qcSexo,
+          data_nascimento: nasc,
+          telefone: telDigits,
+          cpf: cpfDigits ? cpfDigits : null,
+          ativo: true,
+        })
+        .select("id,nome,cpf,telefone,data_nascimento,clinica_id")
+        .single();
+      if (error) throw error;
+      const novo: PatientOption = {
+        id: data.id as string,
+        nome: data.nome as string,
+        cpf: (data.cpf as string | null) ?? null,
+        telefone: (data.telefone as string | null) ?? null,
+        data_nascimento: (data.data_nascimento as string | null) ?? null,
+        clinica_id: data.clinica_id as string,
+      };
+      setPaciente(novo);
+      resetQuickCreate();
+      toast.success("Paciente cadastrado");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Falha ao cadastrar paciente";
+      toast.error(msg);
+      setQcSaving(false);
+    }
+  }
+
   const heading =
     step === "paciente" ? "Quem é o paciente?" :
     step === "servico" ? "Qual o serviço?" :
@@ -259,12 +330,93 @@ export function NovoAgendamentoWizard({
       {step === "paciente" && (
         <div>
           {clinicaId ? (
-            <PatientSearchInput
-              autoFocus
-              value={paciente}
-              onSelect={setPaciente}
-              placeholder="Buscar por nome, CPF ou telefone…"
-            />
+            <>
+              <PatientSearchInput
+                autoFocus
+                value={paciente}
+                onSelect={(p) => { setPaciente(p); if (p) setShowQuickCreate(false); }}
+                placeholder="Buscar por nome, CPF ou telefone…"
+              />
+              {!paciente && !showQuickCreate && (
+                <button
+                  type="button"
+                  onClick={() => setShowQuickCreate(true)}
+                  className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+                >
+                  <UserPlus className="h-3.5 w-3.5" />
+                  Não encontrou? Cadastrar novo paciente
+                </button>
+              )}
+              {!paciente && showQuickCreate && (
+                <div className="mt-4 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs font-semibold uppercase tracking-widest text-indigo-700">Novo paciente</div>
+                    <button
+                      type="button"
+                      onClick={resetQuickCreate}
+                      className="text-slate-400 hover:text-slate-700"
+                      aria-label="Cancelar cadastro rápido"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 gap-2">
+                    <input
+                      value={qcNome}
+                      onChange={(e) => setQcNome(e.target.value)}
+                      placeholder="Nome completo *"
+                      className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm"
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <select
+                        value={qcSexo}
+                        onChange={(e) => setQcSexo(e.target.value as "M" | "F")}
+                        className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm"
+                      >
+                        <option value="F">Feminino</option>
+                        <option value="M">Masculino</option>
+                      </select>
+                      <input
+                        type="date"
+                        value={qcNasc}
+                        onChange={(e) => setQcNasc(e.target.value)}
+                        className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm"
+                      />
+                    </div>
+                    <input
+                      value={qcTel}
+                      onChange={(e) => setQcTel(e.target.value)}
+                      placeholder="Telefone com DDD *"
+                      inputMode="tel"
+                      className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm"
+                    />
+                    <input
+                      value={qcCpf}
+                      onChange={(e) => setQcCpf(e.target.value)}
+                      placeholder="CPF (opcional)"
+                      inputMode="numeric"
+                      className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm"
+                    />
+                  </div>
+                  <div className="text-[11px] text-slate-500">
+                    Nome, sexo, nascimento e telefone são obrigatórios porque o agendamento
+                    exige paciente com cadastro completo.
+                  </div>
+                  <button
+                    type="button"
+                    disabled={qcSaving}
+                    onClick={handleQuickCreatePaciente}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 h-9 px-4 rounded-lg text-xs font-semibold transition-colors",
+                      qcSaving ? "bg-slate-200 text-slate-400" : "bg-indigo-600 text-white hover:bg-indigo-700",
+                    )}
+                  >
+                    {qcSaving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                    {qcSaving ? "Salvando…" : "Cadastrar e continuar"}
+                  </button>
+                </div>
+              )}
+            </>
           ) : (
             <p className="text-sm text-slate-500">Selecione uma clínica antes de criar o agendamento.</p>
           )}
