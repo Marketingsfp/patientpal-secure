@@ -1649,6 +1649,13 @@ function AgendaPage() {
   const medicoEhLaboratorioFormulario = (medicoId: string | null | undefined) => {
     if (!medicoId) return false;
     const med = medicos.find((m) => m.id === medicoId);
+    // Preferência: se qualquer procedimento configurado para o médico é
+    // laboratório (`tipo_procedimento='laboratorio'`), assume lab.
+    const opts = opcoesProcedimentoMedico(medicoId, editing?.agenda_id ?? (filtroAgenda !== "todos" ? filtroAgenda : null));
+    if (opts.some((o) => {
+      const p = procedimentosList.find((pp) => pp.id === o.id);
+      return (p?.tipo_procedimento ?? "").toLowerCase() === "laboratorio";
+    })) return true;
     if (normalizar(med?.especialidade_nome ?? "").includes("laborat")) return true;
     const espIds = medicoEspec.get(medicoId);
     if (!espIds || espIds.size === 0) return false;
@@ -1656,6 +1663,12 @@ function AgendaPage() {
   };
 
   const procedimentoEhImagem = (label: string) => {
+    // Preferência: consulta a categoria no cadastro do procedimento.
+    const alvo = normalizar(label);
+    const p = procedimentosList.find((pp) => normalizar(pp.nome) === alvo);
+    const tp = (p?.tipo_procedimento ?? "").toLowerCase();
+    if (tp === "imagem") return true;
+    if (tp === "laboratorio" || tp === "consulta" || tp === "cirurgia" || tp === "procedimento") return false;
     const u = normalizar(label).toUpperCase();
     return u.includes("ULTRASS")
       || /\bUSG\b|\bUS\b/.test(u)
