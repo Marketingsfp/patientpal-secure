@@ -817,6 +817,25 @@ export function AgendaV2Shell() {
             searchPlaceholder="Buscar sala..."
             className="h-10 rounded-2xl bg-slate-100 border-transparent min-w-0 flex-1 sm:flex-none sm:min-w-40"
           />
+          {usuarioMedicoId && !medicoLoading && (
+            <Button
+              type="button"
+              variant={meusPacientes ? "default" : "outline"}
+              size="sm"
+              onClick={() => setMeusPacientes((v) => !v)}
+              className={cn(
+                "h-9 rounded-2xl gap-1.5 text-xs",
+                meusPacientes
+                  ? "bg-indigo-600 hover:bg-indigo-700 text-white border-transparent"
+                  : "bg-slate-100 border-transparent text-slate-600 hover:bg-slate-200",
+              )}
+              aria-pressed={meusPacientes}
+              title="Mostrar apenas os pacientes do médico logado"
+            >
+              <UserCheck className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Meus pacientes</span>
+            </Button>
+          )}
           {(filtroMedico || filtroEspecialidade || filtroRecurso || kpiFilter) && (
             <Button
               variant="ghost"
