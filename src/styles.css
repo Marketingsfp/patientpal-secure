@@ -472,9 +472,9 @@ html.agenda-v2-active .agenda-v2-scope [data-slot="card"],
 html.agenda-v2-active .agenda-v2-scope .rounded-2xl.border,
 html.agenda-v2-active .agenda-v2-scope .rounded-xl.border,
 html.agenda-v2-active .agenda-v2-scope .rounded-lg.border {
-  border-color: var(--hhp-border-subtle);
-  border-width: 1px;
-  box-shadow: var(--hhp-shadow-hair);
+  border-color: #94A3B8;         /* slate-400 — contorno forte */
+  border-width: 1.5px;
+  box-shadow: none;              /* apar\u00eancia "planilha organizada" */
   transition: border-color var(--hhp-dur-base) var(--hhp-ease),
               box-shadow var(--hhp-dur-base) var(--hhp-ease);
 }
@@ -483,7 +483,7 @@ html.agenda-v2-active .agenda-v2-scope [data-slot="card"]:hover,
 html.agenda-v2-active .agenda-v2-scope .rounded-2xl.border:hover,
 html.agenda-v2-active .agenda-v2-scope .rounded-xl.border:hover,
 html.agenda-v2-active .agenda-v2-scope .rounded-lg.border:hover {
-  border-color: #3B82F6;
+  border-color: var(--clinic-accent, #3B82F6);
 }
 /* Hover consistente em superfícies clicáveis dentro da Agenda V2. */
 html.agenda-v2-active .agenda-v2-scope button:not(:disabled):hover,
