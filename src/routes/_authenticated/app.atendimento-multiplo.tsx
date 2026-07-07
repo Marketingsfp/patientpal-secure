@@ -155,14 +155,19 @@ function AtendimentoMultiploPage() {
       }
       let cancel = false;
       const t = setTimeout(async () => {
-        const { data } = await supabase
+        // Remove acentos e quebra em palavras — cada palavra vira um ilike
+        // (AND). Assim "ácido úrico" encontra "ACIDO URICO" no banco.
+        const semAcento = q.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const palavras = semAcento.split(/\s+/).filter((p) => p.length > 0);
+        let query = supabase
           .from("procedimentos")
           .select("id, nome, valor_padrao, duracao_minutos, tipo_procedimento")
           .eq("clinica_id", clinicaId)
-          .eq("ativo", true)
-          .ilike("nome", `%${q}%`)
-          .order("nome")
-          .limit(20);
+          .eq("ativo", true);
+        for (const p of palavras) {
+          query = query.ilike("nome", `%${p}%`);
+        }
+        const { data } = await query.order("nome").limit(20);
         if (cancel) return;
         const rows = ((data ?? []) as Array<{
           id: string;
