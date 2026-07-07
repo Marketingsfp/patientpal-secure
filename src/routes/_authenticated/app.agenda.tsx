@@ -16,6 +16,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -612,6 +613,7 @@ const toLocalInput = (iso: string) => {
 const EMPTY = {
   paciente_nome: "", paciente_id: "", medico_id: "",
   inicio: "", fim: "", procedimento: "",
+  procedimentos: [] as string[],
   status: "agendado" as Status, observacoes: "",
   data_pagamento: "",
   orcamento_id: "",
