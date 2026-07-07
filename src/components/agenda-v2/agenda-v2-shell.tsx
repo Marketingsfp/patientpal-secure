@@ -48,6 +48,10 @@ const PatientDrawer = lazy(() =>
 const NovoAgendamentoWizard = lazy(() =>
   import("./novo-agendamento-wizard").then((m) => ({ default: m.NovoAgendamentoWizard })),
 );
+const ReagendarModal = lazy(() =>
+  import("./reagendar-modal").then((m) => ({ default: m.ReagendarModal })),
+);
+import type { ReagendarModalSessao } from "./reagendar-modal";
 
 const DENSITY_KEY = "agenda_v2_density";
 const MEUS_PACIENTES_KEY = "agenda_v2_meus_pacientes";
@@ -161,6 +165,8 @@ export function AgendaV2Shell() {
     dia?: Date | null;
     hour?: number | null;
   } | null>(null);
+  // S3-C — modal de reagendamento (isolado; NÃO usa o Wizard).
+  const [reagendarSessao, setReagendarSessao] = useState<ReagendarModalSessao | null>(null);
   const [density, setDensity] = useState<SessionDensity>(() => {
     if (typeof window === "undefined") return "confortavel";
     // fallback: chave legada (sem clínica) para não perder preferência do usuário.
@@ -566,6 +572,43 @@ export function AgendaV2Shell() {
   };
 
   const openDrawer = (id: string) => { setDrawerMounted(true); setDrawerPacote(id); };
+
+  // S3-C — abre o modal de reagendamento para a sessão do card
+  // (ou primeira do drawer). Só move ESTA sessão; irmãos de pacote ficam.
+  const handleOpenReagendar = (data: SessionCardData) => {
+    const primeiro = data.items[0];
+    if (!primeiro) return;
+    setReagendarSessao({
+      agendamento_id: primeiro.id,
+      paciente_nome: data.paciente_nome,
+      procedimento: primeiro.procedimento_nome,
+      inicio: data.inicio,
+      fim: data.fim,
+      medico_id: data.medico_id ?? null,
+      medico_nome: data.medico_nome ?? null,
+    });
+  };
+  const handleOpenReagendarFromDrawer = () => {
+    if (!drawerData || !drawerData.agendamento_ids || drawerData.agendamento_ids.length === 0) return;
+    const primeiroId = drawerData.agendamento_ids[0];
+    const raw = rows?.find((r) => r.id === primeiroId);
+    if (!raw) return;
+    setReagendarSessao({
+      agendamento_id: raw.id,
+      paciente_nome: raw.paciente_nome,
+      procedimento: raw.procedimento,
+      inicio: raw.inicio,
+      fim: raw.fim,
+      medico_id: raw.medico_id,
+      medico_nome: raw.medico_id ? medicos.get(raw.medico_id) ?? null : null,
+    });
+  };
+
+  // Opções de médico para o SearchableSelect do modal.
+  const medicoOptionsForReagendar = useMemo(
+    () => Array.from(medicos.entries()).map(([id, nome]) => ({ value: id, label: nome })),
+    [medicos],
+  );
 
   // Sprint 3 · S3-A — captura o estado atual e navega para o Atendimento
   // IA do agendamento. O snapshot é lido no próximo mount e restaura
@@ -1106,6 +1149,7 @@ export function AgendaV2Shell() {
                           onOpenTimeline={openDrawer}
                           onChangeStatus={onChangeStatusCard}
                           onOpenProntuario={handleOpenProntuario}
+                          onReagendar={handleOpenReagendar}
                           density={density}
                         />
                       ))}
@@ -1144,6 +1188,7 @@ export function AgendaV2Shell() {
             data={drawerData}
             onChangeStatus={onChangeStatusDrawer}
             onOpenProntuario={handleOpenProntuario}
+            onReagendar={handleOpenReagendarFromDrawer}
           />
         </Suspense>
       )}
@@ -1156,6 +1201,17 @@ export function AgendaV2Shell() {
               if (!v) setWizardInitial(null);
             }}
             initial={wizardInitial}
+          />
+        </Suspense>
+      )}
+      {reagendarSessao && clinicaId && (
+        <Suspense fallback={null}>
+          <ReagendarModal
+            open={!!reagendarSessao}
+            onOpenChange={(v) => { if (!v) setReagendarSessao(null); }}
+            sessao={reagendarSessao}
+            clinicaId={clinicaId}
+            medicoOptions={medicoOptionsForReagendar}
           />
         </Suspense>
       )}

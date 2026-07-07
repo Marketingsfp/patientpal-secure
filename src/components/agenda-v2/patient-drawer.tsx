@@ -77,7 +77,7 @@ function idadeFromDob(dob: string | null | undefined): number | null {
  * - Abertura instantânea; detalhes do paciente carregam em segundo plano.
  */
 export function PatientDrawer({
-  open, onOpenChange, data, onChangeStatus, onOpenProntuario,
+  open, onOpenChange, data, onChangeStatus, onOpenProntuario, onReagendar,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -91,6 +91,8 @@ export function PatientDrawer({
    * scroll, paciente selecionado) ao retornar.
    */
   onOpenProntuario?: (agendamentoId: string) => void;
+  /** Sprint 3 · S3-C — abre o modal de reagendamento desta sessão. */
+  onReagendar?: () => void;
 }) {
   const [tab, setTab] = useState<Tab>("resumo");
   const openedAtRef = useRef<number>(0);
@@ -198,7 +200,7 @@ export function PatientDrawer({
                   label="Prontuário"
                   onClick={onOpenProntuario && primeiroAgendamentoId ? abrirProntuario : undefined}
                 />
-                <QuickAction icon={<CalendarClock className="h-4 w-4" />} label="Reagendar" />
+                <QuickAction icon={<CalendarClock className="h-4 w-4" />} label="Reagendar" onClick={onReagendar} />
                 <QuickAction icon={<Wallet className="h-4 w-4" />} label="Financeiro" />
                 <QuickAction icon={<FileSignature className="h-4 w-4" />} label="Orçamento" />
                 <QuickAction icon={<FileText className="h-4 w-4" />} label="Documentos" />
