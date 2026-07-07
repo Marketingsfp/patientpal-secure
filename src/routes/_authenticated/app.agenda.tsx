@@ -1837,11 +1837,15 @@ function AgendaPage() {
         if (!set || !set.has(filtroEspecialidade)) return false;
       }
       if (filtroAgenda !== "todos") {
-        if (a.agenda_id !== filtroAgenda) return false;
+        // Agendamentos criados via "Atendimento Múltiplo" não são vinculados a
+        // uma agenda específica (podem envolver médicos/recursos diferentes),
+        // então não os escondemos quando o usuário filtra por agenda.
+        if (a.agenda_id !== filtroAgenda && !a.atendimento_grupo_id) return false;
       }
+      if (filtroApenasMultiplo && !a.atendimento_grupo_id) return false;
       return true;
     });
-  }, [items, mostrarLivres, filtroMedico, filtroStatus, filtroCliente, filtroFicha, filtroDiaSemana, filtroEspecialidade, filtroAgenda, medicoEspec, fichaPorId]);
+  }, [items, mostrarLivres, filtroMedico, filtroStatus, filtroCliente, filtroFicha, filtroDiaSemana, filtroEspecialidade, filtroAgenda, filtroApenasMultiplo, medicoEspec, fichaPorId]);
 
   const totais = useMemo(() => ({
     total: filtrados.length,
