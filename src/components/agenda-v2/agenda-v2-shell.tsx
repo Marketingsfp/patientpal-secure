@@ -573,6 +573,43 @@ export function AgendaV2Shell() {
 
   const openDrawer = (id: string) => { setDrawerMounted(true); setDrawerPacote(id); };
 
+  // S3-C — abre o modal de reagendamento para a sessão do card
+  // (ou primeira do drawer). Só move ESTA sessão; irmãos de pacote ficam.
+  const handleOpenReagendar = (data: SessionCardData) => {
+    const primeiro = data.items[0];
+    if (!primeiro) return;
+    setReagendarSessao({
+      agendamento_id: primeiro.id,
+      paciente_nome: data.paciente_nome,
+      procedimento: primeiro.procedimento_nome,
+      inicio: data.inicio,
+      fim: data.fim,
+      medico_id: data.medico_id,
+      medico_nome: data.medico_nome,
+    });
+  };
+  const handleOpenReagendarFromDrawer = () => {
+    if (!drawerData || !drawerData.agendamento_ids || drawerData.agendamento_ids.length === 0) return;
+    const primeiroId = drawerData.agendamento_ids[0];
+    const raw = rows?.find((r) => r.id === primeiroId);
+    if (!raw) return;
+    setReagendarSessao({
+      agendamento_id: raw.id,
+      paciente_nome: raw.paciente_nome,
+      procedimento: raw.procedimento,
+      inicio: raw.inicio,
+      fim: raw.fim,
+      medico_id: raw.medico_id,
+      medico_nome: raw.medico_id ? medicos.get(raw.medico_id) ?? null : null,
+    });
+  };
+
+  // Opções de médico para o SearchableSelect do modal.
+  const medicoOptionsForReagendar = useMemo(
+    () => Array.from(medicos.entries()).map(([id, nome]) => ({ value: id, label: nome })),
+    [medicos],
+  );
+
   // Sprint 3 · S3-A — captura o estado atual e navega para o Atendimento
   // IA do agendamento. O snapshot é lido no próximo mount e restaura
   // data/filtros/busca/KPI/drawer/scroll. Não altera nenhuma rota nem
