@@ -77,7 +77,7 @@ function idadeFromDob(dob: string | null | undefined): number | null {
  * - Abertura instantânea; detalhes do paciente carregam em segundo plano.
  */
 export function PatientDrawer({
-  open, onOpenChange, data, onChangeStatus, onOpenProntuario,
+  open, onOpenChange, data, onChangeStatus, onOpenProntuario, onReagendar,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -91,6 +91,8 @@ export function PatientDrawer({
    * scroll, paciente selecionado) ao retornar.
    */
   onOpenProntuario?: (agendamentoId: string) => void;
+  /** Sprint 3 · S3-C — abre o modal de reagendamento desta sessão. */
+  onReagendar?: () => void;
 }) {
   const [tab, setTab] = useState<Tab>("resumo");
   const openedAtRef = useRef<number>(0);
