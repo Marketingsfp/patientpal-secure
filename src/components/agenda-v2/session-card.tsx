@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-  ChevronDown, ChevronRight, ArrowUpRight, CalendarClock, DollarSign,
+  ChevronDown, ChevronRight, ArrowUpRight, CalendarClock, DollarSign, Stethoscope,
   MoreHorizontal, Check, LogIn, ClipboardCheck, XCircle, UserX,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -127,11 +127,18 @@ export function SessionCard({
   data,
   onOpenTimeline,
   onChangeStatus,
+  onOpenProntuario,
   density = "confortavel",
 }: {
   data: SessionCardData;
   onOpenTimeline: (pacoteId: string) => void;
   onChangeStatus?: (data: SessionCardData, novoStatus: StatusAgendamento) => void;
+  /**
+   * Sprint 3 · S3-A — abre o prontuário/atendimento IA para o
+   * primeiro agendamento da sessão. Reusa a rota já existente
+   * `/app/atendimento-ia/$agendamentoId` (mesma da Agenda Express).
+   */
+  onOpenProntuario?: (agendamentoId: string) => void;
   density?: SessionDensity;
 }) {
   const [open, setOpen] = useState(false);
@@ -291,6 +298,13 @@ export function SessionCard({
             label="Abrir"
             onClick={() => onOpenTimeline(data.pacote_id)}
           />
+          {onOpenProntuario && data.items[0] && (
+            <QuickAction
+              icon={<Stethoscope className="h-3 w-3" />}
+              label="Prontuário"
+              onClick={() => onOpenProntuario(data.items[0].id)}
+            />
+          )}
           <QuickAction
             icon={<CalendarClock className="h-3 w-3" />}
             label="Reagendar"
