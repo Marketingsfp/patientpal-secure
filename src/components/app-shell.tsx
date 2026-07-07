@@ -471,7 +471,7 @@ export function AppShell() {
   return (
     <div className="h-screen flex bg-background overflow-hidden">
       {!isChooser && useMenuV2 && (
-        <MenuV2 perfil={perfilV2} />
+        <MenuV2 perfil={perfilV2} clinicColor={clinicColor} />
       )}
       {!isChooser && !useMenuV2 && (
       <aside
