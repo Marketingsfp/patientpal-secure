@@ -135,7 +135,7 @@ function AtendimentoMultiploPage() {
         supabase.from("enfermagem_recursos").select("id, nome").eq("clinica_id", clinicaId).order("nome"),
         supabase
           .from("procedimentos")
-          .select("id, nome, valor, duracao_minutos, tipo_procedimento")
+          .select("id, nome, valor_padrao, duracao_minutos, tipo_procedimento")
           .eq("clinica_id", clinicaId)
           .eq("ativo", true)
           .order("nome"),
@@ -143,7 +143,21 @@ function AtendimentoMultiploPage() {
       if (cancel) return;
       setMedicos((med.data ?? []) as Medico[]);
       setRecursos((rec.data ?? []) as Recurso[]);
-      setProcedimentos((proc.data ?? []) as Procedimento[]);
+      setProcedimentos(
+        ((proc.data ?? []) as Array<{
+          id: string;
+          nome: string;
+          valor_padrao: number | null;
+          duracao_minutos: number | null;
+          tipo_procedimento: string | null;
+        }>).map((p) => ({
+          id: p.id,
+          nome: p.nome,
+          valor: p.valor_padrao,
+          duracao_minutos: p.duracao_minutos,
+          tipo_procedimento: p.tipo_procedimento,
+        })),
+      );
     })();
     return () => { cancel = true; };
   }, [clinicaId]);
