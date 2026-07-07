@@ -494,6 +494,31 @@ export function AgendaV2Shell() {
   const nowMin = now.getMinutes();
   const isToday = new Date(diaKey).toDateString() === new Date().toDateString();
 
+  // Sprint 1 · S1-B — auto-scroll para a hora atual ao abrir o dia de hoje.
+  // Roda uma vez por (dia + carregamento). O usuário pode rolar depois; não
+  // interferimos em interações subsequentes. Nada de UX intrusivo — comportamento
+  // idempotente por render key.
+  const timelineScrollRef = useRef<HTMLDivElement | null>(null);
+  const nowHourRef = useRef<HTMLDivElement | null>(null);
+  const scrolledForKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!isToday) return;
+    if (rows === null) return;
+    const key = `${diaKey}:${rows.length}`;
+    if (scrolledForKeyRef.current === key) return;
+    const container = timelineScrollRef.current;
+    const anchor = nowHourRef.current;
+    if (!container || !anchor) return;
+    // requestAnimationFrame — garante que o layout já foi calculado.
+    requestAnimationFrame(() => {
+      const cRect = container.getBoundingClientRect();
+      const aRect = anchor.getBoundingClientRect();
+      const target = anchor.offsetTop - Math.max(0, (cRect.height - aRect.height) * 0.15);
+      container.scrollTo({ top: Math.max(0, target), behavior: "smooth" });
+      scrolledForKeyRef.current = key;
+    });
+  }, [isToday, rows, diaKey, porHora.length]);
+
   return (
     <div className="h-full flex bg-[#FAFAF8] overflow-hidden">
       {/* Sidebar operacional — visível em md+, vira Sheet no mobile (botão Painel no header) */}
