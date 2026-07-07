@@ -2537,7 +2537,20 @@ function AgendaPage() {
     }
     if (!form.inicio || !form.fim) { toast.error("Defina início e fim"); return; }
     if (new Date(form.fim) <= new Date(form.inicio)) { toast.error("O horário final deve ser após o inicial"); return; }
-    if (!form.procedimento.trim()) { toast.error("Selecione o serviço"); return; }
+    const multiPermitido = !!form.medico_id && (
+      medicoEhLaboratorioFormulario(form.medico_id)
+      || opcoesServicoFormulario().some((o) => procedimentoEhImagem(o.label))
+    );
+    const procedimentosParaSalvar = Array.from(new Set(
+      (multiPermitido && form.procedimentos.length > 0 ? form.procedimentos : [form.procedimento])
+        .map((p) => procedimentoFormulario(form.medico_id, p).trim())
+        .filter(Boolean),
+    ));
+    if (procedimentosParaSalvar.length === 0) { toast.error("Selecione o serviço"); return; }
+    const procedimentoTexto = procedimentosParaSalvar.join(" + ");
+    const multiExamesModo = procedimentosParaSalvar.length > 1
+      ? (medicoEhLaboratorioFormulario(form.medico_id) ? "laboratorio" : "imagem")
+      : null;
     const mudouHorarioOuMedico = !editing
       || editing.medico_id !== form.medico_id
       || new Date(editing.inicio).getTime() !== new Date(form.inicio).getTime()
@@ -2556,7 +2569,7 @@ function AgendaPage() {
       enfermagem_recurso_id: ehRecurso ? form.medico_id : null,
       inicio: new Date(form.inicio).toISOString(),
       fim: new Date(form.fim).toISOString(),
-      procedimento: procedimentoFormulario(form.medico_id, form.procedimento) || null,
+      procedimento: procedimentoTexto || null,
       status: form.status,
       observacoes: form.observacoes.trim() || null,
       data_pagamento: form.data_pagamento ? form.data_pagamento : null,
@@ -2577,6 +2590,8 @@ function AgendaPage() {
           validar_agenda_aberta: !!form.medico_id && mudouHorarioOuMedico && !recursoIds.has(form.medico_id),
           validar_inadimplencia: !!form.paciente_id && form.tipo_atendimento === "convenio",
         },
+        procedimentos: procedimentosParaSalvar,
+        multi_exames_modo: multiExamesModo,
         pending_orc_item_ids: pendingOrcItemIds,
       },
     });
