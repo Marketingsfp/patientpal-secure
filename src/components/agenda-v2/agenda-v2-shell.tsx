@@ -817,10 +817,21 @@ export function AgendaV2Shell() {
                         <SessionCard key={s.pacote_id} data={s} onOpenTimeline={openDrawer} density={density} />
                       ))}
                       {livresPorHora.get(hora) && (
-                        <div className="flex items-center gap-2 text-[11px] text-slate-400 pl-1">
-                          <span className="h-1 w-1 rounded-full bg-slate-300" />
-                          {livresPorHora.get(hora)} horário{livresPorHora.get(hora)! > 1 ? "s" : ""} livre{livresPorHora.get(hora)! > 1 ? "s" : ""} nesta hora
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => openWizardForHora(hora)}
+                          className="group flex items-center gap-2 text-[11px] text-slate-400 hover:text-slate-700 pl-1 py-1 rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                          aria-label={`Agendar em um dos ${livresPorHora.get(hora)} horários livres às ${String(hora).padStart(2, "0")}:00`}
+                          title="Clique para agendar neste horário"
+                        >
+                          <span className="h-1 w-1 rounded-full bg-slate-300 group-hover:bg-indigo-400" />
+                          <span>
+                            {livresPorHora.get(hora)} horário{livresPorHora.get(hora)! > 1 ? "s" : ""} livre{livresPorHora.get(hora)! > 1 ? "s" : ""} nesta hora
+                          </span>
+                          <span className="opacity-0 group-hover:opacity-100 text-[10px] font-semibold uppercase tracking-wider text-indigo-500 transition-opacity">
+                            agendar →
+                          </span>
+                        </button>
                       )}
                     </div>
                   </div>
