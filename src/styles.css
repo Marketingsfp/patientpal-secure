@@ -72,8 +72,8 @@
 
 :root {
   --radius: 0.875rem;
-  --background: oklch(0.985 0.004 250);
-  --foreground: oklch(0.21 0.05 250);
+  --background: oklch(0.985 0.003 240);
+  --foreground: oklch(0.21 0.04 250);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.21 0.05 250);
   --popover: oklch(1 0 0);
@@ -472,7 +472,7 @@ html.agenda-v2-active .agenda-v2-scope [data-slot="card"],
 html.agenda-v2-active .agenda-v2-scope .rounded-2xl.border,
 html.agenda-v2-active .agenda-v2-scope .rounded-xl.border,
 html.agenda-v2-active .agenda-v2-scope .rounded-lg.border {
-  border-color: #94A3B8;         /* slate-400 — contorno forte */
+  border-color: #475569;         /* slate-600 — contorno bem escuro */
   border-width: 1.5px;
   box-shadow: none;              /* apar\u00eancia "planilha organizada" */
   transition: border-color var(--hhp-dur-base) var(--hhp-ease),
