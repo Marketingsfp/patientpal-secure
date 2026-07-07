@@ -311,11 +311,10 @@ export function SessionCard({
           <QuickAction
             icon={<CalendarClock className="h-3 w-3" />}
             label="Reagendar"
-            onClick={() =>
-              toast.info("Reagendar", {
-                description: "Sprint dedicada de reagendamento — em breve.",
-              })
-            }
+            onClick={() => {
+              if (onReagendar) onReagendar(data);
+              else toast.info("Reagendar", { description: "Sprint dedicada de reagendamento — em breve." });
+            }}
           />
           <QuickAction
             icon={<DollarSign className="h-3 w-3" />}
