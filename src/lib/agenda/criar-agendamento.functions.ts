@@ -64,6 +64,13 @@ export type CriarAgendamentoResult =
   | {
       ok: true;
       id: string;
+      /**
+       * IDs de agendamentos-irmãos criados junto com o principal (modo imagem
+       * multi-exame). Vazio no caso comum (1 exame ou modo laboratório).
+       * O caller precisa desses IDs para registrar pagamento único cobrindo
+       * todos os exames do mesmo horário/paciente.
+       */
+      sibling_ids?: string[];
       // Vínculo de itens de orçamento falhou, mas o agendamento foi salvo.
       // A UI clássica exibe: mostrarErro(vErr, "agendamento salvo, mas
       // vínculo com itens do orçamento falhou").
@@ -198,6 +205,7 @@ export const criarAgendamento = createServerFn({ method: "POST" })
 
     // ---------- 6. INSERT ou UPDATE do agendamento (2519-2527) ----------
     let novoId: string | null = editing_id;
+    let siblingIds: string[] = [];
     if (editing_id) {
       if (multiModo === "imagem") {
         const [primeiro, ...restantes] = procedimentos;
@@ -208,8 +216,12 @@ export const criarAgendamento = createServerFn({ method: "POST" })
         if (error) return { ok: false, pg_error: toPgErrorLikeLocal(error) };
         if (restantes.length > 0) {
           const rows = restantes.map((procedimento) => ({ ...payload, procedimento }));
-          const { error: insertError } = await supabase.from("agendamentos").insert(rows);
+          const { data: novosIrmaos, error: insertError } = await supabase
+            .from("agendamentos")
+            .insert(rows)
+            .select("id");
           if (insertError) return { ok: false, pg_error: toPgErrorLikeLocal(insertError) };
+          siblingIds = ((novosIrmaos ?? []) as Array<{ id: string }>).map((r) => r.id);
         }
       } else {
         const payloadEdicao = multiModo === "laboratorio"
@@ -226,7 +238,9 @@ export const criarAgendamento = createServerFn({ method: "POST" })
         .select("id")
         .limit(procedimentos.length);
       if (error || !novos || novos.length === 0) return { ok: false, pg_error: toPgErrorLikeLocal(error) };
-      novoId = (novos[0] as { id: string }).id;
+      const ids = (novos as Array<{ id: string }>).map((r) => r.id);
+      novoId = ids[0];
+      siblingIds = ids.slice(1);
     } else {
       const payloadNovo = multiModo === "laboratorio"
         ? { ...payload, procedimento: procedimentos.join(" + ") }
@@ -261,5 +275,5 @@ export const criarAgendamento = createServerFn({ method: "POST" })
       if (vErr) vinculo_warning = { pg_error: toPgErrorLikeLocal(vErr) };
     }
 
-    return { ok: true, id: novoId!, vinculo_warning };
+    return { ok: true, id: novoId!, sibling_ids: siblingIds, vinculo_warning };
   });

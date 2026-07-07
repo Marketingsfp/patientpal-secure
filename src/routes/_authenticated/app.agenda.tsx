@@ -2632,12 +2632,23 @@ function AgendaPage() {
           dataRef: payload.inicio ?? null,
         }),
       ]);
-      const proc: any = await buscarProcedimentoPorNome(clinicaAtual.clinica_id, payload.procedimento ?? "CONSULTA", lista);
-      const valorCartao = valorCartaoProcedimento(proc);
-      const vDinheiro = primeiroValorValido(proc?.valor_dinheiro, proc?.valor_dinheiro_pix, proc?.valor_padrao);
-      const vPix = valorCartao;
-      const vDebito = valorCartao;
-      const vCredito = valorCartao;
+      // Multi-exame: quando há mais de um procedimento (imagem ou laboratório),
+      // o payload.procedimento vem concatenado ("A + B + C") e não encontra match
+      // no cadastro. Resolvemos cada procedimento individualmente e somamos.
+      const nomesParaValorar = procedimentosParaSalvar.length > 0
+        ? procedimentosParaSalvar
+        : [payload.procedimento ?? "CONSULTA"];
+      const procsIndividuais = await Promise.all(
+        nomesParaValorar.map((nome) => buscarProcedimentoPorNome(clinicaAtual.clinica_id, nome, lista)),
+      );
+      let vDinheiro = 0, vPix = 0, vDebito = 0, vCredito = 0;
+      for (const p of procsIndividuais as any[]) {
+        const valorCartao = valorCartaoProcedimento(p);
+        vDinheiro += primeiroValorValido(p?.valor_dinheiro, p?.valor_dinheiro_pix, p?.valor_padrao);
+        vPix      += valorCartao;
+        vDebito   += valorCartao;
+        vCredito  += valorCartao;
+      }
       let opcoes: FormaOpcao[] = [
         { forma: "dinheiro", label: "Dinheiro", valor: vDinheiro },
         { forma: "pix", label: "Pix", valor: vPix },
@@ -2677,7 +2688,9 @@ function AgendaPage() {
       }
       setFormaPagOpcoes(opcoes);
       setFormaPagCtx({
-        agId: novoId,
+        // Agrupa o principal + irmãos (imagem multi-exame) para que a mesma
+        // cobrança marque todos os agendamentos correspondentes como pagos.
+        agId: [novoId, ...(result.sibling_ids ?? [])].join(","),
         desc: `${payload.paciente_nome} — ${payload.procedimento ?? "CONSULTA"}${descSuffix}`,
         paciente: payload.paciente_nome ?? "",
         procedimento: `${payload.procedimento ?? "CONSULTA"}${descSuffix}`,
@@ -2865,12 +2878,26 @@ function AgendaPage() {
       setPagosSet((prev) => { const n = new Set(prev); n.add(a.id); return n; });
       return;
     }
-    const proc = await buscarProcedimentoPorNome(clinicaAtual.clinica_id, a.procedimento ?? "CONSULTA", lista);
-    const valorCartao = valorCartaoProcedimento(proc);
-    const vDinheiro = primeiroValorValido(proc?.valor_dinheiro, proc?.valor_dinheiro_pix, proc?.valor_padrao);
-    const vPix = valorCartao;
-    const vDebito = valorCartao;
-    const vCredito = valorCartao;
+    // Multi-exame (laboratório/imagem): quando o nome vem concatenado com " + ",
+    // resolvemos cada item individualmente e somamos. Para agendamento simples,
+    // o split retorna apenas um item e o comportamento permanece igual.
+    const nomesParaValorar = (a.procedimento ?? "CONSULTA")
+      .split(/\s+\+\s+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const procsIndividuais = await Promise.all(
+      (nomesParaValorar.length > 0 ? nomesParaValorar : ["CONSULTA"]).map((nome) =>
+        buscarProcedimentoPorNome(clinicaAtual.clinica_id, nome, lista),
+      ),
+    );
+    let vDinheiro = 0, vPix = 0, vDebito = 0, vCredito = 0;
+    for (const p of procsIndividuais as any[]) {
+      const valorCartao = valorCartaoProcedimento(p);
+      vDinheiro += primeiroValorValido(p?.valor_dinheiro, p?.valor_dinheiro_pix, p?.valor_padrao);
+      vPix      += valorCartao;
+      vDebito   += valorCartao;
+      vCredito  += valorCartao;
+    }
     let opcoes: FormaOpcao[] = [
       { forma: "dinheiro", label: "Dinheiro", valor: vDinheiro },
       { forma: "pix", label: "Pix", valor: vPix },
