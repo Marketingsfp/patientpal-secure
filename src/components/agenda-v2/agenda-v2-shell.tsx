@@ -694,7 +694,18 @@ export function AgendaV2Shell() {
       if (k === "c") { e.preventDefault(); setDensity("compacto"); return; }
       if (k === "d") { e.preventDefault(); setDensity("confortavel"); return; }
       if (k === "n") { e.preventDefault(); setWizardOpen(true); return; }
-      if (k === "j" || k === "k" || e.key === "Enter") {
+      if (k === "p") {
+        if (filtradas.length === 0) return;
+        const idx = drawerPacote
+          ? filtradas.findIndex((s) => s.pacote_id === drawerPacote)
+          : -1;
+        const target = idx >= 0 ? filtradas[idx] : filtradas[0];
+        const primeiroId = target?.items?.[0]?.id ?? null;
+        if (primeiroId) { e.preventDefault(); handleOpenProntuario(primeiroId); }
+        return;
+      }
+      const isArrowNav = e.key === "ArrowUp" || e.key === "ArrowDown";
+      if (k === "j" || k === "k" || isArrowNav || e.key === "Enter") {
         if (filtradas.length === 0) return;
         const idx = drawerPacote
           ? filtradas.findIndex((s) => s.pacote_id === drawerPacote)
@@ -707,15 +718,17 @@ export function AgendaV2Shell() {
         }
         e.preventDefault();
         let next = idx;
-        if (k === "j") next = idx < 0 ? 0 : Math.min(filtradas.length - 1, idx + 1);
-        if (k === "k") next = idx < 0 ? 0 : Math.max(0, idx - 1);
+        const goNext = k === "j" || e.key === "ArrowDown";
+        const goPrev = k === "k" || e.key === "ArrowUp";
+        if (goNext) next = idx < 0 ? 0 : Math.min(filtradas.length - 1, idx + 1);
+        if (goPrev) next = idx < 0 ? 0 : Math.max(0, idx - 1);
         const target = filtradas[next];
         if (target) openDrawer(target.pacote_id);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [filtradas, drawerPacote]);
+  }, [filtradas, drawerPacote, handleOpenProntuario]);
 
   // Feedback discreto ao trocar densidade via teclado.
   const setDensityWithToast = (d: SessionDensity) => {
