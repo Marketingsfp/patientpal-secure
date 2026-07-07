@@ -160,9 +160,6 @@ async function carregarBloco(cid: string, periodo: Periodo): Promise<Bloco & { p
     if (a.status === "realizado" || a.executado_em) cur.realizados++;
     porMedicoMap.set(a.medico_id, cur);
   }
-  const porMedico = [...porMedicoMap.entries()]
-    .map(([id, v]) => ({ nome: medNome.get(id) ?? "—", ...v }))
-    .sort((a, b) => b.total - a.total).slice(0, 12);
   // Reaplica regra por médico: se lab, agrupa por (paciente,dia).
   const porMedicoAj = [...porMedicoMap.keys()].map((id) => {
     const doMed = ags.filter((a) => a.medico_id === id);
@@ -251,8 +248,8 @@ async function carregarBloco(cid: string, periodo: Periodo): Promise<Bloco & { p
   const conversaoOrcamento = orcs.length > 0 ? (comAgend / orcs.length) * 100 : 0;
 
   // --- Qualidade ---
-  const noShowDen = realizadosArr.length + faltasArr.length;
-  const noShowPct = noShowDen > 0 ? (faltasArr.length / noShowDen) * 100 : 0;
+  const noShowDen = cCompareceram + cFaltaram;
+  const noShowPct = noShowDen > 0 ? (cFaltaram / noShowDen) * 100 : 0;
 
   // Atraso médio: executado_em - inicio (só quando executado_em > inicio)
   let atrasoTotal = 0, atrasoCount = 0;
