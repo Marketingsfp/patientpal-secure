@@ -88,10 +88,6 @@ export const criarAtendimentoMultiplo = createServerFn({ method: "POST" })
       observacoes: it.observacoes ?? observacoes_gerais ?? null,
       tipo_atendimento: it.tipo_atendimento,
       atendimento_grupo_id: grupoId,
-      // Marcador para não colidir com validação de slot de irmãos no mesmo
-      // horário — a UI já garante que cada linha aponta para um profissional
-      // diferente ou horário diferente.
-      origem: "atendimento_multiplo",
     }));
 
     const { data: novos, error } = await supabase
