@@ -3,11 +3,14 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   ChevronLeft, ChevronRight, LayoutList, GanttChartSquare, CalendarDays,
-  Search, Rows3, Rows2, Focus, Sparkles, Plus, Keyboard, PanelLeft,
+  Search, Rows3, Rows2, Focus, Sparkles, Plus, Keyboard, PanelLeft, UserCheck,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { useMedicoContext } from "@/hooks/use-medico-context";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +26,11 @@ import { KpiBar, type Kpi } from "./kpi-bar";
 import { SessionCard, type SessionCardData, type SessionDensity } from "./session-card";
 import type { DrawerPatientData } from "./patient-drawer";
 import { tipoDaSessao, type ProcMeta } from "@/lib/agenda-v2/session-detect";
+import {
+  atualizarStatusAgendamento,
+  listarIrmaosDoPacote,
+  type StatusAgendamento,
+} from "@/lib/agenda/status-agendamento.functions";
 import { cn } from "@/lib/utils";
 
 // Lazy — só baixa quando efetivamente aparecem em tela.
@@ -41,9 +49,13 @@ const NovoAgendamentoWizard = lazy(() =>
 );
 
 const DENSITY_KEY = "agenda_v2_density";
+const MEUS_PACIENTES_KEY = "agenda_v2_meus_pacientes";
 
 function densityStorageKey(clinicaId: string | null) {
   return clinicaId ? `${DENSITY_KEY}:${clinicaId}` : DENSITY_KEY;
+}
+function meusPacientesStorageKey(userId: string | null) {
+  return userId ? `${MEUS_PACIENTES_KEY}:${userId}` : MEUS_PACIENTES_KEY;
 }
 function isTypingTarget(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false;
@@ -76,6 +88,9 @@ export function AgendaV2Shell() {
   const clinicaId = clinicaAtual?.clinica_id ?? null;
   const clinicaNome = clinicaAtual?.clinica?.nome ?? "Clínica";
   const queryClient = useQueryClient();
+  const { medicoId: usuarioMedicoId, loading: medicoLoading } = useMedicoContext();
+  const atualizarStatusFn = useServerFn(atualizarStatusAgendamento);
+  const listarIrmaosFn = useServerFn(listarIrmaosDoPacote);
 
   const [dia, setDia] = useState<Date>(() => {
     const d = new Date(); d.setHours(0, 0, 0, 0); return d;
@@ -100,6 +115,24 @@ export function AgendaV2Shell() {
     return ((window.localStorage.getItem(DENSITY_KEY) as SessionDensity) ??
       "confortavel");
   });
+  // Sprint 2 · S2-C — filtro "Meus pacientes" persistido por usuário.
+  // Ligado por padrão para médicos, desligado para os demais perfis.
+  // Só aparece na toolbar quando o usuário está associado a um médico da clínica.
+  const [meusPacientes, setMeusPacientes] = useState<boolean>(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!usuarioMedicoId) { setMeusPacientes(false); return; }
+    const raw = window.localStorage.getItem(meusPacientesStorageKey(usuarioMedicoId));
+    if (raw === null) setMeusPacientes(true); // default ON para médicos
+    else setMeusPacientes(raw === "1");
+  }, [usuarioMedicoId]);
+  useEffect(() => {
+    if (typeof window === "undefined" || !usuarioMedicoId) return;
+    window.localStorage.setItem(
+      meusPacientesStorageKey(usuarioMedicoId),
+      meusPacientes ? "1" : "0",
+    );
+  }, [meusPacientes, usuarioMedicoId]);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [sidePanelOpen, setSidePanelOpen] = useState(false);
   const isMobile = useIsMobile();
@@ -336,6 +369,8 @@ export function AgendaV2Shell() {
       // Ocultar sessões "DISPONIVEL" — são horários livres, não pertencem
       // ao fluxo operacional; ficam agrupadas em resumo por hora.
       if (/dispon[íi]vel/i.test(s.paciente_nome ?? "")) return false;
+      // S2-C — filtro "Meus pacientes" (só se aplica a médicos).
+      if (meusPacientes && usuarioMedicoId && s.medico_id !== usuarioMedicoId) return false;
       if (kpiFilter && kpiFilter !== "todos") {
         if (kpiFilter === "lab" && s.tipo !== "coleta_laboratorial") return false;
         if (kpiFilter !== "lab" && s.status !== kpiFilter) return false;
@@ -353,7 +388,7 @@ export function AgendaV2Shell() {
       }
       return true;
     });
-  }, [sessoes, q, kpiFilter, filtroMedico, filtroRecurso, filtroEspecialidade, espData]);
+  }, [sessoes, q, kpiFilter, filtroMedico, filtroRecurso, filtroEspecialidade, espData, meusPacientes, usuarioMedicoId]);
 
   // Contagem de horários livres por hora (para o resumo discreto na timeline).
   const livresPorHora = useMemo(() => {
@@ -426,6 +461,7 @@ export function AgendaV2Shell() {
         : [],
       proc_titulo: primeiro.procedimento,
       hora,
+      agendamento_ids: grupo.map((g) => g.id),
     };
   }, [drawerPacote, rows, medicos, espData]);
 
@@ -434,6 +470,73 @@ export function AgendaV2Shell() {
   };
 
   const openDrawer = (id: string) => { setDrawerMounted(true); setDrawerPacote(id); };
+
+  // Sprint 2 · S2-A — handler de mudança de status, compartilhado por
+  // SessionCard e PatientDrawer. Espelha o fluxo do dropdown clássico:
+  // pergunta sobre cascata de pacote no cancelamento, dispara a server fn
+  // única (`atualizarStatusAgendamento`) e invalida a query do dia.
+  const executarMudancaStatus = async (
+    agendamentoIds: string[],
+    novoStatus: StatusAgendamento,
+    pacoteContexto?: { pacote_id?: string | null; primeiro_id: string },
+  ) => {
+    if (agendamentoIds.length === 0) return;
+    let cascatear = false;
+    if (novoStatus === "cancelado" && pacoteContexto?.pacote_id) {
+      try {
+        const irmaos = await listarIrmaosFn({ data: { agendamento_id: pacoteContexto.primeiro_id } });
+        if (irmaos.length > 0) {
+          const lista = irmaos
+            .sort((a, b) => new Date(a.inicio).getTime() - new Date(b.inicio).getTime())
+            .map((x) => `• ${new Date(x.inicio).toLocaleString("pt-BR")} — ${x.procedimento ?? ""}`)
+            .join("\n");
+          cascatear = confirm(
+            `Este agendamento faz parte de um pacote do orçamento, com mais ${irmaos.length} item(ns) vinculado(s):\n\n${lista}\n\nClique OK para cancelar TODOS do pacote.\nClique Cancelar para cancelar APENAS este.`,
+          );
+        }
+      } catch (e) {
+        console.warn("[agenda-v2] falha ao listar irmãos do pacote", e);
+      }
+    }
+    try {
+      const result = await atualizarStatusFn({
+        data: { agendamento_ids: agendamentoIds, novo_status: novoStatus, cascatear_pacote: cascatear },
+      });
+      if (cascatear && result.count > 1) {
+        toast.success(`${result.count} agendamentos do pacote cancelados.`);
+      } else {
+        const label: Record<string, string> = {
+          confirmado: "Presença confirmada",
+          em_atendimento: "Check-in registrado",
+          realizado: "Atendimento marcado como realizado",
+          cancelado: "Agendamento cancelado",
+          faltou: "Marcado como faltou",
+          agendado: "Status atualizado",
+        };
+        toast.success(label[novoStatus] ?? "Status atualizado");
+      }
+      await queryClient.invalidateQueries({ queryKey: ["agenda-v2", "ags"] });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Falha ao atualizar status.";
+      toast.error(msg);
+    }
+  };
+
+  const onChangeStatusCard = (data: SessionCardData, novoStatus: StatusAgendamento) => {
+    const ids = data.items.map((i) => i.id);
+    // O `pacote_id` do card é `pacote_id ?? id` — só cascatear quando é pacote real
+    // (mais de um item OU quando `rows` original tem `pacote_id` preenchido).
+    const primeiroReal = rows?.find((r) => ids.includes(r.id));
+    const pacoteRealId = primeiroReal?.pacote_id ?? null;
+    void executarMudancaStatus(ids, novoStatus, { pacote_id: pacoteRealId, primeiro_id: ids[0] });
+  };
+
+  const onChangeStatusDrawer = (ids: string[], novoStatus: StatusAgendamento) => {
+    const primeiroReal = rows?.find((r) => ids.includes(r.id));
+    const pacoteRealId = primeiroReal?.pacote_id ?? null;
+    void executarMudancaStatus(ids, novoStatus, { pacote_id: pacoteRealId, primeiro_id: ids[0] });
+  };
+
   const compact = density === "compacto";
   const foco = density === "foco";
 
@@ -814,7 +917,13 @@ export function AgendaV2Shell() {
                     )}
                     <div className={cn(compact ? "space-y-1.5" : foco ? "space-y-4" : "space-y-2.5")}>
                       {lista.map((s) => (
-                        <SessionCard key={s.pacote_id} data={s} onOpenTimeline={openDrawer} density={density} />
+                        <SessionCard
+                          key={s.pacote_id}
+                          data={s}
+                          onOpenTimeline={openDrawer}
+                          onChangeStatus={onChangeStatusCard}
+                          density={density}
+                        />
                       ))}
                       {livresPorHora.get(hora) && (
                         <button
@@ -849,6 +958,7 @@ export function AgendaV2Shell() {
             open={!!drawerPacote}
             onOpenChange={(v) => { if (!v) setDrawerPacote(null); }}
             data={drawerData}
+            onChangeStatus={onChangeStatusDrawer}
           />
         </Suspense>
       )}
