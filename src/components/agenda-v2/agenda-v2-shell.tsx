@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -50,6 +51,46 @@ const NovoAgendamentoWizard = lazy(() =>
 
 const DENSITY_KEY = "agenda_v2_density";
 const MEUS_PACIENTES_KEY = "agenda_v2_meus_pacientes";
+// Sprint 3 · S3-A / S3-E — snapshot para restaurar o contexto ao voltar
+// do Prontuário / Atendimento IA (data, filtros, busca, KPI, drawer,
+// posição de scroll). Vive em sessionStorage e expira em 30 min.
+const RETURN_SNAPSHOT_KEY = "agenda_v2_return_snapshot";
+const RETURN_SNAPSHOT_TTL_MS = 30 * 60 * 1000;
+
+interface AgendaV2ReturnSnapshot {
+  diaIso: string;
+  view: "timeline" | "list";
+  q: string;
+  kpiFilter: string | null;
+  filtroMedico: string;
+  filtroEspecialidade: string;
+  filtroRecurso: string;
+  drawerPacote: string | null;
+  scrollTop: number;
+  ts: number;
+}
+
+function readReturnSnapshot(): AgendaV2ReturnSnapshot | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(RETURN_SNAPSHOT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as AgendaV2ReturnSnapshot;
+    if (!parsed || typeof parsed.ts !== "number") return null;
+    if (Date.now() - parsed.ts > RETURN_SNAPSHOT_TTL_MS) {
+      window.sessionStorage.removeItem(RETURN_SNAPSHOT_KEY);
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function clearReturnSnapshot() {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.removeItem(RETURN_SNAPSHOT_KEY);
+}
 
 function densityStorageKey(clinicaId: string | null) {
   return clinicaId ? `${DENSITY_KEY}:${clinicaId}` : DENSITY_KEY;
@@ -91,18 +132,29 @@ export function AgendaV2Shell() {
   const { medicoId: usuarioMedicoId, loading: medicoLoading } = useMedicoContext();
   const atualizarStatusFn = useServerFn(atualizarStatusAgendamento);
   const listarIrmaosFn = useServerFn(listarIrmaosDoPacote);
+  const navigate = useNavigate();
+
+  // Snapshot de retorno — lido uma única vez no mount (fora do render).
+  const returnSnapshotRef = useRef<AgendaV2ReturnSnapshot | null>(
+    typeof window === "undefined" ? null : readReturnSnapshot(),
+  );
+  const returnSnapshot = returnSnapshotRef.current;
 
   const [dia, setDia] = useState<Date>(() => {
+    if (returnSnapshot?.diaIso) {
+      const d = new Date(returnSnapshot.diaIso);
+      if (!Number.isNaN(d.getTime())) { d.setHours(0, 0, 0, 0); return d; }
+    }
     const d = new Date(); d.setHours(0, 0, 0, 0); return d;
   });
-  const [view, setView] = useState<ViewMode>("timeline");
-  const [q, setQ] = useState("");
-  const [kpiFilter, setKpiFilter] = useState<string | null>(null);
-  const [filtroMedico, setFiltroMedico] = useState<string>("");
-  const [filtroEspecialidade, setFiltroEspecialidade] = useState<string>("");
-  const [filtroRecurso, setFiltroRecurso] = useState<string>("");
-  const [drawerPacote, setDrawerPacote] = useState<string | null>(null);
-  const [drawerMounted, setDrawerMounted] = useState(false);
+  const [view, setView] = useState<ViewMode>(returnSnapshot?.view ?? "timeline");
+  const [q, setQ] = useState<string>(returnSnapshot?.q ?? "");
+  const [kpiFilter, setKpiFilter] = useState<string | null>(returnSnapshot?.kpiFilter ?? null);
+  const [filtroMedico, setFiltroMedico] = useState<string>(returnSnapshot?.filtroMedico ?? "");
+  const [filtroEspecialidade, setFiltroEspecialidade] = useState<string>(returnSnapshot?.filtroEspecialidade ?? "");
+  const [filtroRecurso, setFiltroRecurso] = useState<string>(returnSnapshot?.filtroRecurso ?? "");
+  const [drawerPacote, setDrawerPacote] = useState<string | null>(returnSnapshot?.drawerPacote ?? null);
+  const [drawerMounted, setDrawerMounted] = useState<boolean>(!!returnSnapshot?.drawerPacote);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardInitial, setWizardInitial] = useState<{
     medicoId?: string | null;
@@ -471,6 +523,36 @@ export function AgendaV2Shell() {
 
   const openDrawer = (id: string) => { setDrawerMounted(true); setDrawerPacote(id); };
 
+  // Sprint 3 · S3-A — captura o estado atual e navega para o Atendimento
+  // IA do agendamento. O snapshot é lido no próximo mount e restaura
+  // data/filtros/busca/KPI/drawer/scroll. Não altera nenhuma rota nem
+  // regra clínica; apenas navegação.
+  const handleOpenProntuario = (agendamentoId: string) => {
+    if (typeof window !== "undefined") {
+      const snap: AgendaV2ReturnSnapshot = {
+        diaIso: dia.toISOString(),
+        view,
+        q,
+        kpiFilter,
+        filtroMedico,
+        filtroEspecialidade,
+        filtroRecurso,
+        drawerPacote,
+        scrollTop: timelineScrollRef.current?.scrollTop ?? 0,
+        ts: Date.now(),
+      };
+      try {
+        window.sessionStorage.setItem(RETURN_SNAPSHOT_KEY, JSON.stringify(snap));
+      } catch {
+        /* storage cheio — segue sem snapshot */
+      }
+    }
+    void navigate({
+      to: "/app/atendimento-ia/$agendamentoId",
+      params: { agendamentoId },
+    });
+  };
+
   // Sprint 2 · S2-A — handler de mudança de status, compartilhado por
   // SessionCard e PatientDrawer. Espelha o fluxo do dropdown clássico:
   // pergunta sobre cascata de pacote no cancelamento, dispara a server fn
@@ -654,6 +736,26 @@ export function AgendaV2Shell() {
       scrolledForKeyRef.current = key;
     });
   }, [isToday, rows, diaKey, porHora.length]);
+
+  // Sprint 3 · S3-A / S3-E — restauração de scroll ao voltar do Atendimento IA.
+  // Roda uma vez, depois que a query do dia carregou e as sessões foram
+  // agrupadas. Bloqueia o auto-scroll "agora" para o mesmo render.
+  const restoredScrollRef = useRef(false);
+  useEffect(() => {
+    if (restoredScrollRef.current) return;
+    if (!returnSnapshot) return;
+    if (rows === null) return;
+    const container = timelineScrollRef.current;
+    if (!container) return;
+    requestAnimationFrame(() => {
+      container.scrollTo({ top: returnSnapshot.scrollTop, behavior: "auto" });
+      // Impede o auto-scroll "agora" para este mesmo (dia + carregamento).
+      scrolledForKeyRef.current = `${diaKey}:${rows.length}`;
+      restoredScrollRef.current = true;
+      clearReturnSnapshot();
+      returnSnapshotRef.current = null;
+    });
+  }, [returnSnapshot, rows, diaKey]);
 
   return (
     <div className="h-full flex bg-[#FAFAF8] overflow-hidden">
