@@ -53,6 +53,8 @@ export type CriarAgendamentoInput = {
     orcamento_id: string | null;
     tipo_atendimento: "particular" | "convenio";
   };
+  procedimentos?: string[];
+  multi_exames_modo?: "laboratorio" | "imagem" | null;
   // Checagens que consultam o banco — o caller diz se devem rodar (mantém a
   // mesma gate do submit clássico, que só valida agenda quando mudou o
   // horário/médico e o médico não é recurso).
@@ -109,6 +111,10 @@ export const criarAgendamento = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<CriarAgendamentoResult> => {
     const { supabase } = context;
     const { clinica_id, editing_id, payload, checagens, pending_orc_item_ids } = data;
+    const procedimentos = Array.from(new Set((data.procedimentos ?? [])
+      .map((p) => String(p ?? "").trim())
+      .filter(Boolean)));
+    const multiModo = procedimentos.length > 1 ? data.multi_exames_modo ?? null : null;
 
     // ---------- 1. Paciente com telefone e data_nascimento (2422-2436) ----------
     if (checagens.validar_paciente_completo && payload.paciente_id) {
@@ -196,12 +202,27 @@ export const criarAgendamento = createServerFn({ method: "POST" })
     // ---------- 6. INSERT ou UPDATE do agendamento (2519-2527) ----------
     let novoId: string | null = editing_id;
     if (editing_id) {
-      const { error } = await supabase.from("agendamentos").update(payload).eq("id", editing_id);
+      const payloadEdicao = multiModo === "laboratorio"
+        ? { ...payload, procedimento: procedimentos.join(" + ") }
+        : payload;
+      const { error } = await supabase.from("agendamentos").update(payloadEdicao).eq("id", editing_id);
       if (error) return { ok: false, pg_error: toPgErrorLike(error) };
+    } else if (multiModo === "imagem") {
+      const rows = procedimentos.map((procedimento) => ({ ...payload, procedimento }));
+      const { data: novos, error } = await supabase
+        .from("agendamentos")
+        .insert(rows)
+        .select("id")
+        .limit(procedimentos.length);
+      if (error || !novos || novos.length === 0) return { ok: false, pg_error: toPgErrorLike(error) };
+      novoId = (novos[0] as { id: string }).id;
     } else {
+      const payloadNovo = multiModo === "laboratorio"
+        ? { ...payload, procedimento: procedimentos.join(" + ") }
+        : payload;
       const { data: novo, error } = await supabase
         .from("agendamentos")
-        .insert(payload)
+        .insert(payloadNovo)
         .select("id")
         .single();
       if (error || !novo) return { ok: false, pg_error: toPgErrorLike(error) };
