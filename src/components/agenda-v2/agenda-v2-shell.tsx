@@ -735,14 +735,21 @@ export function AgendaV2Shell() {
             title="Nenhuma sessão para os filtros atuais."
           />
         ) : (
-          <div className={cn(
-            "h-full overflow-y-auto pb-8 transition-[padding] duration-200",
-            foco ? "px-4 md:px-10 pt-6 max-w-4xl mx-auto" : "px-3 md:px-6 pt-4",
-          )}>
+          <div
+            ref={timelineScrollRef}
+            className={cn(
+              "h-full overflow-y-auto pb-8 transition-[padding] duration-200",
+              foco ? "px-4 md:px-10 pt-6 max-w-4xl mx-auto" : "px-3 md:px-6 pt-4",
+            )}
+          >
             {porHora.map(([hora, lista]) => {
               const isNowHour = isToday && hora === nowHour;
               return (
-                <div key={hora} className="flex gap-2 md:gap-4 relative">
+                <div
+                  key={hora}
+                  ref={isNowHour ? nowHourRef : undefined}
+                  className="flex gap-2 md:gap-4 relative"
+                >
                   {/* Coluna de hora (régua) */}
                   <div className={cn("shrink-0 relative", foco ? "w-12 md:w-16" : "w-11 md:w-14")}>
                     <div className={cn(
