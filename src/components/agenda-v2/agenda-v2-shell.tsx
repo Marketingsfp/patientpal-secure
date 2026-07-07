@@ -366,6 +366,34 @@ export function AgendaV2Shell() {
     return m;
   }, [sessoes]);
 
+  // Sprint 1 · S1-A — mapa hora → conjunto de médicos com slot livre nessa
+  // hora. Usado para pré-preencher o wizard quando o usuário clica no
+  // resumo "N horários livres nesta hora".
+  const livresPorHoraMedicos = useMemo(() => {
+    const m = new Map<number, Set<string>>();
+    for (const r of rows ?? []) {
+      if (!/dispon[íi]vel/i.test(r.paciente_nome ?? "")) continue;
+      if (!r.medico_id) continue;
+      const h = new Date(r.inicio).getHours();
+      const set = m.get(h) ?? new Set<string>();
+      set.add(r.medico_id);
+      m.set(h, set);
+    }
+    return m;
+  }, [rows]);
+
+  const openWizardForHora = (hora: number) => {
+    const medicos = livresPorHoraMedicos.get(hora);
+    const medicoId =
+      filtroMedico
+        ? filtroMedico
+        : medicos && medicos.size === 1
+          ? Array.from(medicos)[0]
+          : null;
+    setWizardInitial({ dia: new Date(dia), hour: hora, medicoId });
+    setWizardOpen(true);
+  };
+
   const drawerData = useMemo<DrawerPatientData | null>(() => {
     if (!drawerPacote || !rows) return null;
     const grupo = rows.filter((r) => (r.pacote_id ?? r.id) === drawerPacote);
