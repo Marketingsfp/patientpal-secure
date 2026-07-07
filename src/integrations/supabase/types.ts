@@ -319,6 +319,7 @@ export type Database = {
       agendamentos: {
         Row: {
           agenda_id: string | null
+          atendimento_grupo_id: string | null
           clinica_id: string
           created_at: string
           criado_por: string | null
@@ -349,6 +350,7 @@ export type Database = {
         }
         Insert: {
           agenda_id?: string | null
+          atendimento_grupo_id?: string | null
           clinica_id: string
           created_at?: string
           criado_por?: string | null
@@ -379,6 +381,7 @@ export type Database = {
         }
         Update: {
           agenda_id?: string | null
+          atendimento_grupo_id?: string | null
           clinica_id?: string
           created_at?: string
           criado_por?: string | null
