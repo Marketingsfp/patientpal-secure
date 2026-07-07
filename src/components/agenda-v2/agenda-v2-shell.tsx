@@ -165,6 +165,8 @@ export function AgendaV2Shell() {
     dia?: Date | null;
     hour?: number | null;
   } | null>(null);
+  // S3-C — modal de reagendamento (isolado; NÃO usa o Wizard).
+  const [reagendarSessao, setReagendarSessao] = useState<ReagendarModalSessao | null>(null);
   const [density, setDensity] = useState<SessionDensity>(() => {
     if (typeof window === "undefined") return "confortavel";
     // fallback: chave legada (sem clínica) para não perder preferência do usuário.
