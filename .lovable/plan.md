@@ -1,151 +1,86 @@
-# S3-C — Reagendar (plano técnico)
+# Plano — Infra de QA/IA para Agenda V2
 
-## 1. Assinatura da server function
+Objetivo: permitir que a IA rode testes Playwright end-to-end (criar, reagendar, mudar status) + SELECTs de verificação, sem tocar em dados operacionais nem depender de execução manual.
 
-Arquivo **novo**: `src/lib/agenda/reagendar-agendamento.functions.ts`
-(caminho client-safe — mesmo padrão de `status-agendamento.functions.ts`).
+## 1. Usuário e clínica de QA
 
-```ts
-export type ReagendarAgendamentoInput = {
-  clinica_id: string;
-  agendamento_id: string;          // id da sessão a mover — PRESERVADO
-  novo_inicio: string;             // ISO
-  novo_fim: string;                // ISO
-  novo_medico_id?: string | null;  // opcional; null/undefined = manter médico
-};
+- **Clínica de testes dedicada**: criar `clinicas` com nome `__QA_AGENDA_V2__` (marcador reconhecível). Nenhum dado real entra aqui.
+- **Usuário QA**: `qa-agenda-v2@internal.local` criado via Auth Admin API (migration/seed via server fn admin autorizada). Senha forte guardada em secret `QA_AGENDA_V2_PASSWORD`.
+- **Membership**: `clinica_memberships` com role `gestor` **apenas** na clínica QA. Sem vínculo com nenhuma outra clínica.
+- **Flag**: `profiles.preferencias_ui.flags.agenda_v2 = true` já pré-setado para este usuário.
+- **Guardas de segurança**:
+  - Server fn `assertQaUser()` que compara `context.userId` com o UUID do usuário QA (env `QA_AGENDA_V2_USER_ID`) — usada em qualquer rotina destrutiva (seed/cleanup).
+  - Constraint lógico: rotinas de cleanup filtram sempre por `clinica_id = QA_AGENDA_V2_CLINICA_ID`. Nunca por outro critério.
 
-export type ReagendarAgendamentoResult =
-  | { ok: true; id: string }                                     // sempre o mesmo id de entrada
-  | { ok: false; validation_error: { message: string; toast_duration?: number } }
-  | { ok: false; pg_error: { message: string; details?: string|null; hint?: string|null; code?: string|null } };
+## 2. Isolamento dos dados de teste
 
-export const reagendarAgendamento = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: ReagendarAgendamentoInput) => d)
-  .handler(async ({ data, context }): Promise<ReagendarAgendamentoResult> => { ... });
-```
+- Todos os inserts do teste carregam:
+  - `clinica_id` = clínica QA;
+  - `observacoes` prefixado com marcador `[QA-E2E:{runId}]` onde `runId` é UUID por execução;
+  - `paciente_nome` prefixado com `QA_` para pacientes criados no teste.
+- Médico e recurso de enfermagem específicos da clínica QA (criados no seed, nunca reaproveitados de produção).
+- Disponibilidades geradas apenas em datas futuras "sintéticas" (ex.: ano 2099) para não colidir visualmente com a agenda real caso alguém abra a clínica QA.
 
-**Invariantes obrigatórios do handler:**
-- Nunca altera `paciente_id`, `paciente_nome`, `pacote_id`, `orcamento_id`, `procedimento`, `enfermagem_recurso_id`, `status`, `data_pagamento`, `observacoes` de origem, `fluxo_etapa`, `fluxo_atualizado_em`.
-- Só altera `inicio`, `fim` e (se informado) `medico_id` do agendamento identificado por `agendamento_id`.
-- **Não move irmãos do pacote.** Recebe 1 id, muda 1 linha. Cascata de pacote fica fora do escopo (é UPDATE atômico, único id).
-- Guard de status: recusa se `status ∈ {realizado, cancelado, faltou}` — mesma trava do reagendar clássico (`app.agenda.tsx:820`).
-- Guard de mesmo id + mesmo horário: se `novo_inicio == inicio` e `novo_medico_id ∈ {null, medico_id_atual}`, retorna `validation_error` "Esse já é o horário atual" (paridade com clássica linha 831).
-- Não usa `supabaseAdmin`. Roda como usuário autenticado; RLS já cobre `agendamentos` (4 policies).
+## 3. Seed idempotente
 
-## 2. Regras reaproveitadas (espelhadas, NÃO importadas)
+Migration única cria (se não existir): clínica QA, médico QA, procedimento QA, disponibilidades de 2099. Usuário QA criado por server fn admin (`ensureQaUser`) autorizada só para admin do sistema, chamada uma vez.
 
-Como `criarAgendamento` está congelado, **duplico** aqui exatamente 3 validações lidas de `src/lib/agenda/criar-agendamento.functions.ts` (linhas 134–172, cópia literal, sem alteração de regra):
+## 4. Execução dos testes (Playwright)
 
-| # | Regra | Fonte |
-|---|-------|-------|
-| A | Se `novo_medico_id` informado → precisa existir slot desse médico no dia (`select` linhas 139–146). Mensagem "Este médico não tem agenda aberta nessa data. Gere os horários em Disponibilidades…" | criar-agendamento.functions.ts:149–155 |
-| B | Precisa existir slot `DISPONÍVEL` do médico-destino cobrindo `[novo_inicio, novo_fim]` — mesmo predicado `isSlotLivre` + `sIni ≤ inicioMs && sFim ≥ fimMs` | criar-agendamento.functions.ts:157–172 |
-| C | Excluir o próprio `agendamento_id` do conjunto avaliado (equivalente ao `excludingEditing` linha 148) — o próprio slot de origem, se médico for o mesmo, aparece como ocupado e deve ser ignorado | criar-agendamento.functions.ts:148 |
+Script em `/tmp/browser/qa-agenda-v2/`:
 
-**Não reaproveito** (fora do escopo do reagendar):
-- Validação de paciente completo (telefone/nascimento) — paciente já foi validado no agendamento original.
-- Inadimplência de cartão benefícios — não estamos criando obrigação financeira nova.
-- Vínculos com `agendamento_orcamento_itens` — já existem e são preservados.
+1. Login como usuário QA (email/senha via env — nunca hardcoded).
+2. Trocar para clínica QA.
+3. Abrir `/app/agenda-v2` (flag já ON).
+4. Cenários cobertos:
+   - **S3-A** criar agendamento em slot livre.
+   - **S3-B** alterar status (confirmado → realizado → cancelado).
+   - **S3-C** reagendar (data, hora, médico).
+   - Casos de erro: slot ocupado, horário fora da agenda, mesmo horário.
+5. Screenshot em cada etapa em `/tmp/browser/qa-agenda-v2/screenshots/`.
+6. Capturar `console` e `network` (falhas 4xx/5xx viram falha do teste).
 
-## 3. Estratégia de UPDATE preservando o id
+## 5. Evidências
 
-Modelo do banco: em Agenda clássica, `agendamentos` funciona como grade de slots pré-gerados (paciente_nome="DISPONÍVEL") que viram consulta ao serem ocupados. O reagendar clássico **troca o id** (libera origem, ocupa slot destino, migra `fin_lancamentos`).
+Por execução (`runId`):
 
-A regra do usuário exige **manter o mesmo `agendamento.id`**. Estratégia:
+- `screenshots/NN_step.png` — antes/depois de cada ação.
+- `console.log` — mensagens do browser.
+- `network.jsonl` — requests da rota `/api/*` e server fns.
+- `sql-verificacao.md` — resultado dos SELECTs (id, inicio/fim antes/depois, medico_id antes/depois, slot antigo virou DISPONÍVEL, sem duplicidade, pacote/orçamento/paciente preservados).
+- `resumo.md` — tabela verde/vermelha por cenário.
 
-```text
-Passo 1  SELECT slot destino DISPONÍVEL cobrindo [novo_inicio, novo_fim] do médico-destino  → dest_slot
-Passo 2  SELECT origem (por id)                                                             → origem
-Passo 3  UPDATE dest_slot: paciente_nome='DISPONÍVEL_REAGENDADO_TMP', inicio=origem.inicio,
-         fim=origem.fim, medico_id=origem.medico_id     ← "recicla" o slot destino para
-         cobrir o buraco que a origem vai deixar. Mantém a grade íntegra.
-Passo 4  UPDATE origem: inicio=novo_inicio, fim=novo_fim, medico_id=novo_medico_id (se dado),
-         observacoes = observacoes || '\n[Reagendado …]'  ← trilha idêntica à clássica (:838)
-Passo 5  UPDATE dest_slot novamente: paciente_nome='DISPONÍVEL' (limpa o TMP)
-```
+## 6. Limpeza automática
 
-Resultado: `origem.id` inalterado; grade de slots do dia continua consistente (o slot destino "muda de lugar" para o horário antigo da origem, virando o novo DISPONÍVEL naquele horário). **Nenhum id de referência externa quebra** (`pagamentos`, `agendamento_orcamento_itens`, `prontuarios`, `pacote_id`, `orcamento_id`).
+Ao final (ou em `finally`, mesmo em falha):
 
-Erros em qualquer passo → early return com `pg_error`. Sem transação explícita porque Supabase JS não expõe BEGIN/COMMIT; o TMP marker (Passo 3) só existe entre os UPDATEs sequenciais dentro da mesma requisição — se Passo 4 falhar, Passo 5 executa mesmo assim num `try/finally` para limpar o TMP.
+- Server fn `cleanupQaRun({ runId })` protegida por `assertQaUser` + `clinica_id = QA`:
+  1. `DELETE FROM agendamentos WHERE clinica_id = QA AND (observacoes LIKE '[QA-E2E:{runId}]%' OR paciente_nome LIKE 'QA_%')` — restaurando slots.
+  2. Recria slots DISPONÍVEL apagados via re-seed idempotente das disponibilidades 2099.
+  3. Log em `audit_log` com `runId`, contagem removida, timestamp.
+- Cleanup "guarda-chuva" agendável (pg_cron opcional): remove qualquer resto com prefixo `[QA-E2E:` mais velho que 24h na clínica QA.
 
-## 4. Arquivos alterados
+## 7. Rollback
 
-| Arquivo | Δ | O quê |
-|---|---|---|
-| `src/lib/agenda/reagendar-agendamento.functions.ts` | **novo** | server fn dedicada acima |
-| `src/components/agenda-v2/reagendar-modal.tsx` | **novo** | modal compacto: data (input date), hora (select 07:00–20:00 step 30min), médico (SearchableSelect opcional, default = atual). Sem passos, sem paciente/serviço. Botão "Confirmar reagendamento" chama `reagendarAgendamento` via `useServerFn` |
-| `src/components/agenda-v2/agenda-v2-shell.tsx` | edit | novo state `reagendarSessao`, wiring do modal, invalidate `["agenda-v2","ags"]` on success |
-| `src/components/agenda-v2/session-card.tsx` | edit | QuickAction "Reagendar" já existe no hover (S3-A stub) — conectar `onReagendar` prop ao handler do shell |
-| `src/components/agenda-v2/patient-drawer.tsx` | edit | QuickAction "Reagendar" já existe — mesma conexão |
+- **Rollback de execução**: `cleanupQaRun` roda ao fim; se falhar, cron 24h varre.
+- **Rollback da infra QA**: migration reversa `drop_qa_agenda_v2.sql` remove memberships, clínica QA, médico QA, disponibilidades 2099, e o usuário QA via Auth Admin. Sem efeitos colaterais nas demais clínicas (tudo filtrado por `clinica_id`).
+- **Kill switch**: env `QA_E2E_ENABLED=false` faz `assertQaUser` recusar qualquer operação destrutiva, congelando a infra sem remover.
 
-**Zero migration. Zero alteração em `criarAgendamento.functions.ts`. Zero alteração em `app.agenda.tsx`.**
+## 8. Detalhes técnicos
 
-## 5. Rollback
+- Server fns novas (todas em `src/lib/qa/*.functions.ts`):
+  - `ensureQaUser` (admin-only, idempotente).
+  - `assertQaUser` (helper middleware).
+  - `cleanupQaRun` (autorizado só para usuário QA).
+- Secrets necessárias (pedidas via `add_secret` quando aprovado):
+  - `QA_AGENDA_V2_USER_ID`, `QA_AGENDA_V2_CLINICA_ID`, `QA_AGENDA_V2_PASSWORD`.
+- Nenhuma alteração em `criarAgendamento`, `reagendarAgendamento`, agenda clássica ou RLS de tabelas existentes.
+- Playwright: usa fluxo login/senha padrão (sem bypass de auth), respeita RLS como qualquer gestor.
 
-```bash
-rm src/lib/agenda/reagendar-agendamento.functions.ts \
-   src/components/agenda-v2/reagendar-modal.tsx
-git checkout src/components/agenda-v2/agenda-v2-shell.tsx \
-             src/components/agenda-v2/session-card.tsx \
-             src/components/agenda-v2/patient-drawer.tsx
-```
+## 9. O que NÃO faz parte deste plano
 
-Sem migration, sem alteração de schema, sem função de servidor removida (só duas novas). Comportamento pré-S3-C restaurado imediatamente.
+- Nada é implementado antes da aprovação.
+- Não roda nenhum teste, DELETE, seed ou migration ainda.
+- Não inicia sprint nova; S3-C segue pendente de validação até o primeiro run automatizado passar.
 
-## 6. Testes Playwright (obrigatórios antes de fechar S3-C)
-
-Script único em `/tmp/browser/s3c-reagendar/` executando 3 cenários:
-
-1. **Reagendar mesmo médico, novo horário** — abre `/app/agenda-v2`, liga flag, abre card → "Reagendar" → escolhe novo horário livre → confirma → verifica: mesma linha do card no novo horário, mesmo paciente, mesmo procedimento, KPIs recalculam sozinhos, zero erro de console.
-2. **Reagendar com troca de médico** — mesmo fluxo mas escolhe outro médico com slot livre. Screenshot antes/depois.
-3. **Sessão em pacote** — abrir card cujo `pacote_id` tem irmãos, reagendar. Verifica no drawer que os IRMÃOS permanecem no horário original (não foram movidos).
-4. **Regressão**: abrir `/app/agenda` clássica, criar 1 agendamento novo (fluxo antigo), mudar status. Prova que a rota clássica ficou intacta.
-
-## 7. SELECTs de verificação (rodar via supabase--read_query após cada cenário)
-
-```sql
--- Cenário 1: id preservado, horário mudou, resto intacto
-select id, paciente_id, paciente_nome, medico_id, inicio, fim,
-       pacote_id, orcamento_id, procedimento, status, observacoes
-from agendamentos
-where id = '<AG_ID>';
-
--- Cenário 3: irmãos do pacote permanecem no horário original
-select id, inicio, fim, medico_id
-from agendamentos
-where pacote_id = '<PACOTE_ID>'
-order by inicio;
-
--- Slot antigo virou DISPONÍVEL corretamente
-select id, paciente_nome, inicio, fim, medico_id
-from agendamentos
-where clinica_id = '<CLINICA_ID>'
-  and inicio = '<HORARIO_ANTIGO>'
-  and medico_id = '<MEDICO_ANTIGO_ID>';
-
--- Zero linhas com marker TMP residual (caso Passo 5 do handler falhe)
-select id from agendamentos where paciente_nome = 'DISPONÍVEL_REAGENDADO_TMP';
-
--- Vínculos financeiros e de orçamento continuam ligados ao MESMO id
-select id, agendamento_id, valor from fin_lancamentos where agendamento_id = '<AG_ID>';
-select agendamento_id, orcamento_item_id from agendamento_orcamento_itens where agendamento_id = '<AG_ID>';
-
--- audit_log capturou o UPDATE (trigger fn_audit_trigger já cobre agendamentos)
-select operation, changed_at, changed_by from audit_log
-where table_name = 'agendamentos' and record_id = '<AG_ID>'
-order by changed_at desc limit 5;
-```
-
-## 8. Invariantes reafirmados
-
-- ✅ `criarAgendamento` intocado (diff = vazio).
-- ✅ `src/routes/_authenticated/app.agenda.tsx` intocado.
-- ✅ Zero migration.
-- ✅ Zero alteração de regra de negócio (as 3 regras copiadas são literais).
-- ✅ `agenda_v2` OFF por padrão.
-- ✅ Só move ESTA sessão (função recebe 1 id, muda 1 linha).
-- ✅ Paciente, pacote_id, orçamento, histórico, fluxo, pagamentos preservados.
-- ✅ `agendamento.id` estável.
-
-**Nada será codado sem sua aprovação deste plano.**
+Aguardando aprovação para implementar.
