@@ -64,6 +64,13 @@ export type CriarAgendamentoResult =
   | {
       ok: true;
       id: string;
+      /**
+       * IDs de agendamentos-irmãos criados junto com o principal (modo imagem
+       * multi-exame). Vazio no caso comum (1 exame ou modo laboratório).
+       * O caller precisa desses IDs para registrar pagamento único cobrindo
+       * todos os exames do mesmo horário/paciente.
+       */
+      sibling_ids?: string[];
       // Vínculo de itens de orçamento falhou, mas o agendamento foi salvo.
       // A UI clássica exibe: mostrarErro(vErr, "agendamento salvo, mas
       // vínculo com itens do orçamento falhou").
