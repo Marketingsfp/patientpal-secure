@@ -166,8 +166,8 @@ async function carregarBloco(cid: string, periodo: Periodo): Promise<Bloco & { p
   // Reaplica regra por médico: se lab, agrupa por (paciente,dia).
   const porMedicoAj = [...porMedicoMap.keys()].map((id) => {
     const doMed = ags.filter((a) => a.medico_id === id);
-    const total = contarAtendimentos(doMed.filter((a) => a.status !== "cancelado"), labMedicoIds);
-    const realizados = contarAtendimentos(doMed.filter((a) => a.status === "realizado" || a.executado_em), labMedicoIds);
+    const total = contarAtendimentos(doMed.filter((a) => a.status !== "cancelado"), labMedicoIds, catResolver);
+    const realizados = contarAtendimentos(doMed.filter((a) => a.status === "realizado" || a.executado_em), labMedicoIds, catResolver);
     return { nome: medNome.get(id) ?? "—", total, realizados };
   }).sort((a, b) => b.total - a.total).slice(0, 12);
 
