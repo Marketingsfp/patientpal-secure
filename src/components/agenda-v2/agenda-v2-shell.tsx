@@ -33,6 +33,7 @@ import {
   type StatusAgendamento,
 } from "@/lib/agenda/status-agendamento.functions";
 import { cn } from "@/lib/utils";
+import { useClinicSkin } from "@/hooks/use-clinic-skin";
 
 // Lazy — só baixa quando efetivamente aparecem em tela.
 // Header + timeline + cards + KPIs permanecem no bundle crítico.
@@ -132,6 +133,9 @@ export function AgendaV2Shell() {
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id ?? null;
   const clinicaNome = clinicaAtual?.clinica?.nome ?? "Clínica";
+  // Sprint Beauty — ativa o skin de cor da clínica (azure/emerald/violet)
+  // enquanto a Agenda V2 está montada. Zero impacto em lógica de negócio.
+  useClinicSkin();
   const queryClient = useQueryClient();
   const { medicoId: usuarioMedicoId, loading: medicoLoading } = useMedicoContext();
   const atualizarStatusFn = useServerFn(atualizarStatusAgendamento);
@@ -865,7 +869,7 @@ export function AgendaV2Shell() {
   }, [returnSnapshot, rows, diaKey]);
 
   return (
-    <div className="h-full flex bg-[#FAFAF8] overflow-hidden">
+    <div className="agenda-v2-scope h-full flex bg-[#FAFAF8] overflow-hidden">
       {/* Sidebar operacional — visível em md+, vira Sheet no mobile (botão Painel no header) */}
       {!foco && !isMobile && (
         <Suspense fallback={<div className="hidden md:block w-64 border-r border-slate-100 bg-white" />}>
@@ -921,7 +925,8 @@ export function AgendaV2Shell() {
             <Button
               size="sm"
               onClick={() => setWizardOpen(true)}
-              className="h-9 px-4 rounded-2xl gap-1.5 bg-slate-900 hover:bg-slate-800 text-white shadow-sm transition-all hover:shadow-md hover:-translate-y-[1px]"
+              className="h-9 px-4 rounded-2xl gap-1.5 text-white shadow-[0_6px_18px_-6px_var(--clinic-accent-glow)] transition-all hover:shadow-[0_10px_24px_-8px_var(--clinic-accent-glow)] hover:-translate-y-[1px] border-0"
+              style={{ background: "linear-gradient(180deg, var(--clinic-accent) 0%, var(--clinic-accent-strong) 100%)" }}
             >
               <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
               <span className="text-xs font-semibold hidden sm:inline">Nova sessão</span>
@@ -934,13 +939,13 @@ export function AgendaV2Shell() {
                 value={density}
                 onValueChange={(v) => v && setDensity(v as SessionDensity)}
               >
-                <ToggleGroupItem value="confortavel" aria-label="Confortável" className="h-8 w-8 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm">
+                <ToggleGroupItem value="confortavel" aria-label="Confortável" className="h-8 w-8 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm data-[state=on]:text-[color:var(--clinic-accent-strong)]">
                   <Rows3 className="h-3.5 w-3.5" />
                 </ToggleGroupItem>
-                <ToggleGroupItem value="compacto" aria-label="Compacto" className="h-8 w-8 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm">
+                <ToggleGroupItem value="compacto" aria-label="Compacto" className="h-8 w-8 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm data-[state=on]:text-[color:var(--clinic-accent-strong)]">
                   <Rows2 className="h-3.5 w-3.5" />
                 </ToggleGroupItem>
-                <ToggleGroupItem value="foco" aria-label="Foco" className="h-8 w-8 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm">
+                <ToggleGroupItem value="foco" aria-label="Foco" className="h-8 w-8 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm data-[state=on]:text-[color:var(--clinic-accent-strong)]">
                   <Focus className="h-3.5 w-3.5" />
                 </ToggleGroupItem>
               </ToggleGroup>
@@ -952,10 +957,10 @@ export function AgendaV2Shell() {
                 value={view}
                 onValueChange={(v) => v && setView(v as ViewMode)}
               >
-                <ToggleGroupItem value="timeline" aria-label="Timeline" className="h-8 px-3 gap-1.5 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm">
+                <ToggleGroupItem value="timeline" aria-label="Timeline" className="h-8 px-3 gap-1.5 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm data-[state=on]:text-[color:var(--clinic-accent-strong)]">
                   <GanttChartSquare className="h-3.5 w-3.5" /> <span className="hidden sm:inline text-xs">Timeline</span>
                 </ToggleGroupItem>
-                <ToggleGroupItem value="list" aria-label="Lista" className="h-8 px-3 gap-1.5 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm">
+                <ToggleGroupItem value="list" aria-label="Lista" className="h-8 px-3 gap-1.5 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm data-[state=on]:text-[color:var(--clinic-accent-strong)]">
                   <LayoutList className="h-3.5 w-3.5" /> <span className="hidden sm:inline text-xs">Lista</span>
                 </ToggleGroupItem>
               </ToggleGroup>
@@ -1035,9 +1040,10 @@ export function AgendaV2Shell() {
               className={cn(
                 "h-9 rounded-2xl gap-1.5 text-xs",
                 meusPacientes
-                  ? "bg-indigo-600 hover:bg-indigo-700 text-white border-transparent"
+                  ? "border-transparent text-[color:var(--clinic-accent-fg)] shadow-sm"
                   : "bg-slate-100 border-transparent text-slate-600 hover:bg-slate-200",
               )}
+              style={meusPacientes ? { background: "var(--clinic-accent)" } : undefined}
               aria-pressed={meusPacientes}
               title="Mostrar apenas os pacientes do médico logado"
             >

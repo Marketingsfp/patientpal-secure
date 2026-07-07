@@ -34,14 +34,25 @@ export function HhpKpiCard({
       title={hint ?? label}
       aria-pressed={onClick ? !!active : undefined}
       className={cn(
-        "group text-left rounded-2xl border bg-white transition-all shrink-0",
+        "group relative text-left rounded-2xl border bg-white transition-all shrink-0 overflow-hidden",
         "min-w-[8.5rem] md:min-w-0",
-        onClick && "hover:shadow-md hover:-translate-y-[1px] hover:border-slate-200 cursor-pointer",
+        onClick && "hover:shadow-[0_10px_28px_-16px_rgba(15,23,42,0.20)] hover:-translate-y-[1px] hover:border-slate-200 cursor-pointer",
         compact ? "p-3" : "p-4",
-        active ? "border-slate-900 shadow-sm ring-1 ring-slate-900/5" : "border-slate-100",
+        active
+          ? "border-[var(--clinic-accent)] shadow-sm ring-2 ring-[color:var(--clinic-accent-glow)]"
+          : "border-slate-100",
         className,
       )}
     >
+      {/* Barra de accent no topo — quase invisível em repouso, "acende" no active */}
+      <span
+        aria-hidden
+        className={cn(
+          "absolute inset-x-0 top-0 h-[2px] transition-opacity",
+          active ? "opacity-100" : "opacity-0 group-hover:opacity-40",
+        )}
+        style={{ background: "var(--clinic-accent)" }}
+      />
       <div className="flex items-start justify-between gap-2">
         <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
           {label}
@@ -50,8 +61,14 @@ export function HhpKpiCard({
           <Icon className="h-3 w-3" strokeWidth={2.5} />
         </span>
       </div>
-      <div className="mt-2 flex items-baseline gap-1.5">
-        <span className={cn("tabular-nums font-bold text-slate-900", compact ? "text-xl" : "text-3xl")}>
+      <div className="mt-2 flex items-baseline gap-1.5 hhp-kpi-anim">
+        <span
+          className={cn(
+            "tabular-nums font-bold text-slate-900",
+            compact ? "text-xl" : "text-3xl",
+          )}
+          style={{ fontFamily: "var(--hhp-font-display)", letterSpacing: "-0.02em" }}
+        >
           {typeof value === "number" ? value.toLocaleString("pt-BR") : value}
         </span>
         {delta !== undefined && delta !== 0 && (
