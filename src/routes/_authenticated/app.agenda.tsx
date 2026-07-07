@@ -3463,7 +3463,7 @@ function AgendaPage() {
                   onChange={(v) => {
                     if (v.startsWith("exame:")) {
                       const nome = v.slice(6);
-                      setForm(f => ({ ...f, medico_id: "", procedimento: nome }));
+                      setForm(f => ({ ...f, medico_id: "", procedimento: nome, procedimentos: nome ? [nome] : [] }));
                     } else {
                        setForm(f => {
                          const medico_id = v === "none" ? "" : v;
@@ -3479,7 +3479,7 @@ function AgendaPage() {
                              procedimento = padrao;
                            }
                          }
-                         return { ...f, medico_id, fim, procedimento };
+                          return { ...f, medico_id, fim, procedimento, procedimentos: procedimento ? [procedimento] : [] };
                        });
                     }
                   }}
