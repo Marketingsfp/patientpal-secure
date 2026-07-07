@@ -15,6 +15,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { HhpKpiCard, HhpKpiRow } from "@/design-system/hhp/kpi-card";
 import type { HhpTone } from "@/design-system/hhp/tokens";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { laboratorioMedicoIdsFrom, contarAtendimentos } from "@/lib/agenda/contagem";
 
 export const Route = createFileRoute("/_authenticated/app/painel-executivo")({
   component: PainelExecutivoPage,
@@ -107,6 +108,7 @@ async function carregarBloco(cid: string, periodo: Periodo): Promise<Bloco & { p
   const espNome = new Map(espLista.map(e => [e.id, e.nome] as const));
   const medEspIdx: Record<string, string[]> = {};
   for (const me of medEsp) (medEspIdx[me.medico_id] ||= []).push(me.especialidade_id);
+  const labMedicoIds = laboratorioMedicoIdsFrom(espLista, medEsp);
 
   // --- Produção ---
   const naoCancelados = ags.filter(a => a.status !== "cancelado");
@@ -114,6 +116,13 @@ async function carregarBloco(cid: string, periodo: Periodo): Promise<Bloco & { p
   const faltasArr = ags.filter(a => a.status === "faltou");
   const canceladosArr = ags.filter(a => a.status === "cancelado");
   const confirmadosArr = ags.filter(a => ["confirmado", "realizado", "faltou"].includes(a.status) || (a.fluxo_etapa && a.fluxo_etapa !== "aguardando"));
+
+  // Regra de contagem (lab = 1 por paciente/dia, imagem/consulta = 1 por linha)
+  const cAgendados = contarAtendimentos(naoCancelados, labMedicoIds);
+  const cConfirmados = contarAtendimentos(confirmadosArr, labMedicoIds);
+  const cCompareceram = contarAtendimentos(realizadosArr, labMedicoIds);
+  const cFaltaram = contarAtendimentos(faltasArr, labMedicoIds);
+  const cCancelaram = contarAtendimentos(canceladosArr, labMedicoIds);
 
   // Capacidade em minutos no período (soma de janelas de disponibilidade por dia)
   const iniDt = new Date(`${periodo.de}T00:00:00`);
@@ -151,9 +160,13 @@ async function carregarBloco(cid: string, periodo: Periodo): Promise<Bloco & { p
     if (a.status === "realizado" || a.executado_em) cur.realizados++;
     porMedicoMap.set(a.medico_id, cur);
   }
-  const porMedico = [...porMedicoMap.entries()]
-    .map(([id, v]) => ({ nome: medNome.get(id) ?? "—", ...v }))
-    .sort((a, b) => b.total - a.total).slice(0, 12);
+  // Reaplica regra por médico: se lab, agrupa por (paciente,dia).
+  const porMedicoAj = [...porMedicoMap.keys()].map((id) => {
+    const doMed = ags.filter((a) => a.medico_id === id);
+    const total = contarAtendimentos(doMed.filter((a) => a.status !== "cancelado"), labMedicoIds);
+    const realizados = contarAtendimentos(doMed.filter((a) => a.status === "realizado" || a.executado_em), labMedicoIds);
+    return { nome: medNome.get(id) ?? "—", total, realizados };
+  }).sort((a, b) => b.total - a.total).slice(0, 12);
 
   const porEspMap = new Map<string, number>();
   for (const a of ags) {
@@ -235,8 +248,8 @@ async function carregarBloco(cid: string, periodo: Periodo): Promise<Bloco & { p
   const conversaoOrcamento = orcs.length > 0 ? (comAgend / orcs.length) * 100 : 0;
 
   // --- Qualidade ---
-  const noShowDen = realizadosArr.length + faltasArr.length;
-  const noShowPct = noShowDen > 0 ? (faltasArr.length / noShowDen) * 100 : 0;
+  const noShowDen = cCompareceram + cFaltaram;
+  const noShowPct = noShowDen > 0 ? (cFaltaram / noShowDen) * 100 : 0;
 
   // Atraso médio: executado_em - inicio (só quando executado_em > inicio)
   let atrasoTotal = 0, atrasoCount = 0;
@@ -252,10 +265,10 @@ async function carregarBloco(cid: string, periodo: Periodo): Promise<Bloco & { p
 
   return {
     producao: {
-      agendados: naoCancelados.length, confirmados: confirmadosArr.length,
-      compareceram: realizadosArr.length, faltaram: faltasArr.length, cancelaram: canceladosArr.length,
+      agendados: cAgendados, confirmados: cConfirmados,
+      compareceram: cCompareceram, faltaram: cFaltaram, cancelaram: cCancelaram,
       ocupacaoPct, tempoMedioMin, capacidadeMin, agendadoMin,
-      porMedico, porEspecialidade,
+      porMedico: porMedicoAj, porEspecialidade,
     },
     financeiro: {
       receitaPrevista, receitaRealizada, ticketMedio,
