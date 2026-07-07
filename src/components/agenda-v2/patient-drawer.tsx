@@ -404,6 +404,53 @@ function TabPlaceholder({ title, children }: { title: string; children: React.Re
   );
 }
 
+// Sprint 2 · S2-A — bloco de ações de status, espelhando as transições
+// disponíveis no dropdown da Agenda clássica (`mudarStatus`).
+function StatusActions({
+  status,
+  onChange,
+}: {
+  status: string;
+  onChange: (novo: StatusAgendamento) => void;
+}) {
+  const podeConfirmar = status === "agendado";
+  const podeCheckin = status === "agendado" || status === "confirmado";
+  const podeRealizar = status === "agendado" || status === "confirmado" || status === "em_atendimento";
+  const podeCancelar = status !== "cancelado" && status !== "realizado";
+  const podeFaltou = status !== "faltou" && status !== "cancelado" && status !== "realizado";
+  const acoes: Array<{ key: StatusAgendamento; label: string; icon: React.ReactNode; on: boolean; cls: string }> = [
+    { key: "confirmado", label: "Confirmar", icon: <Check className="h-4 w-4" />, on: podeConfirmar, cls: "text-blue-600" },
+    { key: "em_atendimento", label: "Check-in", icon: <LogIn className="h-4 w-4" />, on: podeCheckin, cls: "text-indigo-600" },
+    { key: "realizado", label: "Realizar", icon: <ClipboardCheck className="h-4 w-4" />, on: podeRealizar, cls: "text-emerald-600" },
+    { key: "faltou", label: "Faltou", icon: <UserX className="h-4 w-4" />, on: podeFaltou, cls: "text-amber-600" },
+    { key: "cancelado", label: "Cancelar", icon: <XCircle className="h-4 w-4" />, on: podeCancelar, cls: "text-rose-600" },
+  ];
+  const visiveis = acoes.filter((a) => a.on);
+  if (visiveis.length === 0) return null;
+  return (
+    <div className="mb-4">
+      <SectionTitle>Status</SectionTitle>
+      <div className="flex flex-wrap gap-1.5">
+        {visiveis.map((a) => (
+          <button
+            key={a.key}
+            type="button"
+            onClick={() => onChange(a.key)}
+            className={cn(
+              "inline-flex items-center gap-1.5 h-8 px-3 rounded-xl text-[11px] font-medium",
+              "border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 transition-colors",
+              a.cls,
+            )}
+          >
+            {a.icon}
+            <span>{a.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ResumoPanel({ proc }: { proc: string | null }) {
   return (
     <div className="grid grid-cols-2 gap-2">
