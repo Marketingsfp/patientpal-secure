@@ -366,10 +366,10 @@ function PainelExecutivoPage() {
         <TabsContent value="producao" className="space-y-6">
           <HhpKpiRow>
             <HhpKpiCard label="Agendados" value={int(p.agendados)} icon={CalendarDays} tone="info" delta={delta(p.agendados, pa.agendados)} />
-            <HhpKpiCard label="Confirmados" value={int(p.confirmados)} icon={CheckCircle2} tone="success" delta={delta(p.confirmados, pa.confirmados)} />
-            <HhpKpiCard label="Compareceram" value={int(p.compareceram)} icon={UserCheck} tone="success" delta={delta(p.compareceram, pa.compareceram)} />
+            <HhpKpiCard label="Confirmados" value={int(p.confirmados)} icon={CheckCircle2} tone="ok" delta={delta(p.confirmados, pa.confirmados)} />
+            <HhpKpiCard label="Compareceram" value={int(p.compareceram)} icon={UserCheck} tone="ok" delta={delta(p.compareceram, pa.compareceram)} />
             <HhpKpiCard label="Faltaram" value={int(p.faltaram)} icon={UserX} tone="danger" delta={delta(p.faltaram, pa.faltaram)} />
-            <HhpKpiCard label="Cancelaram" value={int(p.cancelaram)} icon={Ban} tone="warning" delta={delta(p.cancelaram, pa.cancelaram)} />
+            <HhpKpiCard label="Cancelaram" value={int(p.cancelaram)} icon={Ban} tone="warn" delta={delta(p.cancelaram, pa.cancelaram)} />
             <HhpKpiCard label="Ocupação" value={pctFmt(p.ocupacaoPct)} icon={Percent} tone="info" hint={`${int(p.agendadoMin)} / ${int(p.capacidadeMin)} min`} />
           </HhpKpiRow>
           <HhpKpiRow>
@@ -388,11 +388,11 @@ function PainelExecutivoPage() {
         {podeFin && (
         <TabsContent value="financeiro" className="space-y-6">
           <HhpKpiRow>
-            <HhpKpiCard label="Receita realizada" value={money(f.receitaRealizada)} icon={Wallet} tone="success" delta={delta(f.receitaRealizada, fa.receitaRealizada)} />
+            <HhpKpiCard label="Receita realizada" value={money(f.receitaRealizada)} icon={Wallet} tone="ok" delta={delta(f.receitaRealizada, fa.receitaRealizada)} />
             <HhpKpiCard label="Receita prevista" value={money(f.receitaPrevista)} icon={TrendingUp} tone="info" delta={delta(f.receitaPrevista, fa.receitaPrevista)} />
             <HhpKpiCard label="Ticket médio" value={money(f.ticketMedio)} icon={BadgeDollarSign} tone="info" delta={delta(f.ticketMedio, fa.ticketMedio)} />
-            <HhpKpiCard label="Despesa realizada" value={money(f.despesaRealizada)} icon={Receipt} tone="warning" delta={delta(f.despesaRealizada, fa.despesaRealizada)} />
-            <HhpKpiCard label="Resultado" value={money(f.resultado)} icon={TrendingUp} tone={f.resultado >= 0 ? "success" : "danger"} delta={delta(f.resultado, fa.resultado)} />
+            <HhpKpiCard label="Despesa realizada" value={money(f.despesaRealizada)} icon={Receipt} tone="warn" delta={delta(f.despesaRealizada, fa.despesaRealizada)} />
+            <HhpKpiCard label="Resultado" value={money(f.resultado)} icon={TrendingUp} tone={f.resultado >= 0 ? "ok" : "danger"} delta={delta(f.resultado, fa.resultado)} />
           </HhpKpiRow>
           <HhpKpiRow>
             <HhpKpiCard label="Receita particular" value={money(f.receitaParticular)} icon={Wallet} tone="default" />
@@ -436,7 +436,7 @@ function PainelExecutivoPage() {
         {/* Comercial */}
         <TabsContent value="comercial" className="space-y-6">
           <HhpKpiRow>
-            <HhpKpiCard label="Pacientes novos" value={int(c.novos)} icon={UserPlus} tone="success" delta={delta(c.novos, ca.novos)} />
+            <HhpKpiCard label="Pacientes novos" value={int(c.novos)} icon={UserPlus} tone="ok" delta={delta(c.novos, ca.novos)} />
             <HhpKpiCard label="Recorrentes" value={int(c.recorrentes)} icon={Repeat} tone="info" delta={delta(c.recorrentes, ca.recorrentes)} />
             <HhpKpiCard label="Orçamentos" value={int(c.orcamentosNoPeriodo)} icon={Receipt} tone="default" delta={delta(c.orcamentosNoPeriodo, ca.orcamentosNoPeriodo)} />
             <HhpKpiCard label="Conversão orçam." value={pctFmt(c.conversaoOrcamento)} icon={TrendingUp} tone="info" />
@@ -454,8 +454,8 @@ function PainelExecutivoPage() {
         <TabsContent value="qualidade" className="space-y-6">
           <HhpKpiRow>
             <HhpKpiCard label="No-show %" value={pctFmt(q.noShowPct)} icon={AlertTriangle} tone="danger" delta={delta(q.noShowPct, qa.noShowPct)} />
-            <HhpKpiCard label="Atraso médio" value={`${q.atrasoMedioMin.toFixed(0)} min`} icon={Clock} tone="warning" delta={delta(q.atrasoMedioMin, qa.atrasoMedioMin)} />
-            <HhpKpiCard label="Confirmação" value={pctFmt(p.agendados > 0 ? (p.confirmados / p.agendados) * 100 : 0)} icon={CheckCircle2} tone="success" />
+            <HhpKpiCard label="Atraso médio" value={`${q.atrasoMedioMin.toFixed(0)} min`} icon={Clock} tone="warn" delta={delta(q.atrasoMedioMin, qa.atrasoMedioMin)} />
+            <HhpKpiCard label="Confirmação" value={pctFmt(p.agendados > 0 ? (p.confirmados / p.agendados) * 100 : 0)} icon={CheckCircle2} tone="ok" />
           </HhpKpiRow>
           <Card>
             <CardContent className="py-6 text-sm text-muted-foreground">
