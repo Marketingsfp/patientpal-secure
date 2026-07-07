@@ -74,7 +74,7 @@ export function ThemeSwitcher() {
         onClick={() => setOpen((v) => !v)}
         aria-label="Trocar tema"
         title={`Tema: ${current.label}`}
-        className="h-10 w-10 rounded-full bg-white border border-slate-300 shadow-md flex items-center justify-center hover:bg-slate-50 transition-colors"
+        className="relative h-10 w-10 rounded-full bg-white border border-slate-300 shadow-md flex items-center justify-center hover:bg-slate-50 transition-colors"
       >
         <Palette className="h-4 w-4 text-slate-600" />
         <span
