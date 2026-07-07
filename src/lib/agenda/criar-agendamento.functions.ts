@@ -25,14 +25,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-// Reproduzido de app.agenda.tsx:100-106 (cópia literal).
-const normalizar = (s: string) =>
-  (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-const isSlotLivre = (pacienteNome: string | null | undefined) => {
-  const nome = normalizar(pacienteNome ?? "").trim();
-  return nome === "disponivel" || nome === "bloqueio";
-};
-
 export type CriarAgendamentoInput = {
   clinica_id: string;
   // Presença = UPDATE do agendamento com esse id; ausência = INSERT.
@@ -53,6 +45,8 @@ export type CriarAgendamentoInput = {
     orcamento_id: string | null;
     tipo_atendimento: "particular" | "convenio";
   };
+  procedimentos?: string[];
+  multi_exames_modo?: "laboratorio" | "imagem" | null;
   // Checagens que consultam o banco — o caller diz se devem rodar (mantém a
   // mesma gate do submit clássico, que só valida agenda quando mudou o
   // horário/médico e o médico não é recurso).
@@ -93,22 +87,31 @@ export type PgErrorLike = {
   code?: string | null;
 };
 
-function toPgErrorLike(err: unknown): PgErrorLike {
-  const e = (err ?? {}) as { message?: string; details?: string; hint?: string; code?: string };
-  return {
-    message: e.message ?? "Erro desconhecido",
-    details: e.details ?? null,
-    hint: e.hint ?? null,
-    code: e.code ?? null,
-  };
-}
-
 export const criarAgendamento = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: CriarAgendamentoInput) => data)
   .handler(async ({ data, context }): Promise<CriarAgendamentoResult> => {
     const { supabase } = context;
+    const normalizarLocal = (s: string) =>
+      (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const isSlotLivreLocal = (pacienteNome: string | null | undefined) => {
+      const nome = normalizarLocal(pacienteNome ?? "").trim();
+      return nome === "disponivel" || nome === "bloqueio";
+    };
+    const toPgErrorLikeLocal = (err: unknown): PgErrorLike => {
+      const e = (err ?? {}) as { message?: string; details?: string; hint?: string; code?: string };
+      return {
+        message: e.message ?? "Erro desconhecido",
+        details: e.details ?? null,
+        hint: e.hint ?? null,
+        code: e.code ?? null,
+      };
+    };
     const { clinica_id, editing_id, payload, checagens, pending_orc_item_ids } = data;
+    const procedimentos = Array.from(new Set((data.procedimentos ?? [])
+      .map((p) => String(p ?? "").trim())
+      .filter(Boolean)));
+    const multiModo = procedimentos.length > 1 ? data.multi_exames_modo ?? null : null;
 
     // ---------- 1. Paciente com telefone e data_nascimento (2422-2436) ----------
     if (checagens.validar_paciente_completo && payload.paciente_id) {
@@ -157,7 +160,7 @@ export const criarAgendamento = createServerFn({ method: "POST" })
       const inicioMs = di.getTime();
       const fimMs = df.getTime();
       const cobre = excluindoEditing.some((s) => {
-        if (!isSlotLivre(s.paciente_nome)) return false;
+        if (!isSlotLivreLocal(s.paciente_nome)) return false;
         const sIni = new Date(s.inicio).getTime();
         const sFim = new Date(s.fim).getTime();
         return sIni <= inicioMs && sFim >= fimMs;
@@ -196,15 +199,44 @@ export const criarAgendamento = createServerFn({ method: "POST" })
     // ---------- 6. INSERT ou UPDATE do agendamento (2519-2527) ----------
     let novoId: string | null = editing_id;
     if (editing_id) {
-      const { error } = await supabase.from("agendamentos").update(payload).eq("id", editing_id);
-      if (error) return { ok: false, pg_error: toPgErrorLike(error) };
+      if (multiModo === "imagem") {
+        const [primeiro, ...restantes] = procedimentos;
+        const { error } = await supabase
+          .from("agendamentos")
+          .update({ ...payload, procedimento: primeiro })
+          .eq("id", editing_id);
+        if (error) return { ok: false, pg_error: toPgErrorLikeLocal(error) };
+        if (restantes.length > 0) {
+          const rows = restantes.map((procedimento) => ({ ...payload, procedimento }));
+          const { error: insertError } = await supabase.from("agendamentos").insert(rows);
+          if (insertError) return { ok: false, pg_error: toPgErrorLikeLocal(insertError) };
+        }
+      } else {
+        const payloadEdicao = multiModo === "laboratorio"
+        ? { ...payload, procedimento: procedimentos.join(" + ") }
+        : payload;
+        const { error } = await supabase.from("agendamentos").update(payloadEdicao).eq("id", editing_id);
+        if (error) return { ok: false, pg_error: toPgErrorLikeLocal(error) };
+      }
+    } else if (multiModo === "imagem") {
+      const rows = procedimentos.map((procedimento) => ({ ...payload, procedimento }));
+      const { data: novos, error } = await supabase
+        .from("agendamentos")
+        .insert(rows)
+        .select("id")
+        .limit(procedimentos.length);
+      if (error || !novos || novos.length === 0) return { ok: false, pg_error: toPgErrorLikeLocal(error) };
+      novoId = (novos[0] as { id: string }).id;
     } else {
+      const payloadNovo = multiModo === "laboratorio"
+        ? { ...payload, procedimento: procedimentos.join(" + ") }
+        : payload;
       const { data: novo, error } = await supabase
         .from("agendamentos")
-        .insert(payload)
+        .insert(payloadNovo)
         .select("id")
         .single();
-      if (error || !novo) return { ok: false, pg_error: toPgErrorLike(error) };
+      if (error || !novo) return { ok: false, pg_error: toPgErrorLikeLocal(error) };
       novoId = novo.id;
     }
 
@@ -226,7 +258,7 @@ export const criarAgendamento = createServerFn({ method: "POST" })
       const { error: vErr } = await supabase
         .from("agendamento_orcamento_itens")
         .insert(vinculos as never);
-      if (vErr) vinculo_warning = { pg_error: toPgErrorLike(vErr) };
+      if (vErr) vinculo_warning = { pg_error: toPgErrorLikeLocal(vErr) };
     }
 
     return { ok: true, id: novoId!, vinculo_warning };
