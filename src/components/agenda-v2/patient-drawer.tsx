@@ -200,7 +200,7 @@ export function PatientDrawer({
                   label="Prontuário"
                   onClick={onOpenProntuario && primeiroAgendamentoId ? abrirProntuario : undefined}
                 />
-                <QuickAction icon={<CalendarClock className="h-4 w-4" />} label="Reagendar" />
+                <QuickAction icon={<CalendarClock className="h-4 w-4" />} label="Reagendar" onClick={onReagendar} />
                 <QuickAction icon={<Wallet className="h-4 w-4" />} label="Financeiro" />
                 <QuickAction icon={<FileSignature className="h-4 w-4" />} label="Orçamento" />
                 <QuickAction icon={<FileText className="h-4 w-4" />} label="Documentos" />
