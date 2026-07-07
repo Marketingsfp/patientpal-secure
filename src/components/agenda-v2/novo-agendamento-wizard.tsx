@@ -106,32 +106,6 @@ export function NovoAgendamentoWizard({
     setSaving(false);
   };
 
-  // Aplica `initial` quando o wizard abre e quando os médicos carregam
-  // (necessário porque `medico` precisa vir da lista já carregada).
-  useEffect(() => {
-    if (!open || !initial) return;
-    if (initial.dia) setDataDia(toLocalDateKey(initial.dia));
-    if (initial.medicoId && medicosQuery.data) {
-      const m = medicosQuery.data.find((x) => x.id === initial.medicoId);
-      if (m && medico?.id !== m.id) {
-        setMedico(m);
-        setSlot(null);
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, initial?.medicoId, initial?.dia, medicosQuery.data]);
-
-  // Pré-seleciona o primeiro slot dentro da hora indicada assim que os
-  // slots do médico carregam. Só age se o usuário ainda não escolheu slot.
-  useEffect(() => {
-    if (!open || !initial || initial.hour == null || slot) return;
-    const hit = (slotsQuery.data ?? []).find(
-      (s) => new Date(s.inicio).getHours() === initial.hour,
-    );
-    if (hit) setSlot(hit);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, initial?.hour, slotsQuery.data]);
-
   // ---------- Query: médicos ativos da clínica (mesma da clássica) ----------
   const medicosQuery = useQuery({
     queryKey: ["agenda-v2", "wizard-medicos", clinicaId],
