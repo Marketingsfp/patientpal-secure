@@ -415,8 +415,8 @@ function AtendimentoEditorPage() {
             O atendimento de <b className="text-foreground uppercase">{pacienteNome}</b> foi registrado.
             {salvo.valorMedico > 0 && <> Repasse médico: <b className="text-foreground">R$ {salvo.valorMedico.toFixed(2)}</b>.</>}
           </p>
-          <Button size="lg" onClick={() => navigate({ to: "/app/atendimento-ia" })}>
-            <ArrowLeft className="h-4 w-4" /> Voltar para fila de atendimento
+          <Button size="lg" onClick={() => navigate({ to: backTo })}>
+            <ArrowLeft className="h-4 w-4" /> {cameFromAgendaV2 ? backLabel : "Voltar para fila de atendimento"}
           </Button>
         </Card>
       </div>
@@ -442,7 +442,7 @@ function AtendimentoEditorPage() {
                   <Link to="/app/caixa">Abrir caixa</Link>
                 </Button>
                 <Button size="sm" variant="outline" asChild>
-                  <Link to="/app/atendimento-ia">Voltar para fila</Link>
+                  <Link to={backTo}>{backLabel}</Link>
                 </Button>
               </div>
             </div>
@@ -463,7 +463,7 @@ function AtendimentoEditorPage() {
           </div>
         </div>
         <Button variant="outline" asChild>
-          <Link to="/app/atendimento-ia"><ArrowLeft className="h-4 w-4" /> Voltar para fila</Link>
+          <Link to={backTo}><ArrowLeft className="h-4 w-4" /> {backLabel}</Link>
         </Button>
       </div>
 
