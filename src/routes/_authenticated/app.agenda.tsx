@@ -1640,6 +1640,115 @@ function AgendaPage() {
     return atual;
   };
 
+  const medicoEhLaboratorioFormulario = (medicoId: string | null | undefined) => {
+    if (!medicoId) return false;
+    const med = medicos.find((m) => m.id === medicoId);
+    if (normalizar(med?.especialidade_nome ?? "").includes("laborat")) return true;
+    const espIds = medicoEspec.get(medicoId);
+    if (!espIds || espIds.size === 0) return false;
+    return Array.from(espIds).some((id) => normalizar(especialidades.find((e) => e.id === id)?.nome ?? "").includes("laborat"));
+  };
+
+  const procedimentoEhImagem = (label: string) => {
+    const u = normalizar(label).toUpperCase();
+    return u.includes("ULTRASS")
+      || /\bUSG\b|\bUS\b/.test(u)
+      || u.includes("TOMOGRAF")
+      || /\bTC\b/.test(u)
+      || u.includes("RESSON")
+      || /\bRM\b|\bRNM\b|\bMRI\b/.test(u)
+      || u.includes("RAIO")
+      || u.includes("RADIOGRAF")
+      || /\bRX\b|\bR-X\b/.test(u);
+  };
+
+  const opcoesServicoFormulario = () => {
+    const base: { value: string; label: string }[] = [{ value: "none", label: "— Selecione —" }];
+    if (!form.medico_id) return base;
+    const opts = opcoesProcedimentoMedico(
+      form.medico_id,
+      editing?.agenda_id ?? (filtroAgenda !== "todos" ? filtroAgenda : null),
+    ).map((p) => ({ value: p.nome, label: p.nome }));
+    const padrao = procedimentoPadraoDoMedico(form.medico_id);
+    if (padrao && !opts.some((o) => normalizar(o.value) === normalizar(padrao))) {
+      opts.unshift({ value: padrao, label: `${padrao} (principal)` });
+    }
+    const atual = (form.procedimento ?? "").trim();
+    const especialidadeMedico = medicos.find((m) => m.id === form.medico_id)?.especialidade_nome ?? "";
+    const atualEhEspecialidadeSintetica = especialidadeMedico && normalizar(atual) === normalizar(especialidadeMedico);
+    if (atual && !atualEhEspecialidadeSintetica && !opts.some((o) => normalizar(o.value) === normalizar(atual))) {
+      opts.push({ value: atual, label: atual });
+    }
+    const detectModalidade = (label: string): "us" | "rx" | "tc" | "rm" | null => {
+      const u = label.toUpperCase();
+      if (u.includes("ULTRASS") || /\bUSG\b|\bUS\b/.test(u)) return "us";
+      if (u.includes("TOMOGRAF") || /\bTC\b/.test(u)) return "tc";
+      if (u.includes("RESSON") || /\bRM\b|\bRNM\b|\bMRI\b/.test(u)) return "rm";
+      if (u.includes("RAIO") || u.includes("RADIOGRAF") || /\bRX\b|\bR-X\b/.test(u)) return "rx";
+      return null;
+    };
+    type Curado = { all: string[]; not?: string[] };
+    const curadosPorModalidade: Record<"us" | "rx" | "tc" | "rm", Curado[]> = {
+      us: [
+        { all: ["OBSTETRIC", "1"], not: ["MORFOLOG", "DOPPLER"] },
+        { all: ["MORFOLOG", "1"], not: ["GEMELAR", "DOPPLER"] },
+        { all: ["MORFOLOG", "2"], not: ["GEMELAR", "DOPPLER"] },
+        { all: ["OBSTETRIC", "DOPPLER"], not: ["MORFOLOG"] },
+        { all: ["TRANSVAGINAL"] }, { all: ["MAMA"] }, { all: ["ABDOME TOTAL"] },
+        { all: ["PELV"], not: ["TRANSVAGINAL"] }, { all: ["VIAS URINARIAS"] },
+        { all: ["TIREOIDE"] }, { all: ["PROSTATA"] }, { all: ["RINS"] },
+      ],
+      rx: [
+        { all: ["TORAX"] }, { all: ["COLUNA LOMBAR"] }, { all: ["COLUNA CERVICAL"] },
+        { all: ["JOELHO"] }, { all: ["MAO"] }, { all: ["PE"] }, { all: ["PUNHO"] },
+        { all: ["BACIA"] }, { all: ["CRANIO"] }, { all: ["ABDOME"] },
+      ],
+      tc: [
+        { all: ["CRANIO"] }, { all: ["TORAX"], not: ["CONTRASTE"] }, { all: ["ABDOME TOTAL"] },
+        { all: ["COLUNA LOMBAR"] }, { all: ["SEIOS DA FACE"] }, { all: ["COLUNA CERVICAL"] },
+        { all: ["ABDOME SUPERIOR"] }, { all: ["PESCOCO"] }, { all: ["TORAX", "CONTRASTE"] }, { all: ["PELVE"] },
+      ],
+      rm: [
+        { all: ["CRANIO"] }, { all: ["COLUNA LOMBAR"] }, { all: ["COLUNA CERVICAL"] },
+        { all: ["JOELHO"] }, { all: ["OMBRO"] }, { all: ["ABDOME"] },
+        { all: ["COLUNA TORACICA"] }, { all: ["PELVE"] }, { all: ["QUADRIL"] }, { all: ["TORNOZELO"] },
+      ],
+    };
+    const scoreCurado = (label: string, mod: "us" | "rx" | "tc" | "rm") => {
+      const L = normalizar(label).toUpperCase();
+      const lista = curadosPorModalidade[mod];
+      for (let i = 0; i < lista.length; i++) {
+        const c = lista[i];
+        if (c.not && c.not.some((n) => L.includes(n))) continue;
+        if (c.all.every((k) => L.includes(k))) return lista.length - i;
+      }
+      return 0;
+    };
+    type ScoredOpt = { value: string; label: string; mod: ReturnType<typeof detectModalidade>; score: number; curado: number };
+    const scored: ScoredOpt[] = opts.map((o) => {
+      const mod = detectModalidade(o.label);
+      const uso = procedimentoUsoMap.get(normalizar(o.value)) ?? 0;
+      const curado = mod ? scoreCurado(o.label, mod) : 0;
+      return { ...o, mod, curado, score: curado * 1000 + uso };
+    });
+    const rankByValue = new Map<string, number>();
+    const topOrdenado: ScoredOpt[] = [];
+    (["us", "rx", "tc", "rm"] as const).forEach((mod) => {
+      const lista = scored
+        .filter((s) => s.mod === mod && s.curado > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 10);
+      lista.forEach((s) => topOrdenado.push(s));
+    });
+    topOrdenado.forEach((s, i) => rankByValue.set(s.value, i + 1));
+    const topOpts = topOrdenado.map((s) => ({ value: s.value, label: `${rankByValue.get(s.value)}. ${s.label}` }));
+    const restoOpts = scored
+      .filter((s) => !rankByValue.has(s.value))
+      .map((s) => ({ value: s.value, label: s.label }))
+      .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
+    return [...base, ...topOpts, ...restoOpts];
+  };
+
   // Atualiza inline o procedimento de um agendamento (do badge na coluna Serviço)
   const atualizarProcedimento = async (ag: Agendamento, novoNome: string) => {
     const nomeFinal = novoNome.trim();
