@@ -77,6 +77,7 @@ type Agendamento = {
   orcamento_numero?: number | null;
   pacote_id?: string | null;
   tipo_atendimento?: TipoAtendimento | null;
+  atendimento_grupo_id?: string | null;
 };
 type Medico = { id: string; nome: string; sexo?: string | null; usa_sistema?: boolean; especialidade_id?: string | null; procedimento_padrao_id?: string | null; procedimento_padrao_em_branco?: boolean | null; procedimento_padrao_nome?: string | null; especialidade_nome?: string | null };
 type RecursoEnf = { id: string; nome: string };
@@ -654,6 +655,7 @@ function AgendaPage() {
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [filtroCliente, setFiltroCliente] = useState("");
   const [filtroFicha, setFiltroFicha] = useState("");
+  const [filtroApenasMultiplo, setFiltroApenasMultiplo] = useState<boolean>(false);
   const [page, setPage] = useState(1);
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [items, setItems] = useState<Agendamento[]>([]);
@@ -1054,7 +1056,7 @@ function AgendaPage() {
     setLoading(true);
     let q = supabase
       .from("agendamentos")
-      .select("id,paciente_nome,paciente_id,medico_id,enfermagem_recurso_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as never)
+      .select("id,paciente_nome,paciente_id,medico_id,enfermagem_recurso_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,atendimento_grupo_id,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as never)
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("inicio", { ascending: false });
     // "agendado" agora significa "qualquer ficha com paciente alocado",
@@ -1835,11 +1837,15 @@ function AgendaPage() {
         if (!set || !set.has(filtroEspecialidade)) return false;
       }
       if (filtroAgenda !== "todos") {
-        if (a.agenda_id !== filtroAgenda) return false;
+        // Agendamentos criados via "Atendimento Múltiplo" não são vinculados a
+        // uma agenda específica (podem envolver médicos/recursos diferentes),
+        // então não os escondemos quando o usuário filtra por agenda.
+        if (a.agenda_id !== filtroAgenda && !a.atendimento_grupo_id) return false;
       }
+      if (filtroApenasMultiplo && !a.atendimento_grupo_id) return false;
       return true;
     });
-  }, [items, mostrarLivres, filtroMedico, filtroStatus, filtroCliente, filtroFicha, filtroDiaSemana, filtroEspecialidade, filtroAgenda, medicoEspec, fichaPorId]);
+  }, [items, mostrarLivres, filtroMedico, filtroStatus, filtroCliente, filtroFicha, filtroDiaSemana, filtroEspecialidade, filtroAgenda, filtroApenasMultiplo, medicoEspec, fichaPorId]);
 
   const totais = useMemo(() => ({
     total: filtrados.length,
@@ -4323,6 +4329,23 @@ function AgendaPage() {
           <div className="space-y-0.5">
             <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Nº Ficha</Label>
             <Input value={filtroFicha} onChange={(e) => setFiltroFicha(e.target.value.replace(/\D/g, ""))} placeholder="Ex.: 001" inputMode="numeric" />
+          </div>
+          <div className="space-y-0.5">
+            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Atend. Múltiplo</Label>
+            <button
+              type="button"
+              onClick={() => setFiltroApenasMultiplo((v) => !v)}
+              aria-pressed={filtroApenasMultiplo}
+              className={
+                "h-9 w-full rounded-md border px-3 text-xs font-medium transition-colors " +
+                (filtroApenasMultiplo
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-input bg-background text-muted-foreground hover:text-foreground")
+              }
+              title="Mostrar apenas agendamentos criados em Atendimento Múltiplo"
+            >
+              {filtroApenasMultiplo ? "Somente múltiplos" : "Todos"}
+            </button>
           </div>
           <div className="space-y-0.5">
             <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Especialidade</Label>
