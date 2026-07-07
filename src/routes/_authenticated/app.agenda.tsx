@@ -3624,7 +3624,7 @@ function AgendaPage() {
                 <Textarea value={form.observacoes} onChange={(e) => setForm(f => ({ ...f, observacoes: e.target.value }))} rows={2} className="resize-none" placeholder="Anotações internas (opcional)…" />
               </div>
               </fieldset>
-              <DialogFooter className="sticky bottom-0 bg-white/95 backdrop-blur pt-3 pb-1 -mx-6 px-6 border-t border-slate-100 mt-4 flex-wrap gap-2">
+              <DialogFooter className="sticky bottom-0 bg-white pt-3 pb-2 -mx-6 px-6 border-t border-slate-200 shadow-[0_-8px_16px_-12px_rgba(0,0,0,0.15)] mt-4 flex sm:flex-row flex-col gap-2 sm:items-center sm:justify-between">
                 {editing && pagosSet.has(editing.id) ? (
                   <Button type="button" variant="outline" onClick={() => setOpen(false)}>Fechar</Button>
                 ) : (
@@ -3642,19 +3642,19 @@ function AgendaPage() {
                         });
                         setDescontoDlgOpen(true);
                       }}
-                      className={"mr-auto " + (descontoPendente ? "border-amber-500 text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30" : "")}
+                      className={"sm:self-center " + (descontoPendente ? "border-amber-500 text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30" : "")}
                       title="Aplicar desconto (exige autorização da supervisão)"
                     >
                       {descontoPendente
                         ? `Desconto: ${descontoPendente.tipo === "percentual" ? `${descontoPendente.input}%` : `R$ ${descontoPendente.input}`}`
                         : "Desconto"}
                     </Button>
+                    <div className="flex flex-wrap gap-2 sm:justify-end">
                     <Button
                       type="button"
-                      variant="outline"
                       disabled={saving || !form.paciente_id}
                       onClick={(e) => { emitirNotaAposRef.current = false; submit(e as unknown as FormEvent, true); }}
-                      className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
                       title="Salva, registra pagamento e imprime a GR em A4"
                     >
                       Pagar/Imprimir
@@ -3677,9 +3677,10 @@ function AgendaPage() {
                       className="border-sky-600 text-sky-700 hover:bg-sky-50 dark:hover:bg-sky-950/30"
                       title="Salva, registra pagamento, imprime a GR e abre a emissão da NFS-e (a nota é salva ao imprimir o A4)"
                     >
-                      Pagar/Imprimir/Nota
+                      Pagar + NFS-e
                     </Button>
-                    <Button type="submit" data-primary disabled={saving || !form.paciente_id} title={!form.paciente_id ? "Selecione um paciente cadastrado antes de salvar" : undefined}>{saving ? "Salvando…" : "Salvar"}</Button>
+                    <Button type="submit" variant="secondary" data-primary disabled={saving || !form.paciente_id} title={!form.paciente_id ? "Selecione um paciente cadastrado antes de salvar" : undefined}>{saving ? "Salvando…" : "Salvar"}</Button>
+                    </div>
                   </>
                 )}
               </DialogFooter>
