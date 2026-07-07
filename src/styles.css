@@ -514,6 +514,29 @@ html.agenda-v2-active .agenda-v2-scope h3 {
   font-feature-settings: "cv11", "ss01";
 }
 
+/* =====================================================================
+ * MenuV2 sidebar — legibilidade em fundo navy
+ * A sidebar agora é mid-navy; o markup interno usa text-muted-foreground
+ * (que no tema light é escuro). Redefinimos os tokens *dentro* da aside
+ * para tons claros, sem afetar o resto do app.
+ * ===================================================================== */
+[data-testid="menu-v2"] {
+  --muted-foreground: oklch(0.88 0.02 250);
+  --foreground: oklch(0.99 0 0);
+  --border: oklch(0.38 0.10 258);
+  --primary: oklch(0.86 0.10 240);
+  --ring: oklch(0.86 0.10 240);
+  color: var(--sidebar-foreground);
+}
+[data-testid="menu-v2"] input {
+  background-color: color-mix(in oklab, white 8%, transparent);
+  color: var(--sidebar-foreground);
+  border-color: var(--sidebar-border);
+}
+[data-testid="menu-v2"] input::placeholder {
+  color: color-mix(in oklab, white 55%, transparent);
+}
+
 /* Utilitário de "count-up" sutil para KPIs (visual apenas). */
 @keyframes hhp-kpi-in {
   from { opacity: 0; transform: translateY(4px); }
