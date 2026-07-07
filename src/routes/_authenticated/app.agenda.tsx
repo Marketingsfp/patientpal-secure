@@ -2377,6 +2377,7 @@ function AgendaPage() {
         paciente_id: pacId ?? f.paciente_id,
         paciente_nome: pacNome ?? f.paciente_nome,
         procedimento: procStr,
+        procedimentos: procStr ? [procStr] : [],
       }));
       toast.success(`Orçamento #${String(orc.numero).padStart(5, "0")} vinculado.`);
     } finally {

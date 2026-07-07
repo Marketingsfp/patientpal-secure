@@ -202,11 +202,25 @@ export const criarAgendamento = createServerFn({ method: "POST" })
     // ---------- 6. INSERT ou UPDATE do agendamento (2519-2527) ----------
     let novoId: string | null = editing_id;
     if (editing_id) {
-      const payloadEdicao = multiModo === "laboratorio"
+      if (multiModo === "imagem") {
+        const [primeiro, ...restantes] = procedimentos;
+        const { error } = await supabase
+          .from("agendamentos")
+          .update({ ...payload, procedimento: primeiro })
+          .eq("id", editing_id);
+        if (error) return { ok: false, pg_error: toPgErrorLike(error) };
+        if (restantes.length > 0) {
+          const rows = restantes.map((procedimento) => ({ ...payload, procedimento }));
+          const { error: insertError } = await supabase.from("agendamentos").insert(rows);
+          if (insertError) return { ok: false, pg_error: toPgErrorLike(insertError) };
+        }
+      } else {
+        const payloadEdicao = multiModo === "laboratorio"
         ? { ...payload, procedimento: procedimentos.join(" + ") }
         : payload;
-      const { error } = await supabase.from("agendamentos").update(payloadEdicao).eq("id", editing_id);
-      if (error) return { ok: false, pg_error: toPgErrorLike(error) };
+        const { error } = await supabase.from("agendamentos").update(payloadEdicao).eq("id", editing_id);
+        if (error) return { ok: false, pg_error: toPgErrorLike(error) };
+      }
     } else if (multiModo === "imagem") {
       const rows = procedimentos.map((procedimento) => ({ ...payload, procedimento }));
       const { data: novos, error } = await supabase
