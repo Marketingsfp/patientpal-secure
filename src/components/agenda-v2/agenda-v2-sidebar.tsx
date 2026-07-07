@@ -138,7 +138,7 @@ export function AgendaV2Sidebar({ clinicaNome, dia, sessoes, recursos, equipeOnl
         {/* Card — Equipe on-line */}
         <section className={cardCls}>
           <div className="flex items-center justify-between mb-3">
-            <span className={labelCls}>Equipe on-line</span>
+            <span className={labelCls}>Escala do dia</span>
             <span className="inline-flex items-center gap-1 text-[10px] text-slate-400">
               <Users className="h-3 w-3" /> {equipeOnline.length}
             </span>
@@ -161,7 +161,7 @@ export function AgendaV2Sidebar({ clinicaNome, dia, sessoes, recursos, equipeOnl
             )}
             {equipeOnline.length === 0 && (
               <div className="text-xs text-slate-400 inline-flex items-center gap-1">
-                <Clock className="h-3 w-3" /> ninguém on-line
+                <Clock className="h-3 w-3" /> sem escala hoje
               </div>
             )}
           </div>

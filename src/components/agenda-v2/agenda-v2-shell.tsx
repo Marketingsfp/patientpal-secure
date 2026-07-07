@@ -89,6 +89,11 @@ export function AgendaV2Shell() {
   const [drawerPacote, setDrawerPacote] = useState<string | null>(null);
   const [drawerMounted, setDrawerMounted] = useState(false);
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardInitial, setWizardInitial] = useState<{
+    medicoId?: string | null;
+    dia?: Date | null;
+    hour?: number | null;
+  } | null>(null);
   const [density, setDensity] = useState<SessionDensity>(() => {
     if (typeof window === "undefined") return "confortavel";
     // fallback: chave legada (sem clínica) para não perder preferência do usuário.
@@ -361,6 +366,34 @@ export function AgendaV2Shell() {
     return m;
   }, [sessoes]);
 
+  // Sprint 1 · S1-A — mapa hora → conjunto de médicos com slot livre nessa
+  // hora. Usado para pré-preencher o wizard quando o usuário clica no
+  // resumo "N horários livres nesta hora".
+  const livresPorHoraMedicos = useMemo(() => {
+    const m = new Map<number, Set<string>>();
+    for (const r of rows ?? []) {
+      if (!/dispon[íi]vel/i.test(r.paciente_nome ?? "")) continue;
+      if (!r.medico_id) continue;
+      const h = new Date(r.inicio).getHours();
+      const set = m.get(h) ?? new Set<string>();
+      set.add(r.medico_id);
+      m.set(h, set);
+    }
+    return m;
+  }, [rows]);
+
+  const openWizardForHora = (hora: number) => {
+    const medicos = livresPorHoraMedicos.get(hora);
+    const medicoId =
+      filtroMedico
+        ? filtroMedico
+        : medicos && medicos.size === 1
+          ? Array.from(medicos)[0]
+          : null;
+    setWizardInitial({ dia: new Date(dia), hour: hora, medicoId });
+    setWizardOpen(true);
+  };
+
   const drawerData = useMemo<DrawerPatientData | null>(() => {
     if (!drawerPacote || !rows) return null;
     const grupo = rows.filter((r) => (r.pacote_id ?? r.id) === drawerPacote);
@@ -493,6 +526,31 @@ export function AgendaV2Shell() {
   const nowHour = now.getHours();
   const nowMin = now.getMinutes();
   const isToday = new Date(diaKey).toDateString() === new Date().toDateString();
+
+  // Sprint 1 · S1-B — auto-scroll para a hora atual ao abrir o dia de hoje.
+  // Roda uma vez por (dia + carregamento). O usuário pode rolar depois; não
+  // interferimos em interações subsequentes. Nada de UX intrusivo — comportamento
+  // idempotente por render key.
+  const timelineScrollRef = useRef<HTMLDivElement | null>(null);
+  const nowHourRef = useRef<HTMLDivElement | null>(null);
+  const scrolledForKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!isToday) return;
+    if (rows === null) return;
+    const key = `${diaKey}:${rows.length}`;
+    if (scrolledForKeyRef.current === key) return;
+    const container = timelineScrollRef.current;
+    const anchor = nowHourRef.current;
+    if (!container || !anchor) return;
+    // requestAnimationFrame — garante que o layout já foi calculado.
+    requestAnimationFrame(() => {
+      const cRect = container.getBoundingClientRect();
+      const aRect = anchor.getBoundingClientRect();
+      const target = anchor.offsetTop - Math.max(0, (cRect.height - aRect.height) * 0.15);
+      container.scrollTo({ top: Math.max(0, target), behavior: "smooth" });
+      scrolledForKeyRef.current = key;
+    });
+  }, [isToday, rows, diaKey, porHora.length]);
 
   return (
     <div className="h-full flex bg-[#FAFAF8] overflow-hidden">
@@ -710,14 +768,21 @@ export function AgendaV2Shell() {
             title="Nenhuma sessão para os filtros atuais."
           />
         ) : (
-          <div className={cn(
-            "h-full overflow-y-auto pb-8 transition-[padding] duration-200",
-            foco ? "px-4 md:px-10 pt-6 max-w-4xl mx-auto" : "px-3 md:px-6 pt-4",
-          )}>
+          <div
+            ref={timelineScrollRef}
+            className={cn(
+              "h-full overflow-y-auto pb-8 transition-[padding] duration-200",
+              foco ? "px-4 md:px-10 pt-6 max-w-4xl mx-auto" : "px-3 md:px-6 pt-4",
+            )}
+          >
             {porHora.map(([hora, lista]) => {
               const isNowHour = isToday && hora === nowHour;
               return (
-                <div key={hora} className="flex gap-2 md:gap-4 relative">
+                <div
+                  key={hora}
+                  ref={isNowHour ? nowHourRef : undefined}
+                  className="flex gap-2 md:gap-4 relative"
+                >
                   {/* Coluna de hora (régua) */}
                   <div className={cn("shrink-0 relative", foco ? "w-12 md:w-16" : "w-11 md:w-14")}>
                     <div className={cn(
@@ -752,10 +817,21 @@ export function AgendaV2Shell() {
                         <SessionCard key={s.pacote_id} data={s} onOpenTimeline={openDrawer} density={density} />
                       ))}
                       {livresPorHora.get(hora) && (
-                        <div className="flex items-center gap-2 text-[11px] text-slate-400 pl-1">
-                          <span className="h-1 w-1 rounded-full bg-slate-300" />
-                          {livresPorHora.get(hora)} horário{livresPorHora.get(hora)! > 1 ? "s" : ""} livre{livresPorHora.get(hora)! > 1 ? "s" : ""} nesta hora
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => openWizardForHora(hora)}
+                          className="group flex items-center gap-2 text-[11px] text-slate-400 hover:text-slate-700 pl-1 py-1 rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                          aria-label={`Agendar em um dos ${livresPorHora.get(hora)} horários livres às ${String(hora).padStart(2, "0")}:00`}
+                          title="Clique para agendar neste horário"
+                        >
+                          <span className="h-1 w-1 rounded-full bg-slate-300 group-hover:bg-indigo-400" />
+                          <span>
+                            {livresPorHora.get(hora)} horário{livresPorHora.get(hora)! > 1 ? "s" : ""} livre{livresPorHora.get(hora)! > 1 ? "s" : ""} nesta hora
+                          </span>
+                          <span className="opacity-0 group-hover:opacity-100 text-[10px] font-semibold uppercase tracking-wider text-indigo-500 transition-opacity">
+                            agendar →
+                          </span>
+                        </button>
                       )}
                     </div>
                   </div>
@@ -778,7 +854,14 @@ export function AgendaV2Shell() {
       )}
       {wizardOpen && (
         <Suspense fallback={null}>
-          <NovoAgendamentoWizard open={wizardOpen} onOpenChange={setWizardOpen} />
+          <NovoAgendamentoWizard
+            open={wizardOpen}
+            onOpenChange={(v) => {
+              setWizardOpen(v);
+              if (!v) setWizardInitial(null);
+            }}
+            initial={wizardInitial}
+          />
         </Suspense>
       )}
 
