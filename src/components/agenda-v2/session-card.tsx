@@ -128,6 +128,7 @@ export function SessionCard({
   onOpenTimeline,
   onChangeStatus,
   onOpenProntuario,
+  onReagendar,
   density = "confortavel",
 }: {
   data: SessionCardData;
@@ -139,6 +140,8 @@ export function SessionCard({
    * `/app/atendimento-ia/$agendamentoId` (mesma da Agenda Express).
    */
   onOpenProntuario?: (agendamentoId: string) => void;
+  /** Sprint 3 · S3-C — abre o modal de reagendamento desta sessão. */
+  onReagendar?: (data: SessionCardData) => void;
   density?: SessionDensity;
 }) {
   const [open, setOpen] = useState(false);
