@@ -117,34 +117,54 @@ function AtendimentoMultiploPage() {
   const [paciente, setPaciente] = useState<Paciente | null>(null);
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [recursos, setRecursos] = useState<Recurso[]>([]);
-  const [procedimentos, setProcedimentos] = useState<Procedimento[]>([]);
   const [buscaProc, setBuscaProc] = useState<Record<string, string>>({});
+  const [procResultados, setProcResultados] = useState<Record<string, Procedimento[]>>({});
   const [itens, setItens] = useState<Item[]>([novoItem(dataInicial)]);
   const [observacoes, setObservacoes] = useState("");
   const [salvando, setSalvando] = useState(false);
 
   const clinicaId = clinicaAtual?.clinica_id ?? null;
 
-  // Carrega médicos, recursos e procedimentos da clínica
+  // Carrega médicos e recursos da clínica. Procedimentos são buscados
+  // sob demanda (server-side) porque a base tem milhares de exames de
+  // laboratório e o PostgREST corta em 1000 linhas por consulta.
   useEffect(() => {
     if (!clinicaId) return;
     let cancel = false;
     void (async () => {
-      const [med, rec, proc] = await Promise.all([
+      const [med, rec] = await Promise.all([
         supabase.from("medicos").select("id, nome").eq("clinica_id", clinicaId).order("nome"),
         supabase.from("enfermagem_recursos").select("id, nome").eq("clinica_id", clinicaId).order("nome"),
-        supabase
-          .from("procedimentos")
-          .select("id, nome, valor_padrao, duracao_minutos, tipo_procedimento")
-          .eq("clinica_id", clinicaId)
-          .eq("ativo", true)
-          .order("nome"),
       ]);
       if (cancel) return;
       setMedicos((med.data ?? []) as Medico[]);
       setRecursos((rec.data ?? []) as Recurso[]);
-      setProcedimentos(
-        ((proc.data ?? []) as Array<{
+    })();
+    return () => { cancel = true; };
+  }, [clinicaId]);
+
+  // Busca de procedimentos por linha (server-side, debounced).
+  useEffect(() => {
+    if (!clinicaId) return;
+    const cancels: Array<() => void> = [];
+    for (const [key, termo] of Object.entries(buscaProc)) {
+      const q = (termo ?? "").trim();
+      if (q.length < 2) {
+        setProcResultados((prev) => (prev[key] ? { ...prev, [key]: [] } : prev));
+        continue;
+      }
+      let cancel = false;
+      const t = setTimeout(async () => {
+        const { data } = await supabase
+          .from("procedimentos")
+          .select("id, nome, valor_padrao, duracao_minutos, tipo_procedimento")
+          .eq("clinica_id", clinicaId)
+          .eq("ativo", true)
+          .ilike("nome", `%${q}%`)
+          .order("nome")
+          .limit(20);
+        if (cancel) return;
+        const rows = ((data ?? []) as Array<{
           id: string;
           nome: string;
           valor_padrao: number | null;
@@ -156,11 +176,13 @@ function AtendimentoMultiploPage() {
           valor: p.valor_padrao,
           duracao_minutos: p.duracao_minutos,
           tipo_procedimento: p.tipo_procedimento,
-        })),
-      );
-    })();
-    return () => { cancel = true; };
-  }, [clinicaId]);
+        }));
+        setProcResultados((prev) => ({ ...prev, [key]: rows }));
+      }, 200);
+      cancels.push(() => { cancel = true; clearTimeout(t); });
+    }
+    return () => { for (const c of cancels) c(); };
+  }, [buscaProc, clinicaId]);
 
   // Busca paciente (debounced simples)
   useEffect(() => {
@@ -343,11 +365,8 @@ function AtendimentoMultiploPage() {
         <div className="space-y-3">
           {itens.map((it, idx) => {
             const buscaAtual = buscaProc[it.key] ?? "";
-            const filtrados = buscaAtual.trim().length >= 2
-              ? procedimentos
-                  .filter((p) => p.nome.toLowerCase().includes(buscaAtual.toLowerCase()))
-                  .slice(0, 8)
-              : [];
+            const filtrados: Procedimento[] =
+              buscaAtual.trim().length >= 2 ? (procResultados[it.key] ?? []) : [];
             return (
               <div key={it.key} className="border rounded-lg p-3 space-y-3 bg-card">
                 <div className="flex items-center justify-between">
