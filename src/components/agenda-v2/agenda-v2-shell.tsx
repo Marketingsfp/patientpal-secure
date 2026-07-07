@@ -1043,6 +1043,7 @@ export function AgendaV2Shell() {
                           data={s}
                           onOpenTimeline={openDrawer}
                           onChangeStatus={onChangeStatusCard}
+                          onOpenProntuario={handleOpenProntuario}
                           density={density}
                         />
                       ))}
@@ -1080,6 +1081,7 @@ export function AgendaV2Shell() {
             onOpenChange={(v) => { if (!v) setDrawerPacote(null); }}
             data={drawerData}
             onChangeStatus={onChangeStatusDrawer}
+            onOpenProntuario={handleOpenProntuario}
           />
         </Suspense>
       )}
