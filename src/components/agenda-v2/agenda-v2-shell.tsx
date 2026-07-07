@@ -1009,8 +1009,6 @@ export function AgendaV2Shell() {
 
         <KpiBar
           items={kpis}
-          activeKey={kpiFilter}
-          onSelect={(k) => setKpiFilter(kpiFilter === k ? null : k)}
           compact={compact}
         />
       </HhpPageHeader>
