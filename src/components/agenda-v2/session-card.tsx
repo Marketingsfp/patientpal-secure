@@ -168,10 +168,11 @@ export function SessionCard({
     <div
       className={cn(
         "group relative bg-white border border-slate-200/70 transition-all",
-        "hover:border-slate-300 hover:shadow-[0_4px_20px_-8px_rgba(15,23,42,0.08)]",
+        "hover:border-slate-300 hover:shadow-[0_8px_28px_-12px_rgba(15,23,42,0.12)]",
         dim.radius, dim.padY, dim.padX,
-        isCurrent && "ring-1 ring-indigo-300/70 shadow-[0_0_0_4px_rgba(99,102,241,0.06)]",
+        isCurrent && "ring-2 shadow-[0_0_0_4px_var(--clinic-accent-glow)]",
       )}
+      style={isCurrent ? { boxShadow: "0 0 0 4px var(--clinic-accent-glow)", borderColor: "var(--clinic-accent)" } : undefined}
     >
       <div className={cn("flex items-center", dim.gap)}>
         {/* Foto do paciente — protagonista */}
@@ -213,7 +214,7 @@ export function SessionCard({
                 "block max-w-full truncate text-left font-semibold text-slate-900 hover:text-slate-700",
                 dim.name,
               )}
-              style={{ fontFamily: "'Inter Tight', Inter, sans-serif", letterSpacing: "-0.01em" }}
+              style={{ fontFamily: "var(--hhp-font-display)", letterSpacing: "-0.015em" }}
               onClick={() => onOpenTimeline(data.pacote_id)}
             >
               {data.paciente_nome}
