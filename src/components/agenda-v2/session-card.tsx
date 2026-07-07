@@ -100,7 +100,7 @@ function JourneyBar({
               "flex-1 rounded-full transition-all",
               s.done
                 ? current && i === lastDone
-                  ? "bg-indigo-500"
+                  ? "bg-[var(--clinic-accent)]"
                   : "bg-emerald-400/80"
                 : "bg-slate-200/60",
             )}
