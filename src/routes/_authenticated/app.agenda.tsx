@@ -2688,7 +2688,9 @@ function AgendaPage() {
       }
       setFormaPagOpcoes(opcoes);
       setFormaPagCtx({
-        agId: novoId,
+        // Agrupa o principal + irmãos (imagem multi-exame) para que a mesma
+        // cobrança marque todos os agendamentos correspondentes como pagos.
+        agId: [novoId, ...(result.sibling_ids ?? [])].join(","),
         desc: `${payload.paciente_nome} — ${payload.procedimento ?? "CONSULTA"}${descSuffix}`,
         paciente: payload.paciente_nome ?? "",
         procedimento: `${payload.procedimento ?? "CONSULTA"}${descSuffix}`,
