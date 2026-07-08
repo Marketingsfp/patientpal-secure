@@ -1048,7 +1048,11 @@ function Page() {
   };
 
   const medMap = useMemo(() => new Map(medicos.map((m) => [m.id, m.nome])), [medicos]);
-  const pacMap = useMemo(() => new Map(pacientes.map((p) => [p.id, p.nome])), [pacientes]);
+  const pacMap = useMemo(() => {
+    const m = new Map<string, string>(pacientes.map((p) => [p.id, p.nome]));
+    for (const [id, nome] of Object.entries(pacNameExtra)) if (!m.has(id)) m.set(id, nome);
+    return m;
+  }, [pacientes, pacNameExtra]);
   const filteredItems = useMemo(() => {
     const q = norm(fPaciente.trim());
     const base = !q
