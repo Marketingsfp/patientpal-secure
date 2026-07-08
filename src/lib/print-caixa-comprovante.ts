@@ -27,6 +27,8 @@ export interface ComprovanteCaixaInput {
   saldoCalculado?: number;
   valorInformado?: number;
   diferenca?: number;
+  /** Totais por forma de pagamento (somente fechamento). Chave = forma, valor = R$. */
+  porForma?: Record<string, number>;
   /** Data/hora do movimento (default: agora). */
   quando?: Date;
 }
@@ -61,6 +63,34 @@ export function printComprovanteCaixa(input: ComprovanteCaixaInput) {
   } else {
     linhas.push({ label: "Valor", valor: fmtBRL(input.valor), destaque: true });
   }
+
+  const FORMA_LABEL: Record<string, string> = {
+    dinheiro: "Dinheiro",
+    pix: "PIX",
+    debito: "Cartão de Débito",
+    credito: "Cartão de Crédito",
+    boleto: "Boleto",
+    transferencia: "Transferência",
+    cheque: "Cheque",
+    convenio: "Convênio",
+    associado: "Associado",
+    outros: "Outros",
+  };
+  const formaLabel = (k: string) =>
+    FORMA_LABEL[k?.toLowerCase?.()] ?? (k ? k.charAt(0).toUpperCase() + k.slice(1) : "Outros");
+
+  const formasEntries = isFech && input.porForma
+    ? Object.entries(input.porForma).filter(([, v]) => Number(v) > 0.0009)
+    : [];
+  const totalFormas = formasEntries.reduce((s, [, v]) => s + Number(v || 0), 0);
+  const formasBlock = formasEntries.length
+    ? `<div class="sep"></div>
+       <div class="center" style="font-size:10px;font-weight:800;text-transform:uppercase;">Recebimentos por forma</div>
+       ${formasEntries
+          .map(([k, v]) => `<div class="row"><span class="k">${esc(formaLabel(k))}</span><span class="v">${esc(fmtBRL(Number(v)))}</span></div>`)
+          .join("")}
+       <div class="row" style="margin-top:2px;"><span class="k bold">Total recebido</span><span class="v bold">${esc(fmtBRL(totalFormas))}</span></div>`
+    : "";
 
   const html = `<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8"/>
@@ -115,6 +145,7 @@ export function printComprovanteCaixa(input: ComprovanteCaixaInput) {
       ? linhas.map((l) => `<div class="row"><span class="k">${esc(l.label)}</span><span class="v ${l.destaque ? "bold" : ""}">${esc(l.valor)}</span></div>`).join("")
       : `<div class="valor-destaque">${esc(fmtBRL(input.valor))}</div>`
     }
+    ${formasBlock}
     ${input.descricao ? `<div class="sep"></div><div class="desc"><b>Descrição:</b> ${esc(input.descricao)}</div>` : ""}
     <div class="sep"></div>
     <div class="sig">

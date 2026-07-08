@@ -694,6 +694,13 @@ function Page() {
     const obsFinal = obsFechamento;
     setValorInformado(""); setObsFechamento("");
     toast.success("Caixa fechado");
+    // Total recebido por forma de pagamento na sessão
+    const porForma: Record<string, number> = {};
+    minhasMovs.forEach((m) => {
+      if (m.tipo !== "recebimento") return;
+      const k = (m.forma_pagamento || "outros").toLowerCase();
+      porForma[k] = (porForma[k] || 0) + Number(m.valor || 0);
+    });
     printComprovanteCaixa({
       tipo: "fechamento",
       clinicaNome: clinicaAtual.clinica?.nome ?? "Clínica",
@@ -703,6 +710,7 @@ function Page() {
       valorInformado: informado,
       diferenca: diff,
       descricao: obsFinal || null,
+      porForma,
     });
     void load();
   };
