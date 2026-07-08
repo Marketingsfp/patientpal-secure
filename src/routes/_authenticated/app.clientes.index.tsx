@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Plus, Search, Pencil, Users, Download } from "lucide-react";
+import { Plus, Search, Pencil, Users, Download, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
@@ -129,6 +129,7 @@ function ClientesPage() {
   });
   const [loading, setLoading] = useState(false);
   const [openNovo, setOpenNovo] = useState(false);
+  const [visualizar, setVisualizar] = useState<Paciente | null>(null);
   const loadSeq = useRef(0);
 
   const [fotoSigned, setFotoSigned] = useState<Record<string, string>>({});
