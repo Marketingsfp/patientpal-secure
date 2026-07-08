@@ -1949,6 +1949,25 @@ function Page() {
           </DialogHeader>
           {comprovante && (
             <div className="print-area bg-white text-black text-sm">
+              {comprovante.reimpressao && (
+                <div className="mb-3 border-2 border-rose-600 bg-rose-100 text-rose-900 rounded-md p-3 text-center">
+                  <div className="text-xl font-extrabold tracking-wide uppercase">
+                    Segunda via — Reimpressão de comprovante
+                  </div>
+                  <div className="text-sm mt-1">
+                    Pagamento realizado em{" "}
+                    <b>
+                      {new Date(comprovante.dataPagamento + "T00:00:00").toLocaleDateString("pt-BR")}
+                      {comprovante.horaPagamento
+                        ? ` às ${comprovante.horaPagamento}`
+                        : " (horário não registrado)"}
+                    </b>
+                  </div>
+                  <div className="text-xs mt-0.5 opacity-80">
+                    Reimpressão emitida em {comprovante.emitidoEm}
+                  </div>
+                </div>
+              )}
               <div className="flex items-start justify-between border-b pb-3 mb-3">
                 <div>
                   <div className="text-xs uppercase tracking-wide text-muted-foreground">Clínica</div>
@@ -1966,8 +1985,13 @@ function Page() {
                   <b>{comprovante.medicoNome}</b>
                 </div>
                 <div>
-                  <span className="text-xs text-muted-foreground">Data do pagamento: </span>
-                  <b>{new Date(comprovante.dataPagamento + "T00:00:00").toLocaleDateString("pt-BR")}</b>
+                  <span className="text-xs text-muted-foreground">Data e hora do pagamento: </span>
+                  <b>
+                    {new Date(comprovante.dataPagamento + "T00:00:00").toLocaleDateString("pt-BR")}
+                    {comprovante.horaPagamento
+                      ? ` às ${comprovante.horaPagamento}`
+                      : " (horário não registrado)"}
+                  </b>
                 </div>
                 <div>
                   <span className="text-xs text-muted-foreground">Forma: </span>
