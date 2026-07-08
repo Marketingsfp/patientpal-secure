@@ -66,6 +66,7 @@ interface Atend {
   agendamento_id?: string | null;
   repasse_pago?: boolean;
   repasse_pago_em?: string | null;
+  repasse_pago_at?: string | null;
   repasse_forma_pagamento?: string | null;
   paciente_nome_extra?: string | null;
   agendamento_inicio?: string | null;
@@ -181,18 +182,20 @@ function Page() {
     clinicaNome: string;
     medicoNome: string;
     dataPagamento: string;
+    horaPagamento: string | null;
     formaPagamento: string;
     contaNome: string;
     itens: CompItem[];
     total: number;
     qtd: number;
     emitidoEm: string;
+    reimpressao: boolean;
   } | null;
   const [comprovante, setComprovante] = useState<Comprovante>(null);
   const [comprovanteOpen, setComprovanteOpen] = useState(false);
   const buildComprovante = (
     itens: Atend[],
-    meta: { data: string; forma_pagamento: string; conta_id: string },
+    meta: { data: string; forma_pagamento: string; conta_id: string; pago_at?: string | null; reimpressao?: boolean },
   ): Comprovante => {
     if (!itens.length) return null;
     const medicoIds = new Set(itens.map((i) => i.medico_id ?? ""));
@@ -209,23 +212,42 @@ function Page() {
       valorMedico: Number(a.valor_medico) || 0,
     }));
     const total = rows.reduce((s, r) => s + r.valorMedico, 0);
+    // Deriva HH:mm somente quando o timestamp tem hora explícita (>00:00).
+    // Registros antigos foram backfillados para 00:00 e não representam hora real.
+    let horaPagamento: string | null = null;
+    if (meta.pago_at) {
+      const d = new Date(meta.pago_at);
+      if (!isNaN(d.getTime())) {
+        const hh = d.getHours();
+        const mm = d.getMinutes();
+        const ss = d.getSeconds();
+        if (hh !== 0 || mm !== 0 || ss !== 0) {
+          horaPagamento = `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+        }
+      }
+    }
     return {
       clinicaNome: clinicaAtual?.clinica?.nome ?? "—",
       medicoNome,
       dataPagamento: meta.data,
+      horaPagamento,
       formaPagamento: meta.forma_pagamento || "—",
       contaNome,
       itens: rows,
       total,
       qtd: rows.length,
       emitidoEm: new Date().toLocaleString("pt-BR"),
+      reimpressao: !!meta.reimpressao,
     };
   };
   const abrirComprovanteDoItem = (a: Atend) => {
+    const dataPag = a.repasse_pago_em ?? (a.repasse_pago_at ? a.repasse_pago_at.slice(0, 10) : a.data);
     const c = buildComprovante([a], {
-      data: a.repasse_pago_em ?? a.data,
+      data: dataPag,
       forma_pagamento: a.repasse_forma_pagamento ?? "",
       conta_id: "",
+      pago_at: a.repasse_pago_at ?? null,
+      reimpressao: true,
     });
     setComprovante(c);
     setComprovanteOpen(true);
@@ -641,7 +663,7 @@ function Page() {
     let qManual = supabase
       .from("fin_atendimentos")
       .select(
-        "id, data, procedimento, valor_total, valor_medico, valor_clinica, status, forma_pagamento, medico_id, paciente_id, repasse_pago, repasse_pago_em, repasse_forma_pagamento, laudo_status, medico_laudador_id, valor_laudo, lancamento_id",
+        "id, data, procedimento, valor_total, valor_medico, valor_clinica, status, forma_pagamento, medico_id, paciente_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, laudo_status, medico_laudador_id, valor_laudo, lancamento_id",
       )
       .eq("clinica_id", clinicaAtual.clinica_id)
       .gte("data", fIni)
@@ -649,7 +671,7 @@ function Page() {
     let qAgenda = supabase
       .from("fin_lancamentos")
       .select(
-        "id, data, descricao, valor, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_forma_pagamento, laudo_status, medico_laudador_id, valor_laudo, agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)",
+        "id, data, descricao, valor, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, laudo_status, medico_laudador_id, valor_laudo, agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)",
       )
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("tipo", "receita")
@@ -705,6 +727,7 @@ function Page() {
         origem: "manual",
         repasse_pago: !!r.repasse_pago,
         repasse_pago_em: r.repasse_pago_em,
+        repasse_pago_at: (r as any).repasse_pago_at ?? null,
         repasse_forma_pagamento: r.repasse_forma_pagamento,
         laudo_status: (r as any).laudo_status ?? null,
         medico_laudador_id: (r as any).medico_laudador_id ?? null,
@@ -745,6 +768,7 @@ function Page() {
         origem: "agenda",
         repasse_pago: !!r.repasse_pago,
         repasse_pago_em: r.repasse_pago_em,
+        repasse_pago_at: (r as any).repasse_pago_at ?? null,
         repasse_forma_pagamento: r.repasse_forma_pagamento,
         agendamento_inicio: ag?.inicio ?? null,
         agendamento_status: ag?.status ?? null,
@@ -1201,6 +1225,7 @@ function Page() {
       for (const [medId, list] of byMed) {
         const total = list.reduce((s, x) => s + (Number(x.valor_medico) || 0), 0);
         if (total <= 0) continue;
+        const nowIso = new Date().toISOString();
         const medNome = medId !== "sem" ? (medMap.get(medId) ?? "") : "—";
         const { data: lanc, error: eLanc } = await supabase
           .from("fin_lancamentos")
@@ -1223,6 +1248,7 @@ function Page() {
         const upd = {
           repasse_pago: true,
           repasse_pago_em: payForm.data,
+          repasse_pago_at: nowIso,
           repasse_forma_pagamento: payForm.forma_pagamento || null,
           repasse_conta_id: payForm.conta_id || null,
           repasse_lancamento_id: lancId,
@@ -1239,7 +1265,11 @@ function Page() {
         }
       }
       toast.success("Repasses pagos com sucesso");
-      const c = buildComprovante(selectedItems, payForm);
+      const c = buildComprovante(selectedItems, {
+        ...payForm,
+        pago_at: new Date().toISOString(),
+        reimpressao: false,
+      });
       setPayOpen(false);
       if (c) {
         setComprovante(c);
@@ -1919,6 +1949,25 @@ function Page() {
           </DialogHeader>
           {comprovante && (
             <div className="print-area bg-white text-black text-sm">
+              {comprovante.reimpressao && (
+                <div className="mb-3 border-2 border-rose-600 bg-rose-100 text-rose-900 rounded-md p-3 text-center">
+                  <div className="text-xl font-extrabold tracking-wide uppercase">
+                    Segunda via — Reimpressão de comprovante
+                  </div>
+                  <div className="text-sm mt-1">
+                    Pagamento realizado em{" "}
+                    <b>
+                      {new Date(comprovante.dataPagamento + "T00:00:00").toLocaleDateString("pt-BR")}
+                      {comprovante.horaPagamento
+                        ? ` às ${comprovante.horaPagamento}`
+                        : " (horário não registrado)"}
+                    </b>
+                  </div>
+                  <div className="text-xs mt-0.5 opacity-80">
+                    Reimpressão emitida em {comprovante.emitidoEm}
+                  </div>
+                </div>
+              )}
               <div className="flex items-start justify-between border-b pb-3 mb-3">
                 <div>
                   <div className="text-xs uppercase tracking-wide text-muted-foreground">Clínica</div>
@@ -1936,8 +1985,13 @@ function Page() {
                   <b>{comprovante.medicoNome}</b>
                 </div>
                 <div>
-                  <span className="text-xs text-muted-foreground">Data do pagamento: </span>
-                  <b>{new Date(comprovante.dataPagamento + "T00:00:00").toLocaleDateString("pt-BR")}</b>
+                  <span className="text-xs text-muted-foreground">Data e hora do pagamento: </span>
+                  <b>
+                    {new Date(comprovante.dataPagamento + "T00:00:00").toLocaleDateString("pt-BR")}
+                    {comprovante.horaPagamento
+                      ? ` às ${comprovante.horaPagamento}`
+                      : " (horário não registrado)"}
+                  </b>
                 </div>
                 <div>
                   <span className="text-xs text-muted-foreground">Forma: </span>
