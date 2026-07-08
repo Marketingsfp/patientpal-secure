@@ -715,6 +715,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
                     if (ehSupervisor) {
                       setDescontoAtivo(true);
                     } else {
+                      setAuthIntent("desconto");
                       setSupervisorOpen(true);
                     }
                   }}
