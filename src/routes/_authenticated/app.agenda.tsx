@@ -2838,11 +2838,14 @@ function AgendaPage() {
   const opcoesPagamentoDeOrcamento = async (orcamentoId: string): Promise<FormaOpcao[] | null> => {
     const { data, error } = await supabase
       .from("orcamentos")
-      .select("valor_total, desconto, valores_pagamento")
+      .select("valor_total, valores_pagamento")
       .eq("id", orcamentoId)
       .maybeSingle();
     if (error || !data) return null;
-    const totalLiquido = Math.max(0, Number(data.valor_total ?? 0) - Number(data.desconto ?? 0));
+    // `valor_total` do orçamento JÁ é líquido (subtotal - desconto).
+    // Não subtrair `desconto` de novo aqui — isso causava desconto duplicado
+    // ao converter o orçamento em cobrança na agenda.
+    const totalLiquido = Math.max(0, Number(data.valor_total ?? 0));
     const vals = (data.valores_pagamento ?? {}) as Record<string, number> | null;
     const pegar = (label: string) => {
       const v = vals ? Number(vals[label] ?? 0) : 0;
