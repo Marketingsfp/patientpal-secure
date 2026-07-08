@@ -13,6 +13,7 @@ import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -61,6 +62,7 @@ interface Procedimento {
   permite_venda_direta?: boolean | null;
   permite_encaixe?: boolean | null;
   tempo_padrao_min?: number | null;
+  valor_variavel?: boolean | null;
 }
 interface Cartao {
   id: string;
@@ -105,6 +107,7 @@ const EMPTY = {
   permite_venda_direta: false,
   permite_encaixe: true,
   tempo_padrao_min: "30",
+  valor_variavel: false,
 };
 
 const EMPTY_CARTAO = { nome: "", descricao: "", percentual_desconto: "0", ativo: true };
