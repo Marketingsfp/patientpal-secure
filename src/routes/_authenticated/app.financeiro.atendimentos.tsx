@@ -2108,7 +2108,7 @@ function Page() {
             </DialogTitle>
           </DialogHeader>
           {comprovantes.length > 0 && (
-            <div className="print-area bg-white text-black text-sm max-h-[70vh] overflow-y-auto">
+            <div className="print-area bg-white text-black text-sm max-h-[70vh] overflow-y-auto print:max-h-none print:overflow-visible">
               {comprovantes.map((comprovante, blocoIdx) => (
                 <div
                   key={blocoIdx}
@@ -2248,11 +2248,15 @@ function Page() {
             @media print {
               body * { visibility: hidden !important; }
               .print-area, .print-area * { visibility: visible !important; }
-              .print-area { position: fixed; inset: 0; margin: 0; padding: 16mm; background: white !important; color: black !important; overflow: visible; z-index: 9999; }
+              html, body { height: auto !important; overflow: visible !important; background: white !important; }
+              .print-area { position: absolute; left: 0; top: 0; right: 0; margin: 0; padding: 16mm; background: white !important; color: black !important; max-height: none !important; height: auto !important; overflow: visible !important; z-index: 9999; }
+              [role="dialog"], [role="dialog"] > * { position: static !important; transform: none !important; max-height: none !important; height: auto !important; overflow: visible !important; }
               .no-print { display: none !important; }
               [role="dialog"] { box-shadow: none !important; border: none !important; }
               .comprovante-bloco { break-after: page; page-break-after: always; }
               .comprovante-bloco:last-child { break-after: auto; page-break-after: auto; }
+              .comprovante-bloco table, .comprovante-bloco thead, .comprovante-bloco tbody, .comprovante-bloco tr, .comprovante-bloco td, .comprovante-bloco th { page-break-inside: auto; break-inside: auto; }
+              .comprovante-bloco tr { page-break-inside: avoid; break-inside: avoid; }
             }
           `}</style>
         </DialogContent>
