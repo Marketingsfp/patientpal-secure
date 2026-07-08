@@ -182,18 +182,20 @@ function Page() {
     clinicaNome: string;
     medicoNome: string;
     dataPagamento: string;
+    horaPagamento: string | null;
     formaPagamento: string;
     contaNome: string;
     itens: CompItem[];
     total: number;
     qtd: number;
     emitidoEm: string;
+    reimpressao: boolean;
   } | null;
   const [comprovante, setComprovante] = useState<Comprovante>(null);
   const [comprovanteOpen, setComprovanteOpen] = useState(false);
   const buildComprovante = (
     itens: Atend[],
-    meta: { data: string; forma_pagamento: string; conta_id: string },
+    meta: { data: string; forma_pagamento: string; conta_id: string; pago_at?: string | null; reimpressao?: boolean },
   ): Comprovante => {
     if (!itens.length) return null;
     const medicoIds = new Set(itens.map((i) => i.medico_id ?? ""));
@@ -210,23 +212,42 @@ function Page() {
       valorMedico: Number(a.valor_medico) || 0,
     }));
     const total = rows.reduce((s, r) => s + r.valorMedico, 0);
+    // Deriva HH:mm somente quando o timestamp tem hora explícita (>00:00).
+    // Registros antigos foram backfillados para 00:00 e não representam hora real.
+    let horaPagamento: string | null = null;
+    if (meta.pago_at) {
+      const d = new Date(meta.pago_at);
+      if (!isNaN(d.getTime())) {
+        const hh = d.getHours();
+        const mm = d.getMinutes();
+        const ss = d.getSeconds();
+        if (hh !== 0 || mm !== 0 || ss !== 0) {
+          horaPagamento = `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+        }
+      }
+    }
     return {
       clinicaNome: clinicaAtual?.clinica?.nome ?? "—",
       medicoNome,
       dataPagamento: meta.data,
+      horaPagamento,
       formaPagamento: meta.forma_pagamento || "—",
       contaNome,
       itens: rows,
       total,
       qtd: rows.length,
       emitidoEm: new Date().toLocaleString("pt-BR"),
+      reimpressao: !!meta.reimpressao,
     };
   };
   const abrirComprovanteDoItem = (a: Atend) => {
+    const dataPag = a.repasse_pago_em ?? (a.repasse_pago_at ? a.repasse_pago_at.slice(0, 10) : a.data);
     const c = buildComprovante([a], {
-      data: a.repasse_pago_em ?? a.data,
+      data: dataPag,
       forma_pagamento: a.repasse_forma_pagamento ?? "",
       conta_id: "",
+      pago_at: a.repasse_pago_at ?? null,
+      reimpressao: true,
     });
     setComprovante(c);
     setComprovanteOpen(true);
