@@ -313,13 +313,10 @@ function ClientesPage() {
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      title="Visualizar cliente"
-                      onClick={() => setVisualizar(p)}
-                    >
-                      <Eye className="h-4 w-4" />
+                    <Button asChild variant="ghost" size="icon" title="Visualizar cliente">
+                      <Link to="/app/clientes/$pacienteId/visualizar" params={{ pacienteId: p.id }}>
+                        <Eye className="h-4 w-4" />
+                      </Link>
                     </Button>
                     <Button asChild variant="ghost" size="icon" title="Editar cliente">
                       <Link to="/app/clientes/$pacienteId/editar" params={{ pacienteId: p.id }}>
@@ -354,43 +351,6 @@ function ClientesPage() {
           )}
         </DialogContent>
       </Dialog>
-
-      {/* Visualizar cliente (somente leitura) */}
-      <Dialog open={!!visualizar} onOpenChange={(v) => !v && setVisualizar(null)}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{visualizar?.nome ?? "Cliente"}</DialogTitle>
-            <DialogDescription>Visualização somente leitura do cadastro.</DialogDescription>
-          </DialogHeader>
-          {visualizar && (
-            <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-              <InfoView k="Prontuário" v={visualizar.codigo_prontuario ?? "—"} />
-              <InfoView k="Pasta" v={visualizar.numero_pasta ?? "—"} />
-              <InfoView k="CPF" v={visualizar.cpf ?? "—"} />
-              <InfoView k="Nascimento" v={fmtNasc(visualizar.data_nascimento)} />
-              <InfoView k="Telefone" v={visualizar.telefone ?? "—"} />
-              <InfoView k="E-mail" v={visualizar.email ?? "—"} />
-              <InfoView
-                k="Cidade/UF"
-                v={[visualizar.cidade, visualizar.estado].filter(Boolean).join("/") || "—"}
-              />
-              <InfoView k="Situação" v={visualizar.ativo ? "Ativo" : "Inativo"} />
-            </div>
-          )}
-          <div className="flex justify-end pt-2">
-            <Button variant="outline" onClick={() => setVisualizar(null)}>Fechar</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
-
-function InfoView({ k, v }: { k: string; v: string }) {
-  return (
-    <div className="min-w-0">
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{k}</div>
-      <div className="truncate">{v}</div>
     </div>
   );
 }
