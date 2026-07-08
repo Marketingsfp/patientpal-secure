@@ -701,6 +701,7 @@ function ProcedimentosPage() {
       permite_venda_direta: p.permite_venda_direta ?? false,
       permite_encaixe: p.permite_encaixe ?? true,
       tempo_padrao_min: String(p.tempo_padrao_min ?? p.duracao_minutos ?? 30),
+      valor_variavel: !!p.valor_variavel,
     });
     setOpen(true);
   };
