@@ -63,7 +63,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
   const [saving, setSaving] = useState(false);
   const [valorRecebido, setValorRecebido] = useState("");
   const [pagamentoMisto, setPagamentoMisto] = useState(false);
-  const [pagamentos, setPagamentos] = useState<Array<{ forma: string; recebido: string }>>([
+  const [pagamentos, setPagamentos] = useState<Array<{ forma: string; recebido: string; bandeira?: string; parcelas?: string }>>([
     { forma: "dinheiro", recebido: "" },
   ]);
   // ----- Desconto (apenas para gerente/admin/financeiro) -----
@@ -347,6 +347,11 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         toast.error("Informe o valor recebido em dinheiro em todas as linhas (deve cobrir o valor pago).");
         setSaving(false); return;
       }
+      const creditoSemBandeira = validIdx.find(({ p }) => p.forma === "cartao_credito" && !p.bandeira);
+      if (creditoSemBandeira) {
+        toast.error("Selecione a bandeira do cartão em todas as linhas de Cartão Crédito.");
+        setSaving(false); return;
+      }
       const total = validIdx.reduce((s, { i }) => s + linhasCalc[i].pago, 0);
       if (Math.abs(total - valorNum) > 0.01) {
         toast.error(`Soma das formas (${formatBRL(total)}) difere do valor (${formatBRL(valorNum)})`);
@@ -358,6 +363,11 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         const base = `${FORMAS_LABEL[p.forma] ?? p.forma} ${formatBRL(pago)}`;
         if (p.forma === "dinheiro" && troco > 0) {
           return `${base} (recebido ${formatBRL(Number(p.recebido))}, troco ${formatBRL(troco)})`;
+        }
+        if (p.forma === "cartao_credito") {
+          const parc = Number(p.parcelas || 1) || 1;
+          const band = (p.bandeira ?? "").toUpperCase();
+          return `${base} (${band} ${parc}x)`;
         }
         return base;
       }).join("; ");
@@ -381,6 +391,18 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       medicoId = agPrefetch.medico_id ?? null;
       pacienteId = agPrefetch.paciente_id ?? null;
     }
+    // Quando misto tem linha de Cartão Crédito, propagamos bandeira/parcelas
+    // da primeira linha de crédito para os campos de topo do lançamento
+    // (usados por relatórios e pela impressão da GR).
+    const mistoCredito = pagamentoMisto
+      ? pagamentos.find((p) => p.forma === "cartao_credito" && Number(p.recebido || 0) > 0)
+      : null;
+    const bandeiraFinal = isCredito
+      ? bandeiraCartao
+      : (mistoCredito?.bandeira ?? null);
+    const parcelasFinal = isCredito
+      ? (Number(parcelas) || 1)
+      : (mistoCredito ? (Number(mistoCredito.parcelas || 1) || 1) : null);
     const { data: lancInserido, error } = await supabase.from("fin_lancamentos").insert({
       clinica_id: clinicaAtual.clinica_id,
       tipo,
@@ -390,8 +412,8 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       categoria_id: categoriaId || null,
       conta_id: contaId || null,
       forma_pagamento: formaFinal,
-      bandeira_cartao: isCredito ? bandeiraCartao : null,
-      parcelas: isCredito ? Number(parcelas) || 1 : null,
+      bandeira_cartao: bandeiraFinal,
+      parcelas: parcelasFinal,
       emitir_nfse: emitirNfse,
       observacoes: obsFinal,
       status: "confirmado",
@@ -585,8 +607,8 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     onSavedWithData?.({
       valor: Number(valor),
       forma_pagamento: formaFinal,
-      parcelas: isCredito ? (Number(parcelas) || 1) : null,
-      bandeira_cartao: isCredito ? bandeiraCartao : null,
+      parcelas: parcelasFinal,
+      bandeira_cartao: bandeiraFinal,
       emitir_nfse: emitirNfse,
       pagamentos_detalhe: pagamentoMisto
         ? pagamentos
@@ -860,6 +882,47 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
                     {p.forma === "dinheiro" && trocoP > 0 && (
                       <div className="text-xs text-muted-foreground">
                         Troco: <strong>{formatBRL(trocoP)}</strong>
+                      </div>
+                    )}
+                    {p.forma === "cartao_credito" && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Bandeira *</Label>
+                          <Select
+                            value={p.bandeira ?? ""}
+                            onValueChange={(v) => setPagamentos((xs) => xs.map((q, i) => i === idx ? { ...q, bandeira: v } : q))}
+                          >
+                            <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="visa">Visa</SelectItem>
+                              <SelectItem value="mastercard">Mastercard</SelectItem>
+                              <SelectItem value="elo">Elo</SelectItem>
+                              <SelectItem value="amex">American Express</SelectItem>
+                              <SelectItem value="hipercard">Hipercard</SelectItem>
+                              <SelectItem value="diners">Diners</SelectItem>
+                              <SelectItem value="outra">Outra</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Parcelas</Label>
+                          <Select
+                            value={p.parcelas ?? "1"}
+                            onValueChange={(v) => setPagamentos((xs) => xs.map((q, i) => i === idx ? { ...q, parcelas: v } : q))}
+                          >
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => {
+                                const base = Number(p.recebido || 0);
+                                return (
+                                  <SelectItem key={n} value={String(n)}>
+                                    {n}x {n === 1 ? "(à vista)" : `de ${(base / n).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`}
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
                     )}
                   </div>
