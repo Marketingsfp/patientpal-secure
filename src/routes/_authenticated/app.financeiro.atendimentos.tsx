@@ -2067,11 +2067,22 @@ function Page() {
       <Dialog open={comprovanteOpen} onOpenChange={setComprovanteOpen}>
         <DialogContent className="max-w-3xl">
           <DialogHeader className="no-print">
-            <DialogTitle>Comprovante de pagamento de repasse</DialogTitle>
+            <DialogTitle>
+              Comprovante de pagamento de repasse
+              {comprovantes.length > 1 ? ` — ${comprovantes.length} médicos` : ""}
+            </DialogTitle>
           </DialogHeader>
-          {comprovante && (
-            <div className="print-area bg-white text-black text-sm">
-              {comprovante.reimpressao && (
+          {comprovantes.length > 0 && (
+            <div className="print-area bg-white text-black text-sm max-h-[70vh] overflow-y-auto">
+              {comprovantes.map((comprovante, blocoIdx) => (
+                <div
+                  key={blocoIdx}
+                  className={cn(
+                    "comprovante-bloco",
+                    blocoIdx > 0 && "mt-8 pt-8 border-t-4 border-dashed border-slate-400",
+                  )}
+                >
+                  {comprovante.reimpressao && (
                 <div className="mb-3 border-2 border-rose-600 bg-rose-100 text-rose-900 rounded-md p-3 text-center">
                   <div className="text-xl font-extrabold tracking-wide uppercase">
                     Segunda via — Reimpressão de comprovante
@@ -2084,6 +2095,11 @@ function Page() {
                         ? ` às ${comprovante.horaPagamento}`
                         : " (horário não registrado)"}
                     </b>
+                    {comprovante.multiplasDatas && comprovante.multiplasDatas > 1 ? (
+                      <span className="ml-1">
+                        (contém pagamentos de {comprovante.multiplasDatas} datas)
+                      </span>
+                    ) : null}
                   </div>
                   <div className="text-xs mt-0.5 opacity-80">
                     Reimpressão emitida em {comprovante.emitidoEm}
@@ -2174,6 +2190,8 @@ function Page() {
                   <div className="border-t pt-1">Assinatura da clínica</div>
                 </div>
               </div>
+                </div>
+              ))}
             </div>
           )}
           <DialogFooter className="no-print">
@@ -2192,6 +2210,8 @@ function Page() {
               .print-area { position: fixed; inset: 0; margin: 0; padding: 16mm; background: white !important; color: black !important; overflow: visible; z-index: 9999; }
               .no-print { display: none !important; }
               [role="dialog"] { box-shadow: none !important; border: none !important; }
+              .comprovante-bloco { break-after: page; page-break-after: always; }
+              .comprovante-bloco:last-child { break-after: auto; page-break-after: auto; }
             }
           `}</style>
         </DialogContent>
