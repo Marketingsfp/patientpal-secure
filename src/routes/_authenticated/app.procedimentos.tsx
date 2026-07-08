@@ -99,7 +99,7 @@ const EMPTY = {
   valor_cartao_consulta: "0", valor_cartao_desconto: "0",
   duracao_minutos: "30", observacoes: "", preparo: "", ativo: true,
   // Regras do procedimento (arquitetura de plataforma — fn_regras_procedimento)
-  fluxo_atendimento: "consulta_padrao",
+  fluxo_atendimento: "consulta_medica",
   agenda_obrigatoria: true,
   medico_obrigatorio: false,
   sala_obrigatoria: false,
@@ -693,7 +693,7 @@ function ProcedimentosPage() {
       valor_cartao_consulta: String(p.valor_cartao_consulta ?? 0),
       valor_cartao_desconto: String(p.valor_cartao_desconto ?? 0),
       duracao_minutos: String(p.duracao_minutos), observacoes: p.observacoes ?? "", preparo: p.preparo ?? "", ativo: p.ativo,
-      fluxo_atendimento: p.fluxo_atendimento ?? "consulta_padrao",
+      fluxo_atendimento: p.fluxo_atendimento ?? "consulta_medica",
       agenda_obrigatoria: p.agenda_obrigatoria ?? true,
       medico_obrigatorio: p.medico_obrigatorio ?? false,
       sala_obrigatoria: p.sala_obrigatoria ?? false,
@@ -1368,13 +1368,13 @@ function ProcedimentosPage() {
                   >
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="consulta_padrao">Consulta padrão (com médico)</SelectItem>
-                      <SelectItem value="exame_com_laudo">Exame com laudo</SelectItem>
-                      <SelectItem value="exame_sem_laudo">Exame sem laudo</SelectItem>
-                      <SelectItem value="procedimento_enfermagem">Procedimento de enfermagem</SelectItem>
-                      <SelectItem value="laboratorio">Coleta laboratorial</SelectItem>
-                      <SelectItem value="entrega_domiciliar">Entrega/retirada domiciliar (MAPA/Holter)</SelectItem>
-                      <SelectItem value="balcao">Venda de balcão</SelectItem>
+                      <SelectItem value="consulta_medica">Consulta padrão (com médico)</SelectItem>
+                      <SelectItem value="exame_agendado">Exame com laudo</SelectItem>
+                      <SelectItem value="equipamento">Exame sem laudo</SelectItem>
+                      <SelectItem value="procedimento_ambulatorial">Procedimento de enfermagem</SelectItem>
+                      <SelectItem value="lab_agendado">Coleta laboratorial</SelectItem>
+                      <SelectItem value="domiciliar">Entrega/retirada domiciliar (MAPA/Holter)</SelectItem>
+                      <SelectItem value="venda_balcao">Venda de balcão</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
