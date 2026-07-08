@@ -47,7 +47,15 @@ Especialidade: ${data.especialidade ?? "Clínica Geral"}.
 ${data.promptExtra ?? ""}
 Receberá a transcrição da conversa entre médico e paciente.
 Responda APENAS um JSON com as chaves: queixa_principal, historia_doenca, exame_fisico, hipotese_diagnostica, conduta, prescricao.
-Se um campo não estiver claro na conversa, retorne string vazia. Não invente dados.`;
+Preencha TODOS os campos, mesmo quando a informação não está explícita — infira o mais provável a partir do contexto da consulta e da especialidade, sempre como sugestão a ser revisada pelo médico.
+Regras por campo:
+- queixa_principal: 1 frase curta com o motivo da consulta.
+- historia_doenca: HDA em parágrafo (início, evolução, fatores associados, tratamentos tentados).
+- exame_fisico: achados relatados; quando não houver relato, sugira um exame físico dirigido pertinente à queixa/especialidade, prefixado com "Sugerido: ".
+- hipotese_diagnostica: 1 a 3 hipóteses plausíveis para a queixa/especialidade.
+- conduta: plano terapêutico e orientações; quando faltar dado, proponha conduta usual para o quadro provável.
+- prescricao: prescrição sugerida com medicamento, dose, via, posologia e duração, ou orientações não farmacológicas quando aplicável.
+Nunca devolva string vazia. Ao inferir, marque o trecho suposto com "(sugestão — confirmar)". Sempre em português do Brasil.`;
     const json = await callAI({
       messages: [
         { role: "system", content: sys },
