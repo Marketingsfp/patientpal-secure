@@ -1453,9 +1453,24 @@ function Page() {
             Exportar Excel
           </Button>
           {!isMedicoOnly && (
-            <Button onClick={openPay} disabled={!selectedItems.length}>
+            <Button
+              onClick={openPay}
+              disabled={!podePagar}
+              title={misturado ? "Selecione apenas atendimentos NÃO pagos" : undefined}
+            >
               <Wallet className="h-4 w-4 mr-2" />
-              Pagar repasse{selectedItems.length ? ` (${selectedItems.length} • ${fmt(selectedTotal)})` : ""}
+              Pagar repasse{selectedNaoPagos.length ? ` (${selectedNaoPagos.length} • ${fmt(selectedNaoPagos.reduce((s, x) => s + (Number(x.valor_medico) || 0), 0))})` : ""}
+            </Button>
+          )}
+          {!isMedicoOnly && (
+            <Button
+              variant="outline"
+              onClick={reimprimirSelecionados}
+              disabled={!podeReimprimir}
+              title={misturado ? "Selecione apenas atendimentos JÁ pagos" : "Imprimir 2ª via dos atendimentos pagos selecionados"}
+            >
+              <Printer className="h-4 w-4 mr-2" />
+              Imprimir 2ª via{selectedPagos.length ? ` (${selectedPagos.length})` : ""}
             </Button>
           )}
           <Dialog open={open} onOpenChange={setOpen}>
