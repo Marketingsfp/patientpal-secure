@@ -1746,6 +1746,17 @@ function Page() {
                                   <Undo2 className="h-3.5 w-3.5 text-amber-600" />
                                 </Button>
                               )}
+                              {a.repasse_pago && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  title="Imprimir comprovante de repasse"
+                                  onClick={() => abrirComprovanteDoItem(a)}
+                                >
+                                  <Printer className="h-3.5 w-3.5 text-primary" />
+                                </Button>
+                              )}
                               {/* Botão de excluir para agenda */}
                               <Button
                                 variant="ghost"
@@ -1772,6 +1783,17 @@ function Page() {
                               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(a)}>
                                 <Pencil className="h-3.5 w-3.5" />
                               </Button>
+                              {a.repasse_pago && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  title="Imprimir comprovante de repasse"
+                                  onClick={() => abrirComprovanteDoItem(a)}
+                                >
+                                  <Printer className="h-3.5 w-3.5 text-primary" />
+                                </Button>
+                              )}
                               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => remove(a)}>
                                 <Trash2 className="h-3.5 w-3.5 text-destructive" />
                               </Button>
