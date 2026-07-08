@@ -309,8 +309,12 @@ function AtendimentoIaPage() {
                     const triagemFeita = temRegistroTriagem || it.fluxo_etapa === "atendimento";
                     const pag = pagamentos[it.id];
                     const pago = Boolean(pag?.pago);
+                    const atendido = it.fluxo_etapa === "finalizado";
                     return (
-                      <TableRow key={it.id} className={!pago && pag ? "border-l-4 border-l-amber-400" : ""}>
+                      <TableRow
+                        key={it.id}
+                        className={`${atendido ? "opacity-60" : ""} ${!atendido && !pago && pag ? "border-l-4 border-l-amber-400" : ""}`.trim()}
+                      >
                         <TableCell className="tabular-nums text-xs text-muted-foreground">{idx + 1}</TableCell>
                         <TableCell className="tabular-nums text-xs">{hora}</TableCell>
                         <TableCell className="font-medium uppercase">{it.paciente_nome}</TableCell>
@@ -432,14 +436,23 @@ function AtendimentoIaPage() {
                           </HoverCard>
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            size="sm"
-                            onClick={() => atender(it)}
-                            disabled={Boolean(pag && !pag.pago)}
-                            title={pag && !pag.pago ? "Pagamento pendente — envie ao caixa antes do atendimento" : undefined}
-                          >
-                            <Stethoscope className="h-4 w-4" /> Atender
-                          </Button>
+                          {atendido ? (
+                            <Badge
+                              className="border-0 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200 text-[10px] gap-1"
+                              title="Atendimento finalizado"
+                            >
+                              <Check className="h-3 w-3" /> ATENDIDO
+                            </Badge>
+                          ) : (
+                            <Button
+                              size="sm"
+                              onClick={() => atender(it)}
+                              disabled={Boolean(pag && !pag.pago)}
+                              title={pag && !pag.pago ? "Pagamento pendente — envie ao caixa antes do atendimento" : undefined}
+                            >
+                              <Stethoscope className="h-4 w-4" /> Atender
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     );
