@@ -1732,8 +1732,16 @@ function Page() {
                     <TableRow key={`${a.origem}:${a.id}`} className={cn("hover:bg-muted/30 transition-colors", rowBg)}>
                       {!isMedicoOnly && (
                         <TableCell className="px-2">
-                          {!a.repasse_pago && (a.valor_medico ?? 0) > 0 ? (
-                            isAtendido(a) ? (
+                          {(a.valor_medico ?? 0) > 0 ? (
+                            a.repasse_pago ? (
+                              <Checkbox
+                                checked={sel.has(`${a.origem}:${a.id}`)}
+                                onCheckedChange={() => toggleOne(a)}
+                                aria-label="Selecionar para 2ª via"
+                                title="Selecionar para reimprimir 2ª via"
+                                className="h-4 w-4"
+                              />
+                            ) : isAtendido(a) ? (
                               <Checkbox
                                 checked={sel.has(`${a.origem}:${a.id}`)}
                                 onCheckedChange={() => toggleOne(a)}
