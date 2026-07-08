@@ -261,7 +261,7 @@ async function limparAntigos(
       const { data: files } = await admin.storage
         .from(bucket)
         .list(`${cli.name}/${d.name}`, { limit: 1000 });
-      const paths = (files ?? []).map(
+      const paths = ((files ?? []) as Array<{ name: string }>).map(
         (f) => `${cli.name}/${d.name}/${f.name}`,
       );
       if (paths.length) await admin.storage.from(bucket).remove(paths);
