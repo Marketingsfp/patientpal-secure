@@ -313,11 +313,21 @@ function ClientesPage() {
                   </span>
                 </TableCell>
                 <TableCell className="text-right">
-                  <Button asChild variant="ghost" size="icon" title="Editar cliente">
-                    <Link to="/app/clientes/$pacienteId/editar" params={{ pacienteId: p.id }}>
-                      <Pencil className="h-4 w-4" />
-                    </Link>
-                  </Button>
+                  <div className="flex items-center justify-end gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      title="Visualizar cliente"
+                      onClick={() => setVisualizar(p)}
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    <Button asChild variant="ghost" size="icon" title="Editar cliente">
+                      <Link to="/app/clientes/$pacienteId/editar" params={{ pacienteId: p.id }}>
+                        <Pencil className="h-4 w-4" />
+                      </Link>
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
