@@ -174,6 +174,61 @@ function Page() {
   const [optsReady, setOptsReady] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
   const [payForm, setPayForm] = useState({ data: hoje, conta_id: "", forma_pagamento: "" });
+  // Comprovante de pagamento de repasse (para impressão)
+  type CompItem = { data: string; medico: string; paciente: string; servico: string; valorMedico: number };
+  type Comprovante = {
+    clinicaNome: string;
+    medicoNome: string;
+    dataPagamento: string;
+    formaPagamento: string;
+    contaNome: string;
+    itens: CompItem[];
+    total: number;
+    qtd: number;
+    emitidoEm: string;
+  } | null;
+  const [comprovante, setComprovante] = useState<Comprovante>(null);
+  const [comprovanteOpen, setComprovanteOpen] = useState(false);
+  const buildComprovante = (
+    itens: Atend[],
+    meta: { data: string; forma_pagamento: string; conta_id: string },
+  ): Comprovante => {
+    if (!itens.length) return null;
+    const medicoIds = new Set(itens.map((i) => i.medico_id ?? ""));
+    const medicoNome =
+      medicoIds.size === 1
+        ? (medMap.get([...medicoIds][0]) ?? "—")
+        : `${medicoIds.size} médicos`;
+    const contaNome = contas.find((c) => c.id === meta.conta_id)?.nome ?? "—";
+    const rows: CompItem[] = itens.map((a) => ({
+      data: a.data,
+      medico: a.medico_id ? (medMap.get(a.medico_id) ?? "—") : "—",
+      paciente: a.paciente_id ? (pacMap.get(a.paciente_id) ?? "—") : (a.paciente_nome_extra ?? "—"),
+      servico: a.procedimento ?? "—",
+      valorMedico: Number(a.valor_medico) || 0,
+    }));
+    const total = rows.reduce((s, r) => s + r.valorMedico, 0);
+    return {
+      clinicaNome: clinicaAtual?.clinica?.nome ?? "—",
+      medicoNome,
+      dataPagamento: meta.data,
+      formaPagamento: meta.forma_pagamento || "—",
+      contaNome,
+      itens: rows,
+      total,
+      qtd: rows.length,
+      emitidoEm: new Date().toLocaleString("pt-BR"),
+    };
+  };
+  const abrirComprovanteDoItem = (a: Atend) => {
+    const c = buildComprovante([a], {
+      data: a.repasse_pago_em ?? a.data,
+      forma_pagamento: a.repasse_forma_pagamento ?? "",
+      conta_id: "",
+    });
+    setComprovante(c);
+    setComprovanteOpen(true);
+  };
   const [payingNow, setPayingNow] = useState(false);
 
   // Diálogo de laudo
