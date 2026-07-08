@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import {
   Zap, LogIn, Workflow, ListChecks, Brain, Sparkles, Bell, FileSignature,
-  TrendingUp,
+  TrendingUp, HardDrive,
 } from "lucide-react";
 
 export type MenuItem = {
@@ -108,6 +108,7 @@ export const CENTROS: Centro[] = [
       { path: "/app/campanhas", label: "Campanhas", icon: Send },
       { path: "/app/lgpd", label: "LGPD", icon: ShieldCheck },
       { path: "/app/auditoria", label: "Auditoria", icon: ShieldCheck },
+      { path: "/app/backups", label: "Backups Diários", icon: HardDrive },
       { path: "/app/estoque", label: "Estoque", icon: LayoutGrid },
     ],
   },
