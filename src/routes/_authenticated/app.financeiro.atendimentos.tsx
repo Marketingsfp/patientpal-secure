@@ -190,8 +190,10 @@ function Page() {
     qtd: number;
     emitidoEm: string;
     reimpressao: boolean;
+    multiplasDatas?: number;
   } | null;
   const [comprovante, setComprovante] = useState<Comprovante>(null);
+  const [comprovantes, setComprovantes] = useState<NonNullable<Comprovante>[]>([]);
   const [comprovanteOpen, setComprovanteOpen] = useState(false);
   const buildComprovante = (
     itens: Atend[],
@@ -250,7 +252,44 @@ function Page() {
       reimpressao: true,
     });
     setComprovante(c);
+    setComprovantes(c ? [c] : []);
     setComprovanteOpen(true);
+  };
+  // Constrói um comprovante em 2ª via para cada médico presente em `itens`.
+  const abrirSegundaViaLote = (itens: Atend[]) => {
+    if (!itens.length) return;
+    const byMed = new Map<string, Atend[]>();
+    for (const a of itens) {
+      const k = a.medico_id ?? "sem";
+      if (!byMed.has(k)) byMed.set(k, []);
+      byMed.get(k)!.push(a);
+    }
+    const blocos: NonNullable<Comprovante>[] = [];
+    for (const [, list] of byMed) {
+      // Metadados agregados
+      const datas = new Set(list.map((x) => x.repasse_pago_em ?? "").filter(Boolean));
+      const formas = new Set(list.map((x) => x.repasse_forma_pagamento ?? "").filter(Boolean));
+      const primeiro = list[0];
+      const dataPag =
+        primeiro.repasse_pago_em ??
+        (primeiro.repasse_pago_at ? primeiro.repasse_pago_at.slice(0, 10) : primeiro.data);
+      const c = buildComprovante(list, {
+        data: dataPag,
+        forma_pagamento: formas.size === 1 ? [...formas][0] : formas.size > 1 ? "Vários" : "",
+        conta_id: "",
+        pago_at: primeiro.repasse_pago_at ?? null,
+        reimpressao: true,
+      });
+      if (c) {
+        c.multiplasDatas = datas.size > 1 ? datas.size : 0;
+        blocos.push(c);
+      }
+    }
+    if (blocos.length) {
+      setComprovante(blocos[0]);
+      setComprovantes(blocos);
+      setComprovanteOpen(true);
+    }
   };
   const [payingNow, setPayingNow] = useState(false);
 
