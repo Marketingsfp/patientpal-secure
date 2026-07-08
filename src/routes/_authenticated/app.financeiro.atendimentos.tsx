@@ -1186,7 +1186,10 @@ function Page() {
 
   const isAtendido = (a: Atend) =>
     a.origem === "manual" ? a.status === "realizado" : a.agendamento_status === "realizado";
-  const selectables = filteredItems.filter((a) => !a.repasse_pago && (a.valor_medico ?? 0) > 0 && isAtendido(a));
+  // Itens selecionáveis: para pagar repasse (não pagos + atendidos) OU para 2ª via (já pagos).
+  const selectables = filteredItems.filter(
+    (a) => ((a.repasse_pago || (!a.repasse_pago && isAtendido(a))) && (a.valor_medico ?? 0) > 0),
+  );
   const allSelected = selectables.length > 0 && selectables.every((a) => sel.has(`${a.origem}:${a.id}`));
   const toggleAll = () => {
     if (allSelected) setSel(new Set());
@@ -1201,6 +1204,15 @@ function Page() {
   };
   const selectedItems = filteredItems.filter((a) => sel.has(`${a.origem}:${a.id}`));
   const selectedTotal = selectedItems.reduce((s, a) => s + (Number(a.valor_medico) || 0), 0);
+  const selectedPagos = selectedItems.filter((a) => a.repasse_pago);
+  const selectedNaoPagos = selectedItems.filter((a) => !a.repasse_pago);
+  const podePagar = selectedItems.length > 0 && selectedNaoPagos.length === selectedItems.length;
+  const podeReimprimir = selectedItems.length > 0 && selectedPagos.length === selectedItems.length;
+  const misturado = selectedItems.length > 0 && selectedPagos.length > 0 && selectedNaoPagos.length > 0;
+  const reimprimirSelecionados = () => {
+    if (!podeReimprimir) return;
+    abrirSegundaViaLote(selectedPagos);
+  };
 
   const openPay = () => {
     if (!selectedItems.length) {
