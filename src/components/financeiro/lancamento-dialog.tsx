@@ -259,6 +259,22 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       toast.error("O valor do pagamento deve ser maior que zero.");
       return;
     }
+    // ----- Cortesia: exige justificativa + autorização de supervisor -----
+    const norm0 = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    const catAtual = categorias.find((c) => c.id === categoriaId) ?? null;
+    const ehCortesia = !!(catAtual && norm0(catAtual.nome) === "cortesia");
+    if (ehCortesia) {
+      if (!cortesiaJustificativa.trim()) {
+        toast.error("Informe a justificativa da cortesia.");
+        return;
+      }
+      if (!ehSupervisor && !supervisorInfo) {
+        toast.error("É necessária a autorização de um supervisor para aplicar cortesia.");
+        setAuthIntent("cortesia");
+        setSupervisorOpen(true);
+        return;
+      }
+    }
     // Bloqueio por débito no cartão benefícios — só libera se o pagamento
     // for feito como Particular.
     if (bloqueioCartao?.bloqueado) {
@@ -387,7 +403,12 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       descontoObs = `Desconto aplicado: ${tipoTxt} sobre ${formatBRL(origNum)} — Autorizado por: ${descontoAutorizado.trim()}`
         + (descontoMotivo.trim() ? ` — Motivo: ${descontoMotivo.trim()}` : "");
     }
-    const obsFinal = [observacoes.trim(), descontoObs, obsExtra].filter(Boolean).join(" | ") || null;
+    let cortesiaObs = "";
+    if (ehCortesia) {
+      const autor = supervisorInfo?.nome ?? (ehSupervisor ? (user?.email ?? "supervisor") : "");
+      cortesiaObs = `Cortesia — Autorizado por: ${autor} — Justificativa: ${cortesiaJustificativa.trim()}`;
+    }
+    const obsFinal = [observacoes.trim(), cortesiaObs, descontoObs, obsExtra].filter(Boolean).join(" | ") || null;
     // Quando vinculado a um agendamento, busca medico_id e paciente_id
     // para que o repasse médico e os relatórios por paciente funcionem.
     let medicoId: string | null = null;
