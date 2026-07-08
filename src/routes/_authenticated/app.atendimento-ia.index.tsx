@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Brain, Stethoscope, AlertTriangle, Users, Check, X } from "lucide-react";
+import { Brain, Stethoscope, AlertTriangle, Users, Check, X, DollarSign } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
@@ -12,6 +12,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { toast } from "sonner";
+import { agendamentosStatusPagamento, type StatusPagamento } from "@/lib/pagamento-status";
 
 export const Route = createFileRoute("/_authenticated/app/atendimento-ia/")({
   component: AtendimentoIaPage,
@@ -66,6 +67,8 @@ function AtendimentoIaPage() {
   const [medicoId, setMedicoId] = useState("");
   const [triagens, setTriagens] = useState<Record<string, TriagemResumo>>({});
   const [triagensTick, setTriagensTick] = useState(0);
+  const [pagamentos, setPagamentos] = useState<Record<string, StatusPagamento>>({});
+  const [pagamentosTick, setPagamentosTick] = useState(0);
 
   useEffect(() => {
     (async () => {
@@ -180,6 +183,20 @@ function AtendimentoIaPage() {
   }, [filaIdsKey, triagensTick]);
 
   useEffect(() => {
+    let cancel = false;
+    (async () => {
+      const ids = fila.map((f) => f.id);
+      if (ids.length === 0) { setPagamentos({}); return; }
+      const map = await agendamentosStatusPagamento(ids);
+      if (cancel) return;
+      const obj: Record<string, StatusPagamento> = {};
+      map.forEach((v, k) => { obj[k] = v; });
+      setPagamentos(obj);
+    })();
+    return () => { cancel = true; };
+  }, [filaIdsKey, pagamentosTick]);
+
+  useEffect(() => {
     if (!clinicaAtual || !medicoId) return;
     const ch = supabase
       .channel(`atend-fila-${medicoId}`)
@@ -189,6 +206,12 @@ function AtendimentoIaPage() {
       .on("postgres_changes",
         { event: "*", schema: "public", table: "triagens_enfermagem" },
         () => { setTriagensTick((t) => t + 1); })
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "fin_lancamentos" },
+        () => { setPagamentosTick((t) => t + 1); })
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "agendamento_orcamento_itens" },
+        () => { setPagamentosTick((t) => t + 1); })
       .subscribe();
     return () => { void supabase.removeChannel(ch); };
   }, [medicoId, clinicaAtual?.clinica_id]);
@@ -259,6 +282,7 @@ function AtendimentoIaPage() {
                     <TableHead className="w-20">Hora</TableHead>
                     <TableHead>Paciente</TableHead>
                     <TableHead className="hidden md:table-cell">Serviço</TableHead>
+                    <TableHead className="w-32">Pagamento</TableHead>
                     <TableHead className="w-24 text-center">Triagem</TableHead>
                     <TableHead className="w-28">Prioridade</TableHead>
                     <TableHead className="w-32 text-right">Ação</TableHead>
@@ -274,13 +298,40 @@ function AtendimentoIaPage() {
                       : "";
                     const temRegistroTriagem = Boolean(triagens[it.id]);
                     const triagemFeita = temRegistroTriagem || it.fluxo_etapa === "atendimento";
+                    const pag = pagamentos[it.id];
+                    const pago = Boolean(pag?.pago);
                     return (
-                      <TableRow key={it.id}>
+                      <TableRow key={it.id} className={!pago && pag ? "border-l-4 border-l-amber-400" : ""}>
                         <TableCell className="tabular-nums text-xs text-muted-foreground">{idx + 1}</TableCell>
                         <TableCell className="tabular-nums text-xs">{hora}</TableCell>
                         <TableCell className="font-medium uppercase">{it.paciente_nome}</TableCell>
                         <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
                           {it.procedimento ?? "—"} · {it.fluxo_etapa.replace("_", " ")}
+                        </TableCell>
+                        <TableCell>
+                          {!pag ? (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          ) : pag.pago ? (
+                            <Badge
+                              className={
+                                pag.motivo === "orcamento"
+                                  ? "border-0 bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-200 text-[10px] gap-1"
+                                  : "border-0 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200 text-[10px] gap-1"
+                              }
+                              title={pag.motivo === "orcamento" ? "Pago via orçamento" : "Pago no caixa"}
+                            >
+                              <Check className="h-3 w-3" />
+                              {pag.motivo === "orcamento" ? "PAGO (ORÇAMENTO)" : "PAGO"}
+                            </Badge>
+                          ) : (
+                            <Badge
+                              className="border-0 bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200 text-[10px] gap-1"
+                              title="Pagamento pendente — envie ao caixa antes do atendimento"
+                            >
+                              <DollarSign className="h-3 w-3" />
+                              PENDENTE
+                            </Badge>
+                          )}
                         </TableCell>
                         <TableCell className="text-center">
                           {triagemFeita ? (
@@ -372,7 +423,12 @@ function AtendimentoIaPage() {
                           </HoverCard>
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button size="sm" onClick={() => atender(it)}>
+                          <Button
+                            size="sm"
+                            onClick={() => atender(it)}
+                            disabled={Boolean(pag && !pag.pago)}
+                            title={pag && !pag.pago ? "Pagamento pendente — envie ao caixa antes do atendimento" : undefined}
+                          >
                             <Stethoscope className="h-4 w-4" /> Atender
                           </Button>
                         </TableCell>
