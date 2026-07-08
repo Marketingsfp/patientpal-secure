@@ -75,6 +75,10 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
   const [valorOriginal, setValorOriginal] = useState<string>("");
   const [supervisorOpen, setSupervisorOpen] = useState(false);
   const [supervisorInfo, setSupervisorInfo] = useState<{ userId: string; nome: string; role: string } | null>(null);
+  // ----- Cortesia (categoria especial: exige justificativa + supervisor) -----
+  const [cortesiaJustificativa, setCortesiaJustificativa] = useState("");
+  // Marca a intenção da autenticação do supervisor: "desconto" | "cortesia"
+  const [authIntent, setAuthIntent] = useState<"desconto" | "cortesia">("desconto");
   // Bloqueio: paciente com mensalidade vencida no cartão benefícios.
   // Quando bloqueado, o pagamento só pode ser feito como Particular.
   const [bloqueioCartao, setBloqueioCartao] = useState<{
@@ -97,6 +101,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     setDescontoAtivo(false); setDescontoTipo("valor");
     setDescontoInput(""); setDescontoAutorizado(""); setDescontoMotivo("");
     setSupervisorInfo(null); setSupervisorOpen(false);
+    setCortesiaJustificativa(""); setAuthIntent("desconto");
     setBloqueioCartao(null); setTipoAgendamento(null); setConvenioNome(null);
     if (initialFormaPagamento !== undefined) {
       if (initialFormaPagamento === "__misto__") {
@@ -254,6 +259,22 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       toast.error("O valor do pagamento deve ser maior que zero.");
       return;
     }
+    // ----- Cortesia: exige justificativa + autorização de supervisor -----
+    const norm0 = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    const catAtual = categorias.find((c) => c.id === categoriaId) ?? null;
+    const ehCortesia = !!(catAtual && norm0(catAtual.nome) === "cortesia");
+    if (ehCortesia) {
+      if (!cortesiaJustificativa.trim()) {
+        toast.error("Informe a justificativa da cortesia.");
+        return;
+      }
+      if (!ehSupervisor && !supervisorInfo) {
+        toast.error("É necessária a autorização de um supervisor para aplicar cortesia.");
+        setAuthIntent("cortesia");
+        setSupervisorOpen(true);
+        return;
+      }
+    }
     // Bloqueio por débito no cartão benefícios — só libera se o pagamento
     // for feito como Particular.
     if (bloqueioCartao?.bloqueado) {
@@ -382,7 +403,12 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       descontoObs = `Desconto aplicado: ${tipoTxt} sobre ${formatBRL(origNum)} — Autorizado por: ${descontoAutorizado.trim()}`
         + (descontoMotivo.trim() ? ` — Motivo: ${descontoMotivo.trim()}` : "");
     }
-    const obsFinal = [observacoes.trim(), descontoObs, obsExtra].filter(Boolean).join(" | ") || null;
+    let cortesiaObs = "";
+    if (ehCortesia) {
+      const autor = supervisorInfo?.nome ?? (ehSupervisor ? (user?.email ?? "supervisor") : "");
+      cortesiaObs = `Cortesia — Autorizado por: ${autor} — Justificativa: ${cortesiaJustificativa.trim()}`;
+    }
+    const obsFinal = [observacoes.trim(), cortesiaObs, descontoObs, obsExtra].filter(Boolean).join(" | ") || null;
     // Quando vinculado a um agendamento, busca medico_id e paciente_id
     // para que o repasse médico e os relatórios por paciente funcionem.
     let medicoId: string | null = null;
@@ -689,6 +715,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
                     if (ehSupervisor) {
                       setDescontoAtivo(true);
                     } else {
+                      setAuthIntent("desconto");
                       setSupervisorOpen(true);
                     }
                   }}
@@ -772,6 +799,30 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
               </p>
             )}
           </div>
+          {(() => {
+            const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+            const cat = categorias.find((c) => c.id === categoriaId);
+            const ehCortesia = !!(cat && norm(cat.nome) === "cortesia");
+            if (!ehCortesia) return null;
+            return (
+              <div className="space-y-2 rounded-md border border-dashed border-amber-400 p-3 bg-amber-50/40">
+                <div className="flex items-center justify-between gap-2">
+                  <Label className="text-sm font-medium">
+                    Justificativa da cortesia * <span className="text-xs text-muted-foreground">(exige autorização do supervisor)</span>
+                  </Label>
+                  {supervisorInfo && (
+                    <span className="text-xs text-success">✓ Autorizado por {supervisorInfo.nome}</span>
+                  )}
+                </div>
+                <Textarea
+                  rows={2}
+                  value={cortesiaJustificativa}
+                  onChange={(e) => setCortesiaJustificativa(e.target.value)}
+                  placeholder="Ex: paciente encaminhado pela diretoria, retorno gratuito, campanha social..."
+                />
+              </div>
+            );
+          })()}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Conta</Label>
@@ -1002,9 +1053,13 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     <SupervisorAuthDialog
       open={supervisorOpen}
       onOpenChange={setSupervisorOpen}
-      acao="aplicar desconto"
+      acao={authIntent === "cortesia" ? "aplicar cortesia" : "aplicar desconto"}
       onAuthorized={(info) => {
         setSupervisorInfo({ userId: info.userId, nome: info.nome, role: info.role });
+        if (authIntent === "cortesia") {
+          // Não ativa desconto; apenas registra a autorização para a cortesia.
+          return;
+        }
         setDescontoAutorizado(info.nome);
         setDescontoAtivo(true);
       }}
