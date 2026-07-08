@@ -283,7 +283,7 @@ function AtendimentoIaPage() {
               Nenhum paciente na fila para hoje.
             </div>
           ) : (
-            <div className="rounded-md border max-h-[70vh] overflow-auto">
+            <div className="rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow>
