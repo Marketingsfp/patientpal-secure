@@ -1,45 +1,72 @@
-## Diagnóstico
+## Objetivo
 
-Na tela **Atendimento médico** (`src/routes/_authenticated/app.atendimento-ia.index.tsx`):
+Permitir cadastrar serviços cujo valor não é fixo (ex.: procedimentos que cobram por sessão, por tempo, ou negociáveis). Nesses casos:
+- O usuário marca uma opção **"Valor variável"** no cadastro.
+- Os campos de preço ficam **opcionais** (podem ficar em R$ 0,00 sem bloquear o cadastro).
+- Ao usar o serviço (agenda, caixa, orçamento), o sistema pede o valor manualmente em vez de puxar o preço da tabela.
 
-- A consulta da fila filtra `fluxo_etapa IN ('aguardando_recepcao','recepcao','caixa','triagem','atendimento')` (linhas 97 e 157). Assim que o médico conclui um atendimento, o agendamento vira `fluxo_etapa = 'finalizado'` (ver `app.agenda.tsx:1985` e `2824`) e **some** da fila.
-- A coluna `#` é apenas `idx + 1` sobre a lista já filtrada (linha 305). Como a lista encolhe, os pacientes seguintes sobem uma posição — foi o que aconteceu entre a foto 1 (Luan Carlos = #2) e a foto 2 (Luan Carlos = #1).
+Para os demais serviços, nada muda — continuam com valores fixos e validação normal.
 
-## Correção
+## O que aparece na tela
 
-1. **Trazer os finalizados de hoje para a mesma consulta**
-   - Adicionar `'finalizado'` no `.in('fluxo_etapa', […])` das duas queries (a de médicos com fila do dia — linha 97 — e a `carregarFila` — linha 157).
-   - Escopo continua o mesmo: mesma clínica, mesmo `medico_id`, mesmo dia (`inicio` entre 00:00 e 23:59). Ninguém de outro dia entra.
-   - Continuar filtrando pacientes `DISPONÍVEL` e sem `paciente_id`, como já é feito.
+### Tela **Serviços → Novo serviço / Editar serviço**
 
-2. **Estabilizar a numeração**
-   - Manter a mesma ordenação híbrida atual (prioridade + horário), mas com todos os itens do dia dentro da lista os números deixam de "andar" quando alguém é atendido, porque o item finalizado ocupa o lugar dele.
-   - `#` continua sendo o índice ordenado, agora estável durante o dia.
+No topo da seção **"Valores por forma de pagamento"**, adicionar um switch:
 
-3. **Marcar visualmente "Atendido" e desabilitar ação**
-   - Detectar `it.fluxo_etapa === 'finalizado'`.
-   - Aplicar `className="opacity-60"` no `<TableRow>` desses itens (mantém legível, mas indica que já foi feito).
-   - Substituir o botão **Atender** por um badge verde `Atendido` (ícone `Check`), sem `onClick`. Nada de navegação, nada de refazer atendimento pelo mesmo botão.
-   - Manter todas as demais colunas visíveis (hora, paciente, serviço, pagamento, triagem, prioridade) para o médico continuar tendo o histórico do dia à vista.
+```text
+[  ] Valor variável — informado no momento da cobrança
+     Quando ativo, os campos de preço ficam desativados e o valor
+     é digitado na hora de agendar, cobrar ou orçar.
+```
 
-4. **Realtime**
-   - A subscription atual já reage a qualquer `event: '*'` em `agendamentos` filtrado por `medico_id`, então a transição para `finalizado` também dispara `carregarFila`. Sem mudança de subscription.
+Quando o switch está ligado:
+- Bloco "Valores por forma de pagamento" fica esmaecido e desabilitado.
+- Bloco "Valores por convênio (Cartão Benefícios)" fica esmaecido e desabilitado.
+- Ao salvar, todos os valores são gravados como 0 (evita conflito com regras existentes) e o registro é marcado como valor variável.
 
-5. **Contador do label**
-   - `Fila de atendimento (N)` hoje mostra o total da lista. Vou trocar para exibir **pendentes / total** (ex.: `Fila de atendimento (2 pendentes de 3)`), calculando pendentes como itens com `fluxo_etapa !== 'finalizado'`. Isso preserva a informação útil que o número original dava e evita confusão de "por que aumentou".
+### Tela **Serviços → lista**
 
-## Fora de escopo
+- Na coluna de valores da lista, quando o serviço é de valor variável, exibir um badge **"Valor variável"** no lugar do preço em R$.
 
-- Não altero o comportamento do botão para pacientes com pagamento pendente (permanece desabilitado com o mesmo tooltip).
-- Não altero a query de médicos "com fila do dia" para incluir finalizados na descoberta de médico automático — os finalizados sozinhos não devem forçar seleção de médico se não houver ninguém pendente; hoje esse caminho só usa quem tem `triagem`/`atendimento`, o que continua correto.
-- Não mexo em RLS nem em índices — a filtragem por `medico_id + inicio` já é performante e o adicional `finalizado` cai no mesmo dia.
+### Onde o serviço é usado (agenda, caixa, orçamento)
 
-## Verificação (Playwright + banco)
+Nos diálogos que hoje puxam o valor do procedimento (lançamento financeiro e conversão de orçamento):
+- Se o procedimento escolhido for de valor variável, o campo de valor **não** é preenchido automaticamente com 0.
+- Um aviso curto aparece: **"Este serviço tem valor variável — informe o valor cobrado."**
+- O foco vai para o campo de valor, que precisa ser digitado antes de salvar.
 
-1. Após o build, abrir a rota `/app/atendimento-ia`, selecionar um médico com pelo menos 2 pacientes na fila do dia, capturar screenshot inicial.
-2. Simular a conclusão de um atendimento via SQL controlado (`update agendamentos set fluxo_etapa='finalizado' where id=…`) num agendamento de teste.
-3. Recarregar, capturar novo screenshot e confirmar:
-   - o paciente atendido continua na tabela, com badge **Atendido** e linha esmaecida;
-   - a numeração `#` dos demais permanece igual à do primeiro screenshot;
-   - o contador do cabeçalho reflete "pendentes de total".
-4. Reverter o `fluxo_etapa` do teste para o estado original.
+## Detalhes técnicos
+
+### Banco de dados (migração)
+
+Adicionar à tabela `procedimentos`:
+- `valor_variavel boolean NOT NULL DEFAULT false`
+
+Sem novas policies — a coluna herda o RLS existente da tabela.
+
+### Frontend
+
+**`src/routes/_authenticated/app.procedimentos.tsx`**
+- Adicionar `valor_variavel: false` ao `EMPTY` e ao formulário.
+- Renderizar o switch acima do bloco de valores; quando ligado, desabilitar `CurrencyInput` de dinheiro, pix/cartão, e todos os valores por convênio.
+- No `onSubmit`, se `valor_variavel = true`, forçar todos os valores numéricos do payload para 0 antes de gravar e enviar `valor_variavel: true`.
+- Ao editar, carregar o flag do registro e refletir na UI.
+- Na lista, substituir o valor em R$ por um badge quando `valor_variavel`.
+
+**`src/components/financeiro/lancamento-dialog.tsx`** e **`src/components/orcamentos/conversao-orcamento-dialog.tsx`**
+- Ao carregar o procedimento selecionado, ler `valor_variavel`.
+- Se verdadeiro: não pré-preencher o valor e mostrar o aviso "Este serviço tem valor variável — informe o valor cobrado.". Bloquear submit enquanto o valor estiver zerado.
+
+### Fora de escopo
+
+- Não alterar a política de valores por convênio para serviços de valor fixo.
+- Não alterar as regras de repasse médico / split (o valor variável só entra como base quando o usuário digita).
+- Não mexer nos serviços já cadastrados (todos ficam com `valor_variavel = false` por padrão).
+
+## Verificação
+
+1. Cadastrar um serviço novo com "Valor variável" ligado, com todos os campos de preço em 0 → salva sem erro.
+2. Cadastrar um serviço normal com valor → salva como antes.
+3. Editar um serviço existente e ligar "Valor variável" → campos desabilitam.
+4. Na lista, o serviço variável aparece com badge "Valor variável".
+5. Ao usar o serviço variável em um lançamento financeiro / orçamento, o campo de valor não vem preenchido e exige digitação.
