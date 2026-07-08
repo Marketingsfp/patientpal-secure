@@ -1,49 +1,43 @@
 ## Objetivo
 
-Exibir no comprovante de pagamento do médico o horário exato do pagamento (não só a data). Quando o comprovante for reemitido (segunda via), destacar claramente que é uma **SEGUNDA VIA** e mostrar a data + hora do pagamento original.
+Permitir selecionar vários atendimentos já pagos e imprimir um único comprovante de **2ª via** com todos eles juntos, agrupados por médico (fluxo típico: pagamento diário por médico).
 
 ## Situação atual
 
-- Coluna `repasse_pago_em` em `fin_lancamentos` e `fin_atendimentos` é do tipo `date` (só guarda o dia). Por isso não há como recuperar o horário de pagamentos.
-- O comprovante já mostra "Data do pagamento" (só dia) e "Emitido em" (data+hora do momento da impressão). Não há distinção entre 1ª e 2ª via.
+- A coluna de checkbox já existe, mas o checkbox só aparece para atendimentos **não pagos** (usado no fluxo "Pagar repasse").
+- Atendimentos pagos só permitem reimpressão individual, item a item (ícone de impressora na linha).
 
 ## Mudanças
 
-### 1. Banco de dados (migration)
-- Adicionar coluna `repasse_pago_at timestamptz` em `fin_lancamentos` e `fin_atendimentos`.
-- Backfill: `repasse_pago_at = repasse_pago_em::timestamptz` para linhas antigas já pagas (só data → 00:00 do dia; comportamento aceitável para históricos, será sinalizado como "horário não registrado" na UI quando faltar hora precisa).
-- Índice não é necessário (uso pontual).
+### 1. Habilitar checkbox também para atendimentos pagos
+Em `src/routes/_authenticated/app.financeiro.atendimentos.tsx`, na célula da coluna de seleção, mostrar o `Checkbox` também quando `a.repasse_pago === true`. O estado `sel` já existente é reutilizado (evita duas listas paralelas).
 
-### 2. Gravação do pagamento (`confirmarPagamento`)
-- No update de `repasse_pago_*`, gravar também `repasse_pago_at: new Date().toISOString()` (momento real do clique em "Confirmar pagamento"), independente da `payForm.data` que o usuário escolher para o lançamento contábil.
-- Continuar gravando `repasse_pago_em` como está (data do lançamento).
+### 2. "Selecionar todos" respeita a aba visível
+O checkbox do cabeçalho (`toggleAll`) continua funcionando; ao alternar entre "Pagos"/"A pagar" via filtro `fStatus`, o comportamento segue igual (marca todos os filtrados).
 
-### 3. Query e tipo
-- Adicionar `repasse_pago_at` no SELECT das duas fontes (linhas 644 e 652) e no tipo `Atend`.
+### 3. Ações contextuais dos botões
+- **"Pagar repasse"**: fica habilitado apenas quando **todos** os itens selecionados estão **não pagos** (comportamento igual a hoje na prática, mas com validação explícita para não confundir quando misturar).
+- **Novo botão "Imprimir 2ª via (N)"**: aparece no topo (ao lado de "Pagar repasse") **e** também no rodapé da tabela (barra flutuante já existente). Habilita apenas quando **todos** os selecionados estão **pagos**. Ao clicar:
+  - Se todos os selecionados forem do mesmo médico → gera um único comprovante em 2ª via com todos os itens.
+  - Se houver mais de um médico selecionado → agrupa por médico e emite **um comprovante por médico** (abre um após o outro, ou concatena em blocos separados no mesmo diálogo com quebras de página CSS `break-after: page`). Vou adotar a segunda abordagem (um único diálogo com múltiplos blocos), para permitir imprimir tudo em uma passagem.
+- Quando os selecionados misturam pagos e não pagos, ambos os botões ficam desabilitados com tooltip explicando por quê.
 
-### 4. Comprovante (`buildComprovante` + diálogo)
-- Novo formato de `Comprovante`:
-  - `dataPagamento` continua sendo a data do lançamento.
-  - Novo campo `horaPagamento: string | null` — HH:mm derivado de `repasse_pago_at`.
-  - Novo campo `reimpressao: boolean`.
-- **Primeira via** (fluxo `confirmarPagamento`): passa `reimpressao=false` e `horaPagamento = new Date()` recém-gravado.
-- **Segunda via** (`abrirComprovanteDoItem`): passa `reimpressao=true`, `dataPagamento` e `horaPagamento` extraídos de `repasse_pago_at` da linha; quando só houver `repasse_pago_em` (registros antigos), mostrar `horaPagamento = null` com texto "horário não registrado".
+### 4. Metadados do comprovante em lote
+- `data do pagamento` e `horário`: usa o `repasse_pago_em` / `repasse_pago_at` do próprio atendimento (cada linha do bloco pode ter data diferente; no cabeçalho de cada bloco, mostrar a data/hora do primeiro pagamento e, se houver várias, uma nota "Contém pagamentos de N datas").
+- `forma de pagamento` e `conta`: se todos os itens do bloco compartilham, exibe o valor; se divergem, exibe "Vários".
+- Banner **SEGUNDA VIA** já existente é reutilizado em cada bloco.
 
-### 5. UI do comprovante
-- Substituir o campo "Data do pagamento" por "Data e hora do pagamento: dd/mm/aaaa às HH:mm".
-- Quando `reimpressao=true`:
-  - Banner vermelho no topo do comprovante (visível na tela e na impressão) com texto grande: **"SEGUNDA VIA — Reimpressão de comprovante"**.
-  - Bloco destacado abaixo do banner: "Pagamento realizado em: dd/mm/aaaa às HH:mm" (ou "horário não registrado" quando faltar).
-  - Manter "Emitido em: {emitidoEm}" (data/hora da reimpressão) claramente separado, para não confundir com o pagamento original.
+### 5. Barra flutuante no rodapé
+A barra que hoje mostra "N atendimento(s) • total" quando há seleção ganha o novo botão "Imprimir 2ª via" ao lado do "Pagar repasse", com as mesmas regras de habilitação.
 
 ## Detalhes técnicos
 
-- Arquivo principal: `src/routes/_authenticated/app.financeiro.atendimentos.tsx`.
-- Migration nova para adicionar `repasse_pago_at` nas duas tabelas + backfill.
-- Sem mudanças em outras telas; a página de gestão de repasses continua igual.
-- CSS de impressão: reutilizar classes existentes (`print-area`, `no-print`); banner usa `bg-rose-100 border-rose-500 text-rose-900`.
+- Arquivo único: `src/routes/_authenticated/app.financeiro.atendimentos.tsx`.
+- `buildComprovante` ganha um modo "múltiplos blocos": nova função `buildComprovanteLote(gruposPorMedico)` que reutiliza a lógica atual e monta uma lista de `Comprovante` renderizados sequencialmente no diálogo.
+- Sem mudanças de schema, sem migration.
+- Sem alterações em outras telas.
 
 ## Fora de escopo
 
-- Não alterar cálculo de repasse, RLS, permissões, agendamento ou fluxo de estorno.
-- Não retroativar horários reais de pagamentos antigos (não existem no banco); apenas sinalizar quando ausente.
+- Não muda o cálculo de repasse, RLS, permissões.
+- Não afeta o fluxo de estorno nem o pagamento em si (só reimpressão).
