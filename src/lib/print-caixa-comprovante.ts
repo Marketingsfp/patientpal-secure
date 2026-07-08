@@ -67,37 +67,31 @@ export function printComprovanteCaixa(input: ComprovanteCaixaInput) {
 <title>${esc(TITULOS[input.tipo])}</title>
 <style>
   * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; background: #fff; color: #0f172a;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
-  .page { padding: 18mm 16mm; max-width: 190mm; margin: 0 auto; }
-  .via { border: 1px dashed #94a3b8; padding: 10mm; border-radius: 6px; margin-bottom: 8mm; }
-  .via + .via { margin-top: 0; }
-  .via-label { font-size: 10px; letter-spacing: 2px; color: #64748b;
-    text-transform: uppercase; margin-bottom: 6px; font-weight: 700; }
-  .header { display: flex; justify-content: space-between; align-items: flex-start;
-    border-bottom: 2px solid #0f172a; padding-bottom: 6px; margin-bottom: 10px; }
-  .clinica { font-weight: 800; font-size: 14px; }
-  .titulo { font-size: 15px; font-weight: 800; margin: 4px 0 2px; }
-  .subtitulo { font-size: 11px; color: #475569; }
-  .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px;
-    font-size: 11px; margin: 8px 0 10px; }
-  .meta b { color: #0f172a; }
-  .valores { border-top: 1px solid #cbd5e1; border-bottom: 1px solid #cbd5e1;
-    padding: 6px 0; margin: 6px 0 10px; }
-  .linha { display: flex; justify-content: space-between; padding: 3px 0; font-size: 12px; }
-  .linha.destaque { font-weight: 800; font-size: 14px; }
-  .desc { font-size: 11px; color: #334155; margin: 6px 0 10px; white-space: pre-wrap; }
-  .desc b { color: #0f172a; }
-  .sigs { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
-  .sig { text-align: center; }
-  .sig .line { border-top: 1px solid #0f172a; margin-top: 34px; padding-top: 4px;
-    font-size: 10px; color: #334155; text-transform: uppercase; letter-spacing: 1px; }
-  .sig .nome { font-size: 11px; color: #0f172a; font-weight: 700; }
-  .rodape { font-size: 9px; color: #64748b; margin-top: 10px; text-align: center; }
+  html, body { margin: 0; padding: 0; background: #fff; color: #000;
+    font-family: "Consolas", "Menlo", "Courier New", ui-monospace, monospace; }
+  .receipt { width: 72mm; padding: 3mm 3mm 6mm; margin: 0 auto; font-size: 11px; line-height: 1.35; }
+  .center { text-align: center; }
+  .right { text-align: right; }
+  .bold { font-weight: 700; }
+  .clinica { font-size: 13px; font-weight: 800; text-transform: uppercase; }
+  .titulo { font-size: 12px; font-weight: 800; margin-top: 2px; text-transform: uppercase; }
+  .subtitulo { font-size: 10px; margin-bottom: 4px; }
+  .sep { border-top: 1px dashed #000; margin: 6px 0; }
+  .row { display: flex; justify-content: space-between; gap: 6px; }
+  .row .k { text-transform: uppercase; font-size: 10px; }
+  .row .v { text-align: right; word-break: break-word; }
+  .valor-destaque { font-size: 15px; font-weight: 800; text-align: center; margin: 4px 0; }
+  .desc { font-size: 10px; margin-top: 4px; white-space: pre-wrap; word-break: break-word; }
+  .sig { margin-top: 14px; }
+  .sig .line { border-top: 1px solid #000; margin-top: 22px; padding-top: 2px;
+    font-size: 9px; text-align: center; text-transform: uppercase; letter-spacing: 1px; }
+  .sig .nome { font-size: 10px; text-align: center; font-weight: 700; min-height: 12px; }
+  .rodape { font-size: 9px; margin-top: 8px; text-align: center; }
   @media print {
-    @page { size: A4; margin: 0; }
+    @page { size: 80mm auto; margin: 0; }
     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .no-print { display: none; }
+    .receipt { width: 72mm; }
   }
   .toolbar { position: fixed; top: 8px; right: 8px; display: flex; gap: 8px; }
   .toolbar button { background: #1d4ed8; color: #fff; border: 0; padding: 8px 14px;
@@ -109,45 +103,30 @@ export function printComprovanteCaixa(input: ComprovanteCaixaInput) {
     <button onclick="window.print()">Imprimir</button>
     <button class="sec" onclick="window.close()">Fechar</button>
   </div>
-  ${["1ª VIA — CAIXA", "2ª VIA — TESOURARIA"].map((viaLabel) => `
-    <div class="via">
-      <div class="via-label">${viaLabel}</div>
-      <div class="header">
-        <div>
-          <div class="clinica">${esc(input.clinicaNome)}</div>
-          <div class="titulo">${esc(TITULOS[input.tipo])}</div>
-          <div class="subtitulo">${esc(SUBTITULOS[input.tipo])}</div>
-        </div>
-        <div style="text-align:right; font-size:11px; color:#334155;">
-          <div><b>Data/Hora</b></div>
-          <div>${esc(dtStr)}</div>
-        </div>
-      </div>
-      <div class="meta">
-        <div><b>Operador (Atendente):</b> ${esc(input.operadorNome)}</div>
-        <div><b>Tipo:</b> ${esc(TITULOS[input.tipo].replace("COMPROVANTE DE ", ""))}</div>
-      </div>
-      <div class="valores">
-        ${linhas.map((l) => `
-          <div class="linha ${l.destaque ? "destaque" : ""}">
-            <span>${esc(l.label)}</span>
-            <span>${esc(l.valor)}</span>
-          </div>`).join("")}
-      </div>
-      ${input.descricao ? `<div class="desc"><b>Descrição / motivo:</b><br/>${esc(input.descricao)}</div>` : ""}
-      <div class="sigs">
-        <div class="sig">
-          <div class="line">Assinatura do Atendente</div>
-          <div class="nome">${esc(input.operadorNome)}</div>
-        </div>
-        <div class="sig">
-          <div class="line">Assinatura da Tesouraria</div>
-          <div class="nome">&nbsp;</div>
-        </div>
-      </div>
-      <div class="rodape">Documento gerado em ${esc(dtStr)} — ClinicaOS</div>
+  <div class="receipt">
+    <div class="center clinica">${esc(input.clinicaNome)}</div>
+    <div class="center titulo">${esc(TITULOS[input.tipo])}</div>
+    <div class="center subtitulo">${esc(SUBTITULOS[input.tipo])}</div>
+    <div class="sep"></div>
+    <div class="row"><span class="k">Data/Hora</span><span class="v">${esc(dtStr)}</span></div>
+    <div class="row"><span class="k">Atendente</span><span class="v">${esc(input.operadorNome)}</span></div>
+    <div class="sep"></div>
+    ${isFech
+      ? linhas.map((l) => `<div class="row"><span class="k">${esc(l.label)}</span><span class="v ${l.destaque ? "bold" : ""}">${esc(l.valor)}</span></div>`).join("")
+      : `<div class="valor-destaque">${esc(fmtBRL(input.valor))}</div>`
+    }
+    ${input.descricao ? `<div class="sep"></div><div class="desc"><b>Descrição:</b> ${esc(input.descricao)}</div>` : ""}
+    <div class="sep"></div>
+    <div class="sig">
+      <div class="nome">${esc(input.operadorNome)}</div>
+      <div class="line">Assinatura do Atendente</div>
     </div>
-  `).join("")}
+    <div class="sig">
+      <div class="nome">&nbsp;</div>
+      <div class="line">Assinatura da Tesouraria</div>
+    </div>
+    <div class="rodape">${esc(dtStr)} — ClinicaOS</div>
+  </div>
 </body></html>`;
 
   // Usa iframe oculto para evitar bloqueio de pop-up (o handler é async e
