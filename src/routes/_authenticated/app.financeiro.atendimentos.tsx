@@ -214,16 +214,19 @@ function Page() {
       valorMedico: Number(a.valor_medico) || 0,
     }));
     const total = rows.reduce((s, r) => s + r.valorMedico, 0);
-    // Deriva HH:mm somente quando o timestamp tem hora explícita (>00:00).
-    // Registros antigos foram backfillados para 00:00 e não representam hora real.
+    // Deriva HH:mm somente quando o timestamp tem hora explícita (>00:00 UTC).
+    // Registros antigos foram backfillados de `date` para timestamptz em
+    // 00:00 UTC — comparar em UTC evita falso-positivo quando o fuso local
+    // gera hh != 0 (ex.: 21:00 em BRT para 00:00 UTC).
     let horaPagamento: string | null = null;
     if (meta.pago_at) {
       const d = new Date(meta.pago_at);
       if (!isNaN(d.getTime())) {
-        const hh = d.getHours();
-        const mm = d.getMinutes();
-        const ss = d.getSeconds();
-        if (hh !== 0 || mm !== 0 || ss !== 0) {
+        const isBackfill =
+          d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0;
+        if (!isBackfill) {
+          const hh = d.getHours();
+          const mm = d.getMinutes();
           horaPagamento = `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
         }
       }
