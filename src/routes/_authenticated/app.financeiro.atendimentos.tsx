@@ -755,8 +755,29 @@ function Page() {
     // fin_atendimentos que espelham o mesmo pagamento (duplicidade legada
     // criada pelo fluxo de atendimento IA antes da correção).
     const lancIds = new Set((ar.data ?? []).map((r: { id: string }) => r.id));
+    // Também colecionamos o agendamento_id dos lançamentos para descartar
+    // manuais que espelhem o mesmo agendamento (caso o lancamento_id não
+    // tenha sido preenchido no fin_atendimentos, por qualquer motivo).
+    const lancAgendIds = new Set(
+      (ar.data ?? [])
+        .map((r: { agendamento_id?: string | null }) => r.agendamento_id ?? null)
+        .filter((x): x is string => !!x),
+    );
     const manuaisRaw = (mr.data ?? []).filter(
-      (r: { lancamento_id?: string | null }) => !r.lancamento_id || !lancIds.has(r.lancamento_id),
+      (r: { lancamento_id?: string | null }) => {
+        if (r.lancamento_id && lancIds.has(r.lancamento_id)) return false;
+        // Sem lancamento_id: descarta se algum lançamento carregado apontar
+        // para um agendamento que também aparece no lote manual (mesma data,
+        // procedimento e paciente). O DB já tem trigger que impede este caso
+        // em novos inserts; aqui blindamos registros históricos.
+        if (r.lancamento_id && lancAgendIds.size > 0) {
+          const lanc = (ar.data ?? []).find((l: { id: string }) => l.id === r.lancamento_id) as
+            | { agendamento_id?: string | null }
+            | undefined;
+          if (lanc?.agendamento_id && lancAgendIds.has(lanc.agendamento_id)) return false;
+        }
+        return true;
+      },
     );
     const manuais: Atend[] = manuaisRaw.map((r) => {
       const pago = Number(r.valor_total);
