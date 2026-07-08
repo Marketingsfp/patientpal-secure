@@ -1,29 +1,37 @@
-## Análise — Auditoria dos orçamentos de `jeanpsfp@gmail.com`
+## Análise — Mensalidades de contratos criados por `jeanpsfp@gmail.com`
 
-Encontrei **3 orçamentos** criados por esse usuário. Todos estão com status **"aberto"** (nenhum foi convertido em agendamento, nenhum vínculo em `agendamento_orcamento_itens`).
+A tabela `contrato_mensalidades` não tem coluna de criador — herdo via `contratos_assinatura.criado_por`.
 
-| Nº | Status | Valor | Data | Paciente |
-|----|--------|-------|------|----------|
-| 202600044 | aberto | R$ 110,00 | 05/07/2026 | — (sem paciente vinculado) |
-| 202600043 | aberto | R$ 40,00 | 02/07/2026 | — (sem paciente vinculado) |
-| 202600015 | aberto | R$ 40,00 | 02/07/2026 | — (sem paciente vinculado) |
+**Resultado:**
+- **42 contratos** criados por esse usuário
+- **504 mensalidades** (12 parcelas × 42 contratos)
+- **0 pagas**, **0 com lançamento financeiro**, **0 com pagamento registrado**
+- Todos os contratos estão com status `ativo` e as mensalidades sem `pago_em`, sem `lancamento_id`, sem `valor_pago`
 
-Total: **3 orçamentos + 3 itens de orçamento**. Sem impacto em agendamentos, financeiro, caixa ou NFS-e.
+## Análise dos 4 eixos
 
-## Análise dos 4 eixos (governança)
+- 💰 **Financeiro**: nenhum impacto. Nenhuma mensalidade foi paga nem virou lançamento no financeiro.
+- ⏱️ **Operacional**: remove 504 parcelas futuras que estão poluindo a agenda de recebimentos.
+- 😊 **Experiência**: nenhum paciente foi cobrado por essas parcelas.
+- 🛡️ **Auditoria**: exclusão registrada em `audit_log`.
 
-- 💰 **Financeiro**: nenhum. Orçamentos "aberto" não geram lançamento, guia ou receita — são apenas propostas.
-- ⏱️ **Operacional**: limpa 3 propostas antigas da lista.
-- 😊 **Experiência**: nenhum paciente afetado (nenhum vinculado).
-- 🛡️ **Auditoria**: a exclusão será registrada em `audit_log` via trigger. Ação permanece rastreável mesmo após o delete.
+## Ponto importante — o que o usuário pediu
+
+Você pediu para excluir "todos os `contratos_mensalidades` criados por jeanpsfp". Os **contratos em si (42 registros em `contratos_assinatura`) permanecem intactos** — só as parcelas serão apagadas. Isso deixará os contratos "ativos" mas **sem parcelas geradas**.
+
+Duas opções — preciso que você confirme qual:
+
+**Opção A (literal ao pedido):** Excluir apenas as 504 mensalidades. Contratos ficam ativos sem parcelas.
+
+**Opção B (mais provável):** Excluir as 504 mensalidades **E** os 42 contratos junto (limpeza completa dos contratos criados por ele).
 
 ## Plano de execução
 
-1. **Excluir os 3 orçamentos** (`orcamentos` + `orcamento_itens` em cascata) via `supabase--insert` com um único `DELETE` filtrando pelos 3 IDs listados acima.
-2. Não mexer em nenhum outro registro (agendamentos, pagamentos, caixa, NFS-e — inalterados por não haver vínculo).
+Após sua escolha entre A ou B:
 
-## Confirmação necessária
+1. `DELETE FROM contrato_mensalidades WHERE contrato_id IN (SELECT id FROM contratos_assinatura c JOIN auth.users u ON u.id=c.criado_por WHERE u.email='jeanpsfp@gmail.com')`
+2. **(Só se opção B)** `DELETE FROM contratos_assinatura WHERE criado_por = (uuid do jeanpsfp)` — também remove `contrato_dependentes` em cascata.
 
-Por serem dados financeiros (mesmo que ainda em fase de proposta), preciso da sua confirmação explícita antes de executar. **Confirma a exclusão desses 3 orçamentos?**
+Nenhum lançamento em `fin_lancamentos` será afetado (não há nenhum vinculado).
 
-Se preferir preservar algum, me diga os números a manter.
+**Qual opção — A ou B?**
