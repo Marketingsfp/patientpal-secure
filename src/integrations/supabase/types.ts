@@ -3208,6 +3208,7 @@ export type Database = {
           repasse_forma_pagamento: string | null
           repasse_lancamento_id: string | null
           repasse_pago: boolean
+          repasse_pago_at: string | null
           repasse_pago_em: string | null
           repasse_pago_por: string | null
           status: string
@@ -3239,6 +3240,7 @@ export type Database = {
           repasse_forma_pagamento?: string | null
           repasse_lancamento_id?: string | null
           repasse_pago?: boolean
+          repasse_pago_at?: string | null
           repasse_pago_em?: string | null
           repasse_pago_por?: string | null
           status?: string
@@ -3270,6 +3272,7 @@ export type Database = {
           repasse_forma_pagamento?: string | null
           repasse_lancamento_id?: string | null
           repasse_pago?: boolean
+          repasse_pago_at?: string | null
           repasse_pago_em?: string | null
           repasse_pago_por?: string | null
           status?: string
@@ -3480,6 +3483,7 @@ export type Database = {
           repasse_forma_pagamento: string | null
           repasse_lancamento_id: string | null
           repasse_pago: boolean
+          repasse_pago_at: string | null
           repasse_pago_em: string | null
           repasse_pago_por: string | null
           status: Database["public"]["Enums"]["fin_status_lancamento"]
@@ -3515,6 +3519,7 @@ export type Database = {
           repasse_forma_pagamento?: string | null
           repasse_lancamento_id?: string | null
           repasse_pago?: boolean
+          repasse_pago_at?: string | null
           repasse_pago_em?: string | null
           repasse_pago_por?: string | null
           status?: Database["public"]["Enums"]["fin_status_lancamento"]
@@ -3550,6 +3555,7 @@ export type Database = {
           repasse_forma_pagamento?: string | null
           repasse_lancamento_id?: string | null
           repasse_pago?: boolean
+          repasse_pago_at?: string | null
           repasse_pago_em?: string | null
           repasse_pago_por?: string | null
           status?: Database["public"]["Enums"]["fin_status_lancamento"]
