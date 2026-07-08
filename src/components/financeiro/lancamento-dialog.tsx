@@ -75,6 +75,10 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
   const [valorOriginal, setValorOriginal] = useState<string>("");
   const [supervisorOpen, setSupervisorOpen] = useState(false);
   const [supervisorInfo, setSupervisorInfo] = useState<{ userId: string; nome: string; role: string } | null>(null);
+  // ----- Cortesia (categoria especial: exige justificativa + supervisor) -----
+  const [cortesiaJustificativa, setCortesiaJustificativa] = useState("");
+  // Marca a intenção da autenticação do supervisor: "desconto" | "cortesia"
+  const [authIntent, setAuthIntent] = useState<"desconto" | "cortesia">("desconto");
   // Bloqueio: paciente com mensalidade vencida no cartão benefícios.
   // Quando bloqueado, o pagamento só pode ser feito como Particular.
   const [bloqueioCartao, setBloqueioCartao] = useState<{
@@ -97,6 +101,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     setDescontoAtivo(false); setDescontoTipo("valor");
     setDescontoInput(""); setDescontoAutorizado(""); setDescontoMotivo("");
     setSupervisorInfo(null); setSupervisorOpen(false);
+    setCortesiaJustificativa(""); setAuthIntent("desconto");
     setBloqueioCartao(null); setTipoAgendamento(null); setConvenioNome(null);
     if (initialFormaPagamento !== undefined) {
       if (initialFormaPagamento === "__misto__") {
