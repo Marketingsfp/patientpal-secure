@@ -1,33 +1,42 @@
 ## Problema
 
-Ao salvar um serviço (com valor variável ou não), o backend rejeita com 23514 → "Um dos valores informados está fora do intervalo permitido".
+Na tela **Editar funcionário → aba "Login e perfil"**, hoje só aparece o e-mail e o botão "Trocar senha". Não existe campo para alterar o **perfil de acesso** (admin, gestor, médico, enfermeiro, recepção, financeiro) de um funcionário já cadastrado.
 
-Causa: o Select "Fluxo de atendimento" em `app.procedimentos.tsx` está enviando chaves que **não existem** no CHECK constraint do banco.
+A função de servidor `editarMembro` em `src/lib/equipe.functions.ts` já aceita mudança de `role` — só falta expor na UI.
 
-| Valor enviado hoje       | Valor aceito no banco          |
-| ------------------------ | ------------------------------ |
-| `consulta_padrao`        | `consulta_medica`              |
-| `exame_com_laudo`        | `exame_agendado`               |
-| `exame_sem_laudo`        | `equipamento`                  |
-| `procedimento_enfermagem`| `procedimento_ambulatorial`    |
-| `laboratorio`            | `lab_agendado`                 |
-| `entrega_domiciliar`     | `domiciliar`                   |
-| `balcao`                 | `venda_balcao`                 |
+## Alteração (apenas 1 arquivo)
 
-O bug não é do valor variável — qualquer cadastro que passe pelo Select falha. Só apareceu agora porque outros fluxos anteriores não estavam usando esse campo.
+`src/components/funcionarios/FuncionarioFormDialog.tsx`
 
-## Correção
+1. Ao abrir em modo edição, buscar também o membership atual do usuário na clínica:
+   ```
+   supabase.from("clinica_memberships")
+     .select("id, role, ativo")
+     .eq("clinica_id", clinicaId)
+     .eq("user_id", editingUserId)
+     .maybeSingle()
+   ```
+   Guardar `membershipId`, `perfilAtual`, `ativoAtual` no estado. Preencher `form.perfil` com o role atual.
 
-Alterar somente `src/routes/_authenticated/app.procedimentos.tsx`:
+2. Na aba **"Login e perfil"**, no ramo `isEditingExisting`, adicionar antes do bloco de senha:
+   - Select "Perfil de acesso" usando a mesma lista `PERFIS` (adicionar `caixa` para bater com os roles aceitos pelo servidor).
+   - Bind: `form.perfil` ↔ `setForm({...form, perfil: v})`.
 
-1. Trocar cada `SelectItem value="..."` do bloco "Fluxo de atendimento" para o valor canônico do banco (coluna esquerda → coluna direita da tabela acima). Os rótulos exibidos ao usuário continuam idênticos.
-2. Atualizar o default do form (`fluxo_atendimento: "consulta_padrao"`) para `"consulta_medica"`.
-3. Atualizar o fallback ao abrir edição (`p.fluxo_atendimento ?? "consulta_padrao"`) para `"consulta_medica"`.
+3. No `salvar()`, quando `editingUserId && membershipId` e o perfil mudou em relação ao carregado, chamar `editarMembro`:
+   ```
+   await editarMembroFn({ data: {
+     clinicaId, membershipId,
+     role: form.perfil, ativo: ativoAtual,
+   }})
+   ```
+   Encaixar entre o update de `hr_contratos` e o update de `profiles`, tratando erro com `mostrarErro`.
 
-Sem migração — o banco já está correto. Sem alteração em outras telas.
+4. Importar `editarMembro` e criar `const editarMembroFn = useServerFn(editarMembro)`.
 
-## Verificação
+Nada mais muda: aba "Dados", trocar senha, criação de novo funcionário e telas fora dessa continuam iguais.
 
-- Cadastrar um novo serviço com "Valor variável" ligado e fluxo "Consulta padrão (com médico)" → salva sem erro.
-- Cadastrar um serviço normal com preço → continua salvando.
-- Editar um serviço existente e trocar o fluxo → salva sem erro.
+## Fora de escopo
+
+- Não altero `equipe.functions.ts` (já tem tudo).
+- Não altero a lista de funcionários nem a rota.
+- Não mexo em RLS/migrations.
