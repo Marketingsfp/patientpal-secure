@@ -641,7 +641,7 @@ function Page() {
     let qManual = supabase
       .from("fin_atendimentos")
       .select(
-        "id, data, procedimento, valor_total, valor_medico, valor_clinica, status, forma_pagamento, medico_id, paciente_id, repasse_pago, repasse_pago_em, repasse_forma_pagamento, laudo_status, medico_laudador_id, valor_laudo",
+        "id, data, procedimento, valor_total, valor_medico, valor_clinica, status, forma_pagamento, medico_id, paciente_id, repasse_pago, repasse_pago_em, repasse_forma_pagamento, laudo_status, medico_laudador_id, valor_laudo, lancamento_id",
       )
       .eq("clinica_id", clinicaAtual.clinica_id)
       .gte("data", fIni)
