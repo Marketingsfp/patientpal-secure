@@ -1052,9 +1052,13 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     <SupervisorAuthDialog
       open={supervisorOpen}
       onOpenChange={setSupervisorOpen}
-      acao="aplicar desconto"
+      acao={authIntent === "cortesia" ? "aplicar cortesia" : "aplicar desconto"}
       onAuthorized={(info) => {
         setSupervisorInfo({ userId: info.userId, nome: info.nome, role: info.role });
+        if (authIntent === "cortesia") {
+          // Não ativa desconto; apenas registra a autorização para a cortesia.
+          return;
+        }
         setDescontoAutorizado(info.nome);
         setDescontoAtivo(true);
       }}
