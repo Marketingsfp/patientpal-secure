@@ -238,15 +238,23 @@ function AtendimentoEditorPage() {
     setLoading("estruturar");
     try {
       const out = await estruturar({ data: { transcricao: texto, especialidade, promptExtra: modelo?.prompt_ia ?? undefined } });
-      setSoap((s) => ({
-        queixa_principal: out.queixa_principal || s.queixa_principal,
-        historia_doenca: out.historia_doenca || s.historia_doenca,
-        exame_fisico: out.exame_fisico || s.exame_fisico,
-        hipotese_diagnostica: out.hipotese_diagnostica || s.hipotese_diagnostica,
-        conduta: out.conduta || s.conduta,
-        prescricao: out.prescricao || s.prescricao,
-      }));
+      const nextSoap = {
+        queixa_principal: out.queixa_principal || soap.queixa_principal,
+        historia_doenca: out.historia_doenca || soap.historia_doenca,
+        exame_fisico: out.exame_fisico || soap.exame_fisico,
+        hipotese_diagnostica: out.hipotese_diagnostica || soap.hipotese_diagnostica,
+        conduta: out.conduta || soap.conduta,
+        prescricao: out.prescricao || soap.prescricao,
+      };
+      setSoap(nextSoap);
       toast.success("Prontuário preenchido pela IA como sugestão");
+      // Gera CIDs/exames/prescrição sugerida na sequência
+      try {
+        const sug = await sugerir({ data: { ...nextSoap, especialidade } });
+        setSugestoes(sug);
+      } catch (err) {
+        console.error("sugerir falhou", err);
+      }
     } catch (e) { mostrarErro(e); }
     finally { setLoading(null); }
   }
