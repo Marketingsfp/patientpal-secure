@@ -811,7 +811,6 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
             ou encaminhe para uma atendente. Você pode continuar o cadastro manual mesmo assim.
           </div>
         )}
-        <fieldset disabled={readOnly} className="contents">
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="grid grid-cols-7 w-full">
             <TabsTrigger value="dados">Dados</TabsTrigger>
@@ -824,7 +823,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
             <TabsTrigger value="historico">Histórico</TabsTrigger>
             <TabsTrigger value="convenio">Convênio</TabsTrigger>
           </TabsList>
-
+          <fieldset disabled={readOnly} className="contents">
           <TabsContent value="dados" className="space-y-4 pt-4 pb-16">
             <div className="flex items-center gap-4">
               <div className="relative h-20 w-20 rounded-full overflow-hidden border bg-muted flex items-center justify-center shrink-0">
@@ -1422,8 +1421,8 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
               </div>
             )}
           </TabsContent>
+          </fieldset>
         </Tabs>
-        </fieldset>
 
         {!readOnly && (
           <div className={footerClass}>
