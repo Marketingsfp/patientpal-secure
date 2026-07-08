@@ -1,19 +1,23 @@
-## Diagnóstico
+## Objetivo
 
-Na 2ª via, o horário do pagamento aparece como "21:00" mesmo o pagamento tendo sido feito às ~15:31 local. Causa:
+Na 2ª via do comprovante de repasse, mostrar em cada linha da tabela a **data e hora do pagamento ao médico** (além dos campos já existentes: Data do atendimento, Médico, Paciente, Serviço, Valor pago).
 
-- `repasse_pago_at` desse pagamento foi **backfillado** pela migration, com `repasse_pago_em::timestamptz` — como o Postgres do servidor está em UTC, um `date` "2026-07-08" vira `2026-07-08 00:00:00 UTC`.
-- No navegador (fuso BRT, UTC−3), `new Date("2026-07-08T00:00:00Z").getHours()` retorna **21** (do dia anterior, mas hora 21).
-- A verificação atual "se hh/mm/ss são 0, não mostra hora" usa **horário local** e por isso não detecta o backfill fora do fuso UTC.
+## Mudanças em `src/routes/_authenticated/app.financeiro.atendimentos.tsx`
 
-## Correção
+1. **Tipo `CompItem`** — adicionar `pagoEm: string | null` (data do pagamento, `YYYY-MM-DD`) e `pagoHora: string | null` (HH:mm quando disponível).
 
-Em `src/routes/_authenticated/app.financeiro.atendimentos.tsx`, dentro de `buildComprovante`:
+2. **`buildComprovante`** — ao montar cada `row`, derivar de cada `a` (Atend):
+   - `pagoEm = a.repasse_pago_em ?? (a.repasse_pago_at ? a.repasse_pago_at.slice(0,10) : null)`
+   - `pagoHora` calculado com a mesma regra anti-backfill já usada para `horaPagamento` do cabeçalho (comparar componentes em UTC; se `00:00:00 UTC`, tratar como "sem horário" e retornar `null`; senão formatar HH:mm em horário local).
 
-- Detectar o "sem horário" comparando os componentes em **UTC** (`getUTCHours/getUTCMinutes/getUTCSeconds === 0`). Assim, backfills feitos à meia-noite UTC são reconhecidos e o comprovante exibe "(horário não registrado)".
-- Manter a exibição de HH:mm em horário local para pagamentos novos (`repasse_pago_at` gravado com `new Date().toISOString()`, que raramente cai exatamente em 00:00:00 UTC).
+3. **Tabela do comprovante (JSX ~linha 2155)** — inserir nova coluna **"Pago em"** entre "Data" e "Médico":
+   - Cabeçalho: `<th>Pago em</th>`.
+   - Linha: exibir `dd/mm/aaaa` + (quando houver) `` às HH:mm``; quando não houver hora, mostrar só a data.
+   - Quando `pagoEm` for `null` (raríssimo — item sem registro de pagamento), mostrar "—".
+   - Ajustar `colSpan` do rodapé Total de `4` para `5`.
 
 ## Fora de escopo
 
-- Nenhuma migration.
-- Nenhuma mudança em outras telas nem no fluxo de gravação.
+- Não altera cabeçalho do comprovante (que já mostra "Data e hora do pagamento" agregado).
+- Nenhuma migration ou mudança em gravação.
+- Sem mudar demais telas.

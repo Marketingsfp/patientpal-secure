@@ -177,7 +177,7 @@ function Page() {
   const [payOpen, setPayOpen] = useState(false);
   const [payForm, setPayForm] = useState({ data: hoje, conta_id: "", forma_pagamento: "" });
   // Comprovante de pagamento de repasse (para impressão)
-  type CompItem = { data: string; medico: string; paciente: string; servico: string; valorMedico: number };
+  type CompItem = { data: string; medico: string; paciente: string; servico: string; valorMedico: number; pagoEm: string | null; pagoHora: string | null };
   type Comprovante = {
     clinicaNome: string;
     medicoNome: string;
@@ -206,12 +206,23 @@ function Page() {
         ? (medMap.get([...medicoIds][0]) ?? "—")
         : `${medicoIds.size} médicos`;
     const contaNome = contas.find((c) => c.id === meta.conta_id)?.nome ?? "—";
+    const derivarHora = (iso: string | null | undefined): string | null => {
+      if (!iso) return null;
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return null;
+      const isBackfill =
+        d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0;
+      if (isBackfill) return null;
+      return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    };
     const rows: CompItem[] = itens.map((a) => ({
       data: a.data,
       medico: a.medico_id ? (medMap.get(a.medico_id) ?? "—") : "—",
       paciente: a.paciente_id ? (pacMap.get(a.paciente_id) ?? "—") : (a.paciente_nome_extra ?? "—"),
       servico: a.procedimento ?? "—",
       valorMedico: Number(a.valor_medico) || 0,
+      pagoEm: a.repasse_pago_em ?? (a.repasse_pago_at ? a.repasse_pago_at.slice(0, 10) : null),
+      pagoHora: derivarHora(a.repasse_pago_at ?? null),
     }));
     const total = rows.reduce((s, r) => s + r.valorMedico, 0);
     // Deriva HH:mm somente quando o timestamp tem hora explícita (>00:00 UTC).
@@ -2156,6 +2167,7 @@ function Page() {
                 <thead>
                   <tr className="border-b bg-muted/40">
                     <th className="text-left p-2">Data</th>
+                    <th className="text-left p-2">Pago em</th>
                     <th className="text-left p-2">Médico</th>
                     <th className="text-left p-2">Paciente</th>
                     <th className="text-left p-2">Serviço</th>
@@ -2168,6 +2180,11 @@ function Page() {
                       <td className="p-2 whitespace-nowrap">
                         {new Date(it.data + "T00:00:00").toLocaleDateString("pt-BR")}
                       </td>
+                      <td className="p-2 whitespace-nowrap">
+                        {it.pagoEm
+                          ? `${new Date(it.pagoEm + "T00:00:00").toLocaleDateString("pt-BR")}${it.pagoHora ? ` às ${it.pagoHora}` : ""}`
+                          : "—"}
+                      </td>
                       <td className="p-2">{it.medico}</td>
                       <td className="p-2">{it.paciente}</td>
                       <td className="p-2">{it.servico}</td>
@@ -2177,7 +2194,7 @@ function Page() {
                 </tbody>
                 <tfoot>
                   <tr className="font-semibold">
-                    <td className="p-2" colSpan={4}>
+                    <td className="p-2" colSpan={5}>
                       Total
                     </td>
                     <td className="p-2 text-right">{fmt(comprovante.total)}</td>
