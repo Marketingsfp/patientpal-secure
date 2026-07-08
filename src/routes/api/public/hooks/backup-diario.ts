@@ -156,32 +156,18 @@ function json(body: unknown, status: number) {
   });
 }
 
-async function listarTabelasPublic(
-  admin: Awaited<ReturnType<typeof getAdmin>>,
-): Promise<string[]> {
-  // usa a Data API para information_schema não é possível diretamente;
-  // usamos uma função helper cadastrada via SQL — mas para evitar migração
-  // extra, listamos aqui uma whitelist gerada a partir do schema atual.
-  // Fonte de verdade: se aparecer tabela nova, adicione aqui.
+async function listarTabelasPublic(): Promise<string[]> {
+  // Whitelist estática do schema public. Adicione novas tabelas em
+  // TABELAS_COM_CLINICA_ARR quando criar.
   return TABELAS_PUBLIC;
 }
 
-async function tabelaTemColuna(
-  admin: Awaited<ReturnType<typeof getAdmin>>,
-  tabela: string,
-  coluna: string,
-): Promise<boolean> {
-  // heurística estática — evita 1 round-trip por tabela.
+async function tabelaTemColuna(tabela: string, coluna: string): Promise<boolean> {
   return TABELAS_COM_CLINICA.has(tabela) && coluna === "clinica_id";
 }
 
-type Admin = Awaited<ReturnType<typeof getAdmin>>;
-async function getAdmin() {
-  const { supabaseAdmin } = await import(
-    "@/integrations/supabase/client.server"
-  );
-  return supabaseAdmin;
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Admin = any;
 
 async function dumpTabela(
   admin: Admin,

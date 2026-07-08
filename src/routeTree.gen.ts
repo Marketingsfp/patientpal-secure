@@ -101,6 +101,7 @@ import { Route as AuthenticatedAppEquipeIndexRouteImport } from './routes/_authe
 import { Route as AuthenticatedAppClientesIndexRouteImport } from './routes/_authenticated/app.clientes.index'
 import { Route as AuthenticatedAppAtendimentoIaIndexRouteImport } from './routes/_authenticated/app.atendimento-ia.index'
 import { Route as ApiPublicWhatsappClinicaIdRouteImport } from './routes/api/public/whatsapp.$clinicaId'
+import { Route as ApiPublicHooksBackupDiarioRouteImport } from './routes/api/public/hooks/backup-diario'
 import { Route as ApiPublicFocusnfeWebhookRouteImport } from './routes/api/public/focusnfe.webhook'
 import { Route as AuthenticatedAppNfseTestarRouteImport } from './routes/_authenticated/app.nfse.testar'
 import { Route as AuthenticatedAppMedicoMedicoIdRouteImport } from './routes/_authenticated/app.medico.$medicoId'
@@ -645,6 +646,12 @@ const ApiPublicWhatsappClinicaIdRoute =
     path: '/api/public/whatsapp/$clinicaId',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksBackupDiarioRoute =
+  ApiPublicHooksBackupDiarioRouteImport.update({
+    id: '/api/public/hooks/backup-diario',
+    path: '/api/public/hooks/backup-diario',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicFocusnfeWebhookRoute =
   ApiPublicFocusnfeWebhookRouteImport.update({
     id: '/api/public/focusnfe/webhook',
@@ -952,6 +959,7 @@ export interface FileRoutesByFullPath {
   '/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
   '/app/nfse/testar': typeof AuthenticatedAppNfseTestarRoute
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
+  '/api/public/hooks/backup-diario': typeof ApiPublicHooksBackupDiarioRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/app/atendimento-ia/': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/app/clientes/': typeof AuthenticatedAppClientesIndexRoute
@@ -1073,6 +1081,7 @@ export interface FileRoutesByTo {
   '/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
   '/app/nfse/testar': typeof AuthenticatedAppNfseTestarRoute
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
+  '/api/public/hooks/backup-diario': typeof ApiPublicHooksBackupDiarioRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/app/clientes': typeof AuthenticatedAppClientesIndexRoute
@@ -1200,6 +1209,7 @@ export interface FileRoutesById {
   '/_authenticated/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
   '/_authenticated/app/nfse/testar': typeof AuthenticatedAppNfseTestarRoute
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
+  '/api/public/hooks/backup-diario': typeof ApiPublicHooksBackupDiarioRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/_authenticated/app/atendimento-ia/': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/_authenticated/app/clientes/': typeof AuthenticatedAppClientesIndexRoute
@@ -1327,6 +1337,7 @@ export interface FileRouteTypes {
     | '/app/medico/$medicoId'
     | '/app/nfse/testar'
     | '/api/public/focusnfe/webhook'
+    | '/api/public/hooks/backup-diario'
     | '/api/public/whatsapp/$clinicaId'
     | '/app/atendimento-ia/'
     | '/app/clientes/'
@@ -1448,6 +1459,7 @@ export interface FileRouteTypes {
     | '/app/medico/$medicoId'
     | '/app/nfse/testar'
     | '/api/public/focusnfe/webhook'
+    | '/api/public/hooks/backup-diario'
     | '/api/public/whatsapp/$clinicaId'
     | '/app/atendimento-ia'
     | '/app/clientes'
@@ -1574,6 +1586,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/medico/$medicoId'
     | '/_authenticated/app/nfse/testar'
     | '/api/public/focusnfe/webhook'
+    | '/api/public/hooks/backup-diario'
     | '/api/public/whatsapp/$clinicaId'
     | '/_authenticated/app/atendimento-ia/'
     | '/_authenticated/app/clientes/'
@@ -1607,6 +1620,7 @@ export interface RootRouteChildren {
   PacienteIndexRoute: typeof PacienteIndexRoute
   PContratoTokenRoute: typeof PContratoTokenRoute
   ApiPublicFocusnfeWebhookRoute: typeof ApiPublicFocusnfeWebhookRoute
+  ApiPublicHooksBackupDiarioRoute: typeof ApiPublicHooksBackupDiarioRoute
   ApiPublicWhatsappClinicaIdRoute: typeof ApiPublicWhatsappClinicaIdRoute
 }
 
@@ -2256,6 +2270,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicWhatsappClinicaIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/backup-diario': {
+      id: '/api/public/hooks/backup-diario'
+      path: '/api/public/hooks/backup-diario'
+      fullPath: '/api/public/hooks/backup-diario'
+      preLoaderRoute: typeof ApiPublicHooksBackupDiarioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/focusnfe/webhook': {
       id: '/api/public/focusnfe/webhook'
       path: '/api/public/focusnfe/webhook'
@@ -2826,6 +2847,7 @@ const rootRouteChildren: RootRouteChildren = {
   PacienteIndexRoute: PacienteIndexRoute,
   PContratoTokenRoute: PContratoTokenRoute,
   ApiPublicFocusnfeWebhookRoute: ApiPublicFocusnfeWebhookRoute,
+  ApiPublicHooksBackupDiarioRoute: ApiPublicHooksBackupDiarioRoute,
   ApiPublicWhatsappClinicaIdRoute: ApiPublicWhatsappClinicaIdRoute,
 }
 export const routeTree = rootRouteImport
