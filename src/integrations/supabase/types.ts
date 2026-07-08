@@ -1422,6 +1422,59 @@ export type Database = {
         }
         Relationships: []
       }
+      backup_execucoes: {
+        Row: {
+          arquivos: number | null
+          bytes: number | null
+          clinica_id: string | null
+          created_at: string
+          data_ref: string
+          erro: string | null
+          finalizado_em: string | null
+          id: string
+          iniciado_em: string
+          status: string
+          tabelas: number | null
+          updated_at: string
+        }
+        Insert: {
+          arquivos?: number | null
+          bytes?: number | null
+          clinica_id?: string | null
+          created_at?: string
+          data_ref: string
+          erro?: string | null
+          finalizado_em?: string | null
+          id?: string
+          iniciado_em?: string
+          status?: string
+          tabelas?: number | null
+          updated_at?: string
+        }
+        Update: {
+          arquivos?: number | null
+          bytes?: number | null
+          clinica_id?: string | null
+          created_at?: string
+          data_ref?: string
+          erro?: string | null
+          finalizado_em?: string | null
+          id?: string
+          iniciado_em?: string
+          status?: string
+          tabelas?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "backup_execucoes_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       boletos: {
         Row: {
           banco: string | null
