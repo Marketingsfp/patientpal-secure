@@ -268,7 +268,16 @@ function AtendimentoIaPage() {
         </div>
 
         <div className="space-y-2">
-          <Label className="flex items-center gap-1.5"><Users className="h-4 w-4" /> Fila de atendimento ({filaOrdenada.length})</Label>
+          <Label className="flex items-center gap-1.5">
+            <Users className="h-4 w-4" /> Fila de atendimento
+            {(() => {
+              const total = filaOrdenada.length;
+              const pendentes = filaOrdenada.filter((f) => f.fluxo_etapa !== "finalizado").length;
+              if (total === 0) return " (0)";
+              if (pendentes === total) return ` (${total})`;
+              return ` (${pendentes} pendente${pendentes === 1 ? "" : "s"} de ${total})`;
+            })()}
+          </Label>
           {filaOrdenada.length === 0 ? (
             <div className="text-xs text-muted-foreground border border-dashed rounded-md p-4 text-center">
               Nenhum paciente na fila para hoje.
