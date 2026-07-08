@@ -20,6 +20,7 @@ import {
   CreditCard,
   QrCode,
   HelpCircle,
+  Printer,
 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -173,6 +174,61 @@ function Page() {
   const [optsReady, setOptsReady] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
   const [payForm, setPayForm] = useState({ data: hoje, conta_id: "", forma_pagamento: "" });
+  // Comprovante de pagamento de repasse (para impressão)
+  type CompItem = { data: string; medico: string; paciente: string; servico: string; valorMedico: number };
+  type Comprovante = {
+    clinicaNome: string;
+    medicoNome: string;
+    dataPagamento: string;
+    formaPagamento: string;
+    contaNome: string;
+    itens: CompItem[];
+    total: number;
+    qtd: number;
+    emitidoEm: string;
+  } | null;
+  const [comprovante, setComprovante] = useState<Comprovante>(null);
+  const [comprovanteOpen, setComprovanteOpen] = useState(false);
+  const buildComprovante = (
+    itens: Atend[],
+    meta: { data: string; forma_pagamento: string; conta_id: string },
+  ): Comprovante => {
+    if (!itens.length) return null;
+    const medicoIds = new Set(itens.map((i) => i.medico_id ?? ""));
+    const medicoNome =
+      medicoIds.size === 1
+        ? (medMap.get([...medicoIds][0]) ?? "—")
+        : `${medicoIds.size} médicos`;
+    const contaNome = contas.find((c) => c.id === meta.conta_id)?.nome ?? "—";
+    const rows: CompItem[] = itens.map((a) => ({
+      data: a.data,
+      medico: a.medico_id ? (medMap.get(a.medico_id) ?? "—") : "—",
+      paciente: a.paciente_id ? (pacMap.get(a.paciente_id) ?? "—") : (a.paciente_nome_extra ?? "—"),
+      servico: a.procedimento ?? "—",
+      valorMedico: Number(a.valor_medico) || 0,
+    }));
+    const total = rows.reduce((s, r) => s + r.valorMedico, 0);
+    return {
+      clinicaNome: clinicaAtual?.clinica?.nome ?? "—",
+      medicoNome,
+      dataPagamento: meta.data,
+      formaPagamento: meta.forma_pagamento || "—",
+      contaNome,
+      itens: rows,
+      total,
+      qtd: rows.length,
+      emitidoEm: new Date().toLocaleString("pt-BR"),
+    };
+  };
+  const abrirComprovanteDoItem = (a: Atend) => {
+    const c = buildComprovante([a], {
+      data: a.repasse_pago_em ?? a.data,
+      forma_pagamento: a.repasse_forma_pagamento ?? "",
+      conta_id: "",
+    });
+    setComprovante(c);
+    setComprovanteOpen(true);
+  };
   const [payingNow, setPayingNow] = useState(false);
 
   // Diálogo de laudo
@@ -1148,7 +1204,12 @@ function Page() {
         }
       }
       toast.success("Repasses pagos com sucesso");
+      const c = buildComprovante(selectedItems, payForm);
       setPayOpen(false);
+      if (c) {
+        setComprovante(c);
+        setComprovanteOpen(true);
+      }
       await load();
     } catch (e) {
       const err = e as { message?: string };
@@ -1685,6 +1746,17 @@ function Page() {
                                   <Undo2 className="h-3.5 w-3.5 text-amber-600" />
                                 </Button>
                               )}
+                              {a.repasse_pago && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  title="Imprimir comprovante de repasse"
+                                  onClick={() => abrirComprovanteDoItem(a)}
+                                >
+                                  <Printer className="h-3.5 w-3.5 text-primary" />
+                                </Button>
+                              )}
                               {/* Botão de excluir para agenda */}
                               <Button
                                 variant="ghost"
@@ -1711,6 +1783,17 @@ function Page() {
                               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(a)}>
                                 <Pencil className="h-3.5 w-3.5" />
                               </Button>
+                              {a.repasse_pago && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  title="Imprimir comprovante de repasse"
+                                  onClick={() => abrirComprovanteDoItem(a)}
+                                >
+                                  <Printer className="h-3.5 w-3.5 text-primary" />
+                                </Button>
+                              )}
                               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => remove(a)}>
                                 <Trash2 className="h-3.5 w-3.5 text-destructive" />
                               </Button>
@@ -1790,6 +1873,116 @@ function Page() {
               {payingNow ? "Registrando..." : "Confirmar pagamento"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo: comprovante de repasse (imprimível) */}
+      <Dialog open={comprovanteOpen} onOpenChange={setComprovanteOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader className="no-print">
+            <DialogTitle>Comprovante de pagamento de repasse</DialogTitle>
+          </DialogHeader>
+          {comprovante && (
+            <div className="print-area bg-white text-black text-sm">
+              <div className="flex items-start justify-between border-b pb-3 mb-3">
+                <div>
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground">Clínica</div>
+                  <div className="text-lg font-semibold">{comprovante.clinicaNome}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-base font-semibold">Comprovante de repasse médico</div>
+                  <div className="text-xs text-muted-foreground">Emitido em {comprovante.emitidoEm}</div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 border rounded-md p-3 mb-3">
+                <div>
+                  <span className="text-xs text-muted-foreground">Médico: </span>
+                  <b>{comprovante.medicoNome}</b>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground">Data do pagamento: </span>
+                  <b>{new Date(comprovante.dataPagamento + "T00:00:00").toLocaleDateString("pt-BR")}</b>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground">Forma: </span>
+                  <b>{comprovante.formaPagamento}</b>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground">Conta: </span>
+                  <b>{comprovante.contaNome}</b>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground">Atendimentos: </span>
+                  <b>{comprovante.qtd}</b>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs text-muted-foreground">Total pago ao médico: </span>
+                  <b className="text-base text-primary">{fmt(comprovante.total)}</b>
+                </div>
+              </div>
+
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="border-b bg-muted/40">
+                    <th className="text-left p-2">Data</th>
+                    <th className="text-left p-2">Médico</th>
+                    <th className="text-left p-2">Paciente</th>
+                    <th className="text-left p-2">Serviço</th>
+                    <th className="text-right p-2">Valor pago (R$)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {comprovante.itens.map((it, idx) => (
+                    <tr key={idx} className="border-b">
+                      <td className="p-2 whitespace-nowrap">
+                        {new Date(it.data + "T00:00:00").toLocaleDateString("pt-BR")}
+                      </td>
+                      <td className="p-2">{it.medico}</td>
+                      <td className="p-2">{it.paciente}</td>
+                      <td className="p-2">{it.servico}</td>
+                      <td className="p-2 text-right whitespace-nowrap">{fmt(it.valorMedico)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="font-semibold">
+                    <td className="p-2" colSpan={4}>
+                      Total
+                    </td>
+                    <td className="p-2 text-right">{fmt(comprovante.total)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+
+              <div className="grid grid-cols-2 gap-8 mt-10 pt-4 text-xs">
+                <div className="text-center">
+                  <div className="border-t pt-1">Assinatura do médico</div>
+                </div>
+                <div className="text-center">
+                  <div className="border-t pt-1">Assinatura da clínica</div>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="no-print">
+            <Button variant="outline" onClick={() => setComprovanteOpen(false)}>
+              Fechar
+            </Button>
+            <Button onClick={() => window.print()}>
+              <Printer className="h-4 w-4 mr-2" />
+              Imprimir
+            </Button>
+          </DialogFooter>
+          <style>{`
+            @media print {
+              body * { visibility: hidden !important; }
+              .print-area, .print-area * { visibility: visible !important; }
+              .print-area { position: fixed; inset: 0; margin: 0; padding: 16mm; background: white !important; color: black !important; overflow: visible; z-index: 9999; }
+              .no-print { display: none !important; }
+              [role="dialog"] { box-shadow: none !important; border: none !important; }
+            }
+          `}</style>
         </DialogContent>
       </Dialog>
 
