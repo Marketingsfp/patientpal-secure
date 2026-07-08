@@ -31,6 +31,7 @@ import {
 import { SolicitarEstornoDialog } from "@/components/financeiro/SolicitarEstornoDialog";
 import { useCaixaV2Flag } from "@/hooks/use-caixa-v2-flag";
 import { CaixaV2Mount } from "@/components/caixa-v2/caixa-v2-mount";
+import { printComprovanteCaixa } from "@/lib/print-caixa-comprovante";
 
 export const Route = createFileRoute("/_authenticated/app/caixa")({
   component: CaixaRouteDispatcher,
