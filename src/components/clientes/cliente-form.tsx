@@ -122,9 +122,11 @@ interface ClienteFormProps {
   onCancel: () => void;
   /** Footer apresentado em modo "sticky" (uso no Dialog). Default: false. */
   stickyFooter?: boolean;
+  /** Somente leitura — desabilita todos os campos e oculta o rodapé. */
+  readOnly?: boolean;
 }
 
-export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFooter }: ClienteFormProps) {
+export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFooter, readOnly = false }: ClienteFormProps) {
   const editing = paciente;
   const [form, setForm] = useState<FormState>(EMPTY);
   const [tab, setTab] = useState("dados");
