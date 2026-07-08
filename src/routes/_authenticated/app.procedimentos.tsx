@@ -710,8 +710,9 @@ function ProcedimentosPage() {
     e.preventDefault();
     if (!clinicaAtual) return;
     if (!form.nome.trim()) { toast.error("Informe o nome."); return; }
-    const vDinheiro = Number(form.valor_dinheiro) || 0;
-    const vCartao = Number(form.valor_pix_cartao) || 0;
+    const isVariavel = !!form.valor_variavel;
+    const vDinheiro = isVariavel ? 0 : (Number(form.valor_dinheiro) || 0);
+    const vCartao = isVariavel ? 0 : (Number(form.valor_pix_cartao) || 0);
     const payload = {
       clinica_id: clinicaAtual.clinica_id,
       nome: form.nome.trim(),
@@ -725,12 +726,13 @@ function ProcedimentosPage() {
       valor_cartao_credito: vCartao,
       valor_cartao_debito: vCartao,
       valor_cartao: vCartao, // legado
-      valor_cartao_consulta: Number(form.valor_cartao_consulta) || 0,
-      valor_cartao_desconto: Number(form.valor_cartao_desconto) || 0,
+      valor_cartao_consulta: isVariavel ? 0 : (Number(form.valor_cartao_consulta) || 0),
+      valor_cartao_desconto: isVariavel ? 0 : (Number(form.valor_cartao_desconto) || 0),
       duracao_minutos: Math.max(0, Number(form.duracao_minutos) || 0),
       observacoes: form.observacoes.trim() || null,
       preparo: form.preparo.trim() || null,
       ativo: form.ativo,
+      valor_variavel: isVariavel,
       // Regras do procedimento (configuração > código)
       fluxo_atendimento: form.fluxo_atendimento || null,
       agenda_obrigatoria: !!form.agenda_obrigatoria,
