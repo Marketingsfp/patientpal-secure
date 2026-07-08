@@ -798,6 +798,30 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
               </p>
             )}
           </div>
+          {(() => {
+            const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+            const cat = categorias.find((c) => c.id === categoriaId);
+            const ehCortesia = !!(cat && norm(cat.nome) === "cortesia");
+            if (!ehCortesia) return null;
+            return (
+              <div className="space-y-2 rounded-md border border-dashed border-amber-400 p-3 bg-amber-50/40">
+                <div className="flex items-center justify-between gap-2">
+                  <Label className="text-sm font-medium">
+                    Justificativa da cortesia * <span className="text-xs text-muted-foreground">(exige autorização do supervisor)</span>
+                  </Label>
+                  {supervisorInfo && (
+                    <span className="text-xs text-success">✓ Autorizado por {supervisorInfo.nome}</span>
+                  )}
+                </div>
+                <Textarea
+                  rows={2}
+                  value={cortesiaJustificativa}
+                  onChange={(e) => setCortesiaJustificativa(e.target.value)}
+                  placeholder="Ex: paciente encaminhado pela diretoria, retorno gratuito, campanha social..."
+                />
+              </div>
+            );
+          })()}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Conta</Label>
