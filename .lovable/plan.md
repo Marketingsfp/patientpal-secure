@@ -1,45 +1,47 @@
-## Diagnóstico
+## Objetivo
 
-Cada atendimento aparece duas vezes na tela **Repasse** do médico (uma linha "Pago" e outra "A receber" com os mesmos dados). Consultando o banco:
+Permitir marcar um pagamento como **Cortesia** no diálogo de Novo Lançamento (agenda → pagamento), com justificativa obrigatória e autorização de supervisor.
 
-- 2 registros em `fin_lancamentos` (agenda → caixa), `repasse_pago = true`.
-- 2 registros em `fin_atendimentos` **com `lancamento_id` preenchido apontando exatamente para os `fin_lancamentos` acima**, `repasse_pago = false`.
+## Comportamento
 
-Ou seja, cada pagamento está duplicado: o registro correto vive em `fin_lancamentos` (gerado pelo caixa) e há um espelho redundante em `fin_atendimentos` (mesmo fluxo do bug anterior de outro usuário).
+- Nova opção **"Cortesia"** disponível no seletor **Categoria** do `LancamentoDialog` (arquivo `src/components/financeiro/lancamento-dialog.tsx`).
+- Ao selecionar Cortesia:
+  - Aparece um campo obrigatório **"Justificativa da cortesia"** (Textarea).
+  - O valor **permanece editável** (não é zerado automaticamente).
+  - Ao salvar, exige autorização de supervisor (mesmo fluxo já existente do desconto: `SupervisorAuthDialog` para admin/gestor/financeiro). Quem já é supervisor não precisa reautenticar.
+  - A justificativa e o autorizador são anexados ao campo `observacoes` do lançamento no formato:  
+    `Cortesia — Autorizado por: <nome> — Justificativa: <texto>`
+  - O lançamento é gravado normalmente em `fin_lancamentos` com `categoria_id` = Cortesia.
 
-O filtro cliente atual (`app.financeiro.atendimentos.tsx`) já tenta descartar duplicados quando `fin_atendimentos.lancamento_id` está entre os `fin_lancamentos.id` carregados, mas está falhando em ao menos um caminho (ex.: quando o médico logado só enxerga `fin_atendimentos` da própria clínica e não os `fin_lancamentos` no mesmo intervalo, ou quando aparecem em páginas diferentes). O sintoma é a linha "A receber" reaparecendo ao lado do "Pago".
+## Categoria "Cortesia" no banco
 
-## Correção
+Migration única que faz seed idempotente da categoria em `fin_categorias` para toda clínica que ainda não a possua, tipo `receita`, ativa. (Sem alterar estrutura de tabelas.)
 
-### 1. Migration (banco)
+```sql
+INSERT INTO public.fin_categorias (clinica_id, nome, tipo, ativo)
+SELECT c.id, 'CORTESIA', 'receita', true
+FROM public.clinicas c
+WHERE NOT EXISTS (
+  SELECT 1 FROM public.fin_categorias f
+  WHERE f.clinica_id = c.id
+    AND upper(f.nome) = 'CORTESIA'
+    AND f.tipo = 'receita'
+);
+```
 
-- **Limpar dados atuais:** deletar as linhas de `fin_atendimentos` que possuem `lancamento_id` apontando para um `fin_lancamentos` existente (essas são cópias redundantes; o repasse fica em `fin_lancamentos`, que já é o registro autoritativo).
+Como a categoria passa a existir no `fin_categorias`, ela aparece automaticamente no select existente — sem hardcode no front.
 
-  ```sql
-  DELETE FROM public.fin_atendimentos fa
-   WHERE fa.lancamento_id IS NOT NULL
-     AND EXISTS (SELECT 1 FROM public.fin_lancamentos l WHERE l.id = fa.lancamento_id);
-  ```
+## Alterações no `LancamentoDialog`
 
-- **Impedir novas duplicidades** com constraint parcial única:
+1. Detectar cortesia por nome: `ehCortesia = categorias.find(c => c.id === categoriaId)?.nome?.toUpperCase() === 'CORTESIA'`.
+2. Quando `ehCortesia`:
+   - Renderizar `<Textarea>` "Justificativa da cortesia *" (state novo: `cortesiaJustificativa`).
+   - No submit, validar `cortesiaJustificativa.trim().length > 0` — senão, `toast.error`.
+   - Se `!ehSupervisor` e `!supervisorInfo`, abrir `SupervisorAuthDialog`; após confirmação, prosseguir.
+   - Compor sufixo em `observacoes` com "Cortesia — Autorizado por: … — Justificativa: …" (concatenado às observações que o usuário já tenha digitado, sem sobrescrever).
+3. Resetar `cortesiaJustificativa` no `useEffect` de abertura, junto dos demais resets.
 
-  ```sql
-  CREATE UNIQUE INDEX IF NOT EXISTS uq_fin_atend_lancamento_id
-    ON public.fin_atendimentos(lancamento_id)
-    WHERE lancamento_id IS NOT NULL;
-  ```
+## Fora de escopo
 
-- **Trigger de guarda** em `fin_atendimentos` (BEFORE INSERT): se já existe um `fin_lancamentos` cujo `agendamento_id` = agendamento do NEW ou cujo `id` = `NEW.lancamento_id`, **cancelar silenciosamente** o INSERT (retornar `NULL`). Cobre o caso em que o cliente tenta inserir sem preencher `lancamento_id`.
-
-### 2. Client (`src/routes/_authenticated/app.financeiro.atendimentos.tsx`)
-
-Reforçar o dedup no `load()`:
-
-- Trazer também `agendamento_id` no `select` de `fin_atendimentos` (via join com o próprio `fin_lancamentos` referenciado — ou selecionar `fin_atendimentos.lancamento_id` + resolvendo o `agendamento_id` pelo mapa de `ar.data`).
-- Após montar `lancIds`, também construir `lancAgendIds` (Set de `agendamento_id` dos `fin_lancamentos` carregados) e filtrar `manuaisRaw` descartando **qualquer** linha manual cujo `lancamento_id ∈ lancIds` **ou** cujo `agendamento_id` (do lancamento vinculado) ∈ `lancAgendIds`.
-
-### 3. Fora de escopo
-
-- Não mexer no `atendimento-ia` (a guarda `!lancExist` já existe; o unique + trigger blindam qualquer outro caminho que apareça).
-- Nenhuma mudança na criação/edição manual pela tela Financeiro (esses seguem sem `lancamento_id`).
-- Nada em telas de BI / relatórios.
+- Não altera comprovante, não muda cálculo de repasse médico, não cria nova tabela nem novos campos em `fin_lancamentos`.
+- Não altera o fluxo do "Aplicar desconto" existente.
