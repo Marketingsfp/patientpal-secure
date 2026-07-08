@@ -148,7 +148,6 @@ export function printComprovanteCaixa(input: ComprovanteCaixaInput) {
       <div class="rodape">Documento gerado em ${esc(dtStr)} — ClinicaOS</div>
     </div>
   `).join("")}
-  <script>window.addEventListener('load', () => setTimeout(() => window.print(), 250));</script>
 </body></html>`;
 
   // Usa iframe oculto para evitar bloqueio de pop-up (o handler é async e
