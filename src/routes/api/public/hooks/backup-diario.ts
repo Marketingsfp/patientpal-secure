@@ -49,7 +49,7 @@ export const Route = createFileRoute("/api/public/hooks/backup-diario")({
         }
 
         // 2. Lista tabelas do schema public via RPC embutida em SQL
-        const tabelas = await listarTabelasPublic(supabaseAdmin);
+        const tabelas = await listarTabelasPublic();
 
         // 3. Retenção: apaga backups antigos (>30 dias)
         await limparAntigos(supabaseAdmin, bucket, 30);
@@ -93,11 +93,7 @@ export const Route = createFileRoute("/api/public/hooks/backup-diario")({
           for (const tabela of tabelas) {
             if (processadas >= MAX_TABELAS_POR_RUN) break;
 
-            const hasClinica = await tabelaTemColuna(
-              supabaseAdmin,
-              tabela,
-              "clinica_id",
-            );
+            const hasClinica = await tabelaTemColuna(tabela, "clinica_id");
             if (!hasClinica) {
               // Tabelas sem clinica_id só são exportadas na "clínica raiz"
               // (a primeira). Para simplificar, pulamos aqui — dados globais
