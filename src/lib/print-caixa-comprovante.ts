@@ -151,9 +151,47 @@ export function printComprovanteCaixa(input: ComprovanteCaixaInput) {
   <script>window.addEventListener('load', () => setTimeout(() => window.print(), 250));</script>
 </body></html>`;
 
-  const w = window.open("", "_blank", "width=900,height=1000");
-  if (!w) return;
-  w.document.open();
-  w.document.write(html);
-  w.document.close();
+  // Usa iframe oculto para evitar bloqueio de pop-up (o handler é async e
+  // window.open após await perde o "user gesture" em muitos navegadores).
+  const iframe = document.createElement("iframe");
+  iframe.setAttribute("aria-hidden", "true");
+  iframe.style.position = "fixed";
+  iframe.style.right = "0";
+  iframe.style.bottom = "0";
+  iframe.style.width = "0";
+  iframe.style.height = "0";
+  iframe.style.border = "0";
+  iframe.style.visibility = "hidden";
+  document.body.appendChild(iframe);
+
+  const cleanup = () => {
+    setTimeout(() => {
+      try { document.body.removeChild(iframe); } catch { /* noop */ }
+    }, 1000);
+  };
+
+  const doc = iframe.contentDocument;
+  const win = iframe.contentWindow;
+  if (!doc || !win) { cleanup(); return; }
+  doc.open();
+  doc.write(html);
+  doc.close();
+
+  const triggerPrint = () => {
+    try {
+      win.focus();
+      win.print();
+    } catch { /* noop */ }
+    // Após diálogo de impressão fechar, removemos o iframe.
+    const onAfter = () => { cleanup(); win.removeEventListener("afterprint", onAfter); };
+    win.addEventListener("afterprint", onAfter);
+    // fallback: garante limpeza mesmo sem afterprint
+    setTimeout(cleanup, 60000);
+  };
+
+  if (doc.readyState === "complete") {
+    setTimeout(triggerPrint, 100);
+  } else {
+    iframe.addEventListener("load", () => setTimeout(triggerPrint, 100), { once: true });
+  }
 }
