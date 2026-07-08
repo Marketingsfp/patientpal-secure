@@ -149,6 +149,7 @@ function Page() {
   const [items, setItems] = useState<Atend[]>([]);
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [pacientes, setPacientes] = useState<Pac[]>([]);
+  const [pacNameExtra, setPacNameExtra] = useState<Record<string, string>>({});
   const [convenios, setConvenios] = useState<Convenio[]>([]);
   const [procValores, setProcValores] = useState<Map<string, number>>(new Map());
   const [procTipos, setProcTipos] = useState<Map<string, string>>(new Map());
@@ -753,6 +754,29 @@ function Page() {
     else if (fStatus === "pago") unif = unif.filter((x) => x.repasse_pago);
     setItems(unif);
     setSel(new Set());
+    // Resolve nomes de pacientes referenciados que estão fora do combobox
+    // (o combobox só carrega 500 por ordem alfabética). Sem isso, atendimentos
+    // com paciente cadastrado aparecem como "—".
+    const knownIds = new Set(pacientes.map((p) => p.id));
+    const missing = new Set<string>();
+    for (const it of unif) {
+      if (it.paciente_id && !knownIds.has(it.paciente_id) && !pacNameExtra[it.paciente_id]) {
+        missing.add(it.paciente_id);
+      }
+    }
+    if (missing.size) {
+      const { data: extra } = await supabase
+        .from("pacientes")
+        .select("id, nome")
+        .in("id", [...missing]);
+      if (extra?.length) {
+        setPacNameExtra((prev) => {
+          const next = { ...prev };
+          for (const p of extra) next[p.id] = p.nome;
+          return next;
+        });
+      }
+    }
     setLoading(false);
   };
   const loadOpts = async () => {
@@ -1024,7 +1048,11 @@ function Page() {
   };
 
   const medMap = useMemo(() => new Map(medicos.map((m) => [m.id, m.nome])), [medicos]);
-  const pacMap = useMemo(() => new Map(pacientes.map((p) => [p.id, p.nome])), [pacientes]);
+  const pacMap = useMemo(() => {
+    const m = new Map<string, string>(pacientes.map((p) => [p.id, p.nome]));
+    for (const [id, nome] of Object.entries(pacNameExtra)) if (!m.has(id)) m.set(id, nome);
+    return m;
+  }, [pacientes, pacNameExtra]);
   const filteredItems = useMemo(() => {
     const q = norm(fPaciente.trim());
     const base = !q
