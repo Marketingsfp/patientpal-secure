@@ -1250,23 +1250,39 @@ function ProcedimentosPage() {
             </div>
 
             <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
-              <p className="text-xs font-medium text-muted-foreground uppercase">Valores por forma de pagamento</p>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground uppercase">Valores por forma de pagamento</p>
+                  {form.valor_variavel && (
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      Valor variável ativo — o valor será informado na hora da cobrança.
+                    </p>
+                  )}
+                </div>
+                <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">
+                  <Switch
+                    checked={!!form.valor_variavel}
+                    onCheckedChange={(v) => setForm({ ...form, valor_variavel: !!v })}
+                  />
+                  <span className="font-medium">Valor variável</span>
+                </label>
+              </div>
+              <div className={`grid grid-cols-2 gap-3 ${form.valor_variavel ? "opacity-50 pointer-events-none" : ""}`}>
                 <div className="space-y-1">
                   <Label>Dinheiro (R$)</Label>
-                  <CurrencyInput value={form.valor_dinheiro}
+                  <CurrencyInput value={form.valor_variavel ? "0" : form.valor_dinheiro} disabled={form.valor_variavel}
                     onChange={(v) => setForm({ ...form, valor_dinheiro: v })} />
                 </div>
                 <div className="space-y-1">
                   <Label>Pix / Débito / Crédito (R$)</Label>
-                  <CurrencyInput value={form.valor_pix_cartao}
+                  <CurrencyInput value={form.valor_variavel ? "0" : form.valor_pix_cartao} disabled={form.valor_variavel}
                     onChange={(v) => setForm({ ...form, valor_pix_cartao: v })} />
                   <p className="text-[10px] text-muted-foreground">Mesmo valor para Pix, Cartão de Débito e Crédito.</p>
                 </div>
               </div>
             </div>
 
-            {convenios.length > 0 && (
+            {convenios.length > 0 && !form.valor_variavel && (
               <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
                 <p className="text-xs font-medium text-muted-foreground uppercase">Valores por convênio (Cartão Benefícios)</p>
                 <div className="space-y-3">
