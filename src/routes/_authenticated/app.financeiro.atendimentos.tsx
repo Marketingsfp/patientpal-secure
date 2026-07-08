@@ -190,8 +190,10 @@ function Page() {
     qtd: number;
     emitidoEm: string;
     reimpressao: boolean;
+    multiplasDatas?: number;
   } | null;
   const [comprovante, setComprovante] = useState<Comprovante>(null);
+  const [comprovantes, setComprovantes] = useState<NonNullable<Comprovante>[]>([]);
   const [comprovanteOpen, setComprovanteOpen] = useState(false);
   const buildComprovante = (
     itens: Atend[],
@@ -250,7 +252,44 @@ function Page() {
       reimpressao: true,
     });
     setComprovante(c);
+    setComprovantes(c ? [c] : []);
     setComprovanteOpen(true);
+  };
+  // Constrói um comprovante em 2ª via para cada médico presente em `itens`.
+  const abrirSegundaViaLote = (itens: Atend[]) => {
+    if (!itens.length) return;
+    const byMed = new Map<string, Atend[]>();
+    for (const a of itens) {
+      const k = a.medico_id ?? "sem";
+      if (!byMed.has(k)) byMed.set(k, []);
+      byMed.get(k)!.push(a);
+    }
+    const blocos: NonNullable<Comprovante>[] = [];
+    for (const [, list] of byMed) {
+      // Metadados agregados
+      const datas = new Set(list.map((x) => x.repasse_pago_em ?? "").filter(Boolean));
+      const formas = new Set(list.map((x) => x.repasse_forma_pagamento ?? "").filter(Boolean));
+      const primeiro = list[0];
+      const dataPag =
+        primeiro.repasse_pago_em ??
+        (primeiro.repasse_pago_at ? primeiro.repasse_pago_at.slice(0, 10) : primeiro.data);
+      const c = buildComprovante(list, {
+        data: dataPag,
+        forma_pagamento: formas.size === 1 ? [...formas][0] : formas.size > 1 ? "Vários" : "",
+        conta_id: "",
+        pago_at: primeiro.repasse_pago_at ?? null,
+        reimpressao: true,
+      });
+      if (c) {
+        c.multiplasDatas = datas.size > 1 ? datas.size : 0;
+        blocos.push(c);
+      }
+    }
+    if (blocos.length) {
+      setComprovante(blocos[0]);
+      setComprovantes(blocos);
+      setComprovanteOpen(true);
+    }
   };
   const [payingNow, setPayingNow] = useState(false);
 
@@ -1147,7 +1186,10 @@ function Page() {
 
   const isAtendido = (a: Atend) =>
     a.origem === "manual" ? a.status === "realizado" : a.agendamento_status === "realizado";
-  const selectables = filteredItems.filter((a) => !a.repasse_pago && (a.valor_medico ?? 0) > 0 && isAtendido(a));
+  // Itens selecionáveis: para pagar repasse (não pagos + atendidos) OU para 2ª via (já pagos).
+  const selectables = filteredItems.filter(
+    (a) => ((a.repasse_pago || (!a.repasse_pago && isAtendido(a))) && (a.valor_medico ?? 0) > 0),
+  );
   const allSelected = selectables.length > 0 && selectables.every((a) => sel.has(`${a.origem}:${a.id}`));
   const toggleAll = () => {
     if (allSelected) setSel(new Set());
@@ -1162,6 +1204,15 @@ function Page() {
   };
   const selectedItems = filteredItems.filter((a) => sel.has(`${a.origem}:${a.id}`));
   const selectedTotal = selectedItems.reduce((s, a) => s + (Number(a.valor_medico) || 0), 0);
+  const selectedPagos = selectedItems.filter((a) => a.repasse_pago);
+  const selectedNaoPagos = selectedItems.filter((a) => !a.repasse_pago);
+  const podePagar = selectedItems.length > 0 && selectedNaoPagos.length === selectedItems.length;
+  const podeReimprimir = selectedItems.length > 0 && selectedPagos.length === selectedItems.length;
+  const misturado = selectedItems.length > 0 && selectedPagos.length > 0 && selectedNaoPagos.length > 0;
+  const reimprimirSelecionados = () => {
+    if (!podeReimprimir) return;
+    abrirSegundaViaLote(selectedPagos);
+  };
 
   const openPay = () => {
     if (!selectedItems.length) {
@@ -1273,6 +1324,7 @@ function Page() {
       setPayOpen(false);
       if (c) {
         setComprovante(c);
+        setComprovantes([c]);
         setComprovanteOpen(true);
       }
       await load();
@@ -1401,9 +1453,24 @@ function Page() {
             Exportar Excel
           </Button>
           {!isMedicoOnly && (
-            <Button onClick={openPay} disabled={!selectedItems.length}>
+            <Button
+              onClick={openPay}
+              disabled={!podePagar}
+              title={misturado ? "Selecione apenas atendimentos NÃO pagos" : undefined}
+            >
               <Wallet className="h-4 w-4 mr-2" />
-              Pagar repasse{selectedItems.length ? ` (${selectedItems.length} • ${fmt(selectedTotal)})` : ""}
+              Pagar repasse{selectedNaoPagos.length ? ` (${selectedNaoPagos.length} • ${fmt(selectedNaoPagos.reduce((s, x) => s + (Number(x.valor_medico) || 0), 0))})` : ""}
+            </Button>
+          )}
+          {!isMedicoOnly && (
+            <Button
+              variant="outline"
+              onClick={reimprimirSelecionados}
+              disabled={!podeReimprimir}
+              title={misturado ? "Selecione apenas atendimentos JÁ pagos" : "Imprimir 2ª via dos atendimentos pagos selecionados"}
+            >
+              <Printer className="h-4 w-4 mr-2" />
+              Imprimir 2ª via{selectedPagos.length ? ` (${selectedPagos.length})` : ""}
             </Button>
           )}
           <Dialog open={open} onOpenChange={setOpen}>
@@ -1680,8 +1747,16 @@ function Page() {
                     <TableRow key={`${a.origem}:${a.id}`} className={cn("hover:bg-muted/30 transition-colors", rowBg)}>
                       {!isMedicoOnly && (
                         <TableCell className="px-2">
-                          {!a.repasse_pago && (a.valor_medico ?? 0) > 0 ? (
-                            isAtendido(a) ? (
+                          {(a.valor_medico ?? 0) > 0 ? (
+                            a.repasse_pago ? (
+                              <Checkbox
+                                checked={sel.has(`${a.origem}:${a.id}`)}
+                                onCheckedChange={() => toggleOne(a)}
+                                aria-label="Selecionar para 2ª via"
+                                title="Selecionar para reimprimir 2ª via"
+                                className="h-4 w-4"
+                              />
+                            ) : isAtendido(a) ? (
                               <Checkbox
                                 checked={sel.has(`${a.origem}:${a.id}`)}
                                 onCheckedChange={() => toggleOne(a)}
@@ -1875,6 +1950,53 @@ function Page() {
         </CardContent>
       </Card>
 
+      {/* Barra de ações do rodapé: repete botões quando houver seleção */}
+      {!isMedicoOnly && selectedItems.length > 0 && (
+        <div className="sticky bottom-2 z-10 flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background/95 backdrop-blur px-3 py-2 shadow-md">
+          <div className="text-sm">
+            <b>{selectedItems.length}</b> selecionado(s)
+            {selectedPagos.length > 0 && (
+              <span className="ml-2 text-emerald-700">• {selectedPagos.length} pago(s)</span>
+            )}
+            {selectedNaoPagos.length > 0 && (
+              <span className="ml-2 text-amber-700">• {selectedNaoPagos.length} a pagar</span>
+            )}
+            <span className="ml-2 text-muted-foreground">
+              — total {fmt(selectedTotal)}
+            </span>
+            {misturado && (
+              <span className="ml-2 text-xs text-rose-700">
+                Separe pagos e não pagos para agir.
+              </span>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              onClick={openPay}
+              disabled={!podePagar}
+              title={misturado ? "Selecione apenas atendimentos NÃO pagos" : undefined}
+            >
+              <Wallet className="h-4 w-4 mr-2" />
+              Pagar repasse{selectedNaoPagos.length ? ` (${selectedNaoPagos.length})` : ""}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={reimprimirSelecionados}
+              disabled={!podeReimprimir}
+              title={misturado ? "Selecione apenas atendimentos JÁ pagos" : undefined}
+            >
+              <Printer className="h-4 w-4 mr-2" />
+              Imprimir 2ª via{selectedPagos.length ? ` (${selectedPagos.length})` : ""}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setSel(new Set())}>
+              Limpar
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Diálogo pagar repasse */}
       <Dialog open={payOpen} onOpenChange={setPayOpen}>
         <DialogContent className="max-w-md">
@@ -1945,11 +2067,22 @@ function Page() {
       <Dialog open={comprovanteOpen} onOpenChange={setComprovanteOpen}>
         <DialogContent className="max-w-3xl">
           <DialogHeader className="no-print">
-            <DialogTitle>Comprovante de pagamento de repasse</DialogTitle>
+            <DialogTitle>
+              Comprovante de pagamento de repasse
+              {comprovantes.length > 1 ? ` — ${comprovantes.length} médicos` : ""}
+            </DialogTitle>
           </DialogHeader>
-          {comprovante && (
-            <div className="print-area bg-white text-black text-sm">
-              {comprovante.reimpressao && (
+          {comprovantes.length > 0 && (
+            <div className="print-area bg-white text-black text-sm max-h-[70vh] overflow-y-auto">
+              {comprovantes.map((comprovante, blocoIdx) => (
+                <div
+                  key={blocoIdx}
+                  className={cn(
+                    "comprovante-bloco",
+                    blocoIdx > 0 && "mt-8 pt-8 border-t-4 border-dashed border-slate-400",
+                  )}
+                >
+                  {comprovante.reimpressao && (
                 <div className="mb-3 border-2 border-rose-600 bg-rose-100 text-rose-900 rounded-md p-3 text-center">
                   <div className="text-xl font-extrabold tracking-wide uppercase">
                     Segunda via — Reimpressão de comprovante
@@ -1962,6 +2095,11 @@ function Page() {
                         ? ` às ${comprovante.horaPagamento}`
                         : " (horário não registrado)"}
                     </b>
+                    {comprovante.multiplasDatas && comprovante.multiplasDatas > 1 ? (
+                      <span className="ml-1">
+                        (contém pagamentos de {comprovante.multiplasDatas} datas)
+                      </span>
+                    ) : null}
                   </div>
                   <div className="text-xs mt-0.5 opacity-80">
                     Reimpressão emitida em {comprovante.emitidoEm}
@@ -2052,6 +2190,8 @@ function Page() {
                   <div className="border-t pt-1">Assinatura da clínica</div>
                 </div>
               </div>
+                </div>
+              ))}
             </div>
           )}
           <DialogFooter className="no-print">
@@ -2070,6 +2210,8 @@ function Page() {
               .print-area { position: fixed; inset: 0; margin: 0; padding: 16mm; background: white !important; color: black !important; overflow: visible; z-index: 9999; }
               .no-print { display: none !important; }
               [role="dialog"] { box-shadow: none !important; border: none !important; }
+              .comprovante-bloco { break-after: page; page-break-after: always; }
+              .comprovante-bloco:last-child { break-after: auto; page-break-after: auto; }
             }
           `}</style>
         </DialogContent>
