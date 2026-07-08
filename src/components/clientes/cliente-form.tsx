@@ -811,6 +811,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
             ou encaminhe para uma atendente. Você pode continuar o cadastro manual mesmo assim.
           </div>
         )}
+        <fieldset disabled={readOnly} className="contents">
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="grid grid-cols-7 w-full">
             <TabsTrigger value="dados">Dados</TabsTrigger>
@@ -1422,11 +1423,14 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
             )}
           </TabsContent>
         </Tabs>
+        </fieldset>
 
-        <div className={footerClass}>
-          <Button type="button" variant="outline" onClick={() => { stopVoice(); onCancel(); }}>Cancelar</Button>
-          <Button type="submit" disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
-        </div>
+        {!readOnly && (
+          <div className={footerClass}>
+            <Button type="button" variant="outline" onClick={() => { stopVoice(); onCancel(); }}>Cancelar</Button>
+            <Button type="submit" disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
+          </div>
+        )}
       </form>
 
       <Dialog open={camOpen} onOpenChange={(o) => { if (!o) fecharCamera(); }}>
