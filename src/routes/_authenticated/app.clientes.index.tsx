@@ -129,7 +129,6 @@ function ClientesPage() {
   });
   const [loading, setLoading] = useState(false);
   const [openNovo, setOpenNovo] = useState(false);
-  const [visualizar, setVisualizar] = useState<Paciente | null>(null);
   const loadSeq = useRef(0);
 
   const [fotoSigned, setFotoSigned] = useState<Record<string, string>>({});
