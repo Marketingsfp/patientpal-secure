@@ -66,6 +66,7 @@ interface Atend {
   agendamento_id?: string | null;
   repasse_pago?: boolean;
   repasse_pago_em?: string | null;
+  repasse_pago_at?: string | null;
   repasse_forma_pagamento?: string | null;
   paciente_nome_extra?: string | null;
   agendamento_inicio?: string | null;
