@@ -6807,6 +6807,7 @@ export type Database = {
           valor_dinheiro_pix: number
           valor_padrao: number
           valor_pix: number
+          valor_variavel: boolean
         }
         Insert: {
           agenda_obrigatoria?: boolean
@@ -6849,6 +6850,7 @@ export type Database = {
           valor_dinheiro_pix?: number
           valor_padrao?: number
           valor_pix?: number
+          valor_variavel?: boolean
         }
         Update: {
           agenda_obrigatoria?: boolean
@@ -6891,6 +6893,7 @@ export type Database = {
           valor_dinheiro_pix?: number
           valor_padrao?: number
           valor_pix?: number
+          valor_variavel?: boolean
         }
         Relationships: []
       }
