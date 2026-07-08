@@ -332,7 +332,10 @@ function AtendimentoEditorPage() {
         if (!valorTotal) valorTotal = Number(lancExist.valor ?? 0);
       }
 
-      if (valorTotal > 0) {
+      // Só cria fin_atendimentos quando NÃO houver fin_lancamentos vinculado
+      // ao agendamento — caso contrário duplicaria o registro no Financeiro
+      // (o repasse já vive em fin_lancamentos gerado no caixa).
+      if (valorTotal > 0 && !lancExist) {
         await supabase.from("fin_atendimentos").insert({
           clinica_id: cid,
           paciente_id: pacienteId,
