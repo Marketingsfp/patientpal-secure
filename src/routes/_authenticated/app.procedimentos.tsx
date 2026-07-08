@@ -1077,12 +1077,23 @@ function ProcedimentosPage() {
                       <span className={`text-[10px] px-1.5 py-0 rounded-full ${tipoCor(p.tipo)}`}>{tipoLabel(p.tipo)}</span>
                     </TableCell>
                     <TableCell className="font-medium">{p.nome}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_dinheiro ?? p.valor_dinheiro_pix))}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_pix ?? p.valor_cartao_credito ?? p.valor_cartao_debito ?? p.valor_cartao))}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {p.valor_variavel
+                        ? <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400">Variável</span>
+                        : fmtBRL(Number(p.valor_dinheiro ?? p.valor_dinheiro_pix))}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {p.valor_variavel
+                        ? <span className="text-muted-foreground">—</span>
+                        : fmtBRL(Number(p.valor_pix ?? p.valor_cartao_credito ?? p.valor_cartao_debito ?? p.valor_cartao))}
+                    </TableCell>
                     {convenios.map(c => {
                       const v = getConvValorExibicao(p, c);
                       return (
                         <TableCell key={c.id} className="text-right tabular-nums">
+                          {p.valor_variavel ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
                           <div className="leading-tight">
                             <div title={`Dinheiro: ${fmtBRL(v.valor_dinheiro)}`}>
                               <span className="text-muted-foreground mr-1">D</span>{fmtBRL(v.valor_dinheiro)}
@@ -1091,6 +1102,7 @@ function ProcedimentosPage() {
                               <span className="mr-1">C</span>{fmtBRL(v.valor_outros)}
                             </div>
                           </div>
+                          )}
                         </TableCell>
                       );
                     })}
