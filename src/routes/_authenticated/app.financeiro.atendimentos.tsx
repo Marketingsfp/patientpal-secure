@@ -676,7 +676,14 @@ function Page() {
       setLoading(false);
       return;
     }
-    const manuais: Atend[] = (mr.data ?? []).map((r) => {
+    // IDs de fin_lancamentos já carregados — usado para descartar linhas de
+    // fin_atendimentos que espelham o mesmo pagamento (duplicidade legada
+    // criada pelo fluxo de atendimento IA antes da correção).
+    const lancIds = new Set((ar.data ?? []).map((r: { id: string }) => r.id));
+    const manuaisRaw = (mr.data ?? []).filter(
+      (r: { lancamento_id?: string | null }) => !r.lancamento_id || !lancIds.has(r.lancamento_id),
+    );
+    const manuais: Atend[] = manuaisRaw.map((r) => {
       const pago = Number(r.valor_total);
       // Recalcula repasse usando convênio cadastrado por procedimento
       // (ex.: PREVENTIVO R$ 10,40). Mantém o valor armazenado apenas como
