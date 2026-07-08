@@ -1324,6 +1324,7 @@ function Page() {
       setPayOpen(false);
       if (c) {
         setComprovante(c);
+        setComprovantes([c]);
         setComprovanteOpen(true);
       }
       await load();
