@@ -1225,6 +1225,7 @@ function Page() {
       for (const [medId, list] of byMed) {
         const total = list.reduce((s, x) => s + (Number(x.valor_medico) || 0), 0);
         if (total <= 0) continue;
+        const nowIso = new Date().toISOString();
         const medNome = medId !== "sem" ? (medMap.get(medId) ?? "") : "—";
         const { data: lanc, error: eLanc } = await supabase
           .from("fin_lancamentos")
@@ -1247,6 +1248,7 @@ function Page() {
         const upd = {
           repasse_pago: true,
           repasse_pago_em: payForm.data,
+          repasse_pago_at: nowIso,
           repasse_forma_pagamento: payForm.forma_pagamento || null,
           repasse_conta_id: payForm.conta_id || null,
           repasse_lancamento_id: lancId,
@@ -1263,7 +1265,11 @@ function Page() {
         }
       }
       toast.success("Repasses pagos com sucesso");
-      const c = buildComprovante(selectedItems, payForm);
+      const c = buildComprovante(selectedItems, {
+        ...payForm,
+        pago_at: new Date().toISOString(),
+        reimpressao: false,
+      });
       setPayOpen(false);
       if (c) {
         setComprovante(c);
