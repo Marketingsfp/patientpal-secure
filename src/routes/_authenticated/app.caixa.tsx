@@ -642,9 +642,20 @@ function Page() {
     setSaving(false);
     if (error) { mostrarErro(error); return; }
     setOpenMov(null);
+    const tipoLancado = openMov.tipo;
+    const descLancada = (movDesc || "") + sufixoCartao;
     setMovValor(""); setMovDesc(""); setMovForma("dinheiro");
     setMovBandeira(""); setMovParcelas("1");
-    toast.success(`${TIPO_LABEL[openMov.tipo]} registrada`);
+    toast.success(`${TIPO_LABEL[tipoLancado]} registrada`);
+    if (tipoLancado === "sangria" || tipoLancado === "suprimento") {
+      printComprovanteCaixa({
+        tipo: tipoLancado,
+        clinicaNome: clinicaAtual.clinica?.nome ?? "Clínica",
+        operadorNome: minhaSessao.user_nome || user.user_metadata?.nome || user.email || "Atendente",
+        valor: v,
+        descricao: descLancada || null,
+      });
+    }
     void load();
   };
 
@@ -680,8 +691,19 @@ function Page() {
     setSaving(false);
     if (error) { mostrarErro(error); return; }
     setOpenFechar(false);
+    const obsFinal = obsFechamento;
     setValorInformado(""); setObsFechamento("");
     toast.success("Caixa fechado");
+    printComprovanteCaixa({
+      tipo: "fechamento",
+      clinicaNome: clinicaAtual.clinica?.nome ?? "Clínica",
+      operadorNome: minhaSessao.user_nome || user.user_metadata?.nome || user.email || "Atendente",
+      valor: informado,
+      saldoCalculado: saldoAtual,
+      valorInformado: informado,
+      diferenca: diff,
+      descricao: obsFinal || null,
+    });
     void load();
   };
 
