@@ -1204,7 +1204,12 @@ function Page() {
         }
       }
       toast.success("Repasses pagos com sucesso");
+      const c = buildComprovante(selectedItems, payForm);
       setPayOpen(false);
+      if (c) {
+        setComprovante(c);
+        setComprovanteOpen(true);
+      }
       await load();
     } catch (e) {
       const err = e as { message?: string };
