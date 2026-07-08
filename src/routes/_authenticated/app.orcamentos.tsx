@@ -179,6 +179,7 @@ type Procedimento = {
   valor_cartao_debito: number | null;
   valor_padrao: number | null;
   preparo: string | null;
+  valor_variavel?: boolean | null;
 };
 
 type Item = {
@@ -685,7 +686,7 @@ function NovoOrcamentoDialog({
       const norm = procQuery.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
       let q = supabase
         .from("procedimentos")
-        .select("id, nome, valor_dinheiro_pix, valor_cartao, valor_dinheiro, valor_pix, valor_cartao_credito, valor_cartao_debito, valor_padrao, preparo")
+        .select("id, nome, valor_dinheiro_pix, valor_cartao, valor_dinheiro, valor_pix, valor_cartao_credito, valor_cartao_debito, valor_padrao, preparo, valor_variavel")
         .eq("clinica_id", clinicaId)
         .eq("ativo", true)
         .or(`nome.ilike.%${procQuery}%,nome.ilike.%${norm}%`);
@@ -788,6 +789,9 @@ function NovoOrcamentoDialog({
     }]);
     if (p.preparo && p.preparo.trim()) {
       toast.warning(`⚠ ${p.nome} exige preparo`, { description: p.preparo, duration: 6000 });
+    }
+    if (p.valor_variavel) {
+      toast.info(`${p.nome} tem valor variável — informe o valor cobrado.`, { duration: 6000 });
     }
     setProcQuery("");
     setProcResults([]);
