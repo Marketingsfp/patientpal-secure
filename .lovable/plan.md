@@ -1,37 +1,33 @@
-## Análise — Mensalidades de contratos criados por `jeanpsfp@gmail.com`
+## Módulos ausentes em Perfis & Permissões
 
-A tabela `contrato_mensalidades` não tem coluna de criador — herdo via `contratos_assinatura.criado_por`.
+Comparei `src/lib/permissoes-presets.ts` (lista `TODOS_MODULOS`, base da tela `/app/perfis`) com as rotas reais em `src/routes/_authenticated/` e o catálogo do menu. Encontrei **4 funções do sistema que existem como página mas NÃO aparecem na tela de Perfis**, portanto não podem ter permissão configurada hoje:
 
-**Resultado:**
-- **42 contratos** criados por esse usuário
-- **504 mensalidades** (12 parcelas × 42 contratos)
-- **0 pagas**, **0 com lançamento financeiro**, **0 com pagamento registrado**
-- Todos os contratos estão com status `ativo` e as mensalidades sem `pago_em`, sem `lancamento_id`, sem `valor_pago`
+| Módulo (chave) | Rota | Onde aparece |
+|---|---|---|
+| `atendimento-multiplo` | `/app/atendimento-multiplo` | Menu Atendimento |
+| `painel-executivo` | `/app/painel-executivo` | Menu Gestão |
+| `tipos-servico` | `/app/tipos-servico` | Cadastros clínicos |
+| `enfermagem-recursos` | `/app/enfermagem-recursos` | Enfermagem |
 
-## Análise dos 4 eixos
+Observações:
+- Subpáginas de `financeiro.*` (contas, categorias, movimento, alertas, empresas, relatórios, etc.) e de `cartao-beneficios.*` já são cobertas pelos módulos-pai `financeiro` e `cartao-beneficios` — sem alteração.
+- `orcamentos-agenda` é variação de `orcamentos` — sem alteração.
+- Rotas `dev-*`, `agenda-v2`, `imprimir.*` são internas/feature-flag — sem alteração.
 
-- 💰 **Financeiro**: nenhum impacto. Nenhuma mensalidade foi paga nem virou lançamento no financeiro.
-- ⏱️ **Operacional**: remove 504 parcelas futuras que estão poluindo a agenda de recebimentos.
-- 😊 **Experiência**: nenhum paciente foi cobrado por essas parcelas.
-- 🛡️ **Auditoria**: exclusão registrada em `audit_log`.
+## Alteração proposta
 
-## Ponto importante — o que o usuário pediu
+Editar **apenas** `src/lib/permissoes-presets.ts`:
 
-Você pediu para excluir "todos os `contratos_mensalidades` criados por jeanpsfp". Os **contratos em si (42 registros em `contratos_assinatura`) permanecem intactos** — só as parcelas serão apagadas. Isso deixará os contratos "ativos" mas **sem parcelas geradas**.
+1. Adicionar as 4 chaves em `TODOS_MODULOS` nos grupos apropriados:
+   - Operação: `atendimento-multiplo`
+   - Cadastros: `tipos-servico`, `enfermagem-recursos`
+   - Gestão: `painel-executivo`
+2. Ampliar `PRESETS` com defaults sensatos:
+   - `admin`: `write` em todos (já herda automaticamente via `Object.fromEntries`).
+   - `gestor`: `painel-executivo: write`, `tipos-servico: read`, `enfermagem-recursos: read`, `atendimento-multiplo: read`.
+   - `recepcao`: `atendimento-multiplo: write`, `tipos-servico: read`.
+   - `medico`: `atendimento-multiplo: write`.
+   - `enfermeiro`: `atendimento-multiplo: write`, `enfermagem-recursos: write`.
+   - `caixa` / `financeiro`: sem acesso aos 4 novos (mantém escopo).
 
-Duas opções — preciso que você confirme qual:
-
-**Opção A (literal ao pedido):** Excluir apenas as 504 mensalidades. Contratos ficam ativos sem parcelas.
-
-**Opção B (mais provável):** Excluir as 504 mensalidades **E** os 42 contratos junto (limpeza completa dos contratos criados por ele).
-
-## Plano de execução
-
-Após sua escolha entre A ou B:
-
-1. `DELETE FROM contrato_mensalidades WHERE contrato_id IN (SELECT id FROM contratos_assinatura c JOIN auth.users u ON u.id=c.criado_por WHERE u.email='jeanpsfp@gmail.com')`
-2. **(Só se opção B)** `DELETE FROM contratos_assinatura WHERE criado_por = (uuid do jeanpsfp)` — também remove `contrato_dependentes` em cascata.
-
-Nenhum lançamento em `fin_lancamentos` será afetado (não há nenhum vinculado).
-
-**Qual opção — A ou B?**
+Nenhuma alteração em rotas, componentes ou banco. Após o merge, os 4 módulos passam a aparecer na tela `/app/perfis` e podem ser habilitados/desabilitados por perfil normalmente.
