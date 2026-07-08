@@ -52,7 +52,7 @@ Regras por campo:
 - queixa_principal: 1 frase curta com o motivo da consulta.
 - historia_doenca: HDA em parágrafo (início, evolução, fatores associados, tratamentos tentados).
 - exame_fisico: achados relatados; quando não houver relato, sugira um exame físico dirigido pertinente à queixa/especialidade, prefixado com "Sugerido: ".
-- hipotese_diagnostica: 1 a 3 hipóteses plausíveis para a queixa/especialidade.
+- hipotese_diagnostica: OBRIGATÓRIO. Liste de 1 a 3 hipóteses diagnósticas plausíveis para a queixa/especialidade, separadas por " | " (ex.: "Cefaleia tensional | Enxaqueca sem aura | Cefaleia por fadiga visual"). Nunca deixe vazio — mesmo com poucos dados, proponha as hipóteses mais prováveis marcadas com "(sugestão — confirmar)".
 - conduta: plano terapêutico e orientações; quando faltar dado, proponha conduta usual para o quadro provável.
 - prescricao: prescrição sugerida com medicamento, dose, via, posologia e duração, ou orientações não farmacológicas quando aplicável.
 Nunca devolva string vazia. Ao inferir, marque o trecho suposto com "(sugestão — confirmar)". Sempre em português do Brasil.`;
