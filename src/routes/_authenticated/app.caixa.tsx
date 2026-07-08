@@ -696,11 +696,50 @@ function Page() {
     toast.success("Caixa fechado");
     // Total recebido por forma de pagamento na sessão
     const porForma: Record<string, number> = {};
+    const mistoLancIds: string[] = [];
     minhasMovs.forEach((m) => {
       if (m.tipo !== "recebimento") return;
       const k = (m.forma_pagamento || "outros").toLowerCase();
+      if (k === "misto" && m.lancamento_id) mistoLancIds.push(m.lancamento_id);
       porForma[k] = (porForma[k] || 0) + Number(m.valor || 0);
     });
+    // Decompõe "misto" nas formas reais consultando observacoes do lançamento.
+    if (mistoLancIds.length > 0) {
+      const { data: lancs } = await supabase
+        .from("fin_lancamentos")
+        .select("id, observacoes")
+        .in("id", mistoLancIds);
+      const LABEL_TO_KEY: Array<[RegExp, string]> = [
+        [/^cart[ãa]o\s*cr[ée]dito/i, "credito"],
+        [/^cart[ãa]o\s*d[ée]bito/i, "debito"],
+        [/^dinheiro/i, "dinheiro"],
+        [/^pix/i, "pix"],
+        [/^boleto/i, "boleto"],
+        [/^conv[êe]nio/i, "convenio"],
+        [/^transfer[êe]ncia/i, "transferencia"],
+      ];
+      const parseBRL = (s: string) => Number(s.replace(/\./g, "").replace(",", ".")) || 0;
+      (lancs ?? []).forEach((l: { observacoes: string | null }) => {
+        const obs = l.observacoes ?? "";
+        const idx = obs.indexOf("Pagamento misto:");
+        if (idx < 0) return;
+        const trecho = obs.slice(idx + "Pagamento misto:".length).split(" | ")[0];
+        const partes = trecho.split(";").map((s) => s.trim()).filter(Boolean);
+        let somaDecomposta = 0;
+        for (const p of partes) {
+          const match = LABEL_TO_KEY.find(([re]) => re.test(p));
+          if (!match) continue;
+          const valMatch = p.match(/R\$\s*([\d\.]+,\d{2})/);
+          if (!valMatch) continue;
+          const v = parseBRL(valMatch[1]);
+          porForma[match[1]] = (porForma[match[1]] || 0) + v;
+          somaDecomposta += v;
+        }
+        // Remove do bucket "misto" o que foi decomposto
+        porForma.misto = Math.max(0, (porForma.misto || 0) - somaDecomposta);
+      });
+      if ((porForma.misto || 0) < 0.005) delete porForma.misto;
+    }
     printComprovanteCaixa({
       tipo: "fechamento",
       clinicaNome: clinicaAtual.clinica?.nome ?? "Clínica",
