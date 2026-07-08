@@ -423,7 +423,12 @@ function AtendimentoIaPage() {
                           </HoverCard>
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button size="sm" onClick={() => atender(it)}>
+                          <Button
+                            size="sm"
+                            onClick={() => atender(it)}
+                            disabled={Boolean(pag && !pag.pago)}
+                            title={pag && !pag.pago ? "Pagamento pendente — envie ao caixa antes do atendimento" : undefined}
+                          >
                             <Stethoscope className="h-4 w-4" /> Atender
                           </Button>
                         </TableCell>
