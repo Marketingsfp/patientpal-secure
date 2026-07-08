@@ -1950,6 +1950,53 @@ function Page() {
         </CardContent>
       </Card>
 
+      {/* Barra de ações do rodapé: repete botões quando houver seleção */}
+      {!isMedicoOnly && selectedItems.length > 0 && (
+        <div className="sticky bottom-2 z-10 flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background/95 backdrop-blur px-3 py-2 shadow-md">
+          <div className="text-sm">
+            <b>{selectedItems.length}</b> selecionado(s)
+            {selectedPagos.length > 0 && (
+              <span className="ml-2 text-emerald-700">• {selectedPagos.length} pago(s)</span>
+            )}
+            {selectedNaoPagos.length > 0 && (
+              <span className="ml-2 text-amber-700">• {selectedNaoPagos.length} a pagar</span>
+            )}
+            <span className="ml-2 text-muted-foreground">
+              — total {fmt(selectedTotal)}
+            </span>
+            {misturado && (
+              <span className="ml-2 text-xs text-rose-700">
+                Separe pagos e não pagos para agir.
+              </span>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              onClick={openPay}
+              disabled={!podePagar}
+              title={misturado ? "Selecione apenas atendimentos NÃO pagos" : undefined}
+            >
+              <Wallet className="h-4 w-4 mr-2" />
+              Pagar repasse{selectedNaoPagos.length ? ` (${selectedNaoPagos.length})` : ""}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={reimprimirSelecionados}
+              disabled={!podeReimprimir}
+              title={misturado ? "Selecione apenas atendimentos JÁ pagos" : undefined}
+            >
+              <Printer className="h-4 w-4 mr-2" />
+              Imprimir 2ª via{selectedPagos.length ? ` (${selectedPagos.length})` : ""}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setSel(new Set())}>
+              Limpar
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Diálogo pagar repasse */}
       <Dialog open={payOpen} onOpenChange={setPayOpen}>
         <DialogContent className="max-w-md">
