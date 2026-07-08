@@ -20,6 +20,7 @@ import {
   CreditCard,
   QrCode,
   HelpCircle,
+  Printer,
 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
