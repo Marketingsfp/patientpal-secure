@@ -88,6 +88,7 @@ import { Route as AuthenticatedAppCargosRouteImport } from './routes/_authentica
 import { Route as AuthenticatedAppCampanhasRouteImport } from './routes/_authenticated/app.campanhas'
 import { Route as AuthenticatedAppCaixaRouteImport } from './routes/_authenticated/app.caixa'
 import { Route as AuthenticatedAppBoletosRouteImport } from './routes/_authenticated/app.boletos'
+import { Route as AuthenticatedAppBackupsRouteImport } from './routes/_authenticated/app.backups'
 import { Route as AuthenticatedAppAuditoriaRouteImport } from './routes/_authenticated/app.auditoria'
 import { Route as AuthenticatedAppAtendimentoMultiploRouteImport } from './routes/_authenticated/app.atendimento-multiplo'
 import { Route as AuthenticatedAppAtendimentoIaRouteImport } from './routes/_authenticated/app.atendimento-ia'
@@ -569,6 +570,11 @@ const AuthenticatedAppBoletosRoute = AuthenticatedAppBoletosRouteImport.update({
   path: '/boletos',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
+const AuthenticatedAppBackupsRoute = AuthenticatedAppBackupsRouteImport.update({
+  id: '/backups',
+  path: '/backups',
+  getParentRoute: () => AuthenticatedAppRoute,
+} as any)
 const AuthenticatedAppAuditoriaRoute =
   AuthenticatedAppAuditoriaRouteImport.update({
     id: '/auditoria',
@@ -871,6 +877,7 @@ export interface FileRoutesByFullPath {
   '/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaRouteWithChildren
   '/app/atendimento-multiplo': typeof AuthenticatedAppAtendimentoMultiploRoute
   '/app/auditoria': typeof AuthenticatedAppAuditoriaRoute
+  '/app/backups': typeof AuthenticatedAppBackupsRoute
   '/app/boletos': typeof AuthenticatedAppBoletosRoute
   '/app/caixa': typeof AuthenticatedAppCaixaRoute
   '/app/campanhas': typeof AuthenticatedAppCampanhasRoute
@@ -995,6 +1002,7 @@ export interface FileRoutesByTo {
   '/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
   '/app/atendimento-multiplo': typeof AuthenticatedAppAtendimentoMultiploRoute
   '/app/auditoria': typeof AuthenticatedAppAuditoriaRoute
+  '/app/backups': typeof AuthenticatedAppBackupsRoute
   '/app/boletos': typeof AuthenticatedAppBoletosRoute
   '/app/caixa': typeof AuthenticatedAppCaixaRoute
   '/app/campanhas': typeof AuthenticatedAppCampanhasRoute
@@ -1121,6 +1129,7 @@ export interface FileRoutesById {
   '/_authenticated/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaRouteWithChildren
   '/_authenticated/app/atendimento-multiplo': typeof AuthenticatedAppAtendimentoMultiploRoute
   '/_authenticated/app/auditoria': typeof AuthenticatedAppAuditoriaRoute
+  '/_authenticated/app/backups': typeof AuthenticatedAppBackupsRoute
   '/_authenticated/app/boletos': typeof AuthenticatedAppBoletosRoute
   '/_authenticated/app/caixa': typeof AuthenticatedAppCaixaRoute
   '/_authenticated/app/campanhas': typeof AuthenticatedAppCampanhasRoute
@@ -1249,6 +1258,7 @@ export interface FileRouteTypes {
     | '/app/atendimento-ia'
     | '/app/atendimento-multiplo'
     | '/app/auditoria'
+    | '/app/backups'
     | '/app/boletos'
     | '/app/caixa'
     | '/app/campanhas'
@@ -1373,6 +1383,7 @@ export interface FileRouteTypes {
     | '/app/anamneses'
     | '/app/atendimento-multiplo'
     | '/app/auditoria'
+    | '/app/backups'
     | '/app/boletos'
     | '/app/caixa'
     | '/app/campanhas'
@@ -1498,6 +1509,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/atendimento-ia'
     | '/_authenticated/app/atendimento-multiplo'
     | '/_authenticated/app/auditoria'
+    | '/_authenticated/app/backups'
     | '/_authenticated/app/boletos'
     | '/_authenticated/app/caixa'
     | '/_authenticated/app/campanhas'
@@ -2179,6 +2191,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppBoletosRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/app/backups': {
+      id: '/_authenticated/app/backups'
+      path: '/backups'
+      fullPath: '/app/backups'
+      preLoaderRoute: typeof AuthenticatedAppBackupsRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/app/auditoria': {
       id: '/_authenticated/app/auditoria'
       path: '/auditoria'
@@ -2648,6 +2667,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppAtendimentoIaRoute: typeof AuthenticatedAppAtendimentoIaRouteWithChildren
   AuthenticatedAppAtendimentoMultiploRoute: typeof AuthenticatedAppAtendimentoMultiploRoute
   AuthenticatedAppAuditoriaRoute: typeof AuthenticatedAppAuditoriaRoute
+  AuthenticatedAppBackupsRoute: typeof AuthenticatedAppBackupsRoute
   AuthenticatedAppBoletosRoute: typeof AuthenticatedAppBoletosRoute
   AuthenticatedAppCaixaRoute: typeof AuthenticatedAppCaixaRoute
   AuthenticatedAppCampanhasRoute: typeof AuthenticatedAppCampanhasRoute
@@ -2729,6 +2749,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppAtendimentoMultiploRoute:
     AuthenticatedAppAtendimentoMultiploRoute,
   AuthenticatedAppAuditoriaRoute: AuthenticatedAppAuditoriaRoute,
+  AuthenticatedAppBackupsRoute: AuthenticatedAppBackupsRoute,
   AuthenticatedAppBoletosRoute: AuthenticatedAppBoletosRoute,
   AuthenticatedAppCaixaRoute: AuthenticatedAppCaixaRoute,
   AuthenticatedAppCampanhasRoute: AuthenticatedAppCampanhasRoute,

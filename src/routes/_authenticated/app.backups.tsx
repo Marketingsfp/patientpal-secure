@@ -76,6 +76,7 @@ function Page() {
     try {
       const r = await baixar({ data: { clinica_id: clinicaAtual.clinica_id, data } });
       for (const u of r.urls) {
+        if (!u.url) continue;
         const a = document.createElement("a");
         a.href = u.url;
         a.download = u.nome;
