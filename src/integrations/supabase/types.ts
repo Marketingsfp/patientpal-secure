@@ -325,6 +325,7 @@ export type Database = {
           criado_por: string | null
           data_pagamento: string | null
           enfermagem_recurso_id: string | null
+          especialidade_id: string | null
           executado_em: string | null
           executado_por: string | null
           ficha_numero: number | null
@@ -358,6 +359,7 @@ export type Database = {
           criado_por?: string | null
           data_pagamento?: string | null
           enfermagem_recurso_id?: string | null
+          especialidade_id?: string | null
           executado_em?: string | null
           executado_por?: string | null
           ficha_numero?: number | null
@@ -391,6 +393,7 @@ export type Database = {
           criado_por?: string | null
           data_pagamento?: string | null
           enfermagem_recurso_id?: string | null
+          especialidade_id?: string | null
           executado_em?: string | null
           executado_por?: string | null
           ficha_numero?: number | null
@@ -429,6 +432,13 @@ export type Database = {
             columns: ["enfermagem_recurso_id"]
             isOneToOne: false
             referencedRelation: "enfermagem_recursos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agendamentos_especialidade_id_fkey"
+            columns: ["especialidade_id"]
+            isOneToOne: false
+            referencedRelation: "especialidades"
             referencedColumns: ["id"]
           },
           {
