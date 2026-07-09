@@ -578,6 +578,13 @@ function Page() {
               <SelectItem value="sem">Sem informação</SelectItem>
             </SelectContent>
           </Select></div>
+        <div className="space-y-1 flex-1 min-w-[220px]"><Label className="text-xs">Paciente / descrição</Label>
+          <Input
+            type="search"
+            value={filterPaciente}
+            onChange={(e) => setFilterPaciente(e.target.value)}
+            placeholder="Buscar por nome do paciente..."
+          /></div>
       </CardContent></Card>
 
       <Card><CardContent className="p-0">
