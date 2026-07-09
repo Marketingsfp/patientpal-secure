@@ -1241,7 +1241,7 @@ function Page() {
               }
               exportToExcel(
                 filteredItems.map((a) => ({
-                  data: new Date(a.data).toLocaleDateString("pt-BR"),
+                  data: new Date(a.data + "T00:00:00").toLocaleDateString("pt-BR"),
                   medico: a.medico_id ? (medMap.get(a.medico_id) ?? "") : "",
                   paciente: a.paciente_id ? (pacMap.get(a.paciente_id) ?? "") : "",
                   procedimento: a.procedimento ?? "",
