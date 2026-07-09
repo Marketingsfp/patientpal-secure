@@ -432,10 +432,24 @@ export function AppShell() {
     );
   }
 
+  // Guarda de rota: bloqueia acesso quando o módulo da rota atual não é
+  // permitido pelo perfil do usuário. Admin (allowedModules === null) passa
+  // por padrão. Enquanto as permissões carregam, mostramos o próprio outlet
+  // para evitar flash de "Acesso negado".
+  const currentModulo = moduloDaRota(location.pathname);
+  const rotaPermitida =
+    allowedModules === null
+    || permsLoading
+    || currentModulo === null
+    || (typeof currentModulo === "string" && allowedModules.has(currentModulo));
+  const guardedOutlet = rotaPermitida
+    ? <Outlet />
+    : <SemPermissao modulo={currentModulo ?? undefined} />;
+
   if (isEmbed) {
     return (
       <div className="h-screen w-full overflow-auto bg-background" style={{ background: "var(--surface-cream)" }}>
-        <Outlet />
+        {guardedOutlet}
       </div>
     );
   }
