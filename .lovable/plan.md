@@ -1,27 +1,36 @@
-## Objetivo
-Mostrar, na aba **Meu Caixa** do menu Caixa, um detalhamento por forma de pagamento (Dinheiro, PIX, Débito, Crédito e demais) das entradas da sessão atual, junto ao card **Saldo atual**.
+## Problema
 
-## O que muda (apenas UI, sem alterações de banco/regras)
+Ao clicar em "Cobrar" num agendamento de **REVISÃO** (procedimento cadastrado sem valor / valor zero), o sistema abre o diálogo de forma de pagamento com todas as opções em R$ 0,00, e ao escolher uma forma abre o `LancamentoDialog` com `initialValor=""` (linha 3015 de `app.agenda.tsx`: `valorFinal > 0 ? valorFinal.toFixed(2) : ""`). O `LancamentoDialog.handleSave` então dispara `toast.error("Descrição e valor são obrigatórios")` (linha 255 de `lancamento-dialog.tsx`).
 
-Arquivo: `src/routes/_authenticated/app.caixa.tsx`
+Ou seja, o fluxo de cobrança está sendo executado para um procedimento que **não deve ser cobrado**.
 
-1. **Novo cálculo `entradasPorForma`** (useMemo, ao lado de `resumoTipos`)
-   - Percorre `minhasMovs` filtrando apenas movimentos que somam ao caixa em cada forma: `recebimento` e `suprimento` (positivos).
-   - Agrupa por `forma_pagamento` (fallback `"outros"` quando nulo), normalizando as chaves conhecidas: `dinheiro`, `pix`, `debito`, `credito`, e uma categoria `outros` para o restante (boleto, transferência, cheque, convênio, etc.).
-   - Retorna um objeto `{ dinheiro, pix, debito, credito, outros, total }`.
+## Ajuste proposto
 
-2. **Novo bloco visual abaixo do grid de 4 cards** (Saldo atual / Abertura / Entradas / Saídas):
-   - Um card único intitulado **"Entradas por forma de pagamento"**, com 5 mini-linhas/chips em grid responsivo (`grid-cols-2 md:grid-cols-5`):
-     - Dinheiro · PIX · Débito · Crédito · Outros
-   - Cada item mostra rótulo + valor formatado com `fmt()`. Zeros aparecem como `R$ 0,00` (mantém consistência visual).
-   - Estilo alinhado ao restante da aba (usa `Card`/`CardContent` já importados; sem novas dependências).
+Interceptar o `cobrarAgendamento` em `src/routes/_authenticated/app.agenda.tsx` (por volta da linha 2944-2949, após calcular `opcoes`): quando o total de todas as formas de pagamento for **zero** e não houver orçamento vinculado (`opcoesOrc == null`), tratar como **atendimento sem cobrança** em vez de abrir o diálogo de forma de pagamento.
 
-3. **Sem alteração** em: schema, RPCs, cálculo de `saldoAtual`, fluxo de fechamento, drill-down existente, aba "Todos os caixas" ou comprovantes.
+Nesse caso:
 
-## Detalhes técnicos
-- Fonte dos dados: array `minhasMovs` já carregado (campo `forma_pagamento` já vem do select em `MOV_FIELDS`).
-- Regra de agrupamento: somente `tipo ∈ {recebimento, suprimento}` para representar "quanto entrou"; sangrias/despesas continuam no card "Saídas".
-- Sem impacto em regras de negócio ou memória do projeto.
+1. Inserir um `fin_lancamentos` com:
+   - `tipo: "receita"`, `status: "confirmado"`, `valor: 0`
+   - `descricao: "{paciente} — {procedimento} — SEM COBRANÇA"` (mantém a descrição automática já usada hoje)
+   - `agendamento_id: a.id`, `clinica_id`, `data: hoje`
+   - sem `forma_pagamento`
+   
+   Isso segue o mesmo padrão já usado no código para "linhas-sombra" de pagamentos agrupados (linhas 3865-3876), então não polui o caixa nem duplica receita, e ao mesmo tempo garante que o agendamento apareça como pago/quitado para as próximas checagens (`jaPagos` na linha 2919 e o `pagosSet`).
 
-## Verificação
-- Abrir `/app/agenda` → Caixa → aba **Meu Caixa** com sessão aberta e conferir se o novo card exibe os totais e se batem com o card **Entradas** (soma das 5 categorias = Entradas).
+2. Atualizar `pagosSet` adicionando `a.id`.
+
+3. Executar o mesmo avanço de fluxo que ocorre após um pagamento normal (auto check-in no mesmo dia → triagem), reusando o bloco de código existente em `onSavedWithData` (linhas 3887+). Extrair essa lógica para uma função local `avancarFluxoAposPagamento(ids: string[])` para reaproveitar sem duplicar.
+
+4. Exibir um `toast.success("Revisão registrada sem cobrança.")` no lugar do fluxo de escolha de forma.
+
+## Escopo do que NÃO muda
+
+- Não altera `LancamentoDialog`, `criarAgendamento`, tabelas, RLS, ou orçamentos.
+- Não muda o comportamento quando o procedimento tem valor > 0.
+- Não muda o comportamento quando o agendamento vem de um orçamento (`opcoesOrc` continua mandando).
+- Não muda o fluxo de convênio com gratuidade (o `descSuffix` já cuida disso, mas se `opcoes` também zerar para gratuidade, o mesmo atalho se aplica — o que é o comportamento correto).
+
+## Arquivo tocado
+
+- `src/routes/_authenticated/app.agenda.tsx` — 1 função nova (`avancarFluxoAposPagamento`) + short-circuit no `cobrarAgendamento`.
