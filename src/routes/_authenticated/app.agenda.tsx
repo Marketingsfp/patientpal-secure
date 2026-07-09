@@ -4053,7 +4053,7 @@ function AgendaPage() {
             //    (agendamento_id = principal, tipo = receita, status = confirmado, mais recente).
             const { data: principalRow, error: errPrincipal } = await supabase
               .from("fin_lancamentos")
-              .select("id, observacoes")
+              .select("id, observacoes, criado_por")
               .eq("clinica_id", clinicaAtual.clinica_id)
               .eq("agendamento_id", agId)
               .eq("tipo", "receita")
@@ -4105,6 +4105,7 @@ function AgendaPage() {
               status: "confirmado" as const,
               agendamento_id: extraId,
               grupo_pagamento_id: grupoId,
+              criado_por: (principalRow as { criado_por?: string | null } | null)?.criado_por ?? null,
               observacoes: [
                 `Pagamento agrupado (grupo ${grupoId}) — ${i + 2}/${N} atendimentos`,
                 trechoMisto,
