@@ -4049,6 +4049,11 @@ function AgendaPage() {
               ? crypto.randomUUID()
               : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
+            // Usuário atual — usado como criado_por em TODOS os lançamentos do
+            // grupo, garantindo que o Movimento de Caixa mostre o operador
+            // em todas as linhas do rateio.
+            const currentUserId = (await supabase.auth.getUser()).data.user?.id ?? null;
+
             // 1) Localiza o lançamento principal recém-criado pelo LancamentoDialog
             //    (agendamento_id = principal, tipo = receita, status = confirmado, mais recente).
             const { data: principalRow, error: errPrincipal } = await supabase
@@ -4083,6 +4088,7 @@ function AgendaPage() {
                   valor: valoresRat[0],
                   grupo_pagamento_id: grupoId,
                   descricao: `${pagamentoPacienteNome} — ${rotuloPrincipal} (1/${N} do grupo)`,
+                  criado_por: (principalRow as { criado_por?: string | null }).criado_por ?? currentUserId,
                   observacoes: [
                     `Pagamento agrupado (grupo ${grupoId}) — 1/${N} atendimentos`,
                     trechoMisto,
@@ -4105,7 +4111,7 @@ function AgendaPage() {
               status: "confirmado" as const,
               agendamento_id: extraId,
               grupo_pagamento_id: grupoId,
-              criado_por: (principalRow as { criado_por?: string | null } | null)?.criado_por ?? null,
+              criado_por: (principalRow as { criado_por?: string | null } | null)?.criado_por ?? currentUserId,
               observacoes: [
                 `Pagamento agrupado (grupo ${grupoId}) — ${i + 2}/${N} atendimentos`,
                 trechoMisto,
