@@ -1721,6 +1721,17 @@ function Page() {
                                   <Printer className="h-3.5 w-3.5 text-primary" />
                                 </Button>
                               )}
+                              {!a.repasse_pago && a.agendamento_status !== "realizado" && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  title="Dá baixa (marcar como realizado e liberar repasse)"
+                                  onClick={() => darBaixa(a)}
+                                >
+                                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                                </Button>
+                              )}
                               {/* Botão de excluir para agenda */}
                               <Button
                                 variant="ghost"
