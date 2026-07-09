@@ -1,35 +1,31 @@
-
 ## Objetivo
 
-Hoje, na aba **Financeiro › Atendimentos**, o botão verde ✓ ("Dar baixa") só existe **linha por linha**. Quando o CARLOS EDUARDO (ou qualquer médico) tem 20+ atendimentos "A receber" no dia, é preciso clicar 20 vezes. A meta é permitir **selecionar vários atendimentos e dar baixa em todos de uma vez**, aproveitando as checkboxes que já existem.
+Permitir dar baixa em vários atendimentos de uma vez, com a ação organizada dentro de um novo botão "Opções" no topo da tela de Atendimentos (Financeiro).
 
-## Comportamento
+## Mudanças em `src/routes/_authenticated/app.financeiro.atendimentos.tsx`
 
-1. Na barra de ações do topo (onde ficam "Pagar repasse", "Imprimir 2ª via", "Novo atendimento"), adicionar um novo botão **"Dar baixa"**.
-2. O botão fica **desabilitado** enquanto nenhum item elegível estiver marcado.
-3. É "elegível para baixa" o atendimento selecionado que **ainda não foi baixado**:
-   - origem `agenda` → `agendamento_status !== 'realizado'`
-   - origem `manual` → `status !== 'realizado'`
-4. O rótulo mostra a quantidade: **"Dar baixa (7)"**.
-5. Ao clicar, abre um `confirm` do tipo:
-   *"Confirmar baixa de 7 atendimento(s)? Os médicos serão marcados como tendo atendido esses pacientes e os repasses ficarão liberados para pagamento."*
-6. Ao confirmar, roda em lote:
-   - Um `UPDATE ... IN (...)` em `agendamentos` para todos os IDs vindos de `origem = 'agenda'`.
-   - Um `UPDATE ... IN (...)` em `fin_atendimentos` para todos de `origem = 'manual'`.
-7. Toast: **"Baixa realizada em N atendimento(s). Repasses liberados."** + `load()` para atualizar a lista.
-8. Se algum item selecionado já estava realizado, ele é ignorado silenciosamente (não conta na quantidade e não bloqueia a ação).
-9. Erros de banco caem no `mostrarErro` que já existe.
+1. **Novo botão "Opções" no toolbar do topo** (ao lado de "Pagar repasse"):
+   - Componente: `DropdownMenu` do shadcn (já usado no projeto).
+   - Rótulo: `Opções` com ícone `MoreHorizontal` / `Settings2`.
+   - Sempre habilitado; os itens internos é que ficam habilitados/desabilitados conforme a seleção.
 
-## Detalhe técnico (referência)
+2. **Itens dentro do dropdown "Opções":**
+   - **Dar baixa (N)** — executa `darBaixaLote()` que já existe. Desabilitado quando `selectedNaoBaixados.length === 0`. Rótulo mostra a quantidade.
+   - **Imprimir 2ª via (N)** — move o botão atual de reimpressão para dentro do dropdown, para desafogar a barra superior. Desabilitado quando não há atendimentos pagos selecionados.
+   - Cada item mostra um `title`/descrição curta explicando o requisito de seleção quando desabilitado.
 
-- Arquivo único: `src/routes/_authenticated/app.financeiro.atendimentos.tsx`.
-- Reutilizar `selectedItems` (já existe), derivando um novo memo `selectedNaoBaixados`.
-- Criar função `darBaixaLote()` seguindo o mesmo padrão do `darBaixa(a)` atual (linhas 966–1002), mas com dois `.update().in("id", ids)` em vez de um `.eq`.
-- Colocar o botão ao lado de "Pagar repasse" (por volta da linha 1287), com `variant="outline"` e ícone `CheckCircle2` verde para manter coerência visual com a ação individual da linha.
-- Não altera esquema, não altera RLS, não mexe em outras telas.
+3. **Remover os botões soltos** "Dar baixa" e "Imprimir 2ª via" da barra superior (desktop e mobile) — passam a viver dentro de "Opções". Mantém-se na barra: `Exportar Excel`, `Pagar repasse`, `Opções`, `Novo atendimento`.
+
+4. **Seleção múltipla já existente permanece:** a checkbox no cabeçalho da tabela seleciona/deseleciona todos os itens visíveis; a checkbox de cada linha alterna o item. Nenhuma alteração na lógica de `selectedItems` / `selectedNaoBaixados` / `selectedPagos`.
+
+5. **Confirmação e fluxo do "Dar baixa" em lote (inalterados, apenas revisados):**
+   - Confirmação `confirm("Dar baixa em N atendimento(s)?")` antes de rodar.
+   - `UPDATE agendamentos SET status='realizado' WHERE id IN (...)` para itens origem `agenda`.
+   - `UPDATE fin_atendimentos SET status='realizado' WHERE id IN (...)` para itens origem `manual`.
+   - Toast de sucesso + `load()` para recarregar a lista.
 
 ## Fora de escopo
 
-- Não altera a ação verde individual em cada linha (continua funcionando igual).
-- Não altera o fluxo de "Pagar repasse" nem de "Imprimir 2ª via".
-- Não altera comportamento do Caixa nem cria migração.
+- Não altera RLS, tabelas, ou funções server-side.
+- Não altera a ação individual por linha (ícone de baixa em cada linha continua).
+- Não altera "Pagar repasse", Caixa, nem cálculos de repasse.
