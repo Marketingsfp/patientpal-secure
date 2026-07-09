@@ -2979,6 +2979,47 @@ function AgendaPage() {
         toast.info(`Cliente possui convênio ${info.convenioNome}, mas sem benefício para este procedimento.`);
       }
     }
+    // Procedimento sem valor (ex.: REVISÃO / retorno gratuito). Não abre o
+    // fluxo de cobrança — registra um lançamento de valor 0 (linha-sombra),
+    // marca como pago e avança o fluxo, do mesmo modo que um pagamento normal.
+    const totalOpcoes = opcoes.reduce((s, o) => s + (Number(o.valor) || 0), 0);
+    if (!opcoesOrc && totalOpcoes <= 0) {
+      const desc = `${a.paciente_nome} — ${a.procedimento ?? "CONSULTA"}${descSuffix} — SEM COBRANÇA`;
+      const { error: errSC } = await supabase.from("fin_lancamentos").insert({
+        clinica_id: clinicaAtual.clinica_id,
+        tipo: "receita" as const,
+        descricao: desc,
+        valor: 0,
+        data: new Date().toISOString().slice(0, 10),
+        status: "confirmado" as const,
+        agendamento_id: a.id,
+        observacoes: "Atendimento sem cobrança (procedimento sem valor).",
+      });
+      if (errSC) {
+        mostrarErro(errSC, "falha ao registrar atendimento sem cobrança");
+        return;
+      }
+      setPagosSet((prev) => { const n = new Set(prev); n.add(a.id); return n; });
+      // Auto check-in apenas se o atendimento for do mesmo dia.
+      try {
+        const hoje = new Date().toISOString().slice(0, 10);
+        if (a.inicio && new Date(a.inicio).toISOString().slice(0, 10) === hoje) {
+          const { error: errFluxo } = await supabase
+            .from("agendamentos")
+            .update({ fluxo_etapa: "triagem", fluxo_atualizado_em: new Date().toISOString() } as never)
+            .eq("id", a.id);
+          if (errFluxo) {
+            mostrarErro(errFluxo, "registro salvo, mas falhou ao avançar o fluxo");
+          } else {
+            setEtapaMap((m) => { const n = new Map(m); n.set(a.id, "triagem"); return n; });
+          }
+        }
+      } catch (err) {
+        mostrarErro(err);
+      }
+      toast.success("Atendimento sem cobrança registrado.");
+      return;
+    }
     setFormaPagOpcoes(opcoes);
     setFormaPagCtx({
       agId: a.id,
