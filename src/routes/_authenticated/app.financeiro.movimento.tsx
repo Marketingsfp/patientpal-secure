@@ -389,6 +389,20 @@ function Page() {
               {usuarios.map((u) => <SelectItem key={u.id} value={u.id}>{u.nome}</SelectItem>)}
             </SelectContent>
           </Select></div>
+        <div className="space-y-1"><Label className="text-xs">Forma de pagamento</Label>
+          <Select value={filterForma} onValueChange={setFilterForma}>
+            <SelectTrigger className="w-52"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todas as formas</SelectItem>
+              <SelectItem value="dinheiro">Dinheiro</SelectItem>
+              <SelectItem value="pix">Pix</SelectItem>
+              <SelectItem value="debito">Cartão débito</SelectItem>
+              <SelectItem value="credito">Cartão crédito</SelectItem>
+              <SelectItem value="cartao">Cartão (qualquer)</SelectItem>
+              <SelectItem value="boleto">Boleto / Transferência</SelectItem>
+              <SelectItem value="sem">Sem informação</SelectItem>
+            </SelectContent>
+          </Select></div>
       </CardContent></Card>
 
       <Card><CardContent className="p-0">
