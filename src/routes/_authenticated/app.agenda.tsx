@@ -1386,6 +1386,15 @@ function AgendaPage() {
 
   useEffect(() => { loadRef(); }, [clinicaAtual?.clinica_id]);
 
+  // Sincroniza cadastros (serviços do médico, vínculos serviço↔agenda,
+  // especialidades, recursos de enfermagem) sempre que o diálogo de
+  // agendamento é aberto. Sem isso, um serviço adicionado ao médico em
+  // outra aba/dispositivo só aparece após um refresh da página.
+  useEffect(() => {
+    if (open) void loadRef();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
   // Fallback definitivo: se ao selecionar um médico a lista local de
   // serviços vier vazia (por qualquer motivo — cache defasado, RLS,
   // race com loadRef), busca direto no banco e popula o mapa.
