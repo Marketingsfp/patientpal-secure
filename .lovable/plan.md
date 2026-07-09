@@ -1,80 +1,71 @@
 ## Objetivo
 
-1. Fazer com que o número da ficha impresso na GR **nunca mais** divirja do sistema.
-2. Impedir que dois funcionários abram/operem a mesma ficha ao mesmo tempo — o segundo recebe alerta de que a ficha está em uso pelo colega.
+1. Todo o texto da GR (Guia de Atendimento) impressa deve sair **em negrito**.
+2. O cupom 80mm precisa parar de estourar em nomes longos, valores grandes, procedimentos compridos e pagamento misto — nada de texto cortado, coluna vazando ou linha "grudada".
+
+Aplica-se aos três layouts do arquivo `src/lib/print-gr.ts`:
+- GR individual (ticket do paciente).
+- GR agrupada (vários agendamentos do mesmo paciente).
+- Duplicata/2ª via.
+
+Não mexe em nada da UI da agenda — só no HTML/CSS que vai pra impressora.
 
 ---
 
-## Parte 1 — Ficha congelada no momento da impressão
+## O que muda na aparência
 
-Hoje o número da ficha é recalculado toda vez (posição do paciente na lista do dia). Basta alguém inserir um agendamento anterior na grade para todo mundo depois "andar uma casa" — foi exatamente o que aconteceu com a Diva.
+### Negrito global
+- Peso 700 aplicado ao corpo inteiro (`body { font-weight: 700 }`).
+- Elementos que hoje são `sm` (rodapé, endereço, "IMPRESSÃO Nº X") também ficam em negrito, só continuam menores.
+- Cabeçalho "GUIA DE ATENDIMENTO" e valor recebido continuam maiores/destacados, mas agora sobre uma base já toda em negrito — visual mais uniforme e legível em impressoras térmicas velhas (que costumam borrar texto fino).
 
-**Mudanças:**
+### Responsividade do cupom 80mm
+Problemas identificados hoje no ticket:
 
-- Adicionar coluna `ficha_numero` (int) em `agendamentos`.
-- Na primeira impressão da GR do paciente, gravar `ficha_numero` calculado naquele instante (posição atual entre os válidos do dia).
-- Em impressões seguintes do mesmo agendamento, reutilizar o valor já gravado — nunca recalcular.
-- Na Agenda (colunas Ficha 001/002/…): se o agendamento tem `ficha_numero` gravado, mostrar ele; se não, mostrar a posição atual (comportamento atual). Assim, agendamentos ainda não impressos continuam se ajustando; os já impressos ficam "carimbados".
-- Guardar também `ficha_numero` como snapshot em `gr_impressoes` para rastreabilidade histórica (auditoria já vai capturar o resto agora que o trigger existe).
+1. Linhas como "PROFISSIONAL: CARLOS EDUARDO GONCALVES MONTEIRO" usam `white-space: nowrap` → em nome longo o texto sai cortado ou a coluna transborda os 76mm úteis.
+2. Nome do procedimento longo (ex.: "NEUROLOGIA - CONSULTA DE RETORNO ...") gruda no valor QTD sem espaço e pode cortar.
+3. `.row` (flex) do "VALOR RECEBIDO / R$ ..." não previne quebra quando o rótulo é longo ou o valor tem muitos dígitos.
+4. Pagamento misto: linha "DINHEIRO: (RECEB. R$ X / TROCO R$ Y)" transborda em recibos com troco alto.
+5. Endereço da clínica em duas linhas com `<br/>` sem quebra automática de palavra em cidades compostas.
 
-Efeito: se a Diva imprimir 010, ela continua 010 no sistema mesmo que alguém encaixe alguém antes dela depois.
+Correções de CSS aplicadas ao `<style>` do `printGuiaAtendimentoCore` e ao helper compartilhado (`VIA_CSS`):
 
----
+- `body { font-weight: 700; word-break: break-word; overflow-wrap: anywhere; }` — força quebra dentro de palavras longas em vez de estourar.
+- Remover `white-space: nowrap` das linhas de FICHA / PROFISSIONAL / HORÁRIO / USUÁRIO; deixar o rótulo (`FICHA:` etc.) numa `<td>` de largura fixa e o valor em `<td>` fluida com `word-break`.
+- Tabela de serviço: `td.qtd { width: 10mm; }` fixo; `td.servico { word-break: break-word; }` para nomes longos quebrarem em 2/3 linhas.
+- `.row` do valor recebido: trocar `flex` sem wrap por `display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 4px;` — o rótulo à esquerda encolhe, o valor à direita nunca é cortado.
+- Detalhe de pagamento misto: cada linha vira `<tr>` com rótulo em `<td>` sem `nowrap` e valor à direita; texto de troco/recebido quebra para linha seguinte quando necessário.
+- Endereço da clínica: usar `<div>` empilhados com `word-break: break-word` (sem `<br/>` no meio de "CIDADE - UF").
+- Confirmar que `.ticket` continua `width: 76mm` (margem visual do papel 80mm) e adicionar `max-width: 100%` para o cupom não estourar quando o driver da impressora usa área útil menor.
+- Espaçamento vertical entre blocos (`.sep`) mantido; `line-height` sobe para 1.3 (mais respiro com tudo em negrito).
+- `.lg` (título "GUIA DE ATENDIMENTO", valor total) sobe 1 pt para continuar se destacando sobre o corpo já bold.
 
-## Parte 2 — Trava de ficha em uso (presença colaborativa)
-
-Objetivo: quando o Funcionário A abre a ficha nº 010 na agenda, o Funcionário B ao clicar na mesma vê "Esta ficha está sendo usada por SUELLEN ALEXANDRE BATISTA há 12s. Deseja abrir mesmo assim?" (com opção de continuar ou cancelar).
-
-**Modelo escolhido: presença via Supabase Realtime (channel de presença), sem tabela.**
-
-- Cada usuário que abre um agendamento entra num canal `agendamento:<id>` publicando `{ user_id, nome, entrou_em }`.
-- Ao sair (fechar drawer, trocar de ficha, fechar aba, refresh) o canal é encerrado e a presença some.
-- Ao tentar abrir uma ficha, o cliente lista os presentes do canal. Se já houver **outro** usuário lá:
-  - Se for um agendamento "não sensível" (só leitura), mostra apenas um chip discreto "Também aberto por: FULANO".
-  - Se for uma ação sensível (fluxo, editar procedimento/horário, imprimir GR, dar baixa, mudar status): abre modal de confirmação "Ficha em uso por FULANO desde HH:MM. Continuar?" com botões *Cancelar* / *Continuar assim mesmo* (registrado em auditoria via update posterior — a auditoria de agendamentos já foi ativada).
-
-Por que presença e não uma tabela `agendamento_locks`:
-- Não precisa de heartbeat/limpeza; Realtime já detecta desconexão.
-- Não trava permanentemente uma ficha se o usuário fechar o navegador sem sair "direito".
-- Sem risco de lock órfão.
-
-**Onde integrar no front (ganchos existentes):**
-
-- `patient-drawer.tsx` (Agenda V2) — entra no canal ao montar, sai ao desmontar.
-- `paciente-quick-actions.tsx` / `procedimento-cell.tsx` (Agenda clássica) — mesmo hook antes de abrir ações sensíveis.
-- Novo hook `useFichaPresence(agendamentoId)` centralizando `join/leave/quemEsta` para reutilizar.
-- Novo componente `<FichaEmUsoAlert />` (modal + chip) usando o design system HHP.
-
-**Habilitação no banco:**
-
-- `ALTER PUBLICATION supabase_realtime ADD TABLE public.agendamentos;` (opcional, só se quisermos também refresh automático em mudanças — recomendo incluir agora para eliminar o "F5" descrito na auditoria da Agenda V2).
-- Presença em si não precisa de tabela; só o canal.
+Nada é alterado no `@page { size: 80mm auto }` — impressora térmica continua imprimindo do mesmo jeito, só que o conteúdo agora se acomoda em qualquer largura útil que o driver reportar.
 
 ---
 
 ## Detalhes técnicos
 
-- Migration: `ALTER TABLE public.agendamentos ADD COLUMN ficha_numero smallint;` + `ALTER TABLE public.gr_impressoes ADD COLUMN ficha_numero smallint;` + índice `(clinica_id, inicio) WHERE ficha_numero IS NOT NULL`.
-- `src/lib/print-gr.ts`: antes de calcular a ficha, ler `a.ficha_numero`; se null, calcular e fazer `UPDATE agendamentos SET ficha_numero = X WHERE id = ...` na mesma transação da inserção em `gr_impressoes` (server function `imprimirGr`).
-- Exibição na grade (Agenda clássica e V2): usar `ficha_numero ?? posicaoCalculada`.
-- Presença: `supabase.channel('ficha:'+agendamentoId, { config: { presence: { key: userId }}}).on('presence',{event:'sync'}, ...).track({nome, entrou_em})`.
-- Consulta do nome do outro usuário: já disponível via `profiles.nome` no `useAuth`.
+- Arquivo único: `src/lib/print-gr.ts`.
+- Bloco de estilo do `printGuiaAtendimentoCore` (a partir da linha 519), do `printGuiaAgrupada` (linha ~964) e do fluxo de reimpressão (linha ~1178): mesmas regras replicadas ou centralizadas numa constante `BASE_CSS` reutilizada nos três locais para não divergir.
+- Nenhuma migration, nenhum ajuste de dado — puramente cosmético/CSS.
+- Sem alteração de comportamento: número de vias, número da ficha, cálculos de repasse, texto de "IMPRESSÃO Nº X" e registro em `gr_impressoes` continuam iguais.
+- Compatível com o `iframe` oculto atual — o HTML gerado continua o mesmo mecanismo.
 
 ---
 
 ## Fora do escopo
 
-- Não alterar números de fichas antigas já existentes (fica NULL até a próxima impressão).
-- Não bloquear absolutamente a edição — o segundo usuário pode continuar após confirmar. Bloqueio duro só se você pedir depois.
-- Não mexer no cálculo de repasse / caixa.
+- Não mexer no visual dos botões de imprimir dentro da Agenda / Ficha.
+- Não trocar fonte (segue `Courier New` monoespaçada, padrão de cupom fiscal).
+- Não alterar tamanho do papel nem lógica de cálculo/valores.
 
 ---
 
-## Ordem de execução (build)
+## Verificação
 
-1. Migration (colunas `ficha_numero` + habilitar Realtime na tabela `agendamentos`).
-2. Ajustar `print-gr.ts` + server function de impressão para gravar/reusar `ficha_numero`.
-3. Atualizar exibição da ficha na Agenda clássica e V2.
-4. Criar hook `useFichaPresence` + componente `<FichaEmUsoAlert />`.
-5. Plugar nos pontos de abertura de ficha (drawer da V2 + ações sensíveis da clássica).
-6. Testar com dois usuários (você e a Suellen, por exemplo) simultâneos.
+Após aplicar, testar visualmente com um caso que combine todos os cenários problemáticos:
+- Paciente com nome longo (ex.: MARIA ALICE BASTOS PEREIRA MUNIZ).
+- Procedimento longo com especialidade entre parênteses.
+- Pagamento misto com troco.
+- Duplicata (2ª via) — precisa continuar com rótulo "2ª VIA" e quebra de página entre vias.
