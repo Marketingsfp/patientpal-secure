@@ -3745,6 +3745,9 @@ function AgendaPage() {
                         : "Desconto"}
                     </Button>
                     <div className="flex flex-wrap gap-2 sm:justify-end">
+                    <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={saving}>
+                      Cancelar
+                    </Button>
                     <Button
                       type="button"
                       disabled={saving || !form.paciente_id}
