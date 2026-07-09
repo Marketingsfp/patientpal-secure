@@ -124,6 +124,9 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
   const [novaSenha, setNovaSenha] = useState("");
   const [confirmarSenha, setConfirmarSenha] = useState("");
   const [savingSenha, setSavingSenha] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
+  const [bulkQuery, setBulkQuery] = useState("");
   const activeClinicaId = formClinicaId || clinicaId;
 
   const normalizarNome = (s: string) =>
