@@ -304,17 +304,23 @@ function Page() {
       const fimIso = new Date(`${gerar.data_fim}T23:59:59`).toISOString();
       const medicoIdsSet = new Set(slotsPreview.map((s) => s.medico_id));
       if (medicoIdsSet.size > 0) {
+        // Limpa TODOS os slots livres (sem paciente) no intervalo/médicos —
+        // o unique index uq_agend_slot_vazio bate em (clinica, medico, agenda, inicio)
+        // WHERE paciente_id IS NULL AND status='agendado', então filtrar apenas
+        // por paciente_nome='DISPONÍVEL' deixa slots antigos com outro rótulo
+        // (ex.: "BLOQUEIO", vazio, etc.) causando colisão ao regerar.
         const { error: delErr } = await supabase
           .from("agendamentos")
           .delete()
           .eq("clinica_id", clinicaAtual.clinica_id)
-          .eq("paciente_nome", "DISPONÍVEL")
+          .is("paciente_id", null)
+          .eq("status", "agendado")
           .in("medico_id", Array.from(medicoIdsSet))
           .gte("inicio", iniIso)
           .lte("inicio", fimIso);
         if (delErr) throw delErr;
       }
-      const rows = slotsPreview.map((s) => {
+      const rowsRaw = slotsPreview.map((s) => {
         const inicio = new Date(`${s.data}T${s.inicio}:00`);
         const fim = new Date(`${s.data}T${s.fim}:00`);
         const med = medicoById.get(s.medico_id)!;
@@ -331,6 +337,14 @@ function Page() {
           ...(procedimento ? { procedimento } : {}),
         };
       });
+      // Dedup dentro do próprio lote (mesmo médico/agenda/inicio) para não
+      // colidir com o unique index ao inserir múltiplas disponibilidades
+      // sobrepostas.
+      const rowsMap = new Map<string, typeof rowsRaw[number]>();
+      for (const r of rowsRaw) {
+        rowsMap.set(`${r.medico_id}|${r.agenda_id ?? ""}|${r.inicio}`, r);
+      }
+      const rows = Array.from(rowsMap.values());
       // Inserir em lotes de 500
       for (let i = 0; i < rows.length; i += 500) {
         const { error } = await supabase.from("agendamentos").insert(rows.slice(i, i + 500));
