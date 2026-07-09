@@ -4015,7 +4015,7 @@ function AgendaPage() {
             //    (agendamento_id = principal, tipo = receita, status = confirmado, mais recente).
             const { data: principalRow, error: errPrincipal } = await supabase
               .from("fin_lancamentos")
-              .select("id")
+              .select("id, observacoes")
               .eq("clinica_id", clinicaAtual.clinica_id)
               .eq("agendamento_id", agId)
               .eq("tipo", "receita")
@@ -4027,6 +4027,15 @@ function AgendaPage() {
               mostrarErro(errPrincipal, "pagamento salvo, mas falhou ao localizar o lançamento principal");
             }
 
+            // Preserva o trecho "Pagamento misto: ..." das observações do
+            // principal para que o caixa/relatórios consigam decompor as
+            // formas de pagamento em cada lançamento do grupo.
+            const obsOriginal = (principalRow as { observacoes?: string | null } | null)?.observacoes ?? "";
+            const idxMisto = obsOriginal.indexOf("Pagamento misto:");
+            const trechoMisto = idxMisto >= 0
+              ? obsOriginal.slice(idxMisto).split(" | ")[0]
+              : "";
+
             // 2) Atualiza o principal com valor rateado + grupo_pagamento_id + descrição individual.
             const rotuloPrincipal = pagamentoRotulos[agId] ?? "CONSULTA";
             if (principalRow?.id) {
@@ -4036,7 +4045,10 @@ function AgendaPage() {
                   valor: valoresRat[0],
                   grupo_pagamento_id: grupoId,
                   descricao: `${pagamentoPacienteNome} — ${rotuloPrincipal} (1/${N} do grupo)`,
-                  observacoes: `Pagamento agrupado (grupo ${grupoId}) — 1/${N} atendimentos`,
+                  observacoes: [
+                    `Pagamento agrupado (grupo ${grupoId}) — 1/${N} atendimentos`,
+                    trechoMisto,
+                  ].filter(Boolean).join(" | "),
                 } as never)
                 .eq("id", principalRow.id);
               if (errUpdPrinc) {
@@ -4055,7 +4067,10 @@ function AgendaPage() {
               status: "confirmado" as const,
               agendamento_id: extraId,
               grupo_pagamento_id: grupoId,
-              observacoes: `Pagamento agrupado (grupo ${grupoId}) — ${i + 2}/${N} atendimentos`,
+              observacoes: [
+                `Pagamento agrupado (grupo ${grupoId}) — ${i + 2}/${N} atendimentos`,
+                trechoMisto,
+              ].filter(Boolean).join(" | "),
             }));
             const { error: errExtras } = await supabase
               .from("fin_lancamentos")
