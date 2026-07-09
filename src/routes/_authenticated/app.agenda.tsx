@@ -1368,7 +1368,7 @@ function AgendaPage() {
     setProcOpcoesPorMedico(procOpcoesMap);
     const medicosIds = new Set((((m.data ?? []) as unknown) as Medico[]).map((x) => x.id));
     const nm = new Map<string, Set<string>>();
-    for (const r of (mc.data ?? []) as Array<{ medico_id: string; nome: string }>) {
+    for (const r of (mcRows ?? []) as Array<{ medico_id: string; nome: string }>) {
       if (!r.medico_id || !medicosIds.has(r.medico_id)) continue;
       if (!nm.has(r.medico_id)) nm.set(r.medico_id, new Set());
       nm.get(r.medico_id)!.add(normalizar(r.nome));
