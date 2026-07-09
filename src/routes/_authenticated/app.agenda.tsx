@@ -5381,7 +5381,7 @@ function AgendaPorMedicoGrid({
                         corStatus={corStatus}
                         estornoPend={!!(ag && estornoPendAgs.has(ag.id))}
                         ocultarPaciente={!!(ag && estornoPendAgs.has(ag.id) && ocultarPacienteMedico)}
-                        procedimentoFallback={ag?.procedimento ?? (medicoEhLaboratorioFormulario(ag?.medico_id) ? "EXAMES LABORATORIAIS" : "CONSULTA")}
+                        procedimentoFallback={ag?.procedimento ?? (ehLaboratorio?.(ag?.medico_id) ? "EXAMES LABORATORIAIS" : "CONSULTA")}
                       />
                     );
                   })}
