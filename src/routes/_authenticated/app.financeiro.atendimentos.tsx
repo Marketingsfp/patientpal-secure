@@ -2112,10 +2112,11 @@ function Page() {
           </DialogFooter>
           <style>{`
             @media print {
+              @page { size: A4 portrait; margin: 12mm; }
               body * { visibility: hidden !important; }
               .print-area, .print-area * { visibility: visible !important; }
               html, body { height: auto !important; overflow: visible !important; background: white !important; }
-              .print-area { position: absolute; left: 0; top: 0; right: 0; margin: 0; padding: 16mm; background: white !important; color: black !important; max-height: none !important; height: auto !important; overflow: visible !important; z-index: 9999; }
+              .print-area { position: absolute; left: 0; top: 0; right: 0; margin: 0; padding: 0; width: 186mm; background: white !important; color: black !important; max-height: none !important; height: auto !important; overflow: visible !important; z-index: 9999; font-size: 11pt; }
               [role="dialog"], [role="dialog"] > * { position: static !important; transform: none !important; max-height: none !important; height: auto !important; overflow: visible !important; }
               .no-print { display: none !important; }
               [role="dialog"] { box-shadow: none !important; border: none !important; }
