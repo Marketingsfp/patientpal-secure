@@ -180,6 +180,7 @@ function montarSufixoCartao(forma: string, bandeira: string, parcelas: string): 
 function Page() {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
+  const podeEscrever = usePodeEscrever("caixa");
   const isManager = clinicaAtual?.role === "admin" || clinicaAtual?.role === "gestor";
 
   const [tab, setTab] = useState<"meu" | "todos" | "repasse">("meu");
