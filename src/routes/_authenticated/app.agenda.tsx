@@ -4581,24 +4581,38 @@ function AgendaPage() {
                 const presente =
                   !realizado &&
                   (pagoHoje || !["aguardando_recepcao", "finalizado", "cancelado"].includes(etapaRow));
+                const estornoPend = estornoPendAgs.has(a.id);
+                // Para o médico, oculta a identidade do paciente enquanto a
+                // solicitação de estorno estiver pendente.
+                const ocultarPaciente = estornoPend && isMedicoOnly;
               return (
                   <TableRow
                     key={a.id}
                     className={
-                      realizado
+                      estornoPend
+                        ? "[&>td]:py-1 [&>td]:h-9 text-xs [&>td]:bg-rose-100 hover:[&>td]:bg-rose-100"
+                        : realizado
                         ? "[&>td]:py-1 [&>td]:h-9 text-xs [&>td]:bg-[#d1f0d6] hover:[&>td]:bg-[#d1f0d6]"
                         : presente
                           ? "[&>td]:py-1 [&>td]:h-9 text-xs [&>td]:bg-[#a8c8ed] hover:[&>td]:bg-[#a8c8ed]"
                           : "[&>td]:py-1 [&>td]:h-9 text-xs"
                     }
                     style={
-                      realizado
+                      estornoPend
+                        ? { backgroundColor: "#fee2e2", borderLeft: "3px solid #dc2626" }
+                        : realizado
                         ? { backgroundColor: "#d1f0d6", borderLeft: "3px solid #8fd49a" }
                         : presente
                           ? { backgroundColor: "#a8c8ed", borderLeft: "3px solid #7aa9d8" }
                           : undefined
                     }
-                    title={presente ? "Cliente presente na clínica" : undefined}
+                    title={
+                      estornoPend
+                        ? "Estorno solicitado — aguardando decisão do financeiro"
+                        : presente
+                          ? "Cliente presente na clínica"
+                          : undefined
+                    }
                   >
                   <TableCell title="Marque para cobrar este atendimento em um pagamento agrupado">
                     <Checkbox checked={selecionados.has(a.id)} onCheckedChange={() => toggleSel(a.id)} />
