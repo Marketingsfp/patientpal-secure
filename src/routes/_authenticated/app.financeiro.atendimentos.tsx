@@ -19,6 +19,7 @@ import {
   QrCode,
   HelpCircle,
   Printer,
+  MoreHorizontal,
 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -42,6 +43,14 @@ import { cn } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro/atendimentos")({
   component: Page,
@@ -1332,26 +1341,45 @@ function Page() {
             </Button>
           )}
           {!isMedicoOnly && (
-            <Button
-              variant="outline"
-              onClick={darBaixaLote}
-              disabled={selectedNaoBaixados.length === 0}
-              title="Marcar atendimentos selecionados como realizados e liberar repasses"
-            >
-              <CheckCircle2 className="h-4 w-4 mr-2 text-emerald-600" />
-              Dar baixa{selectedNaoBaixados.length ? ` (${selectedNaoBaixados.length})` : ""}
-            </Button>
-          )}
-          {!isMedicoOnly && (
-            <Button
-              variant="outline"
-              onClick={reimprimirSelecionados}
-              disabled={!podeReimprimir}
-              title={misturado ? "Selecione apenas atendimentos JÁ pagos" : "Imprimir 2ª via dos atendimentos pagos selecionados"}
-            >
-              <Printer className="h-4 w-4 mr-2" />
-              Imprimir 2ª via{selectedPagos.length ? ` (${selectedPagos.length})` : ""}
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  <MoreHorizontal className="h-4 w-4 mr-2" />
+                  Opções
+                  {selectedItems.length ? ` (${selectedItems.length})` : ""}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuLabel>
+                  {selectedItems.length
+                    ? `${selectedItems.length} atendimento(s) selecionado(s)`
+                    : "Selecione atendimentos na lista"}
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  disabled={selectedNaoBaixados.length === 0}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    if (selectedNaoBaixados.length > 0) darBaixaLote();
+                  }}
+                >
+                  <CheckCircle2 className="h-4 w-4 mr-2 text-emerald-600" />
+                  Dar baixa
+                  {selectedNaoBaixados.length ? ` (${selectedNaoBaixados.length})` : ""}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={!podeReimprimir}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    if (podeReimprimir) reimprimirSelecionados();
+                  }}
+                >
+                  <Printer className="h-4 w-4 mr-2" />
+                  Imprimir 2ª via
+                  {selectedPagos.length ? ` (${selectedPagos.length})` : ""}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
           <Dialog open={open} onOpenChange={setOpen}>
             {!isMedicoOnly && (
@@ -1881,16 +1909,38 @@ function Page() {
               <Wallet className="h-4 w-4 mr-2" />
               Pagar repasse{selectedNaoPagos.length ? ` (${selectedNaoPagos.length})` : ""}
             </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={reimprimirSelecionados}
-              disabled={!podeReimprimir}
-              title={misturado ? "Selecione apenas atendimentos JÁ pagos" : undefined}
-            >
-              <Printer className="h-4 w-4 mr-2" />
-              Imprimir 2ª via{selectedPagos.length ? ` (${selectedPagos.length})` : ""}
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="outline">
+                  <MoreHorizontal className="h-4 w-4 mr-2" />
+                  Opções
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuItem
+                  disabled={selectedNaoBaixados.length === 0}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    if (selectedNaoBaixados.length > 0) darBaixaLote();
+                  }}
+                >
+                  <CheckCircle2 className="h-4 w-4 mr-2 text-emerald-600" />
+                  Dar baixa
+                  {selectedNaoBaixados.length ? ` (${selectedNaoBaixados.length})` : ""}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={!podeReimprimir}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    if (podeReimprimir) reimprimirSelecionados();
+                  }}
+                >
+                  <Printer className="h-4 w-4 mr-2" />
+                  Imprimir 2ª via
+                  {selectedPagos.length ? ` (${selectedPagos.length})` : ""}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button size="sm" variant="ghost" onClick={() => setSel(new Set())}>
               Limpar
             </Button>
