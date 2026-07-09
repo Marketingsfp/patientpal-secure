@@ -1,45 +1,35 @@
 
 ## Objetivo
 
-Quando existir uma solicitação de estorno **pendente** vinculada a um agendamento:
-1. A linha desse agendamento na Agenda aparece em **vermelho** (com uma etiqueta "Estorno solicitado").
-2. Para o usuário com perfil **Médico**, o nome do paciente e ações do paciente ficam **ocultos** naquela linha (aparece "— aguardando estorno —"), impedindo o médico de acessar/atender esse paciente até o financeiro decidir.
+Hoje, na aba **Financeiro › Atendimentos**, o botão verde ✓ ("Dar baixa") só existe **linha por linha**. Quando o CARLOS EDUARDO (ou qualquer médico) tem 20+ atendimentos "A receber" no dia, é preciso clicar 20 vezes. A meta é permitir **selecionar vários atendimentos e dar baixa em todos de uma vez**, aproveitando as checkboxes que já existem.
 
-Quando o financeiro **aprova** o estorno, o agendamento já volta para "Agendado" (fluxo existente). Quando **recusa**, a linha volta ao estado normal.
+## Comportamento
 
-## O que muda
+1. Na barra de ações do topo (onde ficam "Pagar repasse", "Imprimir 2ª via", "Novo atendimento"), adicionar um novo botão **"Dar baixa"**.
+2. O botão fica **desabilitado** enquanto nenhum item elegível estiver marcado.
+3. É "elegível para baixa" o atendimento selecionado que **ainda não foi baixado**:
+   - origem `agenda` → `agendamento_status !== 'realizado'`
+   - origem `manual` → `status !== 'realizado'`
+4. O rótulo mostra a quantidade: **"Dar baixa (7)"**.
+5. Ao clicar, abre um `confirm` do tipo:
+   *"Confirmar baixa de 7 atendimento(s)? Os médicos serão marcados como tendo atendido esses pacientes e os repasses ficarão liberados para pagamento."*
+6. Ao confirmar, roda em lote:
+   - Um `UPDATE ... IN (...)` em `agendamentos` para todos os IDs vindos de `origem = 'agenda'`.
+   - Um `UPDATE ... IN (...)` em `fin_atendimentos` para todos de `origem = 'manual'`.
+7. Toast: **"Baixa realizada em N atendimento(s). Repasses liberados."** + `load()` para atualizar a lista.
+8. Se algum item selecionado já estava realizado, ele é ignorado silenciosamente (não conta na quantidade e não bloqueia a ação).
+9. Erros de banco caem no `mostrarErro` que já existe.
 
-### 1. Backfill do vínculo `agendamento_id` nas solicitações de estorno
-Hoje o Caixa abre o diálogo passando apenas `lancamentoId`, então `estorno_solicitacoes.agendamento_id` fica `null` nesses casos. Vou:
-- Ajustar o `SolicitarEstornoDialog` para, quando `agendamentoId` não vier explícito, buscar `fin_lancamentos.agendamento_id` pelo `lancamento_id` antes de inserir a solicitação.
-- Rodar uma **migração leve de dados** que preenche `agendamento_id` retroativo nas solicitações existentes com base no `lancamento_id`.
+## Detalhe técnico (referência)
 
-### 2. Agenda (`src/routes/_authenticated/app.agenda.tsx`)
-- Carregar em paralelo com os agendamentos as solicitações de estorno **pendentes** da clínica, cruzando por `agendamento_id` (e por `lancamento_id → agendamento_id` como fallback).
-- Assinar realtime em `estorno_solicitacoes` para refletir criação/aprovação/recusa sem F5.
-- Novo estilo visual da linha quando `estornoPendente(agendamentoId) === true`:
-  - Cor de fundo/borda vermelhas (token `destructive`), independente do status.
-  - Badge extra "Estorno solicitado" ao lado do status.
-- Para o perfil médico (`isMedicoOnly`):
-  - Substituir `paciente_nome` por "— aguardando estorno —".
-  - Desabilitar botões da coluna "Ações" que abrem paciente/atendimento nessa linha.
-- Atualizar a **Legenda** incluindo "Estorno solicitado" em vermelho.
+- Arquivo único: `src/routes/_authenticated/app.financeiro.atendimentos.tsx`.
+- Reutilizar `selectedItems` (já existe), derivando um novo memo `selectedNaoBaixados`.
+- Criar função `darBaixaLote()` seguindo o mesmo padrão do `darBaixa(a)` atual (linhas 966–1002), mas com dois `.update().in("id", ids)` em vez de um `.eq`.
+- Colocar o botão ao lado de "Pagar repasse" (por volta da linha 1287), com `variant="outline"` e ícone `CheckCircle2` verde para manter coerência visual com a ação individual da linha.
+- Não altera esquema, não altera RLS, não mexe em outras telas.
 
-### 3. Grid "por médico" (`AgendaPorMedicoGrid`)
-Mesmo tratamento visual e mesmo mascaramento do paciente para médico.
+## Fora de escopo
 
-### 4. Caixa
-Passar `agendamentoId` também para o `SolicitarEstornoDialog` (quando conhecido a partir do lançamento), para o vínculo ficar imediato.
-
-## Detalhes técnicos
-
-- Fonte da verdade: `estorno_solicitacoes.status = 'pendente'`.
-- Cor vermelha via classes existentes (`bg-rose-100 text-rose-800 border border-rose-300`) para manter consistência com o resto do app; sem hardcode fora de tokens.
-- Nenhuma alteração de RLS: `is_member` já permite membros da clínica lerem `estorno_solicitacoes`.
-- Sem mudar schema (só um UPDATE de backfill em `estorno_solicitacoes`).
-
-## Perguntas rápidas (opcional)
-
-Se preferir, posso também:
-- Bloquear completamente o clique na linha (não só ocultar o paciente) para o médico.
-- Manter a linha vermelha visível para o médico **ou** ocultá-la totalmente. Meu default é **mostrar em vermelho com paciente mascarado**, para o médico ver que aquele slot está travado.
+- Não altera a ação verde individual em cada linha (continua funcionando igual).
+- Não altera o fluxo de "Pagar repasse" nem de "Imprimir 2ª via".
+- Não altera comportamento do Caixa nem cria migração.

@@ -1001,6 +1001,47 @@ function Page() {
     }
   };
 
+  const darBaixaLote = async () => {
+    const alvos = selectedItems.filter((a) => !a.repasse_pago && !isAtendido(a));
+    if (alvos.length === 0) return;
+    if (
+      !confirm(
+        `Confirmar baixa de ${alvos.length} atendimento(s)?\n\nOs médicos serão marcados como tendo atendido esses pacientes e os repasses ficarão liberados para pagamento.`,
+      )
+    )
+      return;
+    try {
+      const agIds = alvos
+        .filter((a) => a.origem === "agenda" && !!a.agendamento_id)
+        .map((a) => a.agendamento_id as string);
+      const manualIds = alvos.filter((a) => a.origem === "manual").map((a) => a.id);
+      if (agIds.length) {
+        const { error } = await supabase
+          .from("agendamentos")
+          .update({ status: "realizado" })
+          .in("id", agIds);
+        if (error) {
+          mostrarErro(error);
+          return;
+        }
+      }
+      if (manualIds.length) {
+        const { error } = await supabase
+          .from("fin_atendimentos")
+          .update({ status: "realizado" })
+          .in("id", manualIds);
+        if (error) {
+          mostrarErro(error);
+          return;
+        }
+      }
+      toast.success(`Baixa realizada em ${alvos.length} atendimento(s). Repasses liberados.`);
+      await load();
+    } catch (err) {
+      mostrarErro(err);
+    }
+  };
+
   const medMap = useMemo(() => new Map(medicos.map((m) => [m.id, m.nome])), [medicos]);
   const pacMap = useMemo(() => {
     const m = new Map<string, string>(pacientes.map((p) => [p.id, p.nome]));
@@ -1070,10 +1111,10 @@ function Page() {
 
   const isAtendido = (a: Atend) =>
     a.origem === "manual" ? a.status === "realizado" : a.agendamento_status === "realizado";
-  // Itens selecionáveis: para pagar repasse (não pagos + atendidos) OU para 2ª via (já pagos).
-  const selectables = filteredItems.filter(
-    (a) => ((a.repasse_pago || (!a.repasse_pago && isAtendido(a))) && (a.valor_medico ?? 0) > 0),
-  );
+  // Itens selecionáveis: qualquer atendimento com repasse > 0.
+  // As ações do topo validam individualmente o que cada uma aceita
+  // (baixa em lote, pagar repasse, 2ª via).
+  const selectables = filteredItems.filter((a) => (a.valor_medico ?? 0) > 0);
   const allSelected = selectables.length > 0 && selectables.every((a) => sel.has(`${a.origem}:${a.id}`));
   const toggleAll = () => {
     if (allSelected) setSel(new Set());
@@ -1090,6 +1131,9 @@ function Page() {
   const selectedTotal = selectedItems.reduce((s, a) => s + (Number(a.valor_medico) || 0), 0);
   const selectedPagos = selectedItems.filter((a) => a.repasse_pago);
   const selectedNaoPagos = selectedItems.filter((a) => !a.repasse_pago);
+  const selectedNaoBaixados = selectedItems.filter(
+    (a) => !a.repasse_pago && !isAtendido(a),
+  );
   const podePagar = selectedItems.length > 0 && selectedNaoPagos.length === selectedItems.length;
   const podeReimprimir = selectedItems.length > 0 && selectedPagos.length === selectedItems.length;
   const misturado = selectedItems.length > 0 && selectedPagos.length > 0 && selectedNaoPagos.length > 0;
@@ -1285,6 +1329,17 @@ function Page() {
             >
               <Wallet className="h-4 w-4 mr-2" />
               Pagar repasse{selectedNaoPagos.length ? ` (${selectedNaoPagos.length} • ${fmt(selectedNaoPagos.reduce((s, x) => s + (Number(x.valor_medico) || 0), 0))})` : ""}
+            </Button>
+          )}
+          {!isMedicoOnly && (
+            <Button
+              variant="outline"
+              onClick={darBaixaLote}
+              disabled={selectedNaoBaixados.length === 0}
+              title="Marcar atendimentos selecionados como realizados e liberar repasses"
+            >
+              <CheckCircle2 className="h-4 w-4 mr-2 text-emerald-600" />
+              Dar baixa{selectedNaoBaixados.length ? ` (${selectedNaoBaixados.length})` : ""}
             </Button>
           )}
           {!isMedicoOnly && (
