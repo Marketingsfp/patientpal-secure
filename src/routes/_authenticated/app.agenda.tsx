@@ -3209,6 +3209,19 @@ function AgendaPage() {
     }
   };
 
+  const imprimirComprovante = async (a: Agendamento) => {
+    if (!clinicaAtual) return;
+    try {
+      await printComprovanteAgendamento({
+        agendamentoId: a.id,
+        clinicaId: clinicaAtual.clinica_id,
+        usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
+      });
+    } catch (err) {
+      mostrarErro(err);
+    }
+  };
+
   const shiftData = (delta: number) => {
     const d = new Date(`${dataRef}T12:00:00`);
     d.setDate(d.getDate() + delta);
