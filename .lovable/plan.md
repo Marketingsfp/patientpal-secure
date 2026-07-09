@@ -1,31 +1,33 @@
 ## Objetivo
 
-Permitir dar baixa em vários atendimentos de uma vez, com a ação organizada dentro de um novo botão "Opções" no topo da tela de Atendimentos (Financeiro).
+Deixar visualmente óbvio, na coluna **Ações**, quais atendimentos ainda precisam de baixa e quais já foram baixados — e também sinalizar quais estão marcados para baixa em lote.
 
-## Mudanças em `src/routes/_authenticated/app.financeiro.atendimentos.tsx`
+## Estados visuais do botão "Dar baixa"
 
-1. **Novo botão "Opções" no toolbar do topo** (ao lado de "Pagar repasse"):
-   - Componente: `DropdownMenu` do shadcn (já usado no projeto).
-   - Rótulo: `Opções` com ícone `MoreHorizontal` / `Settings2`.
-   - Sempre habilitado; os itens internos é que ficam habilitados/desabilitados conforme a seleção.
+Substituir o atual botão fantasma (ícone verde discreto que só aparece quando pendente) por um **botão-pílula pequeno** sempre visível, com 3 estados:
 
-2. **Itens dentro do dropdown "Opções":**
-   - **Dar baixa (N)** — executa `darBaixaLote()` que já existe. Desabilitado quando `selectedNaoBaixados.length === 0`. Rótulo mostra a quantidade.
-   - **Imprimir 2ª via (N)** — move o botão atual de reimpressão para dentro do dropdown, para desafogar a barra superior. Desabilitado quando não há atendimentos pagos selecionados.
-   - Cada item mostra um `title`/descrição curta explicando o requisito de seleção quando desabilitado.
+| Estado | Condição | Visual |
+|---|---|---|
+| **Pendente** | `!repasse_pago && status !== "realizado"` | Fundo amarelo (`bg-amber-100 text-amber-800 border-amber-300`) + ícone `Clock` + texto "Baixar" |
+| **Selecionado p/ baixa em lote** | pendente **E** linha marcada no checkbox | Fundo amarelo mais forte (`bg-amber-500 text-white`) + ícone `CheckCircle2` preenchido + anel (`ring-2 ring-amber-600`) — indica "vai ser baixado ao clicar em Pagar repasse" |
+| **Baixado** | `repasse_pago \|\| status === "realizado"` | Fundo verde (`bg-emerald-100 text-emerald-800 border-emerald-300`) + ícone `CheckCircle2` + texto "Baixado" (não clicável) |
 
-3. **Remover os botões soltos** "Dar baixa" e "Imprimir 2ª via" da barra superior (desktop e mobile) — passam a viver dentro de "Opções". Mantém-se na barra: `Exportar Excel`, `Pagar repasse`, `Opções`, `Novo atendimento`.
+Aplicar a mesma lógica nas duas branches (`origem === "agenda"` e demais) em `src/routes/_authenticated/app.financeiro.atendimentos.tsx` (linhas ~1807–1817 e ~1855–1865).
 
-4. **Seleção múltipla já existente permanece:** a checkbox no cabeçalho da tabela seleciona/deseleciona todos os itens visíveis; a checkbox de cada linha alterna o item. Nenhuma alteração na lógica de `selectedItems` / `selectedNaoBaixados` / `selectedPagos`.
+## Reforço visual da seleção em lote
 
-5. **Confirmação e fluxo do "Dar baixa" em lote (inalterados, apenas revisados):**
-   - Confirmação `confirm("Dar baixa em N atendimento(s)?")` antes de rodar.
-   - `UPDATE agendamentos SET status='realizado' WHERE id IN (...)` para itens origem `agenda`.
-   - `UPDATE fin_atendimentos SET status='realizado' WHERE id IN (...)` para itens origem `manual`.
-   - Toast de sucesso + `load()` para recarregar a lista.
+Além do check-visual no botão, quando a linha está selecionada e é elegível para baixa (pendente):
+- Manter o checkbox marcado (já existe).
+- Aplicar um `bg-amber-50/60` sutil na linha inteira (via `rowBg` condicional) para o usuário "ver de longe" o grupo que será baixado.
+
+## Detalhes técnicos
+
+- Trocar `<Button variant="ghost" size="icon">` por `<Button size="sm" className="h-6 px-2 text-[10px] ...">` com classes condicionais montadas por helper local `baixaBtnClass(pendente, selecionado)`.
+- Ícones já importados (`CheckCircle2`, `Clock` de lucide-react — adicionar `Clock` no import se faltar).
+- `selecionado` = `selectedIds.has(a.id)` (variável já existente no escopo do render).
+- Botão em estado "Baixado" fica com `disabled` e sem `onClick`, mantendo `title="Repasse já baixado"`.
 
 ## Fora de escopo
 
-- Não altera RLS, tabelas, ou funções server-side.
-- Não altera a ação individual por linha (ícone de baixa em cada linha continua).
-- Não altera "Pagar repasse", Caixa, nem cálculos de repasse.
+- Não altera a lógica de `darBaixa()` nem o fluxo do rodapé "Pagar repasse (N)".
+- Não muda a coluna Status/Pgto — só a coluna Ações.
