@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   Plus,
@@ -445,37 +445,22 @@ function Page() {
     await load();
   };
 
-  // Solicitações de estorno pendentes (vindas do caixa/recepção)
-  interface SolicEst {
-    id: string;
-    paciente_nome: string | null;
-    descricao: string | null;
-    valor: number | null;
-    motivo: string;
-    solicitado_em: string;
-    lancamento_id: string | null;
-    tipo: "erro_caixa" | "devolucao" | null;
-    data_pagamento_original: string | null;
-    data_estorno: string | null;
-  }
-  const [solicitacoes, setSolicitacoes] = useState<SolicEst[]>([]);
-  const loadSolicitacoes = async () => {
+  // Contagem de solicitações de estorno pendentes (gerenciamento agora vive em /app/financeiro/estorno).
+  const [estornoPendentes, setEstornoPendentes] = useState(0);
+  const loadEstornoCount = async () => {
     if (!clinicaAtual) {
-      setSolicitacoes([]);
+      setEstornoPendentes(0);
       return;
     }
-    const { data } = await supabase
+    const { count } = await supabase
       .from("estorno_solicitacoes")
-      .select(
-        "id, paciente_nome, descricao, valor, motivo, solicitado_em, lancamento_id, tipo, data_pagamento_original, data_estorno",
-      )
+      .select("id", { count: "exact", head: true })
       .eq("clinica_id", clinicaAtual.clinica_id)
-      .eq("status", "pendente")
-      .order("solicitado_em", { ascending: false });
-    setSolicitacoes((data ?? []) as SolicEst[]);
+      .eq("status", "pendente");
+    setEstornoPendentes(count ?? 0);
   };
   useEffect(() => {
-    void loadSolicitacoes(); /* eslint-disable-next-line react-hooks/exhaustive-deps */
+    void loadEstornoCount(); /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [clinicaAtual?.clinica_id]);
   useEffect(() => {
     if (!clinicaAtual) return;
@@ -490,7 +475,7 @@ function Page() {
           filter: `clinica_id=eq.${clinicaAtual.clinica_id}`,
         },
         () => {
-          void loadSolicitacoes();
+          void loadEstornoCount();
         },
       )
       .subscribe();
@@ -499,60 +484,6 @@ function Page() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clinicaAtual?.clinica_id]);
-
-  const aprovarSolicitacao = async (s: SolicEst) => {
-    if (!podeEstornar) {
-      toast.error("Sem permissão");
-      return;
-    }
-    // Tenta encontrar o atendimento referente para estornar de fato
-    const alvo = s.lancamento_id ? items.find((x) => x.id === s.lancamento_id) : null;
-    if (alvo) {
-      await estornar(alvo);
-    }
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    const { error } = await supabase
-      .from("estorno_solicitacoes")
-      .update({
-        status: "aprovado",
-        resolvido_por: user?.id ?? null,
-        resolvido_em: new Date().toISOString(),
-        resposta: alvo ? "Estorno executado" : "Aprovado manualmente (processar baixa)",
-      })
-      .eq("id", s.id);
-    if (error) mostrarErro(error);
-    else {
-      toast.success("Solicitação aprovada");
-      void loadSolicitacoes();
-    }
-  };
-
-  const rejeitarSolicitacao = async (s: SolicEst) => {
-    if (!podeEstornar) {
-      toast.error("Sem permissão");
-      return;
-    }
-    const resp = window.prompt("Motivo da recusa (opcional):") ?? "";
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    const { error } = await supabase
-      .from("estorno_solicitacoes")
-      .update({
-        status: "rejeitado",
-        resolvido_por: user?.id ?? null,
-        resolvido_em: new Date().toISOString(),
-        resposta: resp || null,
-      })
-      .eq("id", s.id);
-    if (error) mostrarErro(error);
-    else {
-      toast.success("Solicitação recusada");
-      void loadSolicitacoes();
-    }
-  };
 
   // Perfil médico: trava o filtro no próprio profissional
   useEffect(() => {
@@ -1373,64 +1304,17 @@ function Page() {
 
   return (
     <div className="space-y-3">
-      {podeEstornar && solicitacoes.length > 0 && (
-        <Card className="border-rose-300 bg-rose-50/60">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2 mb-2">
-              <BellRing className="h-4 w-4 text-rose-700" />
-              <strong className="text-sm text-rose-900">
-                {solicitacoes.length} solicitação(ões) de estorno pendente(s)
-              </strong>
-              <span className="text-xs text-rose-700/80">enviadas pelo caixa/recepção</span>
-            </div>
-            <ul className="divide-y divide-rose-200/60">
-              {solicitacoes.map((s) => (
-                <li key={s.id} className="py-2 flex flex-wrap items-start gap-2 text-sm">
-                  <div className="flex-1 min-w-[200px]">
-                    <div className="font-medium flex flex-wrap items-center gap-1.5">
-                      <span>{s.paciente_nome ?? "—"}</span>
-                      {s.valor != null && (
-                        <span className="text-muted-foreground font-normal">• {fmt(Number(s.valor))}</span>
-                      )}
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          "text-[10px] h-4 px-1.5",
-                          s.tipo === "devolucao"
-                            ? "border-amber-400 text-amber-900 bg-amber-100"
-                            : "border-rose-400 text-rose-900 bg-rose-100",
-                        )}
-                      >
-                        {s.tipo === "devolucao" ? "Devolução" : "Erro de caixa"}
-                      </Badge>
-                    </div>
-                    {s.descricao && <div className="text-xs text-muted-foreground">{s.descricao}</div>}
-                    <div className="text-xs italic text-rose-800/80 mt-0.5">"{s.motivo}"</div>
-                    {s.tipo === "devolucao" && (s.data_pagamento_original || s.data_estorno) && (
-                      <div className="text-[10px] text-muted-foreground">
-                        {s.data_pagamento_original && (
-                          <>Pago em {new Date(s.data_pagamento_original).toLocaleDateString("pt-BR")} • </>
-                        )}
-                        {s.data_estorno && <>Devolver em {new Date(s.data_estorno).toLocaleDateString("pt-BR")}</>}
-                      </div>
-                    )}
-                    <div className="text-[10px] text-muted-foreground">
-                      {new Date(s.solicitado_em).toLocaleString("pt-BR")}
-                    </div>
-                  </div>
-                  <div className="flex gap-1.5">
-                    <Button size="sm" className="h-7 text-xs" onClick={() => aprovarSolicitacao(s)}>
-                      <CheckCircle2 className="h-3 w-3 mr-1" /> Aprovar e estornar
-                    </Button>
-                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => rejeitarSolicitacao(s)}>
-                      Recusar
-                    </Button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
+      {podeEstornar && estornoPendentes > 0 && (
+        <Link
+          to="/app/financeiro/estorno"
+          className="flex items-center gap-2 rounded-md border border-rose-300 bg-rose-50/60 px-3 py-2 text-sm text-rose-900 hover:bg-rose-100 transition-colors"
+        >
+          <BellRing className="h-4 w-4 text-rose-700" />
+          <strong>
+            {estornoPendentes} solicitação(ões) de estorno pendente(s)
+          </strong>
+          <span className="text-xs text-rose-700/80">— clique para gerenciar na aba Estorno</span>
+        </Link>
       )}
       <div className="flex items-center justify-between">
         <div>
