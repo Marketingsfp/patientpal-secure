@@ -544,6 +544,23 @@ function Page() {
     return r;
   }, [minhasMovs]);
 
+  // Entradas agrupadas por forma de pagamento (recebimento + suprimento)
+  const entradasPorForma = useMemo(() => {
+    const r = { dinheiro: 0, pix: 0, debito: 0, credito: 0, outros: 0, total: 0 };
+    minhasMovs.forEach((m) => {
+      if (m.tipo !== "recebimento" && m.tipo !== "suprimento") return;
+      const v = Number(m.valor || 0);
+      const f = (m.forma_pagamento || "").toLowerCase();
+      if (f === "dinheiro") r.dinheiro += v;
+      else if (f === "pix") r.pix += v;
+      else if (f === "debito") r.debito += v;
+      else if (f === "credito") r.credito += v;
+      else r.outros += v;
+      r.total += v;
+    });
+    return r;
+  }, [minhasMovs]);
+
   // Calculo por sessao (todos)
   const calcSaldoSessao = useCallback((sid: string) => {
     return todosMovs

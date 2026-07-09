@@ -1,27 +1,27 @@
-## Diagnóstico
+## Objetivo
+Mostrar, na aba **Meu Caixa** do menu Caixa, um detalhamento por forma de pagamento (Dinheiro, PIX, Débito, Crédito e demais) das entradas da sessão atual, junto ao card **Saldo atual**.
 
-A pré-carga de `labProcIds` no diálogo de Novo Orçamento agora inclui **~4.470 procedimentos** (todos com `tipo_procedimento='laboratorio'` ou `grupo ILIKE '%labor%'`, união feita em memória). Ao pesquisar "glicose" em categoria Laboratório, a busca faz:
+## O que muda (apenas UI, sem alterações de banco/regras)
 
-```
-q.in("id", ids)  // ids.length ≈ 4470
-```
+Arquivo: `src/routes/_authenticated/app.caixa.tsx`
 
-O PostgREST recebe uma URL com ~165KB, muito acima do limite (nginx/Cloudflare rejeitam), então a request falha e o `data` volta vazio — nenhum exame de glicose aparece. É regressão da correção anterior: enquanto `procedimento_especialidades` tinha 18 linhas, o `in()` cabia; após adicionar a união com `tipo_procedimento`, estourou.
+1. **Novo cálculo `entradasPorForma`** (useMemo, ao lado de `resumoTipos`)
+   - Percorre `minhasMovs` filtrando apenas movimentos que somam ao caixa em cada forma: `recebimento` e `suprimento` (positivos).
+   - Agrupa por `forma_pagamento` (fallback `"outros"` quando nulo), normalizando as chaves conhecidas: `dinheiro`, `pix`, `debito`, `credito`, e uma categoria `outros` para o restante (boleto, transferência, cheque, convênio, etc.).
+   - Retorna um objeto `{ dinheiro, pix, debito, credito, outros, total }`.
 
-## Correção
+2. **Novo bloco visual abaixo do grid de 4 cards** (Saldo atual / Abertura / Entradas / Saídas):
+   - Um card único intitulado **"Entradas por forma de pagamento"**, com 5 mini-linhas/chips em grid responsivo (`grid-cols-2 md:grid-cols-5`):
+     - Dinheiro · PIX · Débito · Crédito · Outros
+   - Cada item mostra rótulo + valor formatado com `fmt()`. Zeros aparecem como `R$ 0,00` (mantém consistência visual).
+   - Estilo alinhado ao restante da aba (usa `Card`/`CardContent` já importados; sem novas dependências).
 
-Em `src/routes/_authenticated/app.orcamentos.tsx` (busca de procedimentos, linhas ~614–731):
+3. **Sem alteração** em: schema, RPCs, cálculo de `saldoAtual`, fluxo de fechamento, drill-down existente, aba "Todos os caixas" ou comprovantes.
 
-1. **Remover o prefetch** `labProcIds` e o estado associado. Passa a ser desnecessário.
-2. **Aplicar o filtro de categoria direto na query de busca** (PostgREST combina múltiplos `.or()` como AND):
-   - Categoria `laboratorio`: `q.or("tipo_procedimento.eq.laboratorio,grupo.ilike.%labor%")`.
-   - Categoria `demais`: `q.not("tipo_procedimento","eq","laboratorio").not("grupo","ilike","%labor%")` (registros com `grupo` nulo continuam aparecendo, pois `not ilike` inclui NULL como não-match).
-3. **Manter o filtro de nome** como está (`.or("nome.ilike.%q%,nome.ilike.%norm%")`) — combinado com o `.or()` de categoria fica: `(nome match) AND (categoria match)`.
-4. Remover o guard `if (categoria && labProcIds == null) return;` e a dependência `labProcIds` do `useEffect`.
+## Detalhes técnicos
+- Fonte dos dados: array `minhasMovs` já carregado (campo `forma_pagamento` já vem do select em `MOV_FIELDS`).
+- Regra de agrupamento: somente `tipo ∈ {recebimento, suprimento}` para representar "quanto entrou"; sangrias/despesas continuam no card "Saídas".
+- Sem impacto em regras de negócio ou memória do projeto.
 
-Efeito: a busca passa a ser executada 100% no banco, sem prefetch nem lista gigante de IDs. Os 15 exames de glicose voltam a aparecer, e a busca fica mais rápida. Alinhado com a fonte de verdade usada pelo cadastro de Serviços.
-
-## Fora do escopo
-
-- Não mexer em `procedimento_especialidades` — o cadastro de Serviços grava a classificação em `tipo_procedimento`/`grupo`, então essa é a fonte usada.
-- Não alterar nenhuma outra tela (agenda, caixa, atendimento).
+## Verificação
+- Abrir `/app/agenda` → Caixa → aba **Meu Caixa** com sessão aberta e conferir se o novo card exibe os totais e se batem com o card **Entradas** (soma das 5 categorias = Entradas).
