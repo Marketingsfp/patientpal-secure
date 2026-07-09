@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
-import { Plus, Pencil, Trash2, ArrowUpCircle, ArrowDownCircle, ArrowLeftRight, Download } from "lucide-react";
+import { Plus, Pencil, Trash2, ArrowUpCircle, ArrowDownCircle, ArrowLeftRight, Download, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
+import { logAction } from "@/hooks/use-crud";
 import { exportToExcel } from "@/lib/export-csv";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,6 +46,8 @@ const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", curren
 function Page() {
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("financeiro");
+  const podeEstornar = ["admin", "gestor", "financeiro"].includes(clinicaAtual?.role ?? "");
+  const [estornando, setEstornando] = useState<string | null>(null);
   const [items, setItems] = useState<Lanc[]>([]);
   const [cats, setCats] = useState<Opt[]>([]);
   const [contas, setContas] = useState<Opt[]>([]);
@@ -263,6 +266,73 @@ function Page() {
     if (!confirm(`Excluir "${l.descricao}"?`)) return;
     const { error } = await supabase.from("fin_lancamentos").delete().eq("id", l.id);
     if (error) mostrarErro(error); else { toast.success("Removido"); await load(); await loadResumo(); }
+  };
+
+  const estornar = async (l: Lanc) => {
+    if (!podeEstornar) { toast.error("Sem permissão"); return; }
+    if (l.origem === "caixa" || l.tipo === "transferencia") return;
+    if (l.status === "cancelado") { toast.info("Lançamento já estornado."); return; }
+    if (!confirm(`Estornar "${l.descricao}" no valor de ${fmt(Number(l.valor))}?`)) return;
+    setEstornando(l.id);
+    try {
+      const { data: lanc, error: eLanc } = await supabase
+        .from("fin_lancamentos")
+        .select("id, agendamento_id, valor, descricao")
+        .eq("id", l.id)
+        .maybeSingle();
+      if (eLanc) { mostrarErro(eLanc); return; }
+      const { data: atd } = await supabase
+        .from("fin_atendimentos")
+        .select("id, repasse_pago")
+        .eq("lancamento_id", l.id)
+        .maybeSingle();
+      if (atd?.repasse_pago) {
+        toast.error("Repasse já pago — estorne o pagamento do repasse primeiro.");
+        return;
+      }
+      const { error: eUpdLanc } = await supabase
+        .from("fin_lancamentos")
+        .update({ status: "cancelado" })
+        .eq("id", l.id);
+      if (eUpdLanc) { mostrarErro(eUpdLanc, "falha ao estornar lançamento"); return; }
+      const agId = lanc?.agendamento_id ?? null;
+      if (agId) {
+        const { data: agAntes } = await supabase
+          .from("agendamentos")
+          .select("id, status, fluxo_etapa")
+          .eq("id", agId)
+          .maybeSingle();
+        const { error: eUpd } = await supabase
+          .from("agendamentos")
+          .update({
+            status: "agendado",
+            fluxo_etapa: "aguardando_recepcao",
+            fluxo_atualizado_em: new Date().toISOString(),
+          })
+          .eq("id", agId);
+        if (eUpd) { mostrarErro(eUpd); return; }
+        try {
+          await logAction({
+            table_name: "agendamentos",
+            record_id: agId,
+            action: "ESTORNO",
+            clinica_id: clinicaAtual?.clinica_id,
+            dados_antes: agAntes ?? { id: agId },
+            dados_depois: {
+              id: agId,
+              status: "agendado",
+              fin_lancamentos_id_removido: l.id,
+              valor_estornado: lanc?.valor ?? null,
+            },
+          });
+        } catch { /* auditoria best-effort */ }
+      }
+      toast.success("Lançamento estornado");
+      await load();
+      await loadResumo();
+    } finally {
+      setEstornando(null);
+    }
   };
 
   const catsFiltradas = cats.filter((c) => !c.tipo || c.tipo === form.tipo);
@@ -485,7 +555,7 @@ function Page() {
               <TableHead>Usuário</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Valor</TableHead>
-              <TableHead className="w-24"></TableHead>
+              <TableHead className="w-32 text-right">Ações</TableHead>
             </TableRow></TableHeader>
             <TableBody>{items.map((l) => {
               const userMap = new Map(usuarios.map((u) => [u.id, u.nome]));
@@ -511,12 +581,25 @@ function Page() {
                     ? (l.transferSentido === "entrada" ? "↑" : "↓")
                     : (l.tipo === "receita" ? "+" : "-")} {fmt(Number(l.valor))}</TableCell>
                 <TableCell className="text-right">
-                  {podeEscrever && l.origem !== "caixa" ? (
-                    <>
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(l)}><Pencil className="h-3.5 w-3.5" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => remove(l)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
-                    </>
-                  ) : null}
+                  <div className="flex items-center justify-end gap-0.5">
+                    {podeEstornar && l.origem !== "caixa" && l.tipo !== "transferencia" && l.status !== "cancelado" ? (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Estornar"
+                        disabled={estornando === l.id}
+                        onClick={() => estornar(l)}
+                      >
+                        <Undo2 className="h-3.5 w-3.5 text-amber-600" />
+                      </Button>
+                    ) : null}
+                    {podeEscrever && l.origem !== "caixa" ? (
+                      <>
+                        <Button variant="ghost" size="icon" title="Editar" onClick={() => openEdit(l)}><Pencil className="h-3.5 w-3.5" /></Button>
+                        <Button variant="ghost" size="icon" title="Excluir" onClick={() => remove(l)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                      </>
+                    ) : null}
+                  </div>
                 </TableCell>
               </TableRow>);
             })}
