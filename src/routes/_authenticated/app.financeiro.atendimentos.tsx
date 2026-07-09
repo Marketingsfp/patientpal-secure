@@ -1001,6 +1001,47 @@ function Page() {
     }
   };
 
+  const darBaixaLote = async () => {
+    const alvos = selectedItems.filter((a) => !a.repasse_pago && !isAtendido(a));
+    if (alvos.length === 0) return;
+    if (
+      !confirm(
+        `Confirmar baixa de ${alvos.length} atendimento(s)?\n\nOs médicos serão marcados como tendo atendido esses pacientes e os repasses ficarão liberados para pagamento.`,
+      )
+    )
+      return;
+    try {
+      const agIds = alvos
+        .filter((a) => a.origem === "agenda" && !!a.agendamento_id)
+        .map((a) => a.agendamento_id as string);
+      const manualIds = alvos.filter((a) => a.origem === "manual").map((a) => a.id);
+      if (agIds.length) {
+        const { error } = await supabase
+          .from("agendamentos")
+          .update({ status: "realizado" })
+          .in("id", agIds);
+        if (error) {
+          mostrarErro(error);
+          return;
+        }
+      }
+      if (manualIds.length) {
+        const { error } = await supabase
+          .from("fin_atendimentos")
+          .update({ status: "realizado" })
+          .in("id", manualIds);
+        if (error) {
+          mostrarErro(error);
+          return;
+        }
+      }
+      toast.success(`Baixa realizada em ${alvos.length} atendimento(s). Repasses liberados.`);
+      await load();
+    } catch (err) {
+      mostrarErro(err);
+    }
+  };
+
   const medMap = useMemo(() => new Map(medicos.map((m) => [m.id, m.nome])), [medicos]);
   const pacMap = useMemo(() => {
     const m = new Map<string, string>(pacientes.map((p) => [p.id, p.nome]));
