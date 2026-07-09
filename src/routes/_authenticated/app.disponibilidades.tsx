@@ -67,26 +67,50 @@ function Page() {
 
   const load = async () => {
     if (!clinicaAtual) return;
-    const [m, d, a] = await Promise.all([
-      supabase.from("medicos").select("id, nome, duracao_consulta_min, procedimento_padrao_id, cidade, estado, bairro, procedimento:procedimentos!medicos_procedimento_padrao_id_fkey(nome), especialidade:especialidades!medicos_especialidade_id_fkey(nome)" as never).eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
-      supabase.from("medico_disponibilidades").select("id, medico_id, agenda_id, dia_semana, hora_inicio, hora_fim, observacoes, limite_pacientes, intervalo_min, vigencia_inicio, vigencia_fim" as never).eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("dia_semana").order("hora_inicio"),
-      supabase.from("medico_agendas" as never).select("id, medico_id, nome, ativo, ordem").eq("clinica_id", clinicaAtual.clinica_id).order("ordem").order("nome"),
-    ]);
-    type RawMedico = { id: string; nome: string; duracao_consulta_min: number | null; procedimento_padrao_id: string | null; cidade: string | null; estado: string | null; bairro: string | null; procedimento?: { nome: string | null } | null; especialidade?: { nome: string | null } | null };
-    const rawList = ((m.data as unknown) as RawMedico[]) ?? [];
-    setMedicos(rawList.map((r) => ({
-      id: r.id,
-      nome: r.nome,
-      duracao_consulta_min: r.duracao_consulta_min,
-      procedimento_padrao_id: r.procedimento_padrao_id,
-      procedimento_padrao_nome: r.procedimento?.nome ?? null,
-      especialidade_nome: r.especialidade?.nome ?? null,
-      cidade: r.cidade,
-      estado: r.estado,
-      bairro: r.bairro,
-    })));
-    setDisps(((d.data as unknown) as DispRow[]) ?? []);
-    setAgendas(((a.data as unknown) as Agenda[]) ?? []);
+    try {
+      const [m, d, a] = await Promise.all([
+        supabase.from("medicos").select("id, nome, duracao_consulta_min, procedimento_padrao_id, cidade, estado, bairro, procedimento:procedimentos!medicos_procedimento_padrao_id_fkey(nome), especialidade:especialidades!medicos_especialidade_id_fkey(nome)" as never).eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
+        supabase.from("medico_disponibilidades").select("id, medico_id, agenda_id, dia_semana, hora_inicio, hora_fim, observacoes, limite_pacientes, intervalo_min, vigencia_inicio, vigencia_fim" as never).eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("dia_semana").order("hora_inicio"),
+        supabase.from("medico_agendas" as never).select("id, medico_id, nome, ativo, ordem").eq("clinica_id", clinicaAtual.clinica_id).order("ordem").order("nome"),
+      ]);
+
+      if (m.error) {
+        console.error("Erro ao carregar médicos:", m.error);
+        toast.error("Erro ao carregar médicos");
+        return;
+      }
+
+      if (d.error) {
+        console.error("Erro ao carregar disponibilidades:", d.error);
+      }
+
+      if (a.error) {
+        console.error("Erro ao carregar agendas:", a.error);
+      }
+
+      type RawMedico = { id: string; nome: string; duracao_consulta_min: number | null; procedimento_padrao_id: string | null; cidade: string | null; estado: string | null; bairro: string | null; procedimento?: { nome: string | null } | null; especialidade?: { nome: string | null } | null };
+      const rawList = ((m.data as unknown) as RawMedico[]) ?? [];
+      
+      console.log(`✅ Médicos carregados: ${rawList.length}`);
+      console.log("📋 Nomes:", rawList.map(r => r.nome).join(", "));
+      
+      setMedicos(rawList.map((r) => ({
+        id: r.id,
+        nome: r.nome,
+        duracao_consulta_min: r.duracao_consulta_min,
+        procedimento_padrao_id: r.procedimento_padrao_id,
+        procedimento_padrao_nome: r.procedimento?.nome ?? null,
+        especialidade_nome: r.especialidade?.nome ?? null,
+        cidade: r.cidade,
+        estado: r.estado,
+        bairro: r.bairro,
+      })));
+      setDisps(((d.data as unknown) as DispRow[]) ?? []);
+      setAgendas(((a.data as unknown) as Agenda[]) ?? []);
+    } catch (error) {
+      console.error("Erro no load:", error);
+      toast.error("Erro ao carregar dados");
+    }
   };
 
   useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clinicaAtual?.clinica_id]);
@@ -260,6 +284,7 @@ function Page() {
   const cidadesDisponiveis = Array.from(
     new Set(medicos.map((m) => (m.cidade ?? "").trim()).filter((c) => c.length > 0)),
   ).sort((a, b) => a.localeCompare(b, "pt-BR", { sensitivity: "base" }));
+  
   const medicosFiltrados = medicos
     .filter((m) => !filtro || m.nome.toLowerCase().includes(filtro.toLowerCase()))
     .filter((m) => filtroCidade === "all" || (m.cidade ?? "").trim().toLowerCase() === filtroCidade.toLowerCase())
@@ -324,6 +349,11 @@ function Page() {
       <div>
         <h1 className="text-2xl font-semibold">Horários médicos</h1>
         <p className="text-sm text-muted-foreground">Disponibilidade semanal por médico — {clinicaAtual.clinica.nome}</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          Total de médicos: <strong>{medicos.length}</strong> · 
+          Total de agendas: <strong>{agendas.length}</strong> · 
+          Total de disponibilidades: <strong>{disps.length}</strong>
+        </p>
       </div>
 
       <Tabs defaultValue="agendas" className="w-full">
@@ -460,6 +490,9 @@ function Page() {
                 {filtroCidade !== "all" && (
                   <Button variant="ghost" size="sm" onClick={() => setFiltroCidade("all")}>Limpar</Button>
                 )}
+                <span className="text-xs text-muted-foreground ml-auto">
+                  {medicosFiltrados.length} de {medicos.length} médicos
+                </span>
               </div>
               <Card>
                 <CardContent className="p-0">
@@ -467,7 +500,9 @@ function Page() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Médico</TableHead>
+                        <TableHead>Especialidade</TableHead>
                         <TableHead>Localização</TableHead>
+                        <TableHead className="w-32 text-center">Agendas</TableHead>
                         <TableHead className="w-32 text-center">Horários</TableHead>
                         <TableHead className="w-24 text-right">Ações</TableHead>
                       </TableRow>
@@ -475,26 +510,60 @@ function Page() {
                     <TableBody>
                       {medicosFiltrados.map((m) => {
                         const ds = disps.filter((d) => d.medico_id === m.id);
+                        const agendasDoMedico = agendas.filter((a) => a.medico_id === m.id);
+                        const temAgenda = agendasDoMedico.some((a) => a.ativo);
+                        const agendaAtiva = agendasDoMedico.find((a) => a.ativo);
+                        
                         return (
-                          <TableRow key={m.id}>
-                            <TableCell className="font-medium uppercase">{m.nome}</TableCell>
+                          <TableRow key={m.id} className={!temAgenda ? "bg-yellow-50/50" : ""}>
+                            <TableCell className="font-medium uppercase">
+                              <div className="flex items-center gap-2">
+                                {m.nome}
+                                {!temAgenda && (
+                                  <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full font-normal">
+                                    Sem agenda
+                                  </span>
+                                )}
+                                {temAgenda && !agendaAtiva && (
+                                  <span className="text-xs bg-orange-100 text-orange-800 px-2 py-0.5 rounded-full font-normal">
+                                    Inativa
+                                  </span>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {m.especialidade_nome || "—"}
+                            </TableCell>
                             <TableCell className="text-sm text-muted-foreground uppercase">
                               {[m.cidade, m.estado].filter(Boolean).join(" / ") || "—"}
                             </TableCell>
-                            <TableCell className="text-center text-sm text-muted-foreground">{ds.length}</TableCell>
+                            <TableCell className="text-center text-sm">
+                              {agendasDoMedico.length > 0 ? (
+                                <span className="font-medium">{agendasDoMedico.length}</span>
+                              ) : (
+                                <span className="text-muted-foreground">0</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-center text-sm text-muted-foreground">
+                              {ds.length}
+                            </TableCell>
                             <TableCell className="text-right">
                               <Button
                                 size="sm"
-                                variant="ghost"
+                                variant={!temAgenda ? "default" : "ghost"}
                                 onClick={() => {
                                   setMedicoEditando(m.id);
                                   setNovo({ ...novo, medico_id: m.id });
                                   const primeira = agendas.find((a) => a.medico_id === m.id && a.ativo) ?? agendas.find((a) => a.medico_id === m.id);
                                   setAgendaSel(primeira?.id ?? "");
+                                  if (!primeira) {
+                                    toast.warning("Este médico não possui agenda ativa. Crie uma agenda primeiro.");
+                                  }
                                 }}
                                 aria-label="Editar horários"
                               >
                                 <Pencil className="h-4 w-4" />
+                                {!temAgenda && <span className="ml-1 text-xs">Criar</span>}
                               </Button>
                             </TableCell>
                           </TableRow>
@@ -502,7 +571,7 @@ function Page() {
                       })}
                       {medicosFiltrados.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={4} className="text-center text-sm text-muted-foreground py-6">
+                          <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-6">
                             Nenhum médico encontrado.
                           </TableCell>
                         </TableRow>
@@ -532,6 +601,11 @@ function Page() {
                   </Button>
                   <h2 className="text-lg font-semibold uppercase">{m.nome}</h2>
                   <span className="text-xs text-muted-foreground">· {ds.length} horário(s)</span>
+                  {agendasMed.length === 0 && (
+                    <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full">
+                      Sem agendas cadastradas
+                    </span>
+                  )}
                 </div>
 
                 <Card>
@@ -541,11 +615,20 @@ function Page() {
                       <Select value={agendaSel} onValueChange={setAgendaSel}>
                         <SelectTrigger className="w-48"><SelectValue placeholder="Selecione" /></SelectTrigger>
                         <SelectContent>
-                          {agendasMed.map((a) => (
-                            <SelectItem key={a.id} value={a.id} className="uppercase">{a.nome}{!a.ativo ? " (inativa)" : ""}</SelectItem>
-                          ))}
+                          {agendasMed.length > 0 ? (
+                            agendasMed.map((a) => (
+                              <SelectItem key={a.id} value={a.id} className="uppercase">{a.nome}{!a.ativo ? " (inativa)" : ""}</SelectItem>
+                            ))
+                          ) : (
+                            <SelectItem value="" disabled>Nenhuma agenda cadastrada</SelectItem>
+                          )}
                         </SelectContent>
                       </Select>
+                      {agendasMed.length === 0 && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          ⚠️ Crie uma agenda para este médico antes de adicionar horários
+                        </p>
+                      )}
                     </div>
                     <div>
                       <label className="text-xs text-muted-foreground">Dia</label>
@@ -598,7 +681,10 @@ function Page() {
                       <label className="text-xs text-muted-foreground">até</label>
                       <Input type="date" className="w-40" value={novo.vigencia_fim} onChange={(e) => setNovo({ ...novo, vigencia_fim: e.target.value })} />
                     </div>
-                    <Button onClick={() => { setNovo({ ...novo, medico_id: m.id }); void adicionar(); }}>
+                    <Button 
+                      onClick={() => { setNovo({ ...novo, medico_id: m.id }); void adicionar(); }}
+                      disabled={agendasMed.length === 0}
+                    >
                       <Plus className="h-4 w-4 mr-1" /> Adicionar
                     </Button>
                   </CardContent>
