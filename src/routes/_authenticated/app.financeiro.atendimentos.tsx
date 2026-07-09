@@ -1334,6 +1334,17 @@ function Page() {
           {!isMedicoOnly && (
             <Button
               variant="outline"
+              onClick={darBaixaLote}
+              disabled={selectedNaoBaixados.length === 0}
+              title="Marcar atendimentos selecionados como realizados e liberar repasses"
+            >
+              <CheckCircle2 className="h-4 w-4 mr-2 text-emerald-600" />
+              Dar baixa{selectedNaoBaixados.length ? ` (${selectedNaoBaixados.length})` : ""}
+            </Button>
+          )}
+          {!isMedicoOnly && (
+            <Button
+              variant="outline"
               onClick={reimprimirSelecionados}
               disabled={!podeReimprimir}
               title={misturado ? "Selecione apenas atendimentos JÁ pagos" : "Imprimir 2ª via dos atendimentos pagos selecionados"}
