@@ -597,6 +597,7 @@ function NovoOrcamentoDialog({
   const [medicoId, setMedicoId] = useState<string>("");
   const [medicoExterno, setMedicoExterno] = useState(false);
   const [clinicaSolicitante, setClinicaSolicitante] = useState("");
+  const [medicoParticular, setMedicoParticular] = useState(false);
   const [medicos, setMedicos] = useState<MedicoOpt[]>([]);
   const [formasPagamento, setFormasPagamento] = useState<string[]>(["Dinheiro"]);
   const [valoresPagamento, setValoresPagamento] = useState<Record<string, number>>({});
@@ -672,11 +673,20 @@ function NovoOrcamentoDialog({
 
   const alternarMedicoExterno = (externo: boolean) => {
     setMedicoExterno(externo);
+    setMedicoParticular(false);
     if (externo) {
       setMedicoId("");
     } else {
       setClinicaSolicitante("");
     }
+  };
+
+  const ativarParticular = () => {
+    setMedicoParticular(true);
+    setMedicoExterno(false);
+    setMedicoId("");
+    setMedicoNome("");
+    setClinicaSolicitante("");
   };
 
   const selecionarPaciente = (p: PatientOption | null) => {
@@ -872,9 +882,13 @@ function NovoOrcamentoDialog({
         categoria,
         paciente_nome: pacienteNome.trim(),
         paciente_telefone: pacienteTelefone.trim() || null,
-        medico_nome: medicoNome.trim() || null,
-        medico_externo: medicoExterno,
-        clinica_solicitante: medicoExterno ? (clinicaSolicitante.trim() || null) : null,
+        medico_nome: medicoParticular ? "Particular" : (medicoNome.trim() || null),
+        medico_externo: medicoParticular ? false : medicoExterno,
+        clinica_solicitante: medicoParticular
+          ? "Particular (sem solicitante)"
+          : medicoExterno
+            ? (clinicaSolicitante.trim() || null)
+            : null,
         forma_pagamento: formasPagamento.join(" + "),
         valores_pagamento: valoresPag,
         validade_dias: validade,
@@ -972,23 +986,34 @@ function NovoOrcamentoDialog({
             <div className="space-y-1"><Label>Telefone</Label><Input maxLength={20} value={pacienteTelefone} onChange={(e) => setPacienteTelefone(e.target.value.replace(/[<>]/g, ""))} /></div>
             <div className="space-y-1 md:col-span-2">
               <Label>Médico solicitante</Label>
-              <div className="flex gap-1 rounded-md border p-1 w-fit">
+               <div className="flex flex-wrap gap-1 rounded-md border p-1 w-fit">
                 <button
                   type="button"
                   onClick={() => alternarMedicoExterno(false)}
-                  className={`px-3 py-1 text-sm rounded ${!medicoExterno ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                  className={`px-3 py-1 text-sm rounded ${!medicoExterno && !medicoParticular ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
                 >
                   Da nossa clínica
                 </button>
                 <button
                   type="button"
                   onClick={() => alternarMedicoExterno(true)}
-                  className={`px-3 py-1 text-sm rounded ${medicoExterno ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                  className={`px-3 py-1 text-sm rounded ${medicoExterno && !medicoParticular ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
                 >
                   De outro local
                 </button>
+                <button
+                  type="button"
+                  onClick={ativarParticular}
+                  className={`px-3 py-1 text-sm rounded ${medicoParticular ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                >
+                  Particular
+                </button>
               </div>
-              {!medicoExterno ? (
+              {medicoParticular ? (
+                <p className="text-xs text-muted-foreground">
+                  Paciente sem médico solicitante — atendimento particular por procura direta.
+                </p>
+              ) : !medicoExterno ? (
                 <SearchableSelect
                   options={medicoOptions}
                   value={medicoId}
