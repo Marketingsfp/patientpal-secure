@@ -80,6 +80,7 @@ type Agendamento = {
   tipo_atendimento?: TipoAtendimento | null;
   atendimento_grupo_id?: string | null;
   ficha_numero?: number | null;
+  forma_pagamento_prevista?: string | null;
 };
 type Medico = { id: string; nome: string; sexo?: string | null; usa_sistema?: boolean; especialidade_id?: string | null; procedimento_padrao_id?: string | null; procedimento_padrao_em_branco?: boolean | null; procedimento_padrao_nome?: string | null; especialidade_nome?: string | null };
 type RecursoEnf = { id: string; nome: string };
