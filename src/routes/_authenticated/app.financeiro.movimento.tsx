@@ -118,7 +118,7 @@ function Page() {
     let caixaList: Lanc[] = [];
     if (carregarCaixa) {
       let qc = supabase.from("caixa_movimentos")
-        .select("id, tipo, valor, descricao, forma_pagamento, user_id, created_at")
+        .select("id, tipo, valor, descricao, forma_pagamento, user_id, created_at, destino_user_id, destino_nome")
         .eq("clinica_id", clinicaAtual.clinica_id)
         .in("tipo", ["sangria", "suprimento"])
         .gte("created_at", `${fromDate}T00:00:00`)
@@ -135,12 +135,18 @@ function Page() {
         id: string; tipo: "sangria" | "suprimento"; valor: number | string;
         descricao: string | null; forma_pagamento: string | null;
         user_id: string | null; created_at: string;
+        destino_user_id: string | null; destino_nome: string | null;
       }>).map((m) => ({
         id: m.id,
         tipo: "transferencia" as const,
-        descricao: m.descricao?.trim()
-          ? `${m.tipo === "sangria" ? "Sangria" : "Suprimento"} — ${m.descricao}`
-          : (m.tipo === "sangria" ? "Sangria de caixa" : "Suprimento de caixa"),
+        descricao: (() => {
+          const base = m.tipo === "sangria" ? "Sangria" : "Suprimento";
+          const label = m.tipo === "sangria" ? "Entregue a" : "Recebido de";
+          const partes: string[] = [base];
+          if (m.descricao?.trim()) partes.push(m.descricao.trim());
+          if (m.destino_nome?.trim()) partes.push(`${label}: ${m.destino_nome.trim()}`);
+          return partes.join(" — ");
+        })(),
         valor: Number(m.valor) || 0,
         data: m.created_at.slice(0, 10),
         status: "confirmado",
