@@ -1842,6 +1842,7 @@ function Page() {
           const idx = d.indexOf("—");
           return idx > 0 ? d.slice(0, idx).trim() : null;
         })()}
+        onCreated={() => { void reloadEstornosPendentes(); }}
       />
       <Dialog open={!!caixaDrill} onOpenChange={(v) => { if (!v) setCaixaDrill(null); }}>
         <DialogContent className="max-w-3xl">
