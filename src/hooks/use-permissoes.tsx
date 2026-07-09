@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
-import { presetAllowedSet, PRESETS, type PerfilKey } from "@/lib/permissoes-presets";
+import { presetAllowedSet, PRESETS } from "@/lib/permissoes-presets";
 
 export type Acesso = "none" | "read" | "write";
 
