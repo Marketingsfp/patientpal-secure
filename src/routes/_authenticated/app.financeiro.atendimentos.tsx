@@ -1862,14 +1862,18 @@ function Page() {
                         {String(idx + 1).padStart(3, "0")}
                       </TableCell>
                       <TableCell className="text-xs whitespace-nowrap px-2">
-                        {new Date(a.data + "T00:00:00").toLocaleDateString("pt-BR")}
+                        {new Date(a.data + "T00:00:00").toLocaleDateString("pt-BR", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "2-digit",
+                        })}
                       </TableCell>
 
                       {/* Larguras baseadas em % e truncate para textos longos não quebrarem o layout */}
                       <TableCell className="text-xs max-w-[90px] truncate px-2" title={medicoNome}>
                         {medicoNome}
                       </TableCell>
-                      <TableCell className="text-xs font-medium max-w-[160px] truncate px-2" title={pacienteNome}>
+                      <TableCell className="text-xs font-medium max-w-[190px] truncate px-2" title={pacienteNome}>
                         {pacienteNome}
                       </TableCell>
                       <TableCell
