@@ -1507,6 +1507,48 @@ function AgendaPage() {
     if (isMedicoOnly && medicoLogadoId) setFiltroMedico(medicoLogadoId);
   }, [isMedicoOnly, medicoLogadoId]);
 
+  // Carrega os agendamentos que têm uma solicitação de estorno PENDENTE.
+  // O `agendamento_id` pode estar preenchido diretamente na solicitação ou
+  // ser derivado do `lancamento_id` → `fin_lancamentos.agendamento_id`.
+  useEffect(() => {
+    if (!clinicaAtual) { setEstornoPendAgs(new Set()); return; }
+    let cancelado = false;
+    const carregar = async () => {
+      const { data } = await supabase
+        .from("estorno_solicitacoes")
+        .select("agendamento_id, lancamento_id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("status", "pendente");
+      const set = new Set<string>();
+      const lancIds: string[] = [];
+      for (const r of (data ?? []) as Array<{ agendamento_id: string | null; lancamento_id: string | null }>) {
+        if (r.agendamento_id) set.add(r.agendamento_id);
+        else if (r.lancamento_id) lancIds.push(r.lancamento_id);
+      }
+      if (lancIds.length > 0) {
+        const { data: lancs } = await supabase
+          .from("fin_lancamentos")
+          .select("agendamento_id")
+          .in("id", lancIds);
+        for (const l of (lancs ?? []) as Array<{ agendamento_id: string | null }>) {
+          if (l.agendamento_id) set.add(l.agendamento_id);
+        }
+      }
+      if (!cancelado) setEstornoPendAgs(set);
+    };
+    void carregar();
+    const ch = supabase
+      .channel(`agenda-estornos-${clinicaAtual.clinica_id}`)
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "estorno_solicitacoes", filter: `clinica_id=eq.${clinicaAtual.clinica_id}` },
+        () => { void carregar(); })
+      .subscribe();
+    return () => {
+      cancelado = true;
+      void supabase.removeChannel(ch);
+    };
+  }, [clinicaAtual?.clinica_id]);
+
   // Verifica se o usuário logado é médico da clínica atual (para liberar status "Realizado")
   useEffect(() => {
     (async () => {
