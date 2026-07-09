@@ -327,6 +327,7 @@ export type Database = {
           enfermagem_recurso_id: string | null
           executado_em: string | null
           executado_por: string | null
+          ficha_numero: number | null
           fim: string
           fluxo_atualizado_em: string
           fluxo_etapa: Database["public"]["Enums"]["fluxo_etapa"]
@@ -358,6 +359,7 @@ export type Database = {
           enfermagem_recurso_id?: string | null
           executado_em?: string | null
           executado_por?: string | null
+          ficha_numero?: number | null
           fim: string
           fluxo_atualizado_em?: string
           fluxo_etapa?: Database["public"]["Enums"]["fluxo_etapa"]
@@ -389,6 +391,7 @@ export type Database = {
           enfermagem_recurso_id?: string | null
           executado_em?: string | null
           executado_por?: string | null
+          ficha_numero?: number | null
           fim?: string
           fluxo_atualizado_em?: string
           fluxo_etapa?: Database["public"]["Enums"]["fluxo_etapa"]
@@ -3771,6 +3774,7 @@ export type Database = {
           agendamento_id: string | null
           clinica_id: string
           created_at: string
+          ficha_numero: number | null
           id: string
           impresso_por: string | null
           impresso_por_nome: string | null
@@ -3781,6 +3785,7 @@ export type Database = {
           agendamento_id?: string | null
           clinica_id: string
           created_at?: string
+          ficha_numero?: number | null
           id?: string
           impresso_por?: string | null
           impresso_por_nome?: string | null
@@ -3791,6 +3796,7 @@ export type Database = {
           agendamento_id?: string | null
           clinica_id?: string
           created_at?: string
+          ficha_numero?: number | null
           id?: string
           impresso_por?: string | null
           impresso_por_nome?: string | null
