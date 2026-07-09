@@ -1027,11 +1027,55 @@ function Page() {
     }
     if (
       !confirm(
-        "Desfazer a baixa deste atendimento?\n\nO atendimento voltará para o status 'Confirmado' e o repasse deixará de estar liberado.",
+        "Desfazer a baixa deste atendimento?\n\nO atendimento volta para 'Confirmado' e deixa de constar como pago. Lançamentos-sombra de R$ 0,00 serão removidos automaticamente.",
       )
     )
       return;
     try {
+      // Verifica lançamento(s) em caixa vinculados. Só apagamos os R$ 0,00
+      // (lançamento-sombra "SEM COBRANÇA"). Valores > 0 precisam ser
+      // estornados no Mov. Caixa antes, para preservar a trilha financeira.
+      let sombraIds: string[] = [];
+      if (a.origem === "agenda" && a.agendamento_id) {
+        const { data: lancs } = await supabase
+          .from("fin_lancamentos")
+          .select("id, valor")
+          .eq("agendamento_id", a.agendamento_id);
+        const rows = (lancs ?? []) as Array<{ id: string; valor: number | string | null }>;
+        const naoZero = rows.filter((l) => Number(l.valor) > 0);
+        if (naoZero.length > 0) {
+          toast.error(
+            "Há lançamento pago no caixa vinculado. Estorne pelo Mov. Caixa antes de desfazer a baixa.",
+          );
+          return;
+        }
+        sombraIds = rows.filter((l) => Number(l.valor) === 0).map((l) => l.id);
+      } else if (a.origem !== "agenda") {
+        const { data: fa } = await supabase
+          .from("fin_atendimentos")
+          .select("lancamento_id")
+          .eq("id", a.id)
+          .maybeSingle();
+        const lancId = (fa as { lancamento_id: string | null } | null)?.lancamento_id ?? null;
+        if (lancId) {
+          const { data: l } = await supabase
+            .from("fin_lancamentos")
+            .select("id, valor")
+            .eq("id", lancId)
+            .maybeSingle();
+          const row = l as { id: string; valor: number | string | null } | null;
+          if (row) {
+            if (Number(row.valor) > 0) {
+              toast.error(
+                "Há lançamento pago no caixa vinculado. Estorne pelo Mov. Caixa antes de desfazer a baixa.",
+              );
+              return;
+            }
+            sombraIds = [row.id];
+          }
+        }
+      }
+
       if (a.origem === "agenda") {
         if (!a.agendamento_id) {
           toast.error("Atendimento sem agendamento vinculado.");
@@ -1052,6 +1096,16 @@ function Page() {
           .eq("id", a.id);
         if (error) {
           mostrarErro(error);
+          return;
+        }
+      }
+      if (sombraIds.length > 0) {
+        const { error: delErr } = await supabase
+          .from("fin_lancamentos")
+          .delete()
+          .in("id", sombraIds);
+        if (delErr) {
+          mostrarErro(delErr);
           return;
         }
       }
