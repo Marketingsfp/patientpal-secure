@@ -515,7 +515,7 @@ function Page() {
     const DBG = typeof procNome === "string" && /preventivo/i.test(procNome);
     if (!medicoId) return { total: totalPago, repasse: 0 };
     const med = medicos.find((m) => m.id === medicoId);
-    if (DBG) console.log("[repasse-dbg]", { procNome, medicoId, totalPago, descricao, medFound: !!med, conveniosLen: convenios.length, sample: convenios.filter(c=>c.medico_id===medicoId).map(c=>({nome:c.nome, valor:c.valor, tipo:c.tipo_repasse})) });
+    if (DBG) console.log("[repasse-dbg] ctx=" + JSON.stringify({ procNome, medicoId, totalPago, medFound: !!med, conveniosLen: convenios.length, forMed: convenios.filter(c=>c.medico_id===medicoId).map(c=>c.nome) }));
     // Cartão Consulta: o paciente paga um valor reduzido (ex.: R$ 9,99) e o
     // repasse ao médico é o cb_valor_repasse cadastrado (não o valor do
     // convênio particular). Detecta pela descrição do lançamento.
