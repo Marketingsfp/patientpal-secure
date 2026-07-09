@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
-import { Plus, Pencil, Trash2, ArrowUpCircle, ArrowDownCircle, Download } from "lucide-react";
+import { Plus, Pencil, Trash2, ArrowUpCircle, ArrowDownCircle, ArrowLeftRight, Download } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,9 +26,13 @@ export const Route = createFileRoute("/_authenticated/app/financeiro/movimento")
 });
 
 interface Lanc {
-  id: string; tipo: "receita" | "despesa"; descricao: string; valor: number;
+  id: string; tipo: "receita" | "despesa" | "transferencia"; descricao: string; valor: number;
   data: string; status: string; categoria_id: string | null; conta_id: string | null;
   forma_pagamento: string | null; criado_por: string | null;
+  /** true → linha veio de caixa_movimentos (sangria/suprimento); não editável aqui */
+  origem?: "fin" | "caixa";
+  /** direção da transferência: entrada (suprimento) ou saída (sangria) */
+  transferSentido?: "entrada" | "saida";
 }
 interface Opt { id: string; nome: string; tipo?: string }
 
@@ -50,7 +54,7 @@ function Page() {
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<Lanc | null>(null);
   const [form, setForm] = useState(EMPTY);
-  const [filterTipo, setFilterTipo] = useState<"todos" | "receita" | "despesa">("todos");
+  const [filterTipo, setFilterTipo] = useState<"todos" | "receita" | "despesa" | "transferencia">("todos");
   const [fromDate, setFromDate] = useState(new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10));
   const [toDate, setToDate] = useState(new Date().toISOString().slice(0, 10));
   const [detalhe, setDetalhe] = useState<null | "receita" | "despesa" | "saldo">(null);
@@ -83,24 +87,80 @@ function Page() {
   const load = async () => {
     if (!clinicaAtual) { setItems([]); setLoading(false); return; }
     setLoading(true);
-    let q = supabase.from("fin_lancamentos")
-      .select("id, tipo, descricao, valor, data, status, categoria_id, conta_id, forma_pagamento, criado_por")
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .gte("data", fromDate).lte("data", toDate)
-      .order("data", { ascending: false })
-      .range(0, 499);
-    if (filterTipo !== "todos") q = q.eq("tipo", filterTipo);
-    if (filterUsuario !== "todos") {
-      if (filterUsuario === "sem") q = q.is("criado_por", null);
-      else q = q.eq("criado_por", filterUsuario);
+    // 1) Lançamentos (receitas/despesas) — só quando o filtro pede
+    const carregarFin = filterTipo === "todos" || filterTipo === "receita" || filterTipo === "despesa";
+    let finList: Lanc[] = [];
+    if (carregarFin) {
+      let q = supabase.from("fin_lancamentos")
+        .select("id, tipo, descricao, valor, data, status, categoria_id, conta_id, forma_pagamento, criado_por")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .gte("data", fromDate).lte("data", toDate)
+        .order("data", { ascending: false })
+        .range(0, 499);
+      if (filterTipo === "receita" || filterTipo === "despesa") q = q.eq("tipo", filterTipo);
+      if (filterUsuario !== "todos") {
+        if (filterUsuario === "sem") q = q.is("criado_por", null);
+        else q = q.eq("criado_por", filterUsuario);
+      }
+      q = applyForma(q);
+      const { data, error } = await q;
+      if (error) { mostrarErro(error); setLoading(false); return; }
+      finList = ((data ?? []) as Array<Omit<Lanc, "origem">>).map((l) => ({ ...l, origem: "fin" as const }));
     }
-    q = applyForma(q);
-    const { data, error } = await q;
-    if (error) mostrarErro(error); else setItems((data ?? []) as Lanc[]);
+    // 2) Transferências entre caixas — sangria/suprimento em caixa_movimentos
+    //    (só carrega se o filtro Forma não estiver restringindo a algo específico
+    //    e se o filtro de tipo permitir transferências)
+    const carregarCaixa = (filterTipo === "todos" || filterTipo === "transferencia")
+      && (filterForma === "todos" || filterForma === "dinheiro");
+    let caixaList: Lanc[] = [];
+    if (carregarCaixa) {
+      let qc = supabase.from("caixa_movimentos")
+        .select("id, tipo, valor, descricao, forma_pagamento, user_id, created_at")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .in("tipo", ["sangria", "suprimento"])
+        .gte("created_at", `${fromDate}T00:00:00`)
+        .lte("created_at", `${toDate}T23:59:59`)
+        .order("created_at", { ascending: false })
+        .range(0, 499);
+      if (filterUsuario !== "todos") {
+        if (filterUsuario === "sem") qc = qc.is("user_id", null);
+        else qc = qc.eq("user_id", filterUsuario);
+      }
+      const { data: mv, error: errMv } = await qc;
+      if (errMv) { mostrarErro(errMv); setLoading(false); return; }
+      caixaList = ((mv ?? []) as Array<{
+        id: string; tipo: "sangria" | "suprimento"; valor: number | string;
+        descricao: string | null; forma_pagamento: string | null;
+        user_id: string | null; created_at: string;
+      }>).map((m) => ({
+        id: m.id,
+        tipo: "transferencia" as const,
+        descricao: m.descricao?.trim()
+          ? `${m.tipo === "sangria" ? "Sangria" : "Suprimento"} — ${m.descricao}`
+          : (m.tipo === "sangria" ? "Sangria de caixa" : "Suprimento de caixa"),
+        valor: Number(m.valor) || 0,
+        data: m.created_at.slice(0, 10),
+        status: "confirmado",
+        categoria_id: null,
+        conta_id: null,
+        forma_pagamento: m.forma_pagamento,
+        criado_por: m.user_id,
+        origem: "caixa" as const,
+        transferSentido: m.tipo === "suprimento" ? "entrada" : "saida",
+      }));
+    }
+    // Merge ordenado por data desc
+    const merged = [...finList, ...caixaList].sort((a, b) => (a.data < b.data ? 1 : a.data > b.data ? -1 : 0));
+    setItems(merged.slice(0, 500));
     setLoading(false);
   };
   const loadResumo = async () => {
     if (!clinicaAtual) { setResumo({ r: 0, d: 0, saldo: 0, totalRows: 0 }); return; }
+    // Filtro "só transferências" não afeta os cards de Receita/Despesa/Saldo — zera-os.
+    if (filterTipo === "transferencia") {
+      setResumo({ r: 0, d: 0, saldo: 0, totalRows: items.length });
+      return;
+    }
     // Sem filtro por usuário/tipo/forma → usa RPC agregado (rápido).
     if (filterUsuario === "todos" && filterTipo === "todos" && filterForma === "todos") {
       const { data, error } = await supabase.rpc("fin_resumo_periodo", {
@@ -173,8 +233,10 @@ function Page() {
   const totais = resumo;
 
   const openNew = () => { setEditing(null); setForm(EMPTY); setOpen(true); };
-  const openEdit = (l: Lanc) => { setEditing(l); setForm({
-    tipo: l.tipo, descricao: l.descricao, valor: String(l.valor), data: l.data, status: l.status,
+  const openEdit = (l: Lanc) => {
+    if (l.origem === "caixa" || l.tipo === "transferencia") return; // transferências de caixa são somente-leitura aqui
+    setEditing(l); setForm({
+    tipo: l.tipo as "receita" | "despesa", descricao: l.descricao, valor: String(l.valor), data: l.data, status: l.status,
     categoria_id: l.categoria_id ?? "", conta_id: l.conta_id ?? "",
     forma_pagamento: l.forma_pagamento ?? "", observacoes: "",
   }); setOpen(true); };
@@ -369,6 +431,7 @@ function Page() {
               <SelectItem value="todos">Todos</SelectItem>
               <SelectItem value="receita">Receitas</SelectItem>
               <SelectItem value="despesa">Despesas</SelectItem>
+              <SelectItem value="transferencia">Transferências entre caixas</SelectItem>
             </SelectContent>
           </Select></div>
         <div className="space-y-1"><Label className="text-xs">Status (totais)</Label>
@@ -427,18 +490,28 @@ function Page() {
             <TableBody>{items.map((l) => {
               const userMap = new Map(usuarios.map((u) => [u.id, u.nome]));
               return (
-              <TableRow key={l.id}>
-                <TableCell>{l.tipo === "receita"
-                  ? <ArrowUpCircle className="h-4 w-4 text-green-600" />
-                  : <ArrowDownCircle className="h-4 w-4 text-red-600" />}</TableCell>
+              <TableRow key={`${l.origem ?? "fin"}:${l.id}`}>
+                <TableCell>{
+                  l.tipo === "transferencia"
+                    ? <ArrowLeftRight className={`h-4 w-4 ${l.transferSentido === "entrada" ? "text-blue-600" : "text-amber-600"}`} />
+                    : l.tipo === "receita"
+                      ? <ArrowUpCircle className="h-4 w-4 text-green-600" />
+                      : <ArrowDownCircle className="h-4 w-4 text-red-600" />
+                }</TableCell>
                 <TableCell className="text-sm">{new Date(l.data).toLocaleDateString("pt-BR")}</TableCell>
                 <TableCell>{l.descricao}</TableCell>
                 <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{l.criado_por ? userMap.get(l.criado_por) ?? "—" : "—"}</TableCell>
                 <TableCell><Badge variant={l.status === "confirmado" ? "default" : "secondary"}>{l.status}</Badge></TableCell>
-                <TableCell className={`text-right font-medium ${l.tipo === "receita" ? "text-green-600" : "text-red-600"}`}>
-                  {l.tipo === "receita" ? "+" : "-"} {fmt(Number(l.valor))}</TableCell>
+                <TableCell className={`text-right font-medium ${
+                  l.tipo === "transferencia"
+                    ? (l.transferSentido === "entrada" ? "text-blue-600" : "text-amber-600")
+                    : l.tipo === "receita" ? "text-green-600" : "text-red-600"
+                }`}>
+                  {l.tipo === "transferencia"
+                    ? (l.transferSentido === "entrada" ? "↑" : "↓")
+                    : (l.tipo === "receita" ? "+" : "-")} {fmt(Number(l.valor))}</TableCell>
                 <TableCell className="text-right">
-                  {podeEscrever ? (
+                  {podeEscrever && l.origem !== "caixa" ? (
                     <>
                       <Button variant="ghost" size="icon" onClick={() => openEdit(l)}><Pencil className="h-3.5 w-3.5" /></Button>
                       <Button variant="ghost" size="icon" onClick={() => remove(l)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
