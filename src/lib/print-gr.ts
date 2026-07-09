@@ -168,7 +168,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   const [ag, cli] = await Promise.all([
     supabase
       .from("agendamentos")
-      .select("id, paciente_nome, paciente_id, medico_id, agenda_id, inicio, procedimento, observacoes")
+      .select("id, paciente_nome, paciente_id, medico_id, agenda_id, inicio, procedimento, observacoes, ficha_numero")
       .eq("id", agendamentoId)
       .maybeSingle(),
     supabase
@@ -298,31 +298,34 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   const procNomeBase = (a.procedimento || procData?.nome || "CONSULTA").toUpperCase();
   const procNome = espNome && !procNomeBase.includes(espNome) ? `${espNome} - ${procNomeBase}` : procNomeBase;
 
-  // Ficha = posição do paciente na agenda do médico no dia (ex.: nº 1 da Dr. Valéria)
-  // Conta a ordem cronológica entre agendamentos VÁLIDOS (com paciente real),
-  // ignorando blocos de "Bloqueio"/"Disponível" e horários sem paciente.
+  // Ficha = posição do paciente na agenda do médico no dia (ex.: nº 1 da Dr. Valéria).
+  // Se já houver ficha_numero gravado no agendamento, reutiliza — assim o número
+  // impresso na 1ª GR nunca muda, mesmo que alguém insira/mova agendamentos depois.
   const inicioDt = new Date(a.inicio);
   const diaIni = new Date(inicioDt); diaIni.setHours(0, 0, 0, 0);
   const diaFim = new Date(inicioDt); diaFim.setHours(23, 59, 59, 999);
-  let fichaNum = 0;
-  try {
-    let qFicha = supabase
-      .from("agendamentos")
-      .select("id, inicio, paciente_id, paciente_nome")
-      .gte("inicio", diaIni.toISOString())
-      .lte("inicio", diaFim.toISOString())
-      .order("inicio", { ascending: true });
-    if (a.agenda_id) qFicha = qFicha.eq("agenda_id", a.agenda_id);
-    else if (medicoIdEfetivo) qFicha = qFicha.eq("medico_id", medicoIdEfetivo);
-    const { data: lista } = await qFicha;
-    const validos = (lista ?? []).filter((r: any) => {
-      const n = String(r.paciente_nome ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-      if (!r.paciente_id && (n === "disponivel" || n === "bloqueio" || n === "")) return false;
-      return true;
-    });
-    const idx = validos.findIndex((r: any) => r.id === a.id);
-    fichaNum = idx >= 0 ? idx + 1 : 0;
-  } catch { fichaNum = 0; }
+  let fichaNum = Number((a as { ficha_numero?: number | null }).ficha_numero ?? 0) || 0;
+  let fichaJaGravada = fichaNum > 0;
+  if (!fichaJaGravada) {
+    try {
+      let qFicha = supabase
+        .from("agendamentos")
+        .select("id, inicio, paciente_id, paciente_nome")
+        .gte("inicio", diaIni.toISOString())
+        .lte("inicio", diaFim.toISOString())
+        .order("inicio", { ascending: true });
+      if (a.agenda_id) qFicha = qFicha.eq("agenda_id", a.agenda_id);
+      else if (medicoIdEfetivo) qFicha = qFicha.eq("medico_id", medicoIdEfetivo);
+      const { data: lista } = await qFicha;
+      const validos = (lista ?? []).filter((r: any) => {
+        const n = String(r.paciente_nome ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+        if (!r.paciente_id && (n === "disponivel" || n === "bloqueio" || n === "")) return false;
+        return true;
+      });
+      const idx = validos.findIndex((r: any) => r.id === a.id);
+      fichaNum = idx >= 0 ? idx + 1 : 0;
+    } catch { fichaNum = 0; }
+  }
   const ficha = fichaNum > 0
     ? String(fichaNum).padStart(3, "0")
     : String(inicioDt.getHours() * 60 + inicioDt.getMinutes()).padStart(3, "0");
