@@ -445,37 +445,22 @@ function Page() {
     await load();
   };
 
-  // Solicitações de estorno pendentes (vindas do caixa/recepção)
-  interface SolicEst {
-    id: string;
-    paciente_nome: string | null;
-    descricao: string | null;
-    valor: number | null;
-    motivo: string;
-    solicitado_em: string;
-    lancamento_id: string | null;
-    tipo: "erro_caixa" | "devolucao" | null;
-    data_pagamento_original: string | null;
-    data_estorno: string | null;
-  }
-  const [solicitacoes, setSolicitacoes] = useState<SolicEst[]>([]);
-  const loadSolicitacoes = async () => {
+  // Contagem de solicitações de estorno pendentes (gerenciamento agora vive em /app/financeiro/estorno).
+  const [estornoPendentes, setEstornoPendentes] = useState(0);
+  const loadEstornoCount = async () => {
     if (!clinicaAtual) {
-      setSolicitacoes([]);
+      setEstornoPendentes(0);
       return;
     }
-    const { data } = await supabase
+    const { count } = await supabase
       .from("estorno_solicitacoes")
-      .select(
-        "id, paciente_nome, descricao, valor, motivo, solicitado_em, lancamento_id, tipo, data_pagamento_original, data_estorno",
-      )
+      .select("id", { count: "exact", head: true })
       .eq("clinica_id", clinicaAtual.clinica_id)
-      .eq("status", "pendente")
-      .order("solicitado_em", { ascending: false });
-    setSolicitacoes((data ?? []) as SolicEst[]);
+      .eq("status", "pendente");
+    setEstornoPendentes(count ?? 0);
   };
   useEffect(() => {
-    void loadSolicitacoes(); /* eslint-disable-next-line react-hooks/exhaustive-deps */
+    void loadEstornoCount(); /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [clinicaAtual?.clinica_id]);
   useEffect(() => {
     if (!clinicaAtual) return;
@@ -490,7 +475,7 @@ function Page() {
           filter: `clinica_id=eq.${clinicaAtual.clinica_id}`,
         },
         () => {
-          void loadSolicitacoes();
+          void loadEstornoCount();
         },
       )
       .subscribe();
@@ -499,60 +484,6 @@ function Page() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clinicaAtual?.clinica_id]);
-
-  const aprovarSolicitacao = async (s: SolicEst) => {
-    if (!podeEstornar) {
-      toast.error("Sem permissão");
-      return;
-    }
-    // Tenta encontrar o atendimento referente para estornar de fato
-    const alvo = s.lancamento_id ? items.find((x) => x.id === s.lancamento_id) : null;
-    if (alvo) {
-      await estornar(alvo);
-    }
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    const { error } = await supabase
-      .from("estorno_solicitacoes")
-      .update({
-        status: "aprovado",
-        resolvido_por: user?.id ?? null,
-        resolvido_em: new Date().toISOString(),
-        resposta: alvo ? "Estorno executado" : "Aprovado manualmente (processar baixa)",
-      })
-      .eq("id", s.id);
-    if (error) mostrarErro(error);
-    else {
-      toast.success("Solicitação aprovada");
-      void loadSolicitacoes();
-    }
-  };
-
-  const rejeitarSolicitacao = async (s: SolicEst) => {
-    if (!podeEstornar) {
-      toast.error("Sem permissão");
-      return;
-    }
-    const resp = window.prompt("Motivo da recusa (opcional):") ?? "";
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    const { error } = await supabase
-      .from("estorno_solicitacoes")
-      .update({
-        status: "rejeitado",
-        resolvido_por: user?.id ?? null,
-        resolvido_em: new Date().toISOString(),
-        resposta: resp || null,
-      })
-      .eq("id", s.id);
-    if (error) mostrarErro(error);
-    else {
-      toast.success("Solicitação recusada");
-      void loadSolicitacoes();
-    }
-  };
 
   // Perfil médico: trava o filtro no próprio profissional
   useEffect(() => {
