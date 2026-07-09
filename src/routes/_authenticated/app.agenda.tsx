@@ -2715,7 +2715,7 @@ function AgendaPage() {
       // no cadastro. Resolvemos cada procedimento individualmente e somamos.
       const nomesParaValorar = procedimentosParaSalvar.length > 0
         ? procedimentosParaSalvar
-        : [payload.procedimento ?? "CONSULTA"];
+        : [payload.procedimento ?? rotuloFallbackProc(payload.medico_id)];
       const procsIndividuais = await Promise.all(
         nomesParaValorar.map((nome) => buscarProcedimentoPorNome(clinicaAtual.clinica_id, nome, lista)),
       );
@@ -2769,9 +2769,9 @@ function AgendaPage() {
         // Agrupa o principal + irmãos (imagem multi-exame) para que a mesma
         // cobrança marque todos os agendamentos correspondentes como pagos.
         agId: [novoId, ...(result.sibling_ids ?? [])].join(","),
-        desc: `${payload.paciente_nome} — ${payload.procedimento ?? "CONSULTA"}${descSuffix}`,
+        desc: `${payload.paciente_nome} — ${payload.procedimento ?? rotuloFallbackProc(payload.medico_id)}${descSuffix}`,
         paciente: payload.paciente_nome ?? "",
-        procedimento: `${payload.procedimento ?? "CONSULTA"}${descSuffix}`,
+        procedimento: `${payload.procedimento ?? rotuloFallbackProc(payload.medico_id)}${descSuffix}`,
         medico: medicos.find((m) => m.id === payload.medico_id)?.nome ?? undefined,
         especialidade: medicos.find((m) => m.id === payload.medico_id)?.especialidade_nome ?? undefined,
       });
