@@ -1970,8 +1970,8 @@ function AgendaPage() {
     });
     setPagamentoPesos(pesos);
     setPagamentoRotulos(rotulos);
-    setPagamentoPacienteNome(paciente);
     const paciente = itens[0].paciente_nome;
+    setPagamentoPacienteNome(paciente);
     const desc = `${paciente} — ${itens.map(i => (i.procedimento ?? "CONSULTA")).join(" + ")} (${itens.length} serviços)`;
     const opcoes: FormaOpcao[] = [
       { forma: "dinheiro", label: "Dinheiro", valor: totalDinheiro },
