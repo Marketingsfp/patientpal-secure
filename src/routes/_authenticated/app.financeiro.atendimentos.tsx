@@ -1866,10 +1866,10 @@ function Page() {
                       </TableCell>
 
                       {/* Larguras baseadas em % e truncate para textos longos não quebrarem o layout */}
-                      <TableCell className="text-xs max-w-[120px] truncate px-2" title={medicoNome}>
+                      <TableCell className="text-xs max-w-[90px] truncate px-2" title={medicoNome}>
                         {medicoNome}
                       </TableCell>
-                      <TableCell className="text-xs font-medium max-w-[120px] truncate px-2" title={pacienteNome}>
+                      <TableCell className="text-xs font-medium max-w-[160px] truncate px-2" title={pacienteNome}>
                         {pacienteNome}
                       </TableCell>
                       <TableCell
