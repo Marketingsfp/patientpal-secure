@@ -1,30 +1,30 @@
 ## Diagnóstico
 
-O bloqueio "Selecione o serviço" está sendo disparado mesmo com o serviço preenchido porque o formulário passa pelo sanitizador `procedimentoFormulario` (linha 1593 de `src/routes/_authenticated/app.agenda.tsx`):
+A coluna com os checkboxes de repasse (e o botão "Pagar repasse") em `src/routes/_authenticated/app.financeiro.atendimentos.tsx` só é escondida em UM caso: quando `isMedicoOnly === true`, o que acontece se `clinica_memberships.role === "medico"` para o usuário logado (`useMedicoContext`).
 
-```
-if (atual && med?.especialidade_nome && normalizar(atual) === normalizar(med.especialidade_nome)) return "";
-```
+Nada além disso esconde os checkboxes — não há gate por permissão custom, nem por `role` para "financeiro"/"recepcao". Ou seja: **a atendente da tesouraria está registrada na clínica com role `medico` por engano** (ou o usuário dela está vinculado a um cadastro em `medicos` que faz o sistema tratá-la como médica).
 
-Ele existe para não gravar como "serviço" a especialidade sintética do médico (ex.: médico "CARDIOLOGIA" com serviço redundante "CARDIOLOGIA"). Só que quando o "médico/recurso" tem exatamente o mesmo nome do exame que executa — caso do TESTE ERGOMÉTRICO, USG, ECG, etc. — o sanitizador zera o serviço real. No submit (linha 2540-2545), o array fica vazio e cai no toast.
+## Confirmação (antes de mexer em código)
+
+Preciso do e-mail (ou nome) da atendente para checar direto no banco:
+
+1. `SELECT role FROM clinica_memberships WHERE user_id = ... AND clinica_id = ...` — deve retornar `financeiro` (ou `recepcao`/`admin`). Se vier `medico`, é a causa.
+2. `SELECT id, nome, email, ativo FROM medicos WHERE user_id = ... OR email ILIKE ...` — se aparecer, o sistema também pode marcar como médica pelo casamento de e-mail.
 
 ## Correção
 
-Deixar de sanitizar quando o texto atual corresponde a um procedimento **realmente cadastrado** para aquele médico/recurso.
+- **Caso 1 — role errado**: alterar o `role` da atendente para `financeiro` na tabela `clinica_memberships` (Cadastros › Equipe, ou eu ajusto via update).
+- **Caso 2 — vínculo residual em `medicos`**: desativar/desvincular o `user_id` (ou e-mail) do cadastro em `medicos` para que `useMedicoContext` não a identifique como médica.
 
-- Em `procedimentoFormulario`: só retornar `""` se `atual` bater com `especialidade_nome` **e** não existir em `opcoesProcedimentoMedico(medicoId, …)` (nem for o `procedimentoPadraoDoMedico`).
-- Como `procedimentoFormulario` é usada tanto na abertura do formulário quanto no submit, a mesma correção conserta o salvamento e a exibição inicial.
-- Não mexe em `opcoesServicoFormulario` nem no dropdown — só na normalização.
-
-## Verificação
-
-- Editar o agendamento TESTE ERGOMÉTRICO → serviço permanece preenchido → clicar Pagar/Imprimir salva sem erro.
-- Testar caso original (médico com especialidade sintética "CARDIOLOGIA" sem procedimento igual): continua zerando corretamente.
-- Testar USG com médico "USG …": serviço continua exibido.
+Nenhuma alteração de código é necessária — o comportamento atual está correto (esconder ações de repasse de usuários médicos). Só falta ajustar o dado do usuário dela.
 
 ## 4 eixos
 
-- 💰 Sem impacto financeiro direto — mas destrava cobranças que hoje ficam presas.
-- ⏱️ Elimina bloqueio recorrente em exames com médico=exame (ergométrico, USG dedicado).
-- 😊 Recepção não precisa reabrir e reselecionar o serviço.
-- 🛡️ Sem risco — mudança local numa função pura de UI.
+- 💰 Nenhum — só destrava a operação diária de pagamento de repasse.
+- ⏱️ Elimina bloqueio operacional; atendente volta a marcar repasses sem depender de outro usuário.
+- 😊 —
+- 🛡️ Auditoria: mudar `role` gera log em `audit_log` (padrão do sistema).
+
+## Próximo passo
+
+Me envia o nome ou e-mail da atendente que está sem os checkboxes e eu confirmo a causa e ajusto o cadastro.
