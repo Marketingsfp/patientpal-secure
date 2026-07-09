@@ -308,6 +308,8 @@ function Page() {
   const [movForma, setMovForma] = useState("dinheiro");
   const [movBandeira, setMovBandeira] = useState("");
   const [movParcelas, setMovParcelas] = useState("1");
+  const [movDestinoUserId, setMovDestinoUserId] = useState("");
+  const [membrosClinica, setMembrosClinica] = useState<Array<{ user_id: string; nome: string }>>([]);
   const [valorInformado, setValorInformado] = useState("");
   const [obsFechamento, setObsFechamento] = useState("");
   const [saving, setSaving] = useState(false);
