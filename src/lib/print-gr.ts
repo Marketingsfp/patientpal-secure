@@ -287,6 +287,10 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   // valor base de cálculo da 1ª via, mantendo o repasse do médico correto.
   let valor: number;
   let isCartaoConsulta = false;
+  // Quando `pagamento` não vem do caller (ex.: botão "Imprimir GR" reimprimindo
+  // uma cobrança antiga), reconstruímos a forma/parcelas/bandeira/misto a partir
+  // do lançamento financeiro. Sem isso a GR caía num fallback "DINHEIRO".
+  let pagResolvido: PrintGRInput["pagamento"] | undefined = pagamento;
   const detectCartaoConsulta = (desc: string | null | undefined): boolean => {
     if (!desc) return false;
     const d = desc.toUpperCase();
@@ -302,19 +306,74 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     valor = Number(pagamento.valor);
   } else {
     let valorPago = 0;
+    let formaResolvida: string | null = null;
+    let parcelasResolvidas: number | null = null;
+    let bandeiraResolvida: string | null = null;
+    let obsResolvida: string | null = null;
     try {
       const { data: lancs } = await supabase
         .from("fin_lancamentos")
-        .select("valor, descricao")
+        .select("valor, descricao, forma_pagamento, parcelas, bandeira_cartao, observacoes")
         .eq("agendamento_id", agendamentoId)
         .eq("tipo", "receita")
         .eq("status", "confirmado");
-      for (const l of ((lancs ?? []) as Array<{ valor: number | string; descricao: string | null }>)) {
+      for (const l of ((lancs ?? []) as Array<{
+        valor: number | string; descricao: string | null;
+        forma_pagamento: string | null; parcelas: number | null;
+        bandeira_cartao: string | null; observacoes: string | null;
+      }>)) {
         valorPago += Number(l.valor);
         if (detectCartaoConsulta(l.descricao)) isCartaoConsulta = true;
+        // Preserva a primeira forma "real" (ignora linhas-sombra de valor 0
+        // e sem forma) — a cobrança principal é a que dita a forma na GR.
+        if (!formaResolvida && l.forma_pagamento) {
+          formaResolvida = l.forma_pagamento;
+          parcelasResolvidas = l.parcelas;
+          bandeiraResolvida = l.bandeira_cartao;
+          obsResolvida = l.observacoes;
+        }
       }
     } catch { /* segue para fallback */ }
     valor = valorPago > 0 ? valorPago : Number(procData?.valor_dinheiro_pix ?? 0);
+    if (formaResolvida) {
+      // Reconstrói detalhe do misto a partir de "Pagamento misto: X R$ 1,00; Y R$ 2,00 | ..."
+      let detalhe: Array<{ forma: string; pago: number; troco: number; recebido: number }> | undefined;
+      if (formaResolvida === "misto" && obsResolvida) {
+        const idx = obsResolvida.indexOf("Pagamento misto:");
+        if (idx >= 0) {
+          const trecho = obsResolvida.slice(idx + "Pagamento misto:".length).split(" | ")[0];
+          const LABEL_TO_KEY: Array<[RegExp, string]> = [
+            [/^cart[ãa]o\s*cr[ée]dito/i, "cartao_credito"],
+            [/^cart[ãa]o\s*d[ée]bito/i, "cartao_debito"],
+            [/^cr[ée]dito/i, "cartao_credito"],
+            [/^d[ée]bito/i, "cartao_debito"],
+            [/^dinheiro/i, "dinheiro"],
+            [/^pix/i, "pix"],
+            [/^boleto/i, "boleto"],
+            [/^conv[êe]nio/i, "convenio"],
+            [/^transfer[êe]ncia/i, "transferencia"],
+          ];
+          const parseBRL = (s: string) => Number(s.replace(/\./g, "").replace(",", ".")) || 0;
+          const partes = trecho.split(";").map((s) => s.trim()).filter(Boolean);
+          const acc: Array<{ forma: string; pago: number; troco: number; recebido: number }> = [];
+          for (const p of partes) {
+            const match = LABEL_TO_KEY.find(([re]) => re.test(p));
+            if (!match) continue;
+            const valMatch = p.match(/R\$\s*([\d.]+,\d{2})/);
+            if (!valMatch) continue;
+            acc.push({ forma: match[1], pago: parseBRL(valMatch[1]), troco: 0, recebido: 0 });
+          }
+          if (acc.length > 0) detalhe = acc;
+        }
+      }
+      pagResolvido = {
+        valor,
+        forma_pagamento: formaResolvida,
+        parcelas: parcelasResolvidas,
+        bandeira_cartao: bandeiraResolvida,
+        detalhe,
+      };
+    }
   }
   // Quando o pagamento já vem informado pelo caller, ainda consultamos os
   // lançamentos para descobrir se é Cartão Consulta (não há flag no payload).
@@ -453,14 +512,14 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   }
   const clinica = +(Math.max(0, valor - prestador)).toFixed(2);
 
-  const formaLbl = pagamento?.forma_pagamento ? (FORMA_LABEL[pagamento.forma_pagamento] ?? pagamento.forma_pagamento.toUpperCase()) : "DINHEIRO";
-  const parcelasTxt = pagamento && pagamento.forma_pagamento === "cartao_credito" && pagamento.parcelas && pagamento.parcelas > 1
-    ? `${pagamento.parcelas}x DE ${fmtBRL(valor / pagamento.parcelas)}`
+  const formaLbl = pagResolvido?.forma_pagamento ? (FORMA_LABEL[pagResolvido.forma_pagamento] ?? pagResolvido.forma_pagamento.toUpperCase()) : "DINHEIRO";
+  const parcelasTxt = pagResolvido && pagResolvido.forma_pagamento === "cartao_credito" && pagResolvido.parcelas && pagResolvido.parcelas > 1
+    ? `${pagResolvido.parcelas}x DE ${fmtBRL(valor / pagResolvido.parcelas)}`
     : "À VISTA";
-  const bandeiraTxt = pagamento?.bandeira_cartao ? pagamento.bandeira_cartao.toUpperCase() : "";
-  const isMisto = pagamento?.forma_pagamento === "misto" && (pagamento.detalhe?.length ?? 0) > 0;
+  const bandeiraTxt = pagResolvido?.bandeira_cartao ? pagResolvido.bandeira_cartao.toUpperCase() : "";
+  const isMisto = pagResolvido?.forma_pagamento === "misto" && (pagResolvido.detalhe?.length ?? 0) > 0;
   const detalheRows = isMisto
-    ? pagamento!.detalhe!
+    ? pagResolvido!.detalhe!
         .map((d) => {
           const lbl = FORMA_LABEL[d.forma] ?? d.forma.toUpperCase();
           const trocoTxt = d.troco > 0 ? ` (RECEB. ${fmtBRL(d.recebido)} / TROCO ${fmtBRL(d.troco)})` : "";
@@ -524,7 +583,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     </table>
     ` : ""}
 
-    ${pagamento?.forma_pagamento === "cartao_credito" ? `
+    ${pagResolvido?.forma_pagamento === "cartao_credito" ? `
     <table>
       ${bandeiraTxt ? `<tr><td class="label">BANDEIRA:</td><td class="v right">${esc(bandeiraTxt)}</td></tr>` : ""}
       <tr><td class="label">PARCELAMENTO:</td><td class="v right">${parcelasTxt}</td></tr>
@@ -545,7 +604,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     </div>
   </div>`;
 
-  const nVias = numViasGR(pagamento);
+  const nVias = numViasGR(pagResolvido);
   const corpoVias = multiplicarVias(ticketHtml, nVias);
 
   const html = `<!doctype html>
