@@ -169,6 +169,10 @@ function Page() {
           const da = String(d.getDate()).padStart(2, "0");
           return `${y}-${mo}-${da}`;
         })(),
+        hora: (() => {
+          const d = new Date(m.created_at);
+          return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+        })(),
         status: "confirmado",
         categoria_id: null,
         conta_id: null,
