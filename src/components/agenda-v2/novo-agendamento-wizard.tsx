@@ -551,6 +551,39 @@ export function NovoAgendamentoWizard({
           <p className="mt-4 text-[11px] text-slate-400">
             Fase F: recursos de enfermagem ainda não estão disponíveis pelo wizard V2 — use a Agenda clássica.
           </p>
+          {medico && (
+            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+              <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-2">
+                Especialidade deste atendimento
+              </div>
+              {especialidadesQuery.isLoading ? (
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Carregando…
+                </div>
+              ) : (especialidadesQuery.data ?? []).length === 0 ? (
+                <p className="text-xs text-slate-500">
+                  Este profissional não tem especialidade cadastrada. O comprovante sairá sem especialidade.
+                </p>
+              ) : (
+                <>
+                  <select
+                    value={especialidadeId ?? ""}
+                    onChange={(e) => setEspecialidadeId(e.target.value || null)}
+                    className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm"
+                  >
+                    {(especialidadesQuery.data ?? []).map((e) => (
+                      <option key={e.id} value={e.id}>
+                        {e.nome}{e.isPrincipal ? " (principal)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-2 text-[11px] text-slate-500">
+                    Define a especialidade que aparece no comprovante e nas guias deste agendamento.
+                  </p>
+                </>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -601,6 +634,14 @@ export function NovoAgendamentoWizard({
           <div className="flex justify-between text-sm"><span className="text-slate-500">Paciente</span><span className="font-semibold text-slate-900">{paciente?.nome}</span></div>
           <div className="flex justify-between text-sm"><span className="text-slate-500">Serviço</span><span className="font-semibold text-slate-900">{procedimento?.nome}</span></div>
           <div className="flex justify-between text-sm"><span className="text-slate-500">Profissional</span><span className="font-semibold text-slate-900">{medico?.nome}</span></div>
+          {especialidadeId && (
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500">Especialidade</span>
+              <span className="font-semibold text-slate-900">
+                {(especialidadesQuery.data ?? []).find((e) => e.id === especialidadeId)?.nome ?? "—"}
+              </span>
+            </div>
+          )}
           <div className="flex justify-between text-sm">
             <span className="text-slate-500">Data · horário</span>
             <span className="font-semibold text-slate-900 tabular-nums">
