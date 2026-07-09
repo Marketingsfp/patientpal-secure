@@ -303,7 +303,35 @@ function Page() {
     if (!podeEstornar) { toast.error("Sem permissão"); return; }
     if (l.origem === "caixa" || l.tipo === "transferencia") return;
     if (l.status === "cancelado") { toast.info("Lançamento já estornado."); return; }
-    if (!confirm(`Estornar "${l.descricao}" no valor de ${fmt(Number(l.valor))}?`)) return;
+    // Antes de confirmar, consulta o lançamento para verificar se pertence a um
+    // pagamento agrupado (grupo_pagamento_id) ou é uma sombra legada (valor 0 +
+    // observação "Pagamento agrupado com agendamento ..."). O usuário deve saber
+    // que outros atendimentos do mesmo grupo permanecerão pagos.
+    const { data: lancInfo } = await supabase
+      .from("fin_lancamentos")
+      .select("id, valor, observacoes, grupo_pagamento_id")
+      .eq("id", l.id)
+      .maybeSingle();
+    const info = (lancInfo ?? {}) as { valor: number | string | null; observacoes: string | null; grupo_pagamento_id: string | null };
+    let qtdGrupo = 0;
+    if (info.grupo_pagamento_id) {
+      const { count } = await supabase
+        .from("fin_lancamentos")
+        .select("id", { count: "exact", head: true })
+        .eq("grupo_pagamento_id", info.grupo_pagamento_id)
+        .eq("status", "confirmado");
+      qtdGrupo = count ?? 0;
+    }
+    const ehSombraLegado =
+      Number(info.valor) === 0 &&
+      typeof info.observacoes === "string" &&
+      info.observacoes.startsWith("Pagamento agrupado com agendamento");
+    const avisoGrupo = info.grupo_pagamento_id && qtdGrupo > 1
+      ? `\n\nEste pagamento faz parte de um grupo de ${qtdGrupo} atendimentos. Apenas ESTE atendimento será estornado — os demais permanecem pagos.`
+      : ehSombraLegado
+        ? "\n\nEste atendimento foi pago em grupo (pagamento antigo). Ao estornar, o valor total do lançamento principal NÃO é ajustado automaticamente — se necessário, ajuste manualmente o lançamento principal do grupo."
+        : "";
+    if (!confirm(`Estornar "${l.descricao}" no valor de ${fmt(Number(l.valor))}?${avisoGrupo}`)) return;
     setEstornando(l.id);
     try {
       const { data: lanc, error: eLanc } = await supabase
