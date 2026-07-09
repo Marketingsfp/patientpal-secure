@@ -2611,6 +2611,7 @@ function AgendaPage() {
       data_pagamento: form.data_pagamento ? form.data_pagamento : null,
       orcamento_id: form.orcamento_id || null,
       tipo_atendimento: form.tipo_atendimento,
+      forma_pagamento_prevista: form.forma_pagamento_prevista ? form.forma_pagamento_prevista : null,
     };
     // Miolo server-side (validação de paciente completo, agenda aberta + slot livre,
     // inadimplência de cartão, INSERT/UPDATE do agendamento e vínculos com
