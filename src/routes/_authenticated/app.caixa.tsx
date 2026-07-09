@@ -240,10 +240,11 @@ function Page() {
   const [minhaSessao, setMinhaSessao] = useState<Sessao | null>(null);
   const [minhasMovs, setMinhasMovs] = useState<Mov[]>([]);
   const [minhasSessoes, setMinhasSessoes] = useState<Sessao[]>([]);
-  // Solicitações de estorno pendentes vinculadas às movimentações visíveis
-  // (chave = lancamento_id). Usado para trocar o botão "Solicitar estorno"
-  // por "Aguardando aprovação" quando o financeiro ainda não respondeu.
-  const [estornosPendentes, setEstornosPendentes] = useState<Set<string>>(new Set());
+  // Solicitações de estorno vinculadas às movimentações visíveis
+  // (chave = lancamento_id, valor = status). Usado para trocar o botão
+  // "Solicitar estorno" por "Aguardando aprovação" (pendente) ou
+  // "Estornado" (aprovado) conforme a decisão do financeiro.
+  const [estornosPorLanc, setEstornosPorLanc] = useState<Map<string, "pendente" | "aprovado">>(new Map());
   // Filtro de período para "Movimentos" (padrão: hoje)
   type PeriodoFiltro = "hoje" | "semana" | "quinzena" | "mes" | "intervalo" | "todos";
   const [meuPeriodo, setMeuPeriodo] = useState<PeriodoFiltro>("hoje");
@@ -390,22 +391,28 @@ function Page() {
   // às movimentações atuais para trocar o botão pelo rótulo
   // "Aguardando aprovação" quando o financeiro ainda não decidiu.
   const reloadEstornosPendentes = useCallback(async () => {
-    if (!clinicaAtual) { setEstornosPendentes(new Set()); return; }
+    if (!clinicaAtual) { setEstornosPorLanc(new Map()); return; }
     const ids = Array.from(new Set(
       minhasMovs.map((m) => m.lancamento_id).filter((x): x is string => !!x),
     ));
-    if (ids.length === 0) { setEstornosPendentes(new Set()); return; }
+    if (ids.length === 0) { setEstornosPorLanc(new Map()); return; }
     const { data } = await supabase
       .from("estorno_solicitacoes")
       .select("lancamento_id, status")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .in("lancamento_id", ids)
-      .eq("status", "pendente");
-    const set = new Set<string>();
-    for (const r of (data ?? []) as Array<{ lancamento_id: string | null }>) {
-      if (r.lancamento_id) set.add(r.lancamento_id);
+      .in("status", ["pendente", "aprovado"]);
+    const map = new Map<string, "pendente" | "aprovado">();
+    for (const r of (data ?? []) as Array<{ lancamento_id: string | null; status: string }>) {
+      if (!r.lancamento_id) continue;
+      // pendente prevalece sobre aprovado caso ambos existam
+      const prev = map.get(r.lancamento_id);
+      if (prev === "pendente") continue;
+      if (r.status === "pendente" || r.status === "aprovado") {
+        map.set(r.lancamento_id, r.status);
+      }
     }
-    setEstornosPendentes(set);
+    setEstornosPorLanc(map);
   }, [clinicaAtual, minhasMovs]);
 
   useEffect(() => {
@@ -1242,18 +1249,37 @@ function Page() {
                           </TableCell>
                           <TableCell className="text-right">
                             {m.tipo === "recebimento" && (
-                              m.lancamento_id && estornosPendentes.has(m.lancamento_id) ? (
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  disabled
-                                  className="h-7 text-xs text-amber-800 border-amber-300 bg-amber-50 cursor-not-allowed"
-                                  title="Solicitação de estorno enviada — aguardando decisão do financeiro"
-                                >
-                                  <Undo2 className="h-3 w-3 mr-1" /> Aguardando aprovação
-                                </Button>
-                              ) : (
+                              (() => {
+                                const st = m.lancamento_id ? estornosPorLanc.get(m.lancamento_id) : undefined;
+                                if (st === "pendente") {
+                                  return (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      disabled
+                                      className="h-7 text-xs text-amber-800 border-amber-300 bg-amber-50 cursor-not-allowed"
+                                      title="Solicitação de estorno enviada — aguardando decisão do financeiro"
+                                    >
+                                      <Undo2 className="h-3 w-3 mr-1" /> Aguardando aprovação
+                                    </Button>
+                                  );
+                                }
+                                if (st === "aprovado") {
+                                  return (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      disabled
+                                      className="h-7 text-xs text-slate-600 border-slate-300 bg-slate-100 cursor-not-allowed"
+                                      title="Este lançamento já foi estornado"
+                                    >
+                                      <Undo2 className="h-3 w-3 mr-1" /> Estornado
+                                    </Button>
+                                  );
+                                }
+                                return (
                               <Button
                                 type="button"
                                 size="sm"
@@ -1264,7 +1290,8 @@ function Page() {
                               >
                                 <Undo2 className="h-3 w-3 mr-1" /> Solicitar estorno
                               </Button>
-                              )
+                                );
+                              })()
                             )}
                           </TableCell>
                         </TableRow>
