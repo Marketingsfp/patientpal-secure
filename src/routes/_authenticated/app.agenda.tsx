@@ -33,6 +33,7 @@ import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import { ProcedimentoCell } from "@/components/agenda/procedimento-cell";
 import { PatientSearchInput } from "@/components/patient-search-input";
 import { PacienteQuickActions } from "@/components/agenda/paciente-quick-actions";
+import { FichaEmUsoAlert } from "@/components/agenda/ficha-em-uso-alert";
 import { PacienteResumoBar } from "@/components/agenda/paciente-resumo-bar";
 import { PatientQuickCompleteSheet } from "@/components/patient-quick-complete-sheet";
 import { TurboModeToggle } from "@/components/agenda/turbo-mode-toggle";
@@ -78,6 +79,7 @@ type Agendamento = {
   pacote_id?: string | null;
   tipo_atendimento?: TipoAtendimento | null;
   atendimento_grupo_id?: string | null;
+  ficha_numero?: number | null;
 };
 type Medico = { id: string; nome: string; sexo?: string | null; usa_sistema?: boolean; especialidade_id?: string | null; procedimento_padrao_id?: string | null; procedimento_padrao_em_branco?: boolean | null; procedimento_padrao_nome?: string | null; especialidade_nome?: string | null };
 type RecursoEnf = { id: string; nome: string };
@@ -1056,7 +1058,7 @@ function AgendaPage() {
     setLoading(true);
     let q = supabase
       .from("agendamentos")
-      .select("id,paciente_nome,paciente_id,medico_id,enfermagem_recurso_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,atendimento_grupo_id,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as never)
+      .select("id,paciente_nome,paciente_id,medico_id,enfermagem_recurso_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,atendimento_grupo_id,ficha_numero,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as never)
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("inicio", { ascending: false });
     // "agendado" agora significa "qualquer ficha com paciente alocado",
@@ -1794,6 +1796,9 @@ function AgendaPage() {
     const m = new Map<string, string>();
     // Numeração sequencial por dia e por médico (reinicia a cada data/médico)
     // na ordem do horário. Assim cada agenda do médico fica 001, 002, 003...
+    // Se o agendamento já tem `ficha_numero` gravado (na 1ª impressão da GR),
+    // ele PREVALECE sobre a posição dinâmica — o número da ficha impresso na
+    // guia jamais deve divergir do sistema.
     const contadores = new Map<string, number>();
     const ordenados = [...items].sort((a, b) => a.inicio.localeCompare(b.inicio));
     ordenados.forEach((a) => {
@@ -1801,7 +1806,9 @@ function AgendaPage() {
       const chave = `${dia}__${a.medico_id ?? "sem-medico"}`;
       const n = (contadores.get(chave) ?? 0) + 1;
       contadores.set(chave, n);
-      m.set(a.id, String(n).padStart(3, "0"));
+      const fixa = (a as { ficha_numero?: number | null }).ficha_numero;
+      const num = typeof fixa === "number" && fixa > 0 ? fixa : n;
+      m.set(a.id, String(num).padStart(3, "0"));
     });
     return m;
   }, [items]);
@@ -3393,6 +3400,9 @@ function AgendaPage() {
               </p>
             </DialogHeader>
             <form onSubmit={submit} className="space-y-4 px-6 py-5">
+              {editing && open && (
+                <FichaEmUsoAlert agendamentoId={editing.id} />
+              )}
               {editing && pagosSet.has(editing.id) && (
                 <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 text-amber-900 px-3 py-2 text-xs">
                   <span className="mt-0.5">⚠️</span>
