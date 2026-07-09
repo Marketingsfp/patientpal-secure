@@ -240,6 +240,10 @@ function Page() {
   const [minhaSessao, setMinhaSessao] = useState<Sessao | null>(null);
   const [minhasMovs, setMinhasMovs] = useState<Mov[]>([]);
   const [minhasSessoes, setMinhasSessoes] = useState<Sessao[]>([]);
+  // Solicitações de estorno pendentes vinculadas às movimentações visíveis
+  // (chave = lancamento_id). Usado para trocar o botão "Solicitar estorno"
+  // por "Aguardando aprovação" quando o financeiro ainda não respondeu.
+  const [estornosPendentes, setEstornosPendentes] = useState<Set<string>>(new Set());
   // Filtro de período para "Movimentos" (padrão: hoje)
   type PeriodoFiltro = "hoje" | "semana" | "quinzena" | "mes" | "intervalo" | "todos";
   const [meuPeriodo, setMeuPeriodo] = useState<PeriodoFiltro>("hoje");
@@ -381,6 +385,52 @@ function Page() {
     setMinhasSessoes((histRes.data ?? []) as Sessao[]);
     setLoading(false);
   }, [clinicaAtual, user]);
+
+  // Recarrega o conjunto de solicitações de estorno pendentes vinculadas
+  // às movimentações atuais para trocar o botão pelo rótulo
+  // "Aguardando aprovação" quando o financeiro ainda não decidiu.
+  const reloadEstornosPendentes = useCallback(async () => {
+    if (!clinicaAtual) { setEstornosPendentes(new Set()); return; }
+    const ids = Array.from(new Set(
+      minhasMovs.map((m) => m.lancamento_id).filter((x): x is string => !!x),
+    ));
+    if (ids.length === 0) { setEstornosPendentes(new Set()); return; }
+    const { data } = await supabase
+      .from("estorno_solicitacoes")
+      .select("lancamento_id, status")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .in("lancamento_id", ids)
+      .eq("status", "pendente");
+    const set = new Set<string>();
+    for (const r of (data ?? []) as Array<{ lancamento_id: string | null }>) {
+      if (r.lancamento_id) set.add(r.lancamento_id);
+    }
+    setEstornosPendentes(set);
+  }, [clinicaAtual, minhasMovs]);
+
+  useEffect(() => {
+    void reloadEstornosPendentes();
+  }, [reloadEstornosPendentes]);
+
+  // Realtime: se o financeiro aprovar/recusar ou outro caixa solicitar,
+  // atualiza o rótulo do botão sem exigir F5.
+  useEffect(() => {
+    if (!clinicaAtual) return;
+    const ch = supabase
+      .channel(`caixa-estornos-${clinicaAtual.clinica_id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "estorno_solicitacoes",
+          filter: `clinica_id=eq.${clinicaAtual.clinica_id}`,
+        },
+        () => { void reloadEstornosPendentes(); },
+      )
+      .subscribe();
+    return () => { void supabase.removeChannel(ch); };
+  }, [clinicaAtual, reloadEstornosPendentes]);
 
   // Carrega a fila de cobrança (agendamentos hoje aguardando caixa)
   const loadFilaCaixa = useCallback(async () => {
@@ -1192,6 +1242,18 @@ function Page() {
                           </TableCell>
                           <TableCell className="text-right">
                             {m.tipo === "recebimento" && (
+                              m.lancamento_id && estornosPendentes.has(m.lancamento_id) ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  disabled
+                                  className="h-7 text-xs text-amber-800 border-amber-300 bg-amber-50 cursor-not-allowed"
+                                  title="Solicitação de estorno enviada — aguardando decisão do financeiro"
+                                >
+                                  <Undo2 className="h-3 w-3 mr-1" /> Aguardando aprovação
+                                </Button>
+                              ) : (
                               <Button
                                 type="button"
                                 size="sm"
@@ -1202,6 +1264,7 @@ function Page() {
                               >
                                 <Undo2 className="h-3 w-3 mr-1" /> Solicitar estorno
                               </Button>
+                              )
                             )}
                           </TableCell>
                         </TableRow>
@@ -1779,6 +1842,7 @@ function Page() {
           const idx = d.indexOf("—");
           return idx > 0 ? d.slice(0, idx).trim() : null;
         })()}
+        onCreated={() => { void reloadEstornosPendentes(); }}
       />
       <Dialog open={!!caixaDrill} onOpenChange={(v) => { if (!v) setCaixaDrill(null); }}>
         <DialogContent className="max-w-3xl">
