@@ -346,17 +346,21 @@ function Page() {
               <TableHead className="w-10"></TableHead>
               <TableHead>Data</TableHead>
               <TableHead>Descrição</TableHead>
+              <TableHead>Usuário</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Valor</TableHead>
               <TableHead className="w-24"></TableHead>
             </TableRow></TableHeader>
-            <TableBody>{items.map((l) => (
+            <TableBody>{items.map((l) => {
+              const userMap = new Map(usuarios.map((u) => [u.id, u.nome]));
+              return (
               <TableRow key={l.id}>
                 <TableCell>{l.tipo === "receita"
                   ? <ArrowUpCircle className="h-4 w-4 text-green-600" />
                   : <ArrowDownCircle className="h-4 w-4 text-red-600" />}</TableCell>
                 <TableCell className="text-sm">{new Date(l.data).toLocaleDateString("pt-BR")}</TableCell>
                 <TableCell>{l.descricao}</TableCell>
+                <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{l.criado_por ? userMap.get(l.criado_por) ?? "—" : "—"}</TableCell>
                 <TableCell><Badge variant={l.status === "confirmado" ? "default" : "secondary"}>{l.status}</Badge></TableCell>
                 <TableCell className={`text-right font-medium ${l.tipo === "receita" ? "text-green-600" : "text-red-600"}`}>
                   {l.tipo === "receita" ? "+" : "-"} {fmt(Number(l.valor))}</TableCell>
@@ -368,7 +372,8 @@ function Page() {
                     </>
                   ) : null}
                 </TableCell>
-              </TableRow>))}
+              </TableRow>);
+            })}
             </TableBody>
           </Table></>}
       </CardContent></Card>
