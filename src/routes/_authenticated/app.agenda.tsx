@@ -2484,6 +2484,7 @@ function AgendaPage() {
       orcamento_numero: "",
       orcamento_itens: [],
       tipo_atendimento: (a.tipo_atendimento as TipoAtendimento | null) ?? "particular",
+      forma_pagamento_prevista: (a as { forma_pagamento_prevista?: string | null }).forma_pagamento_prevista ?? "",
     });
     if (pacienteCopia) setPacienteCopia(null);
     setOpen(true);
@@ -2553,6 +2554,7 @@ function AgendaPage() {
       orcamento_numero: a.orcamento_numero ? String(a.orcamento_numero) : "",
       orcamento_itens: itensOrc,
       tipo_atendimento: (a.tipo_atendimento as TipoAtendimento | null) ?? "particular",
+      forma_pagamento_prevista: (a as { forma_pagamento_prevista?: string | null }).forma_pagamento_prevista ?? "",
     });
     setOpen(true);
   };
