@@ -3277,11 +3277,49 @@ function AgendaPage() {
       return;
     }
     try {
+      // Reimpressão: carrega a forma/parcelas/bandeira reais do lançamento
+      // confirmado deste agendamento para que a 2ª via mantenha exatamente
+      // a forma de pagamento escolhida (evita cair no default "DINHEIRO"
+      // quando o lançamento não tem forma preenchida).
+      let pagamentoInfo: {
+        valor: number;
+        forma_pagamento: string | null;
+        parcelas: number | null;
+        bandeira_cartao: string | null;
+      } | undefined;
+      try {
+        const { data: lancs } = await supabase
+          .from("fin_lancamentos")
+          .select("valor, forma_pagamento, parcelas, bandeira_cartao, created_at")
+          .eq("agendamento_id", a.id)
+          .eq("tipo", "receita")
+          .eq("status", "confirmado")
+          .order("created_at", { ascending: false });
+        const rows = (lancs ?? []) as Array<{
+          valor: number | string;
+          forma_pagamento: string | null;
+          parcelas: number | null;
+          bandeira_cartao: string | null;
+        }>;
+        if (rows.length > 0) {
+          const total = rows.reduce((s, r) => s + Number(r.valor ?? 0), 0);
+          // Toma a primeira linha com forma preenchida (mais recente); se
+          // nenhuma tiver, usa null (o print exibirá "—" no lugar do default).
+          const comForma = rows.find((r) => r.forma_pagamento) ?? rows[0];
+          pagamentoInfo = {
+            valor: total,
+            forma_pagamento: comForma.forma_pagamento,
+            parcelas: comForma.parcelas,
+            bandeira_cartao: comForma.bandeira_cartao,
+          };
+        }
+      } catch { /* segue sem enriquecer — printGuiaAtendimento tem fallback próprio */ }
       await printGuiaAtendimento({
         agendamentoId: a.id,
         clinicaId: clinicaAtual.clinica_id,
         usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
         usuarioId: user?.id ?? null,
+        pagamento: pagamentoInfo,
       });
     } catch (err) {
       mostrarErro(err);
