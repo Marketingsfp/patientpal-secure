@@ -124,6 +124,9 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
   const [novaSenha, setNovaSenha] = useState("");
   const [confirmarSenha, setConfirmarSenha] = useState("");
   const [savingSenha, setSavingSenha] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
+  const [bulkQuery, setBulkQuery] = useState("");
   const activeClinicaId = formClinicaId || clinicaId;
 
   const normalizarNome = (s: string) =>
@@ -1077,6 +1080,19 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                       >
                         <Plus className="h-4 w-4 mr-1" /> Adicionar serviço
                       </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={especialidadesSelecionadasNomes.size === 0 || procsFiltradosPorEspecialidade.length === 0}
+                        onClick={() => {
+                          setBulkSelected(new Set());
+                          setBulkQuery("");
+                          setBulkOpen(true);
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-1" /> Adicionar vários
+                      </Button>
                     </div>
                   </div>
                   {especialidadesSelecionadasNomes.size === 0 ? (
@@ -1517,6 +1533,103 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                 <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button>
               </DialogFooter>
             )}
+            <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
+              <DialogContent className="sm:max-w-2xl w-[calc(100vw-2rem)] max-h-[85vh] overflow-hidden flex flex-col">
+                <DialogHeader>
+                  <DialogTitle>Adicionar vários serviços</DialogTitle>
+                </DialogHeader>
+                {(() => {
+                  const jaSel = new Set(form.procedimentos.filter(Boolean));
+                  const opts: { value: string; label: string }[] = [];
+                  const pushed = new Set<string>();
+                  for (const p of procsFiltradosPorEspecialidade) {
+                    const choices = procEspChoices.get(p.id) ?? [];
+                    if (choices.length === 0) {
+                      const v = joinItem(p.id, null);
+                      if (!pushed.has(v) && !jaSel.has(v)) { pushed.add(v); opts.push({ value: v, label: p.nome }); }
+                    } else {
+                      for (const c of choices) {
+                        const v = joinItem(p.id, c.id);
+                        if (pushed.has(v) || jaSel.has(v)) continue;
+                        pushed.add(v);
+                        opts.push({ value: v, label: `${p.nome} (${c.nome.toUpperCase()})` });
+                      }
+                    }
+                  }
+                  opts.sort((a, b) => a.label.localeCompare(b.label, "pt-BR", { sensitivity: "base" }));
+                  const q = bulkQuery.trim().toLowerCase();
+                  const filtered = q ? opts.filter((o) => o.label.toLowerCase().includes(q)) : opts;
+                  const allChecked = filtered.length > 0 && filtered.every((o) => bulkSelected.has(o.value));
+                  return (
+                    <div className="flex flex-col gap-3 min-h-0">
+                      <Input
+                        placeholder="Buscar serviço..."
+                        value={bulkQuery}
+                        onChange={(e) => setBulkQuery(e.target.value)}
+                      />
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <Checkbox
+                            checked={allChecked}
+                            onCheckedChange={(v) => {
+                              const next = new Set(bulkSelected);
+                              if (v) filtered.forEach((o) => next.add(o.value));
+                              else filtered.forEach((o) => next.delete(o.value));
+                              setBulkSelected(next);
+                            }}
+                          />
+                          <span>Selecionar todos {q ? "(filtrados)" : ""}</span>
+                        </label>
+                        <span>{bulkSelected.size} selecionado(s)</span>
+                      </div>
+                      <div className="flex-1 overflow-y-auto border rounded-md p-2 space-y-1 min-h-[240px] max-h-[50vh]">
+                        {filtered.length === 0 ? (
+                          <p className="text-xs text-muted-foreground p-2">Nenhum serviço disponível.</p>
+                        ) : (
+                          filtered.map((o) => (
+                            <label key={o.value} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-muted/50 cursor-pointer">
+                              <Checkbox
+                                checked={bulkSelected.has(o.value)}
+                                onCheckedChange={(v) => {
+                                  const next = new Set(bulkSelected);
+                                  if (v) next.add(o.value);
+                                  else next.delete(o.value);
+                                  setBulkSelected(next);
+                                }}
+                              />
+                              <span className="text-sm">{o.label}</span>
+                            </label>
+                          ))
+                        )}
+                      </div>
+                      <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setBulkOpen(false)}>Cancelar</Button>
+                        <Button
+                          type="button"
+                          disabled={bulkSelected.size === 0}
+                          onClick={() => {
+                            const novos = Array.from(bulkSelected).filter((v) => !jaSel.has(v));
+                            if (novos.length === 0) {
+                              toast.info("Nenhum serviço novo para adicionar.");
+                              setBulkOpen(false);
+                              return;
+                            }
+                            setForm({
+                              ...form,
+                              procedimentos: [...form.procedimentos.filter(Boolean), ...novos],
+                            });
+                            toast.success(`${novos.length} serviço(s) adicionado(s).`);
+                            setBulkOpen(false);
+                          }}
+                        >
+                          Adicionar {bulkSelected.size > 0 ? `(${bulkSelected.size})` : ""}
+                        </Button>
+                      </DialogFooter>
+                    </div>
+                  );
+                })()}
+              </DialogContent>
+            </Dialog>
           </form>
         );
 
