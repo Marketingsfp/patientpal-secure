@@ -812,52 +812,41 @@ function Page() {
     const obsFinal = obsFechamento;
     setValorInformado(""); setObsFechamento("");
     toast.success("Caixa fechado");
-    // Total recebido por forma de pagamento na sessão
+    // Total recebido por forma de pagamento na sessão — normaliza aliases e
+    // decompõe "misto" consultando observacoes do lançamento.
     const porForma: Record<string, number> = {};
-    const mistoLancIds: string[] = [];
+    const mistoIds: string[] = [];
+    const mistoValoresTotais: Record<string, number> = {};
     minhasMovs.forEach((m) => {
       if (m.tipo !== "recebimento") return;
-      const k = (m.forma_pagamento || "outros").toLowerCase();
-      if (k === "misto" && m.lancamento_id) mistoLancIds.push(m.lancamento_id);
-      porForma[k] = (porForma[k] || 0) + Number(m.valor || 0);
+      const v = Number(m.valor || 0);
+      const bucket = normalizarForma(m.forma_pagamento);
+      if (bucket === "misto" && m.lancamento_id) {
+        mistoIds.push(m.lancamento_id);
+        mistoValoresTotais[m.lancamento_id] = (mistoValoresTotais[m.lancamento_id] ?? 0) + v;
+      } else {
+        porForma[bucket] = (porForma[bucket] ?? 0) + v;
+      }
     });
-    // Decompõe "misto" nas formas reais consultando observacoes do lançamento.
-    if (mistoLancIds.length > 0) {
+    if (mistoIds.length > 0) {
       const { data: lancs } = await supabase
         .from("fin_lancamentos")
         .select("id, observacoes")
-        .in("id", mistoLancIds);
-      const LABEL_TO_KEY: Array<[RegExp, string]> = [
-        [/^cart[ãa]o\s*cr[ée]dito/i, "credito"],
-        [/^cart[ãa]o\s*d[ée]bito/i, "debito"],
-        [/^dinheiro/i, "dinheiro"],
-        [/^pix/i, "pix"],
-        [/^boleto/i, "boleto"],
-        [/^conv[êe]nio/i, "convenio"],
-        [/^transfer[êe]ncia/i, "transferencia"],
-      ];
-      const parseBRL = (s: string) => Number(s.replace(/\./g, "").replace(",", ".")) || 0;
-      (lancs ?? []).forEach((l: { observacoes: string | null }) => {
-        const obs = l.observacoes ?? "";
-        const idx = obs.indexOf("Pagamento misto:");
-        if (idx < 0) return;
-        const trecho = obs.slice(idx + "Pagamento misto:".length).split(" | ")[0];
-        const partes = trecho.split(";").map((s) => s.trim()).filter(Boolean);
-        let somaDecomposta = 0;
-        for (const p of partes) {
-          const match = LABEL_TO_KEY.find(([re]) => re.test(p));
-          if (!match) continue;
-          const valMatch = p.match(/R\$\s*([\d\.]+,\d{2})/);
-          if (!valMatch) continue;
-          const v = parseBRL(valMatch[1]);
-          porForma[match[1]] = (porForma[match[1]] || 0) + v;
-          somaDecomposta += v;
+        .in("id", mistoIds);
+      (lancs ?? []).forEach((l: { id: string; observacoes: string | null }) => {
+        const partes = decomporMistoObs(l.observacoes);
+        let somado = 0;
+        for (const [k, val] of Object.entries(partes)) {
+          porForma[k] = (porForma[k] ?? 0) + (val ?? 0);
+          somado += val ?? 0;
         }
-        // Remove do bucket "misto" o que foi decomposto
-        porForma.misto = Math.max(0, (porForma.misto || 0) - somaDecomposta);
+        const total = mistoValoresTotais[l.id] ?? 0;
+        const resto = total - somado;
+        if (Math.abs(resto) > 0.005) porForma.outros = (porForma.outros ?? 0) + resto;
       });
-      if ((porForma.misto || 0) < 0.005) delete porForma.misto;
     }
+    // Remove buckets zerados para não poluir o comprovante.
+    for (const k of Object.keys(porForma)) if (Math.abs(porForma[k]) < 0.005) delete porForma[k];
     printComprovanteCaixa({
       tipo: "fechamento",
       clinicaNome: clinicaAtual.clinica?.nome ?? "Clínica",
