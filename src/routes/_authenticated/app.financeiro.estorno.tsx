@@ -187,23 +187,6 @@ function Page() {
       toast.error("Apenas atendimentos vindos da agenda podem ser estornados.");
       return null;
     }
-    if (!agId) {
-      // Sem agendamento associado: apenas remove movimentos e lançamento.
-      const { error: eMov } = await supabase
-        .from("caixa_movimentos")
-        .delete()
-        .eq("lancamento_id", lanc.id);
-      if (eMov) {
-        mostrarErro(eMov, "falha ao reverter caixa");
-        return null;
-      }
-      const { error: eDel } = await supabase.from("fin_lancamentos").delete().eq("id", lanc.id);
-      if (eDel) {
-        mostrarErro(eDel, "falha ao excluir lançamento");
-        return null;
-      }
-      return { executado: true, resposta: "Estorno executado (sem agendamento vinculado)" };
-    }
     const { data: agAntes } = await supabase
       .from("agendamentos")
       .select("id, status, fluxo_etapa")
