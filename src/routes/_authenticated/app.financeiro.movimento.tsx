@@ -233,8 +233,10 @@ function Page() {
   const totais = resumo;
 
   const openNew = () => { setEditing(null); setForm(EMPTY); setOpen(true); };
-  const openEdit = (l: Lanc) => { setEditing(l); setForm({
-    tipo: l.tipo, descricao: l.descricao, valor: String(l.valor), data: l.data, status: l.status,
+  const openEdit = (l: Lanc) => {
+    if (l.origem === "caixa" || l.tipo === "transferencia") return; // transferências de caixa são somente-leitura aqui
+    setEditing(l); setForm({
+    tipo: l.tipo as "receita" | "despesa", descricao: l.descricao, valor: String(l.valor), data: l.data, status: l.status,
     categoria_id: l.categoria_id ?? "", conta_id: l.conta_id ?? "",
     forma_pagamento: l.forma_pagamento ?? "", observacoes: "",
   }); setOpen(true); };
