@@ -390,7 +390,7 @@ function ConsultaRapidaPage() {
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1.5">
                 <Label>Dinheiro (R$)</Label>
                 <CurrencyInput value={procForm.valor_dinheiro} onChange={(v) => setProcForm({ ...procForm, valor_dinheiro: v })} />
@@ -428,8 +428,8 @@ function ConsultaRapidaPage() {
               <Label>Nome *</Label>
               <Input value={medForm.nome} onChange={(e) => setMedForm({ ...medForm, nome: e.target.value })} required />
             </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="space-y-1.5 col-span-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1.5 sm:col-span-2">
                 <Label>CRM</Label>
                 <Input value={medForm.crm} onChange={(e) => setMedForm({ ...medForm, crm: e.target.value })} />
               </div>

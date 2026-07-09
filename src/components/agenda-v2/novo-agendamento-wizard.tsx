@@ -518,7 +518,7 @@ export function NovoAgendamentoWizard({
               Nenhum horário DISPONÍVEL para este médico nessa data. Gere horários em Disponibilidades ou escolha outro dia.
             </p>
           )}
-          <div className="grid grid-cols-5 gap-2">
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
             {(slotsQuery.data ?? []).map((s) => (
               <button
                 key={s.id}

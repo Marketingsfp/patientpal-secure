@@ -191,7 +191,7 @@ function Page() {
           <DialogContent>
             <DialogHeader><DialogTitle>{editing ? "Editar" : "Nova"} nota</DialogTitle></DialogHeader>
             <form onSubmit={submit} className="space-y-3">
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-2"><Label>Número</Label>
                   <Input value={form.numero} onChange={(e) => setForm({ ...form, numero: e.target.value })} /></div>
                 <div className="space-y-2"><Label>Série</Label>

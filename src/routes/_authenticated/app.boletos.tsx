@@ -36,7 +36,7 @@ function BoletosPage() {
       toPayload={f => ({ valor: Number(f.valor) || 0, vencimento: f.vencimento, nosso_numero: f.nosso_numero || null, linha_digitavel: f.linha_digitavel || null, status: f.status, observacoes: f.observacoes || null })}
       renderForm={(f, set) => (
         <div className="space-y-3">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-1"><Label>Valor *</Label><CurrencyInput value={f.valor} onChange={(v) => set({ ...f, valor: v })} /></div>
             <div className="space-y-1"><Label>Vencimento *</Label><Input type="date" required value={f.vencimento} onChange={e => set({ ...f, vencimento: e.target.value })} /></div>
             <div className="space-y-1"><Label>Status</Label>

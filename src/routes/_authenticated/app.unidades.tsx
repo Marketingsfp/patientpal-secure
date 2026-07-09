@@ -167,7 +167,7 @@ function ClinicasTab() {
               </div>
               <div className="space-y-2"><Label>Endereço</Label>
                 <Input value={form.endereco} onChange={(e) => setForm({ ...form, endereco: e.target.value })} /></div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-2"><Label>Cidade</Label>
                   <Input value={form.cidade} onChange={(e) => setForm({ ...form, cidade: e.target.value })} /></div>
                 <div className="space-y-2"><Label>UF</Label>
@@ -183,7 +183,7 @@ function ClinicasTab() {
                     Usar minha localização
                   </Button>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="space-y-2"><Label className="text-xs">Latitude</Label>
                     <Input value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} /></div>
                   <div className="space-y-2"><Label className="text-xs">Longitude</Label>

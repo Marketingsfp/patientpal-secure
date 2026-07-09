@@ -103,7 +103,7 @@ function Page() {
                 <div className="space-y-2"><Label>Saldo inicial</Label>
                   <CurrencyInput value={form.saldo_inicial} onChange={(v) => setForm({ ...form, saldo_inicial: v })} /></div>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-2"><Label>Banco</Label>
                   <Input value={form.banco} onChange={(e) => setForm({ ...form, banco: e.target.value })} /></div>
                 <div className="space-y-2"><Label>Agência</Label>

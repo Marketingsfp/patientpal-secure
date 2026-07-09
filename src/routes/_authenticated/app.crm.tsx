@@ -80,7 +80,7 @@ function CrmPage() {
               <Input type="email" maxLength={255} value={f.email} onChange={e => set({ ...f, email: e.target.value })} />
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-1">
               <Label>Valor (R$)</Label>
               <CurrencyInput value={f.valor_estimado} onChange={(v) => set({ ...f, valor_estimado: v })} />

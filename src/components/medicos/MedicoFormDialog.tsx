@@ -697,8 +697,8 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                   <Label>Nome completo *</Label>
                   <Input required value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} />
                 </div>
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="col-span-2 space-y-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="sm:col-span-2 space-y-2">
                     <Label>CRM *</Label>
                     <Input required value={form.crm} onChange={(e) => setForm({ ...form, crm: e.target.value })} />
                   </div>
@@ -717,7 +717,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                     <Input value={form.rg} onChange={(e) => setForm({ ...form, rg: e.target.value })} />
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="space-y-2">
                     <Label>Data de nascimento</Label>
                     <Input type="date" value={form.data_nascimento} onChange={(e) => setForm({ ...form, data_nascimento: e.target.value })} />
@@ -731,7 +731,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                     <Input value={form.estado_civil} onChange={(e) => setForm({ ...form, estado_civil: e.target.value })} />
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="space-y-2">
                     <Label>Sexo</Label>
                     <Select value={form.sexo} onValueChange={(v) => setForm({ ...form, sexo: v })}>
@@ -791,27 +791,27 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                       <h3 className="text-sm font-semibold">Endereço</h3>
                       <p className="text-xs text-muted-foreground">Endereço de referência do médico.</p>
                     </div>
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div className="space-y-2">
                         <Label>CEP</Label>
                         <Input value={form.cep} onChange={(e) => setForm({ ...form, cep: e.target.value })} />
                       </div>
-                      <div className="col-span-2 space-y-2">
+                      <div className="sm:col-span-2 space-y-2">
                         <Label>Logradouro</Label>
                         <Input value={form.logradouro} onChange={(e) => setForm({ ...form, logradouro: e.target.value })} />
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div className="space-y-2">
                         <Label>Número</Label>
                         <Input value={form.numero} onChange={(e) => setForm({ ...form, numero: e.target.value })} />
                       </div>
-                      <div className="col-span-2 space-y-2">
+                      <div className="sm:col-span-2 space-y-2">
                         <Label>Complemento</Label>
                         <Input value={form.complemento} onChange={(e) => setForm({ ...form, complemento: e.target.value })} />
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div className="space-y-2">
                         <Label>Bairro</Label>
                         <Input value={form.bairro} onChange={(e) => setForm({ ...form, bairro: e.target.value })} />

@@ -69,8 +69,8 @@ function DocumentosPage() {
               <SelectContent>{modelos.map(m => <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>)}</SelectContent>
             </Select>
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1 col-span-2"><Label>Título *</Label><Input required value={f.titulo} onChange={e => set({ ...f, titulo: e.target.value })} /></div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="space-y-1 sm:col-span-2"><Label>Título *</Label><Input required value={f.titulo} onChange={e => set({ ...f, titulo: e.target.value })} /></div>
             <div className="space-y-1"><Label>Tipo</Label>
               <Select value={f.tipo} onValueChange={v => set({ ...f, tipo: v as Tipo })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>

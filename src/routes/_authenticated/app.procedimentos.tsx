@@ -1186,8 +1186,8 @@ function ProcedimentosPage() {
           </DialogHeader>
           <form onSubmit={onSubmit} className="flex flex-col min-h-0 flex-1">
             <div className="space-y-4 overflow-y-auto px-6 py-4 flex-1 min-h-0">
-            <div className="grid grid-cols-3 gap-3">
-              <div className="space-y-1 col-span-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1 sm:col-span-2">
                 <Label>Nome *</Label>
                 <Input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} required />
               </div>
@@ -1196,8 +1196,8 @@ function ProcedimentosPage() {
                 <Input value={form.codigo} onChange={(e) => setForm({ ...form, codigo: e.target.value })} placeholder="TUSS" />
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="space-y-1 col-span-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1 sm:col-span-2">
                 <Label>Especialidade</Label>
                 <Select
                   value={grupoSelecionadoKey}

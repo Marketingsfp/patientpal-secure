@@ -196,7 +196,7 @@ function HoleritesPage() {
                 </div>
               ))}
             </div>
-            <div className="bg-muted p-3 rounded grid grid-cols-3 gap-3 text-sm">
+            <div className="bg-muted p-3 rounded grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
               <div><div className="text-muted-foreground">Proventos</div><div className="font-semibold">{totalProv.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</div></div>
               <div><div className="text-muted-foreground">Descontos</div><div className="font-semibold text-destructive">- {totalDesc.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</div></div>
               <div><div className="text-muted-foreground">Líquido</div><div className="font-bold text-primary">{liquido.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</div></div>

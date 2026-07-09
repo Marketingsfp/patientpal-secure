@@ -212,12 +212,12 @@ function NfseConfigPage() {
             <div className="space-y-1"><Label>Razão social</Label><Input value={f.razao_social} onChange={(e) => set({ ...f, razao_social: e.target.value })} /></div>
             <div className="space-y-1"><Label>Nome fantasia</Label><Input value={f.nome_fantasia} onChange={(e) => set({ ...f, nome_fantasia: e.target.value })} /></div>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-1"><Label>Inscrição Municipal</Label><Input value={f.inscricao_municipal} onChange={(e) => set({ ...f, inscricao_municipal: e.target.value })} /></div>
             <div className="space-y-1"><Label>Município</Label><Input value={f.municipio} onChange={(e) => set({ ...f, municipio: e.target.value })} placeholder="São João de Meriti" /></div>
             <div className="space-y-1"><Label>UF</Label><Input maxLength={2} value={f.uf} onChange={(e) => set({ ...f, uf: e.target.value.toUpperCase() })} /></div>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-1"><Label>Cód. IBGE Município</Label><Input value={f.codigo_municipio} onChange={(e) => set({ ...f, codigo_municipio: e.target.value })} placeholder="3305109" /></div>
             <div className="space-y-1"><Label>CEP</Label><Input value={f.cep} onChange={(e) => set({ ...f, cep: e.target.value })} /></div>
             <div className="space-y-1"><Label>Bairro</Label><Input value={f.bairro} onChange={(e) => set({ ...f, bairro: e.target.value })} /></div>
@@ -234,7 +234,7 @@ function NfseConfigPage() {
 
           <div className="pt-2 border-t">
             <h4 className="text-sm font-medium mb-2">Tributação</h4>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1">
                 <Label>Regime</Label>
                 <Select value={f.regime_tributario} onValueChange={(v) => set({ ...f, regime_tributario: v })}>
@@ -242,7 +242,7 @@ function NfseConfigPage() {
                   <SelectContent>{REGIMES.map((r) => <SelectItem key={r.v} value={r.v}>{r.l}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1 col-span-2">
+              <div className="space-y-1 sm:col-span-2">
                 <Label>Cód. nacional serviço (Lista Nacional NFS-e)</Label>
                 <ItemServicoPicker
                   value={f.item_lista_servico}
@@ -260,7 +260,7 @@ function NfseConfigPage() {
 
           <div className="pt-2 border-t">
             <h4 className="text-sm font-medium mb-2">Focus NFe</h4>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1">
                 <Label>Ambiente</Label>
                 <Select value={f.focus_ambiente} onValueChange={(v) => set({ ...f, focus_ambiente: v })}>

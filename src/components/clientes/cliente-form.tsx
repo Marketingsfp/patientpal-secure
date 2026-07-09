@@ -812,7 +812,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
           </div>
         )}
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="grid grid-cols-7 w-full">
+          <TabsList className="w-full h-auto flex flex-wrap justify-start sm:grid sm:grid-cols-7">
             <TabsTrigger value="dados">Dados</TabsTrigger>
             <TabsTrigger value="endereco">Endereço</TabsTrigger>
             <TabsTrigger value="responsavel">
@@ -923,13 +923,13 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
               <p className="text-xs text-muted-foreground">Preenche o endereço automaticamente.</p>
             </div>
             <div className="space-y-1"><Label>Logradouro</Label><InputVoz {...fieldProps("logradouro")} /></div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1"><Label>Número</Label><InputVoz {...fieldProps("numero")} /></div>
-              <div className="space-y-1 col-span-2"><Label>Complemento</Label><InputVoz {...fieldProps("complemento")} /></div>
+              <div className="space-y-1 sm:col-span-2"><Label>Complemento</Label><InputVoz {...fieldProps("complemento")} /></div>
             </div>
             <div className="space-y-1"><Label>Bairro</Label><InputVoz {...fieldProps("bairro")} /></div>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="space-y-1 col-span-2"><Label>Cidade</Label><InputVoz {...fieldProps("cidade")} /></div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1 sm:col-span-2"><Label>Cidade</Label><InputVoz {...fieldProps("cidade")} /></div>
               <div className="space-y-1">
                 <Label>UF</Label>
                 <Input value={form.estado} maxLength={2}
