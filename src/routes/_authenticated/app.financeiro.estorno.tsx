@@ -213,17 +213,18 @@ function Page() {
       .select("id, status, fluxo_etapa")
       .eq("id", agId)
       .maybeSingle();
-    const { error: eMov } = await supabase
-      .from("caixa_movimentos")
-      .delete()
-      .eq("lancamento_id", lanc.id);
-    if (eMov) {
-      mostrarErro(eMov, "falha ao reverter caixa");
-      return null;
-    }
-    const { error: eDel } = await supabase.from("fin_lancamentos").delete().eq("id", lanc.id);
-    if (eDel) {
-      mostrarErro(eDel, "falha ao excluir lançamento");
+    // Marca o lançamento como CANCELADO (estornado). Não usamos DELETE
+    // porque a policy `fin_lanc_delete` só permite admin/gestor — para
+    // usuários financeiro o DELETE não retorna erro, mas afeta 0 linhas,
+    // deixando o pagamento "vivo" e o agendamento travado como pago na
+    // agenda. Como o restante do sistema já filtra apenas
+    // status='confirmado', mudar para 'cancelado' libera a ficha.
+    const { error: eUpdLanc } = await supabase
+      .from("fin_lancamentos")
+      .update({ status: "cancelado" })
+      .eq("id", lanc.id);
+    if (eUpdLanc) {
+      mostrarErro(eUpdLanc, "falha ao estornar lançamento");
       return null;
     }
     const { error: eUpd } = await supabase
