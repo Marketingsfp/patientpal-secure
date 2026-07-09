@@ -4072,11 +4072,60 @@ function AgendaPage() {
                 trechoMisto,
               ].filter(Boolean).join(" | "),
             }));
-            const { error: errExtras } = await supabase
+            const { data: extrasInseridos, error: errExtras } = await supabase
               .from("fin_lancamentos")
-              .insert(extrasRows as never);
+              .insert(extrasRows as never)
+              .select("id, agendamento_id");
             if (errExtras) {
               mostrarErro(errExtras, "pagamento salvo, mas falhou ao vincular itens extras");
+            }
+
+            // 4) Espelha a divisão no Caixa: o LancamentoDialog criou 1 movimento
+            //    com o valor total. Ajustamos esse movimento para o principal
+            //    rateado e criamos N-1 movimentos individuais (um por extra).
+            try {
+              if (principalRow?.id) {
+                const { data: movPrinc } = await supabase
+                  .from("caixa_movimentos")
+                  .select("id, sessao_id, clinica_id, user_id, forma_pagamento")
+                  .eq("lancamento_id", principalRow.id)
+                  .order("created_at", { ascending: false })
+                  .limit(1)
+                  .maybeSingle();
+                if (movPrinc) {
+                  await supabase
+                    .from("caixa_movimentos")
+                    .update({
+                      valor: valoresRat[0],
+                      descricao: `${pagamentoPacienteNome} — ${rotuloPrincipal} (1/${N} do grupo)`,
+                    } as never)
+                    .eq("id", movPrinc.id);
+                  const extrasList = (extrasInseridos ?? []) as Array<{ id: string; agendamento_id: string | null }>;
+                  const movsExtras = pagamentoExtraIds.map((extraId, i) => {
+                    const lanc = extrasList.find((r) => r.agendamento_id === extraId);
+                    return {
+                      sessao_id: movPrinc.sessao_id,
+                      clinica_id: movPrinc.clinica_id,
+                      user_id: movPrinc.user_id,
+                      tipo: "recebimento" as const,
+                      valor: valoresRat[i + 1],
+                      descricao: `${pagamentoPacienteNome} — ${pagamentoRotulos[extraId] ?? "CONSULTA"} (${i + 2}/${N} do grupo)`,
+                      forma_pagamento: movPrinc.forma_pagamento,
+                      lancamento_id: lanc?.id ?? null,
+                    };
+                  });
+                  if (movsExtras.length > 0) {
+                    const { error: errMovExtras } = await supabase
+                      .from("caixa_movimentos")
+                      .insert(movsExtras as never);
+                    if (errMovExtras) {
+                      console.error("Falha ao criar movimentos de caixa dos extras:", errMovExtras);
+                    }
+                  }
+                }
+              }
+            } catch (e) {
+              console.error("Falha ao espelhar divisão no caixa:", e);
             }
           }
           setPagosSet((prev) => {
