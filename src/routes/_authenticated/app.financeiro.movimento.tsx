@@ -34,6 +34,8 @@ interface Lanc {
   origem?: "fin" | "caixa";
   /** direção da transferência: entrada (suprimento) ou saída (sangria) */
   transferSentido?: "entrada" | "saida";
+  /** HH:MM local — só preenchido para linhas vindas de caixa_movimentos */
+  hora?: string | null;
 }
 interface Opt { id: string; nome: string; tipo?: string }
 
@@ -166,6 +168,10 @@ function Page() {
           const mo = String(d.getMonth() + 1).padStart(2, "0");
           const da = String(d.getDate()).padStart(2, "0");
           return `${y}-${mo}-${da}`;
+        })(),
+        hora: (() => {
+          const d = new Date(m.created_at);
+          return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
         })(),
         status: "confirmado",
         categoria_id: null,
@@ -525,7 +531,7 @@ function Page() {
                   <TableBody>
                     {list.map((l) => (
                       <TableRow key={l.id}>
-                        <TableCell className="text-sm whitespace-nowrap">{(l.data ? l.data.slice(8,10)+"/"+l.data.slice(5,7)+"/"+l.data.slice(0,4) : "")}</TableCell>
+                        <TableCell className="text-sm whitespace-nowrap">{(l.data ? l.data.slice(8,10)+"/"+l.data.slice(5,7)+"/"+l.data.slice(0,4) + (l.hora ? " " + l.hora : "") : "")}</TableCell>
                         {detalhe === "saldo" && <TableCell className="capitalize">{l.tipo}</TableCell>}
                         <TableCell>{l.descricao}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">{l.categoria_id ? catMap.get(l.categoria_id) ?? "—" : "—"}</TableCell>
@@ -626,7 +632,7 @@ function Page() {
                       ? <ArrowUpCircle className="h-4 w-4 text-green-600" />
                       : <ArrowDownCircle className="h-4 w-4 text-red-600" />
                 }</TableCell>
-                <TableCell className="text-sm">{(l.data ? l.data.slice(8,10)+"/"+l.data.slice(5,7)+"/"+l.data.slice(0,4) : "")}</TableCell>
+                <TableCell className="text-sm">{(l.data ? l.data.slice(8,10)+"/"+l.data.slice(5,7)+"/"+l.data.slice(0,4) + (l.hora ? " " + l.hora : "") : "")}</TableCell>
                 <TableCell>{l.descricao}</TableCell>
                 <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{l.criado_por ? userMap.get(l.criado_por) ?? "—" : "—"}</TableCell>
                 <TableCell><Badge variant={l.status === "confirmado" ? "default" : "secondary"}>{l.status}</Badge></TableCell>
