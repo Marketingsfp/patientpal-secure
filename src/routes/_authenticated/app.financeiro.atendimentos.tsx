@@ -1678,14 +1678,7 @@ function Page() {
                                 aria-label="Selecionar"
                                 className="h-4 w-4"
                               />
-                            ) : (
-                              <span
-                                title="Aguardando o médico marcar o atendimento como Realizado na agenda"
-                                className="inline-flex items-center gap-1 text-[10px] text-amber-700 whitespace-nowrap"
-                              >
-                                ⏳ Aguarda atend.
-                              </span>
-                            )
+                            ) : null
                           ) : (
                             <span
                               title="Sem valor de repasse cadastrado para este médico/procedimento"
