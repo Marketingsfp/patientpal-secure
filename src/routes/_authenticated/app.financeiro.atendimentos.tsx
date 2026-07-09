@@ -1269,6 +1269,37 @@ function Page() {
           const { error } = await supabase.from("fin_lancamentos").update(upd).in("id", agendaIds);
           if (error) throw error;
         }
+        // Se usamos valor manual, ajusta o valor_medico de cada atendimento
+        // proporcionalmente para que o comprovante e as visões futuras batam
+        // com o total pago. Distribui o resto (centavos) no último item.
+        if (usarValorManual) {
+          const base = totalCalc > 0 ? totalCalc : list.length;
+          const centavosAlvo = Math.round(total * 100);
+          let acumulado = 0;
+          const novos: { id: string; origem: string; valor: number }[] = [];
+          for (let i = 0; i < list.length; i++) {
+            const item = list[i];
+            let valorItem: number;
+            if (i === list.length - 1) {
+              valorItem = Math.max(0, (centavosAlvo - acumulado) / 100);
+            } else {
+              const peso = totalCalc > 0 ? (Number(item.valor_medico) || 0) / base : 1 / base;
+              const cents = Math.round(centavosAlvo * peso);
+              acumulado += cents;
+              valorItem = cents / 100;
+            }
+            novos.push({ id: item.id, origem: item.origem, valor: valorItem });
+            item.valor_medico = valorItem;
+          }
+          const manualUpds = novos.filter((n) => n.origem === "manual");
+          const agendaUpds = novos.filter((n) => n.origem === "agenda");
+          for (const n of manualUpds) {
+            await supabase.from("fin_atendimentos").update({ valor_medico: n.valor }).eq("id", n.id);
+          }
+          for (const n of agendaUpds) {
+            await supabase.from("fin_lancamentos").update({ valor_medico: n.valor }).eq("id", n.id);
+          }
+        }
       }
       toast.success("Repasses pagos com sucesso");
       const c = buildComprovante(selectedItems, {
