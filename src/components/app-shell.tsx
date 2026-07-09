@@ -6,6 +6,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
 import { useMedicoContext } from "@/hooks/use-medico-context";
 import { usePermissoes } from "@/hooks/use-permissoes";
+import { ROUTE_TO_MODULE as SHARED_ROUTE_TO_MODULE, moduloDaRota } from "@/lib/permissoes-rotas";
+import { SemPermissao } from "@/components/sem-permissao";
 import { supabase } from "@/integrations/supabase/client";
 import { getSubsystem, setSubsystem, subscribeSubsystem, SUBSYSTEMS } from "@/lib/subsystem";
 import logoSaoFrancisco from "@/assets/logo-sao-francisco.png";
@@ -58,75 +60,15 @@ type NavItem = NavLeaf | NavParent;
 const isParent = (it: NavItem): it is NavParent => "children" in it;
 
 // Mapeia rota do menu → chave de módulo da tela de Perfis de Acesso.
-// Rotas omitidas aqui são sempre visíveis (não controladas por permissão).
-const ROUTE_TO_MODULE: Record<string, string> = {
-  "/app/agenda": "agenda",
-  "/app/agenda/express": "agenda",
-  "/app/atendimento-multiplo": "atendimento-multiplo",
-  "/app/checkin": "checkin",
-  "/app/caixa": "caixa",
-  "/app/financeiro/atendimentos": "financeiro",
-  "/app/chat": "chat",
-  "/app/clientes": "clientes",
-  "/app/painel": "painel",
-  "/app/painel-executivo": "painel-executivo",
-  "/app/fluxo": "fluxo",
-  "/app/orcamentos": "orcamentos",
-  "/app/recepcao": "recepcao",
-  "/app/triagem-enfermagem": "triagem-enfermagem",
-  "/app/cartao-beneficios/contratos": "cartao-beneficios",
-  "/app/atendimento-ia": "atendimento-ia",
-  "/app/crm": "crm",
-  "/app/alertas-enfermagem": "alertas-enfermagem",
-  "/app/consulta-rapida": "consulta-rapida",
-  "/app/nina": "nina",
-  "/app/odontologia": "odontologia",
-  "/app/exames-resultados": "exames-resultados",
-  "/app/mkt-leads": "mkt-leads",
-  "/app/campanhas": "campanhas",
-  "/app/mkt-envios": "mkt-envios",
-  "/app/mkt-landing": "mkt-landing",
-  "/app/mkt-segmentos": "mkt-segmentos",
-  "/app/equipe": "equipe",
-  "/app/especialidades": "especialidades",
-  "/app/procedimentos": "procedimentos",
-  "/app/tipos-servico": "tipos-servico",
-  "/app/enfermagem-recursos": "enfermagem-recursos",
-  "/app/disponibilidades": "disponibilidades",
-  "/app/prontuario-modelos": "prontuario-modelos",
-  "/app/modelos-documentos": "modelos-documentos",
-  "/app/planos": "planos",
-  "/app/estoque": "estoque",
-  "/app/documentos": "documentos",
-  "/app/prontuarios": "prontuarios",
-  "/app/anamneses": "anamneses",
-  "/app/medicos": "medicos",
-  "/app/clinicas": "clinicas",
-  "/app/perfis": "perfis",
-  "/app/unidades": "unidades",
-  "/app/hr-ponto": "hr-ponto",
-  "/app/hr-contratos": "hr-contratos",
-  "/app/hr-ferias": "hr-ferias",
-  "/app/hr-holerites": "hr-holerites",
-  "/app/treinamentos": "treinamentos",
-  "/app/lms-admin": "lms-admin",
-  "/app/cargos": "cargos",
-  "/app/financeiro": "financeiro",
-  "/app/boletos": "boletos",
-  "/app/contratos": "contratos",
-  "/app/configuracoes/nfse": "nfse",
-  "/app/integration-secrets": "integration-secrets",
-  "/app/lgpd": "lgpd",
-  "/app/funcionarios": "funcionarios",
-  "/app/relatorios": "relatorios",
-  "/app/auditoria": "auditoria",
-  "/app/setores": "setores",
-};
+// O mapa vive em src/lib/permissoes-rotas.ts (compartilhado com o guard
+// de rota) — aqui apenas reexportamos para uso local.
+const ROUTE_TO_MODULE = SHARED_ROUTE_TO_MODULE;
 
 function leafAllowed(to: string, allowed: Set<string> | null): boolean {
   if (!allowed) return true;
   const mod = ROUTE_TO_MODULE[to];
-  if (!mod) return false; // rota não mapeada → ocultar por padrão
+  if (mod === null) return true;       // rota livre/sistema
+  if (mod === undefined) return false; // rota não mapeada → ocultar
   return allowed.has(mod);
 }
 
@@ -223,7 +165,7 @@ export function AppShell() {
   const { user, signOut, loading } = useAuth();
   const { memberships, clinicaAtual, setClinicaAtual, modoTodas, setModoTodas, branding } = useClinica();
   const { isMedicoOnly } = useMedicoContext();
-  const { allowed: allowedModules } = usePermissoes();
+  const { allowed: allowedModules, loading: permsLoading } = usePermissoes();
   const { enabled: menuV2Enabled } = useMenuV2Flag();
   const location = useLocation();
   const navigate = useNavigate();
@@ -490,10 +432,24 @@ export function AppShell() {
     );
   }
 
+  // Guarda de rota: bloqueia acesso quando o módulo da rota atual não é
+  // permitido pelo perfil do usuário. Admin (allowedModules === null) passa
+  // por padrão. Enquanto as permissões carregam, mostramos o próprio outlet
+  // para evitar flash de "Acesso negado".
+  const currentModulo = moduloDaRota(location.pathname);
+  const rotaPermitida =
+    allowedModules === null
+    || permsLoading
+    || currentModulo === null
+    || (typeof currentModulo === "string" && allowedModules.has(currentModulo));
+  const guardedOutlet = rotaPermitida
+    ? <Outlet />
+    : <SemPermissao modulo={currentModulo ?? undefined} />;
+
   if (isEmbed) {
     return (
       <div className="h-screen w-full overflow-auto bg-background" style={{ background: "var(--surface-cream)" }}>
-        <Outlet />
+        {guardedOutlet}
       </div>
     );
   }
@@ -754,7 +710,7 @@ export function AppShell() {
           </div>
         </header>
         <main className="flex-1 px-3 pt-1 pb-3 sm:px-4 sm:pt-1.5 sm:pb-4 lg:px-6 lg:pt-2 lg:pb-6 overflow-auto min-w-0" style={{ background: "var(--surface-cream)" }}>
-          <Outlet />
+          {guardedOutlet}
         </main>
       </div>
       {pwOpen && (
