@@ -884,6 +884,7 @@ function Page() {
         operadorNome: minhaSessao.user_nome || user.user_metadata?.nome || user.email || "Atendente",
         valor: v,
         descricao: descLancada || null,
+        destinoNome,
       });
     }
     void load();
