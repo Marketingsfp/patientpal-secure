@@ -555,7 +555,7 @@ function Page() {
               <TableHead>Usuário</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Valor</TableHead>
-              <TableHead className="w-24"></TableHead>
+              <TableHead className="w-32 text-right">Ações</TableHead>
             </TableRow></TableHeader>
             <TableBody>{items.map((l) => {
               const userMap = new Map(usuarios.map((u) => [u.id, u.nome]));
