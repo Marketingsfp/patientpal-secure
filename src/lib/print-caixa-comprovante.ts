@@ -23,6 +23,8 @@ export interface ComprovanteCaixaInput {
   operadorNome: string;
   valor: number;
   descricao?: string | null;
+  /** Nome do usuário destinatário (sangria: entregue a; suprimento: recebido de) */
+  destinoNome?: string | null;
   /** Preenchidos somente no fechamento. */
   saldoCalculado?: number;
   valorInformado?: number;
@@ -140,6 +142,9 @@ export function printComprovanteCaixa(input: ComprovanteCaixaInput) {
     <div class="sep"></div>
     <div class="row"><span class="k">Data/Hora</span><span class="v">${esc(dtStr)}</span></div>
     <div class="row"><span class="k">Atendente</span><span class="v">${esc(input.operadorNome)}</span></div>
+    ${!isFech && input.destinoNome
+      ? `<div class="row"><span class="k">${input.tipo === "sangria" ? "Entregue a" : "Recebido de"}</span><span class="v bold">${esc(input.destinoNome)}</span></div>`
+      : ""}
     <div class="sep"></div>
     ${isFech
       ? linhas.map((l) => `<div class="row"><span class="k">${esc(l.label)}</span><span class="v ${l.destaque ? "bold" : ""}">${esc(l.valor)}</span></div>`).join("")
@@ -152,10 +157,15 @@ export function printComprovanteCaixa(input: ComprovanteCaixaInput) {
       <div class="nome">${esc(input.operadorNome)}</div>
       <div class="line">Assinatura do Atendente</div>
     </div>
+    ${!isFech && input.destinoNome ? `
+    <div class="sig">
+      <div class="nome">${esc(input.destinoNome)}</div>
+      <div class="line">${input.tipo === "sangria" ? "Assinatura de quem recebeu" : "Assinatura de quem entregou"}</div>
+    </div>` : `
     <div class="sig">
       <div class="nome">&nbsp;</div>
       <div class="line">Assinatura da Tesouraria</div>
-    </div>
+    </div>`}
     <div class="rodape">${esc(dtStr)} — ClinicaOS</div>
   </div>
 </body></html>`;
