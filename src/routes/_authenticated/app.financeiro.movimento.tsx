@@ -490,18 +490,28 @@ function Page() {
             <TableBody>{items.map((l) => {
               const userMap = new Map(usuarios.map((u) => [u.id, u.nome]));
               return (
-              <TableRow key={l.id}>
-                <TableCell>{l.tipo === "receita"
-                  ? <ArrowUpCircle className="h-4 w-4 text-green-600" />
-                  : <ArrowDownCircle className="h-4 w-4 text-red-600" />}</TableCell>
+              <TableRow key={`${l.origem ?? "fin"}:${l.id}`}>
+                <TableCell>{
+                  l.tipo === "transferencia"
+                    ? <ArrowLeftRight className={`h-4 w-4 ${l.transferSentido === "entrada" ? "text-blue-600" : "text-amber-600"}`} />
+                    : l.tipo === "receita"
+                      ? <ArrowUpCircle className="h-4 w-4 text-green-600" />
+                      : <ArrowDownCircle className="h-4 w-4 text-red-600" />
+                }</TableCell>
                 <TableCell className="text-sm">{new Date(l.data).toLocaleDateString("pt-BR")}</TableCell>
                 <TableCell>{l.descricao}</TableCell>
                 <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{l.criado_por ? userMap.get(l.criado_por) ?? "—" : "—"}</TableCell>
                 <TableCell><Badge variant={l.status === "confirmado" ? "default" : "secondary"}>{l.status}</Badge></TableCell>
-                <TableCell className={`text-right font-medium ${l.tipo === "receita" ? "text-green-600" : "text-red-600"}`}>
-                  {l.tipo === "receita" ? "+" : "-"} {fmt(Number(l.valor))}</TableCell>
+                <TableCell className={`text-right font-medium ${
+                  l.tipo === "transferencia"
+                    ? (l.transferSentido === "entrada" ? "text-blue-600" : "text-amber-600")
+                    : l.tipo === "receita" ? "text-green-600" : "text-red-600"
+                }`}>
+                  {l.tipo === "transferencia"
+                    ? (l.transferSentido === "entrada" ? "↑" : "↓")
+                    : (l.tipo === "receita" ? "+" : "-")} {fmt(Number(l.valor))}</TableCell>
                 <TableCell className="text-right">
-                  {podeEscrever ? (
+                  {podeEscrever && l.origem !== "caixa" ? (
                     <>
                       <Button variant="ghost" size="icon" onClick={() => openEdit(l)}><Pencil className="h-3.5 w-3.5" /></Button>
                       <Button variant="ghost" size="icon" onClick={() => remove(l)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
