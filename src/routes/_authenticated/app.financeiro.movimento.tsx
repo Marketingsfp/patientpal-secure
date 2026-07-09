@@ -658,11 +658,15 @@ function Page() {
         {loading ? <div className="py-12 text-center text-muted-foreground">Carregando...</div>
           : items.length === 0 ? <div className="py-12 text-center text-muted-foreground">Nenhum lançamento no período.</div>
           : <>
-          {resumo.totalRows > items.length ? (
-            <div className="px-4 py-2 text-xs text-muted-foreground bg-muted/30 border-b">
-              Exibindo os {items.length.toLocaleString("pt-BR")} lançamentos mais recentes de {resumo.totalRows.toLocaleString("pt-BR")} no período. Os totais acima consideram todos.
-            </div>
-          ) : null}
+          {(() => {
+            const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+            const currentPage = Math.min(page, totalPages);
+            return (
+              <div className="px-4 py-2 text-xs text-muted-foreground bg-muted/30 border-b">
+                Página {currentPage} de {totalPages} — {items.length.toLocaleString("pt-BR")} lançamento(s) no período.
+              </div>
+            );
+          })()}
           <Table>
             <TableHeader><TableRow>
               <TableHead className="w-10"></TableHead>
@@ -673,7 +677,7 @@ function Page() {
               <TableHead className="text-right">Valor</TableHead>
               <TableHead className="w-32 text-right">Ações</TableHead>
             </TableRow></TableHeader>
-            <TableBody>{items.map((l) => {
+            <TableBody>{items.slice((Math.min(page, Math.max(1, Math.ceil(items.length / PAGE_SIZE))) - 1) * PAGE_SIZE, Math.min(page, Math.max(1, Math.ceil(items.length / PAGE_SIZE))) * PAGE_SIZE).map((l) => {
               const userMap = new Map(usuarios.map((u) => [u.id, u.nome]));
               return (
               <TableRow key={`${l.origem ?? "fin"}:${l.id}`}>
@@ -720,7 +724,28 @@ function Page() {
               </TableRow>);
             })}
             </TableBody>
-          </Table></>}
+          </Table>
+          {items.length > PAGE_SIZE ? (() => {
+            const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+            const currentPage = Math.min(page, totalPages);
+            return (
+              <div className="flex items-center justify-between gap-2 px-4 py-3 border-t bg-muted/20">
+                <div className="text-xs text-muted-foreground">
+                  Mostrando {((currentPage - 1) * PAGE_SIZE + 1).toLocaleString("pt-BR")}
+                  {"–"}
+                  {Math.min(currentPage * PAGE_SIZE, items.length).toLocaleString("pt-BR")} de {items.length.toLocaleString("pt-BR")}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setPage(1)}>Primeira</Button>
+                  <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>Anterior</Button>
+                  <span className="text-xs px-2">Pág. {currentPage} / {totalPages}</span>
+                  <Button variant="outline" size="sm" disabled={currentPage >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>Próxima</Button>
+                  <Button variant="outline" size="sm" disabled={currentPage >= totalPages} onClick={() => setPage(totalPages)}>Última</Button>
+                </div>
+              </div>
+            );
+          })() : null}
+          </>}
       </CardContent></Card>
     </div>
   );
