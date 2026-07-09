@@ -5272,7 +5272,7 @@ function MedicoFiltroInput({
 }
 
 function AgendaPorMedicoGrid({
-  medicoId, dias, dataRef, items, onSlotClick, onAgClick, fmtHora, estornoPendAgs, ocultarPacienteMedico,
+  medicoId, dias, dataRef, items, onSlotClick, onAgClick, fmtHora, estornoPendAgs, ocultarPacienteMedico, ehLaboratorio,
 }: {
   medicoId: string;
   dias: number;
@@ -5283,6 +5283,7 @@ function AgendaPorMedicoGrid({
   fmtHora: (iso: string) => string;
   estornoPendAgs: Set<string>;
   ocultarPacienteMedico: boolean;
+  ehLaboratorio?: (medicoId: string | null | undefined) => boolean;
 }) {
   const diasSemana = ["DOMINGO", "SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO"];
 
