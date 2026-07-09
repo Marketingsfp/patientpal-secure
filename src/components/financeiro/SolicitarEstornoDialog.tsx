@@ -47,6 +47,26 @@ export function SolicitarEstornoDialog({
     const txt = motivo.trim();
     if (txt.length < 5) { toast.error("Descreva o motivo (mínimo 5 caracteres)"); return; }
     setSaving(true);
+    // Evita duplicidade: se já existe uma solicitação pendente ou aprovada
+    // para o mesmo lançamento, não cria outra.
+    if (lancamentoId) {
+      const { data: exist } = await supabase
+        .from("estorno_solicitacoes")
+        .select("id, status")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("lancamento_id", lancamentoId)
+        .in("status", ["pendente", "aprovado"])
+        .limit(1);
+      if (exist && exist.length > 0) {
+        setSaving(false);
+        toast.error(
+          exist[0].status === "pendente"
+            ? "Já existe uma solicitação pendente para este lançamento."
+            : "Este lançamento já foi estornado.",
+        );
+        return;
+      }
+    }
     const { error } = await supabase.from("estorno_solicitacoes").insert({
       clinica_id: clinicaAtual.clinica_id,
       lancamento_id: lancamentoId ?? null,

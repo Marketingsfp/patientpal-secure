@@ -128,7 +128,19 @@ function Page() {
     const q = norm(fBusca.trim());
     const de = fDe ? new Date(fDe + "T00:00:00") : null;
     const ate = fAte ? new Date(fAte + "T23:59:59") : null;
-    return items.filter((s) => {
+    // Dedup: mesma solicitação (mesmo lancamento_id) pode ter sido enviada
+    // duas vezes pelo caixa. Mantém apenas a mais recente por lancamento_id.
+    // Linhas sem lancamento_id (avulsas) não são deduplicadas.
+    const seen = new Set<string>();
+    const deduped: Solic[] = [];
+    for (const s of items) {
+      if (s.lancamento_id) {
+        if (seen.has(s.lancamento_id)) continue;
+        seen.add(s.lancamento_id);
+      }
+      deduped.push(s);
+    }
+    return deduped.filter((s) => {
       if (fStatus !== "todos" && s.status !== fStatus) return false;
       if (fTipo !== "todos" && (s.tipo ?? "") !== fTipo) return false;
       if (q) {
@@ -144,7 +156,16 @@ function Page() {
 
   const contagens = useMemo(() => {
     const c = { pendente: 0, aprovado: 0, rejeitado: 0 };
+    const seen = new Set<string>();
+    const deduped: Solic[] = [];
     for (const s of items) {
+      if (s.lancamento_id) {
+        if (seen.has(s.lancamento_id)) continue;
+        seen.add(s.lancamento_id);
+      }
+      deduped.push(s);
+    }
+    for (const s of deduped) {
       if (s.status === "pendente") c.pendente++;
       else if (s.status === "aprovado") c.aprovado++;
       else if (s.status === "rejeitado") c.rejeitado++;
