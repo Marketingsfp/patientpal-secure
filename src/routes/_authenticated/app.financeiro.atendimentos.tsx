@@ -74,6 +74,7 @@ interface Atend {
   repasse_pago_em?: string | null;
   repasse_pago_at?: string | null;
   repasse_forma_pagamento?: string | null;
+  repasse_conta_id?: string | null;
   paciente_nome_extra?: string | null;
   agendamento_inicio?: string | null;
   agendamento_status?: string | null;
@@ -266,8 +267,8 @@ function Page() {
     const dataPag = a.repasse_pago_em ?? (a.repasse_pago_at ? a.repasse_pago_at.slice(0, 10) : a.data);
     const c = buildComprovante([a], {
       data: dataPag,
-      forma_pagamento: a.repasse_forma_pagamento ?? "",
-      conta_id: "",
+      forma_pagamento: a.repasse_forma_pagamento || a.forma_pagamento || "",
+      conta_id: a.repasse_conta_id ?? "",
       pago_at: a.repasse_pago_at ?? null,
       reimpressao: true,
     });
@@ -288,7 +289,10 @@ function Page() {
     for (const [, list] of byMed) {
       // Metadados agregados
       const datas = new Set(list.map((x) => x.repasse_pago_em ?? "").filter(Boolean));
-      const formas = new Set(list.map((x) => x.repasse_forma_pagamento ?? "").filter(Boolean));
+      const formas = new Set(
+        list.map((x) => x.repasse_forma_pagamento || x.forma_pagamento || "").filter(Boolean),
+      );
+      const contasSet = new Set(list.map((x) => x.repasse_conta_id ?? "").filter(Boolean));
       const primeiro = list[0];
       const dataPag =
         primeiro.repasse_pago_em ??
@@ -296,7 +300,7 @@ function Page() {
       const c = buildComprovante(list, {
         data: dataPag,
         forma_pagamento: formas.size === 1 ? [...formas][0] : formas.size > 1 ? "Vários" : "",
-        conta_id: "",
+        conta_id: contasSet.size === 1 ? [...contasSet][0] : "",
         pago_at: primeiro.repasse_pago_at ?? null,
         reimpressao: true,
       });
@@ -613,7 +617,7 @@ function Page() {
     let qManual = supabase
       .from("fin_atendimentos")
       .select(
-        "id, data, procedimento, valor_total, valor_medico, valor_clinica, status, forma_pagamento, medico_id, paciente_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, laudo_status, medico_laudador_id, valor_laudo, lancamento_id",
+        "id, data, procedimento, valor_total, valor_medico, valor_clinica, status, forma_pagamento, medico_id, paciente_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, laudo_status, medico_laudador_id, valor_laudo, lancamento_id",
       )
       .eq("clinica_id", clinicaAtual.clinica_id)
       .gte("data", fIni)
@@ -621,7 +625,7 @@ function Page() {
     let qAgenda = supabase
       .from("fin_lancamentos")
       .select(
-        "id, data, descricao, valor, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, laudo_status, medico_laudador_id, valor_laudo, agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)",
+        "id, data, descricao, valor, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, laudo_status, medico_laudador_id, valor_laudo, agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)",
       )
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("tipo", "receita")
@@ -700,6 +704,7 @@ function Page() {
         repasse_pago_em: r.repasse_pago_em,
         repasse_pago_at: (r as any).repasse_pago_at ?? null,
         repasse_forma_pagamento: r.repasse_forma_pagamento,
+        repasse_conta_id: (r as any).repasse_conta_id ?? null,
         laudo_status: (r as any).laudo_status ?? null,
         medico_laudador_id: (r as any).medico_laudador_id ?? null,
         valor_laudo: Number((r as any).valor_laudo ?? 0),
@@ -741,6 +746,7 @@ function Page() {
         repasse_pago_em: r.repasse_pago_em,
         repasse_pago_at: (r as any).repasse_pago_at ?? null,
         repasse_forma_pagamento: r.repasse_forma_pagamento,
+        repasse_conta_id: (r as any).repasse_conta_id ?? null,
         agendamento_inicio: ag?.inicio ?? null,
         agendamento_status: ag?.status ?? null,
         laudo_status: (r as any).laudo_status ?? null,
