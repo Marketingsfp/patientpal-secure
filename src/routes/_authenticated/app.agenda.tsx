@@ -598,6 +598,10 @@ function AgendaPage() {
   const [filtroAgenda, setFiltroAgenda] = useState<string>("todos");
   const [agendasPorMedico, setAgendasPorMedico] = useState<Map<string, { id: string; nome: string }[]>>(new Map());
   const [procIdsPorAgenda, setProcIdsPorAgenda] = useState<Map<string, Set<string>>>(new Map());
+  // Solicitações de estorno pendentes por agendamento — a linha correspondente
+  // fica em vermelho e, para o médico, o paciente é ocultado até o financeiro
+  // decidir.
+  const [estornoPendAgs, setEstornoPendAgs] = useState<Set<string>>(new Set());
   const [filtroDiaSemana, setFiltroDiaSemana] = useState<string>("todos");
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [filtroCliente, setFiltroCliente] = useState("");
