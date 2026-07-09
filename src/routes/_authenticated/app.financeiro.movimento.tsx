@@ -157,7 +157,16 @@ function Page() {
           return partes.join(" — ");
         })(),
         valor: Number(m.valor) || 0,
-        data: m.created_at.slice(0, 10),
+        // created_at é UTC; converter para data local (BRT) antes de fatiar,
+        // senão sangrias após 21:00 locais aparecem no dia seguinte em UTC
+        // e sangrias da manhã aparecem no dia anterior no fuso local.
+        data: (() => {
+          const d = new Date(m.created_at);
+          const y = d.getFullYear();
+          const mo = String(d.getMonth() + 1).padStart(2, "0");
+          const da = String(d.getDate()).padStart(2, "0");
+          return `${y}-${mo}-${da}`;
+        })(),
         status: "confirmado",
         categoria_id: null,
         conta_id: null,
@@ -394,7 +403,7 @@ function Page() {
             const userMap = new Map(usuarios.map((u) => [u.id, u.nome]));
             exportToExcel(
               items.map((l) => ({
-                data: new Date(l.data).toLocaleDateString("pt-BR"),
+                data: (l.data ? l.data.slice(8,10)+"/"+l.data.slice(5,7)+"/"+l.data.slice(0,4) : ""),
                 tipo: l.tipo,
                 descricao: l.descricao,
                 categoria: l.categoria_id ? catMap.get(l.categoria_id) ?? "" : "",
@@ -516,7 +525,7 @@ function Page() {
                   <TableBody>
                     {list.map((l) => (
                       <TableRow key={l.id}>
-                        <TableCell className="text-sm whitespace-nowrap">{new Date(l.data).toLocaleDateString("pt-BR")}</TableCell>
+                        <TableCell className="text-sm whitespace-nowrap">{(l.data ? l.data.slice(8,10)+"/"+l.data.slice(5,7)+"/"+l.data.slice(0,4) : "")}</TableCell>
                         {detalhe === "saldo" && <TableCell className="capitalize">{l.tipo}</TableCell>}
                         <TableCell>{l.descricao}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">{l.categoria_id ? catMap.get(l.categoria_id) ?? "—" : "—"}</TableCell>
@@ -617,7 +626,7 @@ function Page() {
                       ? <ArrowUpCircle className="h-4 w-4 text-green-600" />
                       : <ArrowDownCircle className="h-4 w-4 text-red-600" />
                 }</TableCell>
-                <TableCell className="text-sm">{new Date(l.data).toLocaleDateString("pt-BR")}</TableCell>
+                <TableCell className="text-sm">{(l.data ? l.data.slice(8,10)+"/"+l.data.slice(5,7)+"/"+l.data.slice(0,4) : "")}</TableCell>
                 <TableCell>{l.descricao}</TableCell>
                 <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{l.criado_por ? userMap.get(l.criado_por) ?? "—" : "—"}</TableCell>
                 <TableCell><Badge variant={l.status === "confirmado" ? "default" : "secondary"}>{l.status}</Badge></TableCell>
