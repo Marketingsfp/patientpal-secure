@@ -64,6 +64,11 @@ export function SolicitarEstornoDialog({
             ? "Já existe uma solicitação pendente para este lançamento."
             : "Este lançamento já foi estornado.",
         );
+        // Sincroniza a UI: fecha o diálogo e força o pai a recarregar o
+        // estado das solicitações para que o botão exiba corretamente
+        // "Aguardando aprovação" ou "Estornado".
+        onOpenChange(false);
+        onCreated?.();
         return;
       }
     }
