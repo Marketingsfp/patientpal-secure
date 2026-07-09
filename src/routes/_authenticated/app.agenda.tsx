@@ -5293,7 +5293,7 @@ function FragmentDayHeader({ dia, fmtCabecalho }: { dia: string; fmtCabecalho: (
 }
 
 function FragmentDayCell({
-  ag, dia, hi, onSlotClick, onAgClick, fmtHora, corStatus,
+  ag, dia, hi, onSlotClick, onAgClick, fmtHora, corStatus, estornoPend, ocultarPaciente,
 }: {
   ag: Agendamento | undefined;
   dia: string;
@@ -5302,6 +5302,8 @@ function FragmentDayCell({
   onAgClick: (a: Agendamento) => void;
   fmtHora: (iso: string) => string;
   corStatus: (s: Status) => string;
+  estornoPend: boolean;
+  ocultarPaciente: boolean;
 }) {
   const ehLivre = ag && isSlotLivre(ag.paciente_nome);
   return (
@@ -5321,11 +5323,26 @@ function FragmentDayCell({
         ) : (
           <button
             type="button"
-            onClick={() => (ehLivre ? onSlotClick(ag) : onAgClick(ag))}
-            className={`w-full text-left rounded-md px-2 py-1.5 text-xs leading-tight truncate hover:brightness-95 transition ${corStatus(ag.status)}`}
-            title={`${ag.paciente_nome} — ${ag.procedimento ?? "CONSULTA"}`}
+            onClick={() => (ehLivre ? onSlotClick(ag) : (ocultarPaciente ? undefined : onAgClick(ag)))}
+            disabled={ocultarPaciente}
+            className={
+              `w-full text-left rounded-md px-2 py-1.5 text-xs leading-tight truncate hover:brightness-95 transition ${
+                estornoPend
+                  ? "bg-rose-100 text-rose-800 border border-rose-300"
+                  : corStatus(ag.status)
+              } ${ocultarPaciente ? "cursor-not-allowed opacity-90" : ""}`
+            }
+            title={
+              estornoPend
+                ? "Estorno solicitado — aguardando decisão do financeiro"
+                : `${ag.paciente_nome} — ${ag.procedimento ?? "CONSULTA"}`
+            }
           >
-            {ehLivre ? "+ Agendar" : ag.paciente_nome}
+            {ehLivre
+              ? "+ Agendar"
+              : ocultarPaciente
+                ? "— aguardando estorno —"
+                : ag.paciente_nome}
           </button>
         )}
       </td>
