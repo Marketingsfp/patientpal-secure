@@ -544,6 +544,23 @@ function Page() {
     return r;
   }, [minhasMovs]);
 
+  // Entradas agrupadas por forma de pagamento (recebimento + suprimento)
+  const entradasPorForma = useMemo(() => {
+    const r = { dinheiro: 0, pix: 0, debito: 0, credito: 0, outros: 0, total: 0 };
+    minhasMovs.forEach((m) => {
+      if (m.tipo !== "recebimento" && m.tipo !== "suprimento") return;
+      const v = Number(m.valor || 0);
+      const f = (m.forma_pagamento || "").toLowerCase();
+      if (f === "dinheiro") r.dinheiro += v;
+      else if (f === "pix") r.pix += v;
+      else if (f === "debito") r.debito += v;
+      else if (f === "credito") r.credito += v;
+      else r.outros += v;
+      r.total += v;
+    });
+    return r;
+  }, [minhasMovs]);
+
   // Calculo por sessao (todos)
   const calcSaldoSessao = useCallback((sid: string) => {
     return todosMovs
@@ -899,6 +916,28 @@ function Page() {
                   </CardContent>
                 </Card>
               </div>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-xs text-muted-foreground">Entradas por forma de pagamento</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    {[
+                      { label: "Dinheiro", value: entradasPorForma.dinheiro },
+                      { label: "PIX", value: entradasPorForma.pix },
+                      { label: "Débito", value: entradasPorForma.debito },
+                      { label: "Crédito", value: entradasPorForma.credito },
+                      { label: "Outros", value: entradasPorForma.outros },
+                    ].map((it) => (
+                      <div key={it.label} className="rounded-md border bg-muted/30 px-3 py-2">
+                        <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{it.label}</div>
+                        <div className="text-base font-semibold tabular-nums">{fmt(it.value)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
 
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" onClick={() => setOpenMov({ tipo: "suprimento" })}>
