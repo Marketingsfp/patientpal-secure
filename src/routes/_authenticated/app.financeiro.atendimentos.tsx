@@ -833,16 +833,32 @@ function Page() {
     setMedicos(merged);
     setPacientes((p.data ?? []) as Pac[]);
     setContas((c.data ?? []) as Conta[]);
-    // Carrega valor de tabela dos procedimentos para usar como "total cheio"
-    const { data: procs } = await supabase
-      .from("procedimentos")
-      .select("nome, valor_padrao, valor_dinheiro, tipo, requer_laudo")
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .eq("ativo", true);
+    // Carrega valor de tabela dos procedimentos para usar como "total cheio".
+    // Paginado — mesma razão do medico_convenios (teto de 1000 do PostgREST).
+    const procs: Array<{ nome: string | null; valor_padrao?: number | string | null; valor_dinheiro?: number | string | null; tipo?: string | null; requer_laudo?: boolean | null }> = [];
+    {
+      const CHUNK = 1000;
+      const MAX = 50000;
+      let offset = 0;
+      for (;;) {
+        const { data, error } = await supabase
+          .from("procedimentos")
+          .select("nome, valor_padrao, valor_dinheiro, tipo, requer_laudo")
+          .eq("clinica_id", clinicaAtual.clinica_id)
+          .eq("ativo", true)
+          .range(offset, offset + CHUNK - 1);
+        if (error) break;
+        const rows = (data ?? []) as typeof procs;
+        procs.push(...rows);
+        if (rows.length < CHUNK) break;
+        offset += CHUNK;
+        if (offset >= MAX) break;
+      }
+    }
     const pmap = new Map<string, number>();
     const tmap = new Map<string, string>();
     const lmap = new Map<string, boolean>();
-    for (const pr of (procs as any[] | null) ?? []) {
+    for (const pr of procs) {
       const v = Number(pr.valor_padrao ?? pr.valor_dinheiro ?? 0);
       if (!pr?.nome) continue;
       const key = norm(String(pr.nome));
@@ -856,12 +872,29 @@ function Page() {
     setProcLaudo(lmap);
     const ids = ((m.data ?? []) as Medico[]).map((x) => x.id);
     if (ids.length) {
-      const { data: cv } = await supabase
-        .from("medico_convenios")
-        .select("medico_id, nome, tipo_repasse, percentual, valor, ativo")
-        .in("medico_id", ids)
-        .eq("ativo", true);
-      setConvenios((cv ?? []) as Convenio[]);
+      // Paginado: o PostgREST retorna no máximo 1000 linhas por chamada.
+      // Clínicas com muitos convênios cadastrados por médico ultrapassam
+      // esse teto e faziam alguns convênios sumirem do cálculo de repasse
+      // (caía no repasse padrão do médico). Buscamos em chunks até o fim.
+      const CHUNK = 1000;
+      const MAX = 50000; // salvaguarda
+      const acc: Convenio[] = [];
+      let offset = 0;
+      for (;;) {
+        const { data: cv, error: cvErr } = await supabase
+          .from("medico_convenios")
+          .select("medico_id, nome, tipo_repasse, percentual, valor, ativo")
+          .in("medico_id", ids)
+          .eq("ativo", true)
+          .range(offset, offset + CHUNK - 1);
+        if (cvErr) break;
+        const rows = (cv ?? []) as Convenio[];
+        acc.push(...rows);
+        if (rows.length < CHUNK) break;
+        offset += CHUNK;
+        if (offset >= MAX) break;
+      }
+      setConvenios(acc);
     } else {
       setConvenios([]);
     }
