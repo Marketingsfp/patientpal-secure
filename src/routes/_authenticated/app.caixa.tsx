@@ -1610,6 +1610,24 @@ function Page() {
               <Label>Descrição</Label>
               <Input value={movDesc} onChange={(e) => setMovDesc(e.target.value)} placeholder="Motivo / referência" />
             </div>
+            {openMov && (openMov.tipo === "sangria" || openMov.tipo === "suprimento") && (
+              <div>
+                <Label>{openMov.tipo === "sangria" ? "Entregue a *" : "Recebido de *"}</Label>
+                <Select value={movDestinoUserId} onValueChange={setMovDestinoUserId}>
+                  <SelectTrigger><SelectValue placeholder="Selecione o usuário..." /></SelectTrigger>
+                  <SelectContent>
+                    {membrosClinica.map((m) => (
+                      <SelectItem key={m.user_id} value={m.user_id}>{m.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  {openMov.tipo === "sangria"
+                    ? "Registre a quem o dinheiro está sendo entregue (ex.: financeiro, gestor)."
+                    : "Registre de quem o dinheiro está sendo recebido."}
+                </p>
+              </div>
+            )}
             {openMov && (openMov.tipo === "recebimento" || openMov.tipo === "despesa") && (
               <div>
                 <Label>Forma de pagamento</Label>
