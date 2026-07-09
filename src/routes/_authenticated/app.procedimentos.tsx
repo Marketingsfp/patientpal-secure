@@ -821,6 +821,7 @@ function ProcedimentosPage() {
     setSaving(false);
     toast.success(editing ? "Atualizado." : "Cadastrado.");
     setOpen(false);
+    invalidateAgendaRefs(clinicaAtual.clinica_id);
     void load();
     void loadVincEsp();
     void loadConvValores();
@@ -831,6 +832,7 @@ function ProcedimentosPage() {
     const { error } = await supabase.from("procedimentos").delete().eq("id", p.id);
     if (error) { mostrarErro(error); return; }
     toast.success("Excluído.");
+    if (clinicaAtual) invalidateAgendaRefs(clinicaAtual.clinica_id);
     void load();
   };
 
