@@ -963,6 +963,44 @@ function Page() {
     }
   };
 
+  const darBaixa = async (a: Atend) => {
+    if (
+      !confirm(
+        "Confirmar baixa do atendimento?\n\nO médico será marcado como tendo atendido este paciente e o repasse ficará liberado para pagamento.",
+      )
+    )
+      return;
+    try {
+      if (a.origem === "agenda") {
+        if (!a.agendamento_id) {
+          toast.error("Atendimento sem agendamento vinculado.");
+          return;
+        }
+        const { error } = await supabase
+          .from("agendamentos")
+          .update({ status: "realizado" })
+          .eq("id", a.agendamento_id);
+        if (error) {
+          mostrarErro(error);
+          return;
+        }
+      } else {
+        const { error } = await supabase
+          .from("fin_atendimentos")
+          .update({ status: "realizado" })
+          .eq("id", a.id);
+        if (error) {
+          mostrarErro(error);
+          return;
+        }
+      }
+      toast.success("Baixa realizada. Repasse liberado.");
+      await load();
+    } catch (err) {
+      mostrarErro(err);
+    }
+  };
+
   const medMap = useMemo(() => new Map(medicos.map((m) => [m.id, m.nome])), [medicos]);
   const pacMap = useMemo(() => {
     const m = new Map<string, string>(pacientes.map((p) => [p.id, p.nome]));
