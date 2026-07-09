@@ -599,22 +599,68 @@ function Page() {
     return r;
   }, [minhasMovs]);
 
-  // Entradas agrupadas por forma de pagamento (recebimento + suprimento)
+  // Decomposição de pagamentos "misto" — busca observações dos lançamentos
+  // vinculados às movimentações da sessão atual. Chave = lancamento_id.
+  const [mistoObs, setMistoObs] = useState<Record<string, string>>({});
+  const mistoLancIds = useMemo(() => {
+    const ids = new Set<string>();
+    minhasMovs.forEach((m) => {
+      if (m.tipo === "recebimento" && normalizarForma(m.forma_pagamento) === "misto" && m.lancamento_id) {
+        ids.add(m.lancamento_id);
+      }
+    });
+    return Array.from(ids);
+  }, [minhasMovs]);
+  useEffect(() => {
+    let alive = true;
+    const pendentes = mistoLancIds.filter((id) => !(id in mistoObs));
+    if (pendentes.length === 0) return;
+    (async () => {
+      const { data } = await supabase.from("fin_lancamentos")
+        .select("id, observacoes").in("id", pendentes);
+      if (!alive || !data) return;
+      setMistoObs((prev) => {
+        const next = { ...prev };
+        for (const row of data) next[row.id as string] = (row.observacoes as string | null) ?? "";
+        // Marca também os que não voltaram, para não refazer o fetch em loop.
+        for (const id of pendentes) if (!(id in next)) next[id] = "";
+        return next;
+      });
+    })();
+    return () => { alive = false; };
+  }, [mistoLancIds, mistoObs]);
+
+  // Entradas agrupadas por forma de pagamento (recebimento + suprimento).
+  // Aliases cartao_credito/cartao_debito ficam em credito/debito; pagamentos
+  // "misto" são decompostos pelas observações do fin_lancamento.
   const entradasPorForma = useMemo(() => {
-    const r = { dinheiro: 0, pix: 0, debito: 0, credito: 0, outros: 0, total: 0 };
+    const r: Record<string, number> & { total: number } = {
+      dinheiro: 0, pix: 0, debito: 0, credito: 0,
+      boleto: 0, transferencia: 0, convenio: 0, outros: 0, total: 0,
+    };
     minhasMovs.forEach((m) => {
       if (m.tipo !== "recebimento" && m.tipo !== "suprimento") return;
       const v = Number(m.valor || 0);
-      const f = (m.forma_pagamento || "").toLowerCase();
-      if (f === "dinheiro") r.dinheiro += v;
-      else if (f === "pix") r.pix += v;
-      else if (f === "debito") r.debito += v;
-      else if (f === "credito") r.credito += v;
-      else r.outros += v;
       r.total += v;
+      const bucket = normalizarForma(m.forma_pagamento);
+      if (bucket === "misto") {
+        const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
+        const partes = decomporMistoObs(obs);
+        let somado = 0;
+        for (const [k, val] of Object.entries(partes)) {
+          r[k] = (r[k] ?? 0) + (val ?? 0);
+          somado += val ?? 0;
+        }
+        // Diferença (ex.: obs ainda não carregada, ou parcela sem label
+        // reconhecido) vai para "outros" para preservar o total.
+        const resto = v - somado;
+        if (Math.abs(resto) > 0.005) r.outros += resto;
+      } else {
+        r[bucket] += v;
+      }
     });
     return r;
-  }, [minhasMovs]);
+  }, [minhasMovs, mistoObs]);
 
   // Calculo por sessao (todos)
   const calcSaldoSessao = useCallback((sid: string) => {
