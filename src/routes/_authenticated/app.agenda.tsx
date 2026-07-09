@@ -4966,6 +4966,8 @@ function AgendaPage() {
           onSlotClick={(a) => openSlot(a)}
           onAgClick={(a) => openEdit(a)}
           fmtHora={fmtHora}
+          estornoPendAgs={estornoPendAgs}
+          ocultarPacienteMedico={isMedicoOnly}
         />
       )}
 
