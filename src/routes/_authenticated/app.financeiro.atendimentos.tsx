@@ -1636,6 +1636,7 @@ function Page() {
                     </TableHead>
                   )}
                   <TableHead className="text-[11px] font-medium px-2 whitespace-nowrap">Data</TableHead>
+                  <TableHead className="text-[11px] font-medium px-2 whitespace-nowrap text-center w-10">Ficha</TableHead>
                   <TableHead className="text-[11px] font-medium px-2">Médico</TableHead>
                   <TableHead className="text-[11px] font-medium px-2">Paciente</TableHead>
                   <TableHead className="text-[11px] font-medium px-2">Serviço</TableHead>
