@@ -1250,7 +1250,7 @@ function Page() {
                             {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
                           </TableCell>
                           <TableCell className="text-right">
-                            {m.tipo === "recebimento" && (
+                            {m.tipo === "recebimento" && podeEscrever && (
                               (() => {
                                 const st = m.lancamento_id ? estornosPorLanc.get(m.lancamento_id) : undefined;
                                 if (st === "pendente") {
