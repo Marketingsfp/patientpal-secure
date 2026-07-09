@@ -1216,8 +1216,17 @@ function Page() {
         if (!byMed.has(k)) byMed.set(k, []);
         byMed.get(k)!.push(a);
       }
+      // Valor manual (override). Só aplicável quando o pagamento é para
+      // um único médico — se houver mais de um, mostramos aviso e
+      // ignoramos o override para não desbalancear repasses de outros.
+      const valorManualNum = Number((payForm.valor_manual ?? "").toString().replace(",", "."));
+      const usarValorManual = valorManualNum > 0 && byMed.size === 1;
+      if (valorManualNum > 0 && byMed.size > 1) {
+        toast.warning("Valor manual ignorado: selecione atendimentos de apenas um médico para editar o valor do repasse.");
+      }
       for (const [medId, list] of byMed) {
-        const total = list.reduce((s, x) => s + (Number(x.valor_medico) || 0), 0);
+        const totalCalc = list.reduce((s, x) => s + (Number(x.valor_medico) || 0), 0);
+        const total = usarValorManual ? valorManualNum : totalCalc;
         if (total <= 0) continue;
         const nowIso = new Date().toISOString();
         const medNome = medId !== "sem" ? (medMap.get(medId) ?? "") : "—";
