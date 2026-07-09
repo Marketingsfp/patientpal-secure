@@ -520,6 +520,11 @@ function Page() {
                   <TableRow key={s.id}>
                     <TableCell className="text-xs">
                       {new Date(s.solicitado_em).toLocaleString("pt-BR")}
+                      {s.solicitado_por && (
+                        <div className="text-[10px] text-muted-foreground mt-0.5">
+                          por {nomesUsuarios[s.solicitado_por] ?? "—"}
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="text-sm font-medium">{s.paciente_nome ?? "—"}</div>
@@ -575,6 +580,9 @@ function Page() {
                       {s.resolvido_em && (
                         <div className="not-italic text-[10px] text-muted-foreground">
                           Resolvido em {new Date(s.resolvido_em).toLocaleString("pt-BR")}
+                          {s.resolvido_por && (
+                            <> por {nomesUsuarios[s.resolvido_por] ?? "—"}</>
+                          )}
                         </div>
                       )}
                     </TableCell>
