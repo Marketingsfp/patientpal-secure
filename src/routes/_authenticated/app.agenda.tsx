@@ -1056,7 +1056,7 @@ function AgendaPage() {
     setLoading(true);
     let q = supabase
       .from("agendamentos")
-      .select("id,paciente_nome,paciente_id,medico_id,enfermagem_recurso_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,atendimento_grupo_id,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as never)
+      .select("id,paciente_nome,paciente_id,medico_id,enfermagem_recurso_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,atendimento_grupo_id,ficha_numero,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as never)
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("inicio", { ascending: false });
     // "agendado" agora significa "qualquer ficha com paciente alocado",
@@ -1794,6 +1794,9 @@ function AgendaPage() {
     const m = new Map<string, string>();
     // Numeração sequencial por dia e por médico (reinicia a cada data/médico)
     // na ordem do horário. Assim cada agenda do médico fica 001, 002, 003...
+    // Se o agendamento já tem `ficha_numero` gravado (na 1ª impressão da GR),
+    // ele PREVALECE sobre a posição dinâmica — o número da ficha impresso na
+    // guia jamais deve divergir do sistema.
     const contadores = new Map<string, number>();
     const ordenados = [...items].sort((a, b) => a.inicio.localeCompare(b.inicio));
     ordenados.forEach((a) => {
@@ -1801,7 +1804,9 @@ function AgendaPage() {
       const chave = `${dia}__${a.medico_id ?? "sem-medico"}`;
       const n = (contadores.get(chave) ?? 0) + 1;
       contadores.set(chave, n);
-      m.set(a.id, String(n).padStart(3, "0"));
+      const fixa = (a as { ficha_numero?: number | null }).ficha_numero;
+      const num = typeof fixa === "number" && fixa > 0 ? fixa : n;
+      m.set(a.id, String(num).padStart(3, "0"));
     });
     return m;
   }, [items]);
