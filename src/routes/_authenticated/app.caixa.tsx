@@ -95,6 +95,32 @@ function decomporMistoObs(obs: string | null | undefined): Partial<Record<FormaB
 }
 
 /**
+ * Rótulo bonito para exibir a forma de pagamento em tabelas. Para
+ * `misto`, converte as parcelas decompostas em algo como
+ * "Dinheiro R$ 60,00 · PIX R$ 100,00". Sem observações do lançamento
+ * ainda em cache, retorna "Misto (dividido)".
+ */
+const FORMA_LABEL: Record<FormaBucket, string> = {
+  dinheiro: "Dinheiro", pix: "PIX", debito: "Cartão débito", credito: "Cartão crédito",
+  boleto: "Boleto", transferencia: "Transferência", convenio: "Convênio",
+  misto: "Misto", outros: "Outros",
+};
+function formatarFormaPagamento(
+  m: { forma_pagamento: string | null; lancamento_id?: string | null },
+  mistoObs: Record<string, string>,
+): string {
+  const bucket = normalizarForma(m.forma_pagamento);
+  if (bucket !== "misto") return m.forma_pagamento || "—";
+  const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
+  const partes = obs ? decomporMistoObs(obs) : {};
+  const entradas = Object.entries(partes).filter(([, v]) => (v ?? 0) > 0);
+  if (entradas.length === 0) return "Misto (dividido)";
+  return entradas
+    .map(([k, v]) => `${FORMA_LABEL[k as FormaBucket] ?? k} ${(v ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`)
+    .join(" · ");
+}
+
+/**
  * Promoção controlada do CaixaShellV2 para `/app/caixa`, atrás da flag
  * `caixa_v2` E limitado a admin/gestor. Recepção, caixa, médico, financeiro
  * e demais perfis continuam vendo o `<Page />` clássico intocado — mesmo
@@ -701,13 +727,15 @@ function Page() {
   const [mistoObs, setMistoObs] = useState<Record<string, string>>({});
   const mistoLancIds = useMemo(() => {
     const ids = new Set<string>();
-    minhasMovs.forEach((m) => {
+    const scan = (arr: Mov[]) => arr.forEach((m) => {
       if (m.tipo === "recebimento" && normalizarForma(m.forma_pagamento) === "misto" && m.lancamento_id) {
         ids.add(m.lancamento_id);
       }
     });
+    scan(minhasMovs);
+    scan(detalheMovs);
     return Array.from(ids);
-  }, [minhasMovs]);
+  }, [minhasMovs, detalheMovs]);
   useEffect(() => {
     let alive = true;
     const pendentes = mistoLancIds.filter((id) => !(id in mistoObs));
@@ -1299,7 +1327,7 @@ function Page() {
                           <TableCell className="whitespace-nowrap">{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</TableCell>
                           <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
                           <TableCell>{m.descricao || "—"}</TableCell>
-                          <TableCell>{m.forma_pagamento || "—"}</TableCell>
+                          <TableCell className="text-xs">{formatarFormaPagamento(m, mistoObs)}</TableCell>
                           <TableCell className={`text-right font-medium ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
                             {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
                           </TableCell>
@@ -1918,7 +1946,7 @@ function Page() {
                         <TableCell>{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</TableCell>
                         <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
                         <TableCell>{m.descricao || "—"}</TableCell>
-                        <TableCell>{m.forma_pagamento || "—"}</TableCell>
+                        <TableCell className="text-xs">{formatarFormaPagamento(m, mistoObs)}</TableCell>
                         <TableCell className={`text-right ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
                           {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
                         </TableCell>
@@ -1993,7 +2021,7 @@ function Page() {
                         <TableCell className="whitespace-nowrap">{fmtDT(m.created_at)}</TableCell>
                         <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
                         <TableCell>{m.descricao ?? "—"}</TableCell>
-                        <TableCell>{m.forma_pagamento ?? "—"}</TableCell>
+                        <TableCell className="text-xs">{formatarFormaPagamento(m, mistoObs)}</TableCell>
                         <TableCell className={`text-right font-semibold ${TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : ""}`}>
                           {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
                         </TableCell>
