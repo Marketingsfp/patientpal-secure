@@ -331,6 +331,7 @@ export type Database = {
           fim: string
           fluxo_atualizado_em: string
           fluxo_etapa: Database["public"]["Enums"]["fluxo_etapa"]
+          forma_pagamento_prevista: string | null
           id: string
           inicio: string
           link_teleconsulta: string | null
@@ -363,6 +364,7 @@ export type Database = {
           fim: string
           fluxo_atualizado_em?: string
           fluxo_etapa?: Database["public"]["Enums"]["fluxo_etapa"]
+          forma_pagamento_prevista?: string | null
           id?: string
           inicio: string
           link_teleconsulta?: string | null
@@ -395,6 +397,7 @@ export type Database = {
           fim?: string
           fluxo_atualizado_em?: string
           fluxo_etapa?: Database["public"]["Enums"]["fluxo_etapa"]
+          forma_pagamento_prevista?: string | null
           id?: string
           inicio?: string
           link_teleconsulta?: string | null

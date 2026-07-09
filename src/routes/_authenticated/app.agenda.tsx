@@ -80,6 +80,7 @@ type Agendamento = {
   tipo_atendimento?: TipoAtendimento | null;
   atendimento_grupo_id?: string | null;
   ficha_numero?: number | null;
+  forma_pagamento_prevista?: string | null;
 };
 type Medico = { id: string; nome: string; sexo?: string | null; usa_sistema?: boolean; especialidade_id?: string | null; procedimento_padrao_id?: string | null; procedimento_padrao_em_branco?: boolean | null; procedimento_padrao_nome?: string | null; especialidade_nome?: string | null };
 type RecursoEnf = { id: string; nome: string };
@@ -623,6 +624,7 @@ const EMPTY = {
   orcamento_numero: "",
   orcamento_itens: [] as string[],
   tipo_atendimento: "particular" as TipoAtendimento,
+  forma_pagamento_prevista: "" as string,
 };
 
 function AgendaPage() {
@@ -1058,7 +1060,7 @@ function AgendaPage() {
     setLoading(true);
     let q = supabase
       .from("agendamentos")
-      .select("id,paciente_nome,paciente_id,medico_id,enfermagem_recurso_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,atendimento_grupo_id,ficha_numero,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as never)
+      .select("id,paciente_nome,paciente_id,medico_id,enfermagem_recurso_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as never)
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("inicio", { ascending: false });
     // "agendado" agora significa "qualquer ficha com paciente alocado",
@@ -2482,6 +2484,7 @@ function AgendaPage() {
       orcamento_numero: "",
       orcamento_itens: [],
       tipo_atendimento: (a.tipo_atendimento as TipoAtendimento | null) ?? "particular",
+      forma_pagamento_prevista: (a as { forma_pagamento_prevista?: string | null }).forma_pagamento_prevista ?? "",
     });
     if (pacienteCopia) setPacienteCopia(null);
     setOpen(true);
@@ -2551,6 +2554,7 @@ function AgendaPage() {
       orcamento_numero: a.orcamento_numero ? String(a.orcamento_numero) : "",
       orcamento_itens: itensOrc,
       tipo_atendimento: (a.tipo_atendimento as TipoAtendimento | null) ?? "particular",
+      forma_pagamento_prevista: (a as { forma_pagamento_prevista?: string | null }).forma_pagamento_prevista ?? "",
     });
     setOpen(true);
   };
@@ -2607,6 +2611,7 @@ function AgendaPage() {
       data_pagamento: form.data_pagamento ? form.data_pagamento : null,
       orcamento_id: form.orcamento_id || null,
       tipo_atendimento: form.tipo_atendimento,
+      forma_pagamento_prevista: form.forma_pagamento_prevista ? form.forma_pagamento_prevista : null,
     };
     // Miolo server-side (validação de paciente completo, agenda aberta + slot livre,
     // inadimplência de cartão, INSERT/UPDATE do agendamento e vínculos com
@@ -3539,6 +3544,25 @@ function AgendaPage() {
                   )}
                 </div>
               )}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Forma de pagamento prevista</Label>
+                <Select
+                  value={form.forma_pagamento_prevista || "nao_informado"}
+                  onValueChange={(v) => setForm((f) => ({ ...f, forma_pagamento_prevista: v === "nao_informado" ? "" : v }))}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="nao_informado">Não informada (definir na cobrança)</SelectItem>
+                    <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                    <SelectItem value="pix">PIX</SelectItem>
+                    <SelectItem value="cartao_credito">Cartão de Crédito</SelectItem>
+                    <SelectItem value="cartao_debito">Cartão de Débito</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-slate-500">
+                  Registra como o paciente pretende pagar. A forma real ainda é definida na cobrança.
+                </p>
+              </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-slate-700">Médico ou Exame <span className="text-rose-500">*</span></Label>
                 <SearchableSelect
