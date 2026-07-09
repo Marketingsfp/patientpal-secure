@@ -882,9 +882,13 @@ function NovoOrcamentoDialog({
         categoria,
         paciente_nome: pacienteNome.trim(),
         paciente_telefone: pacienteTelefone.trim() || null,
-        medico_nome: medicoNome.trim() || null,
-        medico_externo: medicoExterno,
-        clinica_solicitante: medicoExterno ? (clinicaSolicitante.trim() || null) : null,
+        medico_nome: medicoParticular ? "Particular" : (medicoNome.trim() || null),
+        medico_externo: medicoParticular ? false : medicoExterno,
+        clinica_solicitante: medicoParticular
+          ? "Particular (sem solicitante)"
+          : medicoExterno
+            ? (clinicaSolicitante.trim() || null)
+            : null,
         forma_pagamento: formasPagamento.join(" + "),
         valores_pagamento: valoresPag,
         validade_dias: validade,
