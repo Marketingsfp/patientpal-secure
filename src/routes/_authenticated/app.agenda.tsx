@@ -828,6 +828,11 @@ function AgendaPage() {
   const [pagamentoAgId, setPagamentoAgId] = useState<string | null>(null);
   const [pagamentoExtraIds, setPagamentoExtraIds] = useState<string[]>([]);
   const [pagamentoForma, setPagamentoForma] = useState<string>("");
+  // Peso por atendimento p/ rateio quando o pagamento é agrupado.
+  // key = agendamento_id, value = valor cheio (cartão preferido, senão dinheiro).
+  const [pagamentoPesos, setPagamentoPesos] = useState<Record<string, number>>({});
+  // Rótulo curto por atendimento p/ compor a descrição individual do lançamento.
+  const [pagamentoRotulos, setPagamentoRotulos] = useState<Record<string, string>>({});
   // Sinaliza que após o pagamento+impressão devemos abrir a emissão da NFS-e.
   const emitirNotaAposRef = useRef(false);
   const emitenteNotaAposRef = useRef<string | null>(null);
