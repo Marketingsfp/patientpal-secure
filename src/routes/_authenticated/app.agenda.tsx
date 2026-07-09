@@ -4937,6 +4937,7 @@ function AgendaPage() {
             { cor: "#fef3b6", borda: "#f0dc7a", label: "Atrasado para consulta" },
             { cor: "#e0cdf0", borda: "#bea4d8", label: "Agendamento on-line" },
             { cor: "#f7b6c0", borda: "#e88594", label: "Não comparecimento" },
+            { cor: "#fee2e2", borda: "#dc2626", label: "Estorno solicitado" },
           ].map((s) => (
             <div key={s.label} className="flex items-center gap-2 text-sm">
               <span
