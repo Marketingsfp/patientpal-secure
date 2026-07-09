@@ -65,6 +65,13 @@ function Page() {
   const [filterStatus, setFilterStatus] = useState<"confirmado" | "todos" | "pendente">("confirmado");
   const [filterUsuario, setFilterUsuario] = useState<string>("todos");
   const [filterForma, setFilterForma] = useState<string>("todos");
+  const [filterPaciente, setFilterPaciente] = useState<string>("");
+  const [filterPacienteDebounced, setFilterPacienteDebounced] = useState<string>("");
+
+  useEffect(() => {
+    const t = setTimeout(() => setFilterPacienteDebounced(filterPaciente.trim()), 300);
+    return () => clearTimeout(t);
+  }, [filterPaciente]);
 
   const applyForma = <T extends { or: (s: string) => T; ilike: (c: string, p: string) => T }>(q: T): T => {
     switch (filterForma) {
@@ -106,6 +113,7 @@ function Page() {
         else q = q.eq("criado_por", filterUsuario);
       }
       q = applyForma(q);
+      if (filterPacienteDebounced) q = q.ilike("descricao", `%${filterPacienteDebounced}%`);
       const { data, error } = await q;
       if (error) { mostrarErro(error); setLoading(false); return; }
       finList = ((data ?? []) as Array<Omit<Lanc, "origem">>).map((l) => ({ ...l, origem: "fin" as const }));
@@ -129,6 +137,7 @@ function Page() {
         if (filterUsuario === "sem") qc = qc.is("user_id", null);
         else qc = qc.eq("user_id", filterUsuario);
       }
+      if (filterPacienteDebounced) qc = qc.ilike("descricao", `%${filterPacienteDebounced}%`);
       const { data: mv, error: errMv } = await qc;
       if (errMv) { mostrarErro(errMv); setLoading(false); return; }
       caixaList = ((mv ?? []) as Array<{
