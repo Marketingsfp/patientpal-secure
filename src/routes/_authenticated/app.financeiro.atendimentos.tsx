@@ -1016,9 +1016,6 @@ function Page() {
     }
   };
 
-  const darBaixaLote = async () => {
-  };
-
   const desfazerBaixa = async (a: Atend) => {
     if (!podeEstornar) {
       toast.error("Sem permissão para desfazer a baixa.");
@@ -1065,7 +1062,7 @@ function Page() {
     }
   };
 
-  const _darBaixaLote = async () => {
+  const darBaixaLote = async () => {
     const alvos = selectedItems.filter((a) => !a.repasse_pago && !isAtendido(a));
     if (alvos.length === 0) return;
     if (
