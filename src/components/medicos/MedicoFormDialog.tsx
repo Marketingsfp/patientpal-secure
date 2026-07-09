@@ -318,6 +318,16 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
     return out;
   }, [form.procedimentos, procs, esps]);
 
+  // Map: chave normalizada do nome do serviço -> rótulo "NOME (ESPECIALIDADE)"
+  // usado para exibir as linhas automáticas por serviço na aba Repasse.
+  const labelServicoPorNomeKey = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const s of servicosDoMedico) {
+      m.set(normalizarNome(s.value), s.label);
+    }
+    return m;
+  }, [servicosDoMedico]);
+
   // Load reference data
   useEffect(() => {
     if (!open || !activeClinicaId) return;
