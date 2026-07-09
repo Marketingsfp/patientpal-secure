@@ -41,7 +41,7 @@ import { DividirOrcamentoDialog, type DividirItem } from "@/components/agenda/di
 import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
 import {
   CalendarDays, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X,
-  MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, Clock, DollarSign, ShieldCheck, BadgeCheck, IdCard, Play, FileText,
+  MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, UserMinus, Clock, DollarSign, ShieldCheck, BadgeCheck, IdCard, Play, FileText,
 } from "lucide-react";
 import { printGuiaAtendimento, printGuiaAtendimentoAgrupada } from "@/lib/print-gr";
 import { printComprovanteAgendamento } from "@/lib/print-comprovante-agendamento";
@@ -4865,6 +4865,11 @@ function AgendaPage() {
                         <DropdownMenuItem onClick={() => imprimirComprovante(a)}>
                           <Printer className="h-4 w-4 mr-2" /> Comprovante de agendamento
                         </DropdownMenuItem>
+                        {!isSlotLivre(a.paciente_nome) && a.status !== "realizado" && (
+                          <DropdownMenuItem onClick={() => remove(a)}>
+                            <UserMinus className="h-4 w-4 mr-2 text-amber-600" /> Desmarcar paciente
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem onClick={() => {
                           const url = `${window.location.origin}/p/${(a as any).token_publico}`;
                           navigator.clipboard.writeText(url);
