@@ -331,6 +331,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
               .select("id")
               .eq("agendamento_id", agendamentoId)
               .eq("tipo", "receita")
+              .neq("status", "cancelado")
               .limit(1)
               .maybeSingle()
           : Promise.resolve({ data: null }),
