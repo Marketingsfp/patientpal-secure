@@ -75,7 +75,20 @@ export function SolicitarEstornoDialog({
     const { error } = await supabase.from("estorno_solicitacoes").insert({
       clinica_id: clinicaAtual.clinica_id,
       lancamento_id: lancamentoId ?? null,
-      agendamento_id: agendamentoId ?? null,
+      agendamento_id: await (async () => {
+        if (agendamentoId) return agendamentoId;
+        // Deriva a partir do lançamento para que a Agenda consiga marcar
+        // a linha em vermelho e ocultar o paciente para o médico.
+        if (lancamentoId) {
+          const { data: lanc } = await supabase
+            .from("fin_lancamentos")
+            .select("agendamento_id")
+            .eq("id", lancamentoId)
+            .maybeSingle();
+          return (lanc as { agendamento_id: string | null } | null)?.agendamento_id ?? null;
+        }
+        return null;
+      })(),
       paciente_nome: pacienteNome ?? null,
       descricao: descricao ?? null,
       valor: valor ?? null,
