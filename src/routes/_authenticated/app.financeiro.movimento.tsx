@@ -28,7 +28,7 @@ export const Route = createFileRoute("/_authenticated/app/financeiro/movimento")
 interface Lanc {
   id: string; tipo: "receita" | "despesa"; descricao: string; valor: number;
   data: string; status: string; categoria_id: string | null; conta_id: string | null;
-  forma_pagamento: string | null;
+  forma_pagamento: string | null; criado_por: string | null;
 }
 interface Opt { id: string; nome: string; tipo?: string }
 
@@ -44,6 +44,7 @@ function Page() {
   const [items, setItems] = useState<Lanc[]>([]);
   const [cats, setCats] = useState<Opt[]>([]);
   const [contas, setContas] = useState<Opt[]>([]);
+  const [usuarios, setUsuarios] = useState<Opt[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -55,17 +56,22 @@ function Page() {
   const [detalhe, setDetalhe] = useState<null | "receita" | "despesa" | "saldo">(null);
   const [resumo, setResumo] = useState<{ r: number; d: number; saldo: number; totalRows: number }>({ r: 0, d: 0, saldo: 0, totalRows: 0 });
   const [filterStatus, setFilterStatus] = useState<"confirmado" | "todos" | "pendente">("confirmado");
+  const [filterUsuario, setFilterUsuario] = useState<string>("todos");
 
   const load = async () => {
     if (!clinicaAtual) { setItems([]); setLoading(false); return; }
     setLoading(true);
     let q = supabase.from("fin_lancamentos")
-      .select("id, tipo, descricao, valor, data, status, categoria_id, conta_id, forma_pagamento")
+      .select("id, tipo, descricao, valor, data, status, categoria_id, conta_id, forma_pagamento, criado_por")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .gte("data", fromDate).lte("data", toDate)
       .order("data", { ascending: false })
       .range(0, 499);
     if (filterTipo !== "todos") q = q.eq("tipo", filterTipo);
+    if (filterUsuario !== "todos") {
+      if (filterUsuario === "sem") q = q.is("criado_por", null);
+      else q = q.eq("criado_por", filterUsuario);
+    }
     const { data, error } = await q;
     if (error) mostrarErro(error); else setItems((data ?? []) as Lanc[]);
     setLoading(false);
@@ -88,13 +94,22 @@ function Page() {
   };
   const loadOpts = async () => {
     if (!clinicaAtual) return;
-    const [c, b] = await Promise.all([
+    const [c, b, m] = await Promise.all([
       supabase.from("fin_categorias").select("id, nome, tipo").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("fin_contas").select("id, nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
+      supabase.from("clinica_memberships").select("user_id").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true),
     ]);
     setCats((c.data ?? []) as Opt[]); setContas((b.data ?? []) as Opt[]);
+    const userIds = ((m.data ?? []) as Array<{ user_id: string }>).map((r) => r.user_id);
+    if (userIds.length) {
+      const { data: profs } = await supabase.from("profiles").select("id, nome").in("id", userIds);
+      const list = ((profs ?? []) as Array<{ id: string; nome: string | null }>)
+        .map((p) => ({ id: p.id, nome: p.nome || "(sem nome)" }))
+        .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+      setUsuarios(list);
+    } else setUsuarios([]);
   };
-  useEffect(() => { void load(); void loadResumo(); }, [clinicaAtual?.clinica_id, filterTipo, fromDate, toDate, filterStatus]);
+  useEffect(() => { void load(); void loadResumo(); }, [clinicaAtual?.clinica_id, filterTipo, fromDate, toDate, filterStatus, filterUsuario]);
   useEffect(() => { void loadOpts(); }, [clinicaAtual?.clinica_id]);
   const totais = resumo;
 
@@ -143,6 +158,7 @@ function Page() {
             if (!items.length) { toast.info("Sem dados para exportar."); return; }
             const catMap = new Map(cats.map((c) => [c.id, c.nome]));
             const contaMap = new Map(contas.map((c) => [c.id, c.nome]));
+            const userMap = new Map(usuarios.map((u) => [u.id, u.nome]));
             exportToExcel(
               items.map((l) => ({
                 data: new Date(l.data).toLocaleDateString("pt-BR"),
@@ -152,6 +168,7 @@ function Page() {
                 conta: l.conta_id ? contaMap.get(l.conta_id) ?? "" : "",
                 forma_pagamento: l.forma_pagamento ?? "",
                 status: l.status,
+                usuario: l.criado_por ? userMap.get(l.criado_por) ?? "" : "",
                 valor: Number(l.valor).toFixed(2),
               })),
               `movimento-${fromDate}_a_${toDate}`,
@@ -163,6 +180,7 @@ function Page() {
                 { key: "conta", label: "Conta" },
                 { key: "forma_pagamento", label: "Forma pagamento" },
                 { key: "status", label: "Status" },
+                { key: "usuario", label: "Usuário" },
                 { key: "valor", label: "Valor (R$)" },
               ],
             );
@@ -303,6 +321,15 @@ function Page() {
               <SelectItem value="todos">Confirmados + pendentes</SelectItem>
             </SelectContent>
           </Select></div>
+        <div className="space-y-1"><Label className="text-xs">Usuário</Label>
+          <Select value={filterUsuario} onValueChange={setFilterUsuario}>
+            <SelectTrigger className="w-52"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos os usuários</SelectItem>
+              <SelectItem value="sem">Sem usuário</SelectItem>
+              {usuarios.map((u) => <SelectItem key={u.id} value={u.id}>{u.nome}</SelectItem>)}
+            </SelectContent>
+          </Select></div>
       </CardContent></Card>
 
       <Card><CardContent className="p-0">
@@ -319,17 +346,21 @@ function Page() {
               <TableHead className="w-10"></TableHead>
               <TableHead>Data</TableHead>
               <TableHead>Descrição</TableHead>
+              <TableHead>Usuário</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Valor</TableHead>
               <TableHead className="w-24"></TableHead>
             </TableRow></TableHeader>
-            <TableBody>{items.map((l) => (
+            <TableBody>{items.map((l) => {
+              const userMap = new Map(usuarios.map((u) => [u.id, u.nome]));
+              return (
               <TableRow key={l.id}>
                 <TableCell>{l.tipo === "receita"
                   ? <ArrowUpCircle className="h-4 w-4 text-green-600" />
                   : <ArrowDownCircle className="h-4 w-4 text-red-600" />}</TableCell>
                 <TableCell className="text-sm">{new Date(l.data).toLocaleDateString("pt-BR")}</TableCell>
                 <TableCell>{l.descricao}</TableCell>
+                <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{l.criado_por ? userMap.get(l.criado_por) ?? "—" : "—"}</TableCell>
                 <TableCell><Badge variant={l.status === "confirmado" ? "default" : "secondary"}>{l.status}</Badge></TableCell>
                 <TableCell className={`text-right font-medium ${l.tipo === "receita" ? "text-green-600" : "text-red-600"}`}>
                   {l.tipo === "receita" ? "+" : "-"} {fmt(Number(l.valor))}</TableCell>
@@ -341,7 +372,8 @@ function Page() {
                     </>
                   ) : null}
                 </TableCell>
-              </TableRow>))}
+              </TableRow>);
+            })}
             </TableBody>
           </Table></>}
       </CardContent></Card>
