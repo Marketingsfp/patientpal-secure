@@ -38,7 +38,7 @@ export async function printComprovanteAgendamento(
   const [ag, cli] = await Promise.all([
     supabase
       .from("agendamentos")
-      .select("id, paciente_nome, paciente_id, medico_id, agenda_id, inicio, procedimento")
+      .select("id, paciente_nome, paciente_id, medico_id, agenda_id, inicio, procedimento, especialidade_id")
       .eq("id", agendamentoId)
       .maybeSingle(),
     supabase
@@ -82,7 +82,19 @@ export async function printComprovanteAgendamento(
   const paciente = pac.data as { nome: string; cpf: string | null; telefone: string | null; data_nascimento: string | null } | null;
   const medicoBasic = med.data as { nome: string; especialidade: { nome: string } | null } | null;
   const medicoNome = medicoBasic?.nome ?? "—";
-  const espNome = medicoBasic?.especialidade?.nome?.toUpperCase() ?? "";
+  let espNome = medicoBasic?.especialidade?.nome?.toUpperCase() ?? "";
+  // Se o agendamento tiver uma especialidade escolhida na hora de agendar,
+  // ela prevalece sobre a especialidade principal do médico.
+  const agEspId = (a as { especialidade_id: string | null }).especialidade_id ?? null;
+  if (agEspId) {
+    const { data: esp } = await supabase
+      .from("especialidades")
+      .select("nome")
+      .eq("id", agEspId)
+      .maybeSingle();
+    const nome = (esp as { nome: string } | null)?.nome;
+    if (nome) espNome = nome.toUpperCase();
+  }
   const procNomeBase = (a.procedimento || "CONSULTA").toUpperCase();
   const procNome = espNome && !procNomeBase.includes(espNome) ? `${espNome} - ${procNomeBase}` : procNomeBase;
 
