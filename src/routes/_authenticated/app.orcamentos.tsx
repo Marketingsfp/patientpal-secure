@@ -620,13 +620,24 @@ function NovoOrcamentoDialog({
         .select("id")
         .ilike("nome", "%labor%");
       const espIds = (esps ?? []).map((e) => e.id);
-      if (espIds.length === 0) { setLabProcIds(new Set()); return; }
-      const { data: pe } = await supabase
-        .from("procedimento_especialidades")
-        .select("procedimento_id")
+      const union = new Set<string>();
+      if (espIds.length > 0) {
+        const { data: pe } = await supabase
+          .from("procedimento_especialidades")
+          .select("procedimento_id")
+          .eq("clinica_id", clinicaId)
+          .in("especialidade_id", espIds);
+        for (const r of pe ?? []) union.add(r.procedimento_id as string);
+      }
+      // Também considera procedimentos classificados como laboratório
+      // via tipo_procedimento/grupo (fonte usada pelo cadastro de Serviços).
+      const { data: tp } = await supabase
+        .from("procedimentos")
+        .select("id")
         .eq("clinica_id", clinicaId)
-        .in("especialidade_id", espIds);
-      setLabProcIds(new Set((pe ?? []).map((r) => r.procedimento_id as string)));
+        .or("tipo_procedimento.eq.laboratorio,grupo.ilike.%labor%");
+      for (const r of tp ?? []) union.add(r.id as string);
+      setLabProcIds(union);
     })();
   }, [open, clinicaId]);
 
