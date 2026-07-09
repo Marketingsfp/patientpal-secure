@@ -39,6 +39,61 @@ export const Route = createFileRoute("/_authenticated/app/caixa")({
 });
 
 /**
+ * Normaliza o valor gravado em `caixa_movimentos.forma_pagamento` para os
+ * buckets exibidos no painel (Dinheiro / PIX / Débito / Crédito / Boleto /
+ * Transferência / Convênio). Aliases: `cartao_credito`/`cartao_debito` do
+ * banco viram `credito`/`debito`. Retorna `misto` para pagamentos divididos
+ * (que são decompostos depois consultando `fin_lancamentos.observacoes`) e
+ * `outros` como residual.
+ */
+const FORMA_BUCKETS = ["dinheiro", "pix", "debito", "credito", "boleto", "transferencia", "convenio"] as const;
+type FormaBucket = typeof FORMA_BUCKETS[number] | "misto" | "outros";
+
+function normalizarForma(f: string | null | undefined): FormaBucket {
+  const k = (f ?? "").toLowerCase().trim();
+  if (!k) return "outros";
+  if (k === "dinheiro" || k === "pix" || k === "boleto" || k === "transferencia" || k === "convenio" || k === "misto") return k;
+  if (k === "credito" || k === "cartao_credito" || k === "cartão_credito" || k === "cartao credito") return "credito";
+  if (k === "debito" || k === "cartao_debito" || k === "cartão_debito" || k === "cartao debito") return "debito";
+  return "outros";
+}
+
+/**
+ * Extrai as parcelas de um pagamento misto a partir do trecho
+ * `Pagamento misto: Dinheiro R$ 60,00; PIX R$ 50,00 | ...` gravado em
+ * `fin_lancamentos.observacoes`. Retorna somas por bucket já normalizado.
+ */
+function decomporMistoObs(obs: string | null | undefined): Partial<Record<FormaBucket, number>> {
+  const out: Partial<Record<FormaBucket, number>> = {};
+  if (!obs) return out;
+  const idx = obs.indexOf("Pagamento misto:");
+  if (idx < 0) return out;
+  const trecho = obs.slice(idx + "Pagamento misto:".length).split(" | ")[0];
+  const partes = trecho.split(";").map((s) => s.trim()).filter(Boolean);
+  const LABEL_TO_KEY: Array<[RegExp, FormaBucket]> = [
+    [/^cart[ãa]o\s*cr[ée]dito/i, "credito"],
+    [/^cart[ãa]o\s*d[ée]bito/i, "debito"],
+    [/^cr[ée]dito/i, "credito"],
+    [/^d[ée]bito/i, "debito"],
+    [/^dinheiro/i, "dinheiro"],
+    [/^pix/i, "pix"],
+    [/^boleto/i, "boleto"],
+    [/^conv[êe]nio/i, "convenio"],
+    [/^transfer[êe]ncia/i, "transferencia"],
+  ];
+  const parseBRL = (s: string) => Number(s.replace(/\./g, "").replace(",", ".")) || 0;
+  for (const p of partes) {
+    const match = LABEL_TO_KEY.find(([re]) => re.test(p));
+    if (!match) continue;
+    const valMatch = p.match(/R\$\s*([\d.]+,\d{2})/);
+    if (!valMatch) continue;
+    const v = parseBRL(valMatch[1]);
+    out[match[1]] = (out[match[1]] ?? 0) + v;
+  }
+  return out;
+}
+
+/**
  * Promoção controlada do CaixaShellV2 para `/app/caixa`, atrás da flag
  * `caixa_v2` E limitado a admin/gestor. Recepção, caixa, médico, financeiro
  * e demais perfis continuam vendo o `<Page />` clássico intocado — mesmo
