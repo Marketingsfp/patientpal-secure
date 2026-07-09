@@ -2962,12 +2962,12 @@ function AgendaPage() {
     // Multi-exame (laboratório/imagem): quando o nome vem concatenado com " + ",
     // resolvemos cada item individualmente e somamos. Para agendamento simples,
     // o split retorna apenas um item e o comportamento permanece igual.
-    const nomesParaValorar = (a.procedimento ?? "CONSULTA")
+    const nomesParaValorar = (a.procedimento ?? rotuloFallbackProc(a.medico_id))
       .split(/\s+\+\s+/)
       .map((s) => s.trim())
       .filter(Boolean);
     const procsIndividuais = await Promise.all(
-      (nomesParaValorar.length > 0 ? nomesParaValorar : ["CONSULTA"]).map((nome) =>
+      (nomesParaValorar.length > 0 ? nomesParaValorar : [rotuloFallbackProc(a.medico_id)]).map((nome) =>
         buscarProcedimentoPorNome(clinicaAtual.clinica_id, nome, lista),
       ),
     );
@@ -3022,7 +3022,7 @@ function AgendaPage() {
     // marca como pago e avança o fluxo, do mesmo modo que um pagamento normal.
     const totalOpcoes = opcoes.reduce((s, o) => s + (Number(o.valor) || 0), 0);
     if (!opcoesOrc && totalOpcoes <= 0) {
-      const desc = `${a.paciente_nome} — ${a.procedimento ?? "CONSULTA"}${descSuffix} — SEM COBRANÇA`;
+      const desc = `${a.paciente_nome} — ${a.procedimento ?? rotuloFallbackProc(a.medico_id)}${descSuffix} — SEM COBRANÇA`;
       const { error: errSC } = await supabase.from("fin_lancamentos").insert({
         clinica_id: clinicaAtual.clinica_id,
         tipo: "receita" as const,
@@ -3061,9 +3061,9 @@ function AgendaPage() {
     setFormaPagOpcoes(opcoes);
     setFormaPagCtx({
       agId: a.id,
-      desc: `${a.paciente_nome} — ${a.procedimento ?? "CONSULTA"}${descSuffix}`,
+      desc: `${a.paciente_nome} — ${a.procedimento ?? rotuloFallbackProc(a.medico_id)}${descSuffix}`,
       paciente: a.paciente_nome ?? "",
-      procedimento: `${a.procedimento ?? "CONSULTA"}${descSuffix}`,
+      procedimento: `${a.procedimento ?? rotuloFallbackProc(a.medico_id)}${descSuffix}`,
       medico: medicos.find((m) => m.id === a.medico_id)?.nome ?? undefined,
       especialidade: medicos.find((m) => m.id === a.medico_id)?.especialidade_nome ?? undefined,
     });
