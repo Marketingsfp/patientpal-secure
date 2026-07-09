@@ -1080,6 +1080,19 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                       >
                         <Plus className="h-4 w-4 mr-1" /> Adicionar serviço
                       </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={especialidadesSelecionadasNomes.size === 0 || procsFiltradosPorEspecialidade.length === 0}
+                        onClick={() => {
+                          setBulkSelected(new Set());
+                          setBulkQuery("");
+                          setBulkOpen(true);
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-1" /> Adicionar vários
+                      </Button>
                     </div>
                   </div>
                   {especialidadesSelecionadasNomes.size === 0 ? (
