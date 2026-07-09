@@ -3021,7 +3021,14 @@ function AgendaPage() {
     // fluxo de cobrança — registra um lançamento de valor 0 (linha-sombra),
     // marca como pago e avança o fluxo, do mesmo modo que um pagamento normal.
     const totalOpcoes = opcoes.reduce((s, o) => s + (Number(o.valor) || 0), 0);
-    if (!opcoesOrc && totalOpcoes <= 0) {
+    // Só auto-registra "SEM COBRANÇA" quando o procedimento foi encontrado
+    // no cadastro E realmente está com valor zero. Se nenhum procedimento
+    // casou (ex.: laboratório com nome genérico "EXAMES LABORATORIAIS" ou
+    // agendamento com procedimento em branco), abrimos o diálogo de forma
+    // de pagamento normalmente para o operador digitar o valor.
+    const algumProcCasou = (procsIndividuais as any[]).some((p) => p != null);
+    const ehLab = medicoEhLaboratorioFormulario(a.medico_id);
+    if (!opcoesOrc && totalOpcoes <= 0 && algumProcCasou && !ehLab) {
       const desc = `${a.paciente_nome} — ${a.procedimento ?? rotuloFallbackProc(a.medico_id)}${descSuffix} — SEM COBRANÇA`;
       const { error: errSC } = await supabase.from("fin_lancamentos").insert({
         clinica_id: clinicaAtual.clinica_id,
