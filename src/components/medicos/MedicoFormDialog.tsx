@@ -1025,7 +1025,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                   ) : form.procedimentos.length === 0 ? (
                     <p className="text-xs text-muted-foreground">Nenhum serviço selecionado.</p>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="space-y-2 max-h-[420px] overflow-y-auto pr-2 rounded-md border border-border/40 p-2 bg-muted/20">
                       {form.procedimentos
                         .map((item, idx) => {
                           const { pid, eid } = splitItem(item);
