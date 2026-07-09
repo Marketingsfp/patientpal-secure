@@ -441,6 +441,18 @@ function Page() {
     return () => { void supabase.removeChannel(ch); };
   }, [clinicaAtual, reloadEstornosPendentes]);
 
+  // Se o usuário voltar para a aba após o financeiro decidir e o evento
+  // realtime tiver sido perdido, ressincroniza ao ganhar foco.
+  useEffect(() => {
+    const onFocus = () => { void reloadEstornosPendentes(); };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, [reloadEstornosPendentes]);
+
   // Carrega a fila de cobrança (agendamentos hoje aguardando caixa)
   const loadFilaCaixa = useCallback(async () => {
     if (!clinicaAtual) return;
