@@ -982,23 +982,34 @@ function NovoOrcamentoDialog({
             <div className="space-y-1"><Label>Telefone</Label><Input maxLength={20} value={pacienteTelefone} onChange={(e) => setPacienteTelefone(e.target.value.replace(/[<>]/g, ""))} /></div>
             <div className="space-y-1 md:col-span-2">
               <Label>Médico solicitante</Label>
-              <div className="flex gap-1 rounded-md border p-1 w-fit">
+               <div className="flex flex-wrap gap-1 rounded-md border p-1 w-fit">
                 <button
                   type="button"
                   onClick={() => alternarMedicoExterno(false)}
-                  className={`px-3 py-1 text-sm rounded ${!medicoExterno ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                  className={`px-3 py-1 text-sm rounded ${!medicoExterno && !medicoParticular ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
                 >
                   Da nossa clínica
                 </button>
                 <button
                   type="button"
                   onClick={() => alternarMedicoExterno(true)}
-                  className={`px-3 py-1 text-sm rounded ${medicoExterno ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                  className={`px-3 py-1 text-sm rounded ${medicoExterno && !medicoParticular ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
                 >
                   De outro local
                 </button>
+                <button
+                  type="button"
+                  onClick={ativarParticular}
+                  className={`px-3 py-1 text-sm rounded ${medicoParticular ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                >
+                  Particular
+                </button>
               </div>
-              {!medicoExterno ? (
+              {medicoParticular ? (
+                <p className="text-xs text-muted-foreground">
+                  Paciente sem médico solicitante — atendimento particular por procura direta.
+                </p>
+              ) : !medicoExterno ? (
                 <SearchableSelect
                   options={medicoOptions}
                   value={medicoId}
