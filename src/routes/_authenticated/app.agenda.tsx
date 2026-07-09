@@ -1599,7 +1599,7 @@ function AgendaPage() {
       // (ex.: recurso "TESTE ERGOMETRICO" que executa o exame homônimo),
       // mantém o valor para não perder o serviço no submit.
       const opts = opcoesProcedimentoMedico(
-        medicoId,
+        medicoId ?? null,
         editing?.agenda_id ?? (filtroAgenda !== "todos" ? filtroAgenda : null),
       );
       const alvo = normalizar(atual);
