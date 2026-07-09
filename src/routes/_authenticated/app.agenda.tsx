@@ -1211,7 +1211,7 @@ function AgendaPage() {
     if (!clinicaAtual) return;
     const [m, e, me, pr, sr, mcRows, mp, er, erp, agendasRes] = await Promise.all([
       supabase.from("medicos").select("id,nome,sexo,usa_sistema,especialidade_id,procedimento_padrao_id,procedimento_padrao_em_branco").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
-      supabase.from("especialidades").select("id,nome").order("nome"),
+      supabase.from("especialidades").select("id,nome").eq("ativo", true).order("nome"),
       supabase.from("medico_especialidades").select("medico_id,especialidade_id,medicos!inner(clinica_id)").eq("medicos.clinica_id", clinicaAtual.clinica_id),
       fetchProcedimentosAgenda(clinicaAtual.clinica_id),
       supabase.from("procedimento_split_regras").select("medico_id,procedimento_id").eq("clinica_id", clinicaAtual.clinica_id).not("medico_id", "is", null),
@@ -1303,6 +1303,15 @@ function AgendaPage() {
     for (const r of (me.data ?? []) as Array<{ medico_id: string; especialidade_id: string }>) {
       if (!map.has(r.medico_id)) map.set(r.medico_id, new Set());
       map.get(r.medico_id)!.add(r.especialidade_id);
+    }
+    // Também considera a especialidade principal salva em `medicos.especialidade_id`
+    // (nem todo médico tem entrada em `medico_especialidades`). Sem isso, o filtro
+    // "Especialidade" da agenda não encontra agendamentos desses médicos.
+    for (const md of medicosBase) {
+      if (md.especialidade_id) {
+        if (!map.has(md.id)) map.set(md.id, new Set());
+        map.get(md.id)!.add(md.especialidade_id);
+      }
     }
     setMedicoEspec(map);
     // Médicos com mais de uma especialidade: precisam mostrar o serviço como "NOME (ESPECIALIDADE)".
