@@ -6,6 +6,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
 import { useMedicoContext } from "@/hooks/use-medico-context";
 import { usePermissoes } from "@/hooks/use-permissoes";
+import { ROUTE_TO_MODULE as SHARED_ROUTE_TO_MODULE, moduloDaRota } from "@/lib/permissoes-rotas";
+import { SemPermissao } from "@/components/sem-permissao";
 import { supabase } from "@/integrations/supabase/client";
 import { getSubsystem, setSubsystem, subscribeSubsystem, SUBSYSTEMS } from "@/lib/subsystem";
 import logoSaoFrancisco from "@/assets/logo-sao-francisco.png";
