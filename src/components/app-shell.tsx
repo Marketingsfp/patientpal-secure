@@ -165,7 +165,7 @@ export function AppShell() {
   const { user, signOut, loading } = useAuth();
   const { memberships, clinicaAtual, setClinicaAtual, modoTodas, setModoTodas, branding } = useClinica();
   const { isMedicoOnly } = useMedicoContext();
-  const { allowed: allowedModules } = usePermissoes();
+  const { allowed: allowedModules, loading: permsLoading } = usePermissoes();
   const { enabled: menuV2Enabled } = useMenuV2Flag();
   const location = useLocation();
   const navigate = useNavigate();
