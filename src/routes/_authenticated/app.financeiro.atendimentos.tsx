@@ -1215,6 +1215,8 @@ function Page() {
         if (total <= 0) continue;
         const nowIso = new Date().toISOString();
         const medNome = medId !== "sem" ? (medMap.get(medId) ?? "") : "—";
+        const { data: userData } = await supabase.auth.getUser();
+        const currentUserId = userData?.user?.id ?? null;
         const { data: lanc, error: eLanc } = await supabase
           .from("fin_lancamentos")
           .insert({
@@ -1228,6 +1230,7 @@ function Page() {
             medico_id: medId !== "sem" ? medId : null,
             conta_id: payForm.conta_id || null,
             forma_pagamento: payForm.forma_pagamento || null,
+            criado_por: currentUserId,
           })
           .select("id")
           .single();
