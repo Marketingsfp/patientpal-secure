@@ -57,6 +57,28 @@ function Page() {
   const [resumo, setResumo] = useState<{ r: number; d: number; saldo: number; totalRows: number }>({ r: 0, d: 0, saldo: 0, totalRows: 0 });
   const [filterStatus, setFilterStatus] = useState<"confirmado" | "todos" | "pendente">("confirmado");
   const [filterUsuario, setFilterUsuario] = useState<string>("todos");
+  const [filterForma, setFilterForma] = useState<string>("todos");
+
+  const applyForma = <T extends { or: (s: string) => T; ilike: (c: string, p: string) => T }>(q: T): T => {
+    switch (filterForma) {
+      case "dinheiro":
+        return q.or("forma_pagamento.ilike.%dinheiro%,forma_pagamento.ilike.caixa%");
+      case "pix":
+        return q.ilike("forma_pagamento", "%pix%");
+      case "debito":
+        return q.or("forma_pagamento.ilike.%debito%,forma_pagamento.ilike.%débito%,forma_pagamento.eq.cartao_debito,forma_pagamento.ilike.maestro%");
+      case "credito":
+        return q.or("forma_pagamento.ilike.%credito%,forma_pagamento.ilike.%crédito%,forma_pagamento.eq.cartao_credito");
+      case "cartao":
+        return q.or("forma_pagamento.ilike.%cart%,forma_pagamento.ilike.master%,forma_pagamento.ilike.visa%,forma_pagamento.ilike.elo%,forma_pagamento.ilike.american%,forma_pagamento.ilike.maestro%");
+      case "boleto":
+        return q.or("forma_pagamento.ilike.%boleto%,forma_pagamento.ilike.%banking%,forma_pagamento.ilike.%transfer%");
+      case "sem":
+        return q.or("forma_pagamento.is.null,forma_pagamento.eq.");
+      default:
+        return q;
+    }
+  };
 
   const load = async () => {
     if (!clinicaAtual) { setItems([]); setLoading(false); return; }
@@ -72,14 +94,15 @@ function Page() {
       if (filterUsuario === "sem") q = q.is("criado_por", null);
       else q = q.eq("criado_por", filterUsuario);
     }
+    q = applyForma(q);
     const { data, error } = await q;
     if (error) mostrarErro(error); else setItems((data ?? []) as Lanc[]);
     setLoading(false);
   };
   const loadResumo = async () => {
     if (!clinicaAtual) { setResumo({ r: 0, d: 0, saldo: 0, totalRows: 0 }); return; }
-    // Sem filtro por usuário/tipo → usa RPC agregado (rápido).
-    if (filterUsuario === "todos" && filterTipo === "todos") {
+    // Sem filtro por usuário/tipo/forma → usa RPC agregado (rápido).
+    if (filterUsuario === "todos" && filterTipo === "todos" && filterForma === "todos") {
       const { data, error } = await supabase.rpc("fin_resumo_periodo", {
         p_clinica: clinicaAtual.clinica_id, p_ini: fromDate, p_fim: toDate,
       });
@@ -110,6 +133,7 @@ function Page() {
         if (filterUsuario === "sem") q = q.is("criado_por", null);
         else q = q.eq("criado_por", filterUsuario);
       }
+      q = applyForma(q);
       const { data, error } = await q;
       if (error) { mostrarErro(error); return; }
       const rows = (data ?? []) as Array<{ tipo: string; status: string; valor: number | string | null }>;
