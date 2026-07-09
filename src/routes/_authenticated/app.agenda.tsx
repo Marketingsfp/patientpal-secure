@@ -1796,8 +1796,9 @@ function AgendaPage() {
 
   const fichaPorId = useMemo(() => {
     const m = new Map<string, string>();
-    // Numeração sequencial por dia e por médico (reinicia a cada data/médico)
-    // na ordem do horário. Assim cada agenda do médico fica 001, 002, 003...
+    // Numeração sequencial por dia e por AGENDA (fallback: médico) na ordem do
+    // horário — mesma regra usada pela GR em src/lib/print-gr.ts. Slots livres
+    // (Disponível/Bloqueio) NÃO entram na contagem, pois a GR também os ignora.
     // Se o agendamento já tem `ficha_numero` gravado (na 1ª impressão da GR),
     // ele PREVALECE sobre a posição dinâmica — o número da ficha impresso na
     // guia jamais deve divergir do sistema.
@@ -1805,11 +1806,19 @@ function AgendaPage() {
     const ordenados = [...items].sort((a, b) => a.inicio.localeCompare(b.inicio));
     ordenados.forEach((a) => {
       const dia = a.inicio.slice(0, 10);
-      const chave = `${dia}__${a.medico_id ?? "sem-medico"}`;
+      const fixa = (a as { ficha_numero?: number | null }).ficha_numero;
+      if (typeof fixa === "number" && fixa > 0) {
+        m.set(a.id, String(fixa).padStart(3, "0"));
+        return;
+      }
+      // Alinhado à GR: ignora slots livres na numeração dinâmica.
+      if (isSlotLivre(a.paciente_nome) || !a.paciente_id) {
+        return;
+      }
+      const chave = `${dia}__${a.agenda_id ?? a.medico_id ?? "sem-agenda"}`;
       const n = (contadores.get(chave) ?? 0) + 1;
       contadores.set(chave, n);
-      const fixa = (a as { ficha_numero?: number | null }).ficha_numero;
-      const num = typeof fixa === "number" && fixa > 0 ? fixa : n;
+      const num = n;
       m.set(a.id, String(num).padStart(3, "0"));
     });
     return m;
