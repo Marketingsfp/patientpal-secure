@@ -3962,7 +3962,17 @@ function AgendaPage() {
 
       <LancamentoDialog
         open={pagamentoOpen}
-        onOpenChange={(v) => { setPagamentoOpen(v); if (!v) { setPagamentoAgId(null); setPagamentoExtraIds([]); setDescontoPendente(null); } }}
+        onOpenChange={(v) => {
+          setPagamentoOpen(v);
+          if (!v) {
+            setPagamentoAgId(null);
+            setPagamentoExtraIds([]);
+            setPagamentoPesos({});
+            setPagamentoRotulos({});
+            setPagamentoPacienteNome("");
+            setDescontoPendente(null);
+          }
+        }}
         tipo="receita"
         initialDescricao={pagamentoDesc}
         initialValor={pagamentoValor}
