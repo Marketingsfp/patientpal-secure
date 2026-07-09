@@ -1892,9 +1892,16 @@ function Page() {
                               {a.repasse_pago || a.agendamento_status === "realizado" ? (
                                 <Button
                                   size="sm"
-                                  disabled
+                                  disabled={!podeEstornar || a.repasse_pago}
                                   className="h-6 px-2 text-[10px] gap-1 bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 disabled:opacity-100"
-                                  title="Repasse já baixado"
+                                  title={
+                                    a.repasse_pago
+                                      ? "Repasse já pago — estorne o repasse antes de desfazer a baixa"
+                                      : podeEstornar
+                                        ? "Clique para desfazer a baixa"
+                                        : "Repasse já baixado"
+                                  }
+                                  onClick={() => desfazerBaixa(a)}
                                 >
                                   <CheckCircle2 className="h-3 w-3" /> Baixado
                                 </Button>
@@ -1954,9 +1961,16 @@ function Page() {
                               {a.repasse_pago || a.status === "realizado" ? (
                                 <Button
                                   size="sm"
-                                  disabled
+                                  disabled={!podeEstornar || a.repasse_pago}
                                   className="h-6 px-2 text-[10px] gap-1 bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 disabled:opacity-100"
-                                  title="Repasse já baixado"
+                                  title={
+                                    a.repasse_pago
+                                      ? "Repasse já pago — estorne o repasse antes de desfazer a baixa"
+                                      : podeEstornar
+                                        ? "Clique para desfazer a baixa"
+                                        : "Repasse já baixado"
+                                  }
+                                  onClick={() => desfazerBaixa(a)}
                                 >
                                   <CheckCircle2 className="h-3 w-3" /> Baixado
                                 </Button>
