@@ -285,6 +285,7 @@ export function NovoAgendamentoWizard({
             data_pagamento: null,
             orcamento_id: null,
             tipo_atendimento: tipoAtendimento,
+            forma_pagamento_prevista: null,
           },
           checagens: {
             validar_paciente_completo: true,
