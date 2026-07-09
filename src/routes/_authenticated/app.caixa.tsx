@@ -917,6 +917,28 @@ function Page() {
                 </Card>
               </div>
 
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-xs text-muted-foreground">Entradas por forma de pagamento</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    {[
+                      { label: "Dinheiro", value: entradasPorForma.dinheiro },
+                      { label: "PIX", value: entradasPorForma.pix },
+                      { label: "Débito", value: entradasPorForma.debito },
+                      { label: "Crédito", value: entradasPorForma.credito },
+                      { label: "Outros", value: entradasPorForma.outros },
+                    ].map((it) => (
+                      <div key={it.label} className="rounded-md border bg-muted/30 px-3 py-2">
+                        <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{it.label}</div>
+                        <div className="text-base font-semibold tabular-nums">{fmt(it.value)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" onClick={() => setOpenMov({ tipo: "suprimento" })}>
                   <ArrowDownToLine className="h-4 w-4 mr-2 text-emerald-600" /> Suprimento
