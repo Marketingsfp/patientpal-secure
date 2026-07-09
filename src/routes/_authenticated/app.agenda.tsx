@@ -1695,6 +1695,12 @@ function AgendaPage() {
     return Array.from(espIds).some((id) => normalizar(especialidades.find((e) => e.id === id)?.nome ?? "").includes("laborat"));
   };
 
+  // Rótulo de fallback quando um agendamento não tem procedimento nomeado.
+  // Agendamentos de laboratório NÃO podem exibir "Consulta"; usam
+  // "EXAMES LABORATORIAIS" para deixar claro o tipo de atendimento.
+  const rotuloFallbackProc = (medicoId: string | null | undefined) =>
+    medicoEhLaboratorioFormulario(medicoId) ? "EXAMES LABORATORIAIS" : "CONSULTA";
+
   const procedimentoEhImagem = (label: string) => {
     // Preferência: consulta a categoria no cadastro do procedimento.
     const alvo = normalizar(label);
@@ -1953,7 +1959,7 @@ function AgendaPage() {
     // Resolve todos os procedimentos em paralelo (cada um pode cair em
     // fallback no banco; em paralelo o tempo total fica ~= 1 chamada).
     const procsResolvidos = await Promise.all(
-      itens.map((it) => buscarProcedimentoPorNome(clinicaAtual.clinica_id, it.procedimento ?? "CONSULTA", procs)),
+      itens.map((it) => buscarProcedimentoPorNome(clinicaAtual.clinica_id, it.procedimento ?? rotuloFallbackProc(it.medico_id), procs)),
     );
     const pesos: Record<string, number> = {};
     const rotulos: Record<string, string> = {};
@@ -1966,13 +1972,13 @@ function AgendaPage() {
       totalCredito  += valorCartao;
       // Peso p/ rateio: prioriza valor de cartão (cheio); se 0, usa dinheiro.
       pesos[itens[idx].id] = valorCartao > 0 ? valorCartao : valorDin;
-      rotulos[itens[idx].id] = itens[idx].procedimento ?? "CONSULTA";
+      rotulos[itens[idx].id] = itens[idx].procedimento ?? rotuloFallbackProc(itens[idx].medico_id);
     });
     setPagamentoPesos(pesos);
     setPagamentoRotulos(rotulos);
     const paciente = itens[0].paciente_nome;
     setPagamentoPacienteNome(paciente);
-    const desc = `${paciente} — ${itens.map(i => (i.procedimento ?? "CONSULTA")).join(" + ")} (${itens.length} serviços)`;
+    const desc = `${paciente} — ${itens.map(i => (i.procedimento ?? rotuloFallbackProc(i.medico_id))).join(" + ")} (${itens.length} serviços)`;
     const opcoes: FormaOpcao[] = [
       { forma: "dinheiro", label: "Dinheiro", valor: totalDinheiro },
       { forma: "pix", label: "Pix", valor: totalPix },
@@ -1984,7 +1990,7 @@ function AgendaPage() {
       agId: itens.map(i => i.id).join(","),
       desc,
       paciente,
-      procedimento: `${itens.map(i => (i.procedimento ?? "CONSULTA")).join(" + ")} (${itens.length} serviços)`,
+      procedimento: `${itens.map(i => (i.procedimento ?? rotuloFallbackProc(i.medico_id))).join(" + ")} (${itens.length} serviços)`,
       medico: (() => {
         const m = medicos.find((mm) => mm.id === itens[0].medico_id);
         return m?.nome ?? undefined;
@@ -2709,7 +2715,7 @@ function AgendaPage() {
       // no cadastro. Resolvemos cada procedimento individualmente e somamos.
       const nomesParaValorar = procedimentosParaSalvar.length > 0
         ? procedimentosParaSalvar
-        : [payload.procedimento ?? "CONSULTA"];
+        : [payload.procedimento ?? rotuloFallbackProc(payload.medico_id)];
       const procsIndividuais = await Promise.all(
         nomesParaValorar.map((nome) => buscarProcedimentoPorNome(clinicaAtual.clinica_id, nome, lista)),
       );
@@ -2763,9 +2769,9 @@ function AgendaPage() {
         // Agrupa o principal + irmãos (imagem multi-exame) para que a mesma
         // cobrança marque todos os agendamentos correspondentes como pagos.
         agId: [novoId, ...(result.sibling_ids ?? [])].join(","),
-        desc: `${payload.paciente_nome} — ${payload.procedimento ?? "CONSULTA"}${descSuffix}`,
+        desc: `${payload.paciente_nome} — ${payload.procedimento ?? rotuloFallbackProc(payload.medico_id)}${descSuffix}`,
         paciente: payload.paciente_nome ?? "",
-        procedimento: `${payload.procedimento ?? "CONSULTA"}${descSuffix}`,
+        procedimento: `${payload.procedimento ?? rotuloFallbackProc(payload.medico_id)}${descSuffix}`,
         medico: medicos.find((m) => m.id === payload.medico_id)?.nome ?? undefined,
         especialidade: medicos.find((m) => m.id === payload.medico_id)?.especialidade_nome ?? undefined,
       });
@@ -2956,12 +2962,12 @@ function AgendaPage() {
     // Multi-exame (laboratório/imagem): quando o nome vem concatenado com " + ",
     // resolvemos cada item individualmente e somamos. Para agendamento simples,
     // o split retorna apenas um item e o comportamento permanece igual.
-    const nomesParaValorar = (a.procedimento ?? "CONSULTA")
+    const nomesParaValorar = (a.procedimento ?? rotuloFallbackProc(a.medico_id))
       .split(/\s+\+\s+/)
       .map((s) => s.trim())
       .filter(Boolean);
     const procsIndividuais = await Promise.all(
-      (nomesParaValorar.length > 0 ? nomesParaValorar : ["CONSULTA"]).map((nome) =>
+      (nomesParaValorar.length > 0 ? nomesParaValorar : [rotuloFallbackProc(a.medico_id)]).map((nome) =>
         buscarProcedimentoPorNome(clinicaAtual.clinica_id, nome, lista),
       ),
     );
@@ -3016,7 +3022,7 @@ function AgendaPage() {
     // marca como pago e avança o fluxo, do mesmo modo que um pagamento normal.
     const totalOpcoes = opcoes.reduce((s, o) => s + (Number(o.valor) || 0), 0);
     if (!opcoesOrc && totalOpcoes <= 0) {
-      const desc = `${a.paciente_nome} — ${a.procedimento ?? "CONSULTA"}${descSuffix} — SEM COBRANÇA`;
+      const desc = `${a.paciente_nome} — ${a.procedimento ?? rotuloFallbackProc(a.medico_id)}${descSuffix} — SEM COBRANÇA`;
       const { error: errSC } = await supabase.from("fin_lancamentos").insert({
         clinica_id: clinicaAtual.clinica_id,
         tipo: "receita" as const,
@@ -3055,9 +3061,9 @@ function AgendaPage() {
     setFormaPagOpcoes(opcoes);
     setFormaPagCtx({
       agId: a.id,
-      desc: `${a.paciente_nome} — ${a.procedimento ?? "CONSULTA"}${descSuffix}`,
+      desc: `${a.paciente_nome} — ${a.procedimento ?? rotuloFallbackProc(a.medico_id)}${descSuffix}`,
       paciente: a.paciente_nome ?? "",
-      procedimento: `${a.procedimento ?? "CONSULTA"}${descSuffix}`,
+      procedimento: `${a.procedimento ?? rotuloFallbackProc(a.medico_id)}${descSuffix}`,
       medico: medicos.find((m) => m.id === a.medico_id)?.nome ?? undefined,
       especialidade: medicos.find((m) => m.id === a.medico_id)?.especialidade_nome ?? undefined,
     });
@@ -3478,7 +3484,7 @@ function AgendaPage() {
                   fim: fmtHora(a.fim),
                   profissional: medicoNomeAgendamento(a),
                   paciente: a.paciente_nome,
-                  procedimento: a.procedimento ?? "CONSULTA",
+                  procedimento: a.procedimento ?? rotuloFallbackProc(a.medico_id),
                   status: a.status,
                   observacoes: a.observacoes ?? "",
                 })),
@@ -5075,6 +5081,7 @@ function AgendaPage() {
           fmtHora={fmtHora}
           estornoPendAgs={estornoPendAgs}
           ocultarPacienteMedico={isMedicoOnly}
+          ehLaboratorio={medicoEhLaboratorioFormulario}
         />
       )}
 
@@ -5265,7 +5272,7 @@ function MedicoFiltroInput({
 }
 
 function AgendaPorMedicoGrid({
-  medicoId, dias, dataRef, items, onSlotClick, onAgClick, fmtHora, estornoPendAgs, ocultarPacienteMedico,
+  medicoId, dias, dataRef, items, onSlotClick, onAgClick, fmtHora, estornoPendAgs, ocultarPacienteMedico, ehLaboratorio,
 }: {
   medicoId: string;
   dias: number;
@@ -5276,6 +5283,7 @@ function AgendaPorMedicoGrid({
   fmtHora: (iso: string) => string;
   estornoPendAgs: Set<string>;
   ocultarPacienteMedico: boolean;
+  ehLaboratorio?: (medicoId: string | null | undefined) => boolean;
 }) {
   const diasSemana = ["DOMINGO", "SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO"];
 
@@ -5373,6 +5381,7 @@ function AgendaPorMedicoGrid({
                         corStatus={corStatus}
                         estornoPend={!!(ag && estornoPendAgs.has(ag.id))}
                         ocultarPaciente={!!(ag && estornoPendAgs.has(ag.id) && ocultarPacienteMedico)}
+                        procedimentoFallback={ag?.procedimento ?? (ehLaboratorio?.(ag?.medico_id) ? "EXAMES LABORATORIAIS" : "CONSULTA")}
                       />
                     );
                   })}
@@ -5400,7 +5409,7 @@ function FragmentDayHeader({ dia, fmtCabecalho }: { dia: string; fmtCabecalho: (
 }
 
 function FragmentDayCell({
-  ag, dia, hi, onSlotClick, onAgClick, fmtHora, corStatus, estornoPend, ocultarPaciente,
+  ag, dia, hi, onSlotClick, onAgClick, fmtHora, corStatus, estornoPend, ocultarPaciente, procedimentoFallback,
 }: {
   ag: Agendamento | undefined;
   dia: string;
@@ -5411,6 +5420,7 @@ function FragmentDayCell({
   corStatus: (s: Status) => string;
   estornoPend: boolean;
   ocultarPaciente: boolean;
+  procedimentoFallback?: string;
 }) {
   const ehLivre = ag && isSlotLivre(ag.paciente_nome);
   return (
@@ -5442,7 +5452,7 @@ function FragmentDayCell({
             title={
               estornoPend
                 ? "Estorno solicitado — aguardando decisão do financeiro"
-                : `${ag.paciente_nome} — ${ag.procedimento ?? "CONSULTA"}`
+                : `${ag.paciente_nome} — ${procedimentoFallback ?? ag.procedimento ?? "CONSULTA"}`
             }
           >
             {ehLivre
