@@ -654,6 +654,30 @@ function Page() {
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { if (tab === "todos") void loadTodos(); }, [tab, loadTodos]);
 
+  // Membros da clínica para o seletor de destino de sangria/suprimento
+  useEffect(() => {
+    if (!clinicaAtual) { setMembrosClinica([]); return; }
+    let alive = true;
+    void (async () => {
+      const { data: memb } = await supabase
+        .from("clinica_memberships")
+        .select("user_id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("ativo", true);
+      const ids = ((memb ?? []) as Array<{ user_id: string }>).map((m) => m.user_id);
+      if (!ids.length) { if (alive) setMembrosClinica([]); return; }
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("id, nome")
+        .in("id", ids);
+      const list = ((profs ?? []) as Array<{ id: string; nome: string | null }>)
+        .map((p) => ({ user_id: p.id, nome: p.nome || "(sem nome)" }))
+        .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+      if (alive) setMembrosClinica(list);
+    })();
+    return () => { alive = false; };
+  }, [clinicaAtual?.clinica_id]);
+
   // Calculos
   const saldoAtual = useMemo(() => {
     if (!minhaSessao) return 0;
