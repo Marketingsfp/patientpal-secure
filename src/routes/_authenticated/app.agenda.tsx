@@ -1695,6 +1695,12 @@ function AgendaPage() {
     return Array.from(espIds).some((id) => normalizar(especialidades.find((e) => e.id === id)?.nome ?? "").includes("laborat"));
   };
 
+  // Rótulo de fallback quando um agendamento não tem procedimento nomeado.
+  // Agendamentos de laboratório NÃO podem exibir "Consulta"; usam
+  // "EXAMES LABORATORIAIS" para deixar claro o tipo de atendimento.
+  const rotuloFallbackProc = (medicoId: string | null | undefined) =>
+    medicoEhLaboratorioFormulario(medicoId) ? "EXAMES LABORATORIAIS" : "CONSULTA";
+
   const procedimentoEhImagem = (label: string) => {
     // Preferência: consulta a categoria no cadastro do procedimento.
     const alvo = normalizar(label);
