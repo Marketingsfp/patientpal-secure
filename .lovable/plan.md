@@ -1,38 +1,36 @@
 ## Objetivo
 
-Criar um **Comprovante de Agendamento** — impresso simples para entregar ao paciente quando ele apenas agenda (sem passar pelo caixa). Diferente da GR: sem número de ficha, sem valores, sem repasse, sem exigência de pagamento.
+Mostrar, na tela **Financeiro → Estorno**, o nome do usuário que **solicitou** o estorno (e também quem **resolveu**, quando já aprovado/recusado), em vez de apenas o horário.
 
-## O que muda
+## Onde mudar
 
-### Novo arquivo: `src/lib/print-comprovante-agendamento.ts`
+Apenas 1 arquivo: `src/routes/_authenticated/app.financeiro.estorno.tsx`.
 
-Função `printComprovanteAgendamento({ agendamentoId, clinicaId })` que:
+## Como fica
 
-1. Busca do banco: dados da clínica (nome, endereço, telefone, logo), do agendamento (data, hora, médico, especialidade, procedimento, unidade/sala) e do paciente (nome, telefone).
-2. Monta um HTML A5/térmico simples com:
-   - Cabeçalho: logo + nome da clínica + endereço/telefone
-   - Título: **COMPROVANTE DE AGENDAMENTO**
-   - Bloco do paciente: nome + telefone
-   - Bloco do agendamento: data/hora em destaque, médico, especialidade, procedimento, unidade
-   - Orientações (texto fixo): "Chegar 15 min antes", "Trazer documento com foto e cartão do convênio, se aplicável", "Em caso de imprevisto, avisar com antecedência"
-   - Rodapé: data/hora da emissão e nome do atendente
-3. Usa o mesmo padrão do `print-caixa-comprovante.ts` (iframe oculto + `window.print()` para evitar bloqueio de pop-up).
-4. **Não** grava nada em `gr_impressoes` (é comprovante, não guia oficial).
+Coluna **"Solicitado"** passa a exibir:
 
-### `src/routes/_authenticated/app.agenda.tsx`
+```
+09/07/2026, 12:08:33
+por Maria Recepção
+```
 
-- Importar `printComprovanteAgendamento`.
-- Adicionar `imprimirComprovante(a)` análogo ao `imprimirGR`, mas **sem** exigência de pagamento.
-- Adicionar item no menu de ações de cada agendamento, logo acima de "Imprimir GR":
-  - `<DropdownMenuItem onClick={() => imprimirComprovante(a)}>` → **"Imprimir comprovante de agendamento"** (ícone `Printer`).
-- Sempre habilitado (não depende de `pagosSet`).
+E, quando a linha estiver **Aprovada** ou **Recusada**, logo abaixo do bloco "Resolvido em …" aparece também:
+
+```
+Resolvido em 09/07/2026, 12:15
+por João Financeiro
+```
+
+Se o nome do usuário não for encontrado, mostra "—" (sem quebrar nada).
+
+## Detalhe técnico
+
+- Após carregar as solicitações, coletar os UUIDs distintos de `solicitado_por` + `resolvido_por` e buscar em uma única query `profiles (id, nome)` — guardado num `Map<id, nome>`.
+- Renderizar `nomes.get(s.solicitado_por) ?? "—"` na coluna Solicitado e o mesmo para `resolvido_por` na coluna Motivo (onde já mostramos "Resolvido em …").
+- Sem alterações de banco, sem alterações de regra de negócio, sem mexer em outras telas.
 
 ## Fora do escopo
 
-- Não altera a GR nem o fluxo de pagamento.
-- Não altera schema, RLS, nem tabelas.
-- Sem novo cadastro de layout — o texto de orientações fica fixo no template (pode ser evoluído depois se você quiser tornar editável por clínica).
-
-## Verificação
-
-- Após implementar, abro `/app/agenda` no Playwright, abro o menu de um agendamento não pago e confirmo que o item aparece e imprime (screenshot da janela de impressão via iframe).
+- Não altero fluxo de aprovação/recusa, nem o diálogo de solicitação (`SolicitarEstornoDialog`), nem o sininho (`EstornosBell`).
+- Não crio filtro por solicitante agora — posso adicionar num próximo passo se quiser.
