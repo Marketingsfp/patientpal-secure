@@ -158,6 +158,7 @@ function Page() {
             if (!items.length) { toast.info("Sem dados para exportar."); return; }
             const catMap = new Map(cats.map((c) => [c.id, c.nome]));
             const contaMap = new Map(contas.map((c) => [c.id, c.nome]));
+            const userMap = new Map(usuarios.map((u) => [u.id, u.nome]));
             exportToExcel(
               items.map((l) => ({
                 data: new Date(l.data).toLocaleDateString("pt-BR"),
@@ -167,6 +168,7 @@ function Page() {
                 conta: l.conta_id ? contaMap.get(l.conta_id) ?? "" : "",
                 forma_pagamento: l.forma_pagamento ?? "",
                 status: l.status,
+                usuario: l.criado_por ? userMap.get(l.criado_por) ?? "" : "",
                 valor: Number(l.valor).toFixed(2),
               })),
               `movimento-${fromDate}_a_${toDate}`,
@@ -178,6 +180,7 @@ function Page() {
                 { key: "conta", label: "Conta" },
                 { key: "forma_pagamento", label: "Forma pagamento" },
                 { key: "status", label: "Status" },
+                { key: "usuario", label: "Usuário" },
                 { key: "valor", label: "Valor (R$)" },
               ],
             );
