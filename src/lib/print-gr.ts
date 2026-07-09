@@ -103,6 +103,41 @@ const VIA_CSS = `
   @media print { .via-wrap { break-after: page; } .via-wrap:last-child { break-after: auto; } }
 `;
 
+// CSS base compartilhado pelos três layouts de GR (individual, agrupada e mensalidade).
+// - Tudo em negrito (font-weight: 700) para legibilidade em impressoras térmicas.
+// - word-break/overflow-wrap para nomes/procedimentos longos não estourarem a largura útil do papel 80mm.
+// - .row usa grid em vez de flex para o valor à direita nunca ser cortado.
+const BASE_CSS = `
+  @page { size: 80mm auto; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #fff; color: #000; }
+  body {
+    font-family: "Courier New", "Consolas", monospace;
+    font-size: 11pt;
+    line-height: 1.3;
+    font-weight: 700;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+  .ticket { width: 76mm; max-width: 100%; padding: 3mm 2mm 6mm; }
+  .center { text-align: center; }
+  .right  { text-align: right; }
+  .bold   { font-weight: 700; }
+  .sm     { font-size: 9pt; font-weight: 700; }
+  .lg     { font-size: 14pt; font-weight: 700; }
+  .sep    { border-top: 1px dashed #000; margin: 6px 0; }
+  .row    { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px; align-items: baseline; }
+  .row > * { min-width: 0; }
+  .row .right { justify-self: end; }
+  table   { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  td      { padding: 1px 0; vertical-align: top; word-break: break-word; overflow-wrap: anywhere; }
+  .label  { color: #000; font-weight: 700; }
+  .v      { font-weight: 700; }
+  .qtd    { width: 10mm; }
+  h1, h2, h3 { margin: 0; }
+  ${VIA_CSS}
+`;
+
 // Imprime o HTML diretamente via iframe oculto — sem abrir nova janela.
 // O navegador ainda exibirá a caixa de diálogo de impressão padrão (não há
 // como suprimi-la sem modo quiosque), mas não há mais a tela intermediária.
