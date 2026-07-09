@@ -200,37 +200,52 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
     return p.nome;
   };
 
-  // Sincroniza a aba "Repasse" com as CATEGORIAS dos serviços selecionados:
+  // Sincroniza a aba "Repasse" com os serviços selecionados em Especialidades:
   //  • Cada categoria distinta (Consulta / Exame / Procedimento) dos serviços
   //    selecionados vira automaticamente uma linha em REPASSE INDIVIDUAL,
   //    armazenada com nome sentinela `__CAT__:<TIPO>`.
-  //  • Linhas antigas por serviço (cujo nome corresponde a um procedimento
-  //    cadastrado) são removidas — agora o repasse é por categoria.
+  //  • Cada SERVIÇO distinto selecionado também vira automaticamente uma linha
+  //    (chave = nome do procedimento) — permite definir repasse por serviço
+  //    específico direto, sem precisar clicar em "Manual".
+  //  • Linhas de serviço cujo procedimento foi desmarcado são removidas
+  //    somente se estiverem em branco; se preenchidas, permanecem como manual.
   //  • Linhas manuais avulsas (ex.: "Cartão Consulta") são preservadas.
   useEffect(() => {
     if (!procs.length) return;
     setConvenios((cs) => {
       const tiposSelecionados = new Set<string>();
       const nomesServicosSelecionados = new Set<string>();
+      // Preserva o nome original (case) para exibir na tabela.
+      const nomeOriginalPorKey = new Map<string, string>();
       for (const item of form.procedimentos) {
         const { pid } = splitItem(item);
         if (!pid) continue;
         const proc = procs.find((p) => p.id === pid);
         if (proc?.tipo) tiposSelecionados.add(String(proc.tipo).toUpperCase());
-        if (proc?.nome) nomesServicosSelecionados.add(normalizarNome(proc.nome));
+        if (proc?.nome) {
+          const key = normalizarNome(proc.nome);
+          nomesServicosSelecionados.add(key);
+          if (!nomeOriginalPorKey.has(key)) nomeOriginalPorKey.set(key, proc.nome);
+        }
       }
 
-      // Mantém manuais e sentinelas de categoria ainda usadas.
+      // Mantém sentinelas de categoria ainda usadas, linhas de serviço em uso
+      // (ou já preenchidas) e todas as manuais.
       const mantidos = cs.filter((c) => {
         const nome = c.nome ?? "";
         if (nome.startsWith("__CAT__:")) {
           const tipo = nome.slice("__CAT__:".length).toUpperCase();
           return tiposSelecionados.has(tipo);
         }
-        // Preserva TODAS as linhas manuais (em branco ou preenchidas).
-        // Não descartamos mais linhas cujo serviço não esteja selecionado em
-        // Especialidades — isso causava o sumiço silencioso de repasses
-        // cadastrados manualmente.
+        // Se o nome corresponde a um serviço que NÃO está mais selecionado
+        // em Especialidades E a linha está em branco (auto-linha vazia),
+        // descarta. Caso contrário (preenchida ou nome livre), preserva.
+        const key = normalizarNome(nome);
+        const isServicoCadastrado = procs.some((p) => normalizarNome(p.nome) === key);
+        if (isServicoCadastrado && !nomesServicosSelecionados.has(key)) {
+          const vazio = !c.percentual && !c.valor;
+          if (vazio) return false;
+        }
         return true;
       });
 
@@ -239,6 +254,11 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
           .filter((c) => (c.nome ?? "").startsWith("__CAT__:"))
           .map((c) => c.nome.slice("__CAT__:".length).toUpperCase()),
       );
+      const existentesServico = new Set(
+        mantidos
+          .filter((c) => !(c.nome ?? "").startsWith("__CAT__:") && c.nome)
+          .map((c) => normalizarNome(c.nome)),
+      );
       const novos: ConvenioRow[] = [];
       const ordem = ["CONSULTA", "EXAME", "PROCEDIMENTO"];
       for (const tipo of ordem) {
@@ -246,6 +266,17 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         if (existentesCat.has(tipo)) continue;
         novos.push({
           nome: `__CAT__:${tipo}`,
+          tipo_repasse: form.tipo_repasse,
+          percentual: "",
+          valor: "",
+          ativo: true,
+        });
+      }
+      // Uma linha por serviço selecionado que ainda não tenha linha.
+      for (const [key, nomeOriginal] of nomeOriginalPorKey) {
+        if (existentesServico.has(key)) continue;
+        novos.push({
+          nome: nomeOriginal,
           tipo_repasse: form.tipo_repasse,
           percentual: "",
           valor: "",
@@ -286,6 +317,16 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
     out.sort((a, b) => a.label.localeCompare(b.label));
     return out;
   }, [form.procedimentos, procs, esps]);
+
+  // Map: chave normalizada do nome do serviço -> rótulo "NOME (ESPECIALIDADE)"
+  // usado para exibir as linhas automáticas por serviço na aba Repasse.
+  const labelServicoPorNomeKey = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const s of servicosDoMedico) {
+      m.set(normalizarNome(s.value), s.label);
+    }
+    return m;
+  }, [servicosDoMedico]);
 
   // Load reference data
   useEffect(() => {
@@ -1279,12 +1320,19 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                         <tbody>
                           {convenios.map((c, i) => {
                             const catLbl = labelCategoria(c.nome);
+                            const servicoLbl = !catLbl && c.nome
+                              ? labelServicoPorNomeKey.get(normalizarNome(c.nome)) ?? null
+                              : null;
                             return (
                             <tr key={i} className="border-t align-middle">
                               <td className="px-2 py-1">
                                 {catLbl ? (
                                   <div className="px-2 py-1.5 text-sm font-medium uppercase tracking-wide text-foreground/80">
                                     {catLbl}
+                                  </div>
+                                ) : servicoLbl ? (
+                                  <div className="px-2 py-1.5 text-sm text-foreground/90">
+                                    {servicoLbl}
                                   </div>
                                 ) : (
                                   <select
@@ -1313,7 +1361,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                                   onChange={(e) => setConvenios((cs) => cs.map((x, j) => j === i ? (c.tipo_repasse === "percentual" ? { ...x, percentual: e.target.value } : { ...x, valor: e.target.value }) : x))} />
                               </td>
                               <td className="px-2 py-1 text-right">
-                                {catLbl ? null : (
+                                {catLbl || servicoLbl ? null : (
                                   <Button type="button" size="icon" variant="ghost"
                                     onClick={() => setConvenios((cs) => cs.filter((_, j) => j !== i))} aria-label="Remover">
                                     <Trash2 className="h-4 w-4" />
