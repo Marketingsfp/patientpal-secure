@@ -200,6 +200,28 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
     return p.nome;
   };
 
+  // Remove automaticamente da lista de serviços do médico qualquer item cujo
+  // procedimento não pertença a nenhuma das especialidades atualmente selecionadas
+  // (via `grupo` do procedimento ou via procedimento_especialidades). Também
+  // descarta itens legados sem procedimento válido. Só roda depois que `procs`
+  // e `procEspMap` estão carregados para não apagar tudo no primeiro render.
+  useEffect(() => {
+    if (!procs.length) return;
+    const idsValidos = new Set(procsFiltradosPorEspecialidade.map((p) => p.id));
+    setForm((f) => {
+      if (!f.procedimentos.length) return f;
+      const filtrados = f.procedimentos.filter((item) => {
+        if (!item) return true; // preserva linhas em branco (novo serviço manual)
+        const { pid } = splitItem(item);
+        if (!pid) return true;
+        return idsValidos.has(pid);
+      });
+      if (filtrados.length === f.procedimentos.length) return f;
+      return { ...f, procedimentos: filtrados };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [procs, procEspMap, especialidadesSelecionadasNomes, procsFiltradosPorEspecialidade]);
+
   // Sincroniza a aba "Repasse" com os serviços selecionados em Especialidades:
   //  • Cada categoria distinta (Consulta / Exame / Procedimento) dos serviços
   //    selecionados vira automaticamente uma linha em REPASSE INDIVIDUAL,
