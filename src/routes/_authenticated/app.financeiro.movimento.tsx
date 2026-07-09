@@ -301,6 +301,32 @@ function Page() {
         .update({ status: "cancelado" })
         .eq("id", l.id);
       if (eUpdLanc) { mostrarErro(eUpdLanc, "falha ao estornar lançamento"); return; }
+      // Auditoria: registra o estorno do lançamento em si — antes vinha
+      // só o log do agendamento, então lançamentos avulsos (sem agenda)
+      // ficavam invisíveis na Auditoria.
+      try {
+        await logAction({
+          table_name: "fin_lancamentos",
+          record_id: l.id,
+          action: "ESTORNO",
+          clinica_id: clinicaAtual?.clinica_id,
+          dados_antes: {
+            id: l.id,
+            status: l.status,
+            tipo: l.tipo,
+            valor: l.valor,
+            descricao: l.descricao,
+            forma_pagamento: l.forma_pagamento,
+            data: l.data,
+          },
+          dados_depois: {
+            id: l.id,
+            status: "cancelado",
+            valor_estornado: lanc?.valor ?? l.valor,
+            agendamento_id: lanc?.agendamento_id ?? null,
+          },
+        });
+      } catch { /* auditoria best-effort */ }
       const agId = lanc?.agendamento_id ?? null;
       if (agId) {
         const { data: agAntes } = await supabase
