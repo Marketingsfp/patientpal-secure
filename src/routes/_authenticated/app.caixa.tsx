@@ -308,6 +308,8 @@ function Page() {
   const [movForma, setMovForma] = useState("dinheiro");
   const [movBandeira, setMovBandeira] = useState("");
   const [movParcelas, setMovParcelas] = useState("1");
+  const [movDestinoUserId, setMovDestinoUserId] = useState("");
+  const [membrosClinica, setMembrosClinica] = useState<Array<{ user_id: string; nome: string }>>([]);
   const [valorInformado, setValorInformado] = useState("");
   const [obsFechamento, setObsFechamento] = useState("");
   const [saving, setSaving] = useState(false);
@@ -652,6 +654,30 @@ function Page() {
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { if (tab === "todos") void loadTodos(); }, [tab, loadTodos]);
 
+  // Membros da clínica para o seletor de destino de sangria/suprimento
+  useEffect(() => {
+    if (!clinicaAtual) { setMembrosClinica([]); return; }
+    let alive = true;
+    void (async () => {
+      const { data: memb } = await supabase
+        .from("clinica_memberships")
+        .select("user_id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("ativo", true);
+      const ids = ((memb ?? []) as Array<{ user_id: string }>).map((m) => m.user_id);
+      if (!ids.length) { if (alive) setMembrosClinica([]); return; }
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("id, nome")
+        .in("id", ids);
+      const list = ((profs ?? []) as Array<{ id: string; nome: string | null }>)
+        .map((p) => ({ user_id: p.id, nome: p.nome || "(sem nome)" }))
+        .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+      if (alive) setMembrosClinica(list);
+    })();
+    return () => { alive = false; };
+  }, [clinicaAtual?.clinica_id]);
+
   // Calculos
   const saldoAtual = useMemo(() => {
     if (!minhaSessao) return 0;
@@ -817,6 +843,19 @@ function Page() {
     if (ehPagto && (movForma === "credito" || movForma === "debito") && !movBandeira) {
       toast.error("Selecione a bandeira do cartão"); return;
     }
+    const ehTransfer = openMov.tipo === "sangria" || openMov.tipo === "suprimento";
+    if (ehTransfer && !movDestinoUserId) {
+      toast.error(openMov.tipo === "sangria"
+        ? "Selecione a quem o dinheiro está sendo entregue"
+        : "Selecione de quem o dinheiro está sendo recebido");
+      return;
+    }
+    const destinoNome = ehTransfer
+      ? (membrosClinica.find((m) => m.user_id === movDestinoUserId)?.nome ?? null)
+      : null;
+    const sufixoDestino = ehTransfer && destinoNome
+      ? ` — ${openMov.tipo === "sangria" ? "Entregue a" : "Recebido de"}: ${destinoNome}`
+      : "";
     const sufixoCartao = ehPagto ? montarSufixoCartao(movForma, movBandeira, movParcelas) : "";
     setSaving(true);
     const { error } = await supabase.from("caixa_movimentos").insert({
@@ -825,16 +864,18 @@ function Page() {
       user_id: user.id,
       tipo: openMov.tipo,
       valor: v,
-      descricao: (movDesc || "") + sufixoCartao || null,
+      descricao: ((movDesc || "") + sufixoCartao + sufixoDestino) || null,
       forma_pagamento: ehPagto ? movForma : null,
+      destino_user_id: ehTransfer ? movDestinoUserId : null,
+      destino_nome: ehTransfer ? destinoNome : null,
     });
     setSaving(false);
     if (error) { mostrarErro(error); return; }
     setOpenMov(null);
     const tipoLancado = openMov.tipo;
-    const descLancada = (movDesc || "") + sufixoCartao;
+    const descLancada = (movDesc || "") + sufixoCartao + sufixoDestino;
     setMovValor(""); setMovDesc(""); setMovForma("dinheiro");
-    setMovBandeira(""); setMovParcelas("1");
+    setMovBandeira(""); setMovParcelas("1"); setMovDestinoUserId("");
     toast.success(`${TIPO_LABEL[tipoLancado]} registrada`);
     if (tipoLancado === "sangria" || tipoLancado === "suprimento") {
       printComprovanteCaixa({
@@ -843,6 +884,7 @@ function Page() {
         operadorNome: minhaSessao.user_nome || user.user_metadata?.nome || user.email || "Atendente",
         valor: v,
         descricao: descLancada || null,
+        destinoNome,
       });
     }
     void load();
@@ -1569,6 +1611,24 @@ function Page() {
               <Label>Descrição</Label>
               <Input value={movDesc} onChange={(e) => setMovDesc(e.target.value)} placeholder="Motivo / referência" />
             </div>
+            {openMov && (openMov.tipo === "sangria" || openMov.tipo === "suprimento") && (
+              <div>
+                <Label>{openMov.tipo === "sangria" ? "Entregue a *" : "Recebido de *"}</Label>
+                <Select value={movDestinoUserId} onValueChange={setMovDestinoUserId}>
+                  <SelectTrigger><SelectValue placeholder="Selecione o usuário..." /></SelectTrigger>
+                  <SelectContent>
+                    {membrosClinica.map((m) => (
+                      <SelectItem key={m.user_id} value={m.user_id}>{m.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  {openMov.tipo === "sangria"
+                    ? "Registre a quem o dinheiro está sendo entregue (ex.: financeiro, gestor)."
+                    : "Registre de quem o dinheiro está sendo recebido."}
+                </p>
+              </div>
+            )}
             {openMov && (openMov.tipo === "recebimento" || openMov.tipo === "despesa") && (
               <div>
                 <Label>Forma de pagamento</Label>
