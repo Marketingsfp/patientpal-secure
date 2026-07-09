@@ -436,7 +436,8 @@ function Page() {
             const contaMap = new Map(contas.map((c) => [c.id, c.nome]));
             const userMap = new Map(usuarios.map((u) => [u.id, u.nome]));
             exportToExcel(
-              items.map((l) => ({
+              items.map((l, idx) => ({
+                ficha: items.length - idx,
                 data: (l.data ? l.data.slice(8,10)+"/"+l.data.slice(5,7)+"/"+l.data.slice(0,4) : ""),
                 tipo: l.tipo,
                 descricao: l.descricao,
@@ -449,6 +450,7 @@ function Page() {
               })),
               `movimento-${fromDate}_a_${toDate}`,
               [
+                { key: "ficha", label: "Ficha" },
                 { key: "data", label: "Data" },
                 { key: "tipo", label: "Tipo" },
                 { key: "descricao", label: "Descrição" },
@@ -642,6 +644,7 @@ function Page() {
           <Table>
             <TableHeader><TableRow>
               <TableHead className="w-10"></TableHead>
+              <TableHead className="w-16">Ficha</TableHead>
               <TableHead>Data</TableHead>
               <TableHead>Descrição</TableHead>
               <TableHead>Usuário</TableHead>
@@ -649,7 +652,7 @@ function Page() {
               <TableHead className="text-right">Valor</TableHead>
               <TableHead className="w-32 text-right">Ações</TableHead>
             </TableRow></TableHeader>
-            <TableBody>{items.map((l) => {
+            <TableBody>{items.map((l, idx) => {
               const userMap = new Map(usuarios.map((u) => [u.id, u.nome]));
               return (
               <TableRow key={`${l.origem ?? "fin"}:${l.id}`}>
@@ -660,6 +663,7 @@ function Page() {
                       ? <ArrowUpCircle className="h-4 w-4 text-green-600" />
                       : <ArrowDownCircle className="h-4 w-4 text-red-600" />
                 }</TableCell>
+                <TableCell className="text-sm font-mono text-muted-foreground">{items.length - idx}</TableCell>
                 <TableCell className="text-sm">{(l.data ? l.data.slice(8,10)+"/"+l.data.slice(5,7)+"/"+l.data.slice(0,4) + (l.hora ? " " + l.hora : "") : "")}</TableCell>
                 <TableCell>{l.descricao}</TableCell>
                 <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{l.criado_por ? userMap.get(l.criado_por) ?? "—" : "—"}</TableCell>
