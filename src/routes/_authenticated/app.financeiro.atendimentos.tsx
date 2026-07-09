@@ -856,12 +856,29 @@ function Page() {
     setProcLaudo(lmap);
     const ids = ((m.data ?? []) as Medico[]).map((x) => x.id);
     if (ids.length) {
-      const { data: cv } = await supabase
-        .from("medico_convenios")
-        .select("medico_id, nome, tipo_repasse, percentual, valor, ativo")
-        .in("medico_id", ids)
-        .eq("ativo", true);
-      setConvenios((cv ?? []) as Convenio[]);
+      // Paginado: o PostgREST retorna no máximo 1000 linhas por chamada.
+      // Clínicas com muitos convênios cadastrados por médico ultrapassam
+      // esse teto e faziam alguns convênios sumirem do cálculo de repasse
+      // (caía no repasse padrão do médico). Buscamos em chunks até o fim.
+      const CHUNK = 1000;
+      const MAX = 50000; // salvaguarda
+      const acc: Convenio[] = [];
+      let offset = 0;
+      for (;;) {
+        const { data: cv, error: cvErr } = await supabase
+          .from("medico_convenios")
+          .select("medico_id, nome, tipo_repasse, percentual, valor, ativo")
+          .in("medico_id", ids)
+          .eq("ativo", true)
+          .range(offset, offset + CHUNK - 1);
+        if (cvErr) break;
+        const rows = (cv ?? []) as Convenio[];
+        acc.push(...rows);
+        if (rows.length < CHUNK) break;
+        offset += CHUNK;
+        if (offset >= MAX) break;
+      }
+      setConvenios(acc);
     } else {
       setConvenios([]);
     }
