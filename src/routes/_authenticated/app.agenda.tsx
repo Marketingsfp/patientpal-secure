@@ -1779,19 +1779,23 @@ function AgendaPage() {
     const ordenados = [...items].sort((a, b) => a.inicio.localeCompare(b.inicio));
     ordenados.forEach((a) => {
       const dia = a.inicio.slice(0, 10);
-      const fixa = (a as { ficha_numero?: number | null }).ficha_numero;
-      if (typeof fixa === "number" && fixa > 0) {
-        m.set(a.id, String(fixa).padStart(3, "0"));
-        return;
-      }
-      // Alinhado à GR: ignora slots livres na numeração dinâmica.
+      // Alinhado à GR: ignora slots livres na numeração dinâmica. Também é
+      // o que a impressão da guia faz ao filtrar "paciente_nome DISPONIVEL/
+      // BLOQUEIO" — sem paciente_id.
       if (isSlotLivre(a.paciente_nome) || !a.paciente_id) {
         return;
       }
       const chave = `${dia}__${a.agenda_id ?? a.medico_id ?? "sem-agenda"}`;
+      // IMPORTANTE: o contador sempre avança por posição — a GR calcula
+      // `idx + 1` sobre TODAS as fichas do dia/agenda, então o número exibido
+      // aqui precisa acompanhar essa mesma posição. Se o agendamento tem um
+      // `ficha_numero` congelado (da 1ª impressão), ele PREVALECE apenas na
+      // exibição — não pula a contagem, senão as fichas seguintes ficariam
+      // com número menor do que a GR imprime.
       const n = (contadores.get(chave) ?? 0) + 1;
       contadores.set(chave, n);
-      const num = n;
+      const fixa = (a as { ficha_numero?: number | null }).ficha_numero;
+      const num = typeof fixa === "number" && fixa > 0 ? fixa : n;
       m.set(a.id, String(num).padStart(3, "0"));
     });
     return m;
