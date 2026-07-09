@@ -3484,7 +3484,7 @@ function AgendaPage() {
                   fim: fmtHora(a.fim),
                   profissional: medicoNomeAgendamento(a),
                   paciente: a.paciente_nome,
-                  procedimento: a.procedimento ?? "CONSULTA",
+                  procedimento: a.procedimento ?? rotuloFallbackProc(a.medico_id),
                   status: a.status,
                   observacoes: a.observacoes ?? "",
                 })),
