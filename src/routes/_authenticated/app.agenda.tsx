@@ -4865,6 +4865,11 @@ function AgendaPage() {
                         <DropdownMenuItem onClick={() => imprimirComprovante(a)}>
                           <Printer className="h-4 w-4 mr-2" /> Comprovante de agendamento
                         </DropdownMenuItem>
+                        {!isSlotLivre(a.paciente_nome) && a.status !== "realizado" && (
+                          <DropdownMenuItem onClick={() => remove(a)}>
+                            <UserMinus className="h-4 w-4 mr-2 text-amber-600" /> Desmarcar paciente
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem onClick={() => {
                           const url = `${window.location.origin}/p/${(a as any).token_publico}`;
                           navigator.clipboard.writeText(url);
