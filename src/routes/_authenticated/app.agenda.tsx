@@ -1953,13 +1953,21 @@ function AgendaPage() {
     const procsResolvidos = await Promise.all(
       itens.map((it) => buscarProcedimentoPorNome(clinicaAtual.clinica_id, it.procedimento ?? "CONSULTA", procs)),
     );
-    for (const p of procsResolvidos as any[]) {
+    const pesos: Record<string, number> = {};
+    const rotulos: Record<string, string> = {};
+    (procsResolvidos as any[]).forEach((p, idx) => {
       const valorCartao = valorCartaoProcedimento(p);
-      totalDinheiro += primeiroValorValido(p?.valor_dinheiro, p?.valor_dinheiro_pix, p?.valor_padrao);
+      const valorDin = primeiroValorValido(p?.valor_dinheiro, p?.valor_dinheiro_pix, p?.valor_padrao);
+      totalDinheiro += valorDin;
       totalPix      += valorCartao;
       totalDebito   += valorCartao;
       totalCredito  += valorCartao;
-    }
+      // Peso p/ rateio: prioriza valor de cartão (cheio); se 0, usa dinheiro.
+      pesos[itens[idx].id] = valorCartao > 0 ? valorCartao : valorDin;
+      rotulos[itens[idx].id] = itens[idx].procedimento ?? "CONSULTA";
+    });
+    setPagamentoPesos(pesos);
+    setPagamentoRotulos(rotulos);
     const paciente = itens[0].paciente_nome;
     const desc = `${paciente} — ${itens.map(i => (i.procedimento ?? "CONSULTA")).join(" + ")} (${itens.length} serviços)`;
     const opcoes: FormaOpcao[] = [
