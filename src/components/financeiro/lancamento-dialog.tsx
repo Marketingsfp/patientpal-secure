@@ -684,11 +684,9 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
               <CurrencyInput
                 value={valor}
                 onChange={setValor}
-                disabled={!!initialValor}
-                readOnly={!!initialValor}
               />
               {!!initialValor && (
-                <p className="text-xs text-muted-foreground">Definido pelo serviço</p>
+                <p className="text-xs text-muted-foreground">Sugerido pelo serviço — editável</p>
               )}
             </div>
             <div className="space-y-1.5">
