@@ -512,16 +512,20 @@ function Page() {
     procNome: string | null,
     descricao?: string | null,
   ): { total: number; repasse: number } => {
+    const DBG = typeof procNome === "string" && /preventivo/i.test(procNome);
     if (!medicoId) return { total: totalPago, repasse: 0 };
     const med = medicos.find((m) => m.id === medicoId);
+    if (DBG) console.log("[repasse-dbg]", { procNome, medicoId, totalPago, descricao, medFound: !!med, conveniosLen: convenios.length, sample: convenios.filter(c=>c.medico_id===medicoId).map(c=>({nome:c.nome, valor:c.valor, tipo:c.tipo_repasse})) });
     // Cartão Consulta: o paciente paga um valor reduzido (ex.: R$ 9,99) e o
     // repasse ao médico é o cb_valor_repasse cadastrado (não o valor do
     // convênio particular). Detecta pela descrição do lançamento.
     if (isCartaoConsultaDesc(descricao) && med?.aceita_cartao_beneficios) {
       if (med.cb_tipo_repasse === "valor" && med.cb_valor_repasse != null) {
+        if (DBG) console.log("[repasse-dbg] path=cb-valor", med.cb_valor_repasse);
         return { total: totalPago, repasse: Number(med.cb_valor_repasse) };
       }
       if (med.cb_tipo_repasse === "percentual" && med.cb_percentual_repasse != null) {
+        if (DBG) console.log("[repasse-dbg] path=cb-percentual", med.cb_percentual_repasse);
         return {
           total: totalPago,
           repasse: +((totalPago * Number(med.cb_percentual_repasse)) / 100).toFixed(2),
@@ -531,9 +535,11 @@ function Page() {
     // 1) Procura convênio cadastrado pelo nome do procedimento (independente de ter pagamento)
     if (procNome) {
       const variants = procVariants(procNome);
+      if (DBG) console.log("[repasse-dbg] variants", variants);
       let c: Convenio | undefined;
       for (const alvo of variants) {
         c = convenios.find((cv) => cv.medico_id === medicoId && norm(cv.nome) === alvo);
+        if (DBG) console.log("[repasse-dbg] try", alvo, "→", c?.nome);
         if (c) break;
       }
       // Fallback: repasse por categoria (__CAT__:<TIPO>) usando o tipo do procedimento
