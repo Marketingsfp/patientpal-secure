@@ -171,21 +171,22 @@ function Page() {
     if (!lanc) {
       return { executado: false, resposta: "Aprovado manualmente (lançamento não encontrado)" };
     }
-    // Pré-checagens equivalentes ao estornar() da aba Atendimentos
+    // Pré-checagens equivalentes ao estornar() da aba Atendimentos.
+    // "origem = agenda" corresponde a lançamentos com agendamento_id preenchido.
     const { data: atd } = await supabase
       .from("fin_atendimentos")
-      .select("id, origem, repasse_pago")
-      .eq("id", s.lancamento_id)
+      .select("id, repasse_pago")
+      .eq("lancamento_id", s.lancamento_id)
       .maybeSingle();
     if (atd?.repasse_pago) {
       toast.error("Repasse já pago — estorne o pagamento do repasse primeiro.");
       return null;
     }
-    if (atd && atd.origem !== "agenda") {
+    const agId = lanc.agendamento_id;
+    if (!agId) {
       toast.error("Apenas atendimentos vindos da agenda podem ser estornados.");
       return null;
     }
-    const agId = lanc.agendamento_id;
     if (!agId) {
       // Sem agendamento associado: apenas remove movimentos e lançamento.
       const { error: eMov } = await supabase
