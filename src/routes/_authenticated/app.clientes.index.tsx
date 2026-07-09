@@ -121,6 +121,7 @@ interface Paciente {
 
 function ClientesPage() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("clientes");
   const [items, setItems] = useState<Paciente[]>([]);
   const [totalPacientes, setTotalPacientes] = useState<number | null>(null);
   const [busca, setBusca] = useState(() => {
@@ -251,7 +252,9 @@ function ClientesPage() {
           >
             <Download className="h-4 w-4 mr-2" /> Exportar Excel
           </Button>
-          <Button onClick={() => setOpenNovo(true)}><Plus className="h-4 w-4 mr-2" /> Novo cliente</Button>
+          {podeEscrever && (
+            <Button onClick={() => setOpenNovo(true)}><Plus className="h-4 w-4 mr-2" /> Novo cliente</Button>
+          )}
         </div>
       </div>
 
@@ -319,11 +322,13 @@ function ClientesPage() {
                         <Eye className="h-4 w-4" />
                       </Link>
                     </Button>
-                    <Button asChild variant="ghost" size="icon" title="Editar cliente">
-                      <Link to="/app/clientes/$pacienteId/editar" params={{ pacienteId: p.id }}>
-                        <Pencil className="h-4 w-4" />
-                      </Link>
-                    </Button>
+                    {podeEscrever && (
+                      <Button asChild variant="ghost" size="icon" title="Editar cliente">
+                        <Link to="/app/clientes/$pacienteId/editar" params={{ pacienteId: p.id }}>
+                          <Pencil className="h-4 w-4" />
+                        </Link>
+                      </Button>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>
