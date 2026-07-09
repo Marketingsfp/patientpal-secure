@@ -3319,7 +3319,6 @@ function AgendaPage() {
         clinicaId: clinicaAtual.clinica_id,
         usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
         usuarioId: user?.id ?? null,
-        reimpressao: true,
         pagamento: pagamentoInfo,
       });
     } catch (err) {
