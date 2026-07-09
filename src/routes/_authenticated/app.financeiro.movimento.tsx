@@ -78,17 +78,52 @@ function Page() {
   };
   const loadResumo = async () => {
     if (!clinicaAtual) { setResumo({ r: 0, d: 0, saldo: 0, totalRows: 0 }); return; }
-    const { data, error } = await supabase.rpc("fin_resumo_periodo", {
-      p_clinica: clinicaAtual.clinica_id, p_ini: fromDate, p_fim: toDate,
-    });
-    if (error) { mostrarErro(error); return; }
+    // Sem filtro por usuário/tipo → usa RPC agregado (rápido).
+    if (filterUsuario === "todos" && filterTipo === "todos") {
+      const { data, error } = await supabase.rpc("fin_resumo_periodo", {
+        p_clinica: clinicaAtual.clinica_id, p_ini: fromDate, p_fim: toDate,
+      });
+      if (error) { mostrarErro(error); return; }
+      let r = 0, d = 0, totalRows = 0;
+      for (const row of (data ?? []) as Array<{ tipo: string; status: string; qtd: number; total: number }>) {
+        totalRows += Number(row.qtd) || 0;
+        if (row.status === "cancelado") continue;
+        if (filterStatus !== "todos" && row.status !== filterStatus) continue;
+        if (row.tipo === "receita") r += Number(row.total) || 0;
+        else if (row.tipo === "despesa") d += Number(row.total) || 0;
+      }
+      setResumo({ r, d, saldo: r - d, totalRows });
+      return;
+    }
+    // Com filtros → agrega no cliente sobre as linhas filtradas.
     let r = 0, d = 0, totalRows = 0;
-    for (const row of (data ?? []) as Array<{ tipo: string; status: string; qtd: number; total: number }>) {
-      totalRows += Number(row.qtd) || 0;
-      if (row.status === "cancelado") continue;
-      if (filterStatus !== "todos" && row.status !== filterStatus) continue;
-      if (row.tipo === "receita") r += Number(row.total) || 0;
-      else if (row.tipo === "despesa") d += Number(row.total) || 0;
+    const CHUNK = 1000;
+    let offset = 0;
+    for (;;) {
+      let q = supabase.from("fin_lancamentos")
+        .select("tipo,status,valor")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .gte("data", fromDate).lte("data", toDate)
+        .range(offset, offset + CHUNK - 1);
+      if (filterTipo !== "todos") q = q.eq("tipo", filterTipo);
+      if (filterUsuario !== "todos") {
+        if (filterUsuario === "sem") q = q.is("criado_por", null);
+        else q = q.eq("criado_por", filterUsuario);
+      }
+      const { data, error } = await q;
+      if (error) { mostrarErro(error); return; }
+      const rows = (data ?? []) as Array<{ tipo: string; status: string; valor: number | string | null }>;
+      for (const row of rows) {
+        totalRows += 1;
+        if (row.status === "cancelado") continue;
+        if (filterStatus !== "todos" && row.status !== filterStatus) continue;
+        const v = Number(row.valor) || 0;
+        if (row.tipo === "receita") r += v;
+        else if (row.tipo === "despesa") d += v;
+      }
+      if (rows.length < CHUNK) break;
+      offset += CHUNK;
+      if (offset > 20000) break; // salvaguarda
     }
     setResumo({ r, d, saldo: r - d, totalRows });
   };
