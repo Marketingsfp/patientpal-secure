@@ -1070,10 +1070,10 @@ function Page() {
 
   const isAtendido = (a: Atend) =>
     a.origem === "manual" ? a.status === "realizado" : a.agendamento_status === "realizado";
-  // Itens selecionáveis: para pagar repasse (não pagos + atendidos) OU para 2ª via (já pagos).
-  const selectables = filteredItems.filter(
-    (a) => ((a.repasse_pago || (!a.repasse_pago && isAtendido(a))) && (a.valor_medico ?? 0) > 0),
-  );
+  // Itens selecionáveis: qualquer atendimento com repasse > 0.
+  // As ações do topo validam individualmente o que cada uma aceita
+  // (baixa em lote, pagar repasse, 2ª via).
+  const selectables = filteredItems.filter((a) => (a.valor_medico ?? 0) > 0);
   const allSelected = selectables.length > 0 && selectables.every((a) => sel.has(`${a.origem}:${a.id}`));
   const toggleAll = () => {
     if (allSelected) setSel(new Set());
@@ -1090,6 +1090,9 @@ function Page() {
   const selectedTotal = selectedItems.reduce((s, a) => s + (Number(a.valor_medico) || 0), 0);
   const selectedPagos = selectedItems.filter((a) => a.repasse_pago);
   const selectedNaoPagos = selectedItems.filter((a) => !a.repasse_pago);
+  const selectedNaoBaixados = selectedItems.filter(
+    (a) => !a.repasse_pago && !isAtendido(a),
+  );
   const podePagar = selectedItems.length > 0 && selectedNaoPagos.length === selectedItems.length;
   const podeReimprimir = selectedItems.length > 0 && selectedPagos.length === selectedItems.length;
   const misturado = selectedItems.length > 0 && selectedPagos.length > 0 && selectedNaoPagos.length > 0;
