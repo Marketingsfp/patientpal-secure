@@ -391,22 +391,28 @@ function Page() {
   // às movimentações atuais para trocar o botão pelo rótulo
   // "Aguardando aprovação" quando o financeiro ainda não decidiu.
   const reloadEstornosPendentes = useCallback(async () => {
-    if (!clinicaAtual) { setEstornosPendentes(new Set()); return; }
+    if (!clinicaAtual) { setEstornosPorLanc(new Map()); return; }
     const ids = Array.from(new Set(
       minhasMovs.map((m) => m.lancamento_id).filter((x): x is string => !!x),
     ));
-    if (ids.length === 0) { setEstornosPendentes(new Set()); return; }
+    if (ids.length === 0) { setEstornosPorLanc(new Map()); return; }
     const { data } = await supabase
       .from("estorno_solicitacoes")
       .select("lancamento_id, status")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .in("lancamento_id", ids)
-      .eq("status", "pendente");
-    const set = new Set<string>();
-    for (const r of (data ?? []) as Array<{ lancamento_id: string | null }>) {
-      if (r.lancamento_id) set.add(r.lancamento_id);
+      .in("status", ["pendente", "aprovado"]);
+    const map = new Map<string, "pendente" | "aprovado">();
+    for (const r of (data ?? []) as Array<{ lancamento_id: string | null; status: string }>) {
+      if (!r.lancamento_id) continue;
+      // pendente prevalece sobre aprovado caso ambos existam
+      const prev = map.get(r.lancamento_id);
+      if (prev === "pendente") continue;
+      if (r.status === "pendente" || r.status === "aprovado") {
+        map.set(r.lancamento_id, r.status);
+      }
     }
-    setEstornosPendentes(set);
+    setEstornosPorLanc(map);
   }, [clinicaAtual, minhasMovs]);
 
   useEffect(() => {
