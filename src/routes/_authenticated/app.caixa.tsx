@@ -843,6 +843,19 @@ function Page() {
     if (ehPagto && (movForma === "credito" || movForma === "debito") && !movBandeira) {
       toast.error("Selecione a bandeira do cartão"); return;
     }
+    const ehTransfer = openMov.tipo === "sangria" || openMov.tipo === "suprimento";
+    if (ehTransfer && !movDestinoUserId) {
+      toast.error(openMov.tipo === "sangria"
+        ? "Selecione a quem o dinheiro está sendo entregue"
+        : "Selecione de quem o dinheiro está sendo recebido");
+      return;
+    }
+    const destinoNome = ehTransfer
+      ? (membrosClinica.find((m) => m.user_id === movDestinoUserId)?.nome ?? null)
+      : null;
+    const sufixoDestino = ehTransfer && destinoNome
+      ? ` — ${openMov.tipo === "sangria" ? "Entregue a" : "Recebido de"}: ${destinoNome}`
+      : "";
     const sufixoCartao = ehPagto ? montarSufixoCartao(movForma, movBandeira, movParcelas) : "";
     setSaving(true);
     const { error } = await supabase.from("caixa_movimentos").insert({
@@ -851,16 +864,18 @@ function Page() {
       user_id: user.id,
       tipo: openMov.tipo,
       valor: v,
-      descricao: (movDesc || "") + sufixoCartao || null,
+      descricao: ((movDesc || "") + sufixoCartao + sufixoDestino) || null,
       forma_pagamento: ehPagto ? movForma : null,
+      destino_user_id: ehTransfer ? movDestinoUserId : null,
+      destino_nome: ehTransfer ? destinoNome : null,
     });
     setSaving(false);
     if (error) { mostrarErro(error); return; }
     setOpenMov(null);
     const tipoLancado = openMov.tipo;
-    const descLancada = (movDesc || "") + sufixoCartao;
+    const descLancada = (movDesc || "") + sufixoCartao + sufixoDestino;
     setMovValor(""); setMovDesc(""); setMovForma("dinheiro");
-    setMovBandeira(""); setMovParcelas("1");
+    setMovBandeira(""); setMovParcelas("1"); setMovDestinoUserId("");
     toast.success(`${TIPO_LABEL[tipoLancado]} registrada`);
     if (tipoLancado === "sangria" || tipoLancado === "suprimento") {
       printComprovanteCaixa({
