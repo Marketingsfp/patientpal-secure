@@ -182,7 +182,7 @@ function Page() {
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [optsReady, setOptsReady] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
-  const [payForm, setPayForm] = useState({ data: hoje, conta_id: "", forma_pagamento: "" });
+  const [payForm, setPayForm] = useState({ data: hoje, conta_id: "", forma_pagamento: "", valor_manual: "" });
   // Comprovante de pagamento de repasse (para impressão)
   type CompItem = { data: string; medico: string; paciente: string; servico: string; valorMedico: number; pagoEm: string | null; pagoHora: string | null };
   type Comprovante = {
@@ -1162,7 +1162,7 @@ function Page() {
       toast.info("Selecione ao menos um atendimento.");
       return;
     }
-    setPayForm({ data: hoje, conta_id: contas[0]?.id ?? "", forma_pagamento: "" });
+    setPayForm({ data: hoje, conta_id: contas[0]?.id ?? "", forma_pagamento: "", valor_manual: "" });
     setPayOpen(true);
   };
 
@@ -1216,8 +1216,17 @@ function Page() {
         if (!byMed.has(k)) byMed.set(k, []);
         byMed.get(k)!.push(a);
       }
+      // Valor manual (override). Só aplicável quando o pagamento é para
+      // um único médico — se houver mais de um, mostramos aviso e
+      // ignoramos o override para não desbalancear repasses de outros.
+      const valorManualNum = Number((payForm.valor_manual ?? "").toString().replace(",", "."));
+      const usarValorManual = valorManualNum > 0 && byMed.size === 1;
+      if (valorManualNum > 0 && byMed.size > 1) {
+        toast.warning("Valor manual ignorado: selecione atendimentos de apenas um médico para editar o valor do repasse.");
+      }
       for (const [medId, list] of byMed) {
-        const total = list.reduce((s, x) => s + (Number(x.valor_medico) || 0), 0);
+        const totalCalc = list.reduce((s, x) => s + (Number(x.valor_medico) || 0), 0);
+        const total = usarValorManual ? valorManualNum : totalCalc;
         if (total <= 0) continue;
         const nowIso = new Date().toISOString();
         const medNome = medId !== "sem" ? (medMap.get(medId) ?? "") : "—";
@@ -1259,6 +1268,32 @@ function Page() {
         if (agendaIds.length) {
           const { error } = await supabase.from("fin_lancamentos").update(upd).in("id", agendaIds);
           if (error) throw error;
+        }
+        // Se usamos valor manual, ajusta o valor_medico de cada atendimento
+        // MANUAL proporcionalmente para que o comprovante e o total pago
+        // batam. Para atendimentos de agenda o valor_medico é derivado das
+        // regras de repasse e não é persistido nessa tabela — o total
+        // manual já foi gravado no lançamento de despesa acima.
+        if (usarValorManual) {
+          const centavosAlvo = Math.round(total * 100);
+          const base = totalCalc > 0 ? totalCalc : list.length;
+          let acumulado = 0;
+          for (let i = 0; i < list.length; i++) {
+            const item = list[i];
+            let valorItem: number;
+            if (i === list.length - 1) {
+              valorItem = Math.max(0, (centavosAlvo - acumulado) / 100);
+            } else {
+              const peso = totalCalc > 0 ? (Number(item.valor_medico) || 0) / base : 1 / base;
+              const cents = Math.round(centavosAlvo * peso);
+              acumulado += cents;
+              valorItem = cents / 100;
+            }
+            item.valor_medico = valorItem;
+            if (item.origem === "manual") {
+              await supabase.from("fin_atendimentos").update({ valor_medico: valorItem }).eq("id", item.id);
+            }
+          }
         }
       }
       toast.success("Repasses pagos com sucesso");
@@ -1990,6 +2025,20 @@ function Page() {
             <div className="rounded-md border bg-muted/40 p-3 text-sm flex justify-between">
               <span>{selectedItems.length} atendimento(s)</span>
               <span className="font-semibold text-primary">{fmt(selectedTotal)}</span>
+            </div>
+            <div className="space-y-2">
+              <Label>Valor do repasse (opcional)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder={`Padrão: ${fmt(selectedTotal)}`}
+                value={payForm.valor_manual}
+                onChange={(e) => setPayForm({ ...payForm, valor_manual: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground">
+                Deixe em branco para usar o valor calculado. Para alterar manualmente, selecione atendimentos de apenas um médico.
+              </p>
             </div>
             <div className="space-y-2">
               <Label>Data do pagamento</Label>
