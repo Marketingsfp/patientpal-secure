@@ -2606,7 +2606,8 @@ function AgendaPage() {
         .map((p) => procedimentoFormulario(form.medico_id, p).trim())
         .filter(Boolean),
     ));
-    if (procedimentosParaSalvar.length === 0) { toast.error("Selecione o serviço"); return; }
+    // Serviço é opcional — quando não informado, o agendamento é salvo sem
+    // procedimento e a cobrança pode ser feita via "Valor manual".
     const procedimentoTexto = procedimentosParaSalvar.join(" + ");
     const multiExamesModo = procedimentosParaSalvar.length > 1
       ? (medicoEhLaboratorioFormulario(form.medico_id) ? "laboratorio" : "imagem")
@@ -3096,9 +3097,25 @@ function AgendaPage() {
     requestAnimationFrame(() => setFormaPagOpen(false));
   };
 
+  // Pagamento com valor manual: abre o diálogo de lançamento com valor vazio
+  // e sem forma pré-selecionada, permitindo ao usuário digitar livremente.
+  const escolherManual = () => {
+    if (!formaPagCtx) return;
+    const ids = formaPagCtx.agId.split(",").filter(Boolean);
+    const principal = ids[0] ?? null;
+    const extras = ids.slice(1);
+    setPagamentoDesc(`${descricaoComDesconto(formaPagCtx.desc)} — valor manual`);
+    setPagamentoValor("");
+    setPagamentoForma("");
+    setPagamentoAgId(principal);
+    setPagamentoExtraIds(extras);
+    setPagamentoOpen(true);
+    requestAnimationFrame(() => setFormaPagOpen(false));
+  };
+
   // Atalhos de teclado no diálogo "Forma de pagamento":
-  // 1=Dinheiro, 2=PIX, 3=Débito, 4=Crédito, 5=Mais de uma forma
-  // (segue a ordem exibida em formaPagOpcoes; tecla 5 = misto).
+  // 1=Dinheiro, 2=PIX, 3=Débito, 4=Crédito, 5=Mais de uma forma, 6=Valor manual
+  // (segue a ordem exibida em formaPagOpcoes; tecla N+1 = misto, N+2 = manual).
   useEffect(() => {
     if (!formaPagOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -3112,6 +3129,9 @@ function AgendaPage() {
         } else if (idx === formaPagOpcoes.length) {
           e.preventDefault();
           escolherMisto();
+        } else if (idx === formaPagOpcoes.length + 1) {
+          e.preventDefault();
+          escolherManual();
         }
       }
     };
@@ -3911,6 +3931,14 @@ function AgendaPage() {
             >
               <kbd className="inline-flex h-6 w-6 items-center justify-center rounded border border-primary-foreground/40 bg-primary-foreground/10 text-xs font-mono mr-2">{formaPagOpcoes.length + 1}</kbd>
               💰 Mais de uma forma de pagamento
+            </Button>
+            <Button
+              variant="secondary"
+              className="justify-center h-12"
+              onClick={escolherManual}
+            >
+              <kbd className="inline-flex h-6 w-6 items-center justify-center rounded border bg-muted text-xs font-mono mr-2">{formaPagOpcoes.length + 2}</kbd>
+              ✏️ Valor manual
             </Button>
           </div>
         </DialogContent>
