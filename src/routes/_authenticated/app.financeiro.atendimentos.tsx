@@ -1909,16 +1909,38 @@ function Page() {
               <Wallet className="h-4 w-4 mr-2" />
               Pagar repasse{selectedNaoPagos.length ? ` (${selectedNaoPagos.length})` : ""}
             </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={reimprimirSelecionados}
-              disabled={!podeReimprimir}
-              title={misturado ? "Selecione apenas atendimentos JÁ pagos" : undefined}
-            >
-              <Printer className="h-4 w-4 mr-2" />
-              Imprimir 2ª via{selectedPagos.length ? ` (${selectedPagos.length})` : ""}
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="outline">
+                  <MoreHorizontal className="h-4 w-4 mr-2" />
+                  Opções
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuItem
+                  disabled={selectedNaoBaixados.length === 0}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    if (selectedNaoBaixados.length > 0) darBaixaLote();
+                  }}
+                >
+                  <CheckCircle2 className="h-4 w-4 mr-2 text-emerald-600" />
+                  Dar baixa
+                  {selectedNaoBaixados.length ? ` (${selectedNaoBaixados.length})` : ""}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={!podeReimprimir}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    if (podeReimprimir) reimprimirSelecionados();
+                  }}
+                >
+                  <Printer className="h-4 w-4 mr-2" />
+                  Imprimir 2ª via
+                  {selectedPagos.length ? ` (${selectedPagos.length})` : ""}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button size="sm" variant="ghost" onClick={() => setSel(new Set())}>
               Limpar
             </Button>
