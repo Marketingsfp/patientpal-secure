@@ -5409,7 +5409,7 @@ function FragmentDayHeader({ dia, fmtCabecalho }: { dia: string; fmtCabecalho: (
 }
 
 function FragmentDayCell({
-  ag, dia, hi, onSlotClick, onAgClick, fmtHora, corStatus, estornoPend, ocultarPaciente,
+  ag, dia, hi, onSlotClick, onAgClick, fmtHora, corStatus, estornoPend, ocultarPaciente, procedimentoFallback,
 }: {
   ag: Agendamento | undefined;
   dia: string;
@@ -5420,6 +5420,7 @@ function FragmentDayCell({
   corStatus: (s: Status) => string;
   estornoPend: boolean;
   ocultarPaciente: boolean;
+  procedimentoFallback?: string;
 }) {
   const ehLivre = ag && isSlotLivre(ag.paciente_nome);
   return (
@@ -5451,7 +5452,7 @@ function FragmentDayCell({
             title={
               estornoPend
                 ? "Estorno solicitado — aguardando decisão do financeiro"
-                : `${ag.paciente_nome} — ${ag.procedimento ?? "CONSULTA"}`
+                : `${ag.paciente_nome} — ${procedimentoFallback ?? ag.procedimento ?? "CONSULTA"}`
             }
           >
             {ehLivre
