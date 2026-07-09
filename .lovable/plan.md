@@ -1,43 +1,27 @@
 ## Diagnóstico
 
-Na tela **Serviços** os 15 exames de glicose aparecem como "Laboratório" porque o cadastro usa a coluna `tipo_procedimento = 'laboratorio'` (e/ou `grupo = 'Laboratório'`) do próprio procedimento.
-
-Já a busca de serviços dentro do orçamento (quando a categoria é "Laboratório") **filtra por uma fonte diferente**: a tabela de vínculos `procedimento_especialidades` — que na prática está quase vazia. Só **1 dos 15 exames de glicose** está vinculado por lá:
+A pré-carga de `labProcIds` no diálogo de Novo Orçamento agora inclui **~4.470 procedimentos** (todos com `tipo_procedimento='laboratorio'` ou `grupo ILIKE '%labor%'`, união feita em memória). Ao pesquisar "glicose" em categoria Laboratório, a busca faz:
 
 ```
-GLICOSE (BIOQUIMICA)                        →  sem vínculo
-GLICOSE (URINA 24H)                         →  sem vínculo
-GLICOSE 2H, BASAL, CURVA, SERUM, ...        →  sem vínculo
-...
-TESTE TOLERANCIA A GLICOSE                  →  LABORATORIO  ← único que aparece
+q.in("id", ids)  // ids.length ≈ 4470
 ```
 
-Por isso o orçamento em modo Laboratório só mostra "TESTE TOLERANCIA A GLICOSE".
-
-O `tipo_procedimento`/`grupo` está preenchido corretamente em todos os 15 — é a fonte que o cadastro respeita. O erro é o orçamento **ignorar** essa fonte.
-
----
+O PostgREST recebe uma URL com ~165KB, muito acima do limite (nginx/Cloudflare rejeitam), então a request falha e o `data` volta vazio — nenhum exame de glicose aparece. É regressão da correção anterior: enquanto `procedimento_especialidades` tinha 18 linhas, o `in()` cabia; após adicionar a união com `tipo_procedimento`, estourou.
 
 ## Correção
 
-Ajustar o filtro de busca de serviços no diálogo **Novo Orçamento** (`src/routes/_authenticated/app.orcamentos.tsx`) para usar a mesma classificação que o cadastro:
+Em `src/routes/_authenticated/app.orcamentos.tsx` (busca de procedimentos, linhas ~614–731):
 
-- Categoria **Laboratório**: incluir procedimentos onde `tipo_procedimento = 'laboratorio'` **OU** cujo id esteja em `procedimento_especialidades` vinculado à especialidade LABORATORIO. União dos dois critérios, sem excluir nada.
-- Categoria **Demais Serviços**: excluir esse mesmo conjunto (todos que não caem em Laboratório).
+1. **Remover o prefetch** `labProcIds` e o estado associado. Passa a ser desnecessário.
+2. **Aplicar o filtro de categoria direto na query de busca** (PostgREST combina múltiplos `.or()` como AND):
+   - Categoria `laboratorio`: `q.or("tipo_procedimento.eq.laboratorio,grupo.ilike.%labor%")`.
+   - Categoria `demais`: `q.not("tipo_procedimento","eq","laboratorio").not("grupo","ilike","%labor%")` (registros com `grupo` nulo continuam aparecendo, pois `not ilike` inclui NULL como não-match).
+3. **Manter o filtro de nome** como está (`.or("nome.ilike.%q%,nome.ilike.%norm%")`) — combinado com o `.or()` de categoria fica: `(nome match) AND (categoria match)`.
+4. Remover o guard `if (categoria && labProcIds == null) return;` e a dependência `labProcIds` do `useEffect`.
 
-Implementação:
-
-- Substituir o filtro atual (`q.in("id", labProcIds)` / `q.not("id","in", ...)`) por uma consulta que combine:
-  1. IDs da união `procedimento_especialidades` **∪** `procedimentos.tipo_procedimento = 'laboratorio'`.
-  2. Aplicar `.in("id", uniao)` para Laboratório ou `.not("id","in", uniao)` para Demais.
-- Como o `useEffect` de carga inicial (linhas 615–631) só busca `procedimento_especialidades`, ele passará a buscar também os ids com `tipo_procedimento = 'laboratorio'` e fará a união em memória, guardando o `Set<string>` unificado em `labProcIds`.
-- Nenhuma mudança na UI, nenhum backfill de dados, nenhuma migration. Após o ajuste, ao pesquisar "glicose" no orçamento (categoria Laboratório) aparecem os 15 exames.
-
-Efeito colateral positivo: se no futuro cadastrarem novos exames com `tipo_procedimento = 'laboratorio'` (o padrão do cadastro), eles aparecerão automaticamente no orçamento sem precisar mexer em `procedimento_especialidades`.
-
----
+Efeito: a busca passa a ser executada 100% no banco, sem prefetch nem lista gigante de IDs. Os 15 exames de glicose voltam a aparecer, e a busca fica mais rápida. Alinhado com a fonte de verdade usada pelo cadastro de Serviços.
 
 ## Fora do escopo
 
-- Não vamos "backfillar" `procedimento_especialidades` — a fonte de verdade que o restante do sistema já usa é `tipo_procedimento`/`grupo`, e a UI de cadastro grava por lá.
-- Não mexer no picker da agenda / atendimento múltiplo / caixa (o problema foi reportado só no Orçamento).
+- Não mexer em `procedimento_especialidades` — o cadastro de Serviços grava a classificação em `tipo_procedimento`/`grupo`, então essa é a fonte usada.
+- Não alterar nenhuma outra tela (agenda, caixa, atendimento).
