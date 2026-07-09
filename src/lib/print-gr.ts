@@ -103,6 +103,41 @@ const VIA_CSS = `
   @media print { .via-wrap { break-after: page; } .via-wrap:last-child { break-after: auto; } }
 `;
 
+// CSS base compartilhado pelos três layouts de GR (individual, agrupada e mensalidade).
+// - Tudo em negrito (font-weight: 700) para legibilidade em impressoras térmicas.
+// - word-break/overflow-wrap para nomes/procedimentos longos não estourarem a largura útil do papel 80mm.
+// - .row usa grid em vez de flex para o valor à direita nunca ser cortado.
+const BASE_CSS = `
+  @page { size: 80mm auto; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #fff; color: #000; }
+  body {
+    font-family: "Courier New", "Consolas", monospace;
+    font-size: 11pt;
+    line-height: 1.3;
+    font-weight: 700;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+  .ticket { width: 76mm; max-width: 100%; padding: 3mm 2mm 6mm; }
+  .center { text-align: center; }
+  .right  { text-align: right; }
+  .bold   { font-weight: 700; }
+  .sm     { font-size: 9pt; font-weight: 700; }
+  .lg     { font-size: 14pt; font-weight: 700; }
+  .sep    { border-top: 1px dashed #000; margin: 6px 0; }
+  .row    { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px; align-items: baseline; }
+  .row > * { min-width: 0; }
+  .row .right { justify-self: end; }
+  table   { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  td      { padding: 1px 0; vertical-align: top; word-break: break-word; overflow-wrap: anywhere; }
+  .label  { color: #000; font-weight: 700; }
+  .v      { font-weight: 700; }
+  .qtd    { width: 10mm; }
+  h1, h2, h3 { margin: 0; }
+  ${VIA_CSS}
+`;
+
 // Imprime o HTML diretamente via iframe oculto — sem abrir nova janela.
 // O navegador ainda exibirá a caixa de diálogo de impressão padrão (não há
 // como suprimi-la sem modo quiosque), mas não há mais a tela intermediária.
@@ -458,21 +493,21 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     <div class="sep"></div>
 
     <table>
-      <tr><td class="label" colspan="2" style="white-space:nowrap">FICHA: <span class="v">${ficha}</span></td></tr>
-      <tr><td class="label" colspan="2" style="white-space:nowrap">PROFISSIONAL: <span class="v">${esc(medicoNome)}</span></td></tr>
-      <tr><td class="label" colspan="2" style="white-space:nowrap">HORÁRIO: <span class="v">${fmtData(a.inicio)}</span></td></tr>
-      ${usuarioFinalNome ? `<tr><td class="label" colspan="2" style="white-space:nowrap">USUÁRIO: <span class="v">${esc(usuarioFinalNome)}</span></td></tr>` : ""}
+      <tr><td class="label" colspan="2">FICHA: <span class="v">${ficha}</span></td></tr>
+      <tr><td class="label" colspan="2">PROFISSIONAL: <span class="v">${esc(medicoNome)}</span></td></tr>
+      <tr><td class="label" colspan="2">HORÁRIO: <span class="v">${fmtData(a.inicio)}</span></td></tr>
+      ${usuarioFinalNome ? `<tr><td class="label" colspan="2">USUÁRIO: <span class="v">${esc(usuarioFinalNome)}</span></td></tr>` : ""}
     </table>
 
     <div class="sep"></div>
 
     <table>
       <tr class="bold">
-        <td style="width:14mm">QTD</td>
+        <td class="qtd">QTD</td>
         <td>SERVIÇO</td>
       </tr>
       <tr>
-        <td>1</td>
+        <td class="qtd">1</td>
         <td>${esc(procNome)}</td>
       </tr>
     </table>
@@ -517,24 +552,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
 <html lang="pt-BR"><head><meta charset="utf-8" />
 <title>GR - ${esc(paciente?.nome ?? a.paciente_nome)}</title>
 <style>
-  @page { size: 80mm auto; margin: 0; }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; background: #fff; color: #000; }
-  body { font-family: "Courier New", "Consolas", monospace; font-size: 11pt; line-height: 1.25; }
-  .ticket { width: 76mm; padding: 3mm 2mm 6mm; }
-  .center { text-align: center; }
-  .right  { text-align: right; }
-  .bold   { font-weight: 700; }
-  .sm     { font-size: 9pt; }
-  .lg     { font-size: 13pt; font-weight: 700; }
-  .sep    { border-top: 1px dashed #000; margin: 6px 0; }
-  .row    { display: flex; justify-content: space-between; gap: 6px; }
-  table   { width: 100%; border-collapse: collapse; }
-  td      { padding: 1px 0; vertical-align: top; }
-  .label  { color: #000; }
-  .v      { font-weight: 700; }
-  h1, h2, h3 { margin: 0; }
-  ${VIA_CSS}
+  ${BASE_CSS}
 </style></head>
 <body>
   ${corpoVias}
@@ -894,10 +912,10 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
         ${headerPaciente}
         <div class="sep"></div>
         <table>
-          <tr><td class="label" colspan="2" style="white-space:nowrap">FICHA: <span class="v">${ficha}</span></td></tr>
-          <tr><td class="label" colspan="2" style="white-space:nowrap">PROFISSIONAL: <span class="v">${esc(g.medicoNome)}</span></td></tr>
-          <tr><td class="label" colspan="2" style="white-space:nowrap">HORÁRIO: <span class="v">${fmtData(g.inicioRef)}</span></td></tr>
-          ${usuarioFinalNome ? `<tr><td class="label" colspan="2" style="white-space:nowrap">USUÁRIO: <span class="v">${esc(usuarioFinalNome)}</span></td></tr>` : ""}
+          <tr><td class="label" colspan="2">FICHA: <span class="v">${ficha}</span></td></tr>
+          <tr><td class="label" colspan="2">PROFISSIONAL: <span class="v">${esc(g.medicoNome)}</span></td></tr>
+          <tr><td class="label" colspan="2">HORÁRIO: <span class="v">${fmtData(g.inicioRef)}</span></td></tr>
+          ${usuarioFinalNome ? `<tr><td class="label" colspan="2">USUÁRIO: <span class="v">${esc(usuarioFinalNome)}</span></td></tr>` : ""}
         </table>
         <div class="sep"></div>
         <table>
@@ -942,26 +960,10 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
 <html lang="pt-BR"><head><meta charset="utf-8" />
 <title>GR - ${esc(pacienteNome)}</title>
 <style>
-  @page { size: 80mm auto; margin: 0; }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; background: #fff; color: #000; }
-  body { font-family: "Courier New", "Consolas", monospace; font-size: 11pt; line-height: 1.25; }
-  .ticket { width: 76mm; padding: 3mm 2mm 6mm; }
-  .center { text-align: center; }
-  .right  { text-align: right; }
-  .bold   { font-weight: 700; }
-  .sm     { font-size: 9pt; }
-  .lg     { font-size: 13pt; font-weight: 700; }
-  .sep    { border-top: 1px dashed #000; margin: 6px 0; }
-  .row    { display: flex; justify-content: space-between; gap: 6px; }
-  table   { width: 100%; border-collapse: collapse; }
-  td      { padding: 1px 0; vertical-align: top; }
-  .label  { color: #000; }
-  .v      { font-weight: 700; }
+  ${BASE_CSS}
   .cut    { width: 76mm; padding: 4mm 2mm; text-align: center; }
   .cut-line { border-top: 2px dashed #000; margin: 2mm 0; }
   .cut-label { font-size: 8pt; letter-spacing: 1px; }
-  ${VIA_CSS}
 </style></head>
 <body>
   ${corpoVias}
@@ -1111,7 +1113,7 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
       <tr><td class="label">CONTRATO:</td><td class="v right">#${contrato.numero}</td></tr>
       <tr><td class="label">PARCELA:</td><td class="v right">${m.numero_parcela}/${totalParcelas}</td></tr>
       <tr><td class="label">VENCIMENTO:</td><td class="v right">${fmtDataSimples(m.vencimento)}</td></tr>
-      ${usuarioFinalNome ? `<tr><td class="label" colspan="2" style="white-space:nowrap">USUÁRIO: <span class="v">${esc(usuarioFinalNome)}</span></td></tr>` : ""}
+      ${usuarioFinalNome ? `<tr><td class="label" colspan="2">USUÁRIO: <span class="v">${esc(usuarioFinalNome)}</span></td></tr>` : ""}
     </table>
 
     <div class="sep"></div>
@@ -1159,23 +1161,7 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
 <html lang="pt-BR"><head><meta charset="utf-8" />
 <title>GR - ${esc(tituloPac)}</title>
 <style>
-  @page { size: 80mm auto; margin: 0; }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; background: #fff; color: #000; }
-  body { font-family: "Courier New", "Consolas", monospace; font-size: 11pt; line-height: 1.25; }
-  .ticket { width: 76mm; padding: 3mm 2mm 6mm; }
-  .center { text-align: center; }
-  .right  { text-align: right; }
-  .bold   { font-weight: 700; }
-  .sm     { font-size: 9pt; }
-  .lg     { font-size: 13pt; font-weight: 700; }
-  .sep    { border-top: 1px dashed #000; margin: 6px 0; }
-  .row    { display: flex; justify-content: space-between; gap: 6px; }
-  table   { width: 100%; border-collapse: collapse; }
-  td      { padding: 1px 0; vertical-align: top; }
-  .label  { color: #000; }
-  .v      { font-weight: 700; }
-  ${VIA_CSS}
+  ${BASE_CSS}
 </style></head>
 <body>
   ${corpoVias}
