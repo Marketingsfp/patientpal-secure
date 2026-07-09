@@ -240,6 +240,10 @@ function Page() {
   const [minhaSessao, setMinhaSessao] = useState<Sessao | null>(null);
   const [minhasMovs, setMinhasMovs] = useState<Mov[]>([]);
   const [minhasSessoes, setMinhasSessoes] = useState<Sessao[]>([]);
+  // Solicitações de estorno pendentes vinculadas às movimentações visíveis
+  // (chave = lancamento_id). Usado para trocar o botão "Solicitar estorno"
+  // por "Aguardando aprovação" quando o financeiro ainda não respondeu.
+  const [estornosPendentes, setEstornosPendentes] = useState<Set<string>>(new Set());
   // Filtro de período para "Movimentos" (padrão: hoje)
   type PeriodoFiltro = "hoje" | "semana" | "quinzena" | "mes" | "intervalo" | "todos";
   const [meuPeriodo, setMeuPeriodo] = useState<PeriodoFiltro>("hoje");
