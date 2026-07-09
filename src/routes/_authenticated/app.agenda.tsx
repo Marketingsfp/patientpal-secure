@@ -191,74 +191,10 @@ async function buscarProcedimentoPorNome(
   return proc ?? escolhido ?? null;
 }
 
-// Cache em memória de procedimentos da clínica (com valores) para acelerar
-// o diálogo de pagamento. TTL curto: 60s. Invalida automaticamente.
-type ProcComValor = {
-  nome: string;
-  valor_dinheiro: number | null;
-  valor_pix: number | null;
-  valor_padrao: number | null;
-  valor_cartao: number | null;
-  valor_cartao_credito: number | null;
-  valor_cartao_debito: number | null;
-  valor_dinheiro_pix: number | null;
-};
-const _procsCache = new Map<string, { ts: number; data: ProcComValor[] }>();
-const PROCS_TTL_MS = 60_000;
-async function getProcedimentosComValor(clinicaId: string): Promise<ProcComValor[]> {
-  const cached = _procsCache.get(clinicaId);
-  if (cached && Date.now() - cached.ts < PROCS_TTL_MS) return cached.data;
-  const { data } = await supabase
-    .from("procedimentos")
-    .select("nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix")
-    .eq("clinica_id", clinicaId)
-    .eq("ativo", true)
-    .limit(5000);
-  const rows = (data ?? []) as ProcComValor[];
-  _procsCache.set(clinicaId, { ts: Date.now(), data: rows });
-  return rows;
-}
-
-async function fetchProcedimentosAgenda(clinicaId: string): Promise<ProcedimentoRef[]> {
-  const pageSize = 1000;
-  const rows: ProcedimentoRef[] = [];
-
-  for (let from = 0; ; from += pageSize) {
-    const { data, error } = await supabase
-      .from("procedimentos")
-      .select("id,nome,tipo,grupo,tipo_procedimento")
-      .eq("clinica_id", clinicaId)
-      .eq("ativo", true)
-      .order("nome")
-      .range(from, from + pageSize - 1);
-
-    if (error) throw error;
-    const page = (data ?? []) as ProcedimentoRef[];
-    rows.push(...page);
-    if (page.length < pageSize) break;
-  }
-
-  return rows;
-}
-
-async function fetchMedicoProcedimentosAgenda(clinicaId: string): Promise<MedicoProcedimentoRef[]> {
-  // Filtra por clínica via inner join em medicos (evita carregar dados de
-  // outras clínicas e usa o índice idx_medicos_clinica_ativo).
-  const pageSize = 5000;
-  const rows: MedicoProcedimentoRef[] = [];
-  for (let from = 0; ; from += pageSize) {
-    const { data, error } = await supabase
-      .from("medico_procedimentos")
-      .select("medico_id,procedimento_id,especialidade_id,created_at,medicos!inner(clinica_id)")
-      .eq("medicos.clinica_id", clinicaId)
-      .range(from, from + pageSize - 1);
-    if (error) throw error;
-    const page = (data ?? []) as unknown as MedicoProcedimentoRef[];
-    rows.push(...page);
-    if (page.length < pageSize) break;
-  }
-  return rows;
-}
+// Fetchers com cache in-memory (60s / 300s) vivem em src/lib/agenda/refs-cache.ts.
+// Adaptadores locais para preservar o restante do arquivo sem renomeações.
+const fetchProcedimentosAgenda = getProcedimentosAgenda;
+const fetchMedicoProcedimentosAgenda = getMedicoProcedimentosAgenda;
 
 type DescontoConvenio =
   | { tipo: "percentual"; valor: number }
