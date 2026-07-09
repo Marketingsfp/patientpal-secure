@@ -1211,13 +1211,13 @@ function AgendaPage() {
 
   const loadRef = async () => {
     if (!clinicaAtual) return;
-    const [m, e, me, pr, sr, mc, mp, er, erp, agendasRes] = await Promise.all([
+    const [m, e, me, pr, sr, mcRows, mp, er, erp, agendasRes] = await Promise.all([
       supabase.from("medicos").select("id,nome,sexo,usa_sistema,especialidade_id,procedimento_padrao_id,procedimento_padrao_em_branco").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("especialidades").select("id,nome").order("nome"),
       supabase.from("medico_especialidades").select("medico_id,especialidade_id,medicos!inner(clinica_id)").eq("medicos.clinica_id", clinicaAtual.clinica_id),
       fetchProcedimentosAgenda(clinicaAtual.clinica_id),
       supabase.from("procedimento_split_regras").select("medico_id,procedimento_id").eq("clinica_id", clinicaAtual.clinica_id).not("medico_id", "is", null),
-      supabase.from("medico_convenios").select("medico_id,nome,ativo,medicos!inner(clinica_id)").eq("ativo", true).eq("medicos.clinica_id", clinicaAtual.clinica_id),
+      getMedicoConveniosAgenda(clinicaAtual.clinica_id),
       fetchMedicoProcedimentosAgenda(clinicaAtual.clinica_id),
       supabase.from("enfermagem_recursos").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("enfermagem_recurso_procedimentos").select("recurso_id,procedimento_id,enfermagem_recursos!inner(clinica_id)").eq("enfermagem_recursos.clinica_id", clinicaAtual.clinica_id),
