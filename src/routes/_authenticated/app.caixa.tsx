@@ -95,6 +95,32 @@ function decomporMistoObs(obs: string | null | undefined): Partial<Record<FormaB
 }
 
 /**
+ * Rótulo bonito para exibir a forma de pagamento em tabelas. Para
+ * `misto`, converte as parcelas decompostas em algo como
+ * "Dinheiro R$ 60,00 · PIX R$ 100,00". Sem observações do lançamento
+ * ainda em cache, retorna "Misto (dividido)".
+ */
+const FORMA_LABEL: Record<FormaBucket, string> = {
+  dinheiro: "Dinheiro", pix: "PIX", debito: "Cartão débito", credito: "Cartão crédito",
+  boleto: "Boleto", transferencia: "Transferência", convenio: "Convênio",
+  misto: "Misto", outros: "Outros",
+};
+function formatarFormaPagamento(
+  m: { forma_pagamento: string | null; lancamento_id?: string | null },
+  mistoObs: Record<string, string>,
+): string {
+  const bucket = normalizarForma(m.forma_pagamento);
+  if (bucket !== "misto") return m.forma_pagamento || "—";
+  const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
+  const partes = obs ? decomporMistoObs(obs) : {};
+  const entradas = Object.entries(partes).filter(([, v]) => (v ?? 0) > 0);
+  if (entradas.length === 0) return "Misto (dividido)";
+  return entradas
+    .map(([k, v]) => `${FORMA_LABEL[k as FormaBucket] ?? k} ${(v ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`)
+    .join(" · ");
+}
+
+/**
  * Promoção controlada do CaixaShellV2 para `/app/caixa`, atrás da flag
  * `caixa_v2` E limitado a admin/gestor. Recepção, caixa, médico, financeiro
  * e demais perfis continuam vendo o `<Page />` clássico intocado — mesmo
