@@ -598,6 +598,10 @@ function AgendaPage() {
   const [filtroAgenda, setFiltroAgenda] = useState<string>("todos");
   const [agendasPorMedico, setAgendasPorMedico] = useState<Map<string, { id: string; nome: string }[]>>(new Map());
   const [procIdsPorAgenda, setProcIdsPorAgenda] = useState<Map<string, Set<string>>>(new Map());
+  // Solicitações de estorno pendentes por agendamento — a linha correspondente
+  // fica em vermelho e, para o médico, o paciente é ocultado até o financeiro
+  // decidir.
+  const [estornoPendAgs, setEstornoPendAgs] = useState<Set<string>>(new Set());
   const [filtroDiaSemana, setFiltroDiaSemana] = useState<string>("todos");
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [filtroCliente, setFiltroCliente] = useState("");
@@ -1502,6 +1506,48 @@ function AgendaPage() {
   useEffect(() => {
     if (isMedicoOnly && medicoLogadoId) setFiltroMedico(medicoLogadoId);
   }, [isMedicoOnly, medicoLogadoId]);
+
+  // Carrega os agendamentos que têm uma solicitação de estorno PENDENTE.
+  // O `agendamento_id` pode estar preenchido diretamente na solicitação ou
+  // ser derivado do `lancamento_id` → `fin_lancamentos.agendamento_id`.
+  useEffect(() => {
+    if (!clinicaAtual) { setEstornoPendAgs(new Set()); return; }
+    let cancelado = false;
+    const carregar = async () => {
+      const { data } = await supabase
+        .from("estorno_solicitacoes")
+        .select("agendamento_id, lancamento_id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("status", "pendente");
+      const set = new Set<string>();
+      const lancIds: string[] = [];
+      for (const r of (data ?? []) as Array<{ agendamento_id: string | null; lancamento_id: string | null }>) {
+        if (r.agendamento_id) set.add(r.agendamento_id);
+        else if (r.lancamento_id) lancIds.push(r.lancamento_id);
+      }
+      if (lancIds.length > 0) {
+        const { data: lancs } = await supabase
+          .from("fin_lancamentos")
+          .select("agendamento_id")
+          .in("id", lancIds);
+        for (const l of (lancs ?? []) as Array<{ agendamento_id: string | null }>) {
+          if (l.agendamento_id) set.add(l.agendamento_id);
+        }
+      }
+      if (!cancelado) setEstornoPendAgs(set);
+    };
+    void carregar();
+    const ch = supabase
+      .channel(`agenda-estornos-${clinicaAtual.clinica_id}`)
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "estorno_solicitacoes", filter: `clinica_id=eq.${clinicaAtual.clinica_id}` },
+        () => { void carregar(); })
+      .subscribe();
+    return () => {
+      cancelado = true;
+      void supabase.removeChannel(ch);
+    };
+  }, [clinicaAtual?.clinica_id]);
 
   // Verifica se o usuário logado é médico da clínica atual (para liberar status "Realizado")
   useEffect(() => {
@@ -4535,24 +4581,38 @@ function AgendaPage() {
                 const presente =
                   !realizado &&
                   (pagoHoje || !["aguardando_recepcao", "finalizado", "cancelado"].includes(etapaRow));
+                const estornoPend = estornoPendAgs.has(a.id);
+                // Para o médico, oculta a identidade do paciente enquanto a
+                // solicitação de estorno estiver pendente.
+                const ocultarPaciente = estornoPend && isMedicoOnly;
               return (
                   <TableRow
                     key={a.id}
                     className={
-                      realizado
+                      estornoPend
+                        ? "[&>td]:py-1 [&>td]:h-9 text-xs [&>td]:bg-rose-100 hover:[&>td]:bg-rose-100"
+                        : realizado
                         ? "[&>td]:py-1 [&>td]:h-9 text-xs [&>td]:bg-[#d1f0d6] hover:[&>td]:bg-[#d1f0d6]"
                         : presente
                           ? "[&>td]:py-1 [&>td]:h-9 text-xs [&>td]:bg-[#a8c8ed] hover:[&>td]:bg-[#a8c8ed]"
                           : "[&>td]:py-1 [&>td]:h-9 text-xs"
                     }
                     style={
-                      realizado
+                      estornoPend
+                        ? { backgroundColor: "#fee2e2", borderLeft: "3px solid #dc2626" }
+                        : realizado
                         ? { backgroundColor: "#d1f0d6", borderLeft: "3px solid #8fd49a" }
                         : presente
                           ? { backgroundColor: "#a8c8ed", borderLeft: "3px solid #7aa9d8" }
                           : undefined
                     }
-                    title={presente ? "Cliente presente na clínica" : undefined}
+                    title={
+                      estornoPend
+                        ? "Estorno solicitado — aguardando decisão do financeiro"
+                        : presente
+                          ? "Cliente presente na clínica"
+                          : undefined
+                    }
                   >
                   <TableCell title="Marque para cobrar este atendimento em um pagamento agrupado">
                     <Checkbox checked={selecionados.has(a.id)} onCheckedChange={() => toggleSel(a.id)} />
@@ -4589,7 +4649,14 @@ function AgendaPage() {
                     })()}
                   </TableCell>
                   <TableCell className="pr-1 align-middle max-w-[220px]">
-                    {isSlotLivre(a.paciente_nome) ? (
+                    {ocultarPaciente ? (
+                      <span
+                        className="inline-flex items-center gap-1 text-xs uppercase font-medium text-rose-700 italic"
+                        title="Paciente oculto — estorno solicitado, aguardando aprovação"
+                      >
+                        — aguardando estorno —
+                      </span>
+                    ) : isSlotLivre(a.paciente_nome) ? (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -4664,6 +4731,8 @@ function AgendaPage() {
                     <div className="flex flex-col items-center gap-0.5">
                       {isSlotLivre(a.paciente_nome) ? (
                         <Badge className="bg-slate-100 text-slate-600 border border-slate-300">Livre</Badge>
+                      ) : estornoPend ? (
+                        <Badge className="bg-rose-100 text-rose-800 border border-rose-300">Estorno solicitado</Badge>
                       ) : (
                         <Badge className={STATUS_COR[a.status]}>{STATUS_LABEL[a.status]}</Badge>
                       )}
@@ -4868,6 +4937,7 @@ function AgendaPage() {
             { cor: "#fef3b6", borda: "#f0dc7a", label: "Atrasado para consulta" },
             { cor: "#e0cdf0", borda: "#bea4d8", label: "Agendamento on-line" },
             { cor: "#f7b6c0", borda: "#e88594", label: "Não comparecimento" },
+            { cor: "#fee2e2", borda: "#dc2626", label: "Estorno solicitado" },
           ].map((s) => (
             <div key={s.label} className="flex items-center gap-2 text-sm">
               <span
@@ -4896,6 +4966,8 @@ function AgendaPage() {
           onSlotClick={(a) => openSlot(a)}
           onAgClick={(a) => openEdit(a)}
           fmtHora={fmtHora}
+          estornoPendAgs={estornoPendAgs}
+          ocultarPacienteMedico={isMedicoOnly}
         />
       )}
 
@@ -5086,7 +5158,7 @@ function MedicoFiltroInput({
 }
 
 function AgendaPorMedicoGrid({
-  medicoId, dias, dataRef, items, onSlotClick, onAgClick, fmtHora,
+  medicoId, dias, dataRef, items, onSlotClick, onAgClick, fmtHora, estornoPendAgs, ocultarPacienteMedico,
 }: {
   medicoId: string;
   dias: number;
@@ -5095,6 +5167,8 @@ function AgendaPorMedicoGrid({
   onSlotClick: (a: Agendamento) => void;
   onAgClick: (a: Agendamento) => void;
   fmtHora: (iso: string) => string;
+  estornoPendAgs: Set<string>;
+  ocultarPacienteMedico: boolean;
 }) {
   const diasSemana = ["DOMINGO", "SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO"];
 
@@ -5190,6 +5264,8 @@ function AgendaPorMedicoGrid({
                         onAgClick={onAgClick}
                         fmtHora={fmtHora}
                         corStatus={corStatus}
+                        estornoPend={!!(ag && estornoPendAgs.has(ag.id))}
+                        ocultarPaciente={!!(ag && estornoPendAgs.has(ag.id) && ocultarPacienteMedico)}
                       />
                     );
                   })}
@@ -5217,7 +5293,7 @@ function FragmentDayHeader({ dia, fmtCabecalho }: { dia: string; fmtCabecalho: (
 }
 
 function FragmentDayCell({
-  ag, dia, hi, onSlotClick, onAgClick, fmtHora, corStatus,
+  ag, dia, hi, onSlotClick, onAgClick, fmtHora, corStatus, estornoPend, ocultarPaciente,
 }: {
   ag: Agendamento | undefined;
   dia: string;
@@ -5226,6 +5302,8 @@ function FragmentDayCell({
   onAgClick: (a: Agendamento) => void;
   fmtHora: (iso: string) => string;
   corStatus: (s: Status) => string;
+  estornoPend: boolean;
+  ocultarPaciente: boolean;
 }) {
   const ehLivre = ag && isSlotLivre(ag.paciente_nome);
   return (
@@ -5245,11 +5323,26 @@ function FragmentDayCell({
         ) : (
           <button
             type="button"
-            onClick={() => (ehLivre ? onSlotClick(ag) : onAgClick(ag))}
-            className={`w-full text-left rounded-md px-2 py-1.5 text-xs leading-tight truncate hover:brightness-95 transition ${corStatus(ag.status)}`}
-            title={`${ag.paciente_nome} — ${ag.procedimento ?? "CONSULTA"}`}
+            onClick={() => (ehLivre ? onSlotClick(ag) : (ocultarPaciente ? undefined : onAgClick(ag)))}
+            disabled={ocultarPaciente}
+            className={
+              `w-full text-left rounded-md px-2 py-1.5 text-xs leading-tight truncate hover:brightness-95 transition ${
+                estornoPend
+                  ? "bg-rose-100 text-rose-800 border border-rose-300"
+                  : corStatus(ag.status)
+              } ${ocultarPaciente ? "cursor-not-allowed opacity-90" : ""}`
+            }
+            title={
+              estornoPend
+                ? "Estorno solicitado — aguardando decisão do financeiro"
+                : `${ag.paciente_nome} — ${ag.procedimento ?? "CONSULTA"}`
+            }
           >
-            {ehLivre ? "+ Agendar" : ag.paciente_nome}
+            {ehLivre
+              ? "+ Agendar"
+              : ocultarPaciente
+                ? "— aguardando estorno —"
+                : ag.paciente_nome}
           </button>
         )}
       </td>
