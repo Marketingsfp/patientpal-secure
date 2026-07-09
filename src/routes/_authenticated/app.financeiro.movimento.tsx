@@ -321,6 +321,15 @@ function Page() {
               <SelectItem value="todos">Confirmados + pendentes</SelectItem>
             </SelectContent>
           </Select></div>
+        <div className="space-y-1"><Label className="text-xs">Usuário</Label>
+          <Select value={filterUsuario} onValueChange={setFilterUsuario}>
+            <SelectTrigger className="w-52"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos os usuários</SelectItem>
+              <SelectItem value="sem">Sem usuário</SelectItem>
+              {usuarios.map((u) => <SelectItem key={u.id} value={u.id}>{u.nome}</SelectItem>)}
+            </SelectContent>
+          </Select></div>
       </CardContent></Card>
 
       <Card><CardContent className="p-0">
