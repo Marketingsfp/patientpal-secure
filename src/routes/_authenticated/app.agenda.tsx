@@ -1959,7 +1959,7 @@ function AgendaPage() {
     // Resolve todos os procedimentos em paralelo (cada um pode cair em
     // fallback no banco; em paralelo o tempo total fica ~= 1 chamada).
     const procsResolvidos = await Promise.all(
-      itens.map((it) => buscarProcedimentoPorNome(clinicaAtual.clinica_id, it.procedimento ?? "CONSULTA", procs)),
+      itens.map((it) => buscarProcedimentoPorNome(clinicaAtual.clinica_id, it.procedimento ?? rotuloFallbackProc(it.medico_id), procs)),
     );
     const pesos: Record<string, number> = {};
     const rotulos: Record<string, string> = {};
@@ -1972,13 +1972,13 @@ function AgendaPage() {
       totalCredito  += valorCartao;
       // Peso p/ rateio: prioriza valor de cartão (cheio); se 0, usa dinheiro.
       pesos[itens[idx].id] = valorCartao > 0 ? valorCartao : valorDin;
-      rotulos[itens[idx].id] = itens[idx].procedimento ?? "CONSULTA";
+      rotulos[itens[idx].id] = itens[idx].procedimento ?? rotuloFallbackProc(itens[idx].medico_id);
     });
     setPagamentoPesos(pesos);
     setPagamentoRotulos(rotulos);
     const paciente = itens[0].paciente_nome;
     setPagamentoPacienteNome(paciente);
-    const desc = `${paciente} — ${itens.map(i => (i.procedimento ?? "CONSULTA")).join(" + ")} (${itens.length} serviços)`;
+    const desc = `${paciente} — ${itens.map(i => (i.procedimento ?? rotuloFallbackProc(i.medico_id))).join(" + ")} (${itens.length} serviços)`;
     const opcoes: FormaOpcao[] = [
       { forma: "dinheiro", label: "Dinheiro", valor: totalDinheiro },
       { forma: "pix", label: "Pix", valor: totalPix },
@@ -1990,7 +1990,7 @@ function AgendaPage() {
       agId: itens.map(i => i.id).join(","),
       desc,
       paciente,
-      procedimento: `${itens.map(i => (i.procedimento ?? "CONSULTA")).join(" + ")} (${itens.length} serviços)`,
+      procedimento: `${itens.map(i => (i.procedimento ?? rotuloFallbackProc(i.medico_id))).join(" + ")} (${itens.length} serviços)`,
       medico: (() => {
         const m = medicos.find((mm) => mm.id === itens[0].medico_id);
         return m?.nome ?? undefined;
