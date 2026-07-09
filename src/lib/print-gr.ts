@@ -493,21 +493,21 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     <div class="sep"></div>
 
     <table>
-      <tr><td class="label" colspan="2" style="white-space:nowrap">FICHA: <span class="v">${ficha}</span></td></tr>
-      <tr><td class="label" colspan="2" style="white-space:nowrap">PROFISSIONAL: <span class="v">${esc(medicoNome)}</span></td></tr>
-      <tr><td class="label" colspan="2" style="white-space:nowrap">HORÁRIO: <span class="v">${fmtData(a.inicio)}</span></td></tr>
-      ${usuarioFinalNome ? `<tr><td class="label" colspan="2" style="white-space:nowrap">USUÁRIO: <span class="v">${esc(usuarioFinalNome)}</span></td></tr>` : ""}
+      <tr><td class="label" colspan="2">FICHA: <span class="v">${ficha}</span></td></tr>
+      <tr><td class="label" colspan="2">PROFISSIONAL: <span class="v">${esc(medicoNome)}</span></td></tr>
+      <tr><td class="label" colspan="2">HORÁRIO: <span class="v">${fmtData(a.inicio)}</span></td></tr>
+      ${usuarioFinalNome ? `<tr><td class="label" colspan="2">USUÁRIO: <span class="v">${esc(usuarioFinalNome)}</span></td></tr>` : ""}
     </table>
 
     <div class="sep"></div>
 
     <table>
       <tr class="bold">
-        <td style="width:14mm">QTD</td>
+        <td class="qtd">QTD</td>
         <td>SERVIÇO</td>
       </tr>
       <tr>
-        <td>1</td>
+        <td class="qtd">1</td>
         <td>${esc(procNome)}</td>
       </tr>
     </table>
