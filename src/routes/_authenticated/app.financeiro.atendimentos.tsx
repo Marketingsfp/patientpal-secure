@@ -1017,6 +1017,55 @@ function Page() {
   };
 
   const darBaixaLote = async () => {
+  };
+
+  const desfazerBaixa = async (a: Atend) => {
+    if (!podeEstornar) {
+      toast.error("Sem permissão para desfazer a baixa.");
+      return;
+    }
+    if (a.repasse_pago) {
+      toast.error("Repasse já foi pago — estorne o pagamento do repasse antes de desfazer a baixa.");
+      return;
+    }
+    if (
+      !confirm(
+        "Desfazer a baixa deste atendimento?\n\nO atendimento voltará para o status 'Confirmado' e o repasse deixará de estar liberado.",
+      )
+    )
+      return;
+    try {
+      if (a.origem === "agenda") {
+        if (!a.agendamento_id) {
+          toast.error("Atendimento sem agendamento vinculado.");
+          return;
+        }
+        const { error } = await supabase
+          .from("agendamentos")
+          .update({ status: "confirmado" })
+          .eq("id", a.agendamento_id);
+        if (error) {
+          mostrarErro(error);
+          return;
+        }
+      } else {
+        const { error } = await supabase
+          .from("fin_atendimentos")
+          .update({ status: "confirmado" })
+          .eq("id", a.id);
+        if (error) {
+          mostrarErro(error);
+          return;
+        }
+      }
+      toast.success("Baixa desfeita.");
+      await load();
+    } catch (err) {
+      mostrarErro(err);
+    }
+  };
+
+  const _darBaixaLote = async () => {
     const alvos = selectedItems.filter((a) => !a.repasse_pago && !isAtendido(a));
     if (alvos.length === 0) return;
     if (
