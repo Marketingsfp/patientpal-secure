@@ -4802,6 +4802,9 @@ function AgendaPage() {
                             <span className="ml-2 text-xs text-muted-foreground">(pagar primeiro)</span>
                           )}
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => imprimirComprovante(a)}>
+                          <Printer className="h-4 w-4 mr-2" /> Comprovante de agendamento
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => {
                           const url = `${window.location.origin}/p/${(a as any).token_publico}`;
                           navigator.clipboard.writeText(url);
