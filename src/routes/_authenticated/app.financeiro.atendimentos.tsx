@@ -267,8 +267,8 @@ function Page() {
     const dataPag = a.repasse_pago_em ?? (a.repasse_pago_at ? a.repasse_pago_at.slice(0, 10) : a.data);
     const c = buildComprovante([a], {
       data: dataPag,
-      forma_pagamento: a.repasse_forma_pagamento ?? "",
-      conta_id: "",
+      forma_pagamento: a.repasse_forma_pagamento || a.forma_pagamento || "",
+      conta_id: a.repasse_conta_id ?? "",
       pago_at: a.repasse_pago_at ?? null,
       reimpressao: true,
     });
@@ -289,7 +289,10 @@ function Page() {
     for (const [, list] of byMed) {
       // Metadados agregados
       const datas = new Set(list.map((x) => x.repasse_pago_em ?? "").filter(Boolean));
-      const formas = new Set(list.map((x) => x.repasse_forma_pagamento ?? "").filter(Boolean));
+      const formas = new Set(
+        list.map((x) => x.repasse_forma_pagamento || x.forma_pagamento || "").filter(Boolean),
+      );
+      const contasSet = new Set(list.map((x) => x.repasse_conta_id ?? "").filter(Boolean));
       const primeiro = list[0];
       const dataPag =
         primeiro.repasse_pago_em ??
@@ -297,7 +300,7 @@ function Page() {
       const c = buildComprovante(list, {
         data: dataPag,
         forma_pagamento: formas.size === 1 ? [...formas][0] : formas.size > 1 ? "Vários" : "",
-        conta_id: "",
+        conta_id: contasSet.size === 1 ? [...contasSet][0] : "",
         pago_at: primeiro.repasse_pago_at ?? null,
         reimpressao: true,
       });
