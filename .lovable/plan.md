@@ -1,29 +1,30 @@
-## Objetivo
-Adicionar um botão **"Dá baixa"** em cada linha da tabela **Atendimentos** (`/app/financeiro/atendimentos`), posicionado logo antes do botão de excluir. Ele permite ao financeiro marcar o atendimento como realizado nos casos em que o médico não usa o sistema, liberando o repasse.
+## Diagnóstico
 
-## Comportamento
+O bloqueio "Selecione o serviço" está sendo disparado mesmo com o serviço preenchido porque o formulário passa pelo sanitizador `procedimentoFormulario` (linha 1593 de `src/routes/_authenticated/app.agenda.tsx`):
 
-- Aparece somente quando o atendimento ainda **não foi baixado** (agendamento com status diferente de `realizado`, ou lançamento manual com status diferente de `realizado`) — exatamente o mesmo critério que hoje exibe o selo "⏳ Aguarda atend.".
-- Ao clicar:
-  - Confirma com um diálogo ("Confirmar baixa do atendimento? O repasse do médico será liberado.").
-  - Para itens da **agenda** (`origem === "agenda"`): atualiza `agendamentos.status = 'realizado'` no registro vinculado.
-  - Para itens **manuais** (`origem === "manual"`, `fin_lancamentos`): atualiza `fin_lancamentos.status = 'realizado'`.
-  - Registra em `logs` (via `logAction`) a ação de baixa manual pelo financeiro (auditoria).
-  - Recarrega a lista e mostra toast de sucesso.
-- Após a baixa, a linha passa a se comportar como "atendido": o checkbox de seleção para **Pagar repasse** fica habilitado, exatamente como hoje quando o médico marca via agenda.
-- Fica oculto para o perfil **médico** (`isMedicoOnly`), assim como as demais ações administrativas já são.
-- Fica oculto quando o repasse já está pago (nada a baixar).
+```
+if (atual && med?.especialidade_nome && normalizar(atual) === normalizar(med.especialidade_nome)) return "";
+```
 
-## UI
+Ele existe para não gravar como "serviço" a especialidade sintética do médico (ex.: médico "CARDIOLOGIA" com serviço redundante "CARDIOLOGIA"). Só que quando o "médico/recurso" tem exatamente o mesmo nome do exame que executa — caso do TESTE ERGOMÉTRICO, USG, ECG, etc. — o sanitizador zera o serviço real. No submit (linha 2540-2545), o array fica vazio e cai no toast.
 
-- Ícone: `CheckCircle2` (lucide) em verde suave, `variant="ghost"`, `size="icon"`, `h-7 w-7`, `title="Dá baixa (marcar como realizado)"`.
-- Posicionado **imediatamente antes** do botão de excluir (`Trash2`) tanto no bloco `origem === "agenda"` quanto no bloco de lançamentos manuais.
+## Correção
 
-## Arquivos afetados
+Deixar de sanitizar quando o texto atual corresponde a um procedimento **realmente cadastrado** para aquele médico/recurso.
 
-- `src/routes/_authenticated/app.financeiro.atendimentos.tsx` — adicionar handler `darBaixa(a)`, importar `CheckCircle2` (já importado) e `logAction`, renderizar o botão nas duas branches de ações; após sucesso, chamar o mesmo reload usado por outras mutações.
+- Em `procedimentoFormulario`: só retornar `""` se `atual` bater com `especialidade_nome` **e** não existir em `opcoesProcedimentoMedico(medicoId, …)` (nem for o `procedimentoPadraoDoMedico`).
+- Como `procedimentoFormulario` é usada tanto na abertura do formulário quanto no submit, a mesma correção conserta o salvamento e a exibição inicial.
+- Não mexe em `opcoesServicoFormulario` nem no dropdown — só na normalização.
 
-## Fora de escopo
+## Verificação
 
-- Não altera regras de RLS nem cria migração — as políticas atuais já permitem que o financeiro atualize `agendamentos.status` e `fin_lancamentos.status` da própria clínica.
-- Não mexe na aba **Estorno** nem em outras rotas.
+- Editar o agendamento TESTE ERGOMÉTRICO → serviço permanece preenchido → clicar Pagar/Imprimir salva sem erro.
+- Testar caso original (médico com especialidade sintética "CARDIOLOGIA" sem procedimento igual): continua zerando corretamente.
+- Testar USG com médico "USG …": serviço continua exibido.
+
+## 4 eixos
+
+- 💰 Sem impacto financeiro direto — mas destrava cobranças que hoje ficam presas.
+- ⏱️ Elimina bloqueio recorrente em exames com médico=exame (ergométrico, USG dedicado).
+- 😊 Recepção não precisa reabrir e reselecionar o serviço.
+- 🛡️ Sem risco — mudança local numa função pura de UI.

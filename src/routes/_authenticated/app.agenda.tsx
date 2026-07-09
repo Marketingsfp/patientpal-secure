@@ -1593,7 +1593,20 @@ function AgendaPage() {
   const procedimentoFormulario = (medicoId: string | null | undefined, procedimento: string | null | undefined) => {
     const atual = procedimentoEfetivo(medicoId, procedimento);
     const med = medicoId ? medicos.find((m) => m.id === medicoId) : null;
-    if (atual && med?.especialidade_nome && normalizar(atual) === normalizar(med.especialidade_nome)) return "";
+    if (atual && med?.especialidade_nome && normalizar(atual) === normalizar(med.especialidade_nome)) {
+      // Só zera se for realmente a especialidade sintética — se o texto
+      // corresponder a um procedimento cadastrado para o médico/recurso
+      // (ex.: recurso "TESTE ERGOMETRICO" que executa o exame homônimo),
+      // mantém o valor para não perder o serviço no submit.
+      const opts = opcoesProcedimentoMedico(
+        medicoId,
+        editing?.agenda_id ?? (filtroAgenda !== "todos" ? filtroAgenda : null),
+      );
+      const alvo = normalizar(atual);
+      const ehProcedimentoReal = opts.some((o) => normalizar(o.nome) === alvo)
+        || normalizar(procedimentoPadraoDoMedico(medicoId) ?? "") === alvo;
+      if (!ehProcedimentoReal) return "";
+    }
     return atual;
   };
 
