@@ -1811,15 +1811,29 @@ function Page() {
                                   <Printer className="h-3.5 w-3.5 text-primary" />
                                 </Button>
                               )}
-                              {!a.repasse_pago && a.agendamento_status !== "realizado" && (
+                              {a.repasse_pago || a.agendamento_status === "realizado" ? (
                                 <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7"
+                                  size="sm"
+                                  disabled
+                                  className="h-6 px-2 text-[10px] gap-1 bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 disabled:opacity-100"
+                                  title="Repasse já baixado"
+                                >
+                                  <CheckCircle2 className="h-3 w-3" /> Baixado
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  className={cn(
+                                    "h-6 px-2 text-[10px] gap-1 border",
+                                    isSelected
+                                      ? "bg-amber-500 text-white border-amber-600 ring-2 ring-amber-600 hover:bg-amber-500"
+                                      : "bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200",
+                                  )}
                                   title="Dá baixa (marcar como realizado e liberar repasse)"
                                   onClick={() => darBaixa(a)}
                                 >
-                                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                                  {isSelected ? <CheckCircle2 className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
+                                  Baixar
                                 </Button>
                               )}
                               {/* Botão de excluir para agenda */}
@@ -1859,15 +1873,29 @@ function Page() {
                                   <Printer className="h-3.5 w-3.5 text-primary" />
                                 </Button>
                               )}
-                              {!a.repasse_pago && a.status !== "realizado" && (
+                              {a.repasse_pago || a.status === "realizado" ? (
                                 <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7"
+                                  size="sm"
+                                  disabled
+                                  className="h-6 px-2 text-[10px] gap-1 bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 disabled:opacity-100"
+                                  title="Repasse já baixado"
+                                >
+                                  <CheckCircle2 className="h-3 w-3" /> Baixado
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  className={cn(
+                                    "h-6 px-2 text-[10px] gap-1 border",
+                                    isSelected
+                                      ? "bg-amber-500 text-white border-amber-600 ring-2 ring-amber-600 hover:bg-amber-500"
+                                      : "bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200",
+                                  )}
                                   title="Dá baixa (marcar como realizado e liberar repasse)"
                                   onClick={() => darBaixa(a)}
                                 >
-                                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                                  {isSelected ? <CheckCircle2 className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
+                                  Baixar
                                 </Button>
                               )}
                               <Button variant="ghost" size="icon" className="h-7 w-7" title="Excluir" onClick={() => remove(a)}>
