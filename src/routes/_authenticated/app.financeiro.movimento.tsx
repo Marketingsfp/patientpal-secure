@@ -431,6 +431,7 @@ function Page() {
               <SelectItem value="todos">Todos</SelectItem>
               <SelectItem value="receita">Receitas</SelectItem>
               <SelectItem value="despesa">Despesas</SelectItem>
+              <SelectItem value="transferencia">Transferências entre caixas</SelectItem>
             </SelectContent>
           </Select></div>
         <div className="space-y-1"><Label className="text-xs">Status (totais)</Label>
