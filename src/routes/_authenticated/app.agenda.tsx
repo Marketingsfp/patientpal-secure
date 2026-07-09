@@ -3400,6 +3400,9 @@ function AgendaPage() {
               </p>
             </DialogHeader>
             <form onSubmit={submit} className="space-y-4 px-6 py-5">
+              {editing && open && (
+                <FichaEmUsoAlert agendamentoId={editing.id} />
+              )}
               {editing && pagosSet.has(editing.id) && (
                 <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 text-amber-900 px-3 py-2 text-xs">
                   <span className="mt-0.5">⚠️</span>
