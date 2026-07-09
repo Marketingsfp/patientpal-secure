@@ -69,6 +69,8 @@ function Page() {
   const [filterForma, setFilterForma] = useState<string>("todos");
   const [filterPaciente, setFilterPaciente] = useState<string>("");
   const [filterPacienteDebounced, setFilterPacienteDebounced] = useState<string>("");
+  const PAGE_SIZE = 100;
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     const t = setTimeout(() => setFilterPacienteDebounced(filterPaciente.trim()), 300);
@@ -103,22 +105,31 @@ function Page() {
     const carregarFin = filterTipo === "todos" || filterTipo === "receita" || filterTipo === "despesa";
     let finList: Lanc[] = [];
     if (carregarFin) {
-      let q = supabase.from("fin_lancamentos")
-        .select("id, tipo, descricao, valor, data, status, categoria_id, conta_id, forma_pagamento, criado_por")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .gte("data", fromDate).lte("data", toDate)
-        .order("data", { ascending: false })
-        .range(0, 499);
-      if (filterTipo === "receita" || filterTipo === "despesa") q = q.eq("tipo", filterTipo);
-      if (filterUsuario !== "todos") {
-        if (filterUsuario === "sem") q = q.is("criado_por", null);
-        else q = q.eq("criado_por", filterUsuario);
+      const CHUNK = 1000;
+      const MAX = 20000; // salvaguarda
+      let offset = 0;
+      for (;;) {
+        let q = supabase.from("fin_lancamentos")
+          .select("id, tipo, descricao, valor, data, status, categoria_id, conta_id, forma_pagamento, criado_por")
+          .eq("clinica_id", clinicaAtual.clinica_id)
+          .gte("data", fromDate).lte("data", toDate)
+          .order("data", { ascending: false })
+          .range(offset, offset + CHUNK - 1);
+        if (filterTipo === "receita" || filterTipo === "despesa") q = q.eq("tipo", filterTipo);
+        if (filterUsuario !== "todos") {
+          if (filterUsuario === "sem") q = q.is("criado_por", null);
+          else q = q.eq("criado_por", filterUsuario);
+        }
+        q = applyForma(q);
+        if (filterPacienteDebounced) q = q.ilike("descricao", `%${filterPacienteDebounced}%`);
+        const { data, error } = await q;
+        if (error) { mostrarErro(error); setLoading(false); return; }
+        const rows = (data ?? []) as Array<Omit<Lanc, "origem">>;
+        finList.push(...rows.map((l) => ({ ...l, origem: "fin" as const })));
+        if (rows.length < CHUNK) break;
+        offset += CHUNK;
+        if (offset >= MAX) break;
       }
-      q = applyForma(q);
-      if (filterPacienteDebounced) q = q.ilike("descricao", `%${filterPacienteDebounced}%`);
-      const { data, error } = await q;
-      if (error) { mostrarErro(error); setLoading(false); return; }
-      finList = ((data ?? []) as Array<Omit<Lanc, "origem">>).map((l) => ({ ...l, origem: "fin" as const }));
     }
     // 2) Transferências entre caixas — sangria/suprimento em caixa_movimentos
     //    (só carrega se o filtro Forma não estiver restringindo a algo específico
@@ -127,27 +138,38 @@ function Page() {
       && (filterForma === "todos" || filterForma === "dinheiro");
     let caixaList: Lanc[] = [];
     if (carregarCaixa) {
-      let qc = supabase.from("caixa_movimentos")
-        .select("id, tipo, valor, descricao, forma_pagamento, user_id, created_at, destino_user_id, destino_nome")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .in("tipo", ["sangria", "suprimento"])
-        .gte("created_at", `${fromDate}T00:00:00`)
-        .lte("created_at", `${toDate}T23:59:59`)
-        .order("created_at", { ascending: false })
-        .range(0, 499);
-      if (filterUsuario !== "todos") {
-        if (filterUsuario === "sem") qc = qc.is("user_id", null);
-        else qc = qc.eq("user_id", filterUsuario);
-      }
-      if (filterPacienteDebounced) qc = qc.ilike("descricao", `%${filterPacienteDebounced}%`);
-      const { data: mv, error: errMv } = await qc;
-      if (errMv) { mostrarErro(errMv); setLoading(false); return; }
-      caixaList = ((mv ?? []) as Array<{
+      const CHUNK = 1000;
+      const MAX = 20000;
+      let offset = 0;
+      const raw: Array<{
         id: string; tipo: "sangria" | "suprimento"; valor: number | string;
         descricao: string | null; forma_pagamento: string | null;
         user_id: string | null; created_at: string;
         destino_user_id: string | null; destino_nome: string | null;
-      }>).map((m) => ({
+      }> = [];
+      for (;;) {
+        let qc = supabase.from("caixa_movimentos")
+          .select("id, tipo, valor, descricao, forma_pagamento, user_id, created_at, destino_user_id, destino_nome")
+          .eq("clinica_id", clinicaAtual.clinica_id)
+          .in("tipo", ["sangria", "suprimento"])
+          .gte("created_at", `${fromDate}T00:00:00`)
+          .lte("created_at", `${toDate}T23:59:59`)
+          .order("created_at", { ascending: false })
+          .range(offset, offset + CHUNK - 1);
+        if (filterUsuario !== "todos") {
+          if (filterUsuario === "sem") qc = qc.is("user_id", null);
+          else qc = qc.eq("user_id", filterUsuario);
+        }
+        if (filterPacienteDebounced) qc = qc.ilike("descricao", `%${filterPacienteDebounced}%`);
+        const { data: mv, error: errMv } = await qc;
+        if (errMv) { mostrarErro(errMv); setLoading(false); return; }
+        const rows = (mv ?? []) as typeof raw;
+        raw.push(...rows);
+        if (rows.length < CHUNK) break;
+        offset += CHUNK;
+        if (offset >= MAX) break;
+      }
+      caixaList = raw.map((m) => ({
         id: m.id,
         tipo: "transferencia" as const,
         descricao: (() => {
@@ -184,7 +206,7 @@ function Page() {
     }
     // Merge ordenado por data desc
     const merged = [...finList, ...caixaList].sort((a, b) => (a.data < b.data ? 1 : a.data > b.data ? -1 : 0));
-    setItems(merged.slice(0, 500));
+    setItems(merged);
     setLoading(false);
   };
   const loadResumo = async () => {
@@ -263,6 +285,8 @@ function Page() {
     } else setUsuarios([]);
   };
   useEffect(() => { void load(); void loadResumo(); }, [clinicaAtual?.clinica_id, filterTipo, fromDate, toDate, filterStatus, filterUsuario, filterForma, filterPacienteDebounced]);
+  // Reseta a página sempre que qualquer filtro mudar
+  useEffect(() => { setPage(1); }, [clinicaAtual?.clinica_id, filterTipo, fromDate, toDate, filterStatus, filterUsuario, filterForma, filterPacienteDebounced]);
   useEffect(() => { void loadOpts(); }, [clinicaAtual?.clinica_id]);
   const totais = resumo;
 
@@ -634,11 +658,15 @@ function Page() {
         {loading ? <div className="py-12 text-center text-muted-foreground">Carregando...</div>
           : items.length === 0 ? <div className="py-12 text-center text-muted-foreground">Nenhum lançamento no período.</div>
           : <>
-          {resumo.totalRows > items.length ? (
-            <div className="px-4 py-2 text-xs text-muted-foreground bg-muted/30 border-b">
-              Exibindo os {items.length.toLocaleString("pt-BR")} lançamentos mais recentes de {resumo.totalRows.toLocaleString("pt-BR")} no período. Os totais acima consideram todos.
-            </div>
-          ) : null}
+          {(() => {
+            const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+            const currentPage = Math.min(page, totalPages);
+            return (
+              <div className="px-4 py-2 text-xs text-muted-foreground bg-muted/30 border-b">
+                Página {currentPage} de {totalPages} — {items.length.toLocaleString("pt-BR")} lançamento(s) no período.
+              </div>
+            );
+          })()}
           <Table>
             <TableHeader><TableRow>
               <TableHead className="w-10"></TableHead>
@@ -649,7 +677,7 @@ function Page() {
               <TableHead className="text-right">Valor</TableHead>
               <TableHead className="w-32 text-right">Ações</TableHead>
             </TableRow></TableHeader>
-            <TableBody>{items.map((l) => {
+            <TableBody>{items.slice((Math.min(page, Math.max(1, Math.ceil(items.length / PAGE_SIZE))) - 1) * PAGE_SIZE, Math.min(page, Math.max(1, Math.ceil(items.length / PAGE_SIZE))) * PAGE_SIZE).map((l) => {
               const userMap = new Map(usuarios.map((u) => [u.id, u.nome]));
               return (
               <TableRow key={`${l.origem ?? "fin"}:${l.id}`}>
@@ -696,7 +724,28 @@ function Page() {
               </TableRow>);
             })}
             </TableBody>
-          </Table></>}
+          </Table>
+          {items.length > PAGE_SIZE ? (() => {
+            const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+            const currentPage = Math.min(page, totalPages);
+            return (
+              <div className="flex items-center justify-between gap-2 px-4 py-3 border-t bg-muted/20">
+                <div className="text-xs text-muted-foreground">
+                  Mostrando {((currentPage - 1) * PAGE_SIZE + 1).toLocaleString("pt-BR")}
+                  {"–"}
+                  {Math.min(currentPage * PAGE_SIZE, items.length).toLocaleString("pt-BR")} de {items.length.toLocaleString("pt-BR")}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setPage(1)}>Primeira</Button>
+                  <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>Anterior</Button>
+                  <span className="text-xs px-2">Pág. {currentPage} / {totalPages}</span>
+                  <Button variant="outline" size="sm" disabled={currentPage >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>Próxima</Button>
+                  <Button variant="outline" size="sm" disabled={currentPage >= totalPages} onClick={() => setPage(totalPages)}>Última</Button>
+                </div>
+              </div>
+            );
+          })() : null}
+          </>}
       </CardContent></Card>
     </div>
   );
