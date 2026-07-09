@@ -3400,7 +3400,7 @@ function AgendaPage() {
               <Plus className="h-3 w-3 mr-1.5" /> Adicionar Encaixe
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-xl max-h-[95vh] overflow-y-auto p-0 gap-0 rounded-2xl border-slate-200 shadow-2xl">
+          <DialogContent className="max-w-3xl max-h-[95vh] overflow-y-auto p-0 gap-0 rounded-2xl border-slate-200 shadow-2xl">
             <DialogHeader className="space-y-1 px-6 pt-5 pb-4 border-b border-slate-100 bg-gradient-to-b from-slate-50/60 to-transparent">
               <DialogTitle className="text-lg font-semibold tracking-tight text-slate-900">
                 {editing
