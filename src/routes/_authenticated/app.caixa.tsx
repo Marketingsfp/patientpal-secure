@@ -701,13 +701,15 @@ function Page() {
   const [mistoObs, setMistoObs] = useState<Record<string, string>>({});
   const mistoLancIds = useMemo(() => {
     const ids = new Set<string>();
-    minhasMovs.forEach((m) => {
+    const scan = (arr: Mov[]) => arr.forEach((m) => {
       if (m.tipo === "recebimento" && normalizarForma(m.forma_pagamento) === "misto" && m.lancamento_id) {
         ids.add(m.lancamento_id);
       }
     });
+    scan(minhasMovs);
+    scan(detalheMovs);
     return Array.from(ids);
-  }, [minhasMovs]);
+  }, [minhasMovs, detalheMovs]);
   useEffect(() => {
     let alive = true;
     const pendentes = mistoLancIds.filter((id) => !(id in mistoObs));
