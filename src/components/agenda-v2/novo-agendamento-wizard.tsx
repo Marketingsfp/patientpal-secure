@@ -46,6 +46,8 @@ type SlotLivre = { id: string; inicio: string; fim: string };
 
 type TipoAtendimento = "particular" | "convenio";
 
+type EspecialidadeOpt = { id: string; nome: string; isPrincipal: boolean };
+
 function toLocalDateKey(d: Date) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -93,6 +95,7 @@ export function NovoAgendamentoWizard({
   const [dataDia, setDataDia] = useState<string>(toLocalDateKey(new Date()));
   const [slot, setSlot] = useState<SlotLivre | null>(null);
   const [tipoAtendimento, setTipoAtendimento] = useState<TipoAtendimento>("particular");
+  const [especialidadeId, setEspecialidadeId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   // -------------------------------------------------------------------------
@@ -129,6 +132,7 @@ export function NovoAgendamentoWizard({
     setDataDia(toLocalDateKey(new Date()));
     setSlot(null);
     setTipoAtendimento("particular");
+    setEspecialidadeId(null);
     setSaving(false);
     resetQuickCreate();
   };
@@ -175,6 +179,59 @@ export function NovoAgendamentoWizard({
         .map((s) => ({ id: s.id as string, inicio: s.inicio as string, fim: s.fim as string }));
     },
   });
+
+  // ---------- Query: especialidades do médico selecionado ----------
+  // Junta a principal (medicos.especialidade_id) com as secundárias
+  // (medico_especialidades). O usuário escolhe qual especialidade
+  // aparece no comprovante DESTE agendamento.
+  const especialidadesQuery = useQuery({
+    queryKey: ["agenda-v2", "wizard-especialidades", medico?.id],
+    enabled: !!medico && open,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async (): Promise<EspecialidadeOpt[]> => {
+      if (!medico) return [];
+      const { data: sec, error } = await supabase
+        .from("medico_especialidades")
+        .select("especialidade_id, especialidade:especialidades!medico_especialidades_especialidade_id_fkey(id,nome)")
+        .eq("medico_id", medico.id);
+      if (error) throw error;
+      const listaSec = ((sec ?? []) as Array<{ especialidade: { id: string; nome: string } | null }>)
+        .map((r) => r.especialidade)
+        .filter((e): e is { id: string; nome: string } => !!e);
+      let principal: { id: string; nome: string } | null = null;
+      if (medico.especialidade_id) {
+        const { data: pr } = await supabase
+          .from("especialidades")
+          .select("id,nome")
+          .eq("id", medico.especialidade_id)
+          .maybeSingle();
+        principal = (pr as { id: string; nome: string } | null) ?? null;
+      }
+      const map = new Map<string, EspecialidadeOpt>();
+      if (principal) map.set(principal.id, { ...principal, isPrincipal: true });
+      for (const e of listaSec) {
+        if (!map.has(e.id)) map.set(e.id, { ...e, isPrincipal: false });
+      }
+      return Array.from(map.values()).sort((a, b) => {
+        if (a.isPrincipal && !b.isPrincipal) return -1;
+        if (!a.isPrincipal && b.isPrincipal) return 1;
+        return a.nome.localeCompare(b.nome, "pt-BR");
+      });
+    },
+  });
+
+  // Sempre que trocar médico ou a lista de especialidades carregar,
+  // define o default como a principal do médico (ou a primeira).
+  useEffect(() => {
+    if (!medico) { setEspecialidadeId(null); return; }
+    const opts = especialidadesQuery.data ?? [];
+    if (opts.length === 0) return;
+    const jaSelecionadaValida = especialidadeId && opts.some((o) => o.id === especialidadeId);
+    if (jaSelecionadaValida) return;
+    const principal = opts.find((o) => o.isPrincipal) ?? opts[0];
+    setEspecialidadeId(principal.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [medico?.id, especialidadesQuery.data]);
 
   // Sprint 1 · S1-A — aplica `initial` quando o wizard abre e quando os
   // médicos carregam (necessário porque `medico` precisa vir da lista
@@ -286,6 +343,7 @@ export function NovoAgendamentoWizard({
             orcamento_id: null,
             tipo_atendimento: tipoAtendimento,
             forma_pagamento_prevista: null,
+            especialidade_id: especialidadeId,
           },
           checagens: {
             validar_paciente_completo: true,
