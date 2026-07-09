@@ -67,6 +67,7 @@ function Page() {
   const { clinicaAtual } = useClinica();
   const podeEstornar = ["admin", "gestor", "financeiro"].includes(clinicaAtual?.role ?? "");
   const [items, setItems] = useState<Solic[]>([]);
+  const [nomesUsuarios, setNomesUsuarios] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -92,7 +93,26 @@ function Page() {
       .order("solicitado_em", { ascending: false })
       .limit(500);
     if (error) mostrarErro(error);
-    setItems((data ?? []) as Solic[]);
+    const rows = (data ?? []) as Solic[];
+    setItems(rows);
+    const ids = Array.from(
+      new Set(
+        rows.flatMap((r) => [r.solicitado_por, r.resolvido_por]).filter((x): x is string => !!x),
+      ),
+    );
+    if (ids.length > 0) {
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("id, nome")
+        .in("id", ids);
+      const map: Record<string, string> = {};
+      (profs ?? []).forEach((p: { id: string; nome: string }) => {
+        map[p.id] = p.nome;
+      });
+      setNomesUsuarios(map);
+    } else {
+      setNomesUsuarios({});
+    }
     setLoading(false);
   };
 
@@ -500,6 +520,11 @@ function Page() {
                   <TableRow key={s.id}>
                     <TableCell className="text-xs">
                       {new Date(s.solicitado_em).toLocaleString("pt-BR")}
+                      {s.solicitado_por && (
+                        <div className="text-[10px] text-muted-foreground mt-0.5">
+                          por {nomesUsuarios[s.solicitado_por] ?? "—"}
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="text-sm font-medium">{s.paciente_nome ?? "—"}</div>
@@ -555,6 +580,9 @@ function Page() {
                       {s.resolvido_em && (
                         <div className="not-italic text-[10px] text-muted-foreground">
                           Resolvido em {new Date(s.resolvido_em).toLocaleString("pt-BR")}
+                          {s.resolvido_por && (
+                            <> por {nomesUsuarios[s.resolvido_por] ?? "—"}</>
+                          )}
                         </div>
                       )}
                     </TableCell>
