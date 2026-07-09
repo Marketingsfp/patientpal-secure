@@ -624,6 +624,7 @@ const EMPTY = {
   orcamento_numero: "",
   orcamento_itens: [] as string[],
   tipo_atendimento: "particular" as TipoAtendimento,
+  forma_pagamento_prevista: "" as string,
 };
 
 function AgendaPage() {
