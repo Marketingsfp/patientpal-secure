@@ -53,8 +53,6 @@ import {
   getMedicoProcedimentosAgenda,
   getMedicoConveniosAgenda,
   getProcedimentosComValor,
-  type ProcedimentoRef as ProcedimentoRefShared,
-  type MedicoProcedimentoRef as MedicoProcedimentoRefShared,
 } from "@/lib/agenda/refs-cache";
 import { useServerFn } from "@tanstack/react-start";
 import { listarEquipe } from "@/lib/equipe.functions";
