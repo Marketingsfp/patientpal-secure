@@ -494,6 +494,7 @@ function Page() {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[150px]">Solicitado</TableHead>
+                <TableHead className="w-[160px]">Solicitante</TableHead>
                 <TableHead>Paciente / Descrição</TableHead>
                 <TableHead className="w-[110px]">Valor</TableHead>
                 <TableHead className="w-[110px]">Tipo</TableHead>
@@ -505,13 +506,13 @@ function Page() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-6">
+                  <TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-6">
                     Carregando…
                   </TableCell>
                 </TableRow>
               ) : filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-6">
+                  <TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-6">
                     Nenhuma solicitação encontrada.
                   </TableCell>
                 </TableRow>
@@ -520,11 +521,9 @@ function Page() {
                   <TableRow key={s.id}>
                     <TableCell className="text-xs">
                       {new Date(s.solicitado_em).toLocaleString("pt-BR")}
-                      {s.solicitado_por && (
-                        <div className="text-[10px] text-muted-foreground mt-0.5">
-                          por {nomesUsuarios[s.solicitado_por] ?? "—"}
-                        </div>
-                      )}
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      {s.solicitado_por ? (nomesUsuarios[s.solicitado_por] ?? "—") : "—"}
                     </TableCell>
                     <TableCell>
                       <div className="text-sm font-medium">{s.paciente_nome ?? "—"}</div>
