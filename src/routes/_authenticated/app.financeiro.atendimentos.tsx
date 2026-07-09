@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   Plus,
@@ -10,10 +10,8 @@ import {
   Wallet,
   CheckCircle2,
   Clock,
-  Undo2,
   Check,
   ChevronsUpDown,
-  BellRing,
   Send,
   Loader2,
   Banknote,
@@ -444,46 +442,6 @@ function Page() {
     setLaudoTarget(null);
     await load();
   };
-
-  // Contagem de solicitações de estorno pendentes (gerenciamento agora vive em /app/financeiro/estorno).
-  const [estornoPendentes, setEstornoPendentes] = useState(0);
-  const loadEstornoCount = async () => {
-    if (!clinicaAtual) {
-      setEstornoPendentes(0);
-      return;
-    }
-    const { count } = await supabase
-      .from("estorno_solicitacoes")
-      .select("id", { count: "exact", head: true })
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .eq("status", "pendente");
-    setEstornoPendentes(count ?? 0);
-  };
-  useEffect(() => {
-    void loadEstornoCount(); /* eslint-disable-next-line react-hooks/exhaustive-deps */
-  }, [clinicaAtual?.clinica_id]);
-  useEffect(() => {
-    if (!clinicaAtual) return;
-    const ch = supabase
-      .channel(`fin-estornos-${clinicaAtual.clinica_id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "estorno_solicitacoes",
-          filter: `clinica_id=eq.${clinicaAtual.clinica_id}`,
-        },
-        () => {
-          void loadEstornoCount();
-        },
-      )
-      .subscribe();
-    return () => {
-      void supabase.removeChannel(ch);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clinicaAtual?.clinica_id]);
 
   // Perfil médico: trava o filtro no próprio profissional
   useEffect(() => {
