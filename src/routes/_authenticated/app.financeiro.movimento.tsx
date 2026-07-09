@@ -28,7 +28,7 @@ export const Route = createFileRoute("/_authenticated/app/financeiro/movimento")
 interface Lanc {
   id: string; tipo: "receita" | "despesa"; descricao: string; valor: number;
   data: string; status: string; categoria_id: string | null; conta_id: string | null;
-  forma_pagamento: string | null;
+  forma_pagamento: string | null; criado_por: string | null;
 }
 interface Opt { id: string; nome: string; tipo?: string }
 
@@ -44,6 +44,7 @@ function Page() {
   const [items, setItems] = useState<Lanc[]>([]);
   const [cats, setCats] = useState<Opt[]>([]);
   const [contas, setContas] = useState<Opt[]>([]);
+  const [usuarios, setUsuarios] = useState<Opt[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -55,17 +56,22 @@ function Page() {
   const [detalhe, setDetalhe] = useState<null | "receita" | "despesa" | "saldo">(null);
   const [resumo, setResumo] = useState<{ r: number; d: number; saldo: number; totalRows: number }>({ r: 0, d: 0, saldo: 0, totalRows: 0 });
   const [filterStatus, setFilterStatus] = useState<"confirmado" | "todos" | "pendente">("confirmado");
+  const [filterUsuario, setFilterUsuario] = useState<string>("todos");
 
   const load = async () => {
     if (!clinicaAtual) { setItems([]); setLoading(false); return; }
     setLoading(true);
     let q = supabase.from("fin_lancamentos")
-      .select("id, tipo, descricao, valor, data, status, categoria_id, conta_id, forma_pagamento")
+      .select("id, tipo, descricao, valor, data, status, categoria_id, conta_id, forma_pagamento, criado_por")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .gte("data", fromDate).lte("data", toDate)
       .order("data", { ascending: false })
       .range(0, 499);
     if (filterTipo !== "todos") q = q.eq("tipo", filterTipo);
+    if (filterUsuario !== "todos") {
+      if (filterUsuario === "sem") q = q.is("criado_por", null);
+      else q = q.eq("criado_por", filterUsuario);
+    }
     const { data, error } = await q;
     if (error) mostrarErro(error); else setItems((data ?? []) as Lanc[]);
     setLoading(false);
@@ -88,13 +94,22 @@ function Page() {
   };
   const loadOpts = async () => {
     if (!clinicaAtual) return;
-    const [c, b] = await Promise.all([
+    const [c, b, m] = await Promise.all([
       supabase.from("fin_categorias").select("id, nome, tipo").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("fin_contas").select("id, nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
+      supabase.from("clinica_memberships").select("user_id").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true),
     ]);
     setCats((c.data ?? []) as Opt[]); setContas((b.data ?? []) as Opt[]);
+    const userIds = ((m.data ?? []) as Array<{ user_id: string }>).map((r) => r.user_id);
+    if (userIds.length) {
+      const { data: profs } = await supabase.from("profiles").select("id, nome").in("id", userIds);
+      const list = ((profs ?? []) as Array<{ id: string; nome: string | null }>)
+        .map((p) => ({ id: p.id, nome: p.nome || "(sem nome)" }))
+        .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+      setUsuarios(list);
+    } else setUsuarios([]);
   };
-  useEffect(() => { void load(); void loadResumo(); }, [clinicaAtual?.clinica_id, filterTipo, fromDate, toDate, filterStatus]);
+  useEffect(() => { void load(); void loadResumo(); }, [clinicaAtual?.clinica_id, filterTipo, fromDate, toDate, filterStatus, filterUsuario]);
   useEffect(() => { void loadOpts(); }, [clinicaAtual?.clinica_id]);
   const totais = resumo;
 
