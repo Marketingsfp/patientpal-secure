@@ -44,6 +44,7 @@ export type CriarAgendamentoInput = {
     data_pagamento: string | null;
     orcamento_id: string | null;
     tipo_atendimento: "particular" | "convenio";
+    forma_pagamento_prevista: string | null;
   };
   procedimentos?: string[];
   multi_exames_modo?: "laboratorio" | "imagem" | null;
