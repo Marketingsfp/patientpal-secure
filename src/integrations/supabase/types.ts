@@ -3492,6 +3492,7 @@ export type Database = {
           emitir_nfse: boolean
           empresa_id: string | null
           forma_pagamento: string | null
+          grupo_pagamento_id: string | null
           id: string
           laudo_emitido_em: string | null
           laudo_lancamento_id: string | null
@@ -3528,6 +3529,7 @@ export type Database = {
           emitir_nfse?: boolean
           empresa_id?: string | null
           forma_pagamento?: string | null
+          grupo_pagamento_id?: string | null
           id?: string
           laudo_emitido_em?: string | null
           laudo_lancamento_id?: string | null
@@ -3564,6 +3566,7 @@ export type Database = {
           emitir_nfse?: boolean
           empresa_id?: string | null
           forma_pagamento?: string | null
+          grupo_pagamento_id?: string | null
           id?: string
           laudo_emitido_em?: string | null
           laudo_lancamento_id?: string | null

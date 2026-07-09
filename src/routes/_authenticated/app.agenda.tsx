@@ -828,6 +828,13 @@ function AgendaPage() {
   const [pagamentoAgId, setPagamentoAgId] = useState<string | null>(null);
   const [pagamentoExtraIds, setPagamentoExtraIds] = useState<string[]>([]);
   const [pagamentoForma, setPagamentoForma] = useState<string>("");
+  // Peso por atendimento p/ rateio quando o pagamento é agrupado.
+  // key = agendamento_id, value = valor cheio (cartão preferido, senão dinheiro).
+  const [pagamentoPesos, setPagamentoPesos] = useState<Record<string, number>>({});
+  // Rótulo curto por atendimento p/ compor a descrição individual do lançamento.
+  const [pagamentoRotulos, setPagamentoRotulos] = useState<Record<string, string>>({});
+  // Nome do paciente do pagamento agrupado (para compor descrições individuais).
+  const [pagamentoPacienteNome, setPagamentoPacienteNome] = useState<string>("");
   // Sinaliza que após o pagamento+impressão devemos abrir a emissão da NFS-e.
   const emitirNotaAposRef = useRef(false);
   const emitenteNotaAposRef = useRef<string | null>(null);
@@ -1948,14 +1955,23 @@ function AgendaPage() {
     const procsResolvidos = await Promise.all(
       itens.map((it) => buscarProcedimentoPorNome(clinicaAtual.clinica_id, it.procedimento ?? "CONSULTA", procs)),
     );
-    for (const p of procsResolvidos as any[]) {
+    const pesos: Record<string, number> = {};
+    const rotulos: Record<string, string> = {};
+    (procsResolvidos as any[]).forEach((p, idx) => {
       const valorCartao = valorCartaoProcedimento(p);
-      totalDinheiro += primeiroValorValido(p?.valor_dinheiro, p?.valor_dinheiro_pix, p?.valor_padrao);
+      const valorDin = primeiroValorValido(p?.valor_dinheiro, p?.valor_dinheiro_pix, p?.valor_padrao);
+      totalDinheiro += valorDin;
       totalPix      += valorCartao;
       totalDebito   += valorCartao;
       totalCredito  += valorCartao;
-    }
+      // Peso p/ rateio: prioriza valor de cartão (cheio); se 0, usa dinheiro.
+      pesos[itens[idx].id] = valorCartao > 0 ? valorCartao : valorDin;
+      rotulos[itens[idx].id] = itens[idx].procedimento ?? "CONSULTA";
+    });
+    setPagamentoPesos(pesos);
+    setPagamentoRotulos(rotulos);
     const paciente = itens[0].paciente_nome;
+    setPagamentoPacienteNome(paciente);
     const desc = `${paciente} — ${itens.map(i => (i.procedimento ?? "CONSULTA")).join(" + ")} (${itens.length} serviços)`;
     const opcoes: FormaOpcao[] = [
       { forma: "dinheiro", label: "Dinheiro", valor: totalDinheiro },
@@ -3946,7 +3962,17 @@ function AgendaPage() {
 
       <LancamentoDialog
         open={pagamentoOpen}
-        onOpenChange={(v) => { setPagamentoOpen(v); if (!v) { setPagamentoAgId(null); setPagamentoExtraIds([]); setDescontoPendente(null); } }}
+        onOpenChange={(v) => {
+          setPagamentoOpen(v);
+          if (!v) {
+            setPagamentoAgId(null);
+            setPagamentoExtraIds([]);
+            setPagamentoPesos({});
+            setPagamentoRotulos({});
+            setPagamentoPacienteNome("");
+            setDescontoPendente(null);
+          }
+        }}
         tipo="receita"
         initialDescricao={pagamentoDesc}
         initialValor={pagamentoValor}
@@ -3955,24 +3981,81 @@ function AgendaPage() {
         onSavedWithData={async (dados) => {
           if (!pagamentoAgId || !clinicaAtual) return;
           const agId = pagamentoAgId;
-          // marca todos os agendamentos da cobrança agrupada como pagos
+          // Cobrança agrupada: em vez de 1 lançamento principal + N sombras (R$ 0,00),
+          // divide o valor total proporcionalmente entre os N atendimentos e cria
+          // 1 lançamento por atendimento — permitindo estorno individual sem
+          // afetar os demais do grupo.
           if (pagamentoExtraIds.length > 0) {
-            // insere linhas-sombra (valor 0) para que os demais agendamentos
-            // apareçam como "pagos" sem duplicar receita financeira
-            const sombras = pagamentoExtraIds.map((extraId) => ({
+            const todosIds = [agId, ...pagamentoExtraIds];
+            const N = todosIds.length;
+            const totalPeso = todosIds.reduce((s, id) => s + (pagamentoPesos[id] ?? 0), 0);
+            const valorTotal = Number(dados.valor) || 0;
+            // Rateio proporcional pelo peso; se soma de pesos for 0, divide igualmente.
+            const valoresRat = todosIds.map((id) =>
+              totalPeso > 0
+                ? Math.round(((pagamentoPesos[id] ?? 0) / totalPeso) * valorTotal * 100) / 100
+                : Math.round((valorTotal / N) * 100) / 100,
+            );
+            // Ajuste de arredondamento: joga a diferença no principal.
+            const somaRat = valoresRat.reduce((s, v) => s + v, 0);
+            const diff = Math.round((valorTotal - somaRat) * 100) / 100;
+            valoresRat[0] = Math.round((valoresRat[0] + diff) * 100) / 100;
+
+            const grupoId = (typeof crypto !== "undefined" && "randomUUID" in crypto)
+              ? crypto.randomUUID()
+              : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+            // 1) Localiza o lançamento principal recém-criado pelo LancamentoDialog
+            //    (agendamento_id = principal, tipo = receita, status = confirmado, mais recente).
+            const { data: principalRow, error: errPrincipal } = await supabase
+              .from("fin_lancamentos")
+              .select("id")
+              .eq("clinica_id", clinicaAtual.clinica_id)
+              .eq("agendamento_id", agId)
+              .eq("tipo", "receita")
+              .eq("status", "confirmado")
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            if (errPrincipal) {
+              mostrarErro(errPrincipal, "pagamento salvo, mas falhou ao localizar o lançamento principal");
+            }
+
+            // 2) Atualiza o principal com valor rateado + grupo_pagamento_id + descrição individual.
+            const rotuloPrincipal = pagamentoRotulos[agId] ?? "CONSULTA";
+            if (principalRow?.id) {
+              const { error: errUpdPrinc } = await supabase
+                .from("fin_lancamentos")
+                .update({
+                  valor: valoresRat[0],
+                  grupo_pagamento_id: grupoId,
+                  descricao: `${pagamentoPacienteNome} — ${rotuloPrincipal} (1/${N} do grupo)`,
+                  observacoes: `Pagamento agrupado (grupo ${grupoId}) — 1/${N} atendimentos`,
+                } as never)
+                .eq("id", principalRow.id);
+              if (errUpdPrinc) {
+                mostrarErro(errUpdPrinc, "pagamento salvo, mas falhou ao ajustar o principal");
+              }
+            }
+
+            // 3) Insere N-1 lançamentos individuais (um por extra).
+            const extrasRows = pagamentoExtraIds.map((extraId, i) => ({
               clinica_id: clinicaAtual.clinica_id,
               tipo: "receita" as const,
-              descricao: `${pagamentoDesc} — vinculado ao pagamento agrupado`,
-              valor: 0,
+              descricao: `${pagamentoPacienteNome} — ${pagamentoRotulos[extraId] ?? "CONSULTA"} (${i + 2}/${N} do grupo)`,
+              valor: valoresRat[i + 1],
               data: new Date().toISOString().slice(0, 10),
               forma_pagamento: dados.forma_pagamento,
               status: "confirmado" as const,
               agendamento_id: extraId,
-              observacoes: `Pagamento agrupado com agendamento ${agId}`,
+              grupo_pagamento_id: grupoId,
+              observacoes: `Pagamento agrupado (grupo ${grupoId}) — ${i + 2}/${N} atendimentos`,
             }));
-            const { error: errSombras } = await supabase.from("fin_lancamentos").insert(sombras);
-            if (errSombras) {
-              mostrarErro(errSombras, "pagamento salvo, mas falhou ao vincular itens extras");
+            const { error: errExtras } = await supabase
+              .from("fin_lancamentos")
+              .insert(extrasRows as never);
+            if (errExtras) {
+              mostrarErro(errExtras, "pagamento salvo, mas falhou ao vincular itens extras");
             }
           }
           setPagosSet((prev) => {
