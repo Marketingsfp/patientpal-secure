@@ -48,6 +48,14 @@ import { VoiceInput } from "@/components/voice-input";
 import { exportToExcel } from "@/lib/export-csv";
 import { usePickEmitente } from "@/components/nfse/use-pick-emitente";
 import { useAuth } from "@/hooks/use-auth";
+import {
+  getProcedimentosAgenda,
+  getMedicoProcedimentosAgenda,
+  getMedicoConveniosAgenda,
+  getProcedimentosComValor,
+  type ProcedimentoRef as ProcedimentoRefShared,
+  type MedicoProcedimentoRef as MedicoProcedimentoRefShared,
+} from "@/lib/agenda/refs-cache";
 import { useServerFn } from "@tanstack/react-start";
 import { listarEquipe } from "@/lib/equipe.functions";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
