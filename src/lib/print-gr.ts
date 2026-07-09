@@ -551,8 +551,19 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
         via_numero: viaNumero,
         impresso_por: usuarioId ?? null,
         impresso_por_nome: usuarioNome ?? null,
+        ficha_numero: fichaNum > 0 ? fichaNum : null,
       } as never);
     } catch (_) { /* falha silenciosa: registro de via não deve bloquear impressão */ }
+    // Congela o número da ficha no próprio agendamento na 1ª impressão.
+    if (!fichaJaGravada && fichaNum > 0) {
+      try {
+        await supabase
+          .from("agendamentos")
+          .update({ ficha_numero: fichaNum } as never)
+          .eq("id", agendamentoId)
+          .is("ficha_numero", null);
+      } catch (_) { /* noop */ }
+    }
   }
 }
 
