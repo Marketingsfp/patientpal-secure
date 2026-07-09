@@ -48,6 +48,12 @@ import { VoiceInput } from "@/components/voice-input";
 import { exportToExcel } from "@/lib/export-csv";
 import { usePickEmitente } from "@/components/nfse/use-pick-emitente";
 import { useAuth } from "@/hooks/use-auth";
+import {
+  getProcedimentosAgenda,
+  getMedicoProcedimentosAgenda,
+  getMedicoConveniosAgenda,
+  getProcedimentosComValor,
+} from "@/lib/agenda/refs-cache";
 import { useServerFn } from "@tanstack/react-start";
 import { listarEquipe } from "@/lib/equipe.functions";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
@@ -183,74 +189,10 @@ async function buscarProcedimentoPorNome(
   return proc ?? escolhido ?? null;
 }
 
-// Cache em memória de procedimentos da clínica (com valores) para acelerar
-// o diálogo de pagamento. TTL curto: 60s. Invalida automaticamente.
-type ProcComValor = {
-  nome: string;
-  valor_dinheiro: number | null;
-  valor_pix: number | null;
-  valor_padrao: number | null;
-  valor_cartao: number | null;
-  valor_cartao_credito: number | null;
-  valor_cartao_debito: number | null;
-  valor_dinheiro_pix: number | null;
-};
-const _procsCache = new Map<string, { ts: number; data: ProcComValor[] }>();
-const PROCS_TTL_MS = 60_000;
-async function getProcedimentosComValor(clinicaId: string): Promise<ProcComValor[]> {
-  const cached = _procsCache.get(clinicaId);
-  if (cached && Date.now() - cached.ts < PROCS_TTL_MS) return cached.data;
-  const { data } = await supabase
-    .from("procedimentos")
-    .select("nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix")
-    .eq("clinica_id", clinicaId)
-    .eq("ativo", true)
-    .limit(5000);
-  const rows = (data ?? []) as ProcComValor[];
-  _procsCache.set(clinicaId, { ts: Date.now(), data: rows });
-  return rows;
-}
-
-async function fetchProcedimentosAgenda(clinicaId: string): Promise<ProcedimentoRef[]> {
-  const pageSize = 1000;
-  const rows: ProcedimentoRef[] = [];
-
-  for (let from = 0; ; from += pageSize) {
-    const { data, error } = await supabase
-      .from("procedimentos")
-      .select("id,nome,tipo,grupo,tipo_procedimento")
-      .eq("clinica_id", clinicaId)
-      .eq("ativo", true)
-      .order("nome")
-      .range(from, from + pageSize - 1);
-
-    if (error) throw error;
-    const page = (data ?? []) as ProcedimentoRef[];
-    rows.push(...page);
-    if (page.length < pageSize) break;
-  }
-
-  return rows;
-}
-
-async function fetchMedicoProcedimentosAgenda(clinicaId: string): Promise<MedicoProcedimentoRef[]> {
-  // Filtra por clínica via inner join em medicos (evita carregar dados de
-  // outras clínicas e usa o índice idx_medicos_clinica_ativo).
-  const pageSize = 5000;
-  const rows: MedicoProcedimentoRef[] = [];
-  for (let from = 0; ; from += pageSize) {
-    const { data, error } = await supabase
-      .from("medico_procedimentos")
-      .select("medico_id,procedimento_id,especialidade_id,created_at,medicos!inner(clinica_id)")
-      .eq("medicos.clinica_id", clinicaId)
-      .range(from, from + pageSize - 1);
-    if (error) throw error;
-    const page = (data ?? []) as unknown as MedicoProcedimentoRef[];
-    rows.push(...page);
-    if (page.length < pageSize) break;
-  }
-  return rows;
-}
+// Fetchers com cache in-memory (60s / 300s) vivem em src/lib/agenda/refs-cache.ts.
+// Adaptadores locais para preservar o restante do arquivo sem renomeações.
+const fetchProcedimentosAgenda = getProcedimentosAgenda;
+const fetchMedicoProcedimentosAgenda = getMedicoProcedimentosAgenda;
 
 type DescontoConvenio =
   | { tipo: "percentual"; valor: number }
@@ -1267,13 +1209,13 @@ function AgendaPage() {
 
   const loadRef = async () => {
     if (!clinicaAtual) return;
-    const [m, e, me, pr, sr, mc, mp, er, erp, agendasRes] = await Promise.all([
+    const [m, e, me, pr, sr, mcRows, mp, er, erp, agendasRes] = await Promise.all([
       supabase.from("medicos").select("id,nome,sexo,usa_sistema,especialidade_id,procedimento_padrao_id,procedimento_padrao_em_branco").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("especialidades").select("id,nome").order("nome"),
       supabase.from("medico_especialidades").select("medico_id,especialidade_id,medicos!inner(clinica_id)").eq("medicos.clinica_id", clinicaAtual.clinica_id),
       fetchProcedimentosAgenda(clinicaAtual.clinica_id),
       supabase.from("procedimento_split_regras").select("medico_id,procedimento_id").eq("clinica_id", clinicaAtual.clinica_id).not("medico_id", "is", null),
-      supabase.from("medico_convenios").select("medico_id,nome,ativo,medicos!inner(clinica_id)").eq("ativo", true).eq("medicos.clinica_id", clinicaAtual.clinica_id),
+      getMedicoConveniosAgenda(clinicaAtual.clinica_id),
       fetchMedicoProcedimentosAgenda(clinicaAtual.clinica_id),
       supabase.from("enfermagem_recursos").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("enfermagem_recurso_procedimentos").select("recurso_id,procedimento_id,enfermagem_recursos!inner(clinica_id)").eq("enfermagem_recursos.clinica_id", clinicaAtual.clinica_id),
@@ -1424,7 +1366,7 @@ function AgendaPage() {
     setProcOpcoesPorMedico(procOpcoesMap);
     const medicosIds = new Set((((m.data ?? []) as unknown) as Medico[]).map((x) => x.id));
     const nm = new Map<string, Set<string>>();
-    for (const r of (mc.data ?? []) as Array<{ medico_id: string; nome: string }>) {
+    for (const r of (mcRows ?? []) as Array<{ medico_id: string; nome: string }>) {
       if (!r.medico_id || !medicosIds.has(r.medico_id)) continue;
       if (!nm.has(r.medico_id)) nm.set(r.medico_id, new Set());
       nm.get(r.medico_id)!.add(normalizar(r.nome));

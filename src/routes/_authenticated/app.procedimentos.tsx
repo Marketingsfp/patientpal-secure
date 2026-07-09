@@ -7,6 +7,7 @@ import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { exportToExcel } from "@/lib/export-csv";
+import { invalidateAgendaRefs } from "@/lib/agenda/refs-cache";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -820,6 +821,7 @@ function ProcedimentosPage() {
     setSaving(false);
     toast.success(editing ? "Atualizado." : "Cadastrado.");
     setOpen(false);
+    invalidateAgendaRefs(clinicaAtual.clinica_id);
     void load();
     void loadVincEsp();
     void loadConvValores();
@@ -830,6 +832,7 @@ function ProcedimentosPage() {
     const { error } = await supabase.from("procedimentos").delete().eq("id", p.id);
     if (error) { mostrarErro(error); return; }
     toast.success("Excluído.");
+    if (clinicaAtual) invalidateAgendaRefs(clinicaAtual.clinica_id);
     void load();
   };
 
