@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   Plus,
@@ -10,10 +10,8 @@ import {
   Wallet,
   CheckCircle2,
   Clock,
-  Undo2,
   Check,
   ChevronsUpDown,
-  BellRing,
   Send,
   Loader2,
   Banknote,
@@ -29,7 +27,6 @@ import { useClinica } from "@/hooks/use-clinica";
 import { useMedicoContext } from "@/hooks/use-medico-context";
 import { useServerFn } from "@tanstack/react-start";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
-import { logAction } from "@/hooks/use-crud";
 import { exportToExcel } from "@/lib/export-csv";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -444,46 +441,6 @@ function Page() {
     setLaudoTarget(null);
     await load();
   };
-
-  // Contagem de solicitações de estorno pendentes (gerenciamento agora vive em /app/financeiro/estorno).
-  const [estornoPendentes, setEstornoPendentes] = useState(0);
-  const loadEstornoCount = async () => {
-    if (!clinicaAtual) {
-      setEstornoPendentes(0);
-      return;
-    }
-    const { count } = await supabase
-      .from("estorno_solicitacoes")
-      .select("id", { count: "exact", head: true })
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .eq("status", "pendente");
-    setEstornoPendentes(count ?? 0);
-  };
-  useEffect(() => {
-    void loadEstornoCount(); /* eslint-disable-next-line react-hooks/exhaustive-deps */
-  }, [clinicaAtual?.clinica_id]);
-  useEffect(() => {
-    if (!clinicaAtual) return;
-    const ch = supabase
-      .channel(`fin-estornos-${clinicaAtual.clinica_id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "estorno_solicitacoes",
-          filter: `clinica_id=eq.${clinicaAtual.clinica_id}`,
-        },
-        () => {
-          void loadEstornoCount();
-        },
-      )
-      .subscribe();
-    return () => {
-      void supabase.removeChannel(ch);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clinicaAtual?.clinica_id]);
 
   // Perfil médico: trava o filtro no próprio profissional
   useEffect(() => {
@@ -1006,83 +963,6 @@ function Page() {
     }
   };
 
-  const estornar = async (a: Atend) => {
-    if (a.repasse_pago) {
-      toast.error("Repasse já pago — não é possível estornar. Estorne o pagamento do repasse primeiro.");
-      return;
-    }
-    if (a.origem !== "agenda") {
-      toast.error("Apenas atendimentos vindos da agenda podem ser estornados (voltam para 'Agendado').");
-      return;
-    }
-    if (!confirm("Estornar este atendimento? O agendamento voltará para o status 'Agendado'.")) return;
-    const { data: lanc, error: eLanc } = await supabase
-      .from("fin_lancamentos")
-      .select("agendamento_id, valor, descricao")
-      .eq("id", a.id)
-      .maybeSingle();
-    if (eLanc) {
-      mostrarErro(eLanc);
-      return;
-    }
-    const agId = lanc?.agendamento_id;
-    if (!agId) {
-      toast.error("Agendamento de origem não encontrado.");
-      return;
-    }
-    const { data: agAntes } = await supabase
-      .from("agendamentos")
-      .select("id, status, fluxo_etapa")
-      .eq("id", agId)
-      .maybeSingle();
-    // 1) Remove os movimentos de caixa associados a este lançamento
-    //    (recebimento e eventual abertura automática não são tocados).
-    const { error: eMov } = await supabase.from("caixa_movimentos").delete().eq("lancamento_id", a.id);
-    if (eMov) {
-      mostrarErro(eMov, "falha ao reverter caixa");
-      return;
-    }
-    // 2) Remove o lançamento de receita (libera ja_pago da fila do caixa
-    //    e zera repasse/relatórios).
-    const { error: eDel } = await supabase.from("fin_lancamentos").delete().eq("id", a.id);
-    if (eDel) {
-      mostrarErro(eDel, "falha ao excluir lançamento");
-      return;
-    }
-    // 3) Reabre o fluxo do agendamento para que possa ser cobrado de novo.
-    const { error: eUpd } = await supabase
-      .from("agendamentos")
-      .update({
-        status: "agendado",
-        fluxo_etapa: "aguardando_recepcao",
-        fluxo_atualizado_em: new Date().toISOString(),
-      })
-      .eq("id", agId);
-    if (eUpd) {
-      mostrarErro(eUpd);
-      return;
-    }
-    try {
-      await logAction({
-        table_name: "agendamentos",
-        record_id: agId,
-        action: "ESTORNO",
-        clinica_id: clinicaAtual?.clinica_id,
-        dados_antes: agAntes ?? { id: agId },
-        dados_depois: {
-          id: agId,
-          status: "agendado",
-          fin_lancamentos_id_removido: a.id,
-          valor_estornado: lanc?.valor ?? null,
-        },
-      });
-    } catch {
-      /* auditoria best-effort */
-    }
-    toast.success("Atendimento estornado — receita removida e agendamento liberado para nova cobrança.");
-    await load();
-  };
-
   const medMap = useMemo(() => new Map(medicos.map((m) => [m.id, m.nome])), [medicos]);
   const pacMap = useMemo(() => {
     const m = new Map<string, string>(pacientes.map((p) => [p.id, p.nome]));
@@ -1304,18 +1184,6 @@ function Page() {
 
   return (
     <div className="space-y-3">
-      {podeEstornar && estornoPendentes > 0 && (
-        <Link
-          to="/app/financeiro/estorno"
-          className="flex items-center gap-2 rounded-md border border-rose-300 bg-rose-50/60 px-3 py-2 text-sm text-rose-900 hover:bg-rose-100 transition-colors"
-        >
-          <BellRing className="h-4 w-4 text-rose-700" />
-          <strong>
-            {estornoPendentes} solicitação(ões) de estorno pendente(s)
-          </strong>
-          <span className="text-xs text-rose-700/80">— clique para gerenciar na aba Estorno</span>
-        </Link>
-      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold leading-tight">Atendimentos</h1>
@@ -1804,17 +1672,6 @@ function Page() {
                               >
                                 <Send className="h-3.5 w-3.5" />
                               </Button>
-                              {podeEstornar && !a.repasse_pago && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7"
-                                  title="Estornar"
-                                  onClick={() => estornar(a)}
-                                >
-                                  <Undo2 className="h-3.5 w-3.5 text-amber-600" />
-                                </Button>
-                              )}
                               {a.repasse_pago && (
                                 <Button
                                   variant="ghost"
