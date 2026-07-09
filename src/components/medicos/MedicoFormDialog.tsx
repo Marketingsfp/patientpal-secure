@@ -1320,12 +1320,19 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                         <tbody>
                           {convenios.map((c, i) => {
                             const catLbl = labelCategoria(c.nome);
+                            const servicoLbl = !catLbl && c.nome
+                              ? labelServicoPorNomeKey.get(normalizarNome(c.nome)) ?? null
+                              : null;
                             return (
                             <tr key={i} className="border-t align-middle">
                               <td className="px-2 py-1">
                                 {catLbl ? (
                                   <div className="px-2 py-1.5 text-sm font-medium uppercase tracking-wide text-foreground/80">
                                     {catLbl}
+                                  </div>
+                                ) : servicoLbl ? (
+                                  <div className="px-2 py-1.5 text-sm text-foreground/90">
+                                    {servicoLbl}
                                   </div>
                                 ) : (
                                   <select
@@ -1354,7 +1361,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                                   onChange={(e) => setConvenios((cs) => cs.map((x, j) => j === i ? (c.tipo_repasse === "percentual" ? { ...x, percentual: e.target.value } : { ...x, valor: e.target.value }) : x))} />
                               </td>
                               <td className="px-2 py-1 text-right">
-                                {catLbl ? null : (
+                                {catLbl || servicoLbl ? null : (
                                   <Button type="button" size="icon" variant="ghost"
                                     onClick={() => setConvenios((cs) => cs.filter((_, j) => j !== i))} aria-label="Remover">
                                     <Trash2 className="h-4 w-4" />
