@@ -1185,18 +1185,6 @@ function Page() {
 
   return (
     <div className="space-y-3">
-      {podeEstornar && estornoPendentes > 0 && (
-        <Link
-          to="/app/financeiro/estorno"
-          className="flex items-center gap-2 rounded-md border border-rose-300 bg-rose-50/60 px-3 py-2 text-sm text-rose-900 hover:bg-rose-100 transition-colors"
-        >
-          <BellRing className="h-4 w-4 text-rose-700" />
-          <strong>
-            {estornoPendentes} solicitação(ões) de estorno pendente(s)
-          </strong>
-          <span className="text-xs text-rose-700/80">— clique para gerenciar na aba Estorno</span>
-        </Link>
-      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold leading-tight">Atendimentos</h1>
@@ -1685,17 +1673,6 @@ function Page() {
                               >
                                 <Send className="h-3.5 w-3.5" />
                               </Button>
-                              {podeEstornar && !a.repasse_pago && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7"
-                                  title="Estornar"
-                                  onClick={() => estornar(a)}
-                                >
-                                  <Undo2 className="h-3.5 w-3.5 text-amber-600" />
-                                </Button>
-                              )}
                               {a.repasse_pago && (
                                 <Button
                                   variant="ghost"
