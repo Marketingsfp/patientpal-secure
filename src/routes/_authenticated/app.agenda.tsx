@@ -3545,6 +3545,25 @@ function AgendaPage() {
                 </div>
               )}
               <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Forma de pagamento prevista</Label>
+                <Select
+                  value={form.forma_pagamento_prevista || "nao_informado"}
+                  onValueChange={(v) => setForm((f) => ({ ...f, forma_pagamento_prevista: v === "nao_informado" ? "" : v }))}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="nao_informado">Não informada (definir na cobrança)</SelectItem>
+                    <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                    <SelectItem value="pix">PIX</SelectItem>
+                    <SelectItem value="cartao_credito">Cartão de Crédito</SelectItem>
+                    <SelectItem value="cartao_debito">Cartão de Débito</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-slate-500">
+                  Registra como o paciente pretende pagar. A forma real ainda é definida na cobrança.
+                </p>
+              </div>
+              <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-slate-700">Médico ou Exame <span className="text-rose-500">*</span></Label>
                 <SearchableSelect
                   value={form.medico_id || "none"}
