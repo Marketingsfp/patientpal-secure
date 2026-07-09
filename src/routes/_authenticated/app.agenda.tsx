@@ -833,6 +833,8 @@ function AgendaPage() {
   const [pagamentoPesos, setPagamentoPesos] = useState<Record<string, number>>({});
   // Rótulo curto por atendimento p/ compor a descrição individual do lançamento.
   const [pagamentoRotulos, setPagamentoRotulos] = useState<Record<string, string>>({});
+  // Nome do paciente do pagamento agrupado (para compor descrições individuais).
+  const [pagamentoPacienteNome, setPagamentoPacienteNome] = useState<string>("");
   // Sinaliza que após o pagamento+impressão devemos abrir a emissão da NFS-e.
   const emitirNotaAposRef = useRef(false);
   const emitenteNotaAposRef = useRef<string | null>(null);
