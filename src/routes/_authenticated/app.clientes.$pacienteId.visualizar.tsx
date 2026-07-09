@@ -44,7 +44,7 @@ function VisualizarClientePage() {
   const voltar = () => navigate({ to: "/app/clientes" });
 
   return (
-    <div className="flex flex-col gap-6 min-h-[calc(100dvh-8rem)]">
+    <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
           <Button variant="outline" size="sm" onClick={voltar}>
@@ -96,9 +96,7 @@ function VisualizarClientePage() {
         <PacienteCartoesBeneficios pacienteId={paciente.id} clinicaId={clinicaAtual.clinica_id} />
       )}
       {!loading && paciente && clinicaAtual && (
-        <div className="flex-1 flex flex-col [&>*]:flex-1">
-          <PacienteAtendimentosResumo pacienteId={paciente.id} clinicaId={clinicaAtual.clinica_id} />
-        </div>
+        <PacienteAtendimentosResumo pacienteId={paciente.id} clinicaId={clinicaAtual.clinica_id} />
       )}
     </div>
   );
