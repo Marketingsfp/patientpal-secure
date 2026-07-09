@@ -1327,7 +1327,7 @@ function Page() {
                           <TableCell className="whitespace-nowrap">{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</TableCell>
                           <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
                           <TableCell>{m.descricao || "—"}</TableCell>
-                          <TableCell>{m.forma_pagamento || "—"}</TableCell>
+                          <TableCell className="text-xs">{formatarFormaPagamento(m, mistoObs)}</TableCell>
                           <TableCell className={`text-right font-medium ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
                             {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
                           </TableCell>
@@ -1946,7 +1946,7 @@ function Page() {
                         <TableCell>{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</TableCell>
                         <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
                         <TableCell>{m.descricao || "—"}</TableCell>
-                        <TableCell>{m.forma_pagamento || "—"}</TableCell>
+                        <TableCell className="text-xs">{formatarFormaPagamento(m, mistoObs)}</TableCell>
                         <TableCell className={`text-right ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
                           {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
                         </TableCell>
@@ -2021,7 +2021,7 @@ function Page() {
                         <TableCell className="whitespace-nowrap">{fmtDT(m.created_at)}</TableCell>
                         <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
                         <TableCell>{m.descricao ?? "—"}</TableCell>
-                        <TableCell>{m.forma_pagamento ?? "—"}</TableCell>
+                        <TableCell className="text-xs">{formatarFormaPagamento(m, mistoObs)}</TableCell>
                         <TableCell className={`text-right font-semibold ${TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : ""}`}>
                           {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
                         </TableCell>
