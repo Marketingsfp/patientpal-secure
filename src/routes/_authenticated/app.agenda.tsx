@@ -44,6 +44,7 @@ import {
   MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, Clock, DollarSign, ShieldCheck, BadgeCheck, IdCard, Play, FileText,
 } from "lucide-react";
 import { printGuiaAtendimento, printGuiaAtendimentoAgrupada } from "@/lib/print-gr";
+import { printComprovanteAgendamento } from "@/lib/print-comprovante-agendamento";
 import { VoiceInput } from "@/components/voice-input";
 import { exportToExcel } from "@/lib/export-csv";
 import { usePickEmitente } from "@/components/nfse/use-pick-emitente";
@@ -3208,6 +3209,19 @@ function AgendaPage() {
     }
   };
 
+  const imprimirComprovante = async (a: Agendamento) => {
+    if (!clinicaAtual) return;
+    try {
+      await printComprovanteAgendamento({
+        agendamentoId: a.id,
+        clinicaId: clinicaAtual.clinica_id,
+        usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
+      });
+    } catch (err) {
+      mostrarErro(err);
+    }
+  };
+
   const shiftData = (delta: number) => {
     const d = new Date(`${dataRef}T12:00:00`);
     d.setDate(d.getDate() + delta);
@@ -4787,6 +4801,9 @@ function AgendaPage() {
                           {!pagosSet.has(a.id) && (
                             <span className="ml-2 text-xs text-muted-foreground">(pagar primeiro)</span>
                           )}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => imprimirComprovante(a)}>
+                          <Printer className="h-4 w-4 mr-2" /> Comprovante de agendamento
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => {
                           const url = `${window.location.origin}/p/${(a as any).token_publico}`;
