@@ -673,11 +673,20 @@ function NovoOrcamentoDialog({
 
   const alternarMedicoExterno = (externo: boolean) => {
     setMedicoExterno(externo);
+    setMedicoParticular(false);
     if (externo) {
       setMedicoId("");
     } else {
       setClinicaSolicitante("");
     }
+  };
+
+  const ativarParticular = () => {
+    setMedicoParticular(true);
+    setMedicoExterno(false);
+    setMedicoId("");
+    setMedicoNome("");
+    setClinicaSolicitante("");
   };
 
   const selecionarPaciente = (p: PatientOption | null) => {
