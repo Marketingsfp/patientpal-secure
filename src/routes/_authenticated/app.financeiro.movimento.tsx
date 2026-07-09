@@ -34,6 +34,8 @@ interface Lanc {
   origem?: "fin" | "caixa";
   /** direção da transferência: entrada (suprimento) ou saída (sangria) */
   transferSentido?: "entrada" | "saida";
+  /** HH:MM local — só preenchido para linhas vindas de caixa_movimentos */
+  hora?: string | null;
 }
 interface Opt { id: string; nome: string; tipo?: string }
 
