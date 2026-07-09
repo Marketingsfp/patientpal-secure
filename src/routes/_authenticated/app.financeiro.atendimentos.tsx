@@ -2027,6 +2027,20 @@ function Page() {
               <span className="font-semibold text-primary">{fmt(selectedTotal)}</span>
             </div>
             <div className="space-y-2">
+              <Label>Valor do repasse (opcional)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder={`Padrão: ${fmt(selectedTotal)}`}
+                value={payForm.valor_manual}
+                onChange={(e) => setPayForm({ ...payForm, valor_manual: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground">
+                Deixe em branco para usar o valor calculado. Para alterar manualmente, selecione atendimentos de apenas um médico.
+              </p>
+            </div>
+            <div className="space-y-2">
               <Label>Data do pagamento</Label>
               <Input
                 type="date"
