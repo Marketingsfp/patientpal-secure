@@ -1580,6 +1580,8 @@ export type Database = {
           clinica_id: string
           created_at: string
           descricao: string | null
+          destino_nome: string | null
+          destino_user_id: string | null
           forma_pagamento: string | null
           id: string
           lancamento_id: string | null
@@ -1592,6 +1594,8 @@ export type Database = {
           clinica_id: string
           created_at?: string
           descricao?: string | null
+          destino_nome?: string | null
+          destino_user_id?: string | null
           forma_pagamento?: string | null
           id?: string
           lancamento_id?: string | null
@@ -1604,6 +1608,8 @@ export type Database = {
           clinica_id?: string
           created_at?: string
           descricao?: string | null
+          destino_nome?: string | null
+          destino_user_id?: string | null
           forma_pagamento?: string | null
           id?: string
           lancamento_id?: string | null
