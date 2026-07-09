@@ -3744,7 +3744,7 @@ function AgendaPage() {
                         ? `Desconto: ${descontoPendente.tipo === "percentual" ? `${descontoPendente.input}%` : `R$ ${descontoPendente.input}`}`
                         : "Desconto"}
                     </Button>
-                    <div className="flex flex-wrap gap-2 sm:justify-end">
+                    <div className="flex flex-nowrap gap-2 sm:justify-end">
                     <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={saving}>
                       Cancelar
                     </Button>
