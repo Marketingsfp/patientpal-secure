@@ -31,6 +31,7 @@ import {
 import { SolicitarEstornoDialog } from "@/components/financeiro/SolicitarEstornoDialog";
 import { useCaixaV2Flag } from "@/hooks/use-caixa-v2-flag";
 import { CaixaV2Mount } from "@/components/caixa-v2/caixa-v2-mount";
+import { printComprovanteCaixa } from "@/lib/print-caixa-comprovante";
 
 export const Route = createFileRoute("/_authenticated/app/caixa")({
   component: CaixaRouteDispatcher,
@@ -641,9 +642,20 @@ function Page() {
     setSaving(false);
     if (error) { mostrarErro(error); return; }
     setOpenMov(null);
+    const tipoLancado = openMov.tipo;
+    const descLancada = (movDesc || "") + sufixoCartao;
     setMovValor(""); setMovDesc(""); setMovForma("dinheiro");
     setMovBandeira(""); setMovParcelas("1");
-    toast.success(`${TIPO_LABEL[openMov.tipo]} registrada`);
+    toast.success(`${TIPO_LABEL[tipoLancado]} registrada`);
+    if (tipoLancado === "sangria" || tipoLancado === "suprimento") {
+      printComprovanteCaixa({
+        tipo: tipoLancado,
+        clinicaNome: clinicaAtual.clinica?.nome ?? "Clínica",
+        operadorNome: minhaSessao.user_nome || user.user_metadata?.nome || user.email || "Atendente",
+        valor: v,
+        descricao: descLancada || null,
+      });
+    }
     void load();
   };
 
@@ -679,8 +691,66 @@ function Page() {
     setSaving(false);
     if (error) { mostrarErro(error); return; }
     setOpenFechar(false);
+    const obsFinal = obsFechamento;
     setValorInformado(""); setObsFechamento("");
     toast.success("Caixa fechado");
+    // Total recebido por forma de pagamento na sessão
+    const porForma: Record<string, number> = {};
+    const mistoLancIds: string[] = [];
+    minhasMovs.forEach((m) => {
+      if (m.tipo !== "recebimento") return;
+      const k = (m.forma_pagamento || "outros").toLowerCase();
+      if (k === "misto" && m.lancamento_id) mistoLancIds.push(m.lancamento_id);
+      porForma[k] = (porForma[k] || 0) + Number(m.valor || 0);
+    });
+    // Decompõe "misto" nas formas reais consultando observacoes do lançamento.
+    if (mistoLancIds.length > 0) {
+      const { data: lancs } = await supabase
+        .from("fin_lancamentos")
+        .select("id, observacoes")
+        .in("id", mistoLancIds);
+      const LABEL_TO_KEY: Array<[RegExp, string]> = [
+        [/^cart[ãa]o\s*cr[ée]dito/i, "credito"],
+        [/^cart[ãa]o\s*d[ée]bito/i, "debito"],
+        [/^dinheiro/i, "dinheiro"],
+        [/^pix/i, "pix"],
+        [/^boleto/i, "boleto"],
+        [/^conv[êe]nio/i, "convenio"],
+        [/^transfer[êe]ncia/i, "transferencia"],
+      ];
+      const parseBRL = (s: string) => Number(s.replace(/\./g, "").replace(",", ".")) || 0;
+      (lancs ?? []).forEach((l: { observacoes: string | null }) => {
+        const obs = l.observacoes ?? "";
+        const idx = obs.indexOf("Pagamento misto:");
+        if (idx < 0) return;
+        const trecho = obs.slice(idx + "Pagamento misto:".length).split(" | ")[0];
+        const partes = trecho.split(";").map((s) => s.trim()).filter(Boolean);
+        let somaDecomposta = 0;
+        for (const p of partes) {
+          const match = LABEL_TO_KEY.find(([re]) => re.test(p));
+          if (!match) continue;
+          const valMatch = p.match(/R\$\s*([\d\.]+,\d{2})/);
+          if (!valMatch) continue;
+          const v = parseBRL(valMatch[1]);
+          porForma[match[1]] = (porForma[match[1]] || 0) + v;
+          somaDecomposta += v;
+        }
+        // Remove do bucket "misto" o que foi decomposto
+        porForma.misto = Math.max(0, (porForma.misto || 0) - somaDecomposta);
+      });
+      if ((porForma.misto || 0) < 0.005) delete porForma.misto;
+    }
+    printComprovanteCaixa({
+      tipo: "fechamento",
+      clinicaNome: clinicaAtual.clinica?.nome ?? "Clínica",
+      operadorNome: minhaSessao.user_nome || user.user_metadata?.nome || user.email || "Atendente",
+      valor: informado,
+      saldoCalculado: saldoAtual,
+      valorInformado: informado,
+      diferenca: diff,
+      descricao: obsFinal || null,
+      porForma,
+    });
     void load();
   };
 

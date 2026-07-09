@@ -88,6 +88,7 @@ import { Route as AuthenticatedAppCargosRouteImport } from './routes/_authentica
 import { Route as AuthenticatedAppCampanhasRouteImport } from './routes/_authenticated/app.campanhas'
 import { Route as AuthenticatedAppCaixaRouteImport } from './routes/_authenticated/app.caixa'
 import { Route as AuthenticatedAppBoletosRouteImport } from './routes/_authenticated/app.boletos'
+import { Route as AuthenticatedAppBackupsRouteImport } from './routes/_authenticated/app.backups'
 import { Route as AuthenticatedAppAuditoriaRouteImport } from './routes/_authenticated/app.auditoria'
 import { Route as AuthenticatedAppAtendimentoMultiploRouteImport } from './routes/_authenticated/app.atendimento-multiplo'
 import { Route as AuthenticatedAppAtendimentoIaRouteImport } from './routes/_authenticated/app.atendimento-ia'
@@ -101,6 +102,7 @@ import { Route as AuthenticatedAppEquipeIndexRouteImport } from './routes/_authe
 import { Route as AuthenticatedAppClientesIndexRouteImport } from './routes/_authenticated/app.clientes.index'
 import { Route as AuthenticatedAppAtendimentoIaIndexRouteImport } from './routes/_authenticated/app.atendimento-ia.index'
 import { Route as ApiPublicWhatsappClinicaIdRouteImport } from './routes/api/public/whatsapp.$clinicaId'
+import { Route as ApiPublicHooksBackupDiarioRouteImport } from './routes/api/public/hooks/backup-diario'
 import { Route as ApiPublicFocusnfeWebhookRouteImport } from './routes/api/public/focusnfe.webhook'
 import { Route as AuthenticatedAppNfseTestarRouteImport } from './routes/_authenticated/app.nfse.testar'
 import { Route as AuthenticatedAppMedicoMedicoIdRouteImport } from './routes/_authenticated/app.medico.$medicoId'
@@ -129,6 +131,7 @@ import { Route as AuthenticatedAppCartaoBeneficiosContratosRouteImport } from '.
 import { Route as AuthenticatedAppCartaoBeneficiosBeneficiosRouteImport } from './routes/_authenticated/app.cartao-beneficios.beneficios'
 import { Route as AuthenticatedAppAtendimentoIaAgendamentoIdRouteImport } from './routes/_authenticated/app.atendimento-ia.$agendamentoId'
 import { Route as AuthenticatedAppAgendaExpressRouteImport } from './routes/_authenticated/app.agenda.express'
+import { Route as AuthenticatedAppClientesPacienteIdVisualizarRouteImport } from './routes/_authenticated/app.clientes.$pacienteId.visualizar'
 import { Route as AuthenticatedAppClientesPacienteIdEditarRouteImport } from './routes/_authenticated/app.clientes.$pacienteId.editar'
 import { Route as AuthenticatedAppEquipeMedicoMedicoIdEditarRouteImport } from './routes/_authenticated/app.equipe.medico.$medicoId.editar'
 import { Route as AuthenticatedAppEquipeFuncionarioUserIdEditarRouteImport } from './routes/_authenticated/app.equipe.funcionario.$userId.editar'
@@ -568,6 +571,11 @@ const AuthenticatedAppBoletosRoute = AuthenticatedAppBoletosRouteImport.update({
   path: '/boletos',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
+const AuthenticatedAppBackupsRoute = AuthenticatedAppBackupsRouteImport.update({
+  id: '/backups',
+  path: '/backups',
+  getParentRoute: () => AuthenticatedAppRoute,
+} as any)
 const AuthenticatedAppAuditoriaRoute =
   AuthenticatedAppAuditoriaRouteImport.update({
     id: '/auditoria',
@@ -643,6 +651,12 @@ const ApiPublicWhatsappClinicaIdRoute =
   ApiPublicWhatsappClinicaIdRouteImport.update({
     id: '/api/public/whatsapp/$clinicaId',
     path: '/api/public/whatsapp/$clinicaId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksBackupDiarioRoute =
+  ApiPublicHooksBackupDiarioRouteImport.update({
+    id: '/api/public/hooks/backup-diario',
+    path: '/api/public/hooks/backup-diario',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicFocusnfeWebhookRoute =
@@ -813,6 +827,12 @@ const AuthenticatedAppAgendaExpressRoute =
     path: '/express',
     getParentRoute: () => AuthenticatedAppAgendaRoute,
   } as any)
+const AuthenticatedAppClientesPacienteIdVisualizarRoute =
+  AuthenticatedAppClientesPacienteIdVisualizarRouteImport.update({
+    id: '/clientes/$pacienteId/visualizar',
+    path: '/clientes/$pacienteId/visualizar',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppClientesPacienteIdEditarRoute =
   AuthenticatedAppClientesPacienteIdEditarRouteImport.update({
     id: '/clientes/$pacienteId/editar',
@@ -864,6 +884,7 @@ export interface FileRoutesByFullPath {
   '/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaRouteWithChildren
   '/app/atendimento-multiplo': typeof AuthenticatedAppAtendimentoMultiploRoute
   '/app/auditoria': typeof AuthenticatedAppAuditoriaRoute
+  '/app/backups': typeof AuthenticatedAppBackupsRoute
   '/app/boletos': typeof AuthenticatedAppBoletosRoute
   '/app/caixa': typeof AuthenticatedAppCaixaRoute
   '/app/campanhas': typeof AuthenticatedAppCampanhasRoute
@@ -952,6 +973,7 @@ export interface FileRoutesByFullPath {
   '/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
   '/app/nfse/testar': typeof AuthenticatedAppNfseTestarRoute
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
+  '/api/public/hooks/backup-diario': typeof ApiPublicHooksBackupDiarioRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/app/atendimento-ia/': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/app/clientes/': typeof AuthenticatedAppClientesIndexRoute
@@ -959,6 +981,7 @@ export interface FileRoutesByFullPath {
   '/app/financeiro/': typeof AuthenticatedAppFinanceiroIndexRoute
   '/app/nfse/': typeof AuthenticatedAppNfseIndexRoute
   '/app/clientes/$pacienteId/editar': typeof AuthenticatedAppClientesPacienteIdEditarRoute
+  '/app/clientes/$pacienteId/visualizar': typeof AuthenticatedAppClientesPacienteIdVisualizarRoute
   '/app/equipe/enfermeiro/$userId/editar': typeof AuthenticatedAppEquipeEnfermeiroUserIdEditarRoute
   '/app/equipe/funcionario/$userId/editar': typeof AuthenticatedAppEquipeFuncionarioUserIdEditarRoute
   '/app/equipe/medico/$medicoId/editar': typeof AuthenticatedAppEquipeMedicoMedicoIdEditarRoute
@@ -987,6 +1010,7 @@ export interface FileRoutesByTo {
   '/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
   '/app/atendimento-multiplo': typeof AuthenticatedAppAtendimentoMultiploRoute
   '/app/auditoria': typeof AuthenticatedAppAuditoriaRoute
+  '/app/backups': typeof AuthenticatedAppBackupsRoute
   '/app/boletos': typeof AuthenticatedAppBoletosRoute
   '/app/caixa': typeof AuthenticatedAppCaixaRoute
   '/app/campanhas': typeof AuthenticatedAppCampanhasRoute
@@ -1073,6 +1097,7 @@ export interface FileRoutesByTo {
   '/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
   '/app/nfse/testar': typeof AuthenticatedAppNfseTestarRoute
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
+  '/api/public/hooks/backup-diario': typeof ApiPublicHooksBackupDiarioRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/app/clientes': typeof AuthenticatedAppClientesIndexRoute
@@ -1080,6 +1105,7 @@ export interface FileRoutesByTo {
   '/app/financeiro': typeof AuthenticatedAppFinanceiroIndexRoute
   '/app/nfse': typeof AuthenticatedAppNfseIndexRoute
   '/app/clientes/$pacienteId/editar': typeof AuthenticatedAppClientesPacienteIdEditarRoute
+  '/app/clientes/$pacienteId/visualizar': typeof AuthenticatedAppClientesPacienteIdVisualizarRoute
   '/app/equipe/enfermeiro/$userId/editar': typeof AuthenticatedAppEquipeEnfermeiroUserIdEditarRoute
   '/app/equipe/funcionario/$userId/editar': typeof AuthenticatedAppEquipeFuncionarioUserIdEditarRoute
   '/app/equipe/medico/$medicoId/editar': typeof AuthenticatedAppEquipeMedicoMedicoIdEditarRoute
@@ -1112,6 +1138,7 @@ export interface FileRoutesById {
   '/_authenticated/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaRouteWithChildren
   '/_authenticated/app/atendimento-multiplo': typeof AuthenticatedAppAtendimentoMultiploRoute
   '/_authenticated/app/auditoria': typeof AuthenticatedAppAuditoriaRoute
+  '/_authenticated/app/backups': typeof AuthenticatedAppBackupsRoute
   '/_authenticated/app/boletos': typeof AuthenticatedAppBoletosRoute
   '/_authenticated/app/caixa': typeof AuthenticatedAppCaixaRoute
   '/_authenticated/app/campanhas': typeof AuthenticatedAppCampanhasRoute
@@ -1200,6 +1227,7 @@ export interface FileRoutesById {
   '/_authenticated/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
   '/_authenticated/app/nfse/testar': typeof AuthenticatedAppNfseTestarRoute
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
+  '/api/public/hooks/backup-diario': typeof ApiPublicHooksBackupDiarioRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/_authenticated/app/atendimento-ia/': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/_authenticated/app/clientes/': typeof AuthenticatedAppClientesIndexRoute
@@ -1207,6 +1235,7 @@ export interface FileRoutesById {
   '/_authenticated/app/financeiro/': typeof AuthenticatedAppFinanceiroIndexRoute
   '/_authenticated/app/nfse/': typeof AuthenticatedAppNfseIndexRoute
   '/_authenticated/app/clientes/$pacienteId/editar': typeof AuthenticatedAppClientesPacienteIdEditarRoute
+  '/_authenticated/app/clientes/$pacienteId/visualizar': typeof AuthenticatedAppClientesPacienteIdVisualizarRoute
   '/_authenticated/app/equipe/enfermeiro/$userId/editar': typeof AuthenticatedAppEquipeEnfermeiroUserIdEditarRoute
   '/_authenticated/app/equipe/funcionario/$userId/editar': typeof AuthenticatedAppEquipeFuncionarioUserIdEditarRoute
   '/_authenticated/app/equipe/medico/$medicoId/editar': typeof AuthenticatedAppEquipeMedicoMedicoIdEditarRoute
@@ -1239,6 +1268,7 @@ export interface FileRouteTypes {
     | '/app/atendimento-ia'
     | '/app/atendimento-multiplo'
     | '/app/auditoria'
+    | '/app/backups'
     | '/app/boletos'
     | '/app/caixa'
     | '/app/campanhas'
@@ -1327,6 +1357,7 @@ export interface FileRouteTypes {
     | '/app/medico/$medicoId'
     | '/app/nfse/testar'
     | '/api/public/focusnfe/webhook'
+    | '/api/public/hooks/backup-diario'
     | '/api/public/whatsapp/$clinicaId'
     | '/app/atendimento-ia/'
     | '/app/clientes/'
@@ -1334,6 +1365,7 @@ export interface FileRouteTypes {
     | '/app/financeiro/'
     | '/app/nfse/'
     | '/app/clientes/$pacienteId/editar'
+    | '/app/clientes/$pacienteId/visualizar'
     | '/app/equipe/enfermeiro/$userId/editar'
     | '/app/equipe/funcionario/$userId/editar'
     | '/app/equipe/medico/$medicoId/editar'
@@ -1362,6 +1394,7 @@ export interface FileRouteTypes {
     | '/app/anamneses'
     | '/app/atendimento-multiplo'
     | '/app/auditoria'
+    | '/app/backups'
     | '/app/boletos'
     | '/app/caixa'
     | '/app/campanhas'
@@ -1448,6 +1481,7 @@ export interface FileRouteTypes {
     | '/app/medico/$medicoId'
     | '/app/nfse/testar'
     | '/api/public/focusnfe/webhook'
+    | '/api/public/hooks/backup-diario'
     | '/api/public/whatsapp/$clinicaId'
     | '/app/atendimento-ia'
     | '/app/clientes'
@@ -1455,6 +1489,7 @@ export interface FileRouteTypes {
     | '/app/financeiro'
     | '/app/nfse'
     | '/app/clientes/$pacienteId/editar'
+    | '/app/clientes/$pacienteId/visualizar'
     | '/app/equipe/enfermeiro/$userId/editar'
     | '/app/equipe/funcionario/$userId/editar'
     | '/app/equipe/medico/$medicoId/editar'
@@ -1486,6 +1521,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/atendimento-ia'
     | '/_authenticated/app/atendimento-multiplo'
     | '/_authenticated/app/auditoria'
+    | '/_authenticated/app/backups'
     | '/_authenticated/app/boletos'
     | '/_authenticated/app/caixa'
     | '/_authenticated/app/campanhas'
@@ -1574,6 +1610,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/medico/$medicoId'
     | '/_authenticated/app/nfse/testar'
     | '/api/public/focusnfe/webhook'
+    | '/api/public/hooks/backup-diario'
     | '/api/public/whatsapp/$clinicaId'
     | '/_authenticated/app/atendimento-ia/'
     | '/_authenticated/app/clientes/'
@@ -1581,6 +1618,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/financeiro/'
     | '/_authenticated/app/nfse/'
     | '/_authenticated/app/clientes/$pacienteId/editar'
+    | '/_authenticated/app/clientes/$pacienteId/visualizar'
     | '/_authenticated/app/equipe/enfermeiro/$userId/editar'
     | '/_authenticated/app/equipe/funcionario/$userId/editar'
     | '/_authenticated/app/equipe/medico/$medicoId/editar'
@@ -1607,6 +1645,7 @@ export interface RootRouteChildren {
   PacienteIndexRoute: typeof PacienteIndexRoute
   PContratoTokenRoute: typeof PContratoTokenRoute
   ApiPublicFocusnfeWebhookRoute: typeof ApiPublicFocusnfeWebhookRoute
+  ApiPublicHooksBackupDiarioRoute: typeof ApiPublicHooksBackupDiarioRoute
   ApiPublicWhatsappClinicaIdRoute: typeof ApiPublicWhatsappClinicaIdRoute
 }
 
@@ -2165,6 +2204,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppBoletosRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/app/backups': {
+      id: '/_authenticated/app/backups'
+      path: '/backups'
+      fullPath: '/app/backups'
+      preLoaderRoute: typeof AuthenticatedAppBackupsRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/app/auditoria': {
       id: '/_authenticated/app/auditoria'
       path: '/auditoria'
@@ -2254,6 +2300,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/whatsapp/$clinicaId'
       fullPath: '/api/public/whatsapp/$clinicaId'
       preLoaderRoute: typeof ApiPublicWhatsappClinicaIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/backup-diario': {
+      id: '/api/public/hooks/backup-diario'
+      path: '/api/public/hooks/backup-diario'
+      fullPath: '/api/public/hooks/backup-diario'
+      preLoaderRoute: typeof ApiPublicHooksBackupDiarioRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/focusnfe/webhook': {
@@ -2452,6 +2505,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppAgendaExpressRouteImport
       parentRoute: typeof AuthenticatedAppAgendaRoute
     }
+    '/_authenticated/app/clientes/$pacienteId/visualizar': {
+      id: '/_authenticated/app/clientes/$pacienteId/visualizar'
+      path: '/clientes/$pacienteId/visualizar'
+      fullPath: '/app/clientes/$pacienteId/visualizar'
+      preLoaderRoute: typeof AuthenticatedAppClientesPacienteIdVisualizarRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/app/clientes/$pacienteId/editar': {
       id: '/_authenticated/app/clientes/$pacienteId/editar'
       path: '/clientes/$pacienteId/editar'
@@ -2627,6 +2687,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppAtendimentoIaRoute: typeof AuthenticatedAppAtendimentoIaRouteWithChildren
   AuthenticatedAppAtendimentoMultiploRoute: typeof AuthenticatedAppAtendimentoMultiploRoute
   AuthenticatedAppAuditoriaRoute: typeof AuthenticatedAppAuditoriaRoute
+  AuthenticatedAppBackupsRoute: typeof AuthenticatedAppBackupsRoute
   AuthenticatedAppBoletosRoute: typeof AuthenticatedAppBoletosRoute
   AuthenticatedAppCaixaRoute: typeof AuthenticatedAppCaixaRoute
   AuthenticatedAppCampanhasRoute: typeof AuthenticatedAppCampanhasRoute
@@ -2695,6 +2756,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppClientesIndexRoute: typeof AuthenticatedAppClientesIndexRoute
   AuthenticatedAppNfseIndexRoute: typeof AuthenticatedAppNfseIndexRoute
   AuthenticatedAppClientesPacienteIdEditarRoute: typeof AuthenticatedAppClientesPacienteIdEditarRoute
+  AuthenticatedAppClientesPacienteIdVisualizarRoute: typeof AuthenticatedAppClientesPacienteIdVisualizarRoute
 }
 
 const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
@@ -2708,6 +2770,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppAtendimentoMultiploRoute:
     AuthenticatedAppAtendimentoMultiploRoute,
   AuthenticatedAppAuditoriaRoute: AuthenticatedAppAuditoriaRoute,
+  AuthenticatedAppBackupsRoute: AuthenticatedAppBackupsRoute,
   AuthenticatedAppBoletosRoute: AuthenticatedAppBoletosRoute,
   AuthenticatedAppCaixaRoute: AuthenticatedAppCaixaRoute,
   AuthenticatedAppCampanhasRoute: AuthenticatedAppCampanhasRoute,
@@ -2788,6 +2851,8 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppNfseIndexRoute: AuthenticatedAppNfseIndexRoute,
   AuthenticatedAppClientesPacienteIdEditarRoute:
     AuthenticatedAppClientesPacienteIdEditarRoute,
+  AuthenticatedAppClientesPacienteIdVisualizarRoute:
+    AuthenticatedAppClientesPacienteIdVisualizarRoute,
 }
 
 const AuthenticatedAppRouteWithChildren =
@@ -2826,6 +2891,7 @@ const rootRouteChildren: RootRouteChildren = {
   PacienteIndexRoute: PacienteIndexRoute,
   PContratoTokenRoute: PContratoTokenRoute,
   ApiPublicFocusnfeWebhookRoute: ApiPublicFocusnfeWebhookRoute,
+  ApiPublicHooksBackupDiarioRoute: ApiPublicHooksBackupDiarioRoute,
   ApiPublicWhatsappClinicaIdRoute: ApiPublicWhatsappClinicaIdRoute,
 }
 export const routeTree = rootRouteImport

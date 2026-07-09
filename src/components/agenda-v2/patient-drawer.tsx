@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { HhpChip } from "@/design-system/hhp";
 import { HhpDrawer } from "@/design-system/hhp/drawer";
 import type { StatusAgendamento } from "@/lib/agenda/status-agendamento.functions";
+import { FichaEmUsoAlert } from "@/components/agenda/ficha-em-uso-alert";
 
 export interface DrawerPatientData {
   paciente_id?: string | null;
@@ -142,6 +143,12 @@ export function PatientDrawer({
     >
       {data && (
           <div className="animate-in fade-in duration-150">
+            {/* Alerta de ficha em uso simultâneo por outro funcionário */}
+            {open && primeiroAgendamentoId && (
+              <div className="px-6 pt-4">
+                <FichaEmUsoAlert agendamentoId={primeiroAgendamentoId} />
+              </div>
+            )}
             {/* 1. Cabeçalho */}
             <div className="px-6 pt-7 pb-5 border-b border-slate-100">
               <div className="flex items-start gap-4">

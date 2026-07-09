@@ -20,6 +20,7 @@ import {
   CreditCard,
   QrCode,
   HelpCircle,
+  Printer,
 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -65,6 +66,7 @@ interface Atend {
   agendamento_id?: string | null;
   repasse_pago?: boolean;
   repasse_pago_em?: string | null;
+  repasse_pago_at?: string | null;
   repasse_forma_pagamento?: string | null;
   paciente_nome_extra?: string | null;
   agendamento_inicio?: string | null;
@@ -148,6 +150,7 @@ function Page() {
   const [items, setItems] = useState<Atend[]>([]);
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [pacientes, setPacientes] = useState<Pac[]>([]);
+  const [pacNameExtra, setPacNameExtra] = useState<Record<string, string>>({});
   const [convenios, setConvenios] = useState<Convenio[]>([]);
   const [procValores, setProcValores] = useState<Map<string, number>>(new Map());
   const [procTipos, setProcTipos] = useState<Map<string, string>>(new Map());
@@ -173,6 +176,135 @@ function Page() {
   const [optsReady, setOptsReady] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
   const [payForm, setPayForm] = useState({ data: hoje, conta_id: "", forma_pagamento: "" });
+  // Comprovante de pagamento de repasse (para impressão)
+  type CompItem = { data: string; medico: string; paciente: string; servico: string; valorMedico: number; pagoEm: string | null; pagoHora: string | null };
+  type Comprovante = {
+    clinicaNome: string;
+    medicoNome: string;
+    dataPagamento: string;
+    horaPagamento: string | null;
+    formaPagamento: string;
+    contaNome: string;
+    itens: CompItem[];
+    total: number;
+    qtd: number;
+    emitidoEm: string;
+    reimpressao: boolean;
+    multiplasDatas?: number;
+  } | null;
+  const [comprovante, setComprovante] = useState<Comprovante>(null);
+  const [comprovantes, setComprovantes] = useState<NonNullable<Comprovante>[]>([]);
+  const [comprovanteOpen, setComprovanteOpen] = useState(false);
+  const buildComprovante = (
+    itens: Atend[],
+    meta: { data: string; forma_pagamento: string; conta_id: string; pago_at?: string | null; reimpressao?: boolean },
+  ): Comprovante => {
+    if (!itens.length) return null;
+    const medicoIds = new Set(itens.map((i) => i.medico_id ?? ""));
+    const medicoNome =
+      medicoIds.size === 1
+        ? (medMap.get([...medicoIds][0]) ?? "—")
+        : `${medicoIds.size} médicos`;
+    const contaNome = contas.find((c) => c.id === meta.conta_id)?.nome ?? "—";
+    const derivarHora = (iso: string | null | undefined): string | null => {
+      if (!iso) return null;
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return null;
+      const isBackfill =
+        d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0;
+      if (isBackfill) return null;
+      return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    };
+    const rows: CompItem[] = itens.map((a) => ({
+      data: a.data,
+      medico: a.medico_id ? (medMap.get(a.medico_id) ?? "—") : "—",
+      paciente: a.paciente_id ? (pacMap.get(a.paciente_id) ?? "—") : (a.paciente_nome_extra ?? "—"),
+      servico: a.procedimento ?? "—",
+      valorMedico: Number(a.valor_medico) || 0,
+      pagoEm: a.repasse_pago_em ?? (a.repasse_pago_at ? a.repasse_pago_at.slice(0, 10) : null),
+      pagoHora: derivarHora(a.repasse_pago_at ?? null),
+    }));
+    const total = rows.reduce((s, r) => s + r.valorMedico, 0);
+    // Deriva HH:mm somente quando o timestamp tem hora explícita (>00:00 UTC).
+    // Registros antigos foram backfillados de `date` para timestamptz em
+    // 00:00 UTC — comparar em UTC evita falso-positivo quando o fuso local
+    // gera hh != 0 (ex.: 21:00 em BRT para 00:00 UTC).
+    let horaPagamento: string | null = null;
+    if (meta.pago_at) {
+      const d = new Date(meta.pago_at);
+      if (!isNaN(d.getTime())) {
+        const isBackfill =
+          d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0;
+        if (!isBackfill) {
+          const hh = d.getHours();
+          const mm = d.getMinutes();
+          horaPagamento = `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+        }
+      }
+    }
+    return {
+      clinicaNome: clinicaAtual?.clinica?.nome ?? "—",
+      medicoNome,
+      dataPagamento: meta.data,
+      horaPagamento,
+      formaPagamento: meta.forma_pagamento || "—",
+      contaNome,
+      itens: rows,
+      total,
+      qtd: rows.length,
+      emitidoEm: new Date().toLocaleString("pt-BR"),
+      reimpressao: !!meta.reimpressao,
+    };
+  };
+  const abrirComprovanteDoItem = (a: Atend) => {
+    const dataPag = a.repasse_pago_em ?? (a.repasse_pago_at ? a.repasse_pago_at.slice(0, 10) : a.data);
+    const c = buildComprovante([a], {
+      data: dataPag,
+      forma_pagamento: a.repasse_forma_pagamento ?? "",
+      conta_id: "",
+      pago_at: a.repasse_pago_at ?? null,
+      reimpressao: true,
+    });
+    setComprovante(c);
+    setComprovantes(c ? [c] : []);
+    setComprovanteOpen(true);
+  };
+  // Constrói um comprovante em 2ª via para cada médico presente em `itens`.
+  const abrirSegundaViaLote = (itens: Atend[]) => {
+    if (!itens.length) return;
+    const byMed = new Map<string, Atend[]>();
+    for (const a of itens) {
+      const k = a.medico_id ?? "sem";
+      if (!byMed.has(k)) byMed.set(k, []);
+      byMed.get(k)!.push(a);
+    }
+    const blocos: NonNullable<Comprovante>[] = [];
+    for (const [, list] of byMed) {
+      // Metadados agregados
+      const datas = new Set(list.map((x) => x.repasse_pago_em ?? "").filter(Boolean));
+      const formas = new Set(list.map((x) => x.repasse_forma_pagamento ?? "").filter(Boolean));
+      const primeiro = list[0];
+      const dataPag =
+        primeiro.repasse_pago_em ??
+        (primeiro.repasse_pago_at ? primeiro.repasse_pago_at.slice(0, 10) : primeiro.data);
+      const c = buildComprovante(list, {
+        data: dataPag,
+        forma_pagamento: formas.size === 1 ? [...formas][0] : formas.size > 1 ? "Vários" : "",
+        conta_id: "",
+        pago_at: primeiro.repasse_pago_at ?? null,
+        reimpressao: true,
+      });
+      if (c) {
+        c.multiplasDatas = datas.size > 1 ? datas.size : 0;
+        blocos.push(c);
+      }
+    }
+    if (blocos.length) {
+      setComprovante(blocos[0]);
+      setComprovantes(blocos);
+      setComprovanteOpen(true);
+    }
+  };
   const [payingNow, setPayingNow] = useState(false);
 
   // Diálogo de laudo
@@ -584,7 +716,7 @@ function Page() {
     let qManual = supabase
       .from("fin_atendimentos")
       .select(
-        "id, data, procedimento, valor_total, valor_medico, valor_clinica, status, forma_pagamento, medico_id, paciente_id, repasse_pago, repasse_pago_em, repasse_forma_pagamento, laudo_status, medico_laudador_id, valor_laudo",
+        "id, data, procedimento, valor_total, valor_medico, valor_clinica, status, forma_pagamento, medico_id, paciente_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, laudo_status, medico_laudador_id, valor_laudo, lancamento_id",
       )
       .eq("clinica_id", clinicaAtual.clinica_id)
       .gte("data", fIni)
@@ -592,7 +724,7 @@ function Page() {
     let qAgenda = supabase
       .from("fin_lancamentos")
       .select(
-        "id, data, descricao, valor, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_forma_pagamento, laudo_status, medico_laudador_id, valor_laudo, agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)",
+        "id, data, descricao, valor, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, laudo_status, medico_laudador_id, valor_laudo, agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)",
       )
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("tipo", "receita")
@@ -619,7 +751,35 @@ function Page() {
       setLoading(false);
       return;
     }
-    const manuais: Atend[] = (mr.data ?? []).map((r) => {
+    // IDs de fin_lancamentos já carregados — usado para descartar linhas de
+    // fin_atendimentos que espelham o mesmo pagamento (duplicidade legada
+    // criada pelo fluxo de atendimento IA antes da correção).
+    const lancIds = new Set((ar.data ?? []).map((r: { id: string }) => r.id));
+    // Também colecionamos o agendamento_id dos lançamentos para descartar
+    // manuais que espelhem o mesmo agendamento (caso o lancamento_id não
+    // tenha sido preenchido no fin_atendimentos, por qualquer motivo).
+    const lancAgendIds = new Set(
+      (ar.data ?? [])
+        .map((r: { agendamento_id?: string | null }) => r.agendamento_id ?? null)
+        .filter((x): x is string => !!x),
+    );
+    const manuaisRaw = (mr.data ?? []).filter(
+      (r: { lancamento_id?: string | null }) => {
+        if (r.lancamento_id && lancIds.has(r.lancamento_id)) return false;
+        // Sem lancamento_id: descarta se algum lançamento carregado apontar
+        // para um agendamento que também aparece no lote manual (mesma data,
+        // procedimento e paciente). O DB já tem trigger que impede este caso
+        // em novos inserts; aqui blindamos registros históricos.
+        if (r.lancamento_id && lancAgendIds.size > 0) {
+          const lanc = (ar.data ?? []).find((l: { id: string }) => l.id === r.lancamento_id) as
+            | { agendamento_id?: string | null }
+            | undefined;
+          if (lanc?.agendamento_id && lancAgendIds.has(lanc.agendamento_id)) return false;
+        }
+        return true;
+      },
+    );
+    const manuais: Atend[] = manuaisRaw.map((r) => {
       const pago = Number(r.valor_total);
       // Recalcula repasse usando convênio cadastrado por procedimento
       // (ex.: PREVENTIVO R$ 10,40). Mantém o valor armazenado apenas como
@@ -641,6 +801,7 @@ function Page() {
         origem: "manual",
         repasse_pago: !!r.repasse_pago,
         repasse_pago_em: r.repasse_pago_em,
+        repasse_pago_at: (r as any).repasse_pago_at ?? null,
         repasse_forma_pagamento: r.repasse_forma_pagamento,
         laudo_status: (r as any).laudo_status ?? null,
         medico_laudador_id: (r as any).medico_laudador_id ?? null,
@@ -681,6 +842,7 @@ function Page() {
         origem: "agenda",
         repasse_pago: !!r.repasse_pago,
         repasse_pago_em: r.repasse_pago_em,
+        repasse_pago_at: (r as any).repasse_pago_at ?? null,
         repasse_forma_pagamento: r.repasse_forma_pagamento,
         agendamento_inicio: ag?.inicio ?? null,
         agendamento_status: ag?.status ?? null,
@@ -697,6 +859,29 @@ function Page() {
     else if (fStatus === "pago") unif = unif.filter((x) => x.repasse_pago);
     setItems(unif);
     setSel(new Set());
+    // Resolve nomes de pacientes referenciados que estão fora do combobox
+    // (o combobox só carrega 500 por ordem alfabética). Sem isso, atendimentos
+    // com paciente cadastrado aparecem como "—".
+    const knownIds = new Set(pacientes.map((p) => p.id));
+    const missing = new Set<string>();
+    for (const it of unif) {
+      if (it.paciente_id && !knownIds.has(it.paciente_id) && !pacNameExtra[it.paciente_id]) {
+        missing.add(it.paciente_id);
+      }
+    }
+    if (missing.size) {
+      const { data: extra } = await supabase
+        .from("pacientes")
+        .select("id, nome")
+        .in("id", [...missing]);
+      if (extra?.length) {
+        setPacNameExtra((prev) => {
+          const next = { ...prev };
+          for (const p of extra) next[p.id] = p.nome;
+          return next;
+        });
+      }
+    }
     setLoading(false);
   };
   const loadOpts = async () => {
@@ -968,7 +1153,11 @@ function Page() {
   };
 
   const medMap = useMemo(() => new Map(medicos.map((m) => [m.id, m.nome])), [medicos]);
-  const pacMap = useMemo(() => new Map(pacientes.map((p) => [p.id, p.nome])), [pacientes]);
+  const pacMap = useMemo(() => {
+    const m = new Map<string, string>(pacientes.map((p) => [p.id, p.nome]));
+    for (const [id, nome] of Object.entries(pacNameExtra)) if (!m.has(id)) m.set(id, nome);
+    return m;
+  }, [pacientes, pacNameExtra]);
   const filteredItems = useMemo(() => {
     const q = norm(fPaciente.trim());
     const base = !q
@@ -1032,7 +1221,10 @@ function Page() {
 
   const isAtendido = (a: Atend) =>
     a.origem === "manual" ? a.status === "realizado" : a.agendamento_status === "realizado";
-  const selectables = filteredItems.filter((a) => !a.repasse_pago && (a.valor_medico ?? 0) > 0 && isAtendido(a));
+  // Itens selecionáveis: para pagar repasse (não pagos + atendidos) OU para 2ª via (já pagos).
+  const selectables = filteredItems.filter(
+    (a) => ((a.repasse_pago || (!a.repasse_pago && isAtendido(a))) && (a.valor_medico ?? 0) > 0),
+  );
   const allSelected = selectables.length > 0 && selectables.every((a) => sel.has(`${a.origem}:${a.id}`));
   const toggleAll = () => {
     if (allSelected) setSel(new Set());
@@ -1047,6 +1239,15 @@ function Page() {
   };
   const selectedItems = filteredItems.filter((a) => sel.has(`${a.origem}:${a.id}`));
   const selectedTotal = selectedItems.reduce((s, a) => s + (Number(a.valor_medico) || 0), 0);
+  const selectedPagos = selectedItems.filter((a) => a.repasse_pago);
+  const selectedNaoPagos = selectedItems.filter((a) => !a.repasse_pago);
+  const podePagar = selectedItems.length > 0 && selectedNaoPagos.length === selectedItems.length;
+  const podeReimprimir = selectedItems.length > 0 && selectedPagos.length === selectedItems.length;
+  const misturado = selectedItems.length > 0 && selectedPagos.length > 0 && selectedNaoPagos.length > 0;
+  const reimprimirSelecionados = () => {
+    if (!podeReimprimir) return;
+    abrirSegundaViaLote(selectedPagos);
+  };
 
   const openPay = () => {
     if (!selectedItems.length) {
@@ -1110,6 +1311,7 @@ function Page() {
       for (const [medId, list] of byMed) {
         const total = list.reduce((s, x) => s + (Number(x.valor_medico) || 0), 0);
         if (total <= 0) continue;
+        const nowIso = new Date().toISOString();
         const medNome = medId !== "sem" ? (medMap.get(medId) ?? "") : "—";
         const { data: lanc, error: eLanc } = await supabase
           .from("fin_lancamentos")
@@ -1132,6 +1334,7 @@ function Page() {
         const upd = {
           repasse_pago: true,
           repasse_pago_em: payForm.data,
+          repasse_pago_at: nowIso,
           repasse_forma_pagamento: payForm.forma_pagamento || null,
           repasse_conta_id: payForm.conta_id || null,
           repasse_lancamento_id: lancId,
@@ -1148,7 +1351,17 @@ function Page() {
         }
       }
       toast.success("Repasses pagos com sucesso");
+      const c = buildComprovante(selectedItems, {
+        ...payForm,
+        pago_at: new Date().toISOString(),
+        reimpressao: false,
+      });
       setPayOpen(false);
+      if (c) {
+        setComprovante(c);
+        setComprovantes([c]);
+        setComprovanteOpen(true);
+      }
       await load();
     } catch (e) {
       const err = e as { message?: string };
@@ -1275,9 +1488,24 @@ function Page() {
             Exportar Excel
           </Button>
           {!isMedicoOnly && (
-            <Button onClick={openPay} disabled={!selectedItems.length}>
+            <Button
+              onClick={openPay}
+              disabled={!podePagar}
+              title={misturado ? "Selecione apenas atendimentos NÃO pagos" : undefined}
+            >
               <Wallet className="h-4 w-4 mr-2" />
-              Pagar repasse{selectedItems.length ? ` (${selectedItems.length} • ${fmt(selectedTotal)})` : ""}
+              Pagar repasse{selectedNaoPagos.length ? ` (${selectedNaoPagos.length} • ${fmt(selectedNaoPagos.reduce((s, x) => s + (Number(x.valor_medico) || 0), 0))})` : ""}
+            </Button>
+          )}
+          {!isMedicoOnly && (
+            <Button
+              variant="outline"
+              onClick={reimprimirSelecionados}
+              disabled={!podeReimprimir}
+              title={misturado ? "Selecione apenas atendimentos JÁ pagos" : "Imprimir 2ª via dos atendimentos pagos selecionados"}
+            >
+              <Printer className="h-4 w-4 mr-2" />
+              Imprimir 2ª via{selectedPagos.length ? ` (${selectedPagos.length})` : ""}
             </Button>
           )}
           <Dialog open={open} onOpenChange={setOpen}>
@@ -1554,8 +1782,16 @@ function Page() {
                     <TableRow key={`${a.origem}:${a.id}`} className={cn("hover:bg-muted/30 transition-colors", rowBg)}>
                       {!isMedicoOnly && (
                         <TableCell className="px-2">
-                          {!a.repasse_pago && (a.valor_medico ?? 0) > 0 ? (
-                            isAtendido(a) ? (
+                          {(a.valor_medico ?? 0) > 0 ? (
+                            a.repasse_pago ? (
+                              <Checkbox
+                                checked={sel.has(`${a.origem}:${a.id}`)}
+                                onCheckedChange={() => toggleOne(a)}
+                                aria-label="Selecionar para 2ª via"
+                                title="Selecionar para reimprimir 2ª via"
+                                className="h-4 w-4"
+                              />
+                            ) : isAtendido(a) ? (
                               <Checkbox
                                 checked={sel.has(`${a.origem}:${a.id}`)}
                                 onCheckedChange={() => toggleOne(a)}
@@ -1563,11 +1799,21 @@ function Page() {
                                 className="h-4 w-4"
                               />
                             ) : (
-                              <span title="Aguardando atendimento" className="text-[10px] text-amber-600">
-                                ⏳
+                              <span
+                                title="Aguardando o médico marcar o atendimento como Realizado na agenda"
+                                className="inline-flex items-center gap-1 text-[10px] text-amber-700 whitespace-nowrap"
+                              >
+                                ⏳ Aguarda atend.
                               </span>
                             )
-                          ) : null}
+                          ) : (
+                            <span
+                              title="Sem valor de repasse cadastrado para este médico/procedimento"
+                              className="text-[10px] text-muted-foreground whitespace-nowrap"
+                            >
+                              Sem repasse
+                            </span>
+                          )}
                         </TableCell>
                       )}
                       <TableCell className="text-xs whitespace-nowrap px-2">
@@ -1685,6 +1931,17 @@ function Page() {
                                   <Undo2 className="h-3.5 w-3.5 text-amber-600" />
                                 </Button>
                               )}
+                              {a.repasse_pago && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  title="Imprimir comprovante de repasse"
+                                  onClick={() => abrirComprovanteDoItem(a)}
+                                >
+                                  <Printer className="h-3.5 w-3.5 text-primary" />
+                                </Button>
+                              )}
                               {/* Botão de excluir para agenda */}
                               <Button
                                 variant="ghost"
@@ -1711,6 +1968,17 @@ function Page() {
                               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(a)}>
                                 <Pencil className="h-3.5 w-3.5" />
                               </Button>
+                              {a.repasse_pago && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  title="Imprimir comprovante de repasse"
+                                  onClick={() => abrirComprovanteDoItem(a)}
+                                >
+                                  <Printer className="h-3.5 w-3.5 text-primary" />
+                                </Button>
+                              )}
                               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => remove(a)}>
                                 <Trash2 className="h-3.5 w-3.5 text-destructive" />
                               </Button>
@@ -1726,6 +1994,53 @@ function Page() {
           )}
         </CardContent>
       </Card>
+
+      {/* Barra de ações do rodapé: repete botões quando houver seleção */}
+      {!isMedicoOnly && selectedItems.length > 0 && (
+        <div className="sticky bottom-2 z-10 flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background/95 backdrop-blur px-3 py-2 shadow-md">
+          <div className="text-sm">
+            <b>{selectedItems.length}</b> selecionado(s)
+            {selectedPagos.length > 0 && (
+              <span className="ml-2 text-emerald-700">• {selectedPagos.length} pago(s)</span>
+            )}
+            {selectedNaoPagos.length > 0 && (
+              <span className="ml-2 text-amber-700">• {selectedNaoPagos.length} a pagar</span>
+            )}
+            <span className="ml-2 text-muted-foreground">
+              — total {fmt(selectedTotal)}
+            </span>
+            {misturado && (
+              <span className="ml-2 text-xs text-rose-700">
+                Separe pagos e não pagos para agir.
+              </span>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              onClick={openPay}
+              disabled={!podePagar}
+              title={misturado ? "Selecione apenas atendimentos NÃO pagos" : undefined}
+            >
+              <Wallet className="h-4 w-4 mr-2" />
+              Pagar repasse{selectedNaoPagos.length ? ` (${selectedNaoPagos.length})` : ""}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={reimprimirSelecionados}
+              disabled={!podeReimprimir}
+              title={misturado ? "Selecione apenas atendimentos JÁ pagos" : undefined}
+            >
+              <Printer className="h-4 w-4 mr-2" />
+              Imprimir 2ª via{selectedPagos.length ? ` (${selectedPagos.length})` : ""}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setSel(new Set())}>
+              Limpar
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Diálogo pagar repasse */}
       <Dialog open={payOpen} onOpenChange={setPayOpen}>
@@ -1790,6 +2105,170 @@ function Page() {
               {payingNow ? "Registrando..." : "Confirmar pagamento"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo: comprovante de repasse (imprimível) */}
+      <Dialog open={comprovanteOpen} onOpenChange={setComprovanteOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader className="no-print">
+            <DialogTitle>
+              Comprovante de pagamento de repasse
+              {comprovantes.length > 1 ? ` — ${comprovantes.length} médicos` : ""}
+            </DialogTitle>
+          </DialogHeader>
+          {comprovantes.length > 0 && (
+            <div className="print-area bg-white text-black text-sm max-h-[70vh] overflow-y-auto print:max-h-none print:overflow-visible">
+              {comprovantes.map((comprovante, blocoIdx) => (
+                <div
+                  key={blocoIdx}
+                  className={cn(
+                    "comprovante-bloco",
+                    blocoIdx > 0 && "mt-8 pt-8 border-t-4 border-dashed border-slate-400",
+                  )}
+                >
+                  {comprovante.reimpressao && (
+                <div className="mb-3 border-2 border-rose-600 bg-rose-100 text-rose-900 rounded-md p-3 text-center">
+                  <div className="text-xl font-extrabold tracking-wide uppercase">
+                    Segunda via — Reimpressão de comprovante
+                  </div>
+                  <div className="text-sm mt-1">
+                    Pagamento realizado em{" "}
+                    <b>
+                      {new Date(comprovante.dataPagamento + "T00:00:00").toLocaleDateString("pt-BR")}
+                      {comprovante.horaPagamento
+                        ? ` às ${comprovante.horaPagamento}`
+                        : " (horário não registrado)"}
+                    </b>
+                    {comprovante.multiplasDatas && comprovante.multiplasDatas > 1 ? (
+                      <span className="ml-1">
+                        (contém pagamentos de {comprovante.multiplasDatas} datas)
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="text-xs mt-0.5 opacity-80">
+                    Reimpressão emitida em {comprovante.emitidoEm}
+                  </div>
+                </div>
+              )}
+              <div className="flex items-start justify-between border-b pb-3 mb-3">
+                <div>
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground">Clínica</div>
+                  <div className="text-lg font-semibold">{comprovante.clinicaNome}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-base font-semibold">Comprovante de repasse médico</div>
+                  <div className="text-xs text-muted-foreground">Emitido em {comprovante.emitidoEm}</div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 border rounded-md p-3 mb-3">
+                <div>
+                  <span className="text-xs text-muted-foreground">Médico: </span>
+                  <b>{comprovante.medicoNome}</b>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground">Data e hora do pagamento: </span>
+                  <b>
+                    {new Date(comprovante.dataPagamento + "T00:00:00").toLocaleDateString("pt-BR")}
+                    {comprovante.horaPagamento
+                      ? ` às ${comprovante.horaPagamento}`
+                      : " (horário não registrado)"}
+                  </b>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground">Forma: </span>
+                  <b>{comprovante.formaPagamento}</b>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground">Conta: </span>
+                  <b>{comprovante.contaNome}</b>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground">Atendimentos: </span>
+                  <b>{comprovante.qtd}</b>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs text-muted-foreground">Total pago ao médico: </span>
+                  <b className="text-base text-primary">{fmt(comprovante.total)}</b>
+                </div>
+              </div>
+
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="border-b bg-muted/40">
+                    <th className="text-left p-2">Data</th>
+                    <th className="text-left p-2">Pago em</th>
+                    <th className="text-left p-2">Médico</th>
+                    <th className="text-left p-2">Paciente</th>
+                    <th className="text-left p-2">Serviço</th>
+                    <th className="text-right p-2">Valor pago (R$)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {comprovante.itens.map((it, idx) => (
+                    <tr key={idx} className="border-b">
+                      <td className="p-2 whitespace-nowrap">
+                        {new Date(it.data + "T00:00:00").toLocaleDateString("pt-BR")}
+                      </td>
+                      <td className="p-2 whitespace-nowrap">
+                        {it.pagoEm
+                          ? `${new Date(it.pagoEm + "T00:00:00").toLocaleDateString("pt-BR")}${it.pagoHora ? ` às ${it.pagoHora}` : ""}`
+                          : "—"}
+                      </td>
+                      <td className="p-2">{it.medico}</td>
+                      <td className="p-2">{it.paciente}</td>
+                      <td className="p-2">{it.servico}</td>
+                      <td className="p-2 text-right whitespace-nowrap">{fmt(it.valorMedico)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="font-semibold">
+                    <td className="p-2" colSpan={5}>
+                      Total
+                    </td>
+                    <td className="p-2 text-right">{fmt(comprovante.total)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+
+              <div className="grid grid-cols-2 gap-8 mt-10 pt-4 text-xs">
+                <div className="text-center">
+                  <div className="border-t pt-1">Assinatura do médico</div>
+                </div>
+                <div className="text-center">
+                  <div className="border-t pt-1">Assinatura da clínica</div>
+                </div>
+              </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <DialogFooter className="no-print">
+            <Button variant="outline" onClick={() => setComprovanteOpen(false)}>
+              Fechar
+            </Button>
+            <Button onClick={() => window.print()}>
+              <Printer className="h-4 w-4 mr-2" />
+              Imprimir
+            </Button>
+          </DialogFooter>
+          <style>{`
+            @media print {
+              body * { visibility: hidden !important; }
+              .print-area, .print-area * { visibility: visible !important; }
+              html, body { height: auto !important; overflow: visible !important; background: white !important; }
+              .print-area { position: absolute; left: 0; top: 0; right: 0; margin: 0; padding: 16mm; background: white !important; color: black !important; max-height: none !important; height: auto !important; overflow: visible !important; z-index: 9999; }
+              [role="dialog"], [role="dialog"] > * { position: static !important; transform: none !important; max-height: none !important; height: auto !important; overflow: visible !important; }
+              .no-print { display: none !important; }
+              [role="dialog"] { box-shadow: none !important; border: none !important; }
+              .comprovante-bloco { break-after: page; page-break-after: always; }
+              .comprovante-bloco:last-child { break-after: auto; page-break-after: auto; }
+              .comprovante-bloco table, .comprovante-bloco thead, .comprovante-bloco tbody, .comprovante-bloco tr, .comprovante-bloco td, .comprovante-bloco th { page-break-inside: auto; break-inside: auto; }
+              .comprovante-bloco tr { page-break-inside: avoid; break-inside: avoid; }
+            }
+          `}</style>
         </DialogContent>
       </Dialog>
 

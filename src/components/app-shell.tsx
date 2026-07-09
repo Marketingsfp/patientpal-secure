@@ -61,12 +61,15 @@ const isParent = (it: NavItem): it is NavParent => "children" in it;
 // Rotas omitidas aqui são sempre visíveis (não controladas por permissão).
 const ROUTE_TO_MODULE: Record<string, string> = {
   "/app/agenda": "agenda",
+  "/app/agenda/express": "agenda",
+  "/app/atendimento-multiplo": "atendimento-multiplo",
   "/app/checkin": "checkin",
   "/app/caixa": "caixa",
   "/app/financeiro/atendimentos": "financeiro",
   "/app/chat": "chat",
   "/app/clientes": "clientes",
   "/app/painel": "painel",
+  "/app/painel-executivo": "painel-executivo",
   "/app/fluxo": "fluxo",
   "/app/orcamentos": "orcamentos",
   "/app/recepcao": "recepcao",
@@ -80,15 +83,40 @@ const ROUTE_TO_MODULE: Record<string, string> = {
   "/app/odontologia": "odontologia",
   "/app/exames-resultados": "exames-resultados",
   "/app/mkt-leads": "mkt-leads",
+  "/app/campanhas": "campanhas",
+  "/app/mkt-envios": "mkt-envios",
+  "/app/mkt-landing": "mkt-landing",
+  "/app/mkt-segmentos": "mkt-segmentos",
   "/app/equipe": "equipe",
   "/app/especialidades": "especialidades",
+  "/app/procedimentos": "procedimentos",
+  "/app/tipos-servico": "tipos-servico",
+  "/app/enfermagem-recursos": "enfermagem-recursos",
   "/app/disponibilidades": "disponibilidades",
   "/app/prontuario-modelos": "prontuario-modelos",
+  "/app/modelos-documentos": "modelos-documentos",
+  "/app/planos": "planos",
+  "/app/estoque": "estoque",
+  "/app/documentos": "documentos",
+  "/app/prontuarios": "prontuarios",
+  "/app/anamneses": "anamneses",
+  "/app/medicos": "medicos",
+  "/app/clinicas": "clinicas",
   "/app/perfis": "perfis",
   "/app/unidades": "unidades",
   "/app/hr-ponto": "hr-ponto",
+  "/app/hr-contratos": "hr-contratos",
+  "/app/hr-ferias": "hr-ferias",
+  "/app/hr-holerites": "hr-holerites",
+  "/app/treinamentos": "treinamentos",
+  "/app/lms-admin": "lms-admin",
   "/app/cargos": "cargos",
   "/app/financeiro": "financeiro",
+  "/app/boletos": "boletos",
+  "/app/contratos": "contratos",
+  "/app/configuracoes/nfse": "nfse",
+  "/app/integration-secrets": "integration-secrets",
+  "/app/lgpd": "lgpd",
   "/app/funcionarios": "funcionarios",
   "/app/relatorios": "relatorios",
   "/app/auditoria": "auditoria",
@@ -98,7 +126,7 @@ const ROUTE_TO_MODULE: Record<string, string> = {
 function leafAllowed(to: string, allowed: Set<string> | null): boolean {
   if (!allowed) return true;
   const mod = ROUTE_TO_MODULE[to];
-  if (!mod) return true; // rota não mapeada → sempre visível
+  if (!mod) return false; // rota não mapeada → ocultar por padrão
   return allowed.has(mod);
 }
 

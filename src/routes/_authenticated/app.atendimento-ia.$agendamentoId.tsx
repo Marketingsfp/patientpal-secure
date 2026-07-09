@@ -232,20 +232,29 @@ function AtendimentoEditorPage() {
   const pacienteId = agendamento?.paciente_id ?? "";
   const pacienteNome = agendamento?.paciente_nome ?? "";
 
-  async function handleEstruturar() {
-    if (!transcricao.trim()) { toast.error("Grave ou cole a transcrição primeiro"); return; }
+  async function handleEstruturar(textoOverride?: string) {
+    const texto = (textoOverride ?? transcricao).trim();
+    if (!texto) { toast.error("Grave ou cole a transcrição primeiro"); return; }
     setLoading("estruturar");
     try {
-      const out = await estruturar({ data: { transcricao, especialidade, promptExtra: modelo?.prompt_ia ?? undefined } });
-      setSoap((s) => ({
-        queixa_principal: out.queixa_principal || s.queixa_principal,
-        historia_doenca: out.historia_doenca || s.historia_doenca,
-        exame_fisico: out.exame_fisico || s.exame_fisico,
-        hipotese_diagnostica: out.hipotese_diagnostica || s.hipotese_diagnostica,
-        conduta: out.conduta || s.conduta,
-        prescricao: out.prescricao || s.prescricao,
-      }));
-      toast.success("Anamnese estruturada");
+      const out = await estruturar({ data: { transcricao: texto, especialidade, promptExtra: modelo?.prompt_ia ?? undefined } });
+      const nextSoap = {
+        queixa_principal: out.queixa_principal || soap.queixa_principal,
+        historia_doenca: out.historia_doenca || soap.historia_doenca,
+        exame_fisico: out.exame_fisico || soap.exame_fisico,
+        hipotese_diagnostica: out.hipotese_diagnostica || soap.hipotese_diagnostica,
+        conduta: out.conduta || soap.conduta,
+        prescricao: out.prescricao || soap.prescricao,
+      };
+      setSoap(nextSoap);
+      toast.success("Prontuário preenchido pela IA como sugestão");
+      // Gera CIDs/exames/prescrição sugerida na sequência
+      try {
+        const sug = await sugerir({ data: { ...nextSoap, especialidade } });
+        setSugestoes(sug);
+      } catch (err) {
+        console.error("sugerir falhou", err);
+      }
     } catch (e) { mostrarErro(e); }
     finally { setLoading(null); }
   }
@@ -323,7 +332,10 @@ function AtendimentoEditorPage() {
         if (!valorTotal) valorTotal = Number(lancExist.valor ?? 0);
       }
 
-      if (valorTotal > 0) {
+      // Só cria fin_atendimentos quando NÃO houver fin_lancamentos vinculado
+      // ao agendamento — caso contrário duplicaria o registro no Financeiro
+      // (o repasse já vive em fin_lancamentos gerado no caixa).
+      if (valorTotal > 0 && !lancExist) {
         await supabase.from("fin_atendimentos").insert({
           clinica_id: cid,
           paciente_id: pacienteId,
@@ -556,10 +568,13 @@ function AtendimentoEditorPage() {
             <VoiceInput
               size="sm"
               currentValue={transcricao}
-              onTranscript={setTranscricao}
+              onTranscript={(t) => {
+                setTranscricao(t);
+                void handleEstruturar(t);
+              }}
               append
               prompt="Transcreva fielmente a conversa entre médico e paciente em português do Brasil. Retorne apenas o texto, sem rótulos."
-              title="Gravar conversa"
+              title="Gravar conversa — preenche o prontuário automaticamente"
             />
           </div>
           <Textarea
@@ -568,7 +583,7 @@ function AtendimentoEditorPage() {
             onChange={(e) => setTranscricao(e.target.value)}
             placeholder="Clique no microfone para gravar a consulta, ou cole/digite aqui o relato…"
           />
-          <Button onClick={handleEstruturar} disabled={loading === "estruturar"} className="w-full">
+          <Button onClick={() => handleEstruturar()} disabled={loading === "estruturar"} className="w-full">
             {loading === "estruturar" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
             Estruturar prontuário com IA
           </Button>
@@ -588,13 +603,6 @@ function AtendimentoEditorPage() {
                     {k === "hipotese_diagnostica" && (
                       <Cid10Picker onPick={(t) => addToHipotese(t)} />
                     )}
-                    <VoiceInput
-                      size="sm"
-                      currentValue={soap[k]}
-                      onTranscript={(t) => setSoap((s) => ({ ...s, [k]: t }))}
-                      prompt={`Transcreva o áudio em português como anotação médica do campo "${label}". Retorne apenas o texto.`}
-                      title={`Ditar ${label}`}
-                    />
                   </div>
                 </div>
                 <Textarea

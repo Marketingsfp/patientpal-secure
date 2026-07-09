@@ -122,9 +122,11 @@ interface ClienteFormProps {
   onCancel: () => void;
   /** Footer apresentado em modo "sticky" (uso no Dialog). Default: false. */
   stickyFooter?: boolean;
+  /** Somente leitura — desabilita todos os campos e oculta o rodapé. */
+  readOnly?: boolean;
 }
 
-export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFooter }: ClienteFormProps) {
+export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFooter, readOnly = false }: ClienteFormProps) {
   const editing = paciente;
   const [form, setForm] = useState<FormState>(EMPTY);
   const [tab, setTab] = useState("dados");
@@ -821,7 +823,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
             <TabsTrigger value="historico">Histórico</TabsTrigger>
             <TabsTrigger value="convenio">Convênio</TabsTrigger>
           </TabsList>
-
+          <fieldset disabled={readOnly} className="contents">
           <TabsContent value="dados" className="space-y-4 pt-4 pb-16">
             <div className="flex items-center gap-4">
               <div className="relative h-20 w-20 rounded-full overflow-hidden border bg-muted flex items-center justify-center shrink-0">
@@ -1419,12 +1421,15 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
               </div>
             )}
           </TabsContent>
+          </fieldset>
         </Tabs>
 
-        <div className={footerClass}>
-          <Button type="button" variant="outline" onClick={() => { stopVoice(); onCancel(); }}>Cancelar</Button>
-          <Button type="submit" disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
-        </div>
+        {!readOnly && (
+          <div className={footerClass}>
+            <Button type="button" variant="outline" onClick={() => { stopVoice(); onCancel(); }}>Cancelar</Button>
+            <Button type="submit" disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
+          </div>
+        )}
       </form>
 
       <Dialog open={camOpen} onOpenChange={(o) => { if (!o) fecharCamera(); }}>

@@ -16,7 +16,7 @@ export const TODOS_MODULOS: ReadonlyArray<string> = [
   // Operação
   "agenda", "checkin", "caixa", "chat", "clientes", "dashboard", "fluxo",
   "orcamentos", "recepcao", "triagem-enfermagem", "cartao-beneficios",
-  "painel", "documentos",
+  "painel", "documentos", "atendimento-multiplo",
   // Inteligência
   "atendimento-ia", "crm", "alertas-enfermagem", "consulta-rapida", "nina",
   "odontologia", "prontuarios", "anamneses", "exames-resultados",
@@ -25,13 +25,14 @@ export const TODOS_MODULOS: ReadonlyArray<string> = [
   // Cadastros
   "equipe", "especialidades", "disponibilidades", "prontuario-modelos",
   "perfis", "unidades", "medicos", "procedimentos", "planos", "estoque",
-  "modelos-documentos", "clinicas",
+  "modelos-documentos", "clinicas", "tipos-servico", "enfermagem-recursos",
   // RH
   "hr-ponto", "hr-contratos", "hr-ferias", "hr-holerites", "treinamentos",
   "lms-admin",
   // Gestão
   "cargos", "financeiro", "funcionarios", "relatorios", "auditoria", "setores",
   "boletos", "contratos", "nfse", "integration-secrets", "lgpd",
+  "painel-executivo",
   // Sistema
   "perfil-proprio",
 ];
@@ -51,12 +52,15 @@ export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
     estoque: "read", crm: "read", campanhas: "read", "mkt-leads": "read",
     "consulta-rapida": "read", "alertas-enfermagem": "read",
     "cartao-beneficios": "read", painel: "read", "perfil-proprio": "write",
+    "painel-executivo": "write", "atendimento-multiplo": "read",
+    "tipos-servico": "read", "enfermagem-recursos": "read",
   },
   medico: {
     agenda: "write", "atendimento-ia": "write", "exames-resultados": "read",
     "consulta-rapida": "read", "perfil-proprio": "write", "prontuario-modelos": "read",
     odontologia: "write", prontuarios: "write", anamneses: "write",
     documentos: "write", clientes: "read", chat: "write",
+    "atendimento-multiplo": "write",
   },
   recepcao: {
     agenda: "write", recepcao: "write", clientes: "write", fluxo: "write",
@@ -64,6 +68,7 @@ export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
     checkin: "write", painel: "write",
     chat: "write", "cartao-beneficios": "read", caixa: "write",
     procedimentos: "read",
+    "atendimento-multiplo": "write", "tipos-servico": "read",
   },
   caixa: {
     caixa: "write", clientes: "read", recepcao: "read", financeiro: "read",
@@ -84,6 +89,7 @@ export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
     "atendimento-ia": "read", "perfil-proprio": "write",
     anamneses: "write", prontuarios: "read", estoque: "read",
     documentos: "read", chat: "write", orcamentos: "write",
+    "atendimento-multiplo": "write", "enfermagem-recursos": "write",
   },
 };
 

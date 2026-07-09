@@ -1,0 +1,1 @@
+ALTER TABLE public.procedimentos ADD COLUMN IF NOT EXISTS valor_variavel boolean NOT NULL DEFAULT false;

@@ -327,6 +327,7 @@ export type Database = {
           enfermagem_recurso_id: string | null
           executado_em: string | null
           executado_por: string | null
+          ficha_numero: number | null
           fim: string
           fluxo_atualizado_em: string
           fluxo_etapa: Database["public"]["Enums"]["fluxo_etapa"]
@@ -358,6 +359,7 @@ export type Database = {
           enfermagem_recurso_id?: string | null
           executado_em?: string | null
           executado_por?: string | null
+          ficha_numero?: number | null
           fim: string
           fluxo_atualizado_em?: string
           fluxo_etapa?: Database["public"]["Enums"]["fluxo_etapa"]
@@ -389,6 +391,7 @@ export type Database = {
           enfermagem_recurso_id?: string | null
           executado_em?: string | null
           executado_por?: string | null
+          ficha_numero?: number | null
           fim?: string
           fluxo_atualizado_em?: string
           fluxo_etapa?: Database["public"]["Enums"]["fluxo_etapa"]
@@ -1421,6 +1424,59 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
+      }
+      backup_execucoes: {
+        Row: {
+          arquivos: number | null
+          bytes: number | null
+          clinica_id: string | null
+          created_at: string
+          data_ref: string
+          erro: string | null
+          finalizado_em: string | null
+          id: string
+          iniciado_em: string
+          status: string
+          tabelas: number | null
+          updated_at: string
+        }
+        Insert: {
+          arquivos?: number | null
+          bytes?: number | null
+          clinica_id?: string | null
+          created_at?: string
+          data_ref: string
+          erro?: string | null
+          finalizado_em?: string | null
+          id?: string
+          iniciado_em?: string
+          status?: string
+          tabelas?: number | null
+          updated_at?: string
+        }
+        Update: {
+          arquivos?: number | null
+          bytes?: number | null
+          clinica_id?: string | null
+          created_at?: string
+          data_ref?: string
+          erro?: string | null
+          finalizado_em?: string | null
+          id?: string
+          iniciado_em?: string
+          status?: string
+          tabelas?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "backup_execucoes_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       boletos: {
         Row: {
@@ -3155,6 +3211,7 @@ export type Database = {
           repasse_forma_pagamento: string | null
           repasse_lancamento_id: string | null
           repasse_pago: boolean
+          repasse_pago_at: string | null
           repasse_pago_em: string | null
           repasse_pago_por: string | null
           status: string
@@ -3186,6 +3243,7 @@ export type Database = {
           repasse_forma_pagamento?: string | null
           repasse_lancamento_id?: string | null
           repasse_pago?: boolean
+          repasse_pago_at?: string | null
           repasse_pago_em?: string | null
           repasse_pago_por?: string | null
           status?: string
@@ -3217,6 +3275,7 @@ export type Database = {
           repasse_forma_pagamento?: string | null
           repasse_lancamento_id?: string | null
           repasse_pago?: boolean
+          repasse_pago_at?: string | null
           repasse_pago_em?: string | null
           repasse_pago_por?: string | null
           status?: string
@@ -3427,6 +3486,7 @@ export type Database = {
           repasse_forma_pagamento: string | null
           repasse_lancamento_id: string | null
           repasse_pago: boolean
+          repasse_pago_at: string | null
           repasse_pago_em: string | null
           repasse_pago_por: string | null
           status: Database["public"]["Enums"]["fin_status_lancamento"]
@@ -3462,6 +3522,7 @@ export type Database = {
           repasse_forma_pagamento?: string | null
           repasse_lancamento_id?: string | null
           repasse_pago?: boolean
+          repasse_pago_at?: string | null
           repasse_pago_em?: string | null
           repasse_pago_por?: string | null
           status?: Database["public"]["Enums"]["fin_status_lancamento"]
@@ -3497,6 +3558,7 @@ export type Database = {
           repasse_forma_pagamento?: string | null
           repasse_lancamento_id?: string | null
           repasse_pago?: boolean
+          repasse_pago_at?: string | null
           repasse_pago_em?: string | null
           repasse_pago_por?: string | null
           status?: Database["public"]["Enums"]["fin_status_lancamento"]
@@ -3712,6 +3774,7 @@ export type Database = {
           agendamento_id: string | null
           clinica_id: string
           created_at: string
+          ficha_numero: number | null
           id: string
           impresso_por: string | null
           impresso_por_nome: string | null
@@ -3722,6 +3785,7 @@ export type Database = {
           agendamento_id?: string | null
           clinica_id: string
           created_at?: string
+          ficha_numero?: number | null
           id?: string
           impresso_por?: string | null
           impresso_por_nome?: string | null
@@ -3732,6 +3796,7 @@ export type Database = {
           agendamento_id?: string | null
           clinica_id?: string
           created_at?: string
+          ficha_numero?: number | null
           id?: string
           impresso_por?: string | null
           impresso_por_nome?: string | null
@@ -6748,6 +6813,7 @@ export type Database = {
           valor_dinheiro_pix: number
           valor_padrao: number
           valor_pix: number
+          valor_variavel: boolean
         }
         Insert: {
           agenda_obrigatoria?: boolean
@@ -6790,6 +6856,7 @@ export type Database = {
           valor_dinheiro_pix?: number
           valor_padrao?: number
           valor_pix?: number
+          valor_variavel?: boolean
         }
         Update: {
           agenda_obrigatoria?: boolean
@@ -6832,6 +6899,7 @@ export type Database = {
           valor_dinheiro_pix?: number
           valor_padrao?: number
           valor_pix?: number
+          valor_variavel?: boolean
         }
         Relationships: []
       }
@@ -8225,6 +8293,7 @@ export type Database = {
         | "recepcao"
         | "financeiro"
         | "caixa"
+        | "supervisor"
       app_role_global:
         | "admin"
         | "tesouraria"
@@ -8455,6 +8524,7 @@ export const Constants = {
         "recepcao",
         "financeiro",
         "caixa",
+        "supervisor",
       ],
       app_role_global: [
         "admin",

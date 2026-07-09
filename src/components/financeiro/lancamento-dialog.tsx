@@ -63,7 +63,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
   const [saving, setSaving] = useState(false);
   const [valorRecebido, setValorRecebido] = useState("");
   const [pagamentoMisto, setPagamentoMisto] = useState(false);
-  const [pagamentos, setPagamentos] = useState<Array<{ forma: string; recebido: string }>>([
+  const [pagamentos, setPagamentos] = useState<Array<{ forma: string; recebido: string; bandeira?: string; parcelas?: string }>>([
     { forma: "dinheiro", recebido: "" },
   ]);
   // ----- Desconto (apenas para gerente/admin/financeiro) -----
@@ -75,6 +75,10 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
   const [valorOriginal, setValorOriginal] = useState<string>("");
   const [supervisorOpen, setSupervisorOpen] = useState(false);
   const [supervisorInfo, setSupervisorInfo] = useState<{ userId: string; nome: string; role: string } | null>(null);
+  // ----- Cortesia (categoria especial: exige justificativa + supervisor) -----
+  const [cortesiaJustificativa, setCortesiaJustificativa] = useState("");
+  // Marca a intenção da autenticação do supervisor: "desconto" | "cortesia"
+  const [authIntent, setAuthIntent] = useState<"desconto" | "cortesia">("desconto");
   // Bloqueio: paciente com mensalidade vencida no cartão benefícios.
   // Quando bloqueado, o pagamento só pode ser feito como Particular.
   const [bloqueioCartao, setBloqueioCartao] = useState<{
@@ -97,6 +101,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     setDescontoAtivo(false); setDescontoTipo("valor");
     setDescontoInput(""); setDescontoAutorizado(""); setDescontoMotivo("");
     setSupervisorInfo(null); setSupervisorOpen(false);
+    setCortesiaJustificativa(""); setAuthIntent("desconto");
     setBloqueioCartao(null); setTipoAgendamento(null); setConvenioNome(null);
     if (initialFormaPagamento !== undefined) {
       if (initialFormaPagamento === "__misto__") {
@@ -254,6 +259,22 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       toast.error("O valor do pagamento deve ser maior que zero.");
       return;
     }
+    // ----- Cortesia: exige justificativa + autorização de supervisor -----
+    const norm0 = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    const catAtual = categorias.find((c) => c.id === categoriaId) ?? null;
+    const ehCortesia = !!(catAtual && norm0(catAtual.nome) === "cortesia");
+    if (ehCortesia) {
+      if (!cortesiaJustificativa.trim()) {
+        toast.error("Informe a justificativa da cortesia.");
+        return;
+      }
+      if (!ehSupervisor && !supervisorInfo) {
+        toast.error("É necessária a autorização de um supervisor para aplicar cortesia.");
+        setAuthIntent("cortesia");
+        setSupervisorOpen(true);
+        return;
+      }
+    }
     // Bloqueio por débito no cartão benefícios — só libera se o pagamento
     // for feito como Particular.
     if (bloqueioCartao?.bloqueado) {
@@ -347,6 +368,11 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         toast.error("Informe o valor recebido em dinheiro em todas as linhas (deve cobrir o valor pago).");
         setSaving(false); return;
       }
+      const creditoSemBandeira = validIdx.find(({ p }) => p.forma === "cartao_credito" && !p.bandeira);
+      if (creditoSemBandeira) {
+        toast.error("Selecione a bandeira do cartão em todas as linhas de Cartão Crédito.");
+        setSaving(false); return;
+      }
       const total = validIdx.reduce((s, { i }) => s + linhasCalc[i].pago, 0);
       if (Math.abs(total - valorNum) > 0.01) {
         toast.error(`Soma das formas (${formatBRL(total)}) difere do valor (${formatBRL(valorNum)})`);
@@ -358,6 +384,11 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         const base = `${FORMAS_LABEL[p.forma] ?? p.forma} ${formatBRL(pago)}`;
         if (p.forma === "dinheiro" && troco > 0) {
           return `${base} (recebido ${formatBRL(Number(p.recebido))}, troco ${formatBRL(troco)})`;
+        }
+        if (p.forma === "cartao_credito") {
+          const parc = Number(p.parcelas || 1) || 1;
+          const band = (p.bandeira ?? "").toUpperCase();
+          return `${base} (${band} ${parc}x)`;
         }
         return base;
       }).join("; ");
@@ -372,7 +403,12 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       descontoObs = `Desconto aplicado: ${tipoTxt} sobre ${formatBRL(origNum)} — Autorizado por: ${descontoAutorizado.trim()}`
         + (descontoMotivo.trim() ? ` — Motivo: ${descontoMotivo.trim()}` : "");
     }
-    const obsFinal = [observacoes.trim(), descontoObs, obsExtra].filter(Boolean).join(" | ") || null;
+    let cortesiaObs = "";
+    if (ehCortesia) {
+      const autor = supervisorInfo?.nome ?? (ehSupervisor ? (user?.email ?? "supervisor") : "");
+      cortesiaObs = `Cortesia — Autorizado por: ${autor} — Justificativa: ${cortesiaJustificativa.trim()}`;
+    }
+    const obsFinal = [observacoes.trim(), cortesiaObs, descontoObs, obsExtra].filter(Boolean).join(" | ") || null;
     // Quando vinculado a um agendamento, busca medico_id e paciente_id
     // para que o repasse médico e os relatórios por paciente funcionem.
     let medicoId: string | null = null;
@@ -381,6 +417,18 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       medicoId = agPrefetch.medico_id ?? null;
       pacienteId = agPrefetch.paciente_id ?? null;
     }
+    // Quando misto tem linha de Cartão Crédito, propagamos bandeira/parcelas
+    // da primeira linha de crédito para os campos de topo do lançamento
+    // (usados por relatórios e pela impressão da GR).
+    const mistoCredito = pagamentoMisto
+      ? pagamentos.find((p) => p.forma === "cartao_credito" && Number(p.recebido || 0) > 0)
+      : null;
+    const bandeiraFinal = isCredito
+      ? bandeiraCartao
+      : (mistoCredito?.bandeira ?? null);
+    const parcelasFinal = isCredito
+      ? (Number(parcelas) || 1)
+      : (mistoCredito ? (Number(mistoCredito.parcelas || 1) || 1) : null);
     const { data: lancInserido, error } = await supabase.from("fin_lancamentos").insert({
       clinica_id: clinicaAtual.clinica_id,
       tipo,
@@ -390,8 +438,8 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       categoria_id: categoriaId || null,
       conta_id: contaId || null,
       forma_pagamento: formaFinal,
-      bandeira_cartao: isCredito ? bandeiraCartao : null,
-      parcelas: isCredito ? Number(parcelas) || 1 : null,
+      bandeira_cartao: bandeiraFinal,
+      parcelas: parcelasFinal,
       emitir_nfse: emitirNfse,
       observacoes: obsFinal,
       status: "confirmado",
@@ -585,8 +633,8 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     onSavedWithData?.({
       valor: Number(valor),
       forma_pagamento: formaFinal,
-      parcelas: isCredito ? (Number(parcelas) || 1) : null,
-      bandeira_cartao: isCredito ? bandeiraCartao : null,
+      parcelas: parcelasFinal,
+      bandeira_cartao: bandeiraFinal,
       emitir_nfse: emitirNfse,
       pagamentos_detalhe: pagamentoMisto
         ? pagamentos
@@ -667,6 +715,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
                     if (ehSupervisor) {
                       setDescontoAtivo(true);
                     } else {
+                      setAuthIntent("desconto");
                       setSupervisorOpen(true);
                     }
                   }}
@@ -750,6 +799,30 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
               </p>
             )}
           </div>
+          {(() => {
+            const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+            const cat = categorias.find((c) => c.id === categoriaId);
+            const ehCortesia = !!(cat && norm(cat.nome) === "cortesia");
+            if (!ehCortesia) return null;
+            return (
+              <div className="space-y-2 rounded-md border border-dashed border-amber-400 p-3 bg-amber-50/40">
+                <div className="flex items-center justify-between gap-2">
+                  <Label className="text-sm font-medium">
+                    Justificativa da cortesia * <span className="text-xs text-muted-foreground">(exige autorização do supervisor)</span>
+                  </Label>
+                  {supervisorInfo && (
+                    <span className="text-xs text-success">✓ Autorizado por {supervisorInfo.nome}</span>
+                  )}
+                </div>
+                <Textarea
+                  rows={2}
+                  value={cortesiaJustificativa}
+                  onChange={(e) => setCortesiaJustificativa(e.target.value)}
+                  placeholder="Ex: paciente encaminhado pela diretoria, retorno gratuito, campanha social..."
+                />
+              </div>
+            );
+          })()}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Conta</Label>
@@ -862,6 +935,47 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
                         Troco: <strong>{formatBRL(trocoP)}</strong>
                       </div>
                     )}
+                    {p.forma === "cartao_credito" && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Bandeira *</Label>
+                          <Select
+                            value={p.bandeira ?? ""}
+                            onValueChange={(v) => setPagamentos((xs) => xs.map((q, i) => i === idx ? { ...q, bandeira: v } : q))}
+                          >
+                            <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="visa">Visa</SelectItem>
+                              <SelectItem value="mastercard">Mastercard</SelectItem>
+                              <SelectItem value="elo">Elo</SelectItem>
+                              <SelectItem value="amex">American Express</SelectItem>
+                              <SelectItem value="hipercard">Hipercard</SelectItem>
+                              <SelectItem value="diners">Diners</SelectItem>
+                              <SelectItem value="outra">Outra</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Parcelas</Label>
+                          <Select
+                            value={p.parcelas ?? "1"}
+                            onValueChange={(v) => setPagamentos((xs) => xs.map((q, i) => i === idx ? { ...q, parcelas: v } : q))}
+                          >
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => {
+                                const base = Number(p.recebido || 0);
+                                return (
+                                  <SelectItem key={n} value={String(n)}>
+                                    {n}x {n === 1 ? "(à vista)" : `de ${(base / n).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`}
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -939,9 +1053,13 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     <SupervisorAuthDialog
       open={supervisorOpen}
       onOpenChange={setSupervisorOpen}
-      acao="aplicar desconto"
+      acao={authIntent === "cortesia" ? "aplicar cortesia" : "aplicar desconto"}
       onAuthorized={(info) => {
         setSupervisorInfo({ userId: info.userId, nome: info.nome, role: info.role });
+        if (authIntent === "cortesia") {
+          // Não ativa desconto; apenas registra a autorização para a cortesia.
+          return;
+        }
         setDescontoAutorizado(info.nome);
         setDescontoAtivo(true);
       }}

@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Plus, Search, Pencil, Users, Download } from "lucide-react";
+import { Plus, Search, Pencil, Users, Download, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
@@ -312,11 +312,18 @@ function ClientesPage() {
                   </span>
                 </TableCell>
                 <TableCell className="text-right">
-                  <Button asChild variant="ghost" size="icon" title="Editar cliente">
-                    <Link to="/app/clientes/$pacienteId/editar" params={{ pacienteId: p.id }}>
-                      <Pencil className="h-4 w-4" />
-                    </Link>
-                  </Button>
+                  <div className="flex items-center justify-end gap-1">
+                    <Button asChild variant="ghost" size="icon" title="Visualizar cliente">
+                      <Link to="/app/clientes/$pacienteId/visualizar" params={{ pacienteId: p.id }}>
+                        <Eye className="h-4 w-4" />
+                      </Link>
+                    </Button>
+                    <Button asChild variant="ghost" size="icon" title="Editar cliente">
+                      <Link to="/app/clientes/$pacienteId/editar" params={{ pacienteId: p.id }}>
+                        <Pencil className="h-4 w-4" />
+                      </Link>
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}

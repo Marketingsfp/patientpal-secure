@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
-import { cadastrarUsuario, getFuncionarioLogin, definirSenhaFuncionario } from "@/lib/equipe.functions";
+import { cadastrarUsuario, getFuncionarioLogin, definirSenhaFuncionario, editarMembro } from "@/lib/equipe.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,7 +17,9 @@ const PERFIS = [
   { value: "medico", label: "Médico" },
   { value: "enfermeiro", label: "Enfermeiro" },
   { value: "recepcao", label: "Recepção" },
+  { value: "caixa", label: "Caixa" },
   { value: "financeiro", label: "Financeiro" },
+  { value: "supervisor", label: "Supervisor" },
 ] as const;
 
 interface Ref { id: string; nome: string }
@@ -46,12 +48,16 @@ export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUs
   const cadastrarUsuarioFn = useServerFn(cadastrarUsuario);
   const getLoginFn = useServerFn(getFuncionarioLogin);
   const definirSenhaFn = useServerFn(definirSenhaFuncionario);
+  const editarMembroFn = useServerFn(editarMembro);
   const [setores, setSetores] = useState<Ref[]>([]);
   const [disponiveis, setDisponiveis] = useState<Array<{ id: string; nome: string; setor_id: string | null; status: string }>>([]);
   const [form, setForm] = useState(() => emptyForm(clinicaId));
   const [editingContratoId, setEditingContratoId] = useState<string | null>(null);
   const [prefillUserId, setPrefillUserId] = useState<string | null>(null);
   const [existingEmail, setExistingEmail] = useState<string | null>(null);
+  const [membershipId, setMembershipId] = useState<string | null>(null);
+  const [perfilOriginal, setPerfilOriginal] = useState<string | null>(null);
+  const [ativoOriginal, setAtivoOriginal] = useState<boolean>(true);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showSenha, setShowSenha] = useState(false);
@@ -83,18 +89,26 @@ export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUs
       setEditingContratoId(null);
       setPrefillUserId(null);
       setExistingEmail(null);
+      setMembershipId(null);
+      setPerfilOriginal(null);
+      setAtivoOriginal(true);
       setForm(emptyForm(clinicaId));
       return;
     }
     void (async () => {
       setLoading(true);
-      const [{ data: contrato }, { data: prof }] = await Promise.all([
+      const [{ data: contrato }, { data: prof }, { data: mem }] = await Promise.all([
         supabase.from("hr_contratos").select("*").eq("clinica_id", clinicaId).eq("user_id", editingUserId).maybeSingle(),
         supabase.from("profiles").select("nome, telefone, telefone2").eq("id", editingUserId).maybeSingle(),
+        supabase.from("clinica_memberships").select("id, role, ativo").eq("clinica_id", clinicaId).eq("user_id", editingUserId).maybeSingle(),
       ]);
       const nome = (contrato?.funcionario_nome as string | undefined) ?? (prof?.nome as string | undefined) ?? "";
       const telefone = (prof?.telefone as string | undefined) ?? "";
       const telefone2 = ((prof as { telefone2?: string | null } | null)?.telefone2 as string | undefined) ?? "";
+      const currentRole = (mem?.role as string | undefined) ?? "recepcao";
+      setMembershipId((mem?.id as string | undefined) ?? null);
+      setPerfilOriginal(currentRole);
+      setAtivoOriginal((mem?.ativo as boolean | undefined) ?? true);
       if (contrato) {
         setEditingContratoId(contrato.id as string);
         setPrefillUserId(null);
@@ -106,12 +120,12 @@ export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUs
           telefone2,
           setor_id: (contrato.setor_id as string) ?? "",
           status: (contrato.status as string) ?? "ativo",
-          criar_login: false, email: "", senha: "", perfil: "recepcao",
+          criar_login: false, email: "", senha: "", perfil: currentRole,
         });
       } else {
         setEditingContratoId(null);
         setPrefillUserId(editingUserId);
-        setForm({ ...emptyForm(clinicaId), funcionario_nome: nome, telefone, telefone2 });
+        setForm({ ...emptyForm(clinicaId), funcionario_nome: nome, telefone, telefone2, perfil: currentRole });
       }
       // Try to get email of this user
       try {
@@ -208,6 +222,23 @@ export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUs
     }
     setSaving(false);
     if (error) { mostrarErro(error); return; }
+    // Atualiza perfil de acesso (membership) quando mudou
+    if (editingUserId && membershipId && form.perfil !== perfilOriginal) {
+      try {
+        await editarMembroFn({
+          data: {
+            clinicaId: form.clinica_id,
+            membershipId,
+            role: form.perfil as "recepcao",
+            ativo: ativoOriginal,
+          },
+        });
+        setPerfilOriginal(form.perfil);
+      } catch (e) {
+        toast.error((e as Error)?.message ?? "Erro ao atualizar perfil de acesso");
+        return;
+      }
+    }
     // Atualiza telefones em profiles quando há um usuário vinculado
     const targetUserId = editingUserId ?? userId ?? prefillUserId ?? null;
     if (targetUserId) {
@@ -300,6 +331,20 @@ export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUs
                     <p><span className="text-muted-foreground">E-mail de login:</span> <span className="font-medium">{existingEmail}</span></p>
                   ) : (
                     <p className="text-muted-foreground">Não foi possível recuperar o e-mail de login deste funcionário.</p>
+                  )}
+                  {membershipId && (
+                    <div className="border-t pt-4">
+                      <Label>Perfil de acesso *</Label>
+                      <Select value={form.perfil} onValueChange={v => setForm({ ...form, perfil: v })}>
+                        <SelectTrigger className="max-w-sm"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {PERFIS.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Alterações no perfil são salvas ao clicar em "Salvar".
+                      </p>
+                    </div>
                   )}
                   <div className="border-t pt-4 space-y-3">
                     {!showSenha ? (

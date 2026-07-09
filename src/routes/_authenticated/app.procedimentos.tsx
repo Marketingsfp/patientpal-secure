@@ -13,6 +13,7 @@ import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -61,6 +62,7 @@ interface Procedimento {
   permite_venda_direta?: boolean | null;
   permite_encaixe?: boolean | null;
   tempo_padrao_min?: number | null;
+  valor_variavel?: boolean | null;
 }
 interface Cartao {
   id: string;
@@ -97,7 +99,7 @@ const EMPTY = {
   valor_cartao_consulta: "0", valor_cartao_desconto: "0",
   duracao_minutos: "30", observacoes: "", preparo: "", ativo: true,
   // Regras do procedimento (arquitetura de plataforma — fn_regras_procedimento)
-  fluxo_atendimento: "consulta_padrao",
+  fluxo_atendimento: "consulta_medica",
   agenda_obrigatoria: true,
   medico_obrigatorio: false,
   sala_obrigatoria: false,
@@ -105,6 +107,7 @@ const EMPTY = {
   permite_venda_direta: false,
   permite_encaixe: true,
   tempo_padrao_min: "30",
+  valor_variavel: false,
 };
 
 const EMPTY_CARTAO = { nome: "", descricao: "", percentual_desconto: "0", ativo: true };
@@ -690,7 +693,7 @@ function ProcedimentosPage() {
       valor_cartao_consulta: String(p.valor_cartao_consulta ?? 0),
       valor_cartao_desconto: String(p.valor_cartao_desconto ?? 0),
       duracao_minutos: String(p.duracao_minutos), observacoes: p.observacoes ?? "", preparo: p.preparo ?? "", ativo: p.ativo,
-      fluxo_atendimento: p.fluxo_atendimento ?? "consulta_padrao",
+      fluxo_atendimento: p.fluxo_atendimento ?? "consulta_medica",
       agenda_obrigatoria: p.agenda_obrigatoria ?? true,
       medico_obrigatorio: p.medico_obrigatorio ?? false,
       sala_obrigatoria: p.sala_obrigatoria ?? false,
@@ -698,6 +701,7 @@ function ProcedimentosPage() {
       permite_venda_direta: p.permite_venda_direta ?? false,
       permite_encaixe: p.permite_encaixe ?? true,
       tempo_padrao_min: String(p.tempo_padrao_min ?? p.duracao_minutos ?? 30),
+      valor_variavel: !!p.valor_variavel,
     });
     setOpen(true);
   };
@@ -706,8 +710,9 @@ function ProcedimentosPage() {
     e.preventDefault();
     if (!clinicaAtual) return;
     if (!form.nome.trim()) { toast.error("Informe o nome."); return; }
-    const vDinheiro = Number(form.valor_dinheiro) || 0;
-    const vCartao = Number(form.valor_pix_cartao) || 0;
+    const isVariavel = !!form.valor_variavel;
+    const vDinheiro = isVariavel ? 0 : (Number(form.valor_dinheiro) || 0);
+    const vCartao = isVariavel ? 0 : (Number(form.valor_pix_cartao) || 0);
     const payload = {
       clinica_id: clinicaAtual.clinica_id,
       nome: form.nome.trim(),
@@ -721,12 +726,13 @@ function ProcedimentosPage() {
       valor_cartao_credito: vCartao,
       valor_cartao_debito: vCartao,
       valor_cartao: vCartao, // legado
-      valor_cartao_consulta: Number(form.valor_cartao_consulta) || 0,
-      valor_cartao_desconto: Number(form.valor_cartao_desconto) || 0,
+      valor_cartao_consulta: isVariavel ? 0 : (Number(form.valor_cartao_consulta) || 0),
+      valor_cartao_desconto: isVariavel ? 0 : (Number(form.valor_cartao_desconto) || 0),
       duracao_minutos: Math.max(0, Number(form.duracao_minutos) || 0),
       observacoes: form.observacoes.trim() || null,
       preparo: form.preparo.trim() || null,
       ativo: form.ativo,
+      valor_variavel: isVariavel,
       // Regras do procedimento (configuração > código)
       fluxo_atendimento: form.fluxo_atendimento || null,
       agenda_obrigatoria: !!form.agenda_obrigatoria,
@@ -1071,12 +1077,23 @@ function ProcedimentosPage() {
                       <span className={`text-[10px] px-1.5 py-0 rounded-full ${tipoCor(p.tipo)}`}>{tipoLabel(p.tipo)}</span>
                     </TableCell>
                     <TableCell className="font-medium">{p.nome}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_dinheiro ?? p.valor_dinheiro_pix))}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_pix ?? p.valor_cartao_credito ?? p.valor_cartao_debito ?? p.valor_cartao))}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {p.valor_variavel
+                        ? <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400">Variável</span>
+                        : fmtBRL(Number(p.valor_dinheiro ?? p.valor_dinheiro_pix))}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {p.valor_variavel
+                        ? <span className="text-muted-foreground">—</span>
+                        : fmtBRL(Number(p.valor_pix ?? p.valor_cartao_credito ?? p.valor_cartao_debito ?? p.valor_cartao))}
+                    </TableCell>
                     {convenios.map(c => {
                       const v = getConvValorExibicao(p, c);
                       return (
                         <TableCell key={c.id} className="text-right tabular-nums">
+                          {p.valor_variavel ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
                           <div className="leading-tight">
                             <div title={`Dinheiro: ${fmtBRL(v.valor_dinheiro)}`}>
                               <span className="text-muted-foreground mr-1">D</span>{fmtBRL(v.valor_dinheiro)}
@@ -1085,6 +1102,7 @@ function ProcedimentosPage() {
                               <span className="mr-1">C</span>{fmtBRL(v.valor_outros)}
                             </div>
                           </div>
+                          )}
                         </TableCell>
                       );
                     })}
@@ -1244,23 +1262,39 @@ function ProcedimentosPage() {
             </div>
 
             <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
-              <p className="text-xs font-medium text-muted-foreground uppercase">Valores por forma de pagamento</p>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground uppercase">Valores por forma de pagamento</p>
+                  {form.valor_variavel && (
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      Valor variável ativo — o valor será informado na hora da cobrança.
+                    </p>
+                  )}
+                </div>
+                <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">
+                  <Switch
+                    checked={!!form.valor_variavel}
+                    onCheckedChange={(v) => setForm({ ...form, valor_variavel: !!v })}
+                  />
+                  <span className="font-medium">Valor variável</span>
+                </label>
+              </div>
+              <div className={`grid grid-cols-2 gap-3 ${form.valor_variavel ? "opacity-50 pointer-events-none" : ""}`}>
                 <div className="space-y-1">
                   <Label>Dinheiro (R$)</Label>
-                  <CurrencyInput value={form.valor_dinheiro}
+                  <CurrencyInput value={form.valor_variavel ? "0" : form.valor_dinheiro} disabled={form.valor_variavel}
                     onChange={(v) => setForm({ ...form, valor_dinheiro: v })} />
                 </div>
                 <div className="space-y-1">
                   <Label>Pix / Débito / Crédito (R$)</Label>
-                  <CurrencyInput value={form.valor_pix_cartao}
+                  <CurrencyInput value={form.valor_variavel ? "0" : form.valor_pix_cartao} disabled={form.valor_variavel}
                     onChange={(v) => setForm({ ...form, valor_pix_cartao: v })} />
                   <p className="text-[10px] text-muted-foreground">Mesmo valor para Pix, Cartão de Débito e Crédito.</p>
                 </div>
               </div>
             </div>
 
-            {convenios.length > 0 && (
+            {convenios.length > 0 && !form.valor_variavel && (
               <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
                 <p className="text-xs font-medium text-muted-foreground uppercase">Valores por convênio (Cartão Benefícios)</p>
                 <div className="space-y-3">
@@ -1334,13 +1368,13 @@ function ProcedimentosPage() {
                   >
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="consulta_padrao">Consulta padrão (com médico)</SelectItem>
-                      <SelectItem value="exame_com_laudo">Exame com laudo</SelectItem>
-                      <SelectItem value="exame_sem_laudo">Exame sem laudo</SelectItem>
-                      <SelectItem value="procedimento_enfermagem">Procedimento de enfermagem</SelectItem>
-                      <SelectItem value="laboratorio">Coleta laboratorial</SelectItem>
-                      <SelectItem value="entrega_domiciliar">Entrega/retirada domiciliar (MAPA/Holter)</SelectItem>
-                      <SelectItem value="balcao">Venda de balcão</SelectItem>
+                      <SelectItem value="consulta_medica">Consulta padrão (com médico)</SelectItem>
+                      <SelectItem value="exame_agendado">Exame com laudo</SelectItem>
+                      <SelectItem value="equipamento">Exame sem laudo</SelectItem>
+                      <SelectItem value="procedimento_ambulatorial">Procedimento de enfermagem</SelectItem>
+                      <SelectItem value="lab_agendado">Coleta laboratorial</SelectItem>
+                      <SelectItem value="domiciliar">Entrega/retirada domiciliar (MAPA/Holter)</SelectItem>
+                      <SelectItem value="venda_balcao">Venda de balcão</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

@@ -1,104 +1,43 @@
-# Multi-exame + contagem por categoria de procedimento
+## Diagnóstico
 
-## Fonte da verdade: `procedimentos.tipo_procedimento`
+Na tela **Serviços** os 15 exames de glicose aparecem como "Laboratório" porque o cadastro usa a coluna `tipo_procedimento = 'laboratorio'` (e/ou `grupo = 'Laboratório'`) do próprio procedimento.
 
-Já existe hoje com CHECK: `consulta | exame | laboratorio | procedimento | cirurgia | equipamento | vacina | telemedicina`.
+Já a busca de serviços dentro do orçamento (quando a categoria é "Laboratório") **filtra por uma fonte diferente**: a tabela de vínculos `procedimento_especialidades` — que na prática está quase vazia. Só **1 dos 15 exames de glicose** está vinculado por lá:
 
-Ajuste **mínimo** no CHECK: adicionar `imagem`. Fica:
-`consulta | exame | laboratorio | imagem | procedimento | cirurgia | equipamento | vacina | telemedicina`.
-
-Mantemos `exame` como valor legado (procedimentos antigos que ninguém reclassificou continuam funcionando — caem em "cada um = 1 atendimento", mesma regra de imagem).
-
-Categorias que o usuário pediu mapeadas 1:1:
-- **laboratório** → `tipo_procedimento = 'laboratorio'`
-- **imagem** → `tipo_procedimento = 'imagem'`
-- **consulta** → `tipo_procedimento = 'consulta'`
-- **procedimento** → `tipo_procedimento = 'procedimento'`
-- **cirurgia** → `tipo_procedimento = 'cirurgia'`
-
-## Migration (aguarda aprovação separada)
-
-1. `ALTER TABLE procedimentos DROP CONSTRAINT procedimentos_tipo_procedimento_check`
-2. Recria o CHECK incluindo `'imagem'`.
-3. Backfill best-effort para `tipo_procedimento IS NULL`:
-   - nome contém `raio-x|raio x|rx |tomograf|ultrass|usg|ressonan|mamograf|densitomet` → `'imagem'`
-   - nome contém `hemograma|glicemia|colesterol|urina|fezes|coleta` **ou** grupo contém `laborat` → `'laboratorio'`
-   - resto → mantém NULL (não força classificação).
-
-Sem toque em: cobranças, pagamentos, NFS-e, GR/guia, contratos, cartão benefícios, financeiro. **Nenhum trigger, nenhuma RLS, nenhuma flag de QA.**
-
-Rollback: recolocar o CHECK antigo (o backfill vira dado válido nele porque só adicionamos rótulos).
-
-## Código
-
-### Novo helper: `src/lib/procedimento/categoria.ts`
-
-```ts
-export type CategoriaProc = "laboratorio" | "imagem" | "consulta"
-  | "procedimento" | "cirurgia" | "outro";
-
-export function categoriaDoProcedimento(tipo: string | null): CategoriaProc;
-export function permiteMultiExame(cat: CategoriaProc): boolean;   // true p/ laboratorio+imagem
-export function contaComoUmAtendimento(cat: CategoriaProc): boolean; // true p/ laboratorio
+```
+GLICOSE (BIOQUIMICA)                        →  sem vínculo
+GLICOSE (URINA 24H)                         →  sem vínculo
+GLICOSE 2H, BASAL, CURVA, SERUM, ...        →  sem vínculo
+...
+TESTE TOLERANCIA A GLICOSE                  →  LABORATORIO  ← único que aparece
 ```
 
-### Refactor: `src/lib/agenda/contagem.ts`
+Por isso o orçamento em modo Laboratório só mostra "TESTE TOLERANCIA A GLICOSE".
 
-Troca a heurística "especialidade contém laborat" pela categoria real do procedimento. Assinatura nova:
+O `tipo_procedimento`/`grupo` está preenchido corretamente em todos os 15 — é a fonte que o cadastro respeita. O erro é o orçamento **ignorar** essa fonte.
 
-```ts
-contarAtendimentos(ags, procMetaById): number
-// agrupa por (paciente_id, dia) quando categoria === 'laboratorio';
-// demais contam 1 por linha.
-```
+---
 
-Fallback: se `procMetaById` não tiver o id (linha antiga sem procedimento_id), conta 1 — comportamento atual.
+## Correção
 
-### UI — `app.agenda.tsx` + `procedimento-cell.tsx`
+Ajustar o filtro de busca de serviços no diálogo **Novo Orçamento** (`src/routes/_authenticated/app.orcamentos.tsx`) para usar a mesma classificação que o cadastro:
 
-Quando os procedimentos filtrados para o médico selecionado tiverem `tipo_procedimento in ('laboratorio','imagem')`, o campo vira multiselect com checkboxes + busca. Badge:
-- "Laboratório — conta como 1 atendimento"
-- "Imagem — cada exame conta 1"
+- Categoria **Laboratório**: incluir procedimentos onde `tipo_procedimento = 'laboratorio'` **OU** cujo id esteja em `procedimento_especialidades` vinculado à especialidade LABORATORIO. União dos dois critérios, sem excluir nada.
+- Categoria **Demais Serviços**: excluir esse mesmo conjunto (todos que não caem em Laboratório).
 
-Fora dessas categorias, single-select como hoje. **Zero mudança visual** no fluxo de consulta/procedimento/cirurgia.
+Implementação:
 
-### Server — `src/lib/agenda/criar-agendamento.functions.ts`
+- Substituir o filtro atual (`q.in("id", labProcIds)` / `q.not("id","in", ...)`) por uma consulta que combine:
+  1. IDs da união `procedimento_especialidades` **∪** `procedimentos.tipo_procedimento = 'laboratorio'`.
+  2. Aplicar `.in("id", uniao)` para Laboratório ou `.not("id","in", uniao)` para Demais.
+- Como o `useEffect` de carga inicial (linhas 615–631) só busca `procedimento_especialidades`, ele passará a buscar também os ids com `tipo_procedimento = 'laboratorio'` e fará a união em memória, guardando o `Set<string>` unificado em `labProcIds`.
+- Nenhuma mudança na UI, nenhum backfill de dados, nenhuma migration. Após o ajuste, ao pesquisar "glicose" no orçamento (categoria Laboratório) aparecem os 15 exames.
 
-Novo campo opcional `procedimentos?: string[]` (nomes).
+Efeito colateral positivo: se no futuro cadastrarem novos exames com `tipo_procedimento = 'laboratorio'` (o padrão do cadastro), eles aparecerão automaticamente no orçamento sem precisar mexer em `procedimento_especialidades`.
 
-- `laboratorio` (N nomes) → **1 agendamento**, campo `procedimento` recebe os nomes concatenados com ` + `. Cria **N linhas em `agendamento_orcamento_itens`** — isso preserva GR/guia separada por exame quando o financeiro emitir. 1 `fin_atendimento`, 1 pagamento, 1 NFS-e (regra financeira **inalterada**).
-- `imagem` (N nomes) → **N agendamentos irmãos** no mesmo horário/paciente/médico. 1º valida slot; irmãos 2..N recebem `origem='encaixe_grupo'` e bypass de slot. Cada um gera `fin_atendimento` e GR próprios (comportamento atual).
-- demais categorias → **single**, comportamento idêntico ao atual (contrato preservado para Agenda V2).
+---
 
-### Contagem aplicada em 4 pontos
+## Fora do escopo
 
-Todos passam a usar o helper `contarAtendimentos`:
-- `src/routes/_authenticated/app.painel.tsx`
-- `src/routes/_authenticated/app.painel-executivo.tsx`
-- `src/routes/_authenticated/app.relatorios.tsx`
-- `src/routes/_authenticated/app.financeiro.atendimentos.tsx` (Repasse) — apenas a **quantidade** de atendimentos é agrupada; o **valor de repasse** continua vindo da soma dos `fin_atendimentos` (regra financeira preservada).
-
-## O que NÃO muda (compromisso do ticket)
-
-- Cobrança, pagamento, NFS-e, GR/guia, regra financeira, contratos, pacientes associados: intocados.
-- GRs continuam separadas por exame/procedimento quando o fluxo financeiro exigir (imagem = N `fin_atendimentos`; laboratório = 1 agendamento com N itens de orçamento).
-- Agenda V2 e Express: intocadas — o campo `procedimentos[]` é opcional.
-
-## Rascunho da Jornada do Paciente
-
-Crio `.lovable/plan-jornada.md` **só como documento**, com:
-- objetivo (uma ficha por comparecimento agrupando N atendimentos de N modalidades),
-- modelo de dados proposto (tabela `jornadas_paciente` + `jornada_itens`, sem migration nesta rodada),
-- fluxo de recepção,
-- impactos em Painel, Relatórios, Repasse (por jornada + por exame),
-- riscos e faseamento.
-
-## Ordem de execução (após seu OK)
-
-1. Migration (CHECK + backfill).
-2. Helper `categoria.ts` + refactor `contagem.ts`.
-3. UI multiselect + `criarAgendamento` (procedimentos[]).
-4. Aplicar contagem nos 4 lugares.
-5. Rascunho `.lovable/plan-jornada.md`.
-
-Cada passo autocontido; se algo travar, dá para reverter só aquele passo.
+- Não vamos "backfillar" `procedimento_especialidades` — a fonte de verdade que o restante do sistema já usa é `tipo_procedimento`/`grupo`, e a UI de cadastro grava por lá.
+- Não mexer no picker da agenda / atendimento múltiplo / caixa (o problema foi reportado só no Orçamento).
