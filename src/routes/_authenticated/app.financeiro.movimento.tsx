@@ -180,7 +180,7 @@ function Page() {
       return;
     }
     // Sem filtro por usuário/tipo/forma → usa RPC agregado (rápido).
-    if (filterUsuario === "todos" && filterTipo === "todos" && filterForma === "todos") {
+    if (filterUsuario === "todos" && filterTipo === "todos" && filterForma === "todos" && !filterPacienteDebounced) {
       const { data, error } = await supabase.rpc("fin_resumo_periodo", {
         p_clinica: clinicaAtual.clinica_id, p_ini: fromDate, p_fim: toDate,
       });
@@ -212,6 +212,7 @@ function Page() {
         else q = q.eq("criado_por", filterUsuario);
       }
       q = applyForma(q);
+      if (filterPacienteDebounced) q = q.ilike("descricao", `%${filterPacienteDebounced}%`);
       const { data, error } = await q;
       if (error) { mostrarErro(error); return; }
       const rows = (data ?? []) as Array<{ tipo: string; status: string; valor: number | string | null }>;
@@ -246,7 +247,7 @@ function Page() {
       setUsuarios(list);
     } else setUsuarios([]);
   };
-  useEffect(() => { void load(); void loadResumo(); }, [clinicaAtual?.clinica_id, filterTipo, fromDate, toDate, filterStatus, filterUsuario, filterForma]);
+  useEffect(() => { void load(); void loadResumo(); }, [clinicaAtual?.clinica_id, filterTipo, fromDate, toDate, filterStatus, filterUsuario, filterForma, filterPacienteDebounced]);
   useEffect(() => { void loadOpts(); }, [clinicaAtual?.clinica_id]);
   const totais = resumo;
 
