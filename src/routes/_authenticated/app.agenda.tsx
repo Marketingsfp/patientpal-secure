@@ -4649,7 +4649,14 @@ function AgendaPage() {
                     })()}
                   </TableCell>
                   <TableCell className="pr-1 align-middle max-w-[220px]">
-                    {isSlotLivre(a.paciente_nome) ? (
+                    {ocultarPaciente ? (
+                      <span
+                        className="inline-flex items-center gap-1 text-xs uppercase font-medium text-rose-700 italic"
+                        title="Paciente oculto — estorno solicitado, aguardando aprovação"
+                      >
+                        — aguardando estorno —
+                      </span>
+                    ) : isSlotLivre(a.paciente_nome) ? (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -4724,6 +4731,8 @@ function AgendaPage() {
                     <div className="flex flex-col items-center gap-0.5">
                       {isSlotLivre(a.paciente_nome) ? (
                         <Badge className="bg-slate-100 text-slate-600 border border-slate-300">Livre</Badge>
+                      ) : estornoPend ? (
+                        <Badge className="bg-rose-100 text-rose-800 border border-rose-300">Estorno solicitado</Badge>
                       ) : (
                         <Badge className={STATUS_COR[a.status]}>{STATUS_LABEL[a.status]}</Badge>
                       )}
