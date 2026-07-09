@@ -1012,20 +1012,29 @@ function Page() {
                   <CardTitle className="text-xs text-muted-foreground">Entradas por forma de pagamento</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                    {[
-                      { label: "Dinheiro", value: entradasPorForma.dinheiro },
-                      { label: "PIX", value: entradasPorForma.pix },
-                      { label: "Débito", value: entradasPorForma.debito },
-                      { label: "Crédito", value: entradasPorForma.credito },
+                  {(() => {
+                    const cards: Array<{ label: string; value: number; sempre?: boolean }> = [
+                      { label: "Dinheiro", value: entradasPorForma.dinheiro, sempre: true },
+                      { label: "PIX", value: entradasPorForma.pix, sempre: true },
+                      { label: "Débito", value: entradasPorForma.debito, sempre: true },
+                      { label: "Crédito", value: entradasPorForma.credito, sempre: true },
+                      { label: "Boleto", value: entradasPorForma.boleto },
+                      { label: "Transferência", value: entradasPorForma.transferencia },
+                      { label: "Convênio", value: entradasPorForma.convenio },
                       { label: "Outros", value: entradasPorForma.outros },
-                    ].map((it) => (
-                      <div key={it.label} className="rounded-md border bg-muted/30 px-3 py-2">
-                        <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{it.label}</div>
-                        <div className="text-base font-semibold tabular-nums">{fmt(it.value)}</div>
+                    ];
+                    const visiveis = cards.filter((c) => c.sempre || (c.value ?? 0) > 0.005);
+                    return (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {visiveis.map((it) => (
+                          <div key={it.label} className="rounded-md border bg-muted/30 px-3 py-2">
+                            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{it.label}</div>
+                            <div className="text-base font-semibold tabular-nums">{fmt(it.value)}</div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })()}
                 </CardContent>
               </Card>
 
