@@ -40,6 +40,7 @@ const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", curren
 
 function Page() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("financeiro");
   const [items, setItems] = useState<Lanc[]>([]);
   const [cats, setCats] = useState<Opt[]>([]);
   const [contas, setContas] = useState<Opt[]>([]);
