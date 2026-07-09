@@ -182,7 +182,7 @@ function Page() {
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [optsReady, setOptsReady] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
-  const [payForm, setPayForm] = useState({ data: hoje, conta_id: "", forma_pagamento: "" });
+  const [payForm, setPayForm] = useState({ data: hoje, conta_id: "", forma_pagamento: "", valor_manual: "" });
   // Comprovante de pagamento de repasse (para impressão)
   type CompItem = { data: string; medico: string; paciente: string; servico: string; valorMedico: number; pagoEm: string | null; pagoHora: string | null };
   type Comprovante = {
