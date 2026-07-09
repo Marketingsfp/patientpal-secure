@@ -1649,7 +1649,14 @@ function Page() {
                   const procedimentoNome = a.procedimento ?? "—";
 
                   // Define as cores das linhas para o efeito zebrado acompanhar a coluna fixa
-                  const rowBg = idx % 2 === 0 ? "bg-background" : "bg-slate-50 dark:bg-slate-900/40";
+                  const isSelected = sel.has(`${a.origem}:${a.id}`);
+                  const baixaPendente = !a.repasse_pago && !isAtendido(a);
+                  const rowBg =
+                    isSelected && baixaPendente
+                      ? "bg-amber-50 dark:bg-amber-950/30"
+                      : idx % 2 === 0
+                        ? "bg-background"
+                        : "bg-slate-50 dark:bg-slate-900/40";
 
                   return (
                     <TableRow key={`${a.origem}:${a.id}`} className={cn("hover:bg-muted/30 transition-colors", rowBg)}>
