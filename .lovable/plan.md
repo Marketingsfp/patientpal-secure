@@ -1,63 +1,29 @@
 ## Objetivo
+Adicionar um botão **"Dá baixa"** em cada linha da tabela **Atendimentos** (`/app/financeiro/atendimentos`), posicionado logo antes do botão de excluir. Ele permite ao financeiro marcar o atendimento como realizado nos casos em que o médico não usa o sistema, liberando o repasse.
 
-Criar uma nova aba **"Estorno"** no menu lateral de Financeiro (logo abaixo de "Atendimentos"), consolidando todo o fluxo de solicitações de estorno que hoje aparece como um card rosa dentro da página `/app/financeiro/atendimentos`.
+## Comportamento
 
-## Arquivos
+- Aparece somente quando o atendimento ainda **não foi baixado** (agendamento com status diferente de `realizado`, ou lançamento manual com status diferente de `realizado`) — exatamente o mesmo critério que hoje exibe o selo "⏳ Aguarda atend.".
+- Ao clicar:
+  - Confirma com um diálogo ("Confirmar baixa do atendimento? O repasse do médico será liberado.").
+  - Para itens da **agenda** (`origem === "agenda"`): atualiza `agendamentos.status = 'realizado'` no registro vinculado.
+  - Para itens **manuais** (`origem === "manual"`, `fin_lancamentos`): atualiza `fin_lancamentos.status = 'realizado'`.
+  - Registra em `logs` (via `logAction`) a ação de baixa manual pelo financeiro (auditoria).
+  - Recarrega a lista e mostra toast de sucesso.
+- Após a baixa, a linha passa a se comportar como "atendido": o checkbox de seleção para **Pagar repasse** fica habilitado, exatamente como hoje quando o médico marca via agenda.
+- Fica oculto para o perfil **médico** (`isMedicoOnly`), assim como as demais ações administrativas já são.
+- Fica oculto quando o repasse já está pago (nada a baixar).
 
-### 1. `src/routes/_authenticated/app.financeiro.estorno.tsx` (novo)
+## UI
 
-Nova rota `/app/financeiro/estorno` com o componente `Page`, `head()` "Estorno — Financeiro". Reúne:
+- Ícone: `CheckCircle2` (lucide) em verde suave, `variant="ghost"`, `size="icon"`, `h-7 w-7`, `title="Dá baixa (marcar como realizado)"`.
+- Posicionado **imediatamente antes** do botão de excluir (`Trash2`) tanto no bloco `origem === "agenda"` quanto no bloco de lançamentos manuais.
 
-- **Carregamento das solicitações**: mesma consulta a `estorno_solicitacoes` já existente em `app.financeiro.atendimentos.tsx` (linhas 462-475), agora com filtro de status configurável — por padrão "pendente", mas com abas/toggle "Pendentes / Aprovadas / Recusadas / Todas" e range de datas simples.
-- **Realtime**: mesma inscrição no canal `fin-estornos-{clinicaId}` (linhas 480-501) para atualizar a lista quando novas solicitações chegarem.
-- **Ação Aprovar e Estornar**: replica `aprovarSolicitacao` (linhas 503-530). Como a página não possui a lista `items` de atendimentos (que hoje serve para resolver `alvo`), o fluxo passa a:
-  1. Se `lancamento_id` presente, buscar direto em `fin_lancamentos` os campos `id, agendamento_id, valor, descricao` e em `fin_atendimentos` (view) os campos `origem, repasse_pago` para pré-validar.
-  2. Executar a mesma sequência de `estornar()` (linhas 1078-1153): valida `repasse_pago === false` e `origem === "agenda"`, apaga `caixa_movimentos` do lancamento, apaga `fin_lancamentos`, volta `agendamentos.status` para "agendado" e `fluxo_etapa` para "aguardando_recepcao", registra `logAction` com `action: "ESTORNO"`.
-  3. Marca a solicitação como `aprovado` com `resposta` "Estorno executado" (ou "Aprovado manualmente" se o lançamento não foi encontrado / repasse já pago — nesses casos exibe toast informativo mas ainda encerra a solicitação, mantendo o comportamento atual).
-- **Ação Recusar**: replica `rejeitarSolicitacao` (linhas 532-555) — `window.prompt` para motivo, marca como `rejeitado`.
-- **Permissão**: mesma checagem `podeEstornar = role ∈ {admin, gestor, financeiro}` (linha 149). Sem permissão, mostra Card "Acesso restrito" e não carrega os botões de ação.
-- **Colunas exibidas** por solicitação (mesmo layout do card atual, mas em uma tabela full-width):
-  - Data/hora solicitada
-  - Paciente
-  - Descrição
-  - Valor
-  - Tipo (badge "Erro de caixa" / "Devolução")
-  - Motivo
-  - Datas do pagamento original / previsão de devolução (quando `tipo = devolucao`)
-  - Status (badge)
-  - Resolvido por / em / resposta (quando concluída)
-  - Ações (Aprovar/Recusar quando pendente; somente leitura para o restante).
-- **Filtros locais**: busca por paciente/descrição, filtro por tipo, filtro por status, range de datas (`solicitado_em`). Sem persistir estado — mesmos moldes do resto do módulo Financeiro.
-- **Export**: botão "Exportar Excel" reutiliza `exportToExcel` de `@/lib/export-csv` como em outras páginas.
+## Arquivos afetados
 
-Não altera schema, RLS, RPCs, permissões ou o fluxo de solicitação (Caixa continua criando `estorno_solicitacoes` como hoje).
+- `src/routes/_authenticated/app.financeiro.atendimentos.tsx` — adicionar handler `darBaixa(a)`, importar `CheckCircle2` (já importado) e `logAction`, renderizar o botão nas duas branches de ações; após sucesso, chamar o mesmo reload usado por outras mutações.
 
-### 2. `src/routes/_authenticated/app.financeiro.tsx`
+## Fora de escopo
 
-Adicionar item na `subnav` **logo depois de "Atendimentos"**:
-
-```
-{ to: "/app/financeiro/estorno", label: "Estorno", icon: Undo2 }
-```
-
-`Undo2` já é usado em `atendimentos` e representa bem o fluxo. Manter o modo `isMedicoOnly` inalterado (a aba não aparece para médicos, que já veem só "Repasse").
-
-### 3. `src/routes/_authenticated/app.financeiro.atendimentos.tsx`
-
-Remover o card rosa "N solicitação(ões) de estorno pendente(s)" (linhas 1376-1434) e o estado/efeitos correlatos (linhas 448-555) para não duplicar a funcionalidade. No lugar do card, colocar um **link discreto** no topo da página quando houver pendências, do tipo:
-
-> "N solicitação(ões) de estorno pendente(s) → Abrir aba Estorno"
-
-Esse link é apenas um badge com `Link to="/app/financeiro/estorno"`, mantendo a inscrição realtime só para atualizar a contagem (sem a lista completa nem as ações). Assim continua havendo um alerta visível na aba original, mas todo o gerenciamento acontece na nova aba.
-
-## O que não muda
-
-- Schema/tables `estorno_solicitacoes`, `fin_lancamentos`, `agendamentos`, `caixa_movimentos`.
-- Fluxo de criação de solicitação a partir do caixa/recepção (`SolicitarEstornoDialog`, `EstornosBell`, etc.).
-- Lógica interna de `estornar` (validações, ordem de exclusão, auditoria).
-- Permissões (`podeEstornar`).
-
-## Riscos e mitigação
-
-- **Duplicidade acidental**: manter a lógica inteira do estorno em um único lugar (nova aba) evita que uma solicitação seja aprovada em duas telas ao mesmo tempo. O badge de contagem na aba Atendimentos é apenas atalho.
-- **Regressão do `estornar`**: como a nova aba reproduz o `estornar` sem depender de `items`, adicionamos as duas pré-checagens (`repasse_pago`, `origem = "agenda"`) via SELECT antes de executar, com toasts idênticos aos atuais.
+- Não altera regras de RLS nem cria migração — as políticas atuais já permitem que o financeiro atualize `agendamentos.status` e `fin_lancamentos.status` da própria clínica.
+- Não mexe na aba **Estorno** nem em outras rotas.

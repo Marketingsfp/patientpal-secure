@@ -963,6 +963,44 @@ function Page() {
     }
   };
 
+  const darBaixa = async (a: Atend) => {
+    if (
+      !confirm(
+        "Confirmar baixa do atendimento?\n\nO médico será marcado como tendo atendido este paciente e o repasse ficará liberado para pagamento.",
+      )
+    )
+      return;
+    try {
+      if (a.origem === "agenda") {
+        if (!a.agendamento_id) {
+          toast.error("Atendimento sem agendamento vinculado.");
+          return;
+        }
+        const { error } = await supabase
+          .from("agendamentos")
+          .update({ status: "realizado" })
+          .eq("id", a.agendamento_id);
+        if (error) {
+          mostrarErro(error);
+          return;
+        }
+      } else {
+        const { error } = await supabase
+          .from("fin_atendimentos")
+          .update({ status: "realizado" })
+          .eq("id", a.id);
+        if (error) {
+          mostrarErro(error);
+          return;
+        }
+      }
+      toast.success("Baixa realizada. Repasse liberado.");
+      await load();
+    } catch (err) {
+      mostrarErro(err);
+    }
+  };
+
   const medMap = useMemo(() => new Map(medicos.map((m) => [m.id, m.nome])), [medicos]);
   const pacMap = useMemo(() => {
     const m = new Map<string, string>(pacientes.map((p) => [p.id, p.nome]));
@@ -1683,6 +1721,17 @@ function Page() {
                                   <Printer className="h-3.5 w-3.5 text-primary" />
                                 </Button>
                               )}
+                              {!a.repasse_pago && a.agendamento_status !== "realizado" && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  title="Dá baixa (marcar como realizado e liberar repasse)"
+                                  onClick={() => darBaixa(a)}
+                                >
+                                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                                </Button>
+                              )}
                               {/* Botão de excluir para agenda */}
                               <Button
                                 variant="ghost"
@@ -1720,7 +1769,18 @@ function Page() {
                                   <Printer className="h-3.5 w-3.5 text-primary" />
                                 </Button>
                               )}
-                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => remove(a)}>
+                              {!a.repasse_pago && a.status !== "realizado" && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  title="Dá baixa (marcar como realizado e liberar repasse)"
+                                  onClick={() => darBaixa(a)}
+                                >
+                                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                                </Button>
+                              )}
+                              <Button variant="ghost" size="icon" className="h-7 w-7" title="Excluir" onClick={() => remove(a)}>
                                 <Trash2 className="h-3.5 w-3.5 text-destructive" />
                               </Button>
                             </div>
