@@ -65,6 +65,13 @@ function Page() {
   const [filterStatus, setFilterStatus] = useState<"confirmado" | "todos" | "pendente">("confirmado");
   const [filterUsuario, setFilterUsuario] = useState<string>("todos");
   const [filterForma, setFilterForma] = useState<string>("todos");
+  const [filterPaciente, setFilterPaciente] = useState<string>("");
+  const [filterPacienteDebounced, setFilterPacienteDebounced] = useState<string>("");
+
+  useEffect(() => {
+    const t = setTimeout(() => setFilterPacienteDebounced(filterPaciente.trim()), 300);
+    return () => clearTimeout(t);
+  }, [filterPaciente]);
 
   const applyForma = <T extends { or: (s: string) => T; ilike: (c: string, p: string) => T }>(q: T): T => {
     switch (filterForma) {
@@ -106,6 +113,7 @@ function Page() {
         else q = q.eq("criado_por", filterUsuario);
       }
       q = applyForma(q);
+      if (filterPacienteDebounced) q = q.ilike("descricao", `%${filterPacienteDebounced}%`);
       const { data, error } = await q;
       if (error) { mostrarErro(error); setLoading(false); return; }
       finList = ((data ?? []) as Array<Omit<Lanc, "origem">>).map((l) => ({ ...l, origem: "fin" as const }));
@@ -129,6 +137,7 @@ function Page() {
         if (filterUsuario === "sem") qc = qc.is("user_id", null);
         else qc = qc.eq("user_id", filterUsuario);
       }
+      if (filterPacienteDebounced) qc = qc.ilike("descricao", `%${filterPacienteDebounced}%`);
       const { data: mv, error: errMv } = await qc;
       if (errMv) { mostrarErro(errMv); setLoading(false); return; }
       caixaList = ((mv ?? []) as Array<{
@@ -171,7 +180,7 @@ function Page() {
       return;
     }
     // Sem filtro por usuário/tipo/forma → usa RPC agregado (rápido).
-    if (filterUsuario === "todos" && filterTipo === "todos" && filterForma === "todos") {
+    if (filterUsuario === "todos" && filterTipo === "todos" && filterForma === "todos" && !filterPacienteDebounced) {
       const { data, error } = await supabase.rpc("fin_resumo_periodo", {
         p_clinica: clinicaAtual.clinica_id, p_ini: fromDate, p_fim: toDate,
       });
@@ -203,6 +212,7 @@ function Page() {
         else q = q.eq("criado_por", filterUsuario);
       }
       q = applyForma(q);
+      if (filterPacienteDebounced) q = q.ilike("descricao", `%${filterPacienteDebounced}%`);
       const { data, error } = await q;
       if (error) { mostrarErro(error); return; }
       const rows = (data ?? []) as Array<{ tipo: string; status: string; valor: number | string | null }>;
@@ -237,7 +247,7 @@ function Page() {
       setUsuarios(list);
     } else setUsuarios([]);
   };
-  useEffect(() => { void load(); void loadResumo(); }, [clinicaAtual?.clinica_id, filterTipo, fromDate, toDate, filterStatus, filterUsuario, filterForma]);
+  useEffect(() => { void load(); void loadResumo(); }, [clinicaAtual?.clinica_id, filterTipo, fromDate, toDate, filterStatus, filterUsuario, filterForma, filterPacienteDebounced]);
   useEffect(() => { void loadOpts(); }, [clinicaAtual?.clinica_id]);
   const totais = resumo;
 
@@ -568,6 +578,13 @@ function Page() {
               <SelectItem value="sem">Sem informação</SelectItem>
             </SelectContent>
           </Select></div>
+        <div className="space-y-1 flex-1 min-w-[220px]"><Label className="text-xs">Paciente / descrição</Label>
+          <Input
+            type="search"
+            value={filterPaciente}
+            onChange={(e) => setFilterPaciente(e.target.value)}
+            placeholder="Buscar por nome do paciente..."
+          /></div>
       </CardContent></Card>
 
       <Card><CardContent className="p-0">
