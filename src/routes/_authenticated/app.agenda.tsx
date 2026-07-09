@@ -5081,6 +5081,7 @@ function AgendaPage() {
           fmtHora={fmtHora}
           estornoPendAgs={estornoPendAgs}
           ocultarPacienteMedico={isMedicoOnly}
+          ehLaboratorio={medicoEhLaboratorioFormulario}
         />
       )}
 
