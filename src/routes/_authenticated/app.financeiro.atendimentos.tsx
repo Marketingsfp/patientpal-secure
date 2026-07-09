@@ -1635,8 +1635,8 @@ function Page() {
                       <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                     </TableHead>
                   )}
-                  <TableHead className="text-[11px] font-medium px-2 whitespace-nowrap">Data</TableHead>
                   <TableHead className="text-[11px] font-medium px-2 whitespace-nowrap text-center w-10">Ficha</TableHead>
+                  <TableHead className="text-[11px] font-medium px-2 whitespace-nowrap">Data</TableHead>
                   <TableHead className="text-[11px] font-medium px-2">Médico</TableHead>
                   <TableHead className="text-[11px] font-medium px-2">Paciente</TableHead>
                   <TableHead className="text-[11px] font-medium px-2">Serviço</TableHead>
@@ -1690,11 +1690,11 @@ function Page() {
                           )}
                         </TableCell>
                       )}
-                      <TableCell className="text-xs whitespace-nowrap px-2">
-                        {new Date(a.data + "T00:00:00").toLocaleDateString("pt-BR")}
-                      </TableCell>
                       <TableCell className="text-xs whitespace-nowrap px-2 text-center font-mono text-muted-foreground">
                         {String(idx + 1).padStart(3, "0")}
+                      </TableCell>
+                      <TableCell className="text-xs whitespace-nowrap px-2">
+                        {new Date(a.data + "T00:00:00").toLocaleDateString("pt-BR")}
                       </TableCell>
 
                       {/* Larguras baseadas em % e truncate para textos longos não quebrarem o layout */}
