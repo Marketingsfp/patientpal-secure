@@ -1663,22 +1663,13 @@ function Page() {
                       {!isMedicoOnly && (
                         <TableCell className="px-2">
                           {(a.valor_medico ?? 0) > 0 ? (
-                            a.repasse_pago ? (
-                              <Checkbox
-                                checked={sel.has(`${a.origem}:${a.id}`)}
-                                onCheckedChange={() => toggleOne(a)}
-                                aria-label="Selecionar para 2ª via"
-                                title="Selecionar para reimprimir 2ª via"
-                                className="h-4 w-4"
-                              />
-                            ) : isAtendido(a) ? (
-                              <Checkbox
-                                checked={sel.has(`${a.origem}:${a.id}`)}
-                                onCheckedChange={() => toggleOne(a)}
-                                aria-label="Selecionar"
-                                className="h-4 w-4"
-                              />
-                            ) : null
+                            <Checkbox
+                              checked={sel.has(`${a.origem}:${a.id}`)}
+                              onCheckedChange={() => toggleOne(a)}
+                              aria-label={a.repasse_pago ? "Selecionar para 2ª via" : "Selecionar"}
+                              title={a.repasse_pago ? "Selecionar para reimprimir 2ª via" : undefined}
+                              className="h-4 w-4"
+                            />
                           ) : (
                             <span
                               title="Sem valor de repasse cadastrado para este médico/procedimento"
