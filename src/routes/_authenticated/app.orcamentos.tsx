@@ -611,36 +611,10 @@ function NovoOrcamentoDialog({
   const [procQuery, setProcQuery] = useState("");
   const [procResults, setProcResults] = useState<Procedimento[]>([]);
   const [searchingProc, setSearchingProc] = useState(false);
-  const [labProcIds, setLabProcIds] = useState<Set<string> | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    (async () => {
-      const { data: esps } = await supabase
-        .from("especialidades")
-        .select("id")
-        .ilike("nome", "%labor%");
-      const espIds = (esps ?? []).map((e) => e.id);
-      const union = new Set<string>();
-      if (espIds.length > 0) {
-        const { data: pe } = await supabase
-          .from("procedimento_especialidades")
-          .select("procedimento_id")
-          .eq("clinica_id", clinicaId)
-          .in("especialidade_id", espIds);
-        for (const r of pe ?? []) union.add(r.procedimento_id as string);
-      }
-      // Também considera procedimentos classificados como laboratório
-      // via tipo_procedimento/grupo (fonte usada pelo cadastro de Serviços).
-      const { data: tp } = await supabase
-        .from("procedimentos")
-        .select("id")
-        .eq("clinica_id", clinicaId)
-        .or("tipo_procedimento.eq.laboratorio,grupo.ilike.%labor%");
-      for (const r of tp ?? []) union.add(r.id as string);
-      setLabProcIds(union);
-    })();
-  }, [open, clinicaId]);
+  // Categoria Laboratório é identificada diretamente em `procedimentos`
+  // (tipo_procedimento/grupo) — mesma fonte usada pelo cadastro de Serviços.
+  // Nada de prefetch de IDs: a lista completa (~4.4k) estouraria a URL do
+  // PostgREST no `.in("id", ids)`.
 
   useEffect(() => {
     (async () => {
@@ -701,7 +675,6 @@ function NovoOrcamentoDialog({
   useEffect(() => {
     let cancel = false;
     if (procQuery.trim().length < 2) { setProcResults([]); return; }
-    if (categoria && labProcIds == null) return;
     setSearchingProc(true);
     const t = setTimeout(async () => {
       const norm = procQuery.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -712,23 +685,15 @@ function NovoOrcamentoDialog({
         .eq("ativo", true)
         .or(`nome.ilike.%${procQuery}%,nome.ilike.%${norm}%`);
       if (categoria === "laboratorio") {
-        const ids = Array.from(labProcIds ?? []);
-        if (ids.length === 0) {
-          if (!cancel) { setProcResults([]); setSearchingProc(false); }
-          return;
-        }
-        q = q.in("id", ids);
+        q = q.or("tipo_procedimento.eq.laboratorio,grupo.ilike.%labor%");
       } else if (categoria === "demais") {
-        const ids = Array.from(labProcIds ?? []);
-        if (ids.length > 0) {
-          q = q.not("id", "in", `(${ids.join(",")})`);
-        }
+        q = q.not("tipo_procedimento", "eq", "laboratorio").not("grupo", "ilike", "%labor%");
       }
       const { data } = await q.limit(20);
       if (!cancel) { setProcResults((data ?? []) as Procedimento[]); setSearchingProc(false); }
     }, 250);
     return () => { cancel = true; clearTimeout(t); };
-  }, [procQuery, clinicaId, categoria, labProcIds]);
+  }, [procQuery, clinicaId, categoria]);
 
   const valorPorForma = (p: Procedimento, f: string) => {
     if (f === "Dinheiro") return Number(p.valor_dinheiro ?? p.valor_dinheiro_pix ?? p.valor_padrao ?? 0);
