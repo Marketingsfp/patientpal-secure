@@ -42,7 +42,7 @@ export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
   gestor: {
     dashboard: "write", agenda: "write", fluxo: "write", clientes: "write",
     chat: "write", checkin: "read", recepcao: "read", orcamentos: "read",
-    caixa: "read", financeiro: "read", boletos: "read", contratos: "read",
+    caixa: "read", financeiro: "write", boletos: "read", contratos: "read",
     nfse: "read", relatorios: "write", auditoria: "read", lgpd: "read",
     equipe: "write", "hr-contratos": "read", "hr-ponto": "read",
     "hr-ferias": "read", "hr-holerites": "read", treinamentos: "read",
