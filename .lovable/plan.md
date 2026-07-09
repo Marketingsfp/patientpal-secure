@@ -1,38 +1,76 @@
-## Objetivo
+## Contexto
 
-Tornar o campo **Serviço** opcional no agendamento e adicionar uma opção de **pagamento manual** (com valor editável pelo usuário) no fluxo de cobrança.
+Hoje, quando o recepcionista seleciona vários atendimentos do mesmo paciente e usa **Opções → Cobrar selecionados**, o sistema grava:
 
-## Alterações
+- **1 lançamento "principal"** com o valor total do grupo, vinculado ao primeiro atendimento (`fin_lancamentos.agendamento_id = principal`);
+- **N lançamentos-sombra com valor R$ 0,00**, vinculados aos demais atendimentos, só para marcá-los como "pagos".
 
-Arquivo único: `src/routes/_authenticated/app.agenda.tsx`
+Isso quebra o estorno individual:
 
-### 1. Serviço opcional no cadastro do agendamento
+- Estornar a **linha principal** desfaz só o primeiro atendimento — os outros continuam aparecendo como pagos (as sombras seguem `confirmado`).
+- Estornar uma **sombra** cancela uma linha de R$ 0,00 — o atendimento pedido "sai" do pago, mas o **valor total do grupo continua no principal**, ou seja, o paciente segue cobrado pelo item estornado.
 
-- Remover a validação `if (procedimentosParaSalvar.length === 0) { toast.error("Selecione o serviço"); return; }` (linha ~2609) para permitir salvar/pagar um agendamento sem procedimento definido.
-- Ajustar o campo de serviço no formulário: retirar o asterisco/label de "obrigatório" e permitir submit vazio. O texto do procedimento salvo pode ficar `null` (o schema já aceita).
-- Nos fluxos de cobrança que dependem do nome do procedimento (`cobrarAgendamento`, `cobrarSelecionados`, submit com "ir para pagamento"), manter o fallback já existente `procedimento ?? "CONSULTA"` para descrição/lookup de valor — quando não houver procedimento e nenhum valor de referência, o fluxo cai naturalmente na cobrança manual descrita abaixo.
+Objetivo: cada atendimento deve poder ser estornado individualmente, tirando exatamente **o valor daquele atendimento** do movimento de caixa e mantendo os demais intactos.
 
-### 2. Botão "Valor manual" no diálogo Forma de pagamento
+## Estratégia
 
-No `Dialog` "Forma de pagamento" (linhas ~3867–3917), adicionar um novo botão abaixo de "Mais de uma forma de pagamento":
+Trocar o modelo "1 principal + N sombras zeradas" por **N lançamentos individuais** (um por atendimento) agrupados por um mesmo `grupo_pagamento_id`. A soma dos N continua igual ao total cobrado, então:
 
-```
-✏️ Valor manual (definir manualmente)
-```
+- Movimento de Caixa, BI, resumo do dia: **sem mudança visível de totais** para pagamentos novos.
+- Guia de atendimento agrupada, comprovante e forma de pagamento: **iguais**.
+- Estorno: cancela apenas a linha do atendimento pedido → sai só o valor daquele atendimento; os outros do grupo permanecem.
 
-Comportamento (`escolherManual`, análogo a `escolherMisto`):
-- Abre o `LancamentoDialog` com:
-  - `initialValor = ""` (vazio, para o usuário digitar)
-  - `initialFormaPagamento = ""` (usuário escolhe forma dentro do próprio LancamentoDialog)
-  - `initialDescricao` = mesma descrição usada nos demais fluxos, com sufixo `— valor manual`
-  - `agendamentoId` = mesmo principal + extras já preparados
-- O restante do fluxo (baixa, sombras para agrupados, auto check-in) permanece idêntico ao `onSavedWithData` existente.
+## Mudanças
 
-### 3. Atalho de teclado
+### 1. Banco (migration)
 
-Incluir a tecla correspondente ao novo botão na dica "1–5" já exibida no cabeçalho do diálogo, passando a "1–6" (ou próximo índice disponível), e no handler de teclas do diálogo.
+Adicionar em `fin_lancamentos`:
+- `grupo_pagamento_id uuid` (nullable) — agrupa lançamentos de uma mesma cobrança em lote.
+- Índice em `grupo_pagamento_id`.
+
+Sem alteração de RLS/grants (colunas em tabela já existente).
+
+### 2. Rateio do valor por atendimento (`app.agenda.tsx`, `cobrarSelecionados` → `onSavedWithData`)
+
+Ao montar o pagamento agrupado, além do total, guardar o **valor unitário** de cada atendimento (já calculado hoje em `procsResolvidos` para somar o total). Passar essa lista adiante junto de `pagamentoExtraIds`.
+
+Se houver **desconto** aplicado, ratear proporcionalmente pelos valores unitários (mantém consistência com o total pago).
+
+No `onSavedWithData`, em vez de:
+- atualizar o principal (feito pelo `LancamentoDialog`) + inserir sombras zeradas,
+
+fazer:
+1. Gerar um `grupoId = crypto.randomUUID()`.
+2. Ajustar o lançamento **principal** já criado pelo `LancamentoDialog`: `update` com `valor = valorUnit[0]` e `grupo_pagamento_id = grupoId`, `descricao` da forma "Paciente — Procedimento (1/N do grupo)".
+3. Inserir N-1 lançamentos individuais para os extras, cada um com:
+   - `agendamento_id = extraId`,
+   - `valor = valorUnit[i]`,
+   - `forma_pagamento`, `status = confirmado`, `data`, `clinica_id` iguais ao principal,
+   - `grupo_pagamento_id = grupoId`,
+   - `descricao` "Paciente — Procedimento (i/N do grupo)",
+   - `observacoes` "Pagamento agrupado (grupo <id>)".
+
+Manter check-in automático e limpeza da seleção como estão.
+
+### 3. Estorno individual (`app.financeiro.movimento.tsx`, `estornar`)
+
+Nada muda no botão nem no fluxo. Como cada atendimento agora tem seu próprio lançamento com valor real, o `update status = cancelado` já:
+- tira o valor daquele atendimento do caixa,
+- reverte o agendamento correspondente,
+- mantém os demais do grupo intactos.
+
+Adicionar apenas um detalhe informativo na mensagem de confirmação quando `grupo_pagamento_id` estiver preenchido: "Este pagamento faz parte de um grupo de N atendimentos. Apenas este será estornado." (para o operador entender que os outros continuam pagos).
+
+### 4. Compatibilidade com pagamentos antigos (sombras zeradas)
+
+Para lançamentos legados (`observacoes` começando com "Pagamento agrupado com agendamento ..." ou valor 0 vinculado a agendamento pago):
+
+- No diálogo de confirmação do estorno, quando o lançamento tem valor 0 e observação de agrupamento, avisar: "Este atendimento foi pago em grupo. Estornando-o o valor total do pagamento principal não será ajustado automaticamente — se necessário, ajuste o lançamento principal também."
+- Não fazemos migração retroativa desses registros (arriscado alterar históricos financeiros).
 
 ## Fora de escopo
 
-- Nenhuma mudança em migrations, RLS, tipos gerados ou outros módulos financeiros.
-- Nenhuma alteração no `LancamentoDialog` em si — ele já permite editar valor e forma de pagamento.
+- Não altera fluxos individuais de pagamento (1 atendimento).
+- Não altera RLS, políticas, ou tipos de recibo/guia.
+- Não migra dados antigos.
+- Não altera a auditoria (o log de ESTORNO por lançamento já existe e passa a marcar corretamente cada atendimento estornado).
