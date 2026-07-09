@@ -171,7 +171,9 @@ function Page() {
           <Download className="h-4 w-4 mr-2" />Exportar Excel
         </Button>
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild><Button onClick={openNew} disabled={!clinicaAtual}><Plus className="h-4 w-4 mr-2" />Novo lançamento</Button></DialogTrigger>
+          {podeEscrever && (
+            <DialogTrigger asChild><Button onClick={openNew} disabled={!clinicaAtual}><Plus className="h-4 w-4 mr-2" />Novo lançamento</Button></DialogTrigger>
+          )}
           <DialogContent className="max-w-lg">
             <DialogHeader><DialogTitle>{editing ? "Editar" : "Novo"} lançamento</DialogTitle></DialogHeader>
             <form onSubmit={submit} className="space-y-3">
