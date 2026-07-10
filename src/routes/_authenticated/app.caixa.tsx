@@ -1690,32 +1690,47 @@ function Page() {
 
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-xs text-muted-foreground">Entradas por forma de pagamento</CardTitle>
+                  <CardTitle className="text-xs text-muted-foreground">Movimentação por dia</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  {(() => {
+                <CardContent className="space-y-4">
+                  {resumoPorDia.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Sem movimentações nesta sessão.</p>
+                  ) : resumoPorDia.map((d) => {
                     const cards: Array<{ label: string; value: number; sempre?: boolean }> = [
-                      { label: "Dinheiro", value: entradasPorForma.dinheiro, sempre: true },
-                      { label: "PIX", value: entradasPorForma.pix, sempre: true },
-                      { label: "Débito", value: entradasPorForma.debito, sempre: true },
-                      { label: "Crédito", value: entradasPorForma.credito, sempre: true },
-                      { label: "Boleto", value: entradasPorForma.boleto },
-                      { label: "Transferência", value: entradasPorForma.transferencia },
-                      { label: "Convênio", value: entradasPorForma.convenio },
-                      { label: "Outros", value: entradasPorForma.outros },
+                      { label: "Dinheiro", value: d.porForma.dinheiro ?? 0, sempre: true },
+                      { label: "PIX", value: d.porForma.pix ?? 0, sempre: true },
+                      { label: "Débito", value: d.porForma.debito ?? 0, sempre: true },
+                      { label: "Crédito", value: d.porForma.credito ?? 0, sempre: true },
+                      { label: "Boleto", value: d.porForma.boleto ?? 0 },
+                      { label: "Transferência", value: d.porForma.transferencia ?? 0 },
+                      { label: "Convênio", value: d.porForma.convenio ?? 0 },
+                      { label: "Outros", value: d.porForma.outros ?? 0 },
                     ];
                     const visiveis = cards.filter((c) => c.sempre || (c.value ?? 0) > 0.005);
                     return (
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        {visiveis.map((it) => (
-                          <div key={it.label} className="rounded-md border bg-muted/30 px-3 py-2">
-                            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{it.label}</div>
-                            <div className="text-base font-semibold tabular-nums">{fmt(it.value)}</div>
+                      <div key={d.dia} className="rounded-lg border p-3 space-y-3 bg-card">
+                        <div className="flex flex-wrap items-baseline justify-between gap-2">
+                          <div className="font-semibold text-sm flex items-center gap-2">
+                            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                            {d.label}
                           </div>
-                        ))}
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs tabular-nums">
+                            <span>Entradas: <b className="text-emerald-600">{fmt(d.entradas)}</b></span>
+                            <span>Saídas: <b className="text-rose-600">{fmt(d.saidas)}</b></span>
+                            <span>Saldo do dia: <b className={d.saldo >= 0 ? "text-primary" : "text-rose-600"}>{fmt(d.saldo)}</b></span>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                          {visiveis.map((it) => (
+                            <div key={it.label} className="rounded-md border bg-muted/30 px-3 py-2">
+                              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{it.label}</div>
+                              <div className="text-base font-semibold tabular-nums">{fmt(it.value)}</div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     );
-                  })()}
+                  })}
                 </CardContent>
               </Card>
 
