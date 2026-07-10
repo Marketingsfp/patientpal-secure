@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
+<<<<<<< HEAD
   ChevronDown,
   ChevronRight,
   Star,
@@ -9,6 +10,10 @@ import {
   Search as SearchIcon,
   Pin,
   X,
+=======
+  ChevronDown, ChevronRight, Star, Heart, Clock, Search as SearchIcon,
+  Pin, X, ChevronLeft, Activity,
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -115,6 +120,7 @@ function Row({
 }
 
 function CentroGroup({
+<<<<<<< HEAD
   centro,
   currentPath,
   open,
@@ -122,24 +128,37 @@ function CentroGroup({
   prefs,
   onPin,
   onFav,
+=======
+  centro, currentPath, open, onToggleOpen, prefs, onPin, onFav, hidePaths,
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
 }: {
   centro: Centro;
   currentPath: string;
   open: boolean;
   onToggleOpen: () => void;
   prefs: { pinned: string[]; favorites: string[] };
+<<<<<<< HEAD
   onPin: (p: string) => void;
   onFav: (p: string) => void;
+=======
+  onPin: (p: string) => void; onFav: (p: string) => void;
+  /** paths a esconder dentro do centro (ex.: já mostrados em "Fixados") */
+  hidePaths?: ReadonlyArray<string>;
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
 }) {
   const [query, setQuery] = useState("");
-  const visible = centro.items.slice(0, MAX_INLINE);
-  const hasMore = centro.items.length > MAX_INLINE;
+  const hide = new Set(hidePaths ?? []);
+  const itemsDisponiveis = centro.items.filter((i) => !hide.has(i.path));
+  const visible = itemsDisponiveis.slice(0, MAX_INLINE);
+  const hasMore = itemsDisponiveis.length > MAX_INLINE;
   const Icon = centro.icon;
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return centro.items;
-    return centro.items.filter((i) => i.label.toLowerCase().includes(q));
-  }, [centro.items, query]);
+    if (!q) return itemsDisponiveis;
+    return itemsDisponiveis.filter((i) => i.label.toLowerCase().includes(q));
+  }, [itemsDisponiveis, query]);
+
+  if (itemsDisponiveis.length === 0) return null;
 
   return (
     <div className="mb-1">
@@ -217,11 +236,23 @@ function CentroGroup({
   );
 }
 
-export function MenuV2({ perfil = "gestor" }: { perfil?: PerfilKey }) {
+export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey; clinicColor?: string }) {
   const { prefs, loading, togglePin, toggleFavorite, toggleGroup, pushRecent } = useMenuPrefs();
   const currentPath = useRouterState({ select: (s) => s.location.pathname });
   const defaults = PERFIL_DEFAULTS[perfil];
   const centrosVisiveis = CENTROS.filter((c) => defaults.centros.includes(c.key));
+
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    const stored = window.localStorage.getItem("menuv2:collapsed");
+    if (stored === "1") return true;
+    if (stored === "0") return false;
+    return window.innerWidth < 1024;
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("menuv2:collapsed", collapsed ? "1" : "0");
+  }, [collapsed]);
 
   // pinned = user pinned OR perfil defaults (union, sem duplicar)
   const effectivePinned = useMemo(() => {
@@ -235,6 +266,9 @@ export function MenuV2({ perfil = "gestor" }: { perfil?: PerfilKey }) {
 
   const recentesFiltrados = prefs.recent
     .filter((r) => !effectivePinned.includes(r.path) && r.path !== currentPath)
+    // remove itens que já aparecem em algum centro visível — evita mostrar a
+    // mesma coisa em "Recentes" e no grupo do centro logo acima.
+    .filter((r) => !centrosVisiveis.some((c) => c.items.some((i) => i.path === r.path)))
     .slice(0, 5);
 
   const favoritos = prefs.favorites
@@ -249,8 +283,84 @@ export function MenuV2({ perfil = "gestor" }: { perfil?: PerfilKey }) {
     <TooltipProvider delayDuration={300}>
       <aside
         data-testid="menu-v2"
-        className="w-64 shrink-0 bg-sidebar text-sidebar-foreground border-r border-border h-full flex flex-col"
+        className={cn(
+          "shrink-0 bg-sidebar text-sidebar-foreground border-r border-border h-full flex flex-col transition-all duration-200",
+          collapsed ? "w-16" : "w-64",
+        )}
+        style={clinicColor ? { backgroundColor: clinicColor, color: "#ffffff" } : undefined}
       >
+        {/* Header com marca + botão recolher */}
+        <div className={cn("flex items-center gap-2 border-b border-sidebar-border/40 h-12 shrink-0", collapsed ? "px-2 justify-center" : "px-3")}>
+          <Link to="/app" className="flex items-center gap-2 min-w-0 flex-1">
+            <Activity className="h-5 w-5 shrink-0" />
+            {!collapsed && <span className="font-semibold tracking-tight truncate">ClinicaOS</span>}
+          </Link>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0 shrink-0 hover:bg-sidebar-accent"
+            onClick={() => setCollapsed((v) => !v)}
+            title={collapsed ? "Expandir menu" : "Recolher menu"}
+            aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
+          >
+            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          </Button>
+        </div>
+
+        {collapsed ? (
+          <div className="p-2 space-y-1 overflow-y-auto flex-1">
+            {pinnedItems.map((it) => {
+              const Icon = it.icon;
+              const active = currentPath === it.path || currentPath.startsWith(it.path + "/");
+              return (
+                <Tooltip key={it.path}>
+                  <TooltipTrigger asChild>
+                    <Link
+                      to={it.path}
+                      className={cn(
+                        "flex items-center justify-center h-9 w-full rounded-md hover:bg-sidebar-accent",
+                        active && "bg-sidebar-accent border-l-2 border-primary",
+                      )}
+                    >
+                      <Icon className="h-4 w-4" />
+                    </Link>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">{it.label}</TooltipContent>
+                </Tooltip>
+              );
+            })}
+            {centrosVisiveis.map((c) => {
+              const CIcon = c.icon;
+              return (
+                <div key={c.key} className="pt-2">
+                  <div className="flex items-center justify-center h-6 text-muted-foreground">
+                    <CIcon className="h-3.5 w-3.5" />
+                  </div>
+                  {c.items.slice(0, MAX_INLINE).map((it) => {
+                    const Icon = it.icon;
+                    const active = currentPath === it.path || currentPath.startsWith(it.path + "/");
+                    return (
+                      <Tooltip key={it.path}>
+                        <TooltipTrigger asChild>
+                          <Link
+                            to={it.path}
+                            className={cn(
+                              "flex items-center justify-center h-9 w-full rounded-md hover:bg-sidebar-accent",
+                              active && "bg-sidebar-accent border-l-2 border-primary",
+                            )}
+                          >
+                            <Icon className="h-4 w-4" />
+                          </Link>
+                        </TooltipTrigger>
+                        <TooltipContent side="right">{it.label}</TooltipContent>
+                      </Tooltip>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
         <div className="p-3 space-y-4 overflow-y-auto flex-1">
           {/* Fixados */}
           {pinnedItems.length > 0 && (
@@ -286,6 +396,7 @@ export function MenuV2({ perfil = "gestor" }: { perfil?: PerfilKey }) {
                 prefs={{ pinned: effectivePinned, favorites: prefs.favorites }}
                 onPin={togglePin}
                 onFav={toggleFavorite}
+                hidePaths={effectivePinned}
               />
             ))}
           </div>
@@ -332,6 +443,7 @@ export function MenuV2({ perfil = "gestor" }: { perfil?: PerfilKey }) {
             </div>
           )}
         </div>
+        )}
       </aside>
     </TooltipProvider>
   );

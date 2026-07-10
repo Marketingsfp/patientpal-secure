@@ -1005,7 +1005,7 @@ function NovoContratoForm({
                 <div className="mt-2 space-y-1">
                   {deps.map((d, i) => (
                     <div key={d.id} className="grid grid-cols-12 gap-2 items-center">
-                      <span className="col-span-3 text-sm truncate flex items-center gap-1">
+                      <span className="col-span-12 sm:col-span-3 text-sm truncate flex items-center gap-1">
                         {d.nome}
                         {d.face_descriptor && d.face_descriptor.length > 0 ? (
                           <Check className="h-3 w-3 text-green-600" />
@@ -1017,7 +1017,7 @@ function NovoContratoForm({
                           setDeps(deps.map((x, j) => (j === i ? { ...x, parentesco: v } : x)))
                         }
                       >
-                        <SelectTrigger className="col-span-3 h-8">
+                        <SelectTrigger className="col-span-6 sm:col-span-3 h-8">
                           <SelectValue placeholder="Parentesco" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1029,6 +1029,7 @@ function NovoContratoForm({
                           <SelectItem value="Outro">Outro</SelectItem>
                         </SelectContent>
                       </Select>
+<<<<<<< HEAD
                       <div className="col-span-2 text-xs text-muted-foreground self-center">
                         Dependente
                       </div>
@@ -1038,13 +1039,17 @@ function NovoContratoForm({
                         className="col-span-2 h-8"
                         onClick={() => setFaceOpen(i)}
                       >
+=======
+                      <div className="col-span-6 sm:col-span-2 text-xs text-muted-foreground self-center">Dependente</div>
+                      <Button size="sm" variant="outline" className="col-span-6 sm:col-span-2 h-8" onClick={() => setFaceOpen(i)}>
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
                         <Camera className="h-3 w-3 mr-1" />
                         {d.face_descriptor?.length ? "Refazer" : "Foto"}
                       </Button>
                       <Button
                         size="sm"
                         variant="outline"
-                        className="col-span-1 h-8 px-0"
+                        className="col-span-3 sm:col-span-1 h-8 px-0"
                         onClick={() => setEditarPaciente({ alvo: i })}
                         title="Editar e-mail e telefone"
                       >
@@ -1053,7 +1058,7 @@ function NovoContratoForm({
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="col-span-1"
+                        className="col-span-3 sm:col-span-1"
                         onClick={() => setDeps(deps.filter((_, j) => j !== i))}
                       >
                         <Trash2 className="h-3 w-3 text-destructive" />
@@ -1901,7 +1906,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   </div>
                 </div>
               ) : null}
-              <div className="grid grid-cols-3 gap-3 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
                 <button
                   type="button"
                   onClick={() => setDrill("pagas")}

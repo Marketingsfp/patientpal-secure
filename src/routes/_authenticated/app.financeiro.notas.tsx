@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useServerFn } from "@tanstack/react-start";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
+import { usePickTomador } from "@/components/nfse/use-pick-tomador";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -106,6 +107,7 @@ function Page() {
   const [emitting, setEmitting] = useState(false);
   const emitirFn = useServerFn(emitirNfse);
   const consultarFn = useServerFn(consultarNfse);
+  const { pick: pickTomadorNfse, dialog: tomadorNfseDialog } = usePickTomador();
 
   const load = async () => {
     if (!clinicaAtual) {
@@ -250,6 +252,7 @@ function Page() {
         .maybeSingle();
       if (pacErr || !pac) throw new Error("Paciente não encontrado");
       const p = pac as PacFull;
+<<<<<<< HEAD
       const cpfLimpo = (tomadorCpf || p.cpf || "").replace(/\D/g, "");
       if (cpfLimpo.length !== 11 && cpfLimpo.length !== 14) {
         throw new Error("CPF/CNPJ do tomador é obrigatório (11 ou 14 dígitos).");
@@ -274,6 +277,38 @@ function Page() {
           },
         },
       });
+=======
+      const cpfPaciente = (tomadorCpf || p.cpf || "").replace(/\D/g, "");
+      const tomador = await pickTomadorNfse({
+        paciente: {
+          nome: p.nome,
+          cpfCnpj: cpfPaciente || undefined,
+          email: p.email ?? undefined,
+          cep: p.cep ?? undefined,
+          logradouro: p.logradouro ?? undefined,
+          numero: p.numero ?? undefined,
+          bairro: p.bairro ?? undefined,
+          municipio: p.cidade ?? undefined,
+          uf: p.estado ?? undefined,
+        },
+      });
+      if (!tomador) { setEmitting(false); toast.error("Emissão cancelada."); return; }
+      const cpfLimpo = (tomador.cpfCnpj ?? "").replace(/\D/g, "");
+      if (cpfLimpo.length !== 11 && cpfLimpo.length !== 14) {
+        throw new Error("CPF/CNPJ do tomador é obrigatório (11 ou 14 dígitos).");
+      }
+      const descFinal = tomador.dependenteAtendido
+        ? `${descricao || "Serviços prestados"} — Atendido: ${tomador.dependenteAtendido}`
+        : (descricao || "Serviços prestados");
+      const res = await emitirFn({ data: {
+        emitenteId,
+        pacienteId: p.id,
+        pagamentoId: n.id ?? undefined,
+        valorServicos: Number(n.valor),
+        descricaoServicos: descFinal,
+        tomador: { ...tomador, cpfCnpj: cpfLimpo },
+      } });
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
       const nfseId = (res as { id?: string })?.id;
       toast.success("NFS-e enviada. Consultando status...");
       // Aguarda processamento e consulta
@@ -323,6 +358,7 @@ function Page() {
               <DialogTitle>{editing ? "Editar" : "Nova"} nota</DialogTitle>
             </DialogHeader>
             <form onSubmit={submit} className="space-y-3">
+<<<<<<< HEAD
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-2">
                   <Label>Número</Label>
@@ -347,6 +383,15 @@ function Page() {
                     onChange={(e) => setForm({ ...form, data_emissao: e.target.value })}
                   />
                 </div>
+=======
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-2"><Label>Número</Label>
+                  <Input value={form.numero} onChange={(e) => setForm({ ...form, numero: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Série</Label>
+                  <Input value={form.serie} onChange={(e) => setForm({ ...form, serie: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Data</Label>
+                  <Input type="date" required value={form.data_emissao} onChange={(e) => setForm({ ...form, data_emissao: e.target.value })} /></div>
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
@@ -568,6 +613,7 @@ function Page() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {tomadorNfseDialog}
     </div>
   );
 }

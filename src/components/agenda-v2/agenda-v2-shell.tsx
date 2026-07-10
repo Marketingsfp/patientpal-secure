@@ -2,39 +2,41 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
-  ChevronLeft,
-  ChevronRight,
-  LayoutList,
-  GanttChartSquare,
-  CalendarDays,
-  Search,
-  Rows3,
-  Rows2,
-  Focus,
-  Sparkles,
-  Plus,
-  Keyboard,
-  PanelLeft,
+  ChevronLeft, ChevronRight, LayoutList, GanttChartSquare, CalendarDays,
+  Search, Rows3, Rows2, Focus, Sparkles, Plus, Keyboard, PanelLeft,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { useNavigate } from "@tanstack/react-router";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { useMedicoContext } from "@/hooks/use-medico-context";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { HhpSkeletonCard, HhpEmptyState } from "@/design-system/hhp";
 import { HhpPageHeader, HhpToolbar, HhpToolbarPill } from "@/design-system/hhp";
+import { HhpShortcutsDialog } from "@/design-system/hhp";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { SearchableSelect } from "@/components/ui/searchable-select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import { KpiBar, type Kpi } from "./kpi-bar";
 import { SessionCard, type SessionCardData, type SessionDensity } from "./session-card";
 import type { DrawerPatientData } from "./patient-drawer";
 import { tipoDaSessao, type ProcMeta } from "@/lib/agenda-v2/session-detect";
+import {
+  atualizarStatusAgendamento,
+  listarIrmaosDoPacote,
+  type StatusAgendamento,
+} from "@/lib/agenda/status-agendamento.functions";
 import { cn } from "@/lib/utils";
+import { useClinicSkin } from "@/hooks/use-clinic-skin";
 
 // Lazy — só baixa quando efetivamente aparecem em tela.
 // Header + timeline + cards + KPIs permanecem no bundle crítico.
@@ -50,11 +52,59 @@ const PatientDrawer = lazy(() =>
 const NovoAgendamentoWizard = lazy(() =>
   import("./novo-agendamento-wizard").then((m) => ({ default: m.NovoAgendamentoWizard })),
 );
+const ReagendarModal = lazy(() =>
+  import("./reagendar-modal").then((m) => ({ default: m.ReagendarModal })),
+);
+import type { ReagendarModalSessao } from "./reagendar-modal";
 
 const DENSITY_KEY = "agenda_v2_density";
+const MEUS_PACIENTES_KEY = "agenda_v2_meus_pacientes";
+// Sprint 3 · S3-A / S3-E — snapshot para restaurar o contexto ao voltar
+// do Prontuário / Atendimento IA (data, filtros, busca, KPI, drawer,
+// posição de scroll). Vive em sessionStorage e expira em 30 min.
+const RETURN_SNAPSHOT_KEY = "agenda_v2_return_snapshot";
+const RETURN_SNAPSHOT_TTL_MS = 30 * 60 * 1000;
+
+interface AgendaV2ReturnSnapshot {
+  diaIso: string;
+  view: "timeline" | "list";
+  q: string;
+  kpiFilter: string | null;
+  filtroMedico: string;
+  filtroEspecialidade: string;
+  filtroRecurso: string;
+  drawerPacote: string | null;
+  scrollTop: number;
+  ts: number;
+}
+
+function readReturnSnapshot(): AgendaV2ReturnSnapshot | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(RETURN_SNAPSHOT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as AgendaV2ReturnSnapshot;
+    if (!parsed || typeof parsed.ts !== "number") return null;
+    if (Date.now() - parsed.ts > RETURN_SNAPSHOT_TTL_MS) {
+      window.sessionStorage.removeItem(RETURN_SNAPSHOT_KEY);
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function clearReturnSnapshot() {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.removeItem(RETURN_SNAPSHOT_KEY);
+}
 
 function densityStorageKey(clinicaId: string | null) {
   return clinicaId ? `${DENSITY_KEY}:${clinicaId}` : DENSITY_KEY;
+}
+function meusPacientesStorageKey(userId: string | null) {
+  return userId ? `${MEUS_PACIENTES_KEY}:${userId}` : MEUS_PACIENTES_KEY;
 }
 function isTypingTarget(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false;
@@ -86,27 +136,63 @@ export function AgendaV2Shell() {
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id ?? null;
   const clinicaNome = clinicaAtual?.clinica?.nome ?? "Clínica";
+  // Sprint Beauty — ativa o skin de cor da clínica (azure/emerald/violet)
+  // enquanto a Agenda V2 está montada. Zero impacto em lógica de negócio.
+  useClinicSkin();
   const queryClient = useQueryClient();
+  const { medicoId: usuarioMedicoId, loading: medicoLoading } = useMedicoContext();
+  const atualizarStatusFn = useServerFn(atualizarStatusAgendamento);
+  const listarIrmaosFn = useServerFn(listarIrmaosDoPacote);
+  const navigate = useNavigate();
+
+  // Snapshot de retorno — lido uma única vez no mount (fora do render).
+  const returnSnapshotRef = useRef<AgendaV2ReturnSnapshot | null>(
+    typeof window === "undefined" ? null : readReturnSnapshot(),
+  );
+  const returnSnapshot = returnSnapshotRef.current;
 
   const [dia, setDia] = useState<Date>(() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d;
+    const d = new Date(); d.setHours(0, 0, 0, 0); return d;
   });
-  const [view, setView] = useState<ViewMode>("timeline");
-  const [q, setQ] = useState("");
-  const [kpiFilter, setKpiFilter] = useState<string | null>(null);
-  const [filtroMedico, setFiltroMedico] = useState<string>("");
-  const [filtroEspecialidade, setFiltroEspecialidade] = useState<string>("");
-  const [filtroRecurso, setFiltroRecurso] = useState<string>("");
-  const [drawerPacote, setDrawerPacote] = useState<string | null>(null);
-  const [drawerMounted, setDrawerMounted] = useState(false);
+  const [view, setView] = useState<ViewMode>(returnSnapshot?.view ?? "timeline");
+  const [q, setQ] = useState<string>(returnSnapshot?.q ?? "");
+  const [kpiFilter, setKpiFilter] = useState<string | null>(returnSnapshot?.kpiFilter ?? null);
+  const [filtroMedico, setFiltroMedico] = useState<string>(returnSnapshot?.filtroMedico ?? "");
+  const [filtroEspecialidade, setFiltroEspecialidade] = useState<string>(returnSnapshot?.filtroEspecialidade ?? "");
+  const [filtroRecurso, setFiltroRecurso] = useState<string>(returnSnapshot?.filtroRecurso ?? "");
+  const [drawerPacote, setDrawerPacote] = useState<string | null>(returnSnapshot?.drawerPacote ?? null);
+  const [drawerMounted, setDrawerMounted] = useState<boolean>(!!returnSnapshot?.drawerPacote);
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardInitial, setWizardInitial] = useState<{
+    medicoId?: string | null;
+    dia?: Date | null;
+    hour?: number | null;
+  } | null>(null);
+  // S3-C — modal de reagendamento (isolado; NÃO usa o Wizard).
+  const [reagendarSessao, setReagendarSessao] = useState<ReagendarModalSessao | null>(null);
   const [density, setDensity] = useState<SessionDensity>(() => {
     if (typeof window === "undefined") return "confortavel";
     // fallback: chave legada (sem clínica) para não perder preferência do usuário.
     return (window.localStorage.getItem(DENSITY_KEY) as SessionDensity) ?? "confortavel";
   });
+  // Sprint 2 · S2-C — filtro "Meus pacientes" persistido por usuário.
+  // Ligado por padrão para médicos, desligado para os demais perfis.
+  // Só aparece na toolbar quando o usuário está associado a um médico da clínica.
+  const [meusPacientes, setMeusPacientes] = useState<boolean>(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!usuarioMedicoId) { setMeusPacientes(false); return; }
+    const raw = window.localStorage.getItem(meusPacientesStorageKey(usuarioMedicoId));
+    if (raw === null) setMeusPacientes(true); // default ON para médicos
+    else setMeusPacientes(raw === "1");
+  }, [usuarioMedicoId]);
+  useEffect(() => {
+    if (typeof window === "undefined" || !usuarioMedicoId) return;
+    window.localStorage.setItem(
+      meusPacientesStorageKey(usuarioMedicoId),
+      meusPacientes ? "1" : "0",
+    );
+  }, [meusPacientes, usuarioMedicoId]);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [sidePanelOpen, setSidePanelOpen] = useState(false);
   const isMobile = useIsMobile();
@@ -360,28 +446,56 @@ export function AgendaV2Shell() {
   }, [rows, procMeta, medicos, recursos]);
 
   const kpis = useMemo<Kpi[]>(() => {
-    const c = {
-      total: sessoes.length,
-      aguardando: 0,
-      confirmados: 0,
-      realizados: 0,
-      cancelados: 0,
-      lab: 0,
-    };
+    const c = { total: sessoes.length, aguardando: 0, confirmados: 0, realizados: 0, cancelados: 0, lab: 0 };
     for (const s of sessoes) {
-      if (s.status === "agendado") c.aguardando++;
-      if (s.status === "confirmado") c.confirmados++;
-      if (s.status === "realizado") c.realizados++;
-      if (s.status === "cancelado" || s.status === "faltou") c.cancelados++;
-      if (s.tipo === "coleta_laboratorial") c.lab++;
+      // Sessões "DISPONIVEL" não entram — são horários livres.
+      if (/dispon[íi]vel/i.test(s.paciente_nome ?? "")) continue;
+      if (s.status === "agendado") agendados++;
+      else if (s.status === "confirmado") confirmados++;
+      else if (s.status === "realizado") realizados++;
+      else if (s.status === "faltou") faltou++;
+      else if (s.status === "cancelado") cancelados++;
+      if (s.status !== "cancelado") {
+        const ini = new Date(s.inicio).getTime();
+        const fim = new Date(s.fim).getTime();
+        if (Number.isFinite(ini) && Number.isFinite(fim) && fim > ini) ocupadoMs += fim - ini;
+        if (s.medico_id) medicosAtivos.add(s.medico_id);
+      }
     }
+    // Taxa de confirmação = confirmados / (total − cancelados).
+    const baseConfirm = agendados + confirmados + realizados + faltou;
+    const taxaConf = baseConfirm > 0 ? (confirmados + realizados) / baseConfirm : null;
+    // Taxa de no-show = faltou / (realizados + faltou).
+    const baseNoShow = realizados + faltou;
+    const taxaNoShow = baseNoShow > 0 ? faltou / baseNoShow : null;
+    // Ocupação da grade = minutos ocupados / (médicos ativos × 8h × 60).
+    // Proxy razoável sem query nova: janela de 8h por médico do dia.
+    const disponMin = medicosAtivos.size * 8 * 60;
+    const ocupadoMin = ocupadoMs / 60000;
+    const ocupacao = disponMin > 0 ? Math.min(1, ocupadoMin / disponMin) : null;
+    const pct = (v: number | null) => v === null ? "—" : `${Math.round(v * 100)}%`;
     return [
-      { key: "todos", label: "Total", value: c.total, tone: "info" },
-      { key: "agendado", label: "Aguardando", value: c.aguardando, tone: "warn" },
-      { key: "confirmado", label: "Confirmados", value: c.confirmados, tone: "info" },
-      { key: "realizado", label: "Realizados", value: c.realizados, tone: "ok" },
-      { key: "cancelado", label: "Cancel./Falta", value: c.cancelados, tone: "danger" },
-      { key: "lab", label: "Coletas lab.", value: c.lab, tone: "ok" },
+      {
+        key: "confirmacao",
+        label: "Confirmação",
+        value: pct(taxaConf),
+        tone: "ok",
+        hint: "Confirmados + realizados ÷ agendamentos não cancelados do dia",
+      },
+      {
+        key: "noshow",
+        label: "No-show",
+        value: pct(taxaNoShow),
+        tone: taxaNoShow !== null && taxaNoShow >= 0.15 ? "danger" : "warn",
+        hint: "Faltas ÷ (realizados + faltas) do dia",
+      },
+      {
+        key: "ocupacao",
+        label: "Ocupação",
+        value: pct(ocupacao),
+        tone: "info",
+        hint: "Minutos ocupados ÷ (médicos ativos × 8h). Proxy do dia.",
+      },
     ];
   }, [sessoes]);
 
@@ -391,6 +505,8 @@ export function AgendaV2Shell() {
       // Ocultar sessões "DISPONIVEL" — são horários livres, não pertencem
       // ao fluxo operacional; ficam agrupadas em resumo por hora.
       if (/dispon[íi]vel/i.test(s.paciente_nome ?? "")) return false;
+      // S2-C — filtro "Meus pacientes" (só se aplica a médicos).
+      if (meusPacientes && usuarioMedicoId && s.medico_id !== usuarioMedicoId) return false;
       if (kpiFilter && kpiFilter !== "todos") {
         if (kpiFilter === "lab" && s.tipo !== "coleta_laboratorial") return false;
         if (kpiFilter !== "lab" && s.status !== kpiFilter) return false;
@@ -409,7 +525,7 @@ export function AgendaV2Shell() {
       }
       return true;
     });
-  }, [sessoes, q, kpiFilter, filtroMedico, filtroRecurso, filtroEspecialidade, espData]);
+  }, [sessoes, q, kpiFilter, filtroMedico, filtroRecurso, filtroEspecialidade, espData, meusPacientes, usuarioMedicoId]);
 
   // Contagem de horários livres por hora (para o resumo discreto na timeline).
   const livresPorHora = useMemo(() => {
@@ -421,6 +537,34 @@ export function AgendaV2Shell() {
     }
     return m;
   }, [sessoes]);
+
+  // Sprint 1 · S1-A — mapa hora → conjunto de médicos com slot livre nessa
+  // hora. Usado para pré-preencher o wizard quando o usuário clica no
+  // resumo "N horários livres nesta hora".
+  const livresPorHoraMedicos = useMemo(() => {
+    const m = new Map<number, Set<string>>();
+    for (const r of rows ?? []) {
+      if (!/dispon[íi]vel/i.test(r.paciente_nome ?? "")) continue;
+      if (!r.medico_id) continue;
+      const h = new Date(r.inicio).getHours();
+      const set = m.get(h) ?? new Set<string>();
+      set.add(r.medico_id);
+      m.set(h, set);
+    }
+    return m;
+  }, [rows]);
+
+  const openWizardForHora = (hora: number) => {
+    const medicos = livresPorHoraMedicos.get(hora);
+    const medicoId =
+      filtroMedico
+        ? filtroMedico
+        : medicos && medicos.size === 1
+          ? Array.from(medicos)[0]
+          : null;
+    setWizardInitial({ dia: new Date(dia), hour: hora, medicoId });
+    setWizardOpen(true);
+  };
 
   const drawerData = useMemo<DrawerPatientData | null>(() => {
     if (!drawerPacote || !rows) return null;
@@ -465,6 +609,7 @@ export function AgendaV2Shell() {
         : [],
       proc_titulo: primeiro.procedimento,
       hora,
+      agendamento_ids: grupo.map((g) => g.id),
     };
   }, [drawerPacote, rows, medicos, espData]);
 
@@ -474,10 +619,7 @@ export function AgendaV2Shell() {
     setDia(d);
   };
 
-  const openDrawer = (id: string) => {
-    setDrawerMounted(true);
-    setDrawerPacote(id);
-  };
+  const openDrawer = (id: string) => { setDrawerMounted(true); setDrawerPacote(id); };
   const compact = density === "compacto";
   const foco = density === "foco";
 
@@ -485,6 +627,12 @@ export function AgendaV2Shell() {
   // F = Foco · C = Compacto · D = Confortável · J/K = próx/ant · Enter = abrir
   // Esc = fechar drawer · N = nova sessão · ? = ajuda · Ctrl/⌘+K = busca
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  // Ref para o último handler de prontuário — evita re-attach do keydown a
+  // cada render (a função é recriada por causa dos setters de snapshot).
+  const openProntuarioRef = useRef<(id: string) => void>(() => {});
+  useEffect(() => {
+    openProntuarioRef.current = handleOpenProntuario;
+  });
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // Ctrl/⌘+K → foca busca (Busca Universal do módulo)
@@ -511,26 +659,10 @@ export function AgendaV2Shell() {
       if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
 
       const k = e.key.toLowerCase();
-      if (k === "f") {
-        e.preventDefault();
-        setDensity("foco");
-        return;
-      }
-      if (k === "c") {
-        e.preventDefault();
-        setDensity("compacto");
-        return;
-      }
-      if (k === "d") {
-        e.preventDefault();
-        setDensity("confortavel");
-        return;
-      }
-      if (k === "n") {
-        e.preventDefault();
-        setWizardOpen(true);
-        return;
-      }
+      if (k === "f") { e.preventDefault(); setDensity("foco"); return; }
+      if (k === "c") { e.preventDefault(); setDensity("compacto"); return; }
+      if (k === "d") { e.preventDefault(); setDensity("confortavel"); return; }
+      if (k === "n") { e.preventDefault(); setWizardOpen(true); return; }
       if (k === "j" || k === "k" || e.key === "Enter") {
         if (filtradas.length === 0) return;
         const idx = drawerPacote ? filtradas.findIndex((s) => s.pacote_id === drawerPacote) : -1;
@@ -542,8 +674,10 @@ export function AgendaV2Shell() {
         }
         e.preventDefault();
         let next = idx;
-        if (k === "j") next = idx < 0 ? 0 : Math.min(filtradas.length - 1, idx + 1);
-        if (k === "k") next = idx < 0 ? 0 : Math.max(0, idx - 1);
+        const goNext = k === "j" || e.key === "ArrowDown";
+        const goPrev = k === "k" || e.key === "ArrowUp";
+        if (goNext) next = idx < 0 ? 0 : Math.min(filtradas.length - 1, idx + 1);
+        if (goPrev) next = idx < 0 ? 0 : Math.max(0, idx - 1);
         const target = filtradas[next];
         if (target) openDrawer(target.pacote_id);
       }
@@ -596,8 +730,53 @@ export function AgendaV2Shell() {
   const nowMin = now.getMinutes();
   const isToday = new Date(diaKey).toDateString() === new Date().toDateString();
 
+  // Sprint 1 · S1-B — auto-scroll para a hora atual ao abrir o dia de hoje.
+  // Roda uma vez por (dia + carregamento). O usuário pode rolar depois; não
+  // interferimos em interações subsequentes. Nada de UX intrusivo — comportamento
+  // idempotente por render key.
+  const timelineScrollRef = useRef<HTMLDivElement | null>(null);
+  const nowHourRef = useRef<HTMLDivElement | null>(null);
+  const scrolledForKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!isToday) return;
+    if (rows === null) return;
+    const key = `${diaKey}:${rows.length}`;
+    if (scrolledForKeyRef.current === key) return;
+    const container = timelineScrollRef.current;
+    const anchor = nowHourRef.current;
+    if (!container || !anchor) return;
+    // requestAnimationFrame — garante que o layout já foi calculado.
+    requestAnimationFrame(() => {
+      const cRect = container.getBoundingClientRect();
+      const aRect = anchor.getBoundingClientRect();
+      const target = anchor.offsetTop - Math.max(0, (cRect.height - aRect.height) * 0.15);
+      container.scrollTo({ top: Math.max(0, target), behavior: "smooth" });
+      scrolledForKeyRef.current = key;
+    });
+  }, [isToday, rows, diaKey, porHora.length]);
+
+  // Sprint 3 · S3-A / S3-E — restauração de scroll ao voltar do Atendimento IA.
+  // Roda uma vez, depois que a query do dia carregou e as sessões foram
+  // agrupadas. Bloqueia o auto-scroll "agora" para o mesmo render.
+  const restoredScrollRef = useRef(false);
+  useEffect(() => {
+    if (restoredScrollRef.current) return;
+    if (!returnSnapshot) return;
+    if (rows === null) return;
+    const container = timelineScrollRef.current;
+    if (!container) return;
+    requestAnimationFrame(() => {
+      container.scrollTo({ top: returnSnapshot.scrollTop, behavior: "auto" });
+      // Impede o auto-scroll "agora" para este mesmo (dia + carregamento).
+      scrolledForKeyRef.current = `${diaKey}:${rows.length}`;
+      restoredScrollRef.current = true;
+      clearReturnSnapshot();
+      returnSnapshotRef.current = null;
+    });
+  }, [returnSnapshot, rows, diaKey]);
+
   return (
-    <div className="h-full flex bg-[#FAFAF8] overflow-hidden">
+    <div className="agenda-v2-scope h-full flex bg-[color:var(--hhp-surface-page)] overflow-hidden">
       {/* Sidebar operacional — visível em md+, vira Sheet no mobile (botão Painel no header) */}
       {!foco && !isMobile && (
         <Suspense
@@ -637,220 +816,163 @@ export function AgendaV2Shell() {
       )}
 
       <div className="flex-1 min-w-0 flex flex-col">
-        {/* Header */}
-        <HhpPageHeader
-          title="Agenda do Dia"
-          eyebrow={format(dia, "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
-          leading={
-            !foco && isMobile ? (
+      {/* Header */}
+      <HhpPageHeader
+        title="Agenda do Dia"
+        eyebrow={format(dia, "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+        leading={!foco && isMobile ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 rounded-xl hover:bg-slate-100 shrink-0 md:hidden"
+            onClick={() => setSidePanelOpen(true)}
+            aria-label="Abrir painel"
+          >
+            <PanelLeft className="h-4 w-4 text-slate-500" />
+          </Button>
+        ) : null}
+        actions={(
+          <>
+            <Button
+              size="sm"
+              onClick={() => setWizardOpen(true)}
+              className="h-9 px-4 rounded-2xl gap-1.5 bg-slate-900 hover:bg-slate-800 text-white shadow-sm transition-all hover:shadow-md hover:-translate-y-[1px]"
+            >
+              <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
+              <span className="text-xs font-semibold hidden sm:inline">Nova sessão</span>
+              <span className="text-xs font-semibold sm:hidden">Nova</span>
+            </Button>
+
+            <HhpToolbarPill>
+              <ToggleGroup
+                type="single"
+                value={density}
+                onValueChange={(v) => v && setDensity(v as SessionDensity)}
+              >
+                <ToggleGroupItem value="confortavel" aria-label="Confortável" className="h-8 w-8 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm">
+                  <Rows3 className="h-3.5 w-3.5" />
+                </ToggleGroupItem>
+                <ToggleGroupItem value="compacto" aria-label="Compacto" className="h-8 w-8 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm">
+                  <Rows2 className="h-3.5 w-3.5" />
+                </ToggleGroupItem>
+                <ToggleGroupItem value="foco" aria-label="Foco" className="h-8 w-8 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm">
+                  <Focus className="h-3.5 w-3.5" />
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </HhpToolbarPill>
+
+            <HhpToolbarPill>
+              <ToggleGroup
+                type="single"
+                value={view}
+                onValueChange={(v) => v && setView(v as ViewMode)}
+              >
+                <ToggleGroupItem value="timeline" aria-label="Timeline" className="h-8 px-3 gap-1.5 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm">
+                  <GanttChartSquare className="h-3.5 w-3.5" /> <span className="hidden sm:inline text-xs">Timeline</span>
+                </ToggleGroupItem>
+                <ToggleGroupItem value="list" aria-label="Lista" className="h-8 px-3 gap-1.5 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm">
+                  <LayoutList className="h-3.5 w-3.5" /> <span className="hidden sm:inline text-xs">Lista</span>
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </HhpToolbarPill>
+
+            <div className="flex items-center gap-0.5 ml-1">
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl hover:bg-slate-100" onClick={() => navDia(-1)} aria-label="Dia anterior">
+                <ChevronLeft className="h-4 w-4 text-slate-400" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                onClick={() => { const d = new Date(); d.setHours(0, 0, 0, 0); setDia(d); }}
+              >
+                Hoje
+              </Button>
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl hover:bg-slate-100" onClick={() => navDia(1)} aria-label="Próximo dia">
+                <ChevronRight className="h-4 w-4 text-slate-400" />
+              </Button>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 rounded-xl hover:bg-slate-100 shrink-0 md:hidden"
-                onClick={() => setSidePanelOpen(true)}
-                aria-label="Abrir painel"
+                className="h-8 w-8 rounded-xl hover:bg-slate-100 ml-1"
+                onClick={() => setShortcutsOpen(true)}
+                aria-label="Atalhos de teclado"
+                title="Atalhos (?)"
               >
-                <PanelLeft className="h-4 w-4 text-slate-500" />
+                <Keyboard className="h-4 w-4 text-slate-400" />
               </Button>
-            ) : null
-          }
-          actions={
-            <>
-              <Button
-                size="sm"
-                onClick={() => setWizardOpen(true)}
-                className="h-9 px-4 rounded-2xl gap-1.5 bg-slate-900 hover:bg-slate-800 text-white shadow-sm transition-all hover:shadow-md hover:-translate-y-[1px]"
-              >
-                <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
-                <span className="text-xs font-semibold hidden sm:inline">Nova sessão</span>
-                <span className="text-xs font-semibold sm:hidden">Nova</span>
-              </Button>
-
-              <HhpToolbarPill>
-                <ToggleGroup
-                  type="single"
-                  value={density}
-                  onValueChange={(v) => v && setDensity(v as SessionDensity)}
-                >
-                  <ToggleGroupItem
-                    value="confortavel"
-                    aria-label="Confortável"
-                    className="h-8 w-8 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm"
-                  >
-                    <Rows3 className="h-3.5 w-3.5" />
-                  </ToggleGroupItem>
-                  <ToggleGroupItem
-                    value="compacto"
-                    aria-label="Compacto"
-                    className="h-8 w-8 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm"
-                  >
-                    <Rows2 className="h-3.5 w-3.5" />
-                  </ToggleGroupItem>
-                  <ToggleGroupItem
-                    value="foco"
-                    aria-label="Foco"
-                    className="h-8 w-8 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm"
-                  >
-                    <Focus className="h-3.5 w-3.5" />
-                  </ToggleGroupItem>
-                </ToggleGroup>
-              </HhpToolbarPill>
-
-              <HhpToolbarPill>
-                <ToggleGroup
-                  type="single"
-                  value={view}
-                  onValueChange={(v) => v && setView(v as ViewMode)}
-                >
-                  <ToggleGroupItem
-                    value="timeline"
-                    aria-label="Timeline"
-                    className="h-8 px-3 gap-1.5 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm"
-                  >
-                    <GanttChartSquare className="h-3.5 w-3.5" />{" "}
-                    <span className="hidden sm:inline text-xs">Timeline</span>
-                  </ToggleGroupItem>
-                  <ToggleGroupItem
-                    value="list"
-                    aria-label="Lista"
-                    className="h-8 px-3 gap-1.5 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm"
-                  >
-                    <LayoutList className="h-3.5 w-3.5" />{" "}
-                    <span className="hidden sm:inline text-xs">Lista</span>
-                  </ToggleGroupItem>
-                </ToggleGroup>
-              </HhpToolbarPill>
-
-              <div className="flex items-center gap-0.5 ml-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 rounded-xl hover:bg-slate-100"
-                  onClick={() => navDia(-1)}
-                  aria-label="Dia anterior"
-                >
-                  <ChevronLeft className="h-4 w-4 text-slate-400" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-                  onClick={() => {
-                    const d = new Date();
-                    d.setHours(0, 0, 0, 0);
-                    setDia(d);
-                  }}
-                >
-                  Hoje
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 rounded-xl hover:bg-slate-100"
-                  onClick={() => navDia(1)}
-                  aria-label="Próximo dia"
-                >
-                  <ChevronRight className="h-4 w-4 text-slate-400" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 rounded-xl hover:bg-slate-100 ml-1"
-                  onClick={() => setShortcutsOpen(true)}
-                  aria-label="Atalhos de teclado"
-                  title="Atalhos (?)"
-                >
-                  <Keyboard className="h-4 w-4 text-slate-400" />
-                </Button>
-              </div>
-            </>
-          }
-        >
-          <HhpToolbar>
-            <div className="relative flex-1 min-w-0 md:min-w-64 max-w-md w-full sm:w-auto">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
-              <Input
-                placeholder="Buscar paciente, médico, sala, exame…"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                ref={searchInputRef}
-                className="pl-10 h-10 rounded-2xl bg-slate-100 border-transparent focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-slate-200 text-sm placeholder:text-slate-400 transition-colors duration-150"
-                aria-label="Busca"
-              />
             </div>
-            <SearchableSelect
-              options={[
-                { value: "", label: "Todos os profissionais" },
-                ...Array.from(medicos.entries()).map(([id, nome]) => ({ value: id, label: nome })),
-              ]}
-              value={filtroMedico}
-              onChange={setFiltroMedico}
-              placeholder="Profissional"
-              searchPlaceholder="Buscar profissional..."
-              className="h-10 rounded-2xl bg-slate-100 border-transparent min-w-0 flex-1 sm:flex-none sm:min-w-48"
+          </>
+        )}
+      >
+        <HhpToolbar>
+          <div className="relative flex-1 min-w-0 md:min-w-64 max-w-md w-full sm:w-auto">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+            <Input
+              placeholder="Buscar paciente, médico, sala, exame…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              ref={searchInputRef}
+              className="pl-10 h-10 rounded-2xl bg-slate-100 border-transparent focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-slate-200 text-sm placeholder:text-slate-400 transition-colors duration-150"
+              aria-label="Busca"
             />
-            <SearchableSelect
-              options={[
-                { value: "", label: "Todas as especialidades" },
-                ...Array.from(espData?.espMap.entries() ?? []).map(([id, nome]) => ({
-                  value: id,
-                  label: nome,
-                })),
-              ]}
-              value={filtroEspecialidade}
-              onChange={setFiltroEspecialidade}
-              placeholder="Especialidade"
-              searchPlaceholder="Buscar especialidade..."
-              className="h-10 rounded-2xl bg-slate-100 border-transparent min-w-0 flex-1 sm:flex-none sm:min-w-44"
-            />
-            <SearchableSelect
-              options={[
-                { value: "", label: "Todas as salas" },
-                ...Array.from(recursos.entries()).map(([id, nome]) => ({ value: id, label: nome })),
-              ]}
-              value={filtroRecurso}
-              onChange={setFiltroRecurso}
-              placeholder="Sala / recurso"
-              searchPlaceholder="Buscar sala..."
-              className="h-10 rounded-2xl bg-slate-100 border-transparent min-w-0 flex-1 sm:flex-none sm:min-w-40"
-            />
-            {(filtroMedico || filtroEspecialidade || filtroRecurso || kpiFilter) && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-9 rounded-2xl text-xs text-slate-500 hover:text-slate-900"
-                onClick={() => {
-                  setFiltroMedico("");
-                  setFiltroEspecialidade("");
-                  setFiltroRecurso("");
-                  setKpiFilter(null);
-                }}
-              >
-                Limpar filtros
-              </Button>
-            )}
-            <div className="text-xs text-slate-500 inline-flex items-center gap-2 ml-auto">
-              <Sparkles className="h-3 w-3 text-slate-400" />
-              <span className="tabular-nums">
-                {rows === null
-                  ? "carregando…"
-                  : `${filtradas.length} ${filtradas.length === 1 ? "sessão" : "sessões"}`}
-              </span>
-              {loadedMs !== null && (
-                <span className="text-slate-400 tabular-nums">
-                  · query {loadedMs}ms{renderMs !== null && ` · render ${renderMs}ms`}
-                </span>
-              )}
-            </div>
-          </HhpToolbar>
-
-          <KpiBar
-            items={kpis}
-            activeKey={kpiFilter}
-            onSelect={(k) => setKpiFilter(kpiFilter === k ? null : k)}
-            compact={compact}
+          </div>
+          <SearchableSelect
+            options={[{ value: "", label: "Todos os profissionais" }, ...Array.from(medicos.entries()).map(([id, nome]) => ({ value: id, label: nome }))]}
+            value={filtroMedico}
+            onChange={setFiltroMedico}
+            placeholder="Profissional"
+            searchPlaceholder="Buscar profissional..."
+            className="h-10 rounded-2xl bg-slate-100 border-transparent min-w-0 flex-1 sm:flex-none sm:min-w-48"
           />
-        </HhpPageHeader>
+          <SearchableSelect
+            options={[{ value: "", label: "Todas as especialidades" }, ...Array.from(espData?.espMap.entries() ?? []).map(([id, nome]) => ({ value: id, label: nome }))]}
+            value={filtroEspecialidade}
+            onChange={setFiltroEspecialidade}
+            placeholder="Especialidade"
+            searchPlaceholder="Buscar especialidade..."
+            className="h-10 rounded-2xl bg-slate-100 border-transparent min-w-0 flex-1 sm:flex-none sm:min-w-44"
+          />
+          <SearchableSelect
+            options={[{ value: "", label: "Todas as salas" }, ...Array.from(recursos.entries()).map(([id, nome]) => ({ value: id, label: nome }))]}
+            value={filtroRecurso}
+            onChange={setFiltroRecurso}
+            placeholder="Sala / recurso"
+            searchPlaceholder="Buscar sala..."
+            className="h-10 rounded-2xl bg-slate-100 border-transparent min-w-0 flex-1 sm:flex-none sm:min-w-40"
+          />
+          {(filtroMedico || filtroEspecialidade || filtroRecurso || kpiFilter) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 rounded-2xl text-xs text-slate-500 hover:text-slate-900"
+              onClick={() => { setFiltroMedico(""); setFiltroEspecialidade(""); setFiltroRecurso(""); setKpiFilter(null); }}
+            >
+              Limpar filtros
+            </Button>
+          )}
+          <div className="text-xs text-slate-500 inline-flex items-center gap-2 ml-auto">
+            <Sparkles className="h-3 w-3 text-slate-400" />
+            <span className="tabular-nums">
+              {rows === null
+                ? "carregando…"
+                : `${filtradas.length} ${filtradas.length === 1 ? "sessão" : "sessões"}`}
+            </span>
+            {loadedMs !== null && (
+              <span className="text-slate-400 tabular-nums">
+                · query {loadedMs}ms{renderMs !== null && ` · render ${renderMs}ms`}
+              </span>
+            )}
+          </div>
+        </HhpToolbar>
+
+        <KpiBar
+          items={kpis}
+          activeKey={kpiFilter}
+          onSelect={(k) => setKpiFilter(kpiFilter === k ? null : k)}
+          compact={compact}
+        />
+      </HhpPageHeader>
 
         {/* Faixa de sugestões IA (visual) — recurso secundário, carrega depois */}
         {rows !== null && filtradas.length > 0 && (
@@ -859,95 +981,75 @@ export function AgendaV2Shell() {
           </Suspense>
         )}
 
-        {/* Corpo */}
-        <div className="flex-1 min-h-0 overflow-hidden">
-          {rows === null ? (
-            <div className="p-6 space-y-3">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <HhpSkeletonCard key={i} density={compact ? "compacto" : "confortavel"} />
-              ))}
-            </div>
-          ) : filtradas.length === 0 ? (
-            <HhpEmptyState icon={CalendarDays} title="Nenhuma sessão para os filtros atuais." />
-          ) : (
-            <div
-              className={cn(
-                "h-full overflow-y-auto pb-8 transition-[padding] duration-200",
-                foco ? "px-4 md:px-10 pt-6 max-w-4xl mx-auto" : "px-3 md:px-6 pt-4",
-              )}
-            >
-              {porHora.map(([hora, lista]) => {
-                const isNowHour = isToday && hora === nowHour;
-                return (
-                  <div key={hora} className="flex gap-2 md:gap-4 relative">
-                    {/* Coluna de hora (régua) */}
-                    <div
-                      className={cn("shrink-0 relative", foco ? "w-12 md:w-16" : "w-11 md:w-14")}
-                    >
-                      <div
-                        className={cn(
-                          "sticky top-0 tabular-nums pt-1",
-                          foco
-                            ? "text-[13px] font-semibold text-slate-500"
-                            : "text-[11px] font-bold uppercase tracking-wider text-slate-400",
-                        )}
-                      >
-                        {String(hora).padStart(2, "0")}:00
-                      </div>
-                    </div>
-                    {/* Coluna de sessões */}
-                    <div
-                      className={cn(
-                        "flex-1 min-w-0 border-l border-slate-100 pb-4 relative",
-                        foco ? "pl-4 md:pl-8" : "pl-3 md:pl-6",
-                      )}
-                    >
-                      {isNowHour && (
-                        <div
-                          className="absolute -left-[3px] right-0 flex items-center gap-2 z-10 pointer-events-none"
-                          style={{ top: `${(nowMin / 60) * 100}%` }}
-                        >
-                          <span
-                            className="h-1.5 w-1.5 rounded-full"
-                            style={{ background: "rgba(79, 70, 229, 0.55)" }}
-                          />
-                          <span
-                            className="flex-1 h-px"
-                            style={{ background: "rgba(79, 70, 229, 0.35)" }}
-                          />
-                          <span className="text-[9px] font-semibold uppercase tracking-wider text-indigo-500/70 pr-2">
-                            agora · {String(nowHour).padStart(2, "0")}:
-                            {String(nowMin).padStart(2, "0")}
-                          </span>
-                        </div>
-                      )}
-                      <div
-                        className={cn(compact ? "space-y-1.5" : foco ? "space-y-4" : "space-y-2.5")}
-                      >
-                        {lista.map((s) => (
-                          <SessionCard
-                            key={s.pacote_id}
-                            data={s}
-                            onOpenTimeline={openDrawer}
-                            density={density}
-                          />
-                        ))}
-                        {livresPorHora.get(hora) && (
-                          <div className="flex items-center gap-2 text-[11px] text-slate-400 pl-1">
-                            <span className="h-1 w-1 rounded-full bg-slate-300" />
-                            {livresPorHora.get(hora)} horário
-                            {livresPorHora.get(hora)! > 1 ? "s" : ""} livre
-                            {livresPorHora.get(hora)! > 1 ? "s" : ""} nesta hora
-                          </div>
-                        )}
-                      </div>
+      {/* Corpo */}
+      <div className="flex-1 min-h-0 overflow-hidden">
+        {rows === null ? (
+          <div className="p-6 space-y-3">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <HhpSkeletonCard key={i} density={compact ? "compacto" : "confortavel"} />
+            ))}
+          </div>
+        ) : filtradas.length === 0 ? (
+          <HhpEmptyState
+            icon={CalendarDays}
+            title="Nenhuma sessão para os filtros atuais."
+          />
+        ) : (
+          <div className={cn(
+            "h-full overflow-y-auto pb-8 transition-[padding] duration-200",
+            foco ? "px-4 md:px-10 pt-6 max-w-4xl mx-auto" : "px-3 md:px-6 pt-4",
+          )}>
+            {porHora.map(([hora, lista]) => {
+              const isNowHour = isToday && hora === nowHour;
+              return (
+                <div key={hora} className="flex gap-2 md:gap-4 relative">
+                  {/* Coluna de hora (régua) */}
+                  <div className={cn("shrink-0 relative", foco ? "w-12 md:w-16" : "w-11 md:w-14")}>
+                    <div className={cn(
+                      "sticky top-0 tabular-nums pt-1",
+                      foco ? "text-[13px] font-semibold text-slate-500" : "text-[11px] font-bold uppercase tracking-wider text-slate-400",
+                    )}>
+                      {String(hora).padStart(2, "0")}:00
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+                  {/* Coluna de sessões */}
+                  <div className={cn("flex-1 min-w-0 border-l border-slate-100 pb-4 relative", foco ? "pl-4 md:pl-8" : "pl-3 md:pl-6")}>
+                    {isNowHour && (
+                      <div
+                        className="absolute -left-[3px] right-0 flex items-center gap-2 z-10 pointer-events-none"
+                        style={{ top: `${(nowMin / 60) * 100}%` }}
+                      >
+                        <span
+                          className="h-1.5 w-1.5 rounded-full"
+                          style={{ background: "rgba(79, 70, 229, 0.55)" }}
+                        />
+                        <span
+                          className="flex-1 h-px"
+                          style={{ background: "rgba(79, 70, 229, 0.35)" }}
+                        />
+                        <span className="text-[9px] font-semibold uppercase tracking-wider text-indigo-500/70 pr-2">
+                          agora · {String(nowHour).padStart(2, "0")}:{String(nowMin).padStart(2, "0")}
+                        </span>
+                      </div>
+                    )}
+                    <div className={cn(compact ? "space-y-1.5" : foco ? "space-y-4" : "space-y-2.5")}>
+                      {lista.map((s) => (
+                        <SessionCard key={s.pacote_id} data={s} onOpenTimeline={openDrawer} density={density} />
+                      ))}
+                      {livresPorHora.get(hora) && (
+                        <div className="flex items-center gap-2 text-[11px] text-slate-400 pl-1">
+                          <span className="h-1 w-1 rounded-full bg-slate-300" />
+                          {livresPorHora.get(hora)} horário{livresPorHora.get(hora)! > 1 ? "s" : ""} livre{livresPorHora.get(hora)! > 1 ? "s" : ""} nesta hora
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
       </div>
 
       {drawerMounted && (
@@ -958,12 +1060,33 @@ export function AgendaV2Shell() {
               if (!v) setDrawerPacote(null);
             }}
             data={drawerData}
+            onChangeStatus={onChangeStatusDrawer}
+            onOpenProntuario={handleOpenProntuario}
+            onReagendar={handleOpenReagendarFromDrawer}
           />
         </Suspense>
       )}
       {wizardOpen && (
         <Suspense fallback={null}>
-          <NovoAgendamentoWizard open={wizardOpen} onOpenChange={setWizardOpen} />
+          <NovoAgendamentoWizard
+            open={wizardOpen}
+            onOpenChange={(v) => {
+              setWizardOpen(v);
+              if (!v) setWizardInitial(null);
+            }}
+            initial={wizardInitial}
+          />
+        </Suspense>
+      )}
+      {reagendarSessao && clinicaId && (
+        <Suspense fallback={null}>
+          <ReagendarModal
+            open={!!reagendarSessao}
+            onOpenChange={(v) => { if (!v) setReagendarSessao(null); }}
+            sessao={reagendarSessao}
+            clinicaId={clinicaId}
+            medicoOptions={medicoOptionsForReagendar}
+          />
         </Suspense>
       )}
 
@@ -977,24 +1100,18 @@ export function AgendaV2Shell() {
           <div className="space-y-4 text-sm">
             <ShortcutRow k="?" label="Abrir / fechar este painel" />
             <div className="border-t border-slate-100" />
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-              Modos de visualização
-            </div>
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Modos de visualização</div>
             <ShortcutRow k="D" label="Confortável" />
             <ShortcutRow k="C" label="Compacto" />
             <ShortcutRow k="F" label="Foco" />
             <div className="border-t border-slate-100" />
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-              Navegação
-            </div>
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Navegação</div>
             <ShortcutRow k="J" label="Próxima sessão" />
             <ShortcutRow k="K" label="Sessão anterior" />
             <ShortcutRow k="Enter" label="Abrir sessão selecionada" />
             <ShortcutRow k="Esc" label="Fechar drawer" />
             <div className="border-t border-slate-100" />
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-              Ações
-            </div>
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Ações</div>
             <ShortcutRow k="N" label="Nova sessão" />
             <ShortcutRow k="Ctrl K" label="Focar busca do módulo" />
           </div>

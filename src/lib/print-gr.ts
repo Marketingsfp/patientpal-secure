@@ -15,6 +15,13 @@ export interface PrintGRInput {
   usuarioId?: string | null;
   /** Se true, NÃO grava nova via — apenas reimprime a última via existente. */
   reimpressao?: boolean;
+  /**
+   * Número da ficha (posição da linha na agenda) já calculado pelo chamador.
+   * Quando informado, a guia usa EXATAMENTE este número — garante que a guia
+   * bate com a lista da agenda mesmo havendo slots no mesmo horário. Sem ele,
+   * a posição é recalculada aqui (fallback).
+   */
+  fichaNumero?: number | null;
   pagamento?: {
     valor: number;
     forma_pagamento: string | null;
@@ -99,6 +106,41 @@ const VIA_CSS = `
   @media print { .via-wrap { break-after: page; } .via-wrap:last-child { break-after: auto; } }
 `;
 
+// CSS base compartilhado pelos três layouts de GR (individual, agrupada e mensalidade).
+// - Tudo em negrito (font-weight: 700) para legibilidade em impressoras térmicas.
+// - word-break/overflow-wrap para nomes/procedimentos longos não estourarem a largura útil do papel 80mm.
+// - .row usa grid em vez de flex para o valor à direita nunca ser cortado.
+const BASE_CSS = `
+  @page { size: 80mm auto; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #fff; color: #000; }
+  body {
+    font-family: "Courier New", "Consolas", monospace;
+    font-size: 11pt;
+    line-height: 1.3;
+    font-weight: 700;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+  .ticket { width: 76mm; max-width: 100%; padding: 3mm 2mm 6mm; }
+  .center { text-align: center; }
+  .right  { text-align: right; }
+  .bold   { font-weight: 700; }
+  .sm     { font-size: 9pt; font-weight: 700; }
+  .lg     { font-size: 14pt; font-weight: 700; }
+  .sep    { border-top: 1px dashed #000; margin: 6px 0; }
+  .row    { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px; align-items: baseline; }
+  .row > * { min-width: 0; }
+  .row .right { justify-self: end; }
+  table   { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  td      { padding: 1px 0; vertical-align: top; word-break: break-word; overflow-wrap: anywhere; }
+  .label  { color: #000; font-weight: 700; }
+  .v      { font-weight: 700; }
+  .qtd    { width: 10mm; }
+  h1, h2, h3 { margin: 0; }
+  ${VIA_CSS}
+`;
+
 // Imprime o HTML diretamente via iframe oculto — sem abrir nova janela.
 // O navegador ainda exibirá a caixa de diálogo de impressão padrão (não há
 // como suprimi-la sem modo quiosque), mas não há mais a tela intermediária.
@@ -155,6 +197,7 @@ export async function printGuiaAtendimento(input: PrintGRInput) {
   return printGuiaAtendimentoCore(input);
 }
 
+<<<<<<< HEAD
 async function printGuiaAtendimentoCore({
   agendamentoId,
   clinicaId,
@@ -163,6 +206,9 @@ async function printGuiaAtendimentoCore({
   reimpressao,
   pagamento,
 }: PrintGRInput) {
+=======
+async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome, usuarioId, reimpressao, pagamento, fichaNumero }: PrintGRInput) {
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
   // Controle de vias: máximo 2 (1ª e 2ª via). Reimpressão repete a última sem incrementar.
   const { data: visExistentes, error: errVias } = await supabase
     .from("gr_impressoes" as never)
@@ -186,9 +232,13 @@ async function printGuiaAtendimentoCore({
   const [ag, cli] = await Promise.all([
     supabase
       .from("agendamentos")
+<<<<<<< HEAD
       .select(
         "id, paciente_nome, paciente_id, medico_id, agenda_id, inicio, procedimento, observacoes",
       )
+=======
+      .select("id, paciente_nome, paciente_id, medico_id, agenda_id, inicio, procedimento, observacoes, ficha_numero")
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
       .eq("id", agendamentoId)
       .maybeSingle(),
     supabase
@@ -233,7 +283,7 @@ async function printGuiaAtendimentoCore({
     a.procedimento
       ? supabase
           .from("procedimentos")
-          .select("nome, valor_dinheiro_pix, valor_cartao, tipo")
+          .select("id, nome, valor_dinheiro_pix, valor_cartao, tipo")
           .eq("clinica_id", clinicaId)
           .ilike("nome", a.procedimento)
           .maybeSingle()
@@ -250,12 +300,20 @@ async function printGuiaAtendimentoCore({
   } | null;
   const medicoBasic = med.data as { nome: string; especialidade: { nome: string } | null } | null;
   const medicoNome = medicoBasic?.nome ?? "—";
+<<<<<<< HEAD
   const espNome = medicoBasic?.especialidade?.nome?.toUpperCase() ?? "";
   let medicoData: {
     tipo_repasse: string | null;
     percentual_repasse_padrao: number | null;
     valor_repasse_padrao: number | null;
   } | null = null;
+=======
+  // Fallback: especialidade "principal" do médico (coluna medicos.especialidade_id).
+  // Para médicos com mais de uma especialidade essa coluna é apenas a primeira da
+  // lista e pode não corresponder ao serviço atendido — por isso é só o último recurso.
+  let espNome = medicoBasic?.especialidade?.nome?.toUpperCase() ?? "";
+  let medicoData: { tipo_repasse: string | null; percentual_repasse_padrao: number | null; valor_repasse_padrao: number | null } | null = null;
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
   if (a.medico_id) {
     try {
       const { data: sens } = await supabase.rpc("medico_dados_sensiveis", {
@@ -299,18 +357,61 @@ async function printGuiaAtendimentoCore({
       medicoCb = null;
     }
   }
+<<<<<<< HEAD
   const procData = proc.data as {
     nome: string;
     valor_dinheiro_pix: number | null;
     valor_cartao: number | null;
     tipo: string | null;
   } | null;
+=======
+  const procData = proc.data as { id: string; nome: string; valor_dinheiro_pix: number | null; valor_cartao: number | null; tipo: string | null } | null;
+
+  // Especialidade correta = a que está vinculada a ESTE serviço para ESTE médico
+  // (medico_procedimentos.especialidade_id), definida na aba Especialidades/Serviços
+  // do cadastro do médico. Só assim a guia sai coerente com o atendimento quando o
+  // médico tem várias especialidades. Se não houver vínculo, mantém o fallback acima.
+  if (medicoIdEfetivo && procData?.id) {
+    try {
+      const { data: mps } = await supabase
+        .from("medico_procedimentos")
+        .select("especialidade_id")
+        .eq("medico_id", medicoIdEfetivo)
+        .eq("procedimento_id", procData.id)
+        .not("especialidade_id", "is", null);
+      const eids = Array.from(
+        new Set(
+          ((mps ?? []) as Array<{ especialidade_id: string | null }>)
+            .map((r) => r.especialidade_id)
+            .filter((v): v is string => !!v),
+        ),
+      );
+      // Só usa a especialidade do serviço quando ela é INEQUÍVOCA (uma só). Se o
+      // mesmo serviço estiver vinculado a várias especialidades para este médico
+      // (cadastro bagunçado / import em massa), não dá para adivinhar qual vale —
+      // mantém a especialidade principal do médico (fallback acima).
+      if (eids.length === 1) {
+        const { data: esp } = await supabase
+          .from("especialidades")
+          .select("nome")
+          .eq("id", eids[0])
+          .maybeSingle();
+        const nomeVinculo = (esp as { nome: string | null } | null)?.nome;
+        if (nomeVinculo) espNome = nomeVinculo.toUpperCase();
+      }
+    } catch { /* mantém o fallback da especialidade principal do médico */ }
+  }
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
 
   // Se já temos pagamento informado, usa ele; senão busca valor REALMENTE pago
   // (fin_lancamentos confirmado) — garante que reimpressões usem o mesmo
   // valor base de cálculo da 1ª via, mantendo o repasse do médico correto.
   let valor: number;
   let isCartaoConsulta = false;
+  // Quando `pagamento` não vem do caller (ex.: botão "Imprimir GR" reimprimindo
+  // uma cobrança antiga), reconstruímos a forma/parcelas/bandeira/misto a partir
+  // do lançamento financeiro. Sem isso a GR caía num fallback "DINHEIRO".
+  let pagResolvido: PrintGRInput["pagamento"] | undefined = pagamento;
   const detectCartaoConsulta = (desc: string | null | undefined): boolean => {
     if (!desc) return false;
     const d = desc.toUpperCase();
@@ -326,24 +427,83 @@ async function printGuiaAtendimentoCore({
     valor = Number(pagamento.valor);
   } else {
     let valorPago = 0;
+    let formaResolvida: string | null = null;
+    let parcelasResolvidas: number | null = null;
+    let bandeiraResolvida: string | null = null;
+    let obsResolvida: string | null = null;
     try {
       const { data: lancs } = await supabase
         .from("fin_lancamentos")
-        .select("valor, descricao")
+        .select("valor, descricao, forma_pagamento, parcelas, bandeira_cartao, observacoes")
         .eq("agendamento_id", agendamentoId)
         .eq("tipo", "receita")
         .eq("status", "confirmado");
+<<<<<<< HEAD
       for (const l of (lancs ?? []) as Array<{
         valor: number | string;
         descricao: string | null;
       }>) {
+=======
+      for (const l of ((lancs ?? []) as Array<{
+        valor: number | string; descricao: string | null;
+        forma_pagamento: string | null; parcelas: number | null;
+        bandeira_cartao: string | null; observacoes: string | null;
+      }>)) {
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
         valorPago += Number(l.valor);
         if (detectCartaoConsulta(l.descricao)) isCartaoConsulta = true;
+        // Preserva a primeira forma "real" (ignora linhas-sombra de valor 0
+        // e sem forma) — a cobrança principal é a que dita a forma na GR.
+        if (!formaResolvida && l.forma_pagamento) {
+          formaResolvida = l.forma_pagamento;
+          parcelasResolvidas = l.parcelas;
+          bandeiraResolvida = l.bandeira_cartao;
+          obsResolvida = l.observacoes;
+        }
       }
     } catch {
       /* segue para fallback */
     }
     valor = valorPago > 0 ? valorPago : Number(procData?.valor_dinheiro_pix ?? 0);
+    if (formaResolvida) {
+      // Reconstrói detalhe do misto a partir de "Pagamento misto: X R$ 1,00; Y R$ 2,00 | ..."
+      let detalhe: Array<{ forma: string; pago: number; troco: number; recebido: number }> | undefined;
+      if (formaResolvida === "misto" && obsResolvida) {
+        const idx = obsResolvida.indexOf("Pagamento misto:");
+        if (idx >= 0) {
+          const trecho = obsResolvida.slice(idx + "Pagamento misto:".length).split(" | ")[0];
+          const LABEL_TO_KEY: Array<[RegExp, string]> = [
+            [/^cart[ãa]o\s*cr[ée]dito/i, "cartao_credito"],
+            [/^cart[ãa]o\s*d[ée]bito/i, "cartao_debito"],
+            [/^cr[ée]dito/i, "cartao_credito"],
+            [/^d[ée]bito/i, "cartao_debito"],
+            [/^dinheiro/i, "dinheiro"],
+            [/^pix/i, "pix"],
+            [/^boleto/i, "boleto"],
+            [/^conv[êe]nio/i, "convenio"],
+            [/^transfer[êe]ncia/i, "transferencia"],
+          ];
+          const parseBRL = (s: string) => Number(s.replace(/\./g, "").replace(",", ".")) || 0;
+          const partes = trecho.split(";").map((s) => s.trim()).filter(Boolean);
+          const acc: Array<{ forma: string; pago: number; troco: number; recebido: number }> = [];
+          for (const p of partes) {
+            const match = LABEL_TO_KEY.find(([re]) => re.test(p));
+            if (!match) continue;
+            const valMatch = p.match(/R\$\s*([\d.]+,\d{2})/);
+            if (!valMatch) continue;
+            acc.push({ forma: match[1], pago: parseBRL(valMatch[1]), troco: 0, recebido: 0 });
+          }
+          if (acc.length > 0) detalhe = acc;
+        }
+      }
+      pagResolvido = {
+        valor,
+        forma_pagamento: formaResolvida,
+        parcelas: parcelasResolvidas,
+        bandeira_cartao: bandeiraResolvida,
+        detalhe,
+      };
+    }
   }
   // Quando o pagamento já vem informado pelo caller, ainda consultamos os
   // lançamentos para descobrir se é Cartão Consulta (não há flag no payload).
@@ -368,10 +528,14 @@ async function printGuiaAtendimentoCore({
   const procNome =
     espNome && !procNomeBase.includes(espNome) ? `${espNome} - ${procNomeBase}` : procNomeBase;
 
-  // Ficha = posição do paciente na agenda do médico no dia (ex.: nº 1 da Dr. Valéria)
-  // Conta a ordem cronológica entre agendamentos VÁLIDOS (com paciente real),
-  // ignorando blocos de "Bloqueio"/"Disponível" e horários sem paciente.
+  // Ficha = POSIÇÃO da linha na fila geral da CLÍNICA no dia (mesma regra da
+  // lista da agenda — app.agenda.tsx > fichaPorId): conta TODOS os agendamentos
+  // da clínica no dia, de TODOS os profissionais, na ordem do horário, como uma
+  // senha única (não particiona por médico nem por agenda). O chamador (a
+  // agenda) passa o número já calculado em `fichaNumero` — assim a guia bate
+  // EXATAMENTE com a lista. Sem ele, recalcula aqui como fallback.
   const inicioDt = new Date(a.inicio);
+<<<<<<< HEAD
   const diaIni = new Date(inicioDt);
   diaIni.setHours(0, 0, 0, 0);
   const diaFim = new Date(inicioDt);
@@ -405,6 +569,28 @@ async function printGuiaAtendimentoCore({
     fichaNum > 0
       ? String(fichaNum).padStart(3, "0")
       : String(inicioDt.getHours() * 60 + inicioDt.getMinutes()).padStart(3, "0");
+=======
+  const diaIni = new Date(inicioDt); diaIni.setHours(0, 0, 0, 0);
+  const diaFim = new Date(inicioDt); diaFim.setHours(23, 59, 59, 999);
+  let fichaNum = typeof fichaNumero === "number" && fichaNumero > 0 ? fichaNumero : 0;
+  if (fichaNum === 0) {
+    try {
+      const { data: lista } = await supabase
+        .from("agendamentos")
+        .select("id, inicio")
+        .eq("clinica_id", clinicaId)
+        .gte("inicio", diaIni.toISOString())
+        .lte("inicio", diaFim.toISOString())
+        .order("inicio", { ascending: true })
+        .order("id", { ascending: true });
+      const idx = (lista ?? []).findIndex((r: any) => r.id === a.id);
+      fichaNum = idx >= 0 ? idx + 1 : 0;
+    } catch { fichaNum = 0; }
+  }
+  const ficha = fichaNum > 0
+    ? String(fichaNum).padStart(3, "0")
+    : String(inicioDt.getHours() * 60 + inicioDt.getMinutes()).padStart(3, "0");
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
   const prontuario = paciente?.codigo_prontuario || paciente?.numero_pasta || "";
 
   // Repasse conforme cadastro: tenta primeiro medico_convenios pelo nome do procedimento,
@@ -506,6 +692,7 @@ async function printGuiaAtendimentoCore({
   }
   const clinica = +Math.max(0, valor - prestador).toFixed(2);
 
+<<<<<<< HEAD
   const formaLbl = pagamento?.forma_pagamento
     ? (FORMA_LABEL[pagamento.forma_pagamento] ?? pagamento.forma_pagamento.toUpperCase())
     : "DINHEIRO";
@@ -521,6 +708,17 @@ async function printGuiaAtendimentoCore({
   const detalheRows = isMisto
     ? pagamento!
         .detalhe!.map((d) => {
+=======
+  const formaLbl = pagResolvido?.forma_pagamento ? (FORMA_LABEL[pagResolvido.forma_pagamento] ?? pagResolvido.forma_pagamento.toUpperCase()) : "DINHEIRO";
+  const parcelasTxt = pagResolvido && pagResolvido.forma_pagamento === "cartao_credito" && pagResolvido.parcelas && pagResolvido.parcelas > 1
+    ? `${pagResolvido.parcelas}x DE ${fmtBRL(valor / pagResolvido.parcelas)}`
+    : "À VISTA";
+  const bandeiraTxt = pagResolvido?.bandeira_cartao ? pagResolvido.bandeira_cartao.toUpperCase() : "";
+  const isMisto = pagResolvido?.forma_pagamento === "misto" && (pagResolvido.detalhe?.length ?? 0) > 0;
+  const detalheRows = isMisto
+    ? pagResolvido!.detalhe!
+        .map((d) => {
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
           const lbl = FORMA_LABEL[d.forma] ?? d.forma.toUpperCase();
           const trocoTxt =
             d.troco > 0 ? ` (RECEB. ${fmtBRL(d.recebido)} / TROCO ${fmtBRL(d.troco)})` : "";
@@ -558,21 +756,21 @@ async function printGuiaAtendimentoCore({
     <div class="sep"></div>
 
     <table>
-      <tr><td class="label" colspan="2" style="white-space:nowrap">FICHA: <span class="v">${ficha}</span></td></tr>
-      <tr><td class="label" colspan="2" style="white-space:nowrap">PROFISSIONAL: <span class="v">${esc(medicoNome)}</span></td></tr>
-      <tr><td class="label" colspan="2" style="white-space:nowrap">HORÁRIO: <span class="v">${fmtData(a.inicio)}</span></td></tr>
-      ${usuarioFinalNome ? `<tr><td class="label" colspan="2" style="white-space:nowrap">USUÁRIO: <span class="v">${esc(usuarioFinalNome)}</span></td></tr>` : ""}
+      <tr><td class="label" colspan="2">FICHA: <span class="v">${ficha}</span></td></tr>
+      <tr><td class="label" colspan="2">PROFISSIONAL: <span class="v">${esc(medicoNome)}</span></td></tr>
+      <tr><td class="label" colspan="2">HORÁRIO: <span class="v">${fmtData(a.inicio)}</span></td></tr>
+      ${usuarioFinalNome ? `<tr><td class="label" colspan="2">USUÁRIO: <span class="v">${esc(usuarioFinalNome)}</span></td></tr>` : ""}
     </table>
 
     <div class="sep"></div>
 
     <table>
       <tr class="bold">
-        <td style="width:14mm">QTD</td>
+        <td class="qtd">QTD</td>
         <td>SERVIÇO</td>
       </tr>
       <tr>
-        <td>1</td>
+        <td class="qtd">1</td>
         <td>${esc(procNome)}</td>
       </tr>
     </table>
@@ -595,9 +793,13 @@ async function printGuiaAtendimentoCore({
         : ""
     }
 
+<<<<<<< HEAD
     ${
       pagamento?.forma_pagamento === "cartao_credito"
         ? `
+=======
+    ${pagResolvido?.forma_pagamento === "cartao_credito" ? `
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
     <table>
       ${bandeiraTxt ? `<tr><td class="label">BANDEIRA:</td><td class="v right">${esc(bandeiraTxt)}</td></tr>` : ""}
       <tr><td class="label">PARCELAMENTO:</td><td class="v right">${parcelasTxt}</td></tr>
@@ -622,31 +824,14 @@ async function printGuiaAtendimentoCore({
     </div>
   </div>`;
 
-  const nVias = numViasGR(pagamento);
+  const nVias = numViasGR(pagResolvido);
   const corpoVias = multiplicarVias(ticketHtml, nVias);
 
   const html = `<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8" />
 <title>GR - ${esc(paciente?.nome ?? a.paciente_nome)}</title>
 <style>
-  @page { size: 80mm auto; margin: 0; }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; background: #fff; color: #000; }
-  body { font-family: "Courier New", "Consolas", monospace; font-size: 11pt; line-height: 1.25; }
-  .ticket { width: 76mm; padding: 3mm 2mm 6mm; }
-  .center { text-align: center; }
-  .right  { text-align: right; }
-  .bold   { font-weight: 700; }
-  .sm     { font-size: 9pt; }
-  .lg     { font-size: 13pt; font-weight: 700; }
-  .sep    { border-top: 1px dashed #000; margin: 6px 0; }
-  .row    { display: flex; justify-content: space-between; gap: 6px; }
-  table   { width: 100%; border-collapse: collapse; }
-  td      { padding: 1px 0; vertical-align: top; }
-  .label  { color: #000; }
-  .v      { font-weight: 700; }
-  h1, h2, h3 { margin: 0; }
-  ${VIA_CSS}
+  ${BASE_CSS}
 </style></head>
 <body>
   ${corpoVias}
@@ -663,10 +848,19 @@ async function printGuiaAtendimentoCore({
         via_numero: viaNumero,
         impresso_por: usuarioId ?? null,
         impresso_por_nome: usuarioNome ?? null,
+        ficha_numero: fichaNum > 0 ? fichaNum : null,
       } as never);
+<<<<<<< HEAD
     } catch (_) {
       /* falha silenciosa: registro de via não deve bloquear impressão */
     }
+=======
+    } catch (_) { /* falha silenciosa: registro de via não deve bloquear impressão */ }
+    // Não "congela" mais ficha_numero no agendamento: a ficha é POSICIONAL e
+    // acompanha a lista da agenda (pode mudar se slots forem inseridos/removidos
+    // antes da paciente). O gr_impressoes acima guarda o número de cada via só
+    // para histórico.
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
   }
 }
 
@@ -998,7 +1192,11 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     prestador = Math.min(prestador, valor);
     const clin = +(valor - prestador).toFixed(2);
 
-    const key = a.medico_id ?? "__sem_medico__";
+    // GR separada por serviço: cada agendamento vira sua própria guia,
+    // com seu próprio valor/clínica/prestador. Assim, quando o paciente faz
+    // vários serviços (ex.: USG mama + USG abdominal), cada um imprime uma
+    // GR independente com o repasse calculado só para aquele serviço.
+    const key = a.id;
     const medicoNome = a.medico_id ? (medById.get(a.medico_id)?.nome ?? "—") : "SEM PROFISSIONAL";
     const g: Grupo = grupos.get(key) ?? {
       medicoId: a.medico_id ?? null,
@@ -1022,8 +1220,11 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     grupos.set(key, g);
   }
 
-  // Calcula a ficha (posição no dia) para cada grupo
+  // Calcula a ficha (posição na fila geral da clínica no dia) para cada grupo —
+  // mesma regra de app.agenda.tsx > fichaPorId e da GR individual: senha única
+  // por dia/clínica, sem particionar por médico nem por agenda.
   const fichaByGrupo = new Map<string, number>();
+<<<<<<< HEAD
   await Promise.all(
     Array.from(grupos.entries()).map(async ([key, g]) => {
       try {
@@ -1057,6 +1258,24 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
       }
     }),
   );
+=======
+  await Promise.all(Array.from(grupos.entries()).map(async ([key, g]) => {
+    try {
+      const dt = new Date(g.inicioRef);
+      const ini = new Date(dt); ini.setHours(0,0,0,0);
+      const fim = new Date(dt); fim.setHours(23,59,59,999);
+      const { data } = await supabase.from("agendamentos")
+        .select("id, inicio")
+        .eq("clinica_id", clinicaId)
+        .gte("inicio", ini.toISOString())
+        .lte("inicio", fim.toISOString())
+        .order("inicio", { ascending: true })
+        .order("id", { ascending: true });
+      const idx = (data ?? []).findIndex((r: any) => r.id === g.agIdRef);
+      fichaByGrupo.set(key, idx >= 0 ? idx + 1 : 0);
+    } catch { fichaByGrupo.set(key, 0); }
+  }));
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
 
   const formaLbl = pagamento.forma_pagamento
     ? (FORMA_LABEL[pagamento.forma_pagamento] ?? pagamento.forma_pagamento.toUpperCase())
@@ -1101,6 +1320,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   const dataImpressao = fmtData(new Date().toISOString());
 
   // Uma GR completa por médico, separadas por linha tracejada bem visível
+<<<<<<< HEAD
   const grsHtml = gruposArr
     .map((g, idx) => {
       const isLast = idx === gruposArr.length - 1;
@@ -1114,6 +1334,20 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
       const linhas = g.itens
         .map(
           (it) => `<tr>
+=======
+  const grsHtml = gruposArr.map((g, idx) => {
+    const isLast = idx === gruposArr.length - 1;
+    const key = g.agIdRef;
+    const ficha = (() => {
+      const num = fichaByGrupo.get(key) ?? 0;
+      if (num > 0) return String(num).padStart(3, "0");
+      const d = new Date(g.inicioRef);
+      return String(d.getHours() * 60 + d.getMinutes()).padStart(3, "0");
+    })();
+    const linhas = g.itens
+      .map(
+        (it) => `<tr>
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
           <td style="width:14mm">1</td>
           <td>${esc(it.procNome)}</td>
         </tr>`,
@@ -1134,10 +1368,10 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
         ${headerPaciente}
         <div class="sep"></div>
         <table>
-          <tr><td class="label" colspan="2" style="white-space:nowrap">FICHA: <span class="v">${ficha}</span></td></tr>
-          <tr><td class="label" colspan="2" style="white-space:nowrap">PROFISSIONAL: <span class="v">${esc(g.medicoNome)}</span></td></tr>
-          <tr><td class="label" colspan="2" style="white-space:nowrap">HORÁRIO: <span class="v">${fmtData(g.inicioRef)}</span></td></tr>
-          ${usuarioFinalNome ? `<tr><td class="label" colspan="2" style="white-space:nowrap">USUÁRIO: <span class="v">${esc(usuarioFinalNome)}</span></td></tr>` : ""}
+          <tr><td class="label" colspan="2">FICHA: <span class="v">${ficha}</span></td></tr>
+          <tr><td class="label" colspan="2">PROFISSIONAL: <span class="v">${esc(g.medicoNome)}</span></td></tr>
+          <tr><td class="label" colspan="2">HORÁRIO: <span class="v">${fmtData(g.inicioRef)}</span></td></tr>
+          ${usuarioFinalNome ? `<tr><td class="label" colspan="2">USUÁRIO: <span class="v">${esc(usuarioFinalNome)}</span></td></tr>` : ""}
         </table>
         <div class="sep"></div>
         <table>
@@ -1191,26 +1425,10 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
 <html lang="pt-BR"><head><meta charset="utf-8" />
 <title>GR - ${esc(pacienteNome)}</title>
 <style>
-  @page { size: 80mm auto; margin: 0; }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; background: #fff; color: #000; }
-  body { font-family: "Courier New", "Consolas", monospace; font-size: 11pt; line-height: 1.25; }
-  .ticket { width: 76mm; padding: 3mm 2mm 6mm; }
-  .center { text-align: center; }
-  .right  { text-align: right; }
-  .bold   { font-weight: 700; }
-  .sm     { font-size: 9pt; }
-  .lg     { font-size: 13pt; font-weight: 700; }
-  .sep    { border-top: 1px dashed #000; margin: 6px 0; }
-  .row    { display: flex; justify-content: space-between; gap: 6px; }
-  table   { width: 100%; border-collapse: collapse; }
-  td      { padding: 1px 0; vertical-align: top; }
-  .label  { color: #000; }
-  .v      { font-weight: 700; }
+  ${BASE_CSS}
   .cut    { width: 76mm; padding: 4mm 2mm; text-align: center; }
   .cut-line { border-top: 2px dashed #000; margin: 2mm 0; }
   .cut-label { font-size: 8pt; letter-spacing: 1px; }
-  ${VIA_CSS}
 </style></head>
 <body>
   ${corpoVias}
@@ -1410,7 +1628,7 @@ async function printGuiaMensalidadeCore({
       <tr><td class="label">CONTRATO:</td><td class="v right">#${contrato.numero}</td></tr>
       <tr><td class="label">PARCELA:</td><td class="v right">${m.numero_parcela}/${totalParcelas}</td></tr>
       <tr><td class="label">VENCIMENTO:</td><td class="v right">${fmtDataSimples(m.vencimento)}</td></tr>
-      ${usuarioFinalNome ? `<tr><td class="label" colspan="2" style="white-space:nowrap">USUÁRIO: <span class="v">${esc(usuarioFinalNome)}</span></td></tr>` : ""}
+      ${usuarioFinalNome ? `<tr><td class="label" colspan="2">USUÁRIO: <span class="v">${esc(usuarioFinalNome)}</span></td></tr>` : ""}
     </table>
 
     <div class="sep"></div>
@@ -1466,23 +1684,7 @@ async function printGuiaMensalidadeCore({
 <html lang="pt-BR"><head><meta charset="utf-8" />
 <title>GR - ${esc(tituloPac)}</title>
 <style>
-  @page { size: 80mm auto; margin: 0; }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; background: #fff; color: #000; }
-  body { font-family: "Courier New", "Consolas", monospace; font-size: 11pt; line-height: 1.25; }
-  .ticket { width: 76mm; padding: 3mm 2mm 6mm; }
-  .center { text-align: center; }
-  .right  { text-align: right; }
-  .bold   { font-weight: 700; }
-  .sm     { font-size: 9pt; }
-  .lg     { font-size: 13pt; font-weight: 700; }
-  .sep    { border-top: 1px dashed #000; margin: 6px 0; }
-  .row    { display: flex; justify-content: space-between; gap: 6px; }
-  table   { width: 100%; border-collapse: collapse; }
-  td      { padding: 1px 0; vertical-align: top; }
-  .label  { color: #000; }
-  .v      { font-weight: 700; }
-  ${VIA_CSS}
+  ${BASE_CSS}
 </style></head>
 <body>
   ${corpoVias}

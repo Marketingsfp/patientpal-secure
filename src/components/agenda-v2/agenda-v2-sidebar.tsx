@@ -58,15 +58,26 @@ export function AgendaV2Sidebar({ clinicaNome, dia, sessoes, recursos, equipeOnl
   const labelCls = "text-[10px] font-semibold uppercase tracking-widest text-slate-400";
 
   return (
-    <aside className="w-64 shrink-0 bg-[#F7F7F5] border-r border-slate-200/60 flex flex-col overflow-y-auto">
+    <aside className="w-64 shrink-0 bg-gradient-to-b from-[#FAFBFC] to-[#F5F6F8] border-r border-slate-200/60 flex flex-col overflow-y-auto">
       {/* Header clínica — leve, sem bloco escuro */}
       <div className="px-4 pt-5 pb-3">
         <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-xl bg-white border border-slate-200 text-slate-700 flex items-center justify-center text-[11px] font-bold shadow-sm">
+          <div
+            className="h-9 w-9 rounded-xl border flex items-center justify-center text-[11px] font-bold shadow-sm text-[color:var(--clinic-accent-strong)]"
+            style={{
+              background: "var(--clinic-accent-soft)",
+              borderColor: "color-mix(in oklab, var(--clinic-accent) 25%, transparent)",
+            }}
+          >
             {initials(clinicaNome)}
           </div>
           <div className="min-w-0">
-            <div className="text-sm font-semibold text-slate-800 truncate">{clinicaNome}</div>
+            <div
+              className="text-sm font-semibold text-slate-800 truncate"
+              style={{ fontFamily: "var(--hhp-font-display)", letterSpacing: "-0.01em" }}
+            >
+              {clinicaNome}
+            </div>
             <div className="text-[10px] text-slate-400 uppercase tracking-wider">
               {dia.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
             </div>
@@ -87,23 +98,16 @@ export function AgendaV2Sidebar({ clinicaNome, dia, sessoes, recursos, equipeOnl
           </div>
           <div className="flex items-end justify-between">
             <div>
-              <div className="text-2xl font-semibold text-slate-800 tabular-nums leading-none">
-                {sessoes.length}
-              </div>
+              <div className="text-2xl font-semibold text-slate-800 tabular-nums leading-none">{sessoes.length}</div>
               <div className="text-[10px] text-slate-400 mt-1.5">sessões</div>
             </div>
             <div className="text-right">
-              <div className="text-xl font-semibold text-emerald-600 tabular-nums leading-none">
-                {ocupacao}%
-              </div>
+              <div className="text-xl font-semibold text-emerald-600 tabular-nums leading-none">{ocupacao}%</div>
               <div className="text-[10px] text-slate-400 mt-1.5">ocupação</div>
             </div>
           </div>
           <div className="mt-3 h-1 rounded-full bg-slate-100 overflow-hidden">
-            <div
-              className="h-full bg-emerald-400/80 transition-all"
-              style={{ width: `${ocupacao}%` }}
-            />
+            <div className="h-full bg-emerald-400/80 transition-all" style={{ width: `${ocupacao}%` }} />
           </div>
         </section>
 
@@ -161,7 +165,7 @@ export function AgendaV2Sidebar({ clinicaNome, dia, sessoes, recursos, equipeOnl
         {/* Card — Equipe on-line */}
         <section className={cardCls}>
           <div className="flex items-center justify-between mb-3">
-            <span className={labelCls}>Equipe on-line</span>
+            <span className={labelCls}>Escala do dia</span>
             <span className="inline-flex items-center gap-1 text-[10px] text-slate-400">
               <Users className="h-3 w-3" /> {equipeOnline.length}
             </span>
@@ -170,11 +174,14 @@ export function AgendaV2Sidebar({ clinicaNome, dia, sessoes, recursos, equipeOnl
             {equipeOnline.slice(0, 8).map((m) => (
               <div
                 key={m.id}
-                className="relative h-7 w-7 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center text-[10px] font-semibold text-slate-500"
+                className="relative h-7 w-7 rounded-full bg-white border border-slate-200 flex items-center justify-center text-[10px] font-semibold text-slate-600 shadow-sm"
                 title={m.nome}
               >
                 {initials(m.nome)}
-                <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-400 border-2 border-white" />
+                <span
+                  className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border-2 border-white"
+                  style={{ background: "var(--clinic-accent)" }}
+                />
               </div>
             ))}
             {equipeOnline.length > 8 && (
@@ -184,7 +191,7 @@ export function AgendaV2Sidebar({ clinicaNome, dia, sessoes, recursos, equipeOnl
             )}
             {equipeOnline.length === 0 && (
               <div className="text-xs text-slate-400 inline-flex items-center gap-1">
-                <Clock className="h-3 w-3" /> ninguém on-line
+                <Clock className="h-3 w-3" /> sem escala hoje
               </div>
             )}
           </div>

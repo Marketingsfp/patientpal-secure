@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Button } from "@/components/ui/button";
@@ -31,16 +31,45 @@ const TIPO_COR: Record<string, string> = {
   R: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
 };
 
+// Prioridade de atendimento: Emergência > Prioritário > Retorno > Normal
+const TIPO_PRIORIDADE: Record<string, number> = { E: 0, P: 1, R: 2, N: 3 };
+
+function ordenarPorPrioridade(a: Senha, b: Senha) {
+  const pa = TIPO_PRIORIDADE[a.tipo] ?? 99;
+  const pb = TIPO_PRIORIDADE[b.tipo] ?? 99;
+  if (pa !== pb) return pa - pb;
+  return a.emitida_em.localeCompare(b.emitida_em);
+}
+
 function RecepcaoPage() {
   const { clinicaAtual } = useClinica();
-  const [guiche, setGuiche] = useState<string>(() => localStorage.getItem("guiche") ?? "1");
+  const [guiche, setGuiche] = useState<string>("1");
   const [fila, setFila] = useState<Senha[]>([]);
   const [chamadas, setChamadas] = useState<Senha[]>([]);
   const [busy, setBusy] = useState(false);
 
+<<<<<<< HEAD
   useEffect(() => {
     localStorage.setItem("guiche", guiche);
   }, [guiche]);
+=======
+  // Refs para o atalho de teclado sempre ler o valor mais recente
+  // sem precisar remontar o listener a cada mudança
+  const clinicaIdRef = useRef(clinicaAtual?.clinica_id);
+  useEffect(() => { clinicaIdRef.current = clinicaAtual?.clinica_id; }, [clinicaAtual?.clinica_id]);
+
+  // Carrega o guichê salvo assim que a clínica é conhecida (namespaced por clínica)
+  useEffect(() => {
+    if (!clinicaAtual) return;
+    const saved = localStorage.getItem(`guiche:${clinicaAtual.clinica_id}`);
+    setGuiche(saved ?? "1");
+  }, [clinicaAtual?.clinica_id]);
+
+  useEffect(() => {
+    if (!clinicaAtual) return;
+    localStorage.setItem(`guiche:${clinicaAtual.clinica_id}`, guiche);
+  }, [guiche, clinicaAtual?.clinica_id]);
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
 
   // Atalho: C = chamar próxima senha
   useEffect(() => {
@@ -51,17 +80,19 @@ function RecepcaoPage() {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key.toLowerCase() === "c") {
         e.preventDefault();
+        if (!clinicaIdRef.current) return;
         void chamarProxima();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clinicaAtual?.clinica_id, guiche]);
+  }, []);
 
   const carregar = async () => {
     if (!clinicaAtual) return;
     const hoje = new Date().toISOString().slice(0, 10);
+<<<<<<< HEAD
     const sel =
       "id, codigo, tipo, status, guiche, emitida_em, chamada_em, identificado_por_facial, paciente_id, pacientes(nome)";
     const [{ data: emit }, { data: cham }] = await Promise.all([
@@ -80,8 +111,21 @@ function RecepcaoPage() {
         .eq("status", "chamada")
         .order("chamada_em", { ascending: false })
         .limit(10),
+=======
+    const sel = "id, codigo, tipo, status, guiche, emitida_em, chamada_em, identificado_por_facial, paciente_id, pacientes(nome)";
+    const [{ data: emit, error: errEmit }, { data: cham, error: errCham }] = await Promise.all([
+      supabase.from("senhas").select(sel).eq("clinica_id", clinicaAtual.clinica_id).eq("data_dia", hoje).eq("status", "emitida").order("emitida_em"),
+      supabase.from("senhas").select(sel).eq("clinica_id", clinicaAtual.clinica_id).eq("data_dia", hoje).eq("status", "chamada").order("chamada_em", { ascending: false }).limit(10),
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
     ]);
-    setFila((emit ?? []) as unknown as Senha[]);
+
+    if (errEmit || errCham) {
+      mostrarErro(errEmit ?? errCham!);
+      return;
+    }
+
+    const filaOrdenada = ((emit ?? []) as unknown as Senha[]).sort(ordenarPorPrioridade);
+    setFila(filaOrdenada);
     setChamadas((cham ?? []) as unknown as Senha[]);
   };
 
@@ -160,8 +204,9 @@ function RecepcaoPage() {
         </div>
         <div className="flex items-end gap-3">
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Meu guichê</label>
+            <label htmlFor="guiche-input" className="text-xs text-muted-foreground">Meu guichê</label>
             <input
+              id="guiche-input"
               value={guiche}
               onChange={(e) => setGuiche(e.target.value.slice(0, 10))}
               className="h-10 w-24 px-3 rounded-md border bg-background text-lg font-semibold"

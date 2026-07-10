@@ -200,8 +200,11 @@ interface ClienteFormProps {
   onCancel: () => void;
   /** Footer apresentado em modo "sticky" (uso no Dialog). Default: false. */
   stickyFooter?: boolean;
+  /** Somente leitura — desabilita todos os campos e oculta o rodapé. */
+  readOnly?: boolean;
 }
 
+<<<<<<< HEAD
 export function ClienteForm({
   clinicaId,
   paciente,
@@ -209,6 +212,9 @@ export function ClienteForm({
   onCancel,
   stickyFooter,
 }: ClienteFormProps) {
+=======
+export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFooter, readOnly = false }: ClienteFormProps) {
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
   const editing = paciente;
   const [form, setForm] = useState<FormState>(EMPTY);
   const [tab, setTab] = useState("dados");
@@ -1142,7 +1148,7 @@ export function ClienteForm({
           </div>
         )}
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="grid grid-cols-7 w-full">
+          <TabsList className="w-full h-auto flex flex-wrap justify-start sm:grid sm:grid-cols-7">
             <TabsTrigger value="dados">Dados</TabsTrigger>
             <TabsTrigger value="endereco">Endereço</TabsTrigger>
             <TabsTrigger value="responsavel">
@@ -1153,7 +1159,7 @@ export function ClienteForm({
             <TabsTrigger value="historico">Histórico</TabsTrigger>
             <TabsTrigger value="convenio">Convênio</TabsTrigger>
           </TabsList>
-
+          <fieldset disabled={readOnly} className="contents">
           <TabsContent value="dados" className="space-y-4 pt-4 pb-16">
             <div className="flex items-center gap-4">
               <div className="relative h-20 w-20 rounded-full overflow-hidden border bg-muted flex items-center justify-center shrink-0">
@@ -1316,6 +1322,7 @@ export function ClienteForm({
               </div>
               <p className="text-xs text-muted-foreground">Preenche o endereço automaticamente.</p>
             </div>
+<<<<<<< HEAD
             <div className="space-y-1">
               <Label>Logradouro</Label>
               <InputVoz {...fieldProps("logradouro")} />
@@ -1339,6 +1346,16 @@ export function ClienteForm({
                 <Label>Cidade</Label>
                 <InputVoz {...fieldProps("cidade")} />
               </div>
+=======
+            <div className="space-y-1"><Label>Logradouro</Label><InputVoz {...fieldProps("logradouro")} /></div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1"><Label>Número</Label><InputVoz {...fieldProps("numero")} /></div>
+              <div className="space-y-1 sm:col-span-2"><Label>Complemento</Label><InputVoz {...fieldProps("complemento")} /></div>
+            </div>
+            <div className="space-y-1"><Label>Bairro</Label><InputVoz {...fieldProps("bairro")} /></div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1 sm:col-span-2"><Label>Cidade</Label><InputVoz {...fieldProps("cidade")} /></div>
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
               <div className="space-y-1">
                 <Label>UF</Label>
                 <Input
@@ -1976,8 +1993,10 @@ export function ClienteForm({
               </div>
             )}
           </TabsContent>
+          </fieldset>
         </Tabs>
 
+<<<<<<< HEAD
         <div className={footerClass}>
           <Button
             type="button"
@@ -1993,6 +2012,14 @@ export function ClienteForm({
             {saving ? "Salvando…" : "Salvar"}
           </Button>
         </div>
+=======
+        {!readOnly && (
+          <div className={footerClass}>
+            <Button type="button" variant="outline" onClick={() => { stopVoice(); onCancel(); }}>Cancelar</Button>
+            <Button type="submit" disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
+          </div>
+        )}
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
       </form>
 
       <Dialog

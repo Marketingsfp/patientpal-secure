@@ -94,10 +94,6 @@ export async function printOrcamento(orcamentoId: string, clinicaId: string) {
   .noprint button { padding: 6px 12px; font-size: 12px; cursor: pointer; }
 </style></head>
 <body>
-  <div class="noprint">
-    <button onclick="window.print()">Imprimir</button>
-    <button onclick="window.close()">Fechar</button>
-  </div>
   <div class="ticket">
     <div class="center bold">${esc(c?.nome ?? "")}</div>
     <div class="center sm">${endereco}</div>

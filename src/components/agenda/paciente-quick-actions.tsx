@@ -310,8 +310,8 @@ function EnderecoDialog({
             CEP.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid grid-cols-3 gap-2">
-          <div className="col-span-1 space-y-1">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div className="sm:col-span-1 space-y-1">
             <Label className="text-xs">CEP</Label>
             <div className="flex gap-1">
               <Input
@@ -321,35 +321,35 @@ function EnderecoDialog({
               />
             </div>
           </div>
-          <div className="col-span-2 space-y-1">
+          <div className="sm:col-span-2 space-y-1">
             <Label className="text-xs">Logradouro</Label>
             <Input
               value={data.logradouro ?? ""}
               onChange={(e) => setData((d) => ({ ...d, logradouro: e.target.value }))}
             />
           </div>
-          <div className="col-span-1 space-y-1">
+          <div className="sm:col-span-1 space-y-1">
             <Label className="text-xs">Número</Label>
             <Input
               value={data.numero ?? ""}
               onChange={(e) => setData((d) => ({ ...d, numero: e.target.value }))}
             />
           </div>
-          <div className="col-span-2 space-y-1">
+          <div className="sm:col-span-2 space-y-1">
             <Label className="text-xs">Complemento</Label>
             <Input
               value={data.complemento ?? ""}
               onChange={(e) => setData((d) => ({ ...d, complemento: e.target.value }))}
             />
           </div>
-          <div className="col-span-2 space-y-1">
+          <div className="sm:col-span-2 space-y-1">
             <Label className="text-xs">Bairro</Label>
             <Input
               value={data.bairro ?? ""}
               onChange={(e) => setData((d) => ({ ...d, bairro: e.target.value }))}
             />
           </div>
-          <div className="col-span-1 space-y-1">
+          <div className="sm:col-span-1 space-y-1">
             <Label className="text-xs">UF</Label>
             <Input
               value={data.estado ?? ""}
@@ -357,7 +357,7 @@ function EnderecoDialog({
               onChange={(e) => setData((d) => ({ ...d, estado: e.target.value.toUpperCase() }))}
             />
           </div>
-          <div className="col-span-3 space-y-1">
+          <div className="sm:col-span-3 space-y-1">
             <Label className="text-xs">Cidade</Label>
             <Input
               value={data.cidade ?? ""}

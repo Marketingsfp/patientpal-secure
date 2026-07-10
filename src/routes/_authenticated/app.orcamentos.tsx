@@ -229,6 +229,7 @@ type Procedimento = {
   valor_cartao_debito: number | null;
   valor_padrao: number | null;
   preparo: string | null;
+  valor_variavel?: boolean | null;
 };
 
 type Item = {
@@ -777,6 +778,7 @@ function NovoOrcamentoDialog({
   const [medicoId, setMedicoId] = useState<string>("");
   const [medicoExterno, setMedicoExterno] = useState(false);
   const [clinicaSolicitante, setClinicaSolicitante] = useState("");
+  const [medicoParticular, setMedicoParticular] = useState(false);
   const [medicos, setMedicos] = useState<MedicoOpt[]>([]);
   const [formasPagamento, setFormasPagamento] = useState<string[]>(["Dinheiro"]);
   const [valoresPagamento, setValoresPagamento] = useState<Record<string, number>>({});
@@ -790,6 +792,7 @@ function NovoOrcamentoDialog({
   const [procQuery, setProcQuery] = useState("");
   const [procResults, setProcResults] = useState<Procedimento[]>([]);
   const [searchingProc, setSearchingProc] = useState(false);
+<<<<<<< HEAD
   const [labProcIds, setLabProcIds] = useState<Set<string> | null>(null);
 
   useEffect(() => {
@@ -812,6 +815,12 @@ function NovoOrcamentoDialog({
       setLabProcIds(new Set((pe ?? []).map((r) => r.procedimento_id as string)));
     })();
   }, [open, clinicaId]);
+=======
+  // Categoria Laboratório é identificada diretamente em `procedimentos`
+  // (tipo_procedimento/grupo) — mesma fonte usada pelo cadastro de Serviços.
+  // Nada de prefetch de IDs: a lista completa (~4.4k) estouraria a URL do
+  // PostgREST no `.in("id", ids)`.
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
 
   useEffect(() => {
     (async () => {
@@ -844,11 +853,20 @@ function NovoOrcamentoDialog({
 
   const alternarMedicoExterno = (externo: boolean) => {
     setMedicoExterno(externo);
+    setMedicoParticular(false);
     if (externo) {
       setMedicoId("");
     } else {
       setClinicaSolicitante("");
     }
+  };
+
+  const ativarParticular = () => {
+    setMedicoParticular(true);
+    setMedicoExterno(false);
+    setMedicoId("");
+    setMedicoNome("");
+    setClinicaSolicitante("");
   };
 
   const selecionarPaciente = (p: PatientOption | null) => {
@@ -862,11 +880,15 @@ function NovoOrcamentoDialog({
 
   useEffect(() => {
     let cancel = false;
+<<<<<<< HEAD
     if (procQuery.trim().length < 2) {
       setProcResults([]);
       return;
     }
     if (categoria && labProcIds == null) return;
+=======
+    if (procQuery.trim().length < 2) { setProcResults([]); return; }
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
     setSearchingProc(true);
     const t = setTimeout(async () => {
       const norm = procQuery
@@ -875,13 +897,18 @@ function NovoOrcamentoDialog({
         .replace(/[\u0300-\u036f]/g, "");
       let q = supabase
         .from("procedimentos")
+<<<<<<< HEAD
         .select(
           "id, nome, valor_dinheiro_pix, valor_cartao, valor_dinheiro, valor_pix, valor_cartao_credito, valor_cartao_debito, valor_padrao, preparo",
         )
+=======
+        .select("id, nome, valor_dinheiro_pix, valor_cartao, valor_dinheiro, valor_pix, valor_cartao_credito, valor_cartao_debito, valor_padrao, preparo, valor_variavel")
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
         .eq("clinica_id", clinicaId)
         .eq("ativo", true)
         .or(`nome.ilike.%${procQuery}%,nome.ilike.%${norm}%`);
       if (categoria === "laboratorio") {
+<<<<<<< HEAD
         const ids = Array.from(labProcIds ?? []);
         if (ids.length === 0) {
           if (!cancel) {
@@ -891,11 +918,11 @@ function NovoOrcamentoDialog({
           return;
         }
         q = q.in("id", ids);
+=======
+        q = q.or("tipo_procedimento.eq.laboratorio,grupo.ilike.%labor%");
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
       } else if (categoria === "demais") {
-        const ids = Array.from(labProcIds ?? []);
-        if (ids.length > 0) {
-          q = q.not("id", "in", `(${ids.join(",")})`);
-        }
+        q = q.not("tipo_procedimento", "eq", "laboratorio").not("grupo", "ilike", "%labor%");
       }
       const { data } = await q.limit(20);
       if (!cancel) {
@@ -903,11 +930,16 @@ function NovoOrcamentoDialog({
         setSearchingProc(false);
       }
     }, 250);
+<<<<<<< HEAD
     return () => {
       cancel = true;
       clearTimeout(t);
     };
   }, [procQuery, clinicaId, categoria, labProcIds]);
+=======
+    return () => { cancel = true; clearTimeout(t); };
+  }, [procQuery, clinicaId, categoria]);
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
 
   const valorPorForma = (p: Procedimento, f: string) => {
     if (f === "Dinheiro")
@@ -1004,6 +1036,9 @@ function NovoOrcamentoDialog({
     if (p.preparo && p.preparo.trim()) {
       toast.warning(`⚠ ${p.nome} exige preparo`, { description: p.preparo, duration: 6000 });
     }
+    if (p.valor_variavel) {
+      toast.info(`${p.nome} tem valor variável — informe o valor cobrado.`, { duration: 6000 });
+    }
     setProcQuery("");
     setProcResults([]);
   };
@@ -1082,9 +1117,19 @@ function NovoOrcamentoDialog({
         categoria,
         paciente_nome: pacienteNome.trim(),
         paciente_telefone: pacienteTelefone.trim() || null,
+<<<<<<< HEAD
         medico_nome: medicoNome.trim() || null,
         medico_externo: medicoExterno,
         clinica_solicitante: medicoExterno ? clinicaSolicitante.trim() || null : null,
+=======
+        medico_nome: medicoParticular ? "Particular" : (medicoNome.trim() || null),
+        medico_externo: medicoParticular ? false : medicoExterno,
+        clinica_solicitante: medicoParticular
+          ? "Particular (sem solicitante)"
+          : medicoExterno
+            ? (clinicaSolicitante.trim() || null)
+            : null,
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
         forma_pagamento: formasPagamento.join(" + "),
         valores_pagamento: valoresPag,
         validade_dias: validade,
@@ -1186,6 +1231,7 @@ function NovoOrcamentoDialog({
               </p>
             </div>
 
+<<<<<<< HEAD
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label>Paciente *</Label>
@@ -1193,6 +1239,48 @@ function NovoOrcamentoDialog({
                   maxLength={120}
                   value={pacienteNome}
                   onChange={(e) => setPacienteNome(e.target.value.replace(/[<>]/g, ""))}
+=======
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-1"><Label>Paciente *</Label><Input maxLength={120} value={pacienteNome} onChange={(e) => setPacienteNome(e.target.value.replace(/[<>]/g, ""))} /></div>
+            <div className="space-y-1"><Label>Telefone</Label><Input maxLength={20} value={pacienteTelefone} onChange={(e) => setPacienteTelefone(e.target.value.replace(/[<>]/g, ""))} /></div>
+            <div className="space-y-1 md:col-span-2">
+              <Label>Médico solicitante</Label>
+               <div className="flex flex-wrap gap-1 rounded-md border p-1 w-fit">
+                <button
+                  type="button"
+                  onClick={() => alternarMedicoExterno(false)}
+                  className={`px-3 py-1 text-sm rounded ${!medicoExterno && !medicoParticular ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                >
+                  Da nossa clínica
+                </button>
+                <button
+                  type="button"
+                  onClick={() => alternarMedicoExterno(true)}
+                  className={`px-3 py-1 text-sm rounded ${medicoExterno && !medicoParticular ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                >
+                  De outro local
+                </button>
+                <button
+                  type="button"
+                  onClick={ativarParticular}
+                  className={`px-3 py-1 text-sm rounded ${medicoParticular ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                >
+                  Particular
+                </button>
+              </div>
+              {medicoParticular ? (
+                <p className="text-xs text-muted-foreground">
+                  Paciente sem médico solicitante — atendimento particular por procura direta.
+                </p>
+              ) : !medicoExterno ? (
+                <SearchableSelect
+                  options={medicoOptions}
+                  value={medicoId}
+                  onChange={selecionarMedico}
+                  placeholder="Selecione o médico..."
+                  searchPlaceholder="Buscar por nome ou CRM..."
+                  emptyText="Nenhum médico cadastrado."
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
                 />
               </div>
               <div className="space-y-1">

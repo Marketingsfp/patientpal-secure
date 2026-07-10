@@ -1,62 +1,13 @@
 import { Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import {
-  Activity,
-  Building2,
-  Users,
-  LayoutDashboard,
-  LogOut,
-  Stethoscope,
-  Bell,
-  DollarSign,
-  CalendarDays,
-  ClipboardList,
-  MessageCircle,
-  Target,
-  Clock,
-  BookOpen,
-  Workflow,
-  FileText,
-  CreditCard,
-  Brain,
-  FileHeart,
-  FlaskConical,
-  BellRing,
-  ShieldCheck,
-  BarChart3,
-  Wallet,
-  ChevronLeft,
-  ChevronRight,
-  ChevronDown,
-  Search,
-  HeartPulse,
-  Contact,
-  ConciergeBell,
-  Briefcase,
-  MapPin,
-  Palmtree,
-  GraduationCap,
-  Sparkles,
-  Filter,
-  Send,
-  Megaphone,
-  KeyRound,
-  BadgeCheck,
-  LayoutGrid,
-  Gift,
-  Zap,
-  Coffee,
-  Play,
-  Eye,
-  ArrowRightLeft,
-  Inbox,
-  HandCoins,
-} from "lucide-react";
+import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet, ChevronLeft, ChevronRight, ChevronDown, Search, HeartPulse, Contact, ConciergeBell, Briefcase, MapPin, Palmtree, GraduationCap, Sparkles, Filter, Send, Megaphone, KeyRound, BadgeCheck, LayoutGrid, Gift, Zap, Coffee, Play, Eye, ArrowRightLeft, Inbox, HandCoins } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
 import { useMedicoContext } from "@/hooks/use-medico-context";
 import { usePermissoes } from "@/hooks/use-permissoes";
+import { ROUTE_TO_MODULE as SHARED_ROUTE_TO_MODULE, moduloDaRota } from "@/lib/permissoes-rotas";
+import { SemPermissao } from "@/components/sem-permissao";
 import { supabase } from "@/integrations/supabase/client";
 import { getSubsystem, setSubsystem, subscribeSubsystem, SUBSYSTEMS } from "@/lib/subsystem";
 import logoSaoFrancisco from "@/assets/logo-sao-francisco.png";
@@ -71,16 +22,16 @@ import type { PerfilKey } from "@/components/menu-v2/menu-catalog";
 function corDaClinica(nome?: string): string {
   const n = (nome ?? "").toLowerCase();
   if (n.includes("são francisco") || n.includes("sao francisco")) return "#006634"; // verde São Francisco
-  if (n.includes("menino jesus")) return "#15274f"; // azul marinho Menino Jesus
-  if (n.includes("consulta hoje")) return "#141395"; // azul Consulta Hoje
+  if (n.includes("menino jesus")) return "#2A4A9C"; // azul Menino Jesus
+  if (n.includes("consulta hoje")) return "#6D28D9"; // roxo Consulta Hoje
   return "hsl(var(--muted-foreground))";
 }
 
 function corHoverDaClinica(nome?: string): string {
   const n = (nome ?? "").toLowerCase();
   if (n.includes("são francisco") || n.includes("sao francisco")) return "#004d27"; // verde escuro
-  if (n.includes("menino jesus")) return "#0d1a36"; // marinho escuro
-  if (n.includes("consulta hoje")) return "#0d0c6b"; // azul escuro
+  if (n.includes("menino jesus")) return "#1E3A7A"; // azul escuro Menino Jesus
+  if (n.includes("consulta hoje")) return "#4C1D95"; // roxo escuro
   return "rgba(0,0,0,0.25)";
 }
 
@@ -128,47 +79,15 @@ type NavItem = NavLeaf | NavParent;
 const isParent = (it: NavItem): it is NavParent => "children" in it;
 
 // Mapeia rota do menu → chave de módulo da tela de Perfis de Acesso.
-// Rotas omitidas aqui são sempre visíveis (não controladas por permissão).
-const ROUTE_TO_MODULE: Record<string, string> = {
-  "/app/agenda": "agenda",
-  "/app/checkin": "checkin",
-  "/app/caixa": "caixa",
-  "/app/financeiro/atendimentos": "financeiro",
-  "/app/chat": "chat",
-  "/app/clientes": "clientes",
-  "/app/painel": "painel",
-  "/app/fluxo": "fluxo",
-  "/app/orcamentos": "orcamentos",
-  "/app/recepcao": "recepcao",
-  "/app/triagem-enfermagem": "triagem-enfermagem",
-  "/app/cartao-beneficios/contratos": "cartao-beneficios",
-  "/app/atendimento-ia": "atendimento-ia",
-  "/app/crm": "crm",
-  "/app/alertas-enfermagem": "alertas-enfermagem",
-  "/app/consulta-rapida": "consulta-rapida",
-  "/app/nina": "nina",
-  "/app/odontologia": "odontologia",
-  "/app/exames-resultados": "exames-resultados",
-  "/app/mkt-leads": "mkt-leads",
-  "/app/equipe": "equipe",
-  "/app/especialidades": "especialidades",
-  "/app/disponibilidades": "disponibilidades",
-  "/app/prontuario-modelos": "prontuario-modelos",
-  "/app/perfis": "perfis",
-  "/app/unidades": "unidades",
-  "/app/hr-ponto": "hr-ponto",
-  "/app/cargos": "cargos",
-  "/app/financeiro": "financeiro",
-  "/app/funcionarios": "funcionarios",
-  "/app/relatorios": "relatorios",
-  "/app/auditoria": "auditoria",
-  "/app/setores": "setores",
-};
+// O mapa vive em src/lib/permissoes-rotas.ts (compartilhado com o guard
+// de rota) — aqui apenas reexportamos para uso local.
+const ROUTE_TO_MODULE = SHARED_ROUTE_TO_MODULE;
 
 function leafAllowed(to: string, allowed: Set<string> | null): boolean {
   if (!allowed) return true;
   const mod = ROUTE_TO_MODULE[to];
-  if (!mod) return true; // rota não mapeada → sempre visível
+  if (mod === null) return true;       // rota livre/sistema
+  if (mod === undefined) return false; // rota não mapeada → ocultar
   return allowed.has(mod);
 }
 
@@ -176,19 +95,19 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
   {
     label: "Operação",
     items: [
-      { to: "/app/agenda", label: "Agenda", icon: CalendarDays },
-      { to: "/app/agenda/express", label: "Agenda Express", icon: Zap },
-      { to: "/app/checkin", label: "Check-in", icon: BadgeCheck },
-      { to: "/app/caixa", label: "Caixa", icon: Wallet },
-      { to: "/app/financeiro/atendimentos", label: "Repasse médico", icon: HandCoins },
-      { to: "/app/chat", label: "Chat interno", icon: MessageCircle },
-      { to: "/app/clientes", label: "Clientes", icon: Contact },
-      { to: "/app/painel", label: "Dashboard", icon: LayoutDashboard },
-      { to: "/app/fluxo", label: "Fluxo do paciente", icon: Workflow },
-      { to: "/app/orcamentos", label: "Orçamentos", icon: FileText },
-      { to: "/app/recepcao", label: "Recepção / Filas", icon: ConciergeBell },
-      { to: "/app/triagem-enfermagem", label: "Triagem - Enfermagem", icon: HeartPulse },
-      { to: "/app/cartao-beneficios/contratos", label: "Cartão Benefícios", icon: CreditCard },
+    { to: "/app/agenda", label: "Agenda", icon: CalendarDays },
+    { to: "/app/agenda/express", label: "Agenda Express", icon: Zap },
+    { to: "/app/checkin", label: "Check-in", icon: BadgeCheck },
+    { to: "/app/caixa", label: "Caixa", icon: Wallet },
+    { to: "/app/financeiro/atendimentos", label: "Repasse médico", icon: HandCoins },
+    { to: "/app/chat", label: "Chat interno", icon: MessageCircle },
+    { to: "/app/clientes", label: "Clientes", icon: Contact },
+    { to: "/app/painel", label: "Dashboard", icon: LayoutDashboard },
+    { to: "/app/fluxo", label: "Fluxo do paciente", icon: Workflow },
+    { to: "/app/orcamentos", label: "Orçamentos", icon: FileText },
+    { to: "/app/recepcao", label: "Recepção / Filas", icon: ConciergeBell },
+    { to: "/app/triagem-enfermagem", label: "Triagem - Enfermagem", icon: HeartPulse },
+    { to: "/app/cartao-beneficios/contratos", label: "Cartão Benefícios", icon: CreditCard },
     ],
   },
   {
@@ -305,7 +224,7 @@ export function AppShell() {
   const { memberships, clinicaAtual, setClinicaAtual, modoTodas, setModoTodas, branding } =
     useClinica();
   const { isMedicoOnly } = useMedicoContext();
-  const { allowed: allowedModules } = usePermissoes();
+  const { allowed: allowedModules, loading: permsLoading } = usePermissoes();
   const { enabled: menuV2Enabled } = useMenuV2Flag();
   const location = useLocation();
   const navigate = useNavigate();
@@ -615,12 +534,23 @@ export function AppShell() {
     );
   }
 
+  // Guarda de rota: bloqueia acesso quando o módulo da rota atual não é
+  // permitido pelo perfil do usuário. Admin (allowedModules === null) passa
+  // por padrão. Enquanto as permissões carregam, mostramos o próprio outlet
+  // para evitar flash de "Acesso negado".
+  const currentModulo = moduloDaRota(location.pathname);
+  const rotaPermitida =
+    allowedModules === null
+    || permsLoading
+    || currentModulo === null
+    || (typeof currentModulo === "string" && allowedModules.has(currentModulo));
+  const guardedOutlet = rotaPermitida
+    ? <Outlet />
+    : <SemPermissao modulo={currentModulo ?? undefined} />;
+
   if (isEmbed) {
     return (
-      <div
-        className="h-screen w-full overflow-auto bg-background"
-        style={{ background: "var(--surface-cream)" }}
-      >
+      <div className="h-screen w-full overflow-auto bg-background" style={{ background: "var(--surface-cream)" }}>
         <Outlet />
       </div>
     );
@@ -628,7 +558,9 @@ export function AppShell() {
 
   return (
     <div className="h-screen flex bg-background overflow-hidden">
-      {!isChooser && useMenuV2 && <MenuV2 perfil={perfilV2} />}
+      {!isChooser && useMenuV2 && (
+        <MenuV2 perfil={perfilV2} />
+      )}
       {!isChooser && !useMenuV2 && (
         <aside
           className={`${collapsed ? "w-16" : "w-64"} transition-all duration-200 shrink-0 text-white h-screen overflow-hidden flex flex-col`}
@@ -872,15 +804,10 @@ export function AppShell() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <p
-              className="text-sm font-medium truncate max-w-[160px]"
-              title={user?.email ?? undefined}
-            >
-              {userName}
-            </p>
+            <p className="text-sm font-medium truncate max-w-[160px]" title={user?.email ?? undefined}>{userName}</p>
           </div>
           {clinicaAtual && logoDaClinica(clinicaAtual.clinica.nome) && (
-            <div className="bg-white rounded-lg shadow-sm border px-2 py-1 flex items-center justify-center shrink-0">
+            <div className="bg-white rounded-lg shadow-sm border px-2 py-1 hidden sm:flex items-center justify-center shrink-0">
               <img
                 src={logoDaClinica(clinicaAtual.clinica.nome)!}
                 alt={clinicaAtual.clinica.nome}
@@ -896,7 +823,7 @@ export function AppShell() {
                 else setClinicaAtual(v);
               }}
             >
-              <SelectTrigger className="w-[260px] h-8 text-xs">
+              <SelectTrigger className="w-full min-w-0 max-w-[260px] sm:w-[220px] md:w-[260px] h-8 text-xs shrink">
                 <SelectValue placeholder="Selecione a clínica" />
               </SelectTrigger>
               <SelectContent>
@@ -929,7 +856,7 @@ export function AppShell() {
             <Button
               variant="ghost"
               size="sm"
-              className="h-9 w-9 p-0 rounded-full"
+              className="hidden sm:inline-flex h-9 w-9 p-0 rounded-full"
               title="Atalhos de teclado (?)"
               onClick={() => {
                 window.dispatchEvent(new KeyboardEvent("keydown", { key: "?" }));
@@ -940,10 +867,7 @@ export function AppShell() {
             <EstornosBell />
           </div>
         </header>
-        <main
-          className="flex-1 px-3 pt-1 pb-3 sm:px-4 sm:pt-1.5 sm:pb-4 lg:px-6 lg:pt-2 lg:pb-6 overflow-auto min-w-0"
-          style={{ background: "var(--surface-cream)" }}
-        >
+        <main className="flex-1 px-3 pt-1 pb-3 sm:px-4 sm:pt-1.5 sm:pb-4 lg:px-6 lg:pt-2 lg:pb-6 overflow-auto min-w-0" style={{ background: "var(--surface-cream)" }}>
           <Outlet />
         </main>
       </div>

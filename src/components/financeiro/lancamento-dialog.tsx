@@ -86,7 +86,7 @@ export function LancamentoDialog({
   const [saving, setSaving] = useState(false);
   const [valorRecebido, setValorRecebido] = useState("");
   const [pagamentoMisto, setPagamentoMisto] = useState(false);
-  const [pagamentos, setPagamentos] = useState<Array<{ forma: string; recebido: string }>>([
+  const [pagamentos, setPagamentos] = useState<Array<{ forma: string; recebido: string; bandeira?: string; parcelas?: string }>>([
     { forma: "dinheiro", recebido: "" },
   ]);
   // ----- Desconto (apenas para gerente/admin/financeiro) -----
@@ -97,11 +97,19 @@ export function LancamentoDialog({
   const [descontoMotivo, setDescontoMotivo] = useState("");
   const [valorOriginal, setValorOriginal] = useState<string>("");
   const [supervisorOpen, setSupervisorOpen] = useState(false);
+<<<<<<< HEAD
   const [supervisorInfo, setSupervisorInfo] = useState<{
     userId: string;
     nome: string;
     role: string;
   } | null>(null);
+=======
+  const [supervisorInfo, setSupervisorInfo] = useState<{ userId: string; nome: string; role: string } | null>(null);
+  // ----- Cortesia (categoria especial: exige justificativa + supervisor) -----
+  const [cortesiaJustificativa, setCortesiaJustificativa] = useState("");
+  // Marca a intenção da autenticação do supervisor: "desconto" | "cortesia"
+  const [authIntent, setAuthIntent] = useState<"desconto" | "cortesia">("desconto");
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
   // Bloqueio: paciente com mensalidade vencida no cartão benefícios.
   // Quando bloqueado, o pagamento só pode ser feito como Particular.
   const [bloqueioCartao, setBloqueioCartao] = useState<{
@@ -121,6 +129,7 @@ export function LancamentoDialog({
     if (initialValor !== undefined) setValor(initialValor);
     if (initialValor !== undefined) setValorOriginal(initialValor);
     // Reseta desconto a cada abertura
+<<<<<<< HEAD
     setDescontoAtivo(false);
     setDescontoTipo("valor");
     setDescontoInput("");
@@ -131,6 +140,23 @@ export function LancamentoDialog({
     setBloqueioCartao(null);
     setTipoAgendamento(null);
     setConvenioNome(null);
+=======
+    setDescontoAtivo(false); setDescontoTipo("valor");
+    setDescontoInput(""); setDescontoAutorizado(""); setDescontoMotivo("");
+    setSupervisorInfo(null); setSupervisorOpen(false);
+    setCortesiaJustificativa(""); setAuthIntent("desconto");
+    setBloqueioCartao(null); setTipoAgendamento(null); setConvenioNome(null);
+    // Reset dos campos de pagamento: evita que estado remanescente de uma
+    // abertura anterior (ex.: linhas mistas sem bandeira, bandeira já
+    // preenchida em outro atendimento) bloqueie o Save do próximo pagamento.
+    setBandeiraCartao("");
+    setParcelas("1");
+    setValorRecebido("");
+    setPagamentoMisto(false);
+    setPagamentos([{ forma: "dinheiro", recebido: "" }]);
+    setEmitirNfse(false);
+    setObservacoes("");
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
     if (initialFormaPagamento !== undefined) {
       if (initialFormaPagamento === "__misto__") {
         setPagamentoMisto(true);
@@ -138,6 +164,8 @@ export function LancamentoDialog({
       } else {
         setFormaPagamento(initialFormaPagamento);
       }
+    } else {
+      setFormaPagamento("");
     }
     (async () => {
       const [{ data: cats }, { data: cs }] = await Promise.all([
@@ -305,6 +333,22 @@ export function LancamentoDialog({
       toast.error("O valor do pagamento deve ser maior que zero.");
       return;
     }
+    // ----- Cortesia: exige justificativa + autorização de supervisor -----
+    const norm0 = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    const catAtual = categorias.find((c) => c.id === categoriaId) ?? null;
+    const ehCortesia = !!(catAtual && norm0(catAtual.nome) === "cortesia");
+    if (ehCortesia) {
+      if (!cortesiaJustificativa.trim()) {
+        toast.error("Informe a justificativa da cortesia.");
+        return;
+      }
+      if (!ehSupervisor && !supervisorInfo) {
+        toast.error("É necessária a autorização de um supervisor para aplicar cortesia.");
+        setAuthIntent("cortesia");
+        setSupervisorOpen(true);
+        return;
+      }
+    }
     // Bloqueio por débito no cartão benefícios — só libera se o pagamento
     // for feito como Particular.
     if (bloqueioCartao?.bloqueado) {
@@ -367,6 +411,7 @@ export function LancamentoDialog({
               .select("id")
               .eq("agendamento_id", agendamentoId)
               .eq("tipo", "receita")
+              .neq("status", "cancelado")
               .limit(1)
               .maybeSingle()
           : Promise.resolve({ data: null }),
@@ -422,6 +467,11 @@ export function LancamentoDialog({
         setSaving(false);
         return;
       }
+      const creditoSemBandeira = validIdx.find(({ p }) => p.forma === "cartao_credito" && !p.bandeira);
+      if (creditoSemBandeira) {
+        toast.error("Selecione a bandeira do cartão em todas as linhas de Cartão Crédito.");
+        setSaving(false); return;
+      }
       const total = validIdx.reduce((s, { i }) => s + linhasCalc[i].pago, 0);
       if (Math.abs(total - valorNum) > 0.01) {
         toast.error(
@@ -431,6 +481,7 @@ export function LancamentoDialog({
         return;
       }
       formaFinal = "misto";
+<<<<<<< HEAD
       obsExtra =
         "Pagamento misto: " +
         validIdx
@@ -443,6 +494,21 @@ export function LancamentoDialog({
             return base;
           })
           .join("; ");
+=======
+      obsExtra = "Pagamento misto: " + validIdx.map(({ p, i }) => {
+        const { pago, troco } = linhasCalc[i];
+        const base = `${FORMAS_LABEL[p.forma] ?? p.forma} ${formatBRL(pago)}`;
+        if (p.forma === "dinheiro" && troco > 0) {
+          return `${base} (recebido ${formatBRL(Number(p.recebido))}, troco ${formatBRL(troco)})`;
+        }
+        if (p.forma === "cartao_credito") {
+          const parc = Number(p.parcelas || 1) || 1;
+          const band = (p.bandeira ?? "").toUpperCase();
+          return `${base} (${band} ${parc}x)`;
+        }
+        return base;
+      }).join("; ");
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
     } else if (formaPagamento === "dinheiro" && recebidoNum > 0) {
       obsExtra = `Recebido ${formatBRL(recebidoNum)}, troco ${formatBRL(trocoDinheiro)}`;
     }
@@ -456,8 +522,17 @@ export function LancamentoDialog({
         `Desconto aplicado: ${tipoTxt} sobre ${formatBRL(origNum)} — Autorizado por: ${descontoAutorizado.trim()}` +
         (descontoMotivo.trim() ? ` — Motivo: ${descontoMotivo.trim()}` : "");
     }
+<<<<<<< HEAD
     const obsFinal =
       [observacoes.trim(), descontoObs, obsExtra].filter(Boolean).join(" | ") || null;
+=======
+    let cortesiaObs = "";
+    if (ehCortesia) {
+      const autor = supervisorInfo?.nome ?? (ehSupervisor ? (user?.email ?? "supervisor") : "");
+      cortesiaObs = `Cortesia — Autorizado por: ${autor} — Justificativa: ${cortesiaJustificativa.trim()}`;
+    }
+    const obsFinal = [observacoes.trim(), cortesiaObs, descontoObs, obsExtra].filter(Boolean).join(" | ") || null;
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
     // Quando vinculado a um agendamento, busca medico_id e paciente_id
     // para que o repasse médico e os relatórios por paciente funcionem.
     let medicoId: string | null = null;
@@ -466,6 +541,7 @@ export function LancamentoDialog({
       medicoId = agPrefetch.medico_id ?? null;
       pacienteId = agPrefetch.paciente_id ?? null;
     }
+<<<<<<< HEAD
     const { data: lancInserido, error } = await supabase
       .from("fin_lancamentos")
       .insert({
@@ -489,6 +565,39 @@ export function LancamentoDialog({
       } as never)
       .select("id")
       .single();
+=======
+    // Quando misto tem linha de Cartão Crédito, propagamos bandeira/parcelas
+    // da primeira linha de crédito para os campos de topo do lançamento
+    // (usados por relatórios e pela impressão da GR).
+    const mistoCredito = pagamentoMisto
+      ? pagamentos.find((p) => p.forma === "cartao_credito" && Number(p.recebido || 0) > 0)
+      : null;
+    const bandeiraFinal = isCredito
+      ? bandeiraCartao
+      : (mistoCredito?.bandeira ?? null);
+    const parcelasFinal = isCredito
+      ? (Number(parcelas) || 1)
+      : (mistoCredito ? (Number(mistoCredito.parcelas || 1) || 1) : null);
+    const { data: lancInserido, error } = await supabase.from("fin_lancamentos").insert({
+      clinica_id: clinicaAtual.clinica_id,
+      tipo,
+      descricao: descricao.trim(),
+      valor: Number(valor),
+      data,
+      categoria_id: categoriaId || null,
+      conta_id: contaId || null,
+      forma_pagamento: formaFinal,
+      bandeira_cartao: bandeiraFinal,
+      parcelas: parcelasFinal,
+      emitir_nfse: emitirNfse,
+      observacoes: obsFinal,
+      status: "confirmado",
+      agendamento_id: agendamentoId ?? null,
+      medico_id: medicoId,
+      paciente_id: pacienteId,
+      criado_por: user?.id ?? null,
+    } as never).select("id").single();
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
     setSaving(false);
     if (error) {
       mostrarErro(error);
@@ -657,12 +766,17 @@ export function LancamentoDialog({
     // Se não houver sessão aberta, abre uma automaticamente com valor 0.
     try {
       if (user?.id && Number(valor) > 0) {
+        // Pode existir mais de uma sessão aberta por histórico — pega a mais recente
+        // em vez de usar maybeSingle() (que retorna erro/null quando há múltiplas)
+        // e acabar abrindo uma nova a cada lançamento.
         let { data: sess } = await supabase
           .from("caixa_sessoes")
           .select("id")
           .eq("clinica_id", clinicaAtual.clinica_id)
           .eq("user_id", user.id)
           .eq("status", "aberto")
+          .order("aberto_em", { ascending: false })
+          .limit(1)
           .maybeSingle();
         if (!sess) {
           const nome = (user.user_metadata as { nome?: string } | null)?.nome ?? user.email ?? null;
@@ -707,8 +821,13 @@ export function LancamentoDialog({
     onSavedWithData?.({
       valor: Number(valor),
       forma_pagamento: formaFinal,
+<<<<<<< HEAD
       parcelas: isCredito ? Number(parcelas) || 1 : null,
       bandeira_cartao: isCredito ? bandeiraCartao : null,
+=======
+      parcelas: parcelasFinal,
+      bandeira_cartao: bandeiraFinal,
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
       emitir_nfse: emitirNfse,
       pagamentos_detalhe: pagamentoMisto
         ? pagamentos
@@ -757,6 +876,7 @@ export function LancamentoDialog({
               </div>
             )}
             <div className="space-y-1.5">
+<<<<<<< HEAD
               <Label>Descrição *</Label>
               <Input
                 value={descricao}
@@ -772,6 +892,45 @@ export function LancamentoDialog({
                   onChange={setValor}
                   disabled={!!initialValor}
                   readOnly={!!initialValor}
+=======
+              <Label>Valor *</Label>
+              <CurrencyInput
+                value={valor}
+                onChange={setValor}
+              />
+              {!!initialValor && (
+                <p className="text-xs text-muted-foreground">Sugerido pelo serviço — editável</p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label>Data</Label>
+              <Input type="date" value={data} onChange={(e) => setData(e.target.value)} />
+            </div>
+          </div>
+          {tipo === "receita" && !!initialValor && (
+            <div className="space-y-2 rounded-md border border-dashed p-3 bg-muted/20">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="aplicar-desconto"
+                  checked={descontoAtivo}
+                  onCheckedChange={(v) => {
+                    if (!v) {
+                      setDescontoAtivo(false);
+                      setSupervisorInfo(null);
+                      setDescontoInput("");
+                      setDescontoAutorizado("");
+                      setDescontoMotivo("");
+                      return;
+                    }
+                    // Supervisores aplicam direto; demais precisam autorização.
+                    if (ehSupervisor) {
+                      setDescontoAtivo(true);
+                    } else {
+                      setAuthIntent("desconto");
+                      setSupervisorOpen(true);
+                    }
+                  }}
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
                 />
                 {!!initialValor && (
                   <p className="text-xs text-muted-foreground">Definido pelo serviço</p>
@@ -814,9 +973,127 @@ export function LancamentoDialog({
                     </span>
                   )}
                 </div>
+<<<<<<< HEAD
                 {descontoAtivo && (
                   <div className="space-y-2">
                     <div className="grid grid-cols-[120px_1fr] gap-2">
+=======
+              )}
+            </div>
+          )}
+          <div className="space-y-1.5">
+            <Label>Categoria</Label>
+            <Select value={categoriaId} onValueChange={setCategoriaId} disabled={!!categoriaFixaNome}>
+              <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+              <SelectContent>
+                {categorias.map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {categoriaFixaNome && !categorias.some((c) => c.id === categoriaId) && (
+              <p className="text-xs text-amber-600">
+                Categoria fixa "{categoriaFixaNome}" não encontrada — cadastre em Financeiro › Categorias.
+              </p>
+            )}
+          </div>
+          {(() => {
+            const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+            const cat = categorias.find((c) => c.id === categoriaId);
+            const ehCortesia = !!(cat && norm(cat.nome) === "cortesia");
+            if (!ehCortesia) return null;
+            return (
+              <div className="space-y-2 rounded-md border border-dashed border-amber-400 p-3 bg-amber-50/40">
+                <div className="flex items-center justify-between gap-2">
+                  <Label className="text-sm font-medium">
+                    Justificativa da cortesia * <span className="text-xs text-muted-foreground">(exige autorização do supervisor)</span>
+                  </Label>
+                  {supervisorInfo && (
+                    <span className="text-xs text-success">✓ Autorizado por {supervisorInfo.nome}</span>
+                  )}
+                </div>
+                <Textarea
+                  rows={2}
+                  value={cortesiaJustificativa}
+                  onChange={(e) => setCortesiaJustificativa(e.target.value)}
+                  placeholder="Ex: paciente encaminhado pela diretoria, retorno gratuito, campanha social..."
+                />
+              </div>
+            );
+          })()}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Conta</Label>
+              <Select value={contaId} onValueChange={setContaId}>
+                <SelectTrigger><SelectValue placeholder="Conta" /></SelectTrigger>
+                <SelectContent>
+                  {contas.map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Forma pgto</Label>
+              <Select
+                value={formaPagamento}
+                onValueChange={(v) => {
+                  setFormaPagamento(v);
+                  if (v !== "cartao_credito") { setBandeiraCartao(""); setParcelas("1"); }
+                  if (v !== "dinheiro") setValorRecebido("");
+                }}
+                disabled={pagamentoMisto}
+              >
+                <SelectTrigger><SelectValue placeholder="Forma" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                  <SelectItem value="pix">Pix</SelectItem>
+                  <SelectItem value="cartao_credito">Cartão Crédito</SelectItem>
+                  <SelectItem value="cartao_debito">Cartão Débito</SelectItem>
+                  <SelectItem value="boleto">Boleto</SelectItem>
+                  <SelectItem value="convenio">Convênio</SelectItem>
+                  <SelectItem value="transferencia">Transferência</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          {!pagamentoMisto && formaPagamento === "dinheiro" && (
+            <div className="grid grid-cols-2 gap-3 rounded-md border bg-muted/30 p-3">
+              <div className="space-y-1.5">
+                <Label>Valor recebido</Label>
+                <CurrencyInput value={valorRecebido} onChange={setValorRecebido} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Troco</Label>
+                <Input value={formatBRL(trocoDinheiro)} disabled readOnly className="font-medium" />
+              </div>
+              {recebidoNum > 0 && recebidoNum < valorNum && (
+                <p className="col-span-2 text-xs text-destructive">
+                  Valor recebido é menor que o total. Faltam {formatBRL(valorNum - recebidoNum)}.
+                </p>
+              )}
+            </div>
+          )}
+          <div className="flex items-center gap-2 rounded-md border p-3">
+            <Checkbox
+              id="pgto-misto"
+              checked={pagamentoMisto}
+              onCheckedChange={(v) => {
+                const on = !!v;
+                setPagamentoMisto(on);
+                if (on) {
+                  setFormaPagamento("");
+                  setBandeiraCartao(""); setParcelas("1"); setValorRecebido("");
+                }
+              }}
+            />
+            <Label htmlFor="pgto-misto" className="cursor-pointer">Dividir em mais de uma forma de pagamento</Label>
+          </div>
+          {pagamentoMisto && (
+            <div className="space-y-2 rounded-md border bg-muted/30 p-3">
+              {pagamentos.map((p, idx) => {
+                const restanteAntes = Math.max(0, valorNum - linhasCalc.slice(0, idx).reduce((s, l) => s + l.pago, 0));
+                const trocoP = linhasCalc[idx].troco;
+                return (
+                  <div key={idx} className="space-y-2 rounded border bg-background p-2">
+                    <div className="grid grid-cols-[1fr_1fr_auto] gap-2 items-end">
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
                       <div className="space-y-1">
                         <Label className="text-xs">Tipo</Label>
                         <Select
@@ -853,6 +1130,7 @@ export function LancamentoDialog({
                         )}
                       </div>
                     </div>
+<<<<<<< HEAD
                     <div className="space-y-1">
                       <Label className="text-xs">Autorizado por *</Label>
                       <Input
@@ -879,6 +1157,54 @@ export function LancamentoDialog({
                         Total: {formatBRL(Math.max(0, origNum - descontoNum))}
                       </span>
                     </div>
+=======
+                    {p.forma === "dinheiro" && trocoP > 0 && (
+                      <div className="text-xs text-muted-foreground">
+                        Troco: <strong>{formatBRL(trocoP)}</strong>
+                      </div>
+                    )}
+                    {p.forma === "cartao_credito" && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Bandeira *</Label>
+                          <Select
+                            value={p.bandeira ?? ""}
+                            onValueChange={(v) => setPagamentos((xs) => xs.map((q, i) => i === idx ? { ...q, bandeira: v } : q))}
+                          >
+                            <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="visa">Visa</SelectItem>
+                              <SelectItem value="mastercard">Mastercard</SelectItem>
+                              <SelectItem value="elo">Elo</SelectItem>
+                              <SelectItem value="amex">American Express</SelectItem>
+                              <SelectItem value="hipercard">Hipercard</SelectItem>
+                              <SelectItem value="diners">Diners</SelectItem>
+                              <SelectItem value="outra">Outra</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Parcelas</Label>
+                          <Select
+                            value={p.parcelas ?? "1"}
+                            onValueChange={(v) => setPagamentos((xs) => xs.map((q, i) => i === idx ? { ...q, parcelas: v } : q))}
+                          >
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => {
+                                const base = Number(p.recebido || 0);
+                                return (
+                                  <SelectItem key={n} value={String(n)}>
+                                    {n}x {n === 1 ? "(à vista)" : `de ${(base / n).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`}
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    )}
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
                   </div>
                 )}
               </div>
@@ -975,6 +1301,7 @@ export function LancamentoDialog({
                 )}
               </div>
             )}
+<<<<<<< HEAD
             <div className="flex items-center gap-2 rounded-md border p-3">
               <Checkbox
                 id="pgto-misto"
@@ -1194,6 +1521,26 @@ export function LancamentoDialog({
           setDescontoAtivo(true);
         }}
       />
+=======
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    <SupervisorAuthDialog
+      open={supervisorOpen}
+      onOpenChange={setSupervisorOpen}
+      acao={authIntent === "cortesia" ? "aplicar cortesia" : "aplicar desconto"}
+      onAuthorized={(info) => {
+        setSupervisorInfo({ userId: info.userId, nome: info.nome, role: info.role });
+        if (authIntent === "cortesia") {
+          // Não ativa desconto; apenas registra a autorização para a cortesia.
+          return;
+        }
+        setDescontoAutorizado(info.nome);
+        setDescontoAtivo(true);
+      }}
+    />
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
     </>
   );
 }

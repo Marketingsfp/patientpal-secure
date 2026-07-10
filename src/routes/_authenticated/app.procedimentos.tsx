@@ -23,12 +23,14 @@ import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { exportToExcel } from "@/lib/export-csv";
+import { invalidateAgendaRefs } from "@/lib/agenda/refs-cache";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -96,6 +98,7 @@ interface Procedimento {
   permite_venda_direta?: boolean | null;
   permite_encaixe?: boolean | null;
   tempo_padrao_min?: number | null;
+  valor_variavel?: boolean | null;
 }
 interface Cartao {
   id: string;
@@ -147,7 +150,7 @@ const EMPTY = {
   preparo: "",
   ativo: true,
   // Regras do procedimento (arquitetura de plataforma — fn_regras_procedimento)
-  fluxo_atendimento: "consulta_padrao",
+  fluxo_atendimento: "consulta_medica",
   agenda_obrigatoria: true,
   medico_obrigatorio: false,
   sala_obrigatoria: false,
@@ -155,6 +158,7 @@ const EMPTY = {
   permite_venda_direta: false,
   permite_encaixe: true,
   tempo_padrao_min: "30",
+  valor_variavel: false,
 };
 
 const EMPTY_CARTAO = { nome: "", descricao: "", percentual_desconto: "0", ativo: true };
@@ -824,11 +828,16 @@ function ProcedimentosPage() {
       ),
       valor_cartao_consulta: String(p.valor_cartao_consulta ?? 0),
       valor_cartao_desconto: String(p.valor_cartao_desconto ?? 0),
+<<<<<<< HEAD
       duracao_minutos: String(p.duracao_minutos),
       observacoes: p.observacoes ?? "",
       preparo: p.preparo ?? "",
       ativo: p.ativo,
       fluxo_atendimento: p.fluxo_atendimento ?? "consulta_padrao",
+=======
+      duracao_minutos: String(p.duracao_minutos), observacoes: p.observacoes ?? "", preparo: p.preparo ?? "", ativo: p.ativo,
+      fluxo_atendimento: p.fluxo_atendimento ?? "consulta_medica",
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
       agenda_obrigatoria: p.agenda_obrigatoria ?? true,
       medico_obrigatorio: p.medico_obrigatorio ?? false,
       sala_obrigatoria: p.sala_obrigatoria ?? false,
@@ -836,6 +845,7 @@ function ProcedimentosPage() {
       permite_venda_direta: p.permite_venda_direta ?? false,
       permite_encaixe: p.permite_encaixe ?? true,
       tempo_padrao_min: String(p.tempo_padrao_min ?? p.duracao_minutos ?? 30),
+      valor_variavel: !!p.valor_variavel,
     });
     setOpen(true);
   };
@@ -843,12 +853,19 @@ function ProcedimentosPage() {
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!clinicaAtual) return;
+<<<<<<< HEAD
     if (!form.nome.trim()) {
       toast.error("Informe o nome.");
       return;
     }
     const vDinheiro = Number(form.valor_dinheiro) || 0;
     const vCartao = Number(form.valor_pix_cartao) || 0;
+=======
+    if (!form.nome.trim()) { toast.error("Informe o nome."); return; }
+    const isVariavel = !!form.valor_variavel;
+    const vDinheiro = isVariavel ? 0 : (Number(form.valor_dinheiro) || 0);
+    const vCartao = isVariavel ? 0 : (Number(form.valor_pix_cartao) || 0);
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
     const payload = {
       clinica_id: clinicaAtual.clinica_id,
       nome: form.nome.trim(),
@@ -862,12 +879,13 @@ function ProcedimentosPage() {
       valor_cartao_credito: vCartao,
       valor_cartao_debito: vCartao,
       valor_cartao: vCartao, // legado
-      valor_cartao_consulta: Number(form.valor_cartao_consulta) || 0,
-      valor_cartao_desconto: Number(form.valor_cartao_desconto) || 0,
+      valor_cartao_consulta: isVariavel ? 0 : (Number(form.valor_cartao_consulta) || 0),
+      valor_cartao_desconto: isVariavel ? 0 : (Number(form.valor_cartao_desconto) || 0),
       duracao_minutos: Math.max(0, Number(form.duracao_minutos) || 0),
       observacoes: form.observacoes.trim() || null,
       preparo: form.preparo.trim() || null,
       ativo: form.ativo,
+      valor_variavel: isVariavel,
       // Regras do procedimento (configuração > código)
       fluxo_atendimento: form.fluxo_atendimento || null,
       agenda_obrigatoria: !!form.agenda_obrigatoria,
@@ -977,6 +995,7 @@ function ProcedimentosPage() {
     setSaving(false);
     toast.success(editing ? "Atualizado." : "Cadastrado.");
     setOpen(false);
+    invalidateAgendaRefs(clinicaAtual.clinica_id);
     void load();
     void loadVincEsp();
     void loadConvValores();
@@ -990,6 +1009,7 @@ function ProcedimentosPage() {
       return;
     }
     toast.success("Excluído.");
+    if (clinicaAtual) invalidateAgendaRefs(clinicaAtual.clinica_id);
     void load();
   };
 
@@ -1351,6 +1371,7 @@ function ProcedimentosPage() {
                     </TableCell>
                     <TableCell className="font-medium">{p.nome}</TableCell>
                     <TableCell className="text-right tabular-nums">
+<<<<<<< HEAD
                       {fmtBRL(Number(p.valor_dinheiro ?? p.valor_dinheiro_pix))}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
@@ -1364,9 +1385,24 @@ function ProcedimentosPage() {
                       )}
                     </TableCell>
                     {convenios.map((c) => {
+=======
+                      {p.valor_variavel
+                        ? <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400">Variável</span>
+                        : fmtBRL(Number(p.valor_dinheiro ?? p.valor_dinheiro_pix))}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {p.valor_variavel
+                        ? <span className="text-muted-foreground">—</span>
+                        : fmtBRL(Number(p.valor_pix ?? p.valor_cartao_credito ?? p.valor_cartao_debito ?? p.valor_cartao))}
+                    </TableCell>
+                    {convenios.map(c => {
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
                       const v = getConvValorExibicao(p, c);
                       return (
                         <TableCell key={c.id} className="text-right tabular-nums">
+                          {p.valor_variavel ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
                           <div className="leading-tight">
                             <div title={`Dinheiro: ${fmtBRL(v.valor_dinheiro)}`}>
                               <span className="text-muted-foreground mr-1">D</span>
@@ -1380,6 +1416,7 @@ function ProcedimentosPage() {
                               {fmtBRL(v.valor_outros)}
                             </div>
                           </div>
+                          )}
                         </TableCell>
                       );
                     })}
@@ -1511,6 +1548,7 @@ function ProcedimentosPage() {
           </DialogHeader>
           <form onSubmit={onSubmit} className="flex flex-col min-h-0 flex-1">
             <div className="space-y-4 overflow-y-auto px-6 py-4 flex-1 min-h-0">
+<<<<<<< HEAD
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1 col-span-2">
                   <Label>Nome *</Label>
@@ -1528,6 +1566,12 @@ function ProcedimentosPage() {
                     placeholder="TUSS"
                   />
                 </div>
+=======
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1 sm:col-span-2">
+                <Label>Nome *</Label>
+                <Input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} required />
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1 col-span-2">
@@ -1580,6 +1624,44 @@ function ProcedimentosPage() {
                   </Select>
                 </div>
               </div>
+<<<<<<< HEAD
+=======
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1 sm:col-span-2">
+                <Label>Especialidade</Label>
+                <Select
+                  value={grupoSelecionadoKey}
+                  onValueChange={(v) => {
+                    const esp = especialidades.find(e => especialidadeKey(e.nome) === v);
+                    setForm({ ...form, grupo: v === "__none__" ? "" : displayEspecialidadeNome(esp?.nome ?? form.grupo) });
+                  }}
+                >
+                  <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Nenhuma</SelectItem>
+                    {form.grupo && !grupoExisteNasEspecialidades && (
+                      <SelectItem value={grupoSelecionadoKey}>{displayEspecialidadeNome(form.grupo)}</SelectItem>
+                    )}
+                    {especialidades.map(e => (
+                      <SelectItem key={e.id} value={especialidadeKey(e.nome)}>{displayEspecialidadeNome(e.nome)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Categoria</Label>
+                <Select value={form.tipo} onValueChange={(v) => setForm({ ...form, tipo: v as Tipo })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {tipos.map(t => (
+                      <SelectItem key={t.id} value={t.nome}>{tipoLabel(t.nome)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
 
               <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
                 <p className="text-xs font-medium text-muted-foreground uppercase">
@@ -1614,8 +1696,47 @@ function ProcedimentosPage() {
                     );
                   })}
                 </div>
+<<<<<<< HEAD
+=======
+            </div>
+
+            <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground uppercase">Valores por forma de pagamento</p>
+                  {form.valor_variavel && (
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      Valor variável ativo — o valor será informado na hora da cobrança.
+                    </p>
+                  )}
+                </div>
+                <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">
+                  <Switch
+                    checked={!!form.valor_variavel}
+                    onCheckedChange={(v) => setForm({ ...form, valor_variavel: !!v })}
+                  />
+                  <span className="font-medium">Valor variável</span>
+                </label>
+              </div>
+              <div className={`grid grid-cols-2 gap-3 ${form.valor_variavel ? "opacity-50 pointer-events-none" : ""}`}>
+                <div className="space-y-1">
+                  <Label>Dinheiro (R$)</Label>
+                  <CurrencyInput value={form.valor_variavel ? "0" : form.valor_dinheiro} disabled={form.valor_variavel}
+                    onChange={(v) => setForm({ ...form, valor_dinheiro: v })} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Pix / Débito / Crédito (R$)</Label>
+                  <CurrencyInput value={form.valor_variavel ? "0" : form.valor_pix_cartao} disabled={form.valor_variavel}
+                    onChange={(v) => setForm({ ...form, valor_pix_cartao: v })} />
+                  <p className="text-[10px] text-muted-foreground">Mesmo valor para Pix, Cartão de Débito e Crédito.</p>
+                </div>
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
               </div>
 
+<<<<<<< HEAD
+=======
+            {convenios.length > 0 && !form.valor_variavel && (
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
               <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
                 <p className="text-xs font-medium text-muted-foreground uppercase">
                   Valores por forma de pagamento
@@ -1810,6 +1931,7 @@ function ProcedimentosPage() {
                   clínica em <strong>Configurações → NFS-e</strong>.
                 </p>
               </div>
+<<<<<<< HEAD
               <div className="space-y-1">
                 <Label>Observações</Label>
                 <Textarea
@@ -1817,6 +1939,36 @@ function ProcedimentosPage() {
                   value={form.observacoes}
                   onChange={(e) => setForm({ ...form, observacoes: e.target.value })}
                 />
+=======
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Fluxo de atendimento</Label>
+                  <Select
+                    value={form.fluxo_atendimento}
+                    onValueChange={(v) => setForm({ ...form, fluxo_atendimento: v })}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="consulta_medica">Consulta padrão (com médico)</SelectItem>
+                      <SelectItem value="exame_agendado">Exame com laudo</SelectItem>
+                      <SelectItem value="equipamento">Exame sem laudo</SelectItem>
+                      <SelectItem value="procedimento_ambulatorial">Procedimento de enfermagem</SelectItem>
+                      <SelectItem value="lab_agendado">Coleta laboratorial</SelectItem>
+                      <SelectItem value="domiciliar">Entrega/retirada domiciliar (MAPA/Holter)</SelectItem>
+                      <SelectItem value="venda_balcao">Venda de balcão</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Duração padrão (min)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={form.tempo_padrao_min}
+                    onChange={(e) => setForm({ ...form, tempo_padrao_min: e.target.value })}
+                  />
+                </div>
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
               </div>
               <div className="space-y-1">
                 <Label>Preparo do exame</Label>

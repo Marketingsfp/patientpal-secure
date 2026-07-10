@@ -90,6 +90,7 @@ function ModelosDocPage() {
       })}
       renderForm={(f, set) => (
         <div className="space-y-3">
+<<<<<<< HEAD
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1 col-span-2">
               <Label>Nome *</Label>
@@ -112,6 +113,14 @@ function ModelosDocPage() {
                     </SelectItem>
                   ))}
                 </SelectContent>
+=======
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="space-y-1 sm:col-span-2"><Label>Nome *</Label><Input required value={f.nome} onChange={e => set({ ...f, nome: e.target.value })} /></div>
+            <div className="space-y-1"><Label>Tipo</Label>
+              <Select value={f.tipo} onValueChange={v => set({ ...f, tipo: v as Tipo })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{(Object.keys(TIPO_LABEL) as Tipo[]).map(t => <SelectItem key={t} value={t}>{TIPO_LABEL[t]}</SelectItem>)}</SelectContent>
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
               </Select>
             </div>
           </div>

@@ -286,8 +286,8 @@ function EnfermagemRecursosPage() {
             <DialogTitle>{editingId ? "Editar recurso" : "Novo recurso"}</DialogTitle>
           </DialogHeader>
           <form onSubmit={submit} className="space-y-4">
-            <div className="grid grid-cols-3 gap-3">
-              <div className="col-span-2 space-y-1">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="sm:col-span-2 space-y-1">
                 <Label>Nome *</Label>
                 <Input
                   value={form.nome}

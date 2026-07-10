@@ -3,6 +3,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { z } from "zod";
 
+<<<<<<< HEAD
 const ROLES = [
   "admin",
   "gestor",
@@ -12,6 +13,9 @@ const ROLES = [
   "caixa",
   "financeiro",
 ] as const;
+=======
+const ROLES = ["admin", "gestor", "medico", "enfermeiro", "recepcao", "caixa", "financeiro", "supervisor"] as const;
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
 
 async function assertManager(userId: string, clinicaId: string) {
   const { data, error } = await supabaseAdmin.rpc("can_manage_clinica", {

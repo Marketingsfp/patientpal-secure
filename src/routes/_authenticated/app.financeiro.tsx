@@ -1,5 +1,6 @@
 import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
 import {
+<<<<<<< HEAD
   LayoutDashboard,
   ArrowLeftRight,
   BarChart3,
@@ -14,6 +15,11 @@ import {
   Wallet,
   Sparkles,
   AlertTriangle,
+=======
+  LayoutDashboard, ArrowLeftRight, BarChart3, LineChart, Stethoscope,
+  Building, FileText, FileBarChart, PieChart, Bell, Tag, Wallet,
+  Sparkles, AlertTriangle, Undo2, ScrollText,
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
 } from "lucide-react";
 import { useMedicoContext } from "@/hooks/use-medico-context";
 
@@ -28,6 +34,8 @@ const subnav = [
   { to: "/app/financeiro/bi", label: "BI", icon: BarChart3 },
   { to: "/app/financeiro/analitico", label: "Analítico", icon: LineChart },
   { to: "/app/financeiro/atendimentos", label: "Atendimentos", icon: Stethoscope },
+  { to: "/app/financeiro/laudos-ecg", label: "Laudos ECG", icon: ScrollText },
+  { to: "/app/financeiro/estorno", label: "Estorno", icon: Undo2 },
   { to: "/app/financeiro/empresas", label: "Empresas", icon: Building },
   { to: "/app/financeiro/notas", label: "Notas Pacientes", icon: FileText },
   { to: "/app/financeiro/relatorios", label: "Relatórios", icon: FileBarChart },

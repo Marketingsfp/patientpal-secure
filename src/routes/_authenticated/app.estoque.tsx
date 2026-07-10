@@ -107,6 +107,7 @@ function EstoquePage() {
       })}
       renderForm={(f, set) => (
         <div className="space-y-3">
+<<<<<<< HEAD
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1 col-span-2">
               <Label>Nome *</Label>
@@ -149,6 +150,17 @@ function EstoquePage() {
                 onChange={(v) => set({ ...f, custo_unitario: v })}
               />
             </div>
+=======
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="space-y-1 sm:col-span-2"><Label>Nome *</Label><Input required value={f.nome} onChange={e => set({ ...f, nome: e.target.value })} /></div>
+            <div className="space-y-1"><Label>Código</Label><Input value={f.codigo} onChange={e => set({ ...f, codigo: e.target.value })} /></div>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="space-y-1"><Label>Unidade</Label><Input value={f.unidade} onChange={e => set({ ...f, unidade: e.target.value })} /></div>
+            <div className="space-y-1"><Label>Estoque atual</Label><Input type="number" value={f.estoque_atual} onChange={e => set({ ...f, estoque_atual: e.target.value })} /></div>
+            <div className="space-y-1"><Label>Mínimo</Label><Input type="number" value={f.estoque_minimo} onChange={e => set({ ...f, estoque_minimo: e.target.value })} /></div>
+            <div className="space-y-1"><Label>Custo (R$)</Label><CurrencyInput value={f.custo_unitario} onChange={(v) => set({ ...f, custo_unitario: v })} /></div>
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
           </div>
           <div className="space-y-1">
             <Label>Observações</Label>

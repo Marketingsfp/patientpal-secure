@@ -1,14 +1,33 @@
 import { useState } from "react";
+<<<<<<< HEAD
 import { ChevronDown, ChevronRight, ArrowUpRight, CalendarClock, DollarSign } from "lucide-react";
+=======
+import {
+  ChevronDown, ChevronRight, ArrowUpRight, CalendarClock, DollarSign, Stethoscope,
+  MoreHorizontal, Check, LogIn, ClipboardCheck, XCircle, UserX,
+} from "lucide-react";
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
+<<<<<<< HEAD
   TIPO_SESSAO_ESTILO,
   TIPO_SESSAO_LABEL,
   type TipoSessao,
 } from "@/lib/agenda-v2/session-detect";
+=======
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { TIPO_SESSAO_ESTILO, TIPO_SESSAO_LABEL, type TipoSessao } from "@/lib/agenda-v2/session-detect";
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
 import { HhpChip } from "@/design-system/hhp";
+import type { StatusAgendamento } from "@/lib/agenda/status-agendamento.functions";
 
 // Chips de status — tom baixo, editorial.
 const STATUS_LABEL: Record<string, string> = {
@@ -24,8 +43,11 @@ const STATUS_DOT: Record<string, string> = {
   confirmado: "bg-blue-400",
   em_atendimento: "bg-indigo-500",
   realizado: "bg-emerald-500",
-  cancelado: "bg-rose-400",
-  faltou: "bg-rose-400",
+  // Cancelado (paciente/clínica cancelou) e Faltou (no-show) precisam
+  // ser visualmente distintos — impacto financeiro/jurídico diferente
+  // (cobrança de multa, retorno de crédito etc.). Sprint 1 · S1-C.
+  cancelado: "bg-rose-500",
+  faltou: "bg-amber-500",
 };
 
 export interface SessionItem {
@@ -89,7 +111,7 @@ function JourneyBar({
               "flex-1 rounded-full transition-all",
               s.done
                 ? current && i === lastDone
-                  ? "bg-indigo-500"
+                  ? "bg-[var(--clinic-accent)]"
                   : "bg-emerald-400/80"
                 : "bg-slate-200/60",
             )}
@@ -115,10 +137,22 @@ export type SessionDensity = "confortavel" | "compacto" | "foco";
 export function SessionCard({
   data,
   onOpenTimeline,
+  onChangeStatus,
+  onOpenProntuario,
+  onReagendar,
   density = "confortavel",
 }: {
   data: SessionCardData;
   onOpenTimeline: (pacoteId: string) => void;
+  onChangeStatus?: (data: SessionCardData, novoStatus: StatusAgendamento) => void;
+  /**
+   * Sprint 3 · S3-A — abre o prontuário/atendimento IA para o
+   * primeiro agendamento da sessão. Reusa a rota já existente
+   * `/app/atendimento-ia/$agendamentoId` (mesma da Agenda Express).
+   */
+  onOpenProntuario?: (agendamentoId: string) => void;
+  /** Sprint 3 · S3-C — abre o modal de reagendamento desta sessão. */
+  onReagendar?: (data: SessionCardData) => void;
   density?: SessionDensity;
 }) {
   const [open, setOpen] = useState(false);
@@ -169,13 +203,21 @@ export function SessionCard({
   return (
     <div
       className={cn(
+<<<<<<< HEAD
         "group relative bg-white border border-slate-200/70 transition-all",
         "hover:border-slate-300 hover:shadow-[0_4px_20px_-8px_rgba(15,23,42,0.08)]",
         dim.radius,
         dim.padY,
         dim.padX,
         isCurrent && "ring-1 ring-indigo-300/70 shadow-[0_0_0_4px_rgba(99,102,241,0.06)]",
+=======
+        "group relative bg-white border-[1.5px] border-[color:var(--hhp-card-border-strong)] transition-all",
+        "hover:border-[color:var(--clinic-accent)]",
+        dim.radius, dim.padY, dim.padX,
+        isCurrent && "ring-2 shadow-[0_0_0_4px_var(--clinic-accent-glow)]",
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
       )}
+      style={isCurrent ? { boxShadow: "0 0 0 4px var(--clinic-accent-glow)", borderColor: "var(--clinic-accent)" } : undefined}
     >
       <div className={cn("flex items-center", dim.gap)}>
         {/* Foto do paciente — protagonista */}
@@ -217,7 +259,7 @@ export function SessionCard({
                 "block max-w-full truncate text-left font-semibold text-slate-900 hover:text-slate-700",
                 dim.name,
               )}
-              style={{ fontFamily: "'Inter Tight', Inter, sans-serif", letterSpacing: "-0.01em" }}
+              style={{ fontFamily: "var(--hhp-font-display)", letterSpacing: "-0.015em" }}
               onClick={() => onOpenTimeline(data.pacote_id)}
             >
               {data.paciente_nome}
@@ -328,14 +370,20 @@ export function SessionCard({
             label="Abrir"
             onClick={() => onOpenTimeline(data.pacote_id)}
           />
+          {onOpenProntuario && data.items[0] && (
+            <QuickAction
+              icon={<Stethoscope className="h-3 w-3" />}
+              label="Prontuário"
+              onClick={() => onOpenProntuario(data.items[0].id)}
+            />
+          )}
           <QuickAction
             icon={<CalendarClock className="h-3 w-3" />}
             label="Reagendar"
-            onClick={() =>
-              toast.info("Reagendar", {
-                description: "Fluxo será conectado na Fase E (wizard).",
-              })
-            }
+            onClick={() => {
+              if (onReagendar) onReagendar(data);
+              else toast.info("Reagendar", { description: "Sprint dedicada de reagendamento — em breve." });
+            }}
           />
           <QuickAction
             icon={<DollarSign className="h-3 w-3" />}
@@ -346,6 +394,9 @@ export function SessionCard({
               })
             }
           />
+          {onChangeStatus && (
+            <StatusMenu data={data} onChangeStatus={onChangeStatus} />
+          )}
         </div>
       )}
 
@@ -392,3 +443,77 @@ function QuickAction({
     </button>
   );
 }
+<<<<<<< HEAD
+=======
+
+// Sprint 2 · S2-A — menu de mudança de status, espelhando as transições
+// disponíveis na Agenda clássica (dropdown do card, `mudarStatus`).
+function StatusMenu({
+  data,
+  onChangeStatus,
+}: {
+  data: SessionCardData;
+  onChangeStatus: (data: SessionCardData, novoStatus: StatusAgendamento) => void;
+}) {
+  const s = data.status;
+  const podeConfirmar = s === "agendado";
+  const podeCheckin = s === "agendado" || s === "confirmado";
+  const podeRealizar = s === "agendado" || s === "confirmado" || s === "em_atendimento";
+  const podeCancelar = s !== "cancelado" && s !== "realizado";
+  const podeFaltou = s !== "faltou" && s !== "cancelado" && s !== "realizado";
+  const semAcoes = !podeConfirmar && !podeCheckin && !podeRealizar && !podeCancelar && !podeFaltou;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            "inline-flex items-center justify-center h-7 w-7 rounded-lg",
+            "bg-white/95 backdrop-blur-sm border border-slate-200/70 shadow-sm",
+            "text-slate-600 hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-colors",
+          )}
+          aria-label="Alterar status"
+          disabled={semAcoes}
+        >
+          <MoreHorizontal className="h-3.5 w-3.5" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-52">
+        <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-slate-400">
+          Alterar status
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {podeConfirmar && (
+          <DropdownMenuItem onClick={() => onChangeStatus(data, "confirmado")}>
+            <Check className="h-3.5 w-3.5 mr-2 text-blue-500" /> Confirmar
+          </DropdownMenuItem>
+        )}
+        {podeCheckin && (
+          <DropdownMenuItem onClick={() => onChangeStatus(data, "em_atendimento")}>
+            <LogIn className="h-3.5 w-3.5 mr-2 text-indigo-500" /> Check-in
+          </DropdownMenuItem>
+        )}
+        {podeRealizar && (
+          <DropdownMenuItem onClick={() => onChangeStatus(data, "realizado")}>
+            <ClipboardCheck className="h-3.5 w-3.5 mr-2 text-emerald-500" /> Realizar
+          </DropdownMenuItem>
+        )}
+        {(podeCancelar || podeFaltou) && <DropdownMenuSeparator />}
+        {podeFaltou && (
+          <DropdownMenuItem onClick={() => onChangeStatus(data, "faltou")}>
+            <UserX className="h-3.5 w-3.5 mr-2 text-amber-500" /> Faltou
+          </DropdownMenuItem>
+        )}
+        {podeCancelar && (
+          <DropdownMenuItem
+            onClick={() => onChangeStatus(data, "cancelado")}
+            className="text-rose-600 focus:text-rose-700"
+          >
+            <XCircle className="h-3.5 w-3.5 mr-2" /> Cancelar
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b

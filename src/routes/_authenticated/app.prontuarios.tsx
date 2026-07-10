@@ -120,8 +120,8 @@ function ProntuariosPage() {
       })}
       renderForm={(f, set) => (
         <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1 col-span-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="space-y-1 sm:col-span-2">
               <Label>Paciente *</Label>
               <PatientSearchInput
                 value={

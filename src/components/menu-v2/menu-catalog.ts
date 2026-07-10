@@ -33,6 +33,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import {
+<<<<<<< HEAD
   Zap,
   LogIn,
   Workflow,
@@ -41,6 +42,10 @@ import {
   Sparkles,
   Bell,
   FileSignature,
+=======
+  Zap, LogIn, Workflow, ListChecks, Brain, Sparkles, Bell, FileSignature,
+  TrendingUp, HardDrive,
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
 } from "lucide-react";
 
 export type MenuItem = {
@@ -65,7 +70,7 @@ export const CENTROS: Centro[] = [
     icon: HeartPulse,
     items: [
       { path: "/app/agenda", label: "Agenda", icon: CalendarDays, modulo: "agenda" },
-      { path: "/app/agenda/express", label: "Agenda Express", icon: Zap, modulo: "agenda" },
+      { path: "/app/atendimento-multiplo", label: "Atendimento Múltiplo", icon: ListChecks },
       { path: "/app/checkin", label: "Check-in", icon: LogIn },
       { path: "/app/fluxo", label: "Fluxo", icon: Workflow },
       { path: "/app/recepcao", label: "Recepção / Filas", icon: ListChecks },
@@ -89,7 +94,6 @@ export const CENTROS: Centro[] = [
     icon: Wallet,
     items: [
       { path: "/app/caixa", label: "Caixa", icon: Wallet, modulo: "caixa" },
-      { path: "/app/orcamentos", label: "Orçamentos", icon: FileSignature },
       { path: "/app/boletos", label: "Boletos", icon: FileText },
       { path: "/app/nfse", label: "NFS-e", icon: Receipt },
       {
@@ -145,7 +149,6 @@ export const CENTROS: Centro[] = [
       { path: "/app/atendimento-ia", label: "Atendimento IA", icon: Sparkles },
       { path: "/app/consulta-rapida", label: "Consulta Rápida", icon: Zap },
       { path: "/app/alertas-enfermagem", label: "Alertas Enfermagem", icon: Bell },
-      { path: "/app/nina", label: "Nina / WhatsApp", icon: Send },
     ],
   },
   {
@@ -153,6 +156,7 @@ export const CENTROS: Centro[] = [
     label: "Gestão",
     icon: LayoutDashboard,
     items: [
+      { path: "/app/painel-executivo", label: "Painel de Indicadores", icon: TrendingUp },
       { path: "/app/painel", label: "Dashboard", icon: LayoutDashboard, modulo: "painel" },
       { path: "/app/relatorios", label: "Relatórios", icon: BarChart3 },
       { path: "/app/crm", label: "CRM", icon: Target, modulo: "crm" },
@@ -160,6 +164,7 @@ export const CENTROS: Centro[] = [
       { path: "/app/campanhas", label: "Campanhas", icon: Send },
       { path: "/app/lgpd", label: "LGPD", icon: ShieldCheck },
       { path: "/app/auditoria", label: "Auditoria", icon: ShieldCheck },
+      { path: "/app/backups", label: "Backups Diários", icon: HardDrive },
       { path: "/app/estoque", label: "Estoque", icon: LayoutGrid },
     ],
   },
@@ -209,11 +214,11 @@ export const PERFIL_DEFAULTS: Record<PerfilKey, { pinned: string[]; centros: str
     centros: ["financeiro", "gestao"],
   },
   gestor: {
-    pinned: ["/app/painel", "/app/relatorios", "/app/agenda", "/app/orcamentos"],
+    pinned: ["/app/painel-executivo", "/app/painel", "/app/relatorios", "/app/agenda"],
     centros: ["atendimento", "financeiro", "cartao", "clinico", "inteligencia", "gestao"],
   },
   admin: {
-    pinned: ["/app/painel", "/app/clinicas", "/app/equipe"],
+    pinned: ["/app/painel-executivo", "/app/painel", "/app/clinicas", "/app/equipe"],
     centros: ["atendimento", "financeiro", "cartao", "clinico", "inteligencia", "gestao", "config"],
   },
 };

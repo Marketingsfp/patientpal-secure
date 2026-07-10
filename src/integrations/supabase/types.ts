@@ -312,6 +312,7 @@ export type Database = {
       };
       agendamentos: {
         Row: {
+<<<<<<< HEAD
           agenda_id: string | null;
           clinica_id: string;
           created_at: string;
@@ -401,6 +402,109 @@ export type Database = {
           token_publico?: string | null;
           updated_at?: string;
         };
+=======
+          agenda_id: string | null
+          atendimento_grupo_id: string | null
+          clinica_id: string
+          created_at: string
+          criado_por: string | null
+          data_pagamento: string | null
+          enfermagem_recurso_id: string | null
+          especialidade_id: string | null
+          executado_em: string | null
+          executado_por: string | null
+          ficha_numero: number | null
+          fim: string
+          fluxo_atualizado_em: string
+          fluxo_etapa: Database["public"]["Enums"]["fluxo_etapa"]
+          forma_pagamento_prevista: string | null
+          id: string
+          inicio: string
+          link_teleconsulta: string | null
+          medico_id: string | null
+          observacoes: string | null
+          orcamento_id: string | null
+          orcamento_item_id: string | null
+          paciente_id: string | null
+          paciente_nome: string
+          pacote_id: string | null
+          prioridade: Database["public"]["Enums"]["agendamento_prioridade"]
+          procedimento: string | null
+          status: Database["public"]["Enums"]["agendamento_status"]
+          teleconsulta: boolean
+          tipo_atendimento: string
+          token_publico: string | null
+          updated_at: string
+        }
+        Insert: {
+          agenda_id?: string | null
+          atendimento_grupo_id?: string | null
+          clinica_id: string
+          created_at?: string
+          criado_por?: string | null
+          data_pagamento?: string | null
+          enfermagem_recurso_id?: string | null
+          especialidade_id?: string | null
+          executado_em?: string | null
+          executado_por?: string | null
+          ficha_numero?: number | null
+          fim: string
+          fluxo_atualizado_em?: string
+          fluxo_etapa?: Database["public"]["Enums"]["fluxo_etapa"]
+          forma_pagamento_prevista?: string | null
+          id?: string
+          inicio: string
+          link_teleconsulta?: string | null
+          medico_id?: string | null
+          observacoes?: string | null
+          orcamento_id?: string | null
+          orcamento_item_id?: string | null
+          paciente_id?: string | null
+          paciente_nome: string
+          pacote_id?: string | null
+          prioridade?: Database["public"]["Enums"]["agendamento_prioridade"]
+          procedimento?: string | null
+          status?: Database["public"]["Enums"]["agendamento_status"]
+          teleconsulta?: boolean
+          tipo_atendimento?: string
+          token_publico?: string | null
+          updated_at?: string
+        }
+        Update: {
+          agenda_id?: string | null
+          atendimento_grupo_id?: string | null
+          clinica_id?: string
+          created_at?: string
+          criado_por?: string | null
+          data_pagamento?: string | null
+          enfermagem_recurso_id?: string | null
+          especialidade_id?: string | null
+          executado_em?: string | null
+          executado_por?: string | null
+          ficha_numero?: number | null
+          fim?: string
+          fluxo_atualizado_em?: string
+          fluxo_etapa?: Database["public"]["Enums"]["fluxo_etapa"]
+          forma_pagamento_prevista?: string | null
+          id?: string
+          inicio?: string
+          link_teleconsulta?: string | null
+          medico_id?: string | null
+          observacoes?: string | null
+          orcamento_id?: string | null
+          orcamento_item_id?: string | null
+          paciente_id?: string | null
+          paciente_nome?: string
+          pacote_id?: string | null
+          prioridade?: Database["public"]["Enums"]["agendamento_prioridade"]
+          procedimento?: string | null
+          status?: Database["public"]["Enums"]["agendamento_status"]
+          teleconsulta?: boolean
+          tipo_atendimento?: string
+          token_publico?: string | null
+          updated_at?: string
+        }
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
         Relationships: [
           {
             foreignKeyName: "agendamentos_agenda_id_fkey";
@@ -417,11 +521,26 @@ export type Database = {
             referencedColumns: ["id"];
           },
           {
+<<<<<<< HEAD
             foreignKeyName: "agendamentos_medico_id_fkey";
             columns: ["medico_id"];
             isOneToOne: false;
             referencedRelation: "medicos";
             referencedColumns: ["id"];
+=======
+            foreignKeyName: "agendamentos_especialidade_id_fkey"
+            columns: ["especialidade_id"]
+            isOneToOne: false
+            referencedRelation: "especialidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agendamentos_medico_id_fkey"
+            columns: ["medico_id"]
+            isOneToOne: false
+            referencedRelation: "medicos"
+            referencedColumns: ["id"]
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
           },
           {
             foreignKeyName: "agendamentos_orcamento_id_fkey";
@@ -1398,6 +1517,7 @@ export type Database = {
           user_id?: string | null;
         };
         Update: {
+<<<<<<< HEAD
           action?: string;
           clinica_id?: string | null;
           created_at?: string;
@@ -1413,6 +1533,76 @@ export type Database = {
         };
         Relationships: [];
       };
+=======
+          action?: string
+          clinica_id?: string | null
+          created_at?: string
+          dados_antes?: Json | null
+          dados_depois?: Json | null
+          id?: string
+          ip_address?: unknown
+          record_id?: string | null
+          table_name?: string
+          user_agent?: string | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      backup_execucoes: {
+        Row: {
+          arquivos: number | null
+          bytes: number | null
+          clinica_id: string | null
+          created_at: string
+          data_ref: string
+          erro: string | null
+          finalizado_em: string | null
+          id: string
+          iniciado_em: string
+          status: string
+          tabelas: number | null
+          updated_at: string
+        }
+        Insert: {
+          arquivos?: number | null
+          bytes?: number | null
+          clinica_id?: string | null
+          created_at?: string
+          data_ref: string
+          erro?: string | null
+          finalizado_em?: string | null
+          id?: string
+          iniciado_em?: string
+          status?: string
+          tabelas?: number | null
+          updated_at?: string
+        }
+        Update: {
+          arquivos?: number | null
+          bytes?: number | null
+          clinica_id?: string | null
+          created_at?: string
+          data_ref?: string
+          erro?: string | null
+          finalizado_em?: string | null
+          id?: string
+          iniciado_em?: string
+          status?: string
+          tabelas?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "backup_execucoes_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
       boletos: {
         Row: {
           banco: string | null;
@@ -1499,6 +1689,7 @@ export type Database = {
       };
       caixa_movimentos: {
         Row: {
+<<<<<<< HEAD
           clinica_id: string;
           created_at: string;
           descricao: string | null;
@@ -1534,6 +1725,49 @@ export type Database = {
           user_id?: string;
           valor?: number;
         };
+=======
+          clinica_id: string
+          created_at: string
+          descricao: string | null
+          destino_nome: string | null
+          destino_user_id: string | null
+          forma_pagamento: string | null
+          id: string
+          lancamento_id: string | null
+          sessao_id: string
+          tipo: Database["public"]["Enums"]["caixa_mov_tipo"]
+          user_id: string
+          valor: number
+        }
+        Insert: {
+          clinica_id: string
+          created_at?: string
+          descricao?: string | null
+          destino_nome?: string | null
+          destino_user_id?: string | null
+          forma_pagamento?: string | null
+          id?: string
+          lancamento_id?: string | null
+          sessao_id: string
+          tipo: Database["public"]["Enums"]["caixa_mov_tipo"]
+          user_id: string
+          valor?: number
+        }
+        Update: {
+          clinica_id?: string
+          created_at?: string
+          descricao?: string | null
+          destino_nome?: string | null
+          destino_user_id?: string | null
+          forma_pagamento?: string | null
+          id?: string
+          lancamento_id?: string | null
+          sessao_id?: string
+          tipo?: Database["public"]["Enums"]["caixa_mov_tipo"]
+          user_id?: string
+          valor?: number
+        }
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
         Relationships: [
           {
             foreignKeyName: "caixa_movimentos_sessao_id_fkey";
@@ -3125,6 +3359,7 @@ export type Database = {
       };
       fin_atendimentos: {
         Row: {
+<<<<<<< HEAD
           clinica_id: string;
           created_at: string;
           data: string;
@@ -3217,6 +3452,103 @@ export type Database = {
           valor_medico?: number;
           valor_total?: number;
         };
+=======
+          clinica_id: string
+          created_at: string
+          data: string
+          forma_pagamento: string | null
+          id: string
+          lancamento_id: string | null
+          laudo_de_atendimento_id: string | null
+          laudo_emitido_em: string | null
+          laudo_lancamento_id: string | null
+          laudo_status: string | null
+          medico_id: string | null
+          medico_laudador_id: string | null
+          nfse_id: string | null
+          observacoes: string | null
+          orcamento_item_id: string | null
+          paciente_id: string | null
+          procedimento: string | null
+          repasse_conta_id: string | null
+          repasse_forma_pagamento: string | null
+          repasse_lancamento_id: string | null
+          repasse_pago: boolean
+          repasse_pago_at: string | null
+          repasse_pago_em: string | null
+          repasse_pago_por: string | null
+          status: string
+          updated_at: string
+          valor_clinica: number
+          valor_laudo: number
+          valor_medico: number
+          valor_total: number
+        }
+        Insert: {
+          clinica_id: string
+          created_at?: string
+          data?: string
+          forma_pagamento?: string | null
+          id?: string
+          lancamento_id?: string | null
+          laudo_de_atendimento_id?: string | null
+          laudo_emitido_em?: string | null
+          laudo_lancamento_id?: string | null
+          laudo_status?: string | null
+          medico_id?: string | null
+          medico_laudador_id?: string | null
+          nfse_id?: string | null
+          observacoes?: string | null
+          orcamento_item_id?: string | null
+          paciente_id?: string | null
+          procedimento?: string | null
+          repasse_conta_id?: string | null
+          repasse_forma_pagamento?: string | null
+          repasse_lancamento_id?: string | null
+          repasse_pago?: boolean
+          repasse_pago_at?: string | null
+          repasse_pago_em?: string | null
+          repasse_pago_por?: string | null
+          status?: string
+          updated_at?: string
+          valor_clinica?: number
+          valor_laudo?: number
+          valor_medico?: number
+          valor_total?: number
+        }
+        Update: {
+          clinica_id?: string
+          created_at?: string
+          data?: string
+          forma_pagamento?: string | null
+          id?: string
+          lancamento_id?: string | null
+          laudo_de_atendimento_id?: string | null
+          laudo_emitido_em?: string | null
+          laudo_lancamento_id?: string | null
+          laudo_status?: string | null
+          medico_id?: string | null
+          medico_laudador_id?: string | null
+          nfse_id?: string | null
+          observacoes?: string | null
+          orcamento_item_id?: string | null
+          paciente_id?: string | null
+          procedimento?: string | null
+          repasse_conta_id?: string | null
+          repasse_forma_pagamento?: string | null
+          repasse_lancamento_id?: string | null
+          repasse_pago?: boolean
+          repasse_pago_at?: string | null
+          repasse_pago_em?: string | null
+          repasse_pago_por?: string | null
+          status?: string
+          updated_at?: string
+          valor_clinica?: number
+          valor_laudo?: number
+          valor_medico?: number
+          valor_total?: number
+        }
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
         Relationships: [
           {
             foreignKeyName: "fin_atendimentos_lancamento_id_fkey";
@@ -3392,6 +3724,7 @@ export type Database = {
       };
       fin_lancamentos: {
         Row: {
+<<<<<<< HEAD
           agendamento_id: string | null;
           bandeira_cartao: string | null;
           categoria_id: string | null;
@@ -3496,6 +3829,121 @@ export type Database = {
           valor?: number;
           valor_laudo?: number;
         };
+=======
+          agendamento_id: string | null
+          bandeira_cartao: string | null
+          categoria_id: string | null
+          clinica_id: string
+          conta_id: string | null
+          created_at: string
+          criado_por: string | null
+          data: string
+          data_vencimento: string | null
+          descricao: string
+          emitir_nfse: boolean
+          empresa_id: string | null
+          forma_pagamento: string | null
+          grupo_pagamento_id: string | null
+          id: string
+          laudo_emitido_em: string | null
+          laudo_lancamento_id: string | null
+          laudo_lote_id: string | null
+          laudo_status: string | null
+          medico_id: string | null
+          medico_laudador_id: string | null
+          observacoes: string | null
+          paciente_id: string | null
+          parcelas: number | null
+          repasse_conta_id: string | null
+          repasse_forma_pagamento: string | null
+          repasse_lancamento_id: string | null
+          repasse_pago: boolean
+          repasse_pago_at: string | null
+          repasse_pago_em: string | null
+          repasse_pago_por: string | null
+          status: Database["public"]["Enums"]["fin_status_lancamento"]
+          tipo: Database["public"]["Enums"]["fin_tipo_lancamento"]
+          updated_at: string
+          valor: number
+          valor_laudo: number
+        }
+        Insert: {
+          agendamento_id?: string | null
+          bandeira_cartao?: string | null
+          categoria_id?: string | null
+          clinica_id: string
+          conta_id?: string | null
+          created_at?: string
+          criado_por?: string | null
+          data?: string
+          data_vencimento?: string | null
+          descricao: string
+          emitir_nfse?: boolean
+          empresa_id?: string | null
+          forma_pagamento?: string | null
+          grupo_pagamento_id?: string | null
+          id?: string
+          laudo_emitido_em?: string | null
+          laudo_lancamento_id?: string | null
+          laudo_lote_id?: string | null
+          laudo_status?: string | null
+          medico_id?: string | null
+          medico_laudador_id?: string | null
+          observacoes?: string | null
+          paciente_id?: string | null
+          parcelas?: number | null
+          repasse_conta_id?: string | null
+          repasse_forma_pagamento?: string | null
+          repasse_lancamento_id?: string | null
+          repasse_pago?: boolean
+          repasse_pago_at?: string | null
+          repasse_pago_em?: string | null
+          repasse_pago_por?: string | null
+          status?: Database["public"]["Enums"]["fin_status_lancamento"]
+          tipo: Database["public"]["Enums"]["fin_tipo_lancamento"]
+          updated_at?: string
+          valor: number
+          valor_laudo?: number
+        }
+        Update: {
+          agendamento_id?: string | null
+          bandeira_cartao?: string | null
+          categoria_id?: string | null
+          clinica_id?: string
+          conta_id?: string | null
+          created_at?: string
+          criado_por?: string | null
+          data?: string
+          data_vencimento?: string | null
+          descricao?: string
+          emitir_nfse?: boolean
+          empresa_id?: string | null
+          forma_pagamento?: string | null
+          grupo_pagamento_id?: string | null
+          id?: string
+          laudo_emitido_em?: string | null
+          laudo_lancamento_id?: string | null
+          laudo_lote_id?: string | null
+          laudo_status?: string | null
+          medico_id?: string | null
+          medico_laudador_id?: string | null
+          observacoes?: string | null
+          paciente_id?: string | null
+          parcelas?: number | null
+          repasse_conta_id?: string | null
+          repasse_forma_pagamento?: string | null
+          repasse_lancamento_id?: string | null
+          repasse_pago?: boolean
+          repasse_pago_at?: string | null
+          repasse_pago_em?: string | null
+          repasse_pago_por?: string | null
+          status?: Database["public"]["Enums"]["fin_status_lancamento"]
+          tipo?: Database["public"]["Enums"]["fin_tipo_lancamento"]
+          updated_at?: string
+          valor?: number
+          valor_laudo?: number
+        }
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
         Relationships: [
           {
             foreignKeyName: "fin_lancamentos_agendamento_id_fkey";
@@ -3533,11 +3981,26 @@ export type Database = {
             referencedColumns: ["id"];
           },
           {
+<<<<<<< HEAD
             foreignKeyName: "fin_lancamentos_medico_id_fkey";
             columns: ["medico_id"];
             isOneToOne: false;
             referencedRelation: "medicos";
             referencedColumns: ["id"];
+=======
+            foreignKeyName: "fin_lancamentos_laudo_lote_id_fkey"
+            columns: ["laudo_lote_id"]
+            isOneToOne: false
+            referencedRelation: "fin_laudo_lotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fin_lancamentos_medico_id_fkey"
+            columns: ["medico_id"]
+            isOneToOne: false
+            referencedRelation: "medicos"
+            referencedColumns: ["id"]
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
           },
           {
             foreignKeyName: "fin_lancamentos_medico_laudador_id_fkey";
@@ -3553,8 +4016,70 @@ export type Database = {
             referencedRelation: "pacientes";
             referencedColumns: ["id"];
           },
+<<<<<<< HEAD
         ];
       };
+=======
+        ]
+      }
+      fin_laudo_lotes: {
+        Row: {
+          agenda_medico_id: string
+          clinica_id: string
+          created_at: string
+          criado_por: string | null
+          id: string
+          observacoes: string | null
+          periodo_fim: string
+          periodo_inicio: string
+          total_ecgs: number
+          total_repasse: number
+          updated_at: string
+        }
+        Insert: {
+          agenda_medico_id: string
+          clinica_id: string
+          created_at?: string
+          criado_por?: string | null
+          id?: string
+          observacoes?: string | null
+          periodo_fim: string
+          periodo_inicio: string
+          total_ecgs?: number
+          total_repasse?: number
+          updated_at?: string
+        }
+        Update: {
+          agenda_medico_id?: string
+          clinica_id?: string
+          created_at?: string
+          criado_por?: string | null
+          id?: string
+          observacoes?: string | null
+          periodo_fim?: string
+          periodo_inicio?: string
+          total_ecgs?: number
+          total_repasse?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fin_laudo_lotes_agenda_medico_id_fkey"
+            columns: ["agenda_medico_id"]
+            isOneToOne: false
+            referencedRelation: "medicos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fin_laudo_lotes_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
       fin_lembretes: {
         Row: {
           clinica_id: string;
@@ -3700,6 +4225,7 @@ export type Database = {
       };
       gr_impressoes: {
         Row: {
+<<<<<<< HEAD
           agendamento_id: string | null;
           clinica_id: string;
           created_at: string;
@@ -3729,6 +4255,40 @@ export type Database = {
           mensalidade_id?: string | null;
           via_numero?: number;
         };
+=======
+          agendamento_id: string | null
+          clinica_id: string
+          created_at: string
+          ficha_numero: number | null
+          id: string
+          impresso_por: string | null
+          impresso_por_nome: string | null
+          mensalidade_id: string | null
+          via_numero: number
+        }
+        Insert: {
+          agendamento_id?: string | null
+          clinica_id: string
+          created_at?: string
+          ficha_numero?: number | null
+          id?: string
+          impresso_por?: string | null
+          impresso_por_nome?: string | null
+          mensalidade_id?: string | null
+          via_numero: number
+        }
+        Update: {
+          agendamento_id?: string | null
+          clinica_id?: string
+          created_at?: string
+          ficha_numero?: number | null
+          id?: string
+          impresso_por?: string | null
+          impresso_por_nome?: string | null
+          mensalidade_id?: string | null
+          via_numero?: number
+        }
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
         Relationships: [
           {
             foreignKeyName: "gr_impressoes_mensalidade_id_fkey";
@@ -4953,8 +5513,74 @@ export type Database = {
             referencedRelation: "procedimentos";
             referencedColumns: ["id"];
           },
+<<<<<<< HEAD
         ];
       };
+=======
+        ]
+      }
+      medico_repasse_laudo: {
+        Row: {
+          agenda_medico_id: string
+          ativo: boolean
+          clinica_id: string
+          created_at: string
+          id: string
+          laudador_medico_id: string
+          percentual: number | null
+          tipo_repasse: string
+          updated_at: string
+          valor: number | null
+        }
+        Insert: {
+          agenda_medico_id: string
+          ativo?: boolean
+          clinica_id: string
+          created_at?: string
+          id?: string
+          laudador_medico_id: string
+          percentual?: number | null
+          tipo_repasse: string
+          updated_at?: string
+          valor?: number | null
+        }
+        Update: {
+          agenda_medico_id?: string
+          ativo?: boolean
+          clinica_id?: string
+          created_at?: string
+          id?: string
+          laudador_medico_id?: string
+          percentual?: number | null
+          tipo_repasse?: string
+          updated_at?: string
+          valor?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medico_repasse_laudo_agenda_medico_id_fkey"
+            columns: ["agenda_medico_id"]
+            isOneToOne: false
+            referencedRelation: "medicos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medico_repasse_laudo_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medico_repasse_laudo_laudador_medico_id_fkey"
+            columns: ["laudador_medico_id"]
+            isOneToOne: false
+            referencedRelation: "medicos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
       medicos: {
         Row: {
           aceita_cartao_beneficios: boolean;
@@ -6699,6 +7325,7 @@ export type Database = {
       };
       procedimentos: {
         Row: {
+<<<<<<< HEAD
           agenda_obrigatoria: boolean;
           ativo: boolean;
           clinica_id: string;
@@ -6826,6 +7453,138 @@ export type Database = {
         };
         Relationships: [];
       };
+=======
+          agenda_obrigatoria: boolean
+          ativo: boolean
+          clinica_id: string
+          codigo: string | null
+          cor_agenda: string | null
+          created_at: string
+          duracao_minutos: number
+          equipamento_obrigatorio: boolean
+          exige_autorizacao: boolean
+          exige_preparo: boolean
+          exige_termo: boolean
+          fluxo_atendimento: string | null
+          grupo: string | null
+          id: string
+          medico_obrigatorio: boolean
+          nome: string
+          observacoes: string | null
+          permite_encaixe: boolean
+          permite_orcamento: boolean
+          permite_venda_direta: boolean
+          preparo: string | null
+          requer_laudo: boolean
+          requer_medico: boolean
+          requer_sala: boolean
+          sala_obrigatoria: boolean
+          tempo_padrao_min: number
+          tipo: string
+          tipo_destino: string | null
+          tipo_procedimento: string | null
+          tipo_recurso: string | null
+          updated_at: string
+          valor_cartao: number
+          valor_cartao_consulta: number
+          valor_cartao_credito: number
+          valor_cartao_debito: number
+          valor_cartao_desconto: number
+          valor_dinheiro: number
+          valor_dinheiro_pix: number
+          valor_padrao: number
+          valor_pix: number
+          valor_variavel: boolean
+        }
+        Insert: {
+          agenda_obrigatoria?: boolean
+          ativo?: boolean
+          clinica_id: string
+          codigo?: string | null
+          cor_agenda?: string | null
+          created_at?: string
+          duracao_minutos?: number
+          equipamento_obrigatorio?: boolean
+          exige_autorizacao?: boolean
+          exige_preparo?: boolean
+          exige_termo?: boolean
+          fluxo_atendimento?: string | null
+          grupo?: string | null
+          id?: string
+          medico_obrigatorio?: boolean
+          nome: string
+          observacoes?: string | null
+          permite_encaixe?: boolean
+          permite_orcamento?: boolean
+          permite_venda_direta?: boolean
+          preparo?: string | null
+          requer_laudo?: boolean
+          requer_medico?: boolean
+          requer_sala?: boolean
+          sala_obrigatoria?: boolean
+          tempo_padrao_min?: number
+          tipo?: string
+          tipo_destino?: string | null
+          tipo_procedimento?: string | null
+          tipo_recurso?: string | null
+          updated_at?: string
+          valor_cartao?: number
+          valor_cartao_consulta?: number
+          valor_cartao_credito?: number
+          valor_cartao_debito?: number
+          valor_cartao_desconto?: number
+          valor_dinheiro?: number
+          valor_dinheiro_pix?: number
+          valor_padrao?: number
+          valor_pix?: number
+          valor_variavel?: boolean
+        }
+        Update: {
+          agenda_obrigatoria?: boolean
+          ativo?: boolean
+          clinica_id?: string
+          codigo?: string | null
+          cor_agenda?: string | null
+          created_at?: string
+          duracao_minutos?: number
+          equipamento_obrigatorio?: boolean
+          exige_autorizacao?: boolean
+          exige_preparo?: boolean
+          exige_termo?: boolean
+          fluxo_atendimento?: string | null
+          grupo?: string | null
+          id?: string
+          medico_obrigatorio?: boolean
+          nome?: string
+          observacoes?: string | null
+          permite_encaixe?: boolean
+          permite_orcamento?: boolean
+          permite_venda_direta?: boolean
+          preparo?: string | null
+          requer_laudo?: boolean
+          requer_medico?: boolean
+          requer_sala?: boolean
+          sala_obrigatoria?: boolean
+          tempo_padrao_min?: number
+          tipo?: string
+          tipo_destino?: string | null
+          tipo_procedimento?: string | null
+          tipo_recurso?: string | null
+          updated_at?: string
+          valor_cartao?: number
+          valor_cartao_consulta?: number
+          valor_cartao_credito?: number
+          valor_cartao_debito?: number
+          valor_cartao_desconto?: number
+          valor_dinheiro?: number
+          valor_dinheiro_pix?: number
+          valor_padrao?: number
+          valor_pix?: number
+          valor_variavel?: boolean
+        }
+        Relationships: []
+      }
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
       profiles: {
         Row: {
           avatar_url: string | null;
@@ -8196,10 +8955,30 @@ export type Database = {
       verificar_certificado: { Args: { _codigo: string }; Returns: Json };
     };
     Enums: {
+<<<<<<< HEAD
       agendamento_prioridade: "normal" | "prioritario" | "urgente";
       agendamento_status: "agendado" | "confirmado" | "realizado" | "cancelado" | "faltou";
       alerta_enf_status: "aberto" | "em_contato" | "resolvido" | "sem_contato";
       app_role: "admin" | "gestor" | "medico" | "enfermeiro" | "recepcao" | "financeiro" | "caixa";
+=======
+      agendamento_prioridade: "normal" | "prioritario" | "urgente"
+      agendamento_status:
+        | "agendado"
+        | "confirmado"
+        | "realizado"
+        | "cancelado"
+        | "faltou"
+      alerta_enf_status: "aberto" | "em_contato" | "resolvido" | "sem_contato"
+      app_role:
+        | "admin"
+        | "gestor"
+        | "medico"
+        | "enfermeiro"
+        | "recepcao"
+        | "financeiro"
+        | "caixa"
+        | "supervisor"
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
       app_role_global:
         "admin" | "tesouraria" | "medico" | "enfermagem" | "recepcao" | "marketing" | "rh";
       caixa_mov_tipo:
@@ -8384,7 +9163,20 @@ export const Constants = {
       agendamento_prioridade: ["normal", "prioritario", "urgente"],
       agendamento_status: ["agendado", "confirmado", "realizado", "cancelado", "faltou"],
       alerta_enf_status: ["aberto", "em_contato", "resolvido", "sem_contato"],
+<<<<<<< HEAD
       app_role: ["admin", "gestor", "medico", "enfermeiro", "recepcao", "financeiro", "caixa"],
+=======
+      app_role: [
+        "admin",
+        "gestor",
+        "medico",
+        "enfermeiro",
+        "recepcao",
+        "financeiro",
+        "caixa",
+        "supervisor",
+      ],
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
       app_role_global: [
         "admin",
         "tesouraria",

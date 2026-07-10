@@ -12,7 +12,7 @@ import { HhpKpiCard, HhpKpiRow, type HhpTone } from "@/design-system/hhp";
 export interface Kpi {
   key: string;
   label: string;
-  value: number;
+  value: number | string;
   tone?: "default" | "warn" | "danger" | "ok" | "info";
   hint?: string;
   delta?: number;
@@ -25,6 +25,9 @@ const ICONS: Record<string, LucideIcon> = {
   realizado: Activity,
   cancelado: XCircle,
   lab: TestTube,
+  confirmacao: CheckCircle2,
+  noshow: XCircle,
+  ocupacao: Activity,
 };
 
 /**

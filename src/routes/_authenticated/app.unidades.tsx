@@ -253,6 +253,7 @@ function ClinicasTab() {
                   onChange={(e) => setForm({ ...form, endereco: e.target.value })}
                 />
               </div>
+<<<<<<< HEAD
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-2">
                   <Label>Cidade</Label>
@@ -276,6 +277,18 @@ function ClinicasTab() {
                     onChange={(e) => setForm({ ...form, cep: e.target.value })}
                   />
                 </div>
+=======
+              <div className="space-y-2"><Label>Endereço</Label>
+                <Input value={form.endereco} onChange={(e) => setForm({ ...form, endereco: e.target.value })} /></div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-2"><Label>Cidade</Label>
+                  <Input value={form.cidade} onChange={(e) => setForm({ ...form, cidade: e.target.value })} /></div>
+                <div className="space-y-2"><Label>UF</Label>
+                  <Input maxLength={2} value={form.estado}
+                    onChange={(e) => setForm({ ...form, estado: e.target.value.toUpperCase() })} /></div>
+                <div className="space-y-2"><Label>CEP</Label>
+                  <Input value={form.cep} onChange={(e) => setForm({ ...form, cep: e.target.value })} /></div>
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
               </div>
               <div className="border-t pt-3">
                 <div className="flex items-center justify-between mb-2">
@@ -284,6 +297,7 @@ function ClinicasTab() {
                     Usar minha localização
                   </Button>
                 </div>
+<<<<<<< HEAD
                 <div className="grid grid-cols-3 gap-3">
                   <div className="space-y-2">
                     <Label className="text-xs">Latitude</Label>
@@ -307,6 +321,16 @@ function ClinicasTab() {
                       onChange={(e) => setForm({ ...form, raio_metros: e.target.value })}
                     />
                   </div>
+=======
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-2"><Label className="text-xs">Latitude</Label>
+                    <Input value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} /></div>
+                  <div className="space-y-2"><Label className="text-xs">Longitude</Label>
+                    <Input value={form.longitude} onChange={(e) => setForm({ ...form, longitude: e.target.value })} /></div>
+                  <div className="space-y-2"><Label className="text-xs">Raio (m)</Label>
+                    <Input type="number" value={form.raio_metros}
+                      onChange={(e) => setForm({ ...form, raio_metros: e.target.value })} /></div>
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
                 </div>
               </div>
               <label className="flex items-center gap-2 text-sm">

@@ -140,6 +140,7 @@ function LandingPagesAdmin() {
             <Label>Subtítulo</Label>
             <Input value={f.subtitulo} onChange={(e) => set({ ...f, subtitulo: e.target.value })} />
           </div>
+<<<<<<< HEAD
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1">
               <Label>Cor primária</Label>
@@ -156,6 +157,12 @@ function LandingPagesAdmin() {
                 onChange={(e) => set({ ...f, cta_label: e.target.value })}
               />
             </div>
+=======
+          <div className="space-y-1"><Label>Subtítulo</Label><Input value={f.subtitulo} onChange={e => set({ ...f, subtitulo: e.target.value })} /></div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="space-y-1"><Label>Cor primária</Label><Input type="color" value={f.cor_primaria} onChange={e => set({ ...f, cor_primaria: e.target.value })} /></div>
+            <div className="space-y-1 sm:col-span-2"><Label>Texto do botão</Label><Input value={f.cta_label} onChange={e => set({ ...f, cta_label: e.target.value })} /></div>
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
           </div>
           <div className="space-y-1">
             <Label>Imagem hero (URL)</Label>

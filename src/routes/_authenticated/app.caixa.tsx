@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
+<<<<<<< HEAD
   Wallet,
   PlusCircle,
   MinusCircle,
@@ -20,12 +21,17 @@ import {
   ArrowRight,
   Undo2,
   Printer,
+=======
+  Wallet, PlusCircle, MinusCircle, ArrowDownToLine, ArrowUpFromLine, Lock,
+  Unlock, Eye, FileDown, Users, Receipt, ChevronRight, Trash2, Plus, HandCoins, ArrowRight, Undo2, Printer, CalendarIcon, X, Search,
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { exportToExcel } from "@/lib/export-csv";
 import { Button } from "@/components/ui/button";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -50,6 +56,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import type { DateRange } from "react-day-picker";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -61,11 +73,93 @@ import {
 import { SolicitarEstornoDialog } from "@/components/financeiro/SolicitarEstornoDialog";
 import { useCaixaV2Flag } from "@/hooks/use-caixa-v2-flag";
 import { CaixaV2Mount } from "@/components/caixa-v2/caixa-v2-mount";
+import { printComprovanteCaixa } from "@/lib/print-caixa-comprovante";
 
 export const Route = createFileRoute("/_authenticated/app/caixa")({
   component: CaixaRouteDispatcher,
   head: () => ({ meta: [{ title: "Caixa — ClinicaOS" }] }),
 });
+
+/**
+ * Normaliza o valor gravado em `caixa_movimentos.forma_pagamento` para os
+ * buckets exibidos no painel (Dinheiro / PIX / Débito / Crédito / Boleto /
+ * Transferência / Convênio). Aliases: `cartao_credito`/`cartao_debito` do
+ * banco viram `credito`/`debito`. Retorna `misto` para pagamentos divididos
+ * (que são decompostos depois consultando `fin_lancamentos.observacoes`) e
+ * `outros` como residual.
+ */
+const FORMA_BUCKETS = ["dinheiro", "pix", "debito", "credito", "boleto", "transferencia", "convenio"] as const;
+type FormaBucket = typeof FORMA_BUCKETS[number] | "misto" | "outros";
+
+function normalizarForma(f: string | null | undefined): FormaBucket {
+  const k = (f ?? "").toLowerCase().trim();
+  if (!k) return "outros";
+  if (k === "dinheiro" || k === "pix" || k === "boleto" || k === "transferencia" || k === "convenio" || k === "misto") return k;
+  if (k === "credito" || k === "cartao_credito" || k === "cartão_credito" || k === "cartao credito") return "credito";
+  if (k === "debito" || k === "cartao_debito" || k === "cartão_debito" || k === "cartao debito") return "debito";
+  return "outros";
+}
+
+/**
+ * Extrai as parcelas de um pagamento misto a partir do trecho
+ * `Pagamento misto: Dinheiro R$ 60,00; PIX R$ 50,00 | ...` gravado em
+ * `fin_lancamentos.observacoes`. Retorna somas por bucket já normalizado.
+ */
+function decomporMistoObs(obs: string | null | undefined): Partial<Record<FormaBucket, number>> {
+  const out: Partial<Record<FormaBucket, number>> = {};
+  if (!obs) return out;
+  const idx = obs.indexOf("Pagamento misto:");
+  if (idx < 0) return out;
+  const trecho = obs.slice(idx + "Pagamento misto:".length).split(" | ")[0];
+  const partes = trecho.split(";").map((s) => s.trim()).filter(Boolean);
+  const LABEL_TO_KEY: Array<[RegExp, FormaBucket]> = [
+    [/^cart[ãa]o\s*cr[ée]dito/i, "credito"],
+    [/^cart[ãa]o\s*d[ée]bito/i, "debito"],
+    [/^cr[ée]dito/i, "credito"],
+    [/^d[ée]bito/i, "debito"],
+    [/^dinheiro/i, "dinheiro"],
+    [/^pix/i, "pix"],
+    [/^boleto/i, "boleto"],
+    [/^conv[êe]nio/i, "convenio"],
+    [/^transfer[êe]ncia/i, "transferencia"],
+  ];
+  const parseBRL = (s: string) => Number(s.replace(/\./g, "").replace(",", ".")) || 0;
+  for (const p of partes) {
+    const match = LABEL_TO_KEY.find(([re]) => re.test(p));
+    if (!match) continue;
+    const valMatch = p.match(/R\$\s*([\d.]+,\d{2})/);
+    if (!valMatch) continue;
+    const v = parseBRL(valMatch[1]);
+    out[match[1]] = (out[match[1]] ?? 0) + v;
+  }
+  return out;
+}
+
+/**
+ * Rótulo bonito para exibir a forma de pagamento em tabelas. Para
+ * `misto`, converte as parcelas decompostas em algo como
+ * "Dinheiro R$ 60,00 · PIX R$ 100,00". Sem observações do lançamento
+ * ainda em cache, retorna "Misto (dividido)".
+ */
+const FORMA_LABEL: Record<FormaBucket, string> = {
+  dinheiro: "Dinheiro", pix: "PIX", debito: "Cartão débito", credito: "Cartão crédito",
+  boleto: "Boleto", transferencia: "Transferência", convenio: "Convênio",
+  misto: "Misto", outros: "Outros",
+};
+function formatarFormaPagamento(
+  m: { forma_pagamento: string | null; lancamento_id?: string | null },
+  mistoObs: Record<string, string>,
+): string {
+  const bucket = normalizarForma(m.forma_pagamento);
+  if (bucket !== "misto") return m.forma_pagamento || "—";
+  const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
+  const partes = obs ? decomporMistoObs(obs) : {};
+  const entradas = Object.entries(partes).filter(([, v]) => (v ?? 0) > 0);
+  if (entradas.length === 0) return "Misto (dividido)";
+  return entradas
+    .map(([k, v]) => `${FORMA_LABEL[k as FormaBucket] ?? k} ${(v ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`)
+    .join(" · ");
+}
 
 /**
  * Promoção controlada do CaixaShellV2 para `/app/caixa`, atrás da flag
@@ -165,6 +259,23 @@ const SESSAO_FIELDS =
 const MOV_FIELDS =
   "id, sessao_id, user_id, tipo, valor, descricao, forma_pagamento, created_at, lancamento_id";
 
+/** Extrai o nome do serviço da descrição de um movimento como fallback, quando
+ *  não há enriquecimento via fin_lancamentos/agendamento. */
+function servicoFromDescricao(desc: string | null): string | null {
+  if (!desc) return null;
+  // Remove prefixo "Recebimento — " para facilitar o parse
+  const clean = desc.replace(/^Recebimento\s+—\s+/i, "");
+  // Padrão 1: "PACIENTE (SERVIÇO)" — texto entre parênteses no final
+  const par = clean.match(/\(([^()]+)\)\s*$/);
+  if (par) return par[1].trim() || null;
+  // Padrão 2: separado por " — " ou " · "
+  const idx = Math.max(clean.lastIndexOf(" — "), clean.lastIndexOf(" · "));
+  if (idx > 0) {
+    return clean.slice(idx + 3).replace(/\s*\(.*\)\s*$/, "").trim() || null;
+  }
+  return null;
+}
+
 const BANDEIRAS_CARTAO = [
   "Visa",
   "Mastercard",
@@ -187,6 +298,7 @@ function montarSufixoCartao(forma: string, bandeira: string, parcelas: string): 
 function Page() {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
+  const podeEscrever = usePodeEscrever("caixa");
   const isManager = clinicaAtual?.role === "admin" || clinicaAtual?.role === "gestor";
 
   const [tab, setTab] = useState<"meu" | "todos" | "repasse">("meu");
@@ -290,39 +402,100 @@ function Page() {
   const [minhaSessao, setMinhaSessao] = useState<Sessao | null>(null);
   const [minhasMovs, setMinhasMovs] = useState<Mov[]>([]);
   const [minhasSessoes, setMinhasSessoes] = useState<Sessao[]>([]);
+  // Solicitações de estorno vinculadas às movimentações visíveis
+  // (chave = lancamento_id, valor = status). Usado para trocar o botão
+  // "Solicitar estorno" por "Aguardando aprovação" (pendente) ou
+  // "Estornado" (aprovado) conforme a decisão do financeiro.
+  const [estornosPorLanc, setEstornosPorLanc] = useState<Map<string, "pendente" | "aprovado">>(new Map());
+  const [enrichPorLanc, setEnrichPorLanc] = useState<Map<string, { servico: string | null; medico: string | null }>>(new Map());
   // Filtro de período para "Movimentos" (padrão: hoje)
   type PeriodoFiltro = "hoje" | "semana" | "quinzena" | "mes" | "intervalo" | "todos";
   const [meuPeriodo, setMeuPeriodo] = useState<PeriodoFiltro>("hoje");
   const [meuDataIni, setMeuDataIni] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [meuDataFim, setMeuDataFim] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const [meuMedico, setMeuMedico] = useState<string>("__all__");
+  const [meuPaciente, setMeuPaciente] = useState<string>("");
+  const [openCal, setOpenCal] = useState(false);
   const minhasMovsFiltrados = useMemo<Mov[]>(() => {
-    if (meuPeriodo === "todos") return minhasMovs;
-    const now = new Date();
-    const fim = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
-    let ini: Date;
-    if (meuPeriodo === "hoje") {
-      ini = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-    } else if (meuPeriodo === "semana") {
-      ini = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6, 0, 0, 0, 0);
-    } else if (meuPeriodo === "quinzena") {
-      ini = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 14, 0, 0, 0, 0);
-    } else if (meuPeriodo === "mes") {
-      ini = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29, 0, 0, 0, 0);
-    } else {
-      const [yi, mi, di] = meuDataIni.split("-").map(Number);
-      const [yf, mf, df] = meuDataFim.split("-").map(Number);
-      ini = new Date(yi, (mi || 1) - 1, di || 1, 0, 0, 0, 0);
-      return minhasMovs.filter((m) => {
+    // 1) filtro de período (data)
+    let base: Mov[] = minhasMovs;
+    if (meuPeriodo !== "todos") {
+      const now = new Date();
+      const fim = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+      let ini: Date;
+      let fimP: Date = fim;
+      if (meuPeriodo === "hoje") {
+        ini = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+      } else if (meuPeriodo === "semana") {
+        ini = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6, 0, 0, 0, 0);
+      } else if (meuPeriodo === "quinzena") {
+        ini = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 14, 0, 0, 0, 0);
+      } else if (meuPeriodo === "mes") {
+        ini = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29, 0, 0, 0, 0);
+      } else {
+        const [yi, mi, di] = meuDataIni.split("-").map(Number);
+        const [yf, mf, df] = meuDataFim.split("-").map(Number);
+        ini = new Date(yi, (mi || 1) - 1, di || 1, 0, 0, 0, 0);
+        fimP = new Date(yf, (mf || 1) - 1, df || 1, 23, 59, 59, 999);
+      }
+      base = base.filter((m) => {
         const d = new Date(m.created_at);
-        const fimP = new Date(yf, (mf || 1) - 1, df || 1, 23, 59, 59, 999);
         return d >= ini && d <= fimP;
       });
     }
-    return minhasMovs.filter((m) => {
-      const d = new Date(m.created_at);
-      return d >= ini && d <= fim;
-    });
-  }, [minhasMovs, meuPeriodo, meuDataIni, meuDataFim]);
+    // 2) filtro por médico (usa enrichPorLanc quando disponível)
+    if (meuMedico && meuMedico !== "__all__") {
+      base = base.filter((m) => {
+        const enr = m.lancamento_id ? enrichPorLanc.get(m.lancamento_id) : undefined;
+        return (enr?.medico ?? "").trim() === meuMedico;
+      });
+    }
+    // 3) filtro por paciente (nome antes do " — " na descrição)
+    const termo = meuPaciente.trim().toLocaleLowerCase("pt-BR");
+    if (termo) {
+      base = base.filter((m) => {
+        const desc = (m.descricao ?? "").toLocaleLowerCase("pt-BR");
+        return desc.includes(termo);
+      });
+    }
+    return base;
+  }, [minhasMovs, meuPeriodo, meuDataIni, meuDataFim, meuMedico, meuPaciente, enrichPorLanc]);
+
+  // Lista de médicos distintos presentes nos movimentos carregados.
+  const medicosDisponiveis = useMemo<string[]>(() => {
+    const set = new Set<string>();
+    for (const m of minhasMovs) {
+      const enr = m.lancamento_id ? enrichPorLanc.get(m.lancamento_id) : undefined;
+      const nome = (enr?.medico ?? "").trim();
+      if (nome) set.add(nome);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [minhasMovs, enrichPorLanc]);
+
+  const filtrosAtivos =
+    meuPeriodo !== "hoje" || meuMedico !== "__all__" || meuPaciente.trim() !== "";
+  const limparFiltros = () => {
+    setMeuPeriodo("hoje");
+    setMeuMedico("__all__");
+    setMeuPaciente("");
+    const hj = new Date().toISOString().slice(0, 10);
+    setMeuDataIni(hj);
+    setMeuDataFim(hj);
+  };
+
+  // Rótulo curto do período para mostrar no botão do calendário.
+  const periodoLabel = useMemo(() => {
+    if (meuPeriodo === "hoje") return "Hoje";
+    if (meuPeriodo === "semana") return "Última semana";
+    if (meuPeriodo === "quinzena") return "Última quinzena";
+    if (meuPeriodo === "mes") return "Último mês";
+    if (meuPeriodo === "todos") return "Todos";
+    const p = (s: string) => {
+      const [y, m, d] = s.split("-");
+      return `${d}/${m}/${y}`;
+    };
+    return `${p(meuDataIni)} — ${p(meuDataFim)}`;
+  }, [meuPeriodo, meuDataIni, meuDataFim]);
 
   const [todasSessoes, setTodasSessoes] = useState<Sessao[]>([]);
   const [todosMovs, setTodosMovs] = useState<Mov[]>([]);
@@ -356,6 +529,8 @@ function Page() {
   const [movForma, setMovForma] = useState("dinheiro");
   const [movBandeira, setMovBandeira] = useState("");
   const [movParcelas, setMovParcelas] = useState("1");
+  const [movDestinoUserId, setMovDestinoUserId] = useState("");
+  const [membrosClinica, setMembrosClinica] = useState<Array<{ user_id: string; nome: string }>>([]);
   const [valorInformado, setValorInformado] = useState("");
   const [obsFechamento, setObsFechamento] = useState("");
   const [saving, setSaving] = useState(false);
@@ -429,14 +604,136 @@ function Page() {
         .select(MOV_FIELDS)
         .eq("sessao_id", (aberta as Sessao).id)
         .order("created_at", { ascending: true });
-      setMinhasMovs((movs ?? []) as Mov[]);
+      const movsList = (movs ?? []) as Mov[];
+      setMinhasMovs(movsList);
+      // Enriquecer com nome do serviço e médico
+      const lancIds = Array.from(new Set(movsList.map((m) => m.lancamento_id).filter((x): x is string => !!x)));
+      const enrich = new Map<string, { servico: string | null; medico: string | null }>();
+      if (lancIds.length > 0) {
+        const { data: lancs } = await supabase
+          .from("fin_lancamentos")
+          .select("id, medico_id, agendamento_id, descricao")
+          .in("id", lancIds);
+        const lancRows = (lancs ?? []) as Array<{ id: string; medico_id: string | null; agendamento_id: string | null; descricao: string | null }>;
+        const medIds = Array.from(new Set(lancRows.map((l) => l.medico_id).filter((x): x is string => !!x)));
+        const agIds = Array.from(new Set(lancRows.map((l) => l.agendamento_id).filter((x): x is string => !!x)));
+        const [medRes, agRes] = await Promise.all([
+          medIds.length > 0
+            ? supabase.from("medicos").select("id, nome").in("id", medIds)
+            : Promise.resolve({ data: [] as Array<{ id: string; nome: string | null }> }),
+          agIds.length > 0
+            ? supabase.from("agendamentos").select("id, procedimento_id").in("id", agIds)
+            : Promise.resolve({ data: [] as Array<{ id: string; procedimento_id: string | null }> }),
+        ]);
+        const medMap = new Map<string, string>();
+        for (const m of (medRes.data ?? []) as Array<{ id: string; nome: string | null }>) {
+          if (m.nome) medMap.set(m.id, m.nome);
+        }
+        const agMap = new Map<string, string | null>();
+        const procIds = new Set<string>();
+        for (const a of (agRes.data ?? []) as Array<{ id: string; procedimento_id: string | null }>) {
+          agMap.set(a.id, a.procedimento_id);
+          if (a.procedimento_id) procIds.add(a.procedimento_id);
+        }
+        const procMap = new Map<string, string>();
+        if (procIds.size > 0) {
+          const { data: procs } = await supabase
+            .from("procedimentos")
+            .select("id, nome")
+            .in("id", Array.from(procIds));
+          for (const p of (procs ?? []) as Array<{ id: string; nome: string | null }>) {
+            if (p.nome) procMap.set(p.id, p.nome);
+          }
+        }
+        for (const l of lancRows) {
+          const procId = l.agendamento_id ? agMap.get(l.agendamento_id) ?? null : null;
+          const servicoFromProc = procId ? procMap.get(procId) ?? null : null;
+          // fallback: extrai serviço da descrição do lançamento após " — " ou " · "
+          let servico = servicoFromProc;
+          if (!servico && l.descricao) {
+            const desc = l.descricao;
+            const idx = Math.max(desc.lastIndexOf(" — "), desc.lastIndexOf(" · "));
+            if (idx > 0) servico = desc.slice(idx + 3).replace(/\s*\(.*\)\s*$/, "").trim() || null;
+          }
+          enrich.set(l.id, {
+            servico,
+            medico: l.medico_id ? medMap.get(l.medico_id) ?? null : null,
+          });
+        }
+      }
+      setEnrichPorLanc(enrich);
     } else {
       setMinhasMovs([]);
+      setEnrichPorLanc(new Map());
     }
 
     setMinhasSessoes((histRes.data ?? []) as Sessao[]);
     setLoading(false);
   }, [clinicaAtual, user]);
+
+  // Recarrega o conjunto de solicitações de estorno pendentes vinculadas
+  // às movimentações atuais para trocar o botão pelo rótulo
+  // "Aguardando aprovação" quando o financeiro ainda não decidiu.
+  const reloadEstornosPendentes = useCallback(async () => {
+    if (!clinicaAtual) { setEstornosPorLanc(new Map()); return; }
+    const ids = Array.from(new Set(
+      minhasMovs.map((m) => m.lancamento_id).filter((x): x is string => !!x),
+    ));
+    if (ids.length === 0) { setEstornosPorLanc(new Map()); return; }
+    const { data } = await supabase
+      .from("estorno_solicitacoes")
+      .select("lancamento_id, status")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .in("lancamento_id", ids)
+      .in("status", ["pendente", "aprovado"]);
+    const map = new Map<string, "pendente" | "aprovado">();
+    for (const r of (data ?? []) as Array<{ lancamento_id: string | null; status: string }>) {
+      if (!r.lancamento_id) continue;
+      // pendente prevalece sobre aprovado caso ambos existam
+      const prev = map.get(r.lancamento_id);
+      if (prev === "pendente") continue;
+      if (r.status === "pendente" || r.status === "aprovado") {
+        map.set(r.lancamento_id, r.status);
+      }
+    }
+    setEstornosPorLanc(map);
+  }, [clinicaAtual, minhasMovs]);
+
+  useEffect(() => {
+    void reloadEstornosPendentes();
+  }, [reloadEstornosPendentes]);
+
+  // Realtime: se o financeiro aprovar/recusar ou outro caixa solicitar,
+  // atualiza o rótulo do botão sem exigir F5.
+  useEffect(() => {
+    if (!clinicaAtual) return;
+    const ch = supabase
+      .channel(`caixa-estornos-${clinicaAtual.clinica_id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "estorno_solicitacoes",
+          filter: `clinica_id=eq.${clinicaAtual.clinica_id}`,
+        },
+        () => { void reloadEstornosPendentes(); },
+      )
+      .subscribe();
+    return () => { void supabase.removeChannel(ch); };
+  }, [clinicaAtual, reloadEstornosPendentes]);
+
+  // Se o usuário voltar para a aba após o financeiro decidir e o evento
+  // realtime tiver sido perdido, ressincroniza ao ganhar foco.
+  useEffect(() => {
+    const onFocus = () => { void reloadEstornosPendentes(); };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, [reloadEstornosPendentes]);
 
   // Carrega a fila de cobrança (agendamentos hoje aguardando caixa)
   const loadFilaCaixa = useCallback(async () => {
@@ -681,6 +978,30 @@ function Page() {
     if (tab === "todos") void loadTodos();
   }, [tab, loadTodos]);
 
+  // Membros da clínica para o seletor de destino de sangria/suprimento
+  useEffect(() => {
+    if (!clinicaAtual) { setMembrosClinica([]); return; }
+    let alive = true;
+    void (async () => {
+      const { data: memb } = await supabase
+        .from("clinica_memberships")
+        .select("user_id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("ativo", true);
+      const ids = ((memb ?? []) as Array<{ user_id: string }>).map((m) => m.user_id);
+      if (!ids.length) { if (alive) setMembrosClinica([]); return; }
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("id, nome")
+        .in("id", ids);
+      const list = ((profs ?? []) as Array<{ id: string; nome: string | null }>)
+        .map((p) => ({ user_id: p.id, nome: p.nome || "(sem nome)" }))
+        .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+      if (alive) setMembrosClinica(list);
+    })();
+    return () => { alive = false; };
+  }, [clinicaAtual?.clinica_id]);
+
   // Calculos
   const saldoAtual = useMemo(() => {
     if (!minhaSessao) return 0;
@@ -701,6 +1022,71 @@ function Page() {
     });
     return r;
   }, [minhasMovs]);
+
+  // Decomposição de pagamentos "misto" — busca observações dos lançamentos
+  // vinculados às movimentações da sessão atual. Chave = lancamento_id.
+  const [mistoObs, setMistoObs] = useState<Record<string, string>>({});
+  const mistoLancIds = useMemo(() => {
+    const ids = new Set<string>();
+    const scan = (arr: Mov[]) => arr.forEach((m) => {
+      if (m.tipo === "recebimento" && normalizarForma(m.forma_pagamento) === "misto" && m.lancamento_id) {
+        ids.add(m.lancamento_id);
+      }
+    });
+    scan(minhasMovs);
+    scan(detalheMovs);
+    return Array.from(ids);
+  }, [minhasMovs, detalheMovs]);
+  useEffect(() => {
+    let alive = true;
+    const pendentes = mistoLancIds.filter((id) => !(id in mistoObs));
+    if (pendentes.length === 0) return;
+    (async () => {
+      const { data } = await supabase.from("fin_lancamentos")
+        .select("id, observacoes").in("id", pendentes);
+      if (!alive || !data) return;
+      setMistoObs((prev) => {
+        const next = { ...prev };
+        for (const row of data) next[row.id as string] = (row.observacoes as string | null) ?? "";
+        // Marca também os que não voltaram, para não refazer o fetch em loop.
+        for (const id of pendentes) if (!(id in next)) next[id] = "";
+        return next;
+      });
+    })();
+    return () => { alive = false; };
+  }, [mistoLancIds, mistoObs]);
+
+  // Entradas agrupadas por forma de pagamento (recebimento + suprimento).
+  // Aliases cartao_credito/cartao_debito ficam em credito/debito; pagamentos
+  // "misto" são decompostos pelas observações do fin_lancamento.
+  const entradasPorForma = useMemo(() => {
+    const r: Record<string, number> & { total: number } = {
+      dinheiro: 0, pix: 0, debito: 0, credito: 0,
+      boleto: 0, transferencia: 0, convenio: 0, outros: 0, total: 0,
+    };
+    minhasMovs.forEach((m) => {
+      if (m.tipo !== "recebimento" && m.tipo !== "suprimento") return;
+      const v = Number(m.valor || 0);
+      r.total += v;
+      const bucket = normalizarForma(m.forma_pagamento);
+      if (bucket === "misto") {
+        const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
+        const partes = decomporMistoObs(obs);
+        let somado = 0;
+        for (const [k, val] of Object.entries(partes)) {
+          r[k] = (r[k] ?? 0) + (val ?? 0);
+          somado += val ?? 0;
+        }
+        // Diferença (ex.: obs ainda não carregada, ou parcela sem label
+        // reconhecido) vai para "outros" para preservar o total.
+        const resto = v - somado;
+        if (Math.abs(resto) > 0.005) r.outros += resto;
+      } else {
+        r[bucket] += v;
+      }
+    });
+    return r;
+  }, [minhasMovs, mistoObs]);
 
   // Calculo por sessao (todos)
   const calcSaldoSessao = useCallback(
@@ -799,6 +1185,19 @@ function Page() {
       toast.error("Selecione a bandeira do cartão");
       return;
     }
+    const ehTransfer = openMov.tipo === "sangria" || openMov.tipo === "suprimento";
+    if (ehTransfer && !movDestinoUserId) {
+      toast.error(openMov.tipo === "sangria"
+        ? "Selecione a quem o dinheiro está sendo entregue"
+        : "Selecione de quem o dinheiro está sendo recebido");
+      return;
+    }
+    const destinoNome = ehTransfer
+      ? (membrosClinica.find((m) => m.user_id === movDestinoUserId)?.nome ?? null)
+      : null;
+    const sufixoDestino = ehTransfer && destinoNome
+      ? ` — ${openMov.tipo === "sangria" ? "Entregue a" : "Recebido de"}: ${destinoNome}`
+      : "";
     const sufixoCartao = ehPagto ? montarSufixoCartao(movForma, movBandeira, movParcelas) : "";
     setSaving(true);
     const { error } = await supabase.from("caixa_movimentos").insert({
@@ -807,8 +1206,10 @@ function Page() {
       user_id: user.id,
       tipo: openMov.tipo,
       valor: v,
-      descricao: (movDesc || "") + sufixoCartao || null,
+      descricao: ((movDesc || "") + sufixoCartao + sufixoDestino) || null,
       forma_pagamento: ehPagto ? movForma : null,
+      destino_user_id: ehTransfer ? movDestinoUserId : null,
+      destino_nome: ehTransfer ? destinoNome : null,
     });
     setSaving(false);
     if (error) {
@@ -816,12 +1217,30 @@ function Page() {
       return;
     }
     setOpenMov(null);
+<<<<<<< HEAD
     setMovValor("");
     setMovDesc("");
     setMovForma("dinheiro");
     setMovBandeira("");
     setMovParcelas("1");
     toast.success(`${TIPO_LABEL[openMov.tipo]} registrada`);
+=======
+    const tipoLancado = openMov.tipo;
+    const descLancada = (movDesc || "") + sufixoCartao + sufixoDestino;
+    setMovValor(""); setMovDesc(""); setMovForma("dinheiro");
+    setMovBandeira(""); setMovParcelas("1"); setMovDestinoUserId("");
+    toast.success(`${TIPO_LABEL[tipoLancado]} registrada`);
+    if (tipoLancado === "sangria" || tipoLancado === "suprimento") {
+      printComprovanteCaixa({
+        tipo: tipoLancado,
+        clinicaNome: clinicaAtual.clinica?.nome ?? "Clínica",
+        operadorNome: minhaSessao.user_nome || user.user_metadata?.nome || user.email || "Atendente",
+        valor: v,
+        descricao: descLancada || null,
+        destinoNome,
+      });
+    }
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
     void load();
   };
 
@@ -860,9 +1279,60 @@ function Page() {
       return;
     }
     setOpenFechar(false);
+<<<<<<< HEAD
     setValorInformado("");
     setObsFechamento("");
+=======
+    const obsFinal = obsFechamento;
+    setValorInformado(""); setObsFechamento("");
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
     toast.success("Caixa fechado");
+    // Total recebido por forma de pagamento na sessão — normaliza aliases e
+    // decompõe "misto" consultando observacoes do lançamento.
+    const porForma: Record<string, number> = {};
+    const mistoIds: string[] = [];
+    const mistoValoresTotais: Record<string, number> = {};
+    minhasMovs.forEach((m) => {
+      if (m.tipo !== "recebimento") return;
+      const v = Number(m.valor || 0);
+      const bucket = normalizarForma(m.forma_pagamento);
+      if (bucket === "misto" && m.lancamento_id) {
+        mistoIds.push(m.lancamento_id);
+        mistoValoresTotais[m.lancamento_id] = (mistoValoresTotais[m.lancamento_id] ?? 0) + v;
+      } else {
+        porForma[bucket] = (porForma[bucket] ?? 0) + v;
+      }
+    });
+    if (mistoIds.length > 0) {
+      const { data: lancs } = await supabase
+        .from("fin_lancamentos")
+        .select("id, observacoes")
+        .in("id", mistoIds);
+      (lancs ?? []).forEach((l: { id: string; observacoes: string | null }) => {
+        const partes = decomporMistoObs(l.observacoes);
+        let somado = 0;
+        for (const [k, val] of Object.entries(partes)) {
+          porForma[k] = (porForma[k] ?? 0) + (val ?? 0);
+          somado += val ?? 0;
+        }
+        const total = mistoValoresTotais[l.id] ?? 0;
+        const resto = total - somado;
+        if (Math.abs(resto) > 0.005) porForma.outros = (porForma.outros ?? 0) + resto;
+      });
+    }
+    // Remove buckets zerados para não poluir o comprovante.
+    for (const k of Object.keys(porForma)) if (Math.abs(porForma[k]) < 0.005) delete porForma[k];
+    printComprovanteCaixa({
+      tipo: "fechamento",
+      clinicaNome: clinicaAtual.clinica?.nome ?? "Clínica",
+      operadorNome: minhaSessao.user_nome || user.user_metadata?.nome || user.email || "Atendente",
+      valor: informado,
+      saldoCalculado: saldoAtual,
+      valorInformado: informado,
+      diferenca: diff,
+      descricao: obsFinal || null,
+      porForma,
+    });
     void load();
   };
 
@@ -994,20 +1464,29 @@ function Page() {
         <TabsContent value="meu" className="space-y-4 pt-4">
           {loading && <p className="text-sm text-muted-foreground">Carregando…</p>}
 
-          {!loading && !minhaSessao && (
-            <Card>
-              <CardContent className="py-10 text-center space-y-3">
-                <Wallet className="h-10 w-10 mx-auto text-muted-foreground" />
-                <p className="text-muted-foreground">Nenhum caixa aberto.</p>
-                <Button onClick={() => setOpenAbrir(true)}>
-                  <Unlock className="h-4 w-4 mr-2" /> Abrir caixa
-                </Button>
-              </CardContent>
-            </Card>
-          )}
+          {!loading && (
+            <Tabs defaultValue="saldo" className="w-full">
+              <TabsList>
+                <TabsTrigger value="saldo">Saldo</TabsTrigger>
+                <TabsTrigger value="movimentos">Movimentos</TabsTrigger>
+                <TabsTrigger value="historico">Histórico</TabsTrigger>
+                <TabsTrigger value="aguardando">Aguardando</TabsTrigger>
+              </TabsList>
 
-          {!loading && minhaSessao && (
-            <>
+              {/* ---------- Saldo ---------- */}
+              <TabsContent value="saldo" className="space-y-4 pt-4">
+                {!minhaSessao ? (
+                  <Card>
+                    <CardContent className="py-10 text-center space-y-3">
+                      <Wallet className="h-10 w-10 mx-auto text-muted-foreground" />
+                      <p className="text-muted-foreground">Nenhum caixa aberto.</p>
+                      <Button onClick={() => setOpenAbrir(true)}>
+                        <Unlock className="h-4 w-4 mr-2" /> Abrir caixa
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <Card
                   className="cursor-pointer hover:bg-muted/50 transition-colors"
@@ -1053,6 +1532,37 @@ function Page() {
                 </Card>
               </div>
 
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-xs text-muted-foreground">Entradas por forma de pagamento</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {(() => {
+                    const cards: Array<{ label: string; value: number; sempre?: boolean }> = [
+                      { label: "Dinheiro", value: entradasPorForma.dinheiro, sempre: true },
+                      { label: "PIX", value: entradasPorForma.pix, sempre: true },
+                      { label: "Débito", value: entradasPorForma.debito, sempre: true },
+                      { label: "Crédito", value: entradasPorForma.credito, sempre: true },
+                      { label: "Boleto", value: entradasPorForma.boleto },
+                      { label: "Transferência", value: entradasPorForma.transferencia },
+                      { label: "Convênio", value: entradasPorForma.convenio },
+                      { label: "Outros", value: entradasPorForma.outros },
+                    ];
+                    const visiveis = cards.filter((c) => c.sempre || (c.value ?? 0) > 0.005);
+                    return (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {visiveis.map((it) => (
+                          <div key={it.label} className="rounded-md border bg-muted/30 px-3 py-2">
+                            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{it.label}</div>
+                            <div className="text-base font-semibold tabular-nums">{fmt(it.value)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" onClick={() => setOpenMov({ tipo: "suprimento" })}>
                   <ArrowDownToLine className="h-4 w-4 mr-2 text-emerald-600" /> Suprimento
@@ -1077,8 +1587,19 @@ function Page() {
                   <Lock className="h-4 w-4 mr-2" /> Fechar caixa
                 </Button>
               </div>
+                  </>
+                )}
+              </TabsContent>
 
-              {/* === FILA DE COBRANÇA === */}
+              {/* ---------- Aguardando ---------- */}
+              <TabsContent value="aguardando" className="space-y-4 pt-4">
+                {!minhaSessao ? (
+                  <Card>
+                    <CardContent className="py-10 text-center text-muted-foreground">
+                      Abra um caixa para visualizar a fila de cobrança.
+                    </CardContent>
+                  </Card>
+                ) : (
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
@@ -1092,7 +1613,7 @@ function Page() {
                       Nenhum paciente aguardando cobrança hoje.
                     </p>
                   ) : (
-                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-80 overflow-auto pr-1">
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-[32rem] overflow-auto pr-1">
                       {filaCaixa.map((f) => {
                         const hora = new Date(f.inicio).toLocaleTimeString("pt-BR", {
                           hour: "2-digit",
@@ -1149,16 +1670,40 @@ function Page() {
                   )}
                 </CardContent>
               </Card>
+                )}
+              </TabsContent>
 
+              {/* ---------- Movimentos ---------- */}
+              <TabsContent value="movimentos" className="space-y-4 pt-4">
+                {!minhaSessao ? (
+                  <Card>
+                    <CardContent className="py-10 text-center text-muted-foreground">
+                      Abra um caixa para visualizar os movimentos.
+                    </CardContent>
+                  </Card>
+                ) : (
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap">
-                  <CardTitle className="text-base">
-                    {isManager ? "Movimentos da sessão" : "Movimentos de hoje"}
-                  </CardTitle>
-                  {isManager ? (
-                    <div className="flex items-end gap-2 flex-wrap">
+                <CardHeader className="gap-3">
+                  <div className="flex flex-row items-center justify-between gap-2 flex-wrap">
+                    <CardTitle className="text-base">
+                      {isManager ? "Movimentos da sessão" : "Movimentos de hoje"}
+                      {filtrosAtivos && (
+                        <span className="ml-2 text-xs font-normal text-muted-foreground">
+                          ({minhasMovsFiltrados.length} de {minhasMovs.length})
+                        </span>
+                      )}
+                    </CardTitle>
+                    {!isManager && (
+                      <span className="text-xs text-muted-foreground">
+                        {new Date().toLocaleDateString("pt-BR")}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-end gap-2 flex-wrap">
+                    {isManager && (
                       <div>
                         <Label className="text-xs">Período</Label>
+<<<<<<< HEAD
                         <Select
                           value={meuPeriodo}
                           onValueChange={(v) => setMeuPeriodo(v as typeof meuPeriodo)}
@@ -1175,35 +1720,102 @@ function Page() {
                             <SelectItem value="todos">Todos</SelectItem>
                           </SelectContent>
                         </Select>
+=======
+                        <Popover open={openCal} onOpenChange={setOpenCal}>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm" className="h-8 justify-start font-normal min-w-[220px]">
+                              <CalendarIcon className="h-3.5 w-3.5 mr-2" />
+                              {periodoLabel}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <div className="flex flex-col sm:flex-row">
+                              <div className="flex sm:flex-col gap-1 p-2 border-b sm:border-b-0 sm:border-r bg-muted/30">
+                                {([
+                                  ["hoje", "Hoje"],
+                                  ["semana", "Última semana"],
+                                  ["quinzena", "Última quinzena"],
+                                  ["mes", "Último mês"],
+                                  ["todos", "Todos"],
+                                ] as const).map(([v, lbl]) => (
+                                  <Button
+                                    key={v}
+                                    type="button"
+                                    variant={meuPeriodo === v ? "default" : "ghost"}
+                                    size="sm"
+                                    className="justify-start text-xs h-7"
+                                    onClick={() => { setMeuPeriodo(v); setOpenCal(false); }}
+                                  >
+                                    {lbl}
+                                  </Button>
+                                ))}
+                              </div>
+                              <Calendar
+                                mode="range"
+                                locale={ptBR}
+                                numberOfMonths={2}
+                                selected={{
+                                  from: meuDataIni ? new Date(meuDataIni + "T00:00:00") : undefined,
+                                  to: meuDataFim ? new Date(meuDataFim + "T00:00:00") : undefined,
+                                }}
+                                onSelect={(range: DateRange | undefined) => {
+                                  if (!range?.from) return;
+                                  const f = range.from;
+                                  const t = range.to ?? range.from;
+                                  const iso = (d: Date) =>
+                                    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+                                  setMeuDataIni(iso(f));
+                                  setMeuDataFim(iso(t));
+                                  setMeuPeriodo("intervalo");
+                                  if (range.to) setOpenCal(false);
+                                }}
+                                initialFocus
+                                className={cn("p-3 pointer-events-auto")}
+                              />
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
                       </div>
-                      {meuPeriodo === "intervalo" && (
-                        <>
-                          <div>
-                            <Label className="text-xs">De</Label>
-                            <Input
-                              type="date"
-                              value={meuDataIni}
-                              onChange={(e) => setMeuDataIni(e.target.value)}
-                              className="h-8 w-[150px]"
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-xs">Até</Label>
-                            <Input
-                              type="date"
-                              value={meuDataFim}
-                              onChange={(e) => setMeuDataFim(e.target.value)}
-                              className="h-8 w-[150px]"
-                            />
-                          </div>
-                        </>
-                      )}
+                    )}
+                    <div>
+                      <Label className="text-xs">Médico</Label>
+                      <Select value={meuMedico} onValueChange={setMeuMedico}>
+                        <SelectTrigger className="h-8 w-[200px]">
+                          <SelectValue placeholder="Todos" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__all__">Todos os médicos</SelectItem>
+                          {medicosDisponiveis.map((n) => (
+                            <SelectItem key={n} value={n}>{n}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">
-                      {new Date().toLocaleDateString("pt-BR")}
-                    </span>
-                  )}
+                    <div>
+                      <Label className="text-xs">Paciente</Label>
+                      <div className="relative">
+                        <Search className="h-3.5 w-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          value={meuPaciente}
+                          onChange={(e) => setMeuPaciente(e.target.value)}
+                          placeholder="Buscar paciente..."
+                          className="h-8 w-[200px] pl-7"
+                        />
+                      </div>
+                    </div>
+                    {filtrosAtivos && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={limparFiltros}
+                        className="h-8 text-xs"
+                      >
+                        <X className="h-3.5 w-3.5 mr-1" /> Limpar
+                      </Button>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent className="overflow-x-auto">
                   <Table>
@@ -1213,6 +1825,8 @@ function Page() {
                         <TableHead>Hora</TableHead>
                         <TableHead>Tipo</TableHead>
                         <TableHead>Descrição</TableHead>
+                        <TableHead>Serviço</TableHead>
+                        <TableHead>Médico</TableHead>
                         <TableHead>Forma</TableHead>
                         <TableHead className="text-right">Valor</TableHead>
                         <TableHead className="text-right w-[1%]">Ação</TableHead>
@@ -1221,6 +1835,7 @@ function Page() {
                     <TableBody>
                       {minhasMovsFiltrados.length === 0 ? (
                         <TableRow>
+<<<<<<< HEAD
                           <TableCell colSpan={7} className="text-center text-muted-foreground">
                             {isManager ? "Sem movimentos no período" : "Sem movimentos hoje"}
                           </TableCell>
@@ -1267,14 +1882,98 @@ function Page() {
                           </TableRow>
                         ))
                       )}
+=======
+                          <TableCell colSpan={9} className="text-center text-muted-foreground">
+                            {filtrosAtivos
+                              ? "Nenhum movimento corresponde aos filtros"
+                              : isManager
+                                ? "Sem movimentos no período"
+                                : "Sem movimentos hoje"}
+                          </TableCell>
+                        </TableRow>
+                      ) : minhasMovsFiltrados.map((m) => {
+                        const enr = m.lancamento_id ? enrichPorLanc.get(m.lancamento_id) : undefined;
+                        const servico = enr?.servico ?? servicoFromDescricao(m.descricao);
+                        const medico = enr?.medico ?? null;
+                        return (
+                        <TableRow key={m.id}>
+                          <TableCell className="whitespace-nowrap">{new Date(m.created_at).toLocaleDateString("pt-BR")}</TableCell>
+                          <TableCell className="whitespace-nowrap">{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</TableCell>
+                          <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
+                          <TableCell>{m.descricao || "—"}</TableCell>
+                          <TableCell className="text-xs">{servico || "—"}</TableCell>
+                          <TableCell className="text-xs">{medico || "—"}</TableCell>
+                          <TableCell className="text-xs">{formatarFormaPagamento(m, mistoObs)}</TableCell>
+                          <TableCell className={`text-right font-medium ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
+                            {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {m.tipo === "recebimento" && podeEscrever && (
+                              (() => {
+                                const st = m.lancamento_id ? estornosPorLanc.get(m.lancamento_id) : undefined;
+                                if (st === "pendente") {
+                                  return (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      disabled
+                                      className="h-7 text-xs text-amber-800 border-amber-300 bg-amber-50 cursor-not-allowed"
+                                      title="Solicitação de estorno enviada — aguardando decisão do financeiro"
+                                    >
+                                      <Undo2 className="h-3 w-3 mr-1" /> Aguardando aprovação
+                                    </Button>
+                                  );
+                                }
+                                if (st === "aprovado") {
+                                  return (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      disabled
+                                      className="h-7 text-xs text-slate-600 border-slate-300 bg-slate-100 cursor-not-allowed"
+                                      title="Este lançamento já foi estornado"
+                                    >
+                                      <Undo2 className="h-3 w-3 mr-1" /> Estornado
+                                    </Button>
+                                  );
+                                }
+                                return (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs text-rose-700 border-rose-200 hover:bg-rose-50"
+                                title="Solicitar estorno ao financeiro"
+                                onClick={() => setEstornoFor(m)}
+                              >
+                                <Undo2 className="h-3 w-3 mr-1" /> Solicitar estorno
+                              </Button>
+                                );
+                              })()
+                            )}
+                          </TableCell>
+                        </TableRow>
+                        );
+                      })}
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
                     </TableBody>
                   </Table>
                 </CardContent>
               </Card>
-            </>
-          )}
+                )}
+              </TabsContent>
 
-          {minhasSessoes.length > 0 && (
+              {/* ---------- Histórico ---------- */}
+              <TabsContent value="historico" className="space-y-4 pt-4">
+                {minhasSessoes.length === 0 ? (
+                  <Card>
+                    <CardContent className="py-10 text-center text-muted-foreground">
+                      Nenhuma sessão anterior.
+                    </CardContent>
+                  </Card>
+                ) : (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Meu histórico</CardTitle>
@@ -1322,6 +2021,9 @@ function Page() {
                 </Table>
               </CardContent>
             </Card>
+                )}
+              </TabsContent>
+            </Tabs>
           )}
         </TabsContent>
 
@@ -1614,6 +2316,24 @@ function Page() {
                 placeholder="Motivo / referência"
               />
             </div>
+            {openMov && (openMov.tipo === "sangria" || openMov.tipo === "suprimento") && (
+              <div>
+                <Label>{openMov.tipo === "sangria" ? "Entregue a *" : "Recebido de *"}</Label>
+                <Select value={movDestinoUserId} onValueChange={setMovDestinoUserId}>
+                  <SelectTrigger><SelectValue placeholder="Selecione o usuário..." /></SelectTrigger>
+                  <SelectContent>
+                    {membrosClinica.map((m) => (
+                      <SelectItem key={m.user_id} value={m.user_id}>{m.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  {openMov.tipo === "sangria"
+                    ? "Registre a quem o dinheiro está sendo entregue (ex.: financeiro, gestor)."
+                    : "Registre de quem o dinheiro está sendo recebido."}
+                </p>
+              </div>
+            )}
             {openMov && (openMov.tipo === "recebimento" || openMov.tipo === "despesa") && (
               <div>
                 <Label>Forma de pagamento</Label>
@@ -2062,12 +2782,18 @@ function Page() {
                           </Badge>
                         </TableCell>
                         <TableCell>{m.descricao || "—"}</TableCell>
+<<<<<<< HEAD
                         <TableCell>{m.forma_pagamento || "—"}</TableCell>
                         <TableCell
                           className={`text-right ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}
                         >
                           {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}
                           {fmt(m.valor)}
+=======
+                        <TableCell className="text-xs">{formatarFormaPagamento(m, mistoObs)}</TableCell>
+                        <TableCell className={`text-right ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
+                          {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
                         </TableCell>
                       </TableRow>
                     ))}
@@ -2092,6 +2818,7 @@ function Page() {
           const idx = d.indexOf("—");
           return idx > 0 ? d.slice(0, idx).trim() : null;
         })()}
+        onCreated={() => { void reloadEstornosPendentes(); }}
       />
       <Dialog
         open={!!caixaDrill}
@@ -2166,12 +2893,18 @@ function Page() {
                           </Badge>
                         </TableCell>
                         <TableCell>{m.descricao ?? "—"}</TableCell>
+<<<<<<< HEAD
                         <TableCell>{m.forma_pagamento ?? "—"}</TableCell>
                         <TableCell
                           className={`text-right font-semibold ${TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : ""}`}
                         >
                           {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}
                           {fmt(m.valor)}
+=======
+                        <TableCell className="text-xs">{formatarFormaPagamento(m, mistoObs)}</TableCell>
+                        <TableCell className={`text-right font-semibold ${TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : ""}`}>
+                          {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
+>>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
                         </TableCell>
                       </TableRow>
                     ))}

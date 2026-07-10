@@ -122,14 +122,28 @@ export function AiInsightsStrip({
 
   return (
     <div className="px-6 pt-3">
-      <div className="rounded-2xl border border-slate-200/70 bg-white/60 backdrop-blur-sm">
+      <div
+        className="rounded-2xl border bg-white/80 backdrop-blur-sm shadow-[0_1px_2px_rgba(15,23,42,0.03)]"
+        style={{
+          borderColor: "color-mix(in oklab, var(--clinic-accent) 14%, transparent)",
+        }}
+      >
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
           className="w-full flex items-center gap-2 px-4 py-2.5 text-left"
           aria-expanded={open}
         >
-          <Sparkles className="h-3.5 w-3.5 text-indigo-500" />
+          <span
+            aria-hidden
+            className="inline-flex h-5 w-5 items-center justify-center rounded-md"
+            style={{
+              background: "var(--clinic-accent-soft)",
+              color: "var(--clinic-accent-strong)",
+            }}
+          >
+            <Sparkles className="h-3 w-3" />
+          </span>
           <span className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">
             Sugestões da IA
           </span>
