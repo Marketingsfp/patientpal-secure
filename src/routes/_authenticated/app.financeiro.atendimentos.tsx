@@ -2531,18 +2531,20 @@ function Page() {
                 </p>
               )}
             </div>
-            <div className="space-y-2">
-              <Label>Valor do laudo (R$)</Label>
-              <CurrencyInput
-                value={laudoForm.valor_laudo}
-                onChange={(v) => setLaudoForm({ ...laudoForm, valor_laudo: v })}
-              />
-              {laudoSemRegra && (
-                <p className="text-xs text-muted-foreground">
-                  Sem regra cadastrada para este laudador — informe o valor manualmente.
-                </p>
-              )}
-            </div>
+            {laudoForm.medico_laudador_id && (
+              <div className="space-y-2">
+                <Label>Valor do laudo (R$)</Label>
+                <CurrencyInput
+                  value={laudoForm.valor_laudo}
+                  onChange={(v) => setLaudoForm({ ...laudoForm, valor_laudo: v })}
+                />
+                {laudoSemRegra && (
+                  <p className="text-xs text-muted-foreground">
+                    Sem regra cadastrada para este laudador — informe o valor manualmente.
+                  </p>
+                )}
+              </div>
+            )}
             <p className="text-xs text-muted-foreground">
               Ao confirmar, o sistema gera automaticamente um lançamento de repasse para o laudador no valor informado.
             </p>
