@@ -21,6 +21,7 @@ import {
   Printer,
   MoreHorizontal,
   Undo2,
+  CalendarIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -40,6 +41,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format, parse } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -2388,11 +2392,33 @@ function Page() {
             </div>
             <div className="space-y-2">
               <Label>Data do pagamento</Label>
-              <Input
-                type="date"
-                value={payForm.data}
-                onChange={(e) => setPayForm({ ...payForm, data: e.target.value })}
-              />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className={cn("w-full justify-start text-left font-normal", !payForm.data && "text-muted-foreground")}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {payForm.data
+                      ? format(parse(payForm.data, "yyyy-MM-dd", new Date()), "dd/MM/yyyy", { locale: ptBR })
+                      : "Selecionar data"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    locale={ptBR}
+                    selected={payForm.data ? parse(payForm.data, "yyyy-MM-dd", new Date()) : undefined}
+                    onSelect={(d) => d && setPayForm({ ...payForm, data: format(d, "yyyy-MM-dd") })}
+                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
+              <p className="text-xs text-muted-foreground">
+                Use uma data anterior para lançar pagamentos retroativos.
+              </p>
             </div>
             <div className="space-y-2">
               <Label>Conta</Label>
