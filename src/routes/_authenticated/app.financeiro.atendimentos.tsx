@@ -2672,7 +2672,7 @@ function Page() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 border rounded-md p-3 mb-3">
+              <div className="comprovante-resumo grid grid-cols-2 gap-x-6 gap-y-1.5 border rounded-md p-3 mb-3">
                 <div>
                   <span className="text-xs text-muted-foreground">Médico: </span>
                   <b>{comprovante.medicoNome}</b>
@@ -2759,6 +2759,22 @@ function Page() {
             <Button variant="outline" onClick={() => setComprovanteOpen(false)}>
               Fechar
             </Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                document.body.classList.add("print-resumo-only");
+                const cleanup = () => {
+                  document.body.classList.remove("print-resumo-only");
+                  window.removeEventListener("afterprint", cleanup);
+                };
+                window.addEventListener("afterprint", cleanup);
+                window.print();
+                setTimeout(cleanup, 60000);
+              }}
+            >
+              <Printer className="h-4 w-4 mr-2" />
+              Imprimir resumo (médico)
+            </Button>
             <Button onClick={() => window.print()}>
               <Printer className="h-4 w-4 mr-2" />
               Imprimir
@@ -2778,6 +2794,14 @@ function Page() {
               .comprovante-bloco:last-child { break-after: auto; page-break-after: auto; }
               .comprovante-bloco table, .comprovante-bloco thead, .comprovante-bloco tbody, .comprovante-bloco tr, .comprovante-bloco td, .comprovante-bloco th { page-break-inside: auto; break-inside: auto; }
               .comprovante-bloco tr { page-break-inside: avoid; break-inside: avoid; }
+            }
+            @media print {
+              body.print-resumo-only .print-area .comprovante-bloco > *:not(.comprovante-resumo) {
+                display: none !important;
+              }
+              body.print-resumo-only .print-area .comprovante-resumo {
+                margin-top: 0 !important;
+              }
             }
           `}</style>
         </DialogContent>
