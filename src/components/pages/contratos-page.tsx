@@ -426,7 +426,6 @@ function NovoContratoForm({
     !saving &&
     !checkingDup &&
     titularContratoAtivo === null &&
-    emailValido(titular?.email) &&
     obsSanitizedLen <= OBS_MAX;
 
   useEffect(() => {
@@ -533,30 +532,11 @@ function NovoContratoForm({
         maxDep === 0 ? "Este convênio não permite dependentes." : `Limite de ${maxDep} dependentes excedido.`,
       );
     }
-    if (!emailValido(titular.email))
-      return toast.error(
-        "Titular precisa ter um e-mail válido para acessar o app. Cadastre/corrija o e-mail no paciente antes de gerar o contrato.",
-      );
     // Sanitiza observações (remove HTML/scripts) e aplica limite
     const obsClean = DOMPurify.sanitize(obs.trim(), { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
     if (obsClean.length > OBS_MAX) {
       return toast.error(`Observações: máximo ${OBS_MAX} caracteres.`);
     }
-    const semEmailDeps = deps.filter((d) => !d.email);
-    if (
-      semEmailDeps.length > 0 &&
-      !confirm(`${semEmailDeps.length} dependente(s) sem e-mail não conseguirão acessar o app. Continuar mesmo assim?`)
-    )
-      return;
-    if (!titular.face_descriptor || titular.face_descriptor.length === 0) {
-      if (!confirm("Titular sem foto facial. Continuar mesmo assim?")) return;
-    }
-    const semFotoDeps = deps.filter((d) => !d.face_descriptor || d.face_descriptor.length === 0);
-    if (
-      semFotoDeps.length > 0 &&
-      !confirm(`${semFotoDeps.length} dependente(s) sem foto facial. Continuar mesmo assim?`)
-    )
-      return;
     setSaving(true);
     // Rede de segurança: revalida duplicidade no submit (o estado já bloqueia o botão)
     const { data: jaAtivo } = await supabase
@@ -1041,11 +1021,9 @@ function NovoContratoForm({
               title={
                 titularContratoAtivo !== null
                   ? `Titular já possui contrato ativo #${titularContratoAtivo}`
-                  : !emailValido(titular?.email)
-                    ? "Titular precisa ter e-mail válido"
-                    : obsSanitizedLen > OBS_MAX
-                      ? `Observações excedem ${OBS_MAX} caracteres`
-                      : undefined
+                  : obsSanitizedLen > OBS_MAX
+                    ? `Observações excedem ${OBS_MAX} caracteres`
+                    : undefined
               }
             >
               {saving ? (
