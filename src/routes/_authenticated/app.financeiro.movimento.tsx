@@ -894,6 +894,25 @@ function Page() {
             onChange={(e) => setFilterPaciente(e.target.value)}
             placeholder="Buscar por nome do paciente..."
           /></div>
+        <div className="space-y-1"><Label className="text-xs">Valor (R$)</Label>
+          <Input
+            type="number"
+            step="0.01"
+            min={0}
+            className="w-32"
+            value={filterValor}
+            onChange={(e) => setFilterValor(e.target.value)}
+            placeholder="Ex.: 36,00"
+          /></div>
+        <div className="space-y-1"><Label className="text-xs">Ficha (referência)</Label>
+          <Input
+            type="number"
+            min={0}
+            className="w-32"
+            value={filterFicha}
+            onChange={(e) => setFilterFicha(e.target.value)}
+            placeholder="Nº da ficha"
+          /></div>
       </CardContent></Card>
 
       <Card><CardContent className="p-0">
