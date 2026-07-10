@@ -3087,6 +3087,17 @@ function AgendaPage() {
     setEtapaMap((m) => { const n = new Map(m); n.set(a.id, "triagem"); return n; });
   };
 
+  const estornarCheckin = async (a: Agendamento) => {
+    if (!window.confirm("Desfazer check-in deste paciente? Ele voltará para 'aguardando recepção'.")) return;
+    const { error } = await supabase
+      .from("agendamentos")
+      .update({ fluxo_etapa: "aguardando_recepcao", fluxo_atualizado_em: new Date().toISOString() } as never)
+      .eq("id", a.id);
+    if (error) { mostrarErro(error); return; }
+    toast.success("Check-in estornado");
+    setEtapaMap((m) => { const n = new Map(m); n.set(a.id, "aguardando_recepcao"); return n; });
+  };
+
   const escolherForma = (op: FormaOpcao) => {
     if (!formaPagCtx) return;
     const ids = formaPagCtx.agId.split(",").filter(Boolean);
