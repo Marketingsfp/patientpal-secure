@@ -1187,20 +1187,29 @@ function Page() {
         <TabsContent value="meu" className="space-y-4 pt-4">
           {loading && <p className="text-sm text-muted-foreground">Carregando…</p>}
 
-          {!loading && !minhaSessao && (
-            <Card>
-              <CardContent className="py-10 text-center space-y-3">
-                <Wallet className="h-10 w-10 mx-auto text-muted-foreground" />
-                <p className="text-muted-foreground">Nenhum caixa aberto.</p>
-                <Button onClick={() => setOpenAbrir(true)}>
-                  <Unlock className="h-4 w-4 mr-2" /> Abrir caixa
-                </Button>
-              </CardContent>
-            </Card>
-          )}
+          {!loading && (
+            <Tabs defaultValue="saldo" className="w-full">
+              <TabsList>
+                <TabsTrigger value="saldo">Saldo</TabsTrigger>
+                <TabsTrigger value="movimentos">Movimentos</TabsTrigger>
+                <TabsTrigger value="historico">Histórico</TabsTrigger>
+                <TabsTrigger value="aguardando">Aguardando</TabsTrigger>
+              </TabsList>
 
-          {!loading && minhaSessao && (
-            <>
+              {/* ---------- Saldo ---------- */}
+              <TabsContent value="saldo" className="space-y-4 pt-4">
+                {!minhaSessao ? (
+                  <Card>
+                    <CardContent className="py-10 text-center space-y-3">
+                      <Wallet className="h-10 w-10 mx-auto text-muted-foreground" />
+                      <p className="text-muted-foreground">Nenhum caixa aberto.</p>
+                      <Button onClick={() => setOpenAbrir(true)}>
+                        <Unlock className="h-4 w-4 mr-2" /> Abrir caixa
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setCaixaDrill("saldo")}>
                   <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Saldo atual</CardTitle></CardHeader>
@@ -1273,8 +1282,19 @@ function Page() {
                   <Lock className="h-4 w-4 mr-2" /> Fechar caixa
                 </Button>
               </div>
+                  </>
+                )}
+              </TabsContent>
 
-              {/* === FILA DE COBRANÇA === */}
+              {/* ---------- Aguardando ---------- */}
+              <TabsContent value="aguardando" className="space-y-4 pt-4">
+                {!minhaSessao ? (
+                  <Card>
+                    <CardContent className="py-10 text-center text-muted-foreground">
+                      Abra um caixa para visualizar a fila de cobrança.
+                    </CardContent>
+                  </Card>
+                ) : (
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
@@ -1286,7 +1306,7 @@ function Page() {
                   {filaCaixa.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-4">Nenhum paciente aguardando cobrança hoje.</p>
                   ) : (
-                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-80 overflow-auto pr-1">
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-[32rem] overflow-auto pr-1">
                       {filaCaixa.map((f) => {
                         const hora = new Date(f.inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
                         return (
@@ -1322,7 +1342,18 @@ function Page() {
                   )}
                 </CardContent>
               </Card>
+                )}
+              </TabsContent>
 
+              {/* ---------- Movimentos ---------- */}
+              <TabsContent value="movimentos" className="space-y-4 pt-4">
+                {!minhaSessao ? (
+                  <Card>
+                    <CardContent className="py-10 text-center text-muted-foreground">
+                      Abra um caixa para visualizar os movimentos.
+                    </CardContent>
+                  </Card>
+                ) : (
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap">
                   <CardTitle className="text-base">
@@ -1469,10 +1500,18 @@ function Page() {
                   </Table>
                 </CardContent>
               </Card>
-            </>
-          )}
+                )}
+              </TabsContent>
 
-          {minhasSessoes.length > 0 && (
+              {/* ---------- Histórico ---------- */}
+              <TabsContent value="historico" className="space-y-4 pt-4">
+                {minhasSessoes.length === 0 ? (
+                  <Card>
+                    <CardContent className="py-10 text-center text-muted-foreground">
+                      Nenhuma sessão anterior.
+                    </CardContent>
+                  </Card>
+                ) : (
             <Card>
               <CardHeader><CardTitle className="text-base">Meu histórico</CardTitle></CardHeader>
               <CardContent className="overflow-x-auto">
@@ -1508,6 +1547,9 @@ function Page() {
                 </Table>
               </CardContent>
             </Card>
+                )}
+              </TabsContent>
+            </Tabs>
           )}
         </TabsContent>
 
