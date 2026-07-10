@@ -323,6 +323,18 @@ function Page() {
   const [laudoTarget, setLaudoTarget] = useState<Atend | null>(null);
   const [laudoForm, setLaudoForm] = useState({ medico_laudador_id: "", valor_laudo: "" });
   const [laudoSaving, setLaudoSaving] = useState(false);
+  // Regras de repasse cadastradas para a agenda do atendimento em edição.
+  // Alimenta o dropdown (só laudadores cadastrados) e o auto-preenchimento
+  // do "Valor do laudo" ao trocar o médico.
+  type LaudoRegra = {
+    laudador_medico_id: string;
+    laudador_nome: string;
+    tipo_repasse: "valor" | "percentual";
+    percentual: number | null;
+    valor: number | null;
+  };
+  const [laudoRegras, setLaudoRegras] = useState<LaudoRegra[]>([]);
+  const [laudoSemRegra, setLaudoSemRegra] = useState(false);
 
   // NFS-e
   const [emitentes, setEmitentes] = useState<Emitente[]>([]);
