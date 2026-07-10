@@ -976,6 +976,98 @@ function Page() {
       .reduce((acc, m) => acc + Number(m.valor || 0), 0);
   }, [todosMovs]);
 
+  // ============ Agrupamento por operador × dia ============
+  // Um mesmo turno pode atravessar a meia-noite; a listagem mostra uma linha
+  // por dia, com os movimentos, sangrias, informado e diferença daquele dia
+  // específico. Cada dia = "um caixa" com abertura e fechamento próprios.
+  type LinhaDia = {
+    key: string; user_id: string; user_nome: string; data: string;
+    primeiraAbertura: string | null; ultimoFechamento: string | null;
+    statusDia: "aberto" | "fechado";
+    valorAbertura: number; calculado: number; informado: number;
+    sangria: number; estorno: number; diferenca: number;
+    sessoes: Sessao[]; sessaoAbertaId: string | null;
+  };
+  const localDate = (iso: string | null | undefined): string | null => {
+    if (!iso) return null;
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return null;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+  const fmtDia = (data: string) => {
+    const [y, m, d] = data.split("-");
+    return `${d}/${m}/${y}`;
+  };
+  const fmtHora = (iso: string | null) =>
+    iso ? new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—";
+
+  const agruparPorDia = useCallback((sessoes: Sessao[], movs: Mov[]): LinhaDia[] => {
+    const buckets = new Map<string, LinhaDia>();
+    const sessById = new Map(sessoes.map((s) => [s.id, s]));
+    const get = (uid: string, nome: string, data: string) => {
+      const k = `${uid}__${data}`;
+      let b = buckets.get(k);
+      if (!b) {
+        b = {
+          key: k, user_id: uid, user_nome: nome, data,
+          primeiraAbertura: null, ultimoFechamento: null,
+          statusDia: "fechado",
+          valorAbertura: 0, calculado: 0, informado: 0,
+          sangria: 0, estorno: 0, diferenca: 0,
+          sessoes: [], sessaoAbertaId: null,
+        };
+        buckets.set(k, b);
+      }
+      return b;
+    };
+    for (const s of sessoes) {
+      const nome = (s.user_nome || s.user_id.slice(0, 8)).toString();
+      const dAb = localDate(s.aberto_em);
+      if (dAb) {
+        const b = get(s.user_id, nome, dAb);
+        b.sessoes.push(s);
+        b.valorAbertura += Number(s.valor_abertura || 0);
+        if (!b.primeiraAbertura || s.aberto_em < b.primeiraAbertura) b.primeiraAbertura = s.aberto_em;
+        if (s.status === "aberto") {
+          b.statusDia = "aberto";
+          if (!b.sessaoAbertaId) b.sessaoAbertaId = s.id;
+        }
+      }
+      const dFe = localDate(s.fechado_em);
+      if (dFe && s.fechado_em) {
+        const b = get(s.user_id, nome, dFe);
+        if (!b.sessoes.some((x) => x.id === s.id)) b.sessoes.push(s);
+        b.informado += Number(s.valor_fechamento_informado || 0);
+        b.diferenca += Number(s.diferenca || 0);
+        if (!b.ultimoFechamento || s.fechado_em > b.ultimoFechamento) b.ultimoFechamento = s.fechado_em;
+      }
+    }
+    for (const m of movs) {
+      const d = localDate(m.created_at);
+      if (!d) continue;
+      const s = sessById.get(m.sessao_id);
+      if (!s) continue;
+      const nome = (s.user_nome || s.user_id.slice(0, 8)).toString();
+      const b = get(s.user_id, nome, d);
+      b.calculado += TIPO_SINAL[m.tipo] * Number(m.valor || 0);
+      if (m.tipo === "sangria") b.sangria += Number(m.valor || 0);
+      if ((m.descricao ?? "").toLowerCase().includes("estorno")) b.estorno += Number(m.valor || 0);
+    }
+    return Array.from(buckets.values()).sort((a, b) => {
+      if (a.data !== b.data) return b.data.localeCompare(a.data);
+      return a.user_nome.localeCompare(b.user_nome, "pt-BR");
+    });
+  }, []);
+
+  const linhasTodosPorDia = useMemo(
+    () => agruparPorDia(todasSessoes, todosMovs),
+    [agruparPorDia, todasSessoes, todosMovs],
+  );
+  const linhasMinhasPorDia = useMemo(
+    () => agruparPorDia(minhasSessoes, minhasMovs),
+    [agruparPorDia, minhasSessoes, minhasMovs],
+  );
+
   // Total recebido/suprido por forma de pagamento em uma sessão qualquer
   // (usa `todosMovs`). Decompõe pagamentos "misto" quando as observações do
   // lançamento já foram carregadas via `mistoObs`.
