@@ -190,6 +190,23 @@ const TIPO_CLASS: Record<MovTipo, string> = {
 const SESSAO_FIELDS = "id, clinica_id, user_id, user_nome, aberto_em, valor_abertura, fechado_em, valor_fechamento_informado, valor_fechamento_calculado, diferenca, status, observacoes";
 const MOV_FIELDS = "id, sessao_id, user_id, tipo, valor, descricao, forma_pagamento, created_at, lancamento_id";
 
+/** Extrai o nome do serviço da descrição de um movimento como fallback, quando
+ *  não há enriquecimento via fin_lancamentos/agendamento. */
+function servicoFromDescricao(desc: string | null): string | null {
+  if (!desc) return null;
+  // Remove prefixo "Recebimento — " para facilitar o parse
+  const clean = desc.replace(/^Recebimento\s+—\s+/i, "");
+  // Padrão 1: "PACIENTE (SERVIÇO)" — texto entre parênteses no final
+  const par = clean.match(/\(([^()]+)\)\s*$/);
+  if (par) return par[1].trim() || null;
+  // Padrão 2: separado por " — " ou " · "
+  const idx = Math.max(clean.lastIndexOf(" — "), clean.lastIndexOf(" · "));
+  if (idx > 0) {
+    return clean.slice(idx + 3).replace(/\s*\(.*\)\s*$/, "").trim() || null;
+  }
+  return null;
+}
+
 const BANDEIRAS_CARTAO = [
   "Visa", "Mastercard", "Elo", "Hipercard", "American Express", "Diners", "Outra",
 ];
