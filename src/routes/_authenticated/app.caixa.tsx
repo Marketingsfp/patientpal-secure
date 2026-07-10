@@ -273,6 +273,7 @@ function Page() {
   // "Solicitar estorno" por "Aguardando aprovação" (pendente) ou
   // "Estornado" (aprovado) conforme a decisão do financeiro.
   const [estornosPorLanc, setEstornosPorLanc] = useState<Map<string, "pendente" | "aprovado">>(new Map());
+  const [enrichPorLanc, setEnrichPorLanc] = useState<Map<string, { servico: string | null; medico: string | null }>>(new Map());
   // Filtro de período para "Movimentos" (padrão: hoje)
   type PeriodoFiltro = "hoje" | "semana" | "quinzena" | "mes" | "intervalo" | "todos";
   const [meuPeriodo, setMeuPeriodo] = useState<PeriodoFiltro>("hoje");
