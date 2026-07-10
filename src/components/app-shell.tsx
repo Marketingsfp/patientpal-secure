@@ -294,16 +294,6 @@ export function AppShell() {
 
   const initial = (userName || user?.email || "?").trim().charAt(0).toUpperCase();
 
-  const medicoNavRows: typeof navRows = [
-    {
-      label: "Médico",
-      items: [
-        { to: "/app/agenda", label: "Agenda", icon: CalendarDays },
-        { to: "/app/atendimento-ia", label: "Atendimento médico", icon: Brain },
-        { to: "/app/financeiro/atendimentos", label: "Repasse", icon: DollarSign },
-      ],
-    },
-  ];
   const filteredByGroup = subsystem
     ? navRows.filter((r) => SUBSYSTEMS[subsystem].groups.includes(r.label))
     : navRows;
@@ -332,7 +322,10 @@ export function AppShell() {
       return { ...row, items };
     })
     .filter((row) => row.items.length > 0);
-  const visibleNavRows = isMedicoOnly ? medicoNavRows : permissionFilteredRows;
+  // O perfil médico também deve respeitar a matriz configurada em Perfis de
+  // Acesso. O escopo clínico do médico continua sendo aplicado pelos hooks e
+  // consultas de cada módulo; não substitua as permissões por um menu fixo.
+  const visibleNavRows = permissionFilteredRows;
   const subsystemLabel = subsystem ? SUBSYSTEMS[subsystem].label : null;
 
   // Kill-switch gradual: MenuV2 só é ativado se a flag `menu_v2` estiver on
@@ -480,7 +473,7 @@ export function AppShell() {
             {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           </Button>
         </div>
-        {!isMedicoOnly && subsystemLabel && (
+        {subsystemLabel && (
           <div className={`${collapsed ? "px-1 py-2" : "px-3 py-2"} border-b border-white/10`}>
             <button
               type="button"
