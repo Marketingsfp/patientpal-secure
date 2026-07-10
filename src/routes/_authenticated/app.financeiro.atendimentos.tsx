@@ -2832,6 +2832,53 @@ function Page() {
         </DialogContent>
       </Dialog>
 
+      {/* Diálogo: vincular laudos em lote */}
+      <Dialog open={laudoLoteOpen} onOpenChange={setLaudoLoteOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Vincular laudos em lote</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="rounded-md border bg-muted/40 p-3 text-xs">
+              <b>{selectedLaudoElegiveis.length}</b> atendimento(s) elegível(is) para vínculo de laudo.
+            </div>
+            <div className="space-y-2">
+              <Label>Médico laudador</Label>
+              <Select
+                value={laudoLoteLaudadorId || undefined}
+                onValueChange={setLaudoLoteLaudadorId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o médico..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {medicos.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                O valor de cada laudo será calculado automaticamente pela regra de repasse
+                da agenda de cada atendimento. Atendimentos sem regra para este laudador serão ignorados.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLaudoLoteOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={vincularLaudoLote}
+              disabled={laudoLoteSaving || !laudoLoteLaudadorId}
+            >
+              {laudoLoteSaving ? "Vinculando..." : `Vincular (${selectedLaudoElegiveis.length})`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Diálogo: emitir NFS-e */}
       <Dialog
         open={nfseDialog.open}
