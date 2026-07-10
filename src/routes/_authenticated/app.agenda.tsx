@@ -4269,13 +4269,8 @@ function AgendaPage() {
                   if (!pac) {
                     toast.error("Paciente não encontrado para emissão da NFS-e.");
                   } else {
-                    const res = await emitirNfseFn({ data: {
-                      emitenteId: emitenteIdEscolhido,
-                      pacienteId: pac.id,
-                      agendamentoId: agId,
-                      valorServicos: Number(dados.valor) || 0,
-                      descricaoServicos: ag.procedimento || pagamentoDesc || "Serviços prestados",
-                      tomador: {
+                    const tomador = await pickTomadorNfse({
+                      paciente: {
                         nome: pac.nome,
                         cpfCnpj: pac.cpf ?? undefined,
                         email: pac.email ?? undefined,
@@ -4286,6 +4281,15 @@ function AgendaPage() {
                         municipio: pac.cidade ?? undefined,
                         uf: pac.estado ?? undefined,
                       },
+                    });
+                    if (!tomador) { toast.error("Emissão cancelada."); return; }
+                    const res = await emitirNfseFn({ data: {
+                      emitenteId: emitenteIdEscolhido,
+                      pacienteId: pac.id,
+                      agendamentoId: agId,
+                      valorServicos: Number(dados.valor) || 0,
+                      descricaoServicos: ag.procedimento || pagamentoDesc || "Serviços prestados",
+                      tomador,
                     } });
                     const nfseId = (res as { id?: string })?.id;
                     if (nfseId) {
