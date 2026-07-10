@@ -814,6 +814,7 @@ function NovoContratoForm({
                     const full = await carregarPacienteCompleto(p);
                     setTitular(full);
                   }}
+                  onRequestCreate={(q) => setQuickCreate({ alvo: "titular", nome: q })}
                 />
               )}
             </div>
