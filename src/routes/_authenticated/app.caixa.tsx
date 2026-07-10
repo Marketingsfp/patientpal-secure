@@ -2745,6 +2745,18 @@ function Page() {
                   <Button size="sm" variant="outline" onClick={exportarDetalhe}>
                     <FileDown className="h-4 w-4 mr-1" /> Excel
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => imprimirRelatorioMovs(
+                      detalheMovs,
+                      `${new Date(openDetalhe.aberto_em).toLocaleDateString("pt-BR")}${openDetalhe.fechado_em ? ` — ${new Date(openDetalhe.fechado_em).toLocaleDateString("pt-BR")}` : ""}`,
+                      openDetalhe.user_nome ?? undefined,
+                    )}
+                    disabled={detalheMovs.length === 0}
+                  >
+                    <Printer className="h-4 w-4 mr-1" /> Relatório
+                  </Button>
                   <Button size="sm" variant="outline" onClick={imprimirDetalhe}>
                     <Printer className="h-4 w-4 mr-1" /> Imprimir
                   </Button>
