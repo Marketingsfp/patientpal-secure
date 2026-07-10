@@ -305,6 +305,7 @@ function Page() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {tomadorNfseDialog}
     </div>
   );
 }
