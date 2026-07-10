@@ -341,6 +341,11 @@ function Page() {
   const [laudoRegras, setLaudoRegras] = useState<LaudoRegra[]>([]);
   const [laudoSemRegra, setLaudoSemRegra] = useState(false);
 
+  // Diálogo de vínculo de laudo em lote
+  const [laudoLoteOpen, setLaudoLoteOpen] = useState(false);
+  const [laudoLoteLaudadorId, setLaudoLoteLaudadorId] = useState("");
+  const [laudoLoteSaving, setLaudoLoteSaving] = useState(false);
+
   // NFS-e
   const [emitentes, setEmitentes] = useState<Emitente[]>([]);
   const [emitenteId, setEmitenteId] = useState("");
