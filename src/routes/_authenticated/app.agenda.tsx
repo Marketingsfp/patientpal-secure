@@ -3247,12 +3247,16 @@ function AgendaPage() {
         },
       });
       if (!tomador) { toast.error("Emissão cancelada."); return; }
+      const descBase = a.procedimento || "Serviços prestados";
+      const descFinal = tomador.dependenteAtendido
+        ? `${descBase} — Atendido: ${tomador.dependenteAtendido}`
+        : descBase;
       const res = await emitirNfseFn({ data: {
         emitenteId: emitenteIdEscolhido,
         pacienteId: pac.id,
         agendamentoId: a.id,
         valorServicos: Number(valor) || 0,
-        descricaoServicos: a.procedimento || "Serviços prestados",
+        descricaoServicos: descFinal,
         tomador,
       } });
       const nfseId = (res as { id?: string })?.id;
@@ -4283,12 +4287,16 @@ function AgendaPage() {
                       },
                     });
                     if (!tomador) { toast.error("Emissão cancelada."); return; }
+                    const descBase = ag.procedimento || pagamentoDesc || "Serviços prestados";
+                    const descFinal = tomador.dependenteAtendido
+                      ? `${descBase} — Atendido: ${tomador.dependenteAtendido}`
+                      : descBase;
                     const res = await emitirNfseFn({ data: {
                       emitenteId: emitenteIdEscolhido,
                       pacienteId: pac.id,
                       agendamentoId: agId,
                       valorServicos: Number(dados.valor) || 0,
-                      descricaoServicos: ag.procedimento || pagamentoDesc || "Serviços prestados",
+                      descricaoServicos: descFinal,
                       tomador,
                     } });
                     const nfseId = (res as { id?: string })?.id;

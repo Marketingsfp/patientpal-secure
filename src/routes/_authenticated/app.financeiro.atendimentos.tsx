@@ -406,6 +406,10 @@ function Page() {
         },
       });
       if (!tomador) { setNfseEmitting(false); toast.error("Emissão cancelada."); return; }
+      const descBase = nfseDesc || "Serviços prestados";
+      const descFinal = tomador.dependenteAtendido
+        ? `${descBase} — Atendido: ${tomador.dependenteAtendido}`
+        : descBase;
       const res = await emitirNfseFn({
         data: {
           emitenteId,
@@ -413,7 +417,7 @@ function Page() {
           agendamentoId: a.agendamento_id ?? undefined,
           pagamentoId: a.id ?? undefined,
           valorServicos: valor,
-          descricaoServicos: nfseDesc || "Serviços prestados",
+          descricaoServicos: descFinal,
           tomador,
         },
       });

@@ -5,6 +5,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 export interface TomadorPayload {
@@ -17,6 +18,12 @@ export interface TomadorPayload {
   bairro?: string;
   municipio?: string;
   uf?: string;
+  /**
+   * Quando o tomador é um terceiro pagador, permite descrever quem foi o
+   * dependente (paciente) efetivamente atendido. Fica em branco quando a
+   * NFS-e é emitida no nome do próprio paciente.
+   */
+  dependenteAtendido?: string;
 }
 
 export interface PickTomadorInput {
@@ -37,7 +44,7 @@ export function usePickTomador() {
   const [paciente, setPaciente] = useState<TomadorPayload | null>(null);
   const [pacienteLabel, setPacienteLabel] = useState<string>("");
   const [terceiro, setTerceiro] = useState<TomadorPayload>({
-    nome: "", cpfCnpj: "", email: "", cep: "", logradouro: "", numero: "", bairro: "", municipio: "", uf: "",
+    nome: "", cpfCnpj: "", email: "", cep: "", logradouro: "", numero: "", bairro: "", municipio: "", uf: "", dependenteAtendido: "",
   });
   const resolverRef = useRef<((v: TomadorPayload | null) => void) | null>(null);
 
@@ -45,7 +52,7 @@ export function usePickTomador() {
     setPaciente(input.paciente);
     setPacienteLabel(input.pacienteLabel ?? input.paciente?.nome ?? "Paciente");
     setModo(input.paciente ? "paciente" : "terceiro");
-    setTerceiro({ nome: "", cpfCnpj: "", email: "", cep: "", logradouro: "", numero: "", bairro: "", municipio: "", uf: "" });
+    setTerceiro({ nome: "", cpfCnpj: "", email: "", cep: "", logradouro: "", numero: "", bairro: "", municipio: "", uf: "", dependenteAtendido: "" });
     return new Promise<TomadorPayload | null>((resolve) => {
       resolverRef.current = resolve;
       setOpen(true);
@@ -73,6 +80,7 @@ export function usePickTomador() {
       bairro: terceiro.bairro?.trim() || undefined,
       municipio: terceiro.municipio?.trim() || undefined,
       uf: terceiro.uf?.trim() || undefined,
+      dependenteAtendido: terceiro.dependenteAtendido?.trim() || undefined,
     });
   };
 
@@ -150,6 +158,19 @@ export function usePickTomador() {
               <div className="sm:col-span-2 space-y-1">
                 <Label>Município</Label>
                 <Input value={terceiro.municipio ?? ""} onChange={(e) => setTerceiro({ ...terceiro, municipio: e.target.value })} />
+              </div>
+              <div className="sm:col-span-2 space-y-1">
+                <Label>Dependente atendido (opcional)</Label>
+                <Textarea
+                  rows={2}
+                  maxLength={200}
+                  placeholder="Nome do dependente / paciente efetivamente atendido"
+                  value={terceiro.dependenteAtendido ?? ""}
+                  onChange={(e) => setTerceiro({ ...terceiro, dependenteAtendido: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Aparecerá na descrição dos serviços da NFS-e.
+                </p>
               </div>
             </div>
           </div>
