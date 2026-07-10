@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
-<<<<<<< HEAD
   ChevronDown,
   ChevronRight,
   Star,
@@ -10,10 +9,6 @@ import {
   Search as SearchIcon,
   Pin,
   X,
-=======
-  ChevronDown, ChevronRight, Star, Heart, Clock, Search as SearchIcon,
-  Pin, X, ChevronLeft, Activity,
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -120,7 +115,6 @@ function Row({
 }
 
 function CentroGroup({
-<<<<<<< HEAD
   centro,
   currentPath,
   open,
@@ -128,23 +122,14 @@ function CentroGroup({
   prefs,
   onPin,
   onFav,
-=======
-  centro, currentPath, open, onToggleOpen, prefs, onPin, onFav, hidePaths,
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
 }: {
   centro: Centro;
   currentPath: string;
   open: boolean;
   onToggleOpen: () => void;
   prefs: { pinned: string[]; favorites: string[] };
-<<<<<<< HEAD
   onPin: (p: string) => void;
   onFav: (p: string) => void;
-=======
-  onPin: (p: string) => void; onFav: (p: string) => void;
-  /** paths a esconder dentro do centro (ex.: já mostrados em "Fixados") */
-  hidePaths?: ReadonlyArray<string>;
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
 }) {
   const [query, setQuery] = useState("");
   const hide = new Set(hidePaths ?? []);

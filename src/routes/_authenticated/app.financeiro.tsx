@@ -1,6 +1,5 @@
 import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
 import {
-<<<<<<< HEAD
   LayoutDashboard,
   ArrowLeftRight,
   BarChart3,
@@ -15,11 +14,6 @@ import {
   Wallet,
   Sparkles,
   AlertTriangle,
-=======
-  LayoutDashboard, ArrowLeftRight, BarChart3, LineChart, Stethoscope,
-  Building, FileText, FileBarChart, PieChart, Bell, Tag, Wallet,
-  Sparkles, AlertTriangle, Undo2, ScrollText,
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
 } from "lucide-react";
 import { useMedicoContext } from "@/hooks/use-medico-context";
 

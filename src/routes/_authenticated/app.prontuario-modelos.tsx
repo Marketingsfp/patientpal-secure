@@ -108,16 +108,11 @@ function ModelosPage() {
               </Button>
             </div>
             {f.secoes.map((s, i) => (
-<<<<<<< HEAD
               <div
                 key={i}
                 className="grid grid-cols-12 gap-2 items-end p-2 rounded border bg-muted/20"
               >
                 <div className="col-span-3 space-y-1">
-=======
-              <div key={i} className="grid grid-cols-12 gap-2 items-end p-2 rounded border bg-muted/20">
-                <div className="col-span-12 sm:col-span-3 space-y-1">
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
                   <Label className="text-xs">Chave</Label>
                   <Input
                     value={s.chave}
@@ -150,7 +145,6 @@ function ModelosPage() {
                     }}
                   />
                 </div>
-<<<<<<< HEAD
                 <Button
                   type="button"
                   size="icon"
@@ -161,9 +155,6 @@ function ModelosPage() {
                     set({ ...f, secoes: ns });
                   }}
                 >
-=======
-                <Button type="button" size="icon" variant="ghost" className="col-span-2 sm:col-span-1" onClick={() => { const ns = f.secoes.filter((_, idx) => idx !== i); set({ ...f, secoes: ns }); }}>
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
                   <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>
               </div>

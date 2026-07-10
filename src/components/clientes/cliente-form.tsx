@@ -204,7 +204,6 @@ interface ClienteFormProps {
   readOnly?: boolean;
 }
 
-<<<<<<< HEAD
 export function ClienteForm({
   clinicaId,
   paciente,
@@ -212,9 +211,6 @@ export function ClienteForm({
   onCancel,
   stickyFooter,
 }: ClienteFormProps) {
-=======
-export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFooter, readOnly = false }: ClienteFormProps) {
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
   const editing = paciente;
   const [form, setForm] = useState<FormState>(EMPTY);
   const [tab, setTab] = useState("dados");
@@ -1322,7 +1318,6 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
               </div>
               <p className="text-xs text-muted-foreground">Preenche o endereço automaticamente.</p>
             </div>
-<<<<<<< HEAD
             <div className="space-y-1">
               <Label>Logradouro</Label>
               <InputVoz {...fieldProps("logradouro")} />
@@ -1346,16 +1341,6 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
                 <Label>Cidade</Label>
                 <InputVoz {...fieldProps("cidade")} />
               </div>
-=======
-            <div className="space-y-1"><Label>Logradouro</Label><InputVoz {...fieldProps("logradouro")} /></div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="space-y-1"><Label>Número</Label><InputVoz {...fieldProps("numero")} /></div>
-              <div className="space-y-1 sm:col-span-2"><Label>Complemento</Label><InputVoz {...fieldProps("complemento")} /></div>
-            </div>
-            <div className="space-y-1"><Label>Bairro</Label><InputVoz {...fieldProps("bairro")} /></div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="space-y-1 sm:col-span-2"><Label>Cidade</Label><InputVoz {...fieldProps("cidade")} /></div>
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
               <div className="space-y-1">
                 <Label>UF</Label>
                 <Input
@@ -1996,7 +1981,6 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
           </fieldset>
         </Tabs>
 
-<<<<<<< HEAD
         <div className={footerClass}>
           <Button
             type="button"
@@ -2012,14 +1996,6 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
             {saving ? "Salvando…" : "Salvar"}
           </Button>
         </div>
-=======
-        {!readOnly && (
-          <div className={footerClass}>
-            <Button type="button" variant="outline" onClick={() => { stopVoice(); onCancel(); }}>Cancelar</Button>
-            <Button type="submit" disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
-          </div>
-        )}
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
       </form>
 
       <Dialog

@@ -305,7 +305,6 @@ function NfsePage() {
         )}
       </div>
 
-<<<<<<< HEAD
       {emitidasComPdf.length > 0 && (
         <div className="rounded-lg border bg-card p-4 space-y-3">
           <div className="flex items-center justify-between">
@@ -365,8 +364,6 @@ function NfsePage() {
         </div>
       )}
 
-=======
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
       <div className="rounded-lg border bg-card overflow-hidden">
         <Table>
           <TableHeader>

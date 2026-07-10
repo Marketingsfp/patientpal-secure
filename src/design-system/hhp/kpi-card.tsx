@@ -74,19 +74,9 @@ export function HhpKpiCard({
           <Icon className="h-3 w-3" strokeWidth={2.5} />
         </span>
       </div>
-<<<<<<< HEAD
       <div className="mt-2 flex items-baseline gap-1.5">
         <span
           className={cn("tabular-nums font-bold text-slate-900", compact ? "text-xl" : "text-3xl")}
-=======
-      <div className="mt-2 flex items-baseline gap-1.5 hhp-kpi-anim">
-        <span
-          className={cn(
-            "tabular-nums font-bold text-slate-900",
-            compact ? "text-xl" : "text-3xl",
-          )}
-          style={{ fontFamily: "var(--hhp-font-display)", letterSpacing: "-0.02em" }}
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
         >
           {typeof value === "number" ? value.toLocaleString("pt-BR") : value}
         </span>

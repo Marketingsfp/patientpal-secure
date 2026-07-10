@@ -2,7 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
-<<<<<<< HEAD
   Wallet,
   PlusCircle,
   MinusCircle,
@@ -21,10 +20,6 @@ import {
   ArrowRight,
   Undo2,
   Printer,
-=======
-  Wallet, PlusCircle, MinusCircle, ArrowDownToLine, ArrowUpFromLine, Lock,
-  Unlock, Eye, FileDown, Users, Receipt, ChevronRight, Trash2, Plus, HandCoins, ArrowRight, Undo2, Printer, CalendarIcon, X, Search,
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -1217,30 +1212,12 @@ function Page() {
       return;
     }
     setOpenMov(null);
-<<<<<<< HEAD
     setMovValor("");
     setMovDesc("");
     setMovForma("dinheiro");
     setMovBandeira("");
     setMovParcelas("1");
     toast.success(`${TIPO_LABEL[openMov.tipo]} registrada`);
-=======
-    const tipoLancado = openMov.tipo;
-    const descLancada = (movDesc || "") + sufixoCartao + sufixoDestino;
-    setMovValor(""); setMovDesc(""); setMovForma("dinheiro");
-    setMovBandeira(""); setMovParcelas("1"); setMovDestinoUserId("");
-    toast.success(`${TIPO_LABEL[tipoLancado]} registrada`);
-    if (tipoLancado === "sangria" || tipoLancado === "suprimento") {
-      printComprovanteCaixa({
-        tipo: tipoLancado,
-        clinicaNome: clinicaAtual.clinica?.nome ?? "Clínica",
-        operadorNome: minhaSessao.user_nome || user.user_metadata?.nome || user.email || "Atendente",
-        valor: v,
-        descricao: descLancada || null,
-        destinoNome,
-      });
-    }
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
     void load();
   };
 
@@ -1279,13 +1256,8 @@ function Page() {
       return;
     }
     setOpenFechar(false);
-<<<<<<< HEAD
     setValorInformado("");
     setObsFechamento("");
-=======
-    const obsFinal = obsFechamento;
-    setValorInformado(""); setObsFechamento("");
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
     toast.success("Caixa fechado");
     // Total recebido por forma de pagamento na sessão — normaliza aliases e
     // decompõe "misto" consultando observacoes do lançamento.
@@ -1703,7 +1675,6 @@ function Page() {
                     {isManager && (
                       <div>
                         <Label className="text-xs">Período</Label>
-<<<<<<< HEAD
                         <Select
                           value={meuPeriodo}
                           onValueChange={(v) => setMeuPeriodo(v as typeof meuPeriodo)}
@@ -1720,62 +1691,6 @@ function Page() {
                             <SelectItem value="todos">Todos</SelectItem>
                           </SelectContent>
                         </Select>
-=======
-                        <Popover open={openCal} onOpenChange={setOpenCal}>
-                          <PopoverTrigger asChild>
-                            <Button variant="outline" size="sm" className="h-8 justify-start font-normal min-w-[220px]">
-                              <CalendarIcon className="h-3.5 w-3.5 mr-2" />
-                              {periodoLabel}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <div className="flex flex-col sm:flex-row">
-                              <div className="flex sm:flex-col gap-1 p-2 border-b sm:border-b-0 sm:border-r bg-muted/30">
-                                {([
-                                  ["hoje", "Hoje"],
-                                  ["semana", "Última semana"],
-                                  ["quinzena", "Última quinzena"],
-                                  ["mes", "Último mês"],
-                                  ["todos", "Todos"],
-                                ] as const).map(([v, lbl]) => (
-                                  <Button
-                                    key={v}
-                                    type="button"
-                                    variant={meuPeriodo === v ? "default" : "ghost"}
-                                    size="sm"
-                                    className="justify-start text-xs h-7"
-                                    onClick={() => { setMeuPeriodo(v); setOpenCal(false); }}
-                                  >
-                                    {lbl}
-                                  </Button>
-                                ))}
-                              </div>
-                              <Calendar
-                                mode="range"
-                                locale={ptBR}
-                                numberOfMonths={2}
-                                selected={{
-                                  from: meuDataIni ? new Date(meuDataIni + "T00:00:00") : undefined,
-                                  to: meuDataFim ? new Date(meuDataFim + "T00:00:00") : undefined,
-                                }}
-                                onSelect={(range: DateRange | undefined) => {
-                                  if (!range?.from) return;
-                                  const f = range.from;
-                                  const t = range.to ?? range.from;
-                                  const iso = (d: Date) =>
-                                    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-                                  setMeuDataIni(iso(f));
-                                  setMeuDataFim(iso(t));
-                                  setMeuPeriodo("intervalo");
-                                  if (range.to) setOpenCal(false);
-                                }}
-                                initialFocus
-                                className={cn("p-3 pointer-events-auto")}
-                              />
-                            </div>
-                          </PopoverContent>
-                        </Popover>
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
                       </div>
                     )}
                     <div>
@@ -1835,7 +1750,6 @@ function Page() {
                     <TableBody>
                       {minhasMovsFiltrados.length === 0 ? (
                         <TableRow>
-<<<<<<< HEAD
                           <TableCell colSpan={7} className="text-center text-muted-foreground">
                             {isManager ? "Sem movimentos no período" : "Sem movimentos hoje"}
                           </TableCell>
@@ -1882,82 +1796,6 @@ function Page() {
                           </TableRow>
                         ))
                       )}
-=======
-                          <TableCell colSpan={9} className="text-center text-muted-foreground">
-                            {filtrosAtivos
-                              ? "Nenhum movimento corresponde aos filtros"
-                              : isManager
-                                ? "Sem movimentos no período"
-                                : "Sem movimentos hoje"}
-                          </TableCell>
-                        </TableRow>
-                      ) : minhasMovsFiltrados.map((m) => {
-                        const enr = m.lancamento_id ? enrichPorLanc.get(m.lancamento_id) : undefined;
-                        const servico = enr?.servico ?? servicoFromDescricao(m.descricao);
-                        const medico = enr?.medico ?? null;
-                        return (
-                        <TableRow key={m.id}>
-                          <TableCell className="whitespace-nowrap">{new Date(m.created_at).toLocaleDateString("pt-BR")}</TableCell>
-                          <TableCell className="whitespace-nowrap">{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</TableCell>
-                          <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
-                          <TableCell>{m.descricao || "—"}</TableCell>
-                          <TableCell className="text-xs">{servico || "—"}</TableCell>
-                          <TableCell className="text-xs">{medico || "—"}</TableCell>
-                          <TableCell className="text-xs">{formatarFormaPagamento(m, mistoObs)}</TableCell>
-                          <TableCell className={`text-right font-medium ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
-                            {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {m.tipo === "recebimento" && podeEscrever && (
-                              (() => {
-                                const st = m.lancamento_id ? estornosPorLanc.get(m.lancamento_id) : undefined;
-                                if (st === "pendente") {
-                                  return (
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant="outline"
-                                      disabled
-                                      className="h-7 text-xs text-amber-800 border-amber-300 bg-amber-50 cursor-not-allowed"
-                                      title="Solicitação de estorno enviada — aguardando decisão do financeiro"
-                                    >
-                                      <Undo2 className="h-3 w-3 mr-1" /> Aguardando aprovação
-                                    </Button>
-                                  );
-                                }
-                                if (st === "aprovado") {
-                                  return (
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant="outline"
-                                      disabled
-                                      className="h-7 text-xs text-slate-600 border-slate-300 bg-slate-100 cursor-not-allowed"
-                                      title="Este lançamento já foi estornado"
-                                    >
-                                      <Undo2 className="h-3 w-3 mr-1" /> Estornado
-                                    </Button>
-                                  );
-                                }
-                                return (
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                className="h-7 text-xs text-rose-700 border-rose-200 hover:bg-rose-50"
-                                title="Solicitar estorno ao financeiro"
-                                onClick={() => setEstornoFor(m)}
-                              >
-                                <Undo2 className="h-3 w-3 mr-1" /> Solicitar estorno
-                              </Button>
-                                );
-                              })()
-                            )}
-                          </TableCell>
-                        </TableRow>
-                        );
-                      })}
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
                     </TableBody>
                   </Table>
                 </CardContent>
@@ -2782,18 +2620,12 @@ function Page() {
                           </Badge>
                         </TableCell>
                         <TableCell>{m.descricao || "—"}</TableCell>
-<<<<<<< HEAD
                         <TableCell>{m.forma_pagamento || "—"}</TableCell>
                         <TableCell
                           className={`text-right ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}
                         >
                           {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}
                           {fmt(m.valor)}
-=======
-                        <TableCell className="text-xs">{formatarFormaPagamento(m, mistoObs)}</TableCell>
-                        <TableCell className={`text-right ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
-                          {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
                         </TableCell>
                       </TableRow>
                     ))}
@@ -2893,18 +2725,12 @@ function Page() {
                           </Badge>
                         </TableCell>
                         <TableCell>{m.descricao ?? "—"}</TableCell>
-<<<<<<< HEAD
                         <TableCell>{m.forma_pagamento ?? "—"}</TableCell>
                         <TableCell
                           className={`text-right font-semibold ${TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : ""}`}
                         >
                           {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}
                           {fmt(m.valor)}
-=======
-                        <TableCell className="text-xs">{formatarFormaPagamento(m, mistoObs)}</TableCell>
-                        <TableCell className={`text-right font-semibold ${TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : ""}`}>
-                          {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
                         </TableCell>
                       </TableRow>
                     ))}

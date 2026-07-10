@@ -1029,7 +1029,6 @@ function NovoContratoForm({
                           <SelectItem value="Outro">Outro</SelectItem>
                         </SelectContent>
                       </Select>
-<<<<<<< HEAD
                       <div className="col-span-2 text-xs text-muted-foreground self-center">
                         Dependente
                       </div>
@@ -1039,10 +1038,6 @@ function NovoContratoForm({
                         className="col-span-2 h-8"
                         onClick={() => setFaceOpen(i)}
                       >
-=======
-                      <div className="col-span-6 sm:col-span-2 text-xs text-muted-foreground self-center">Dependente</div>
-                      <Button size="sm" variant="outline" className="col-span-6 sm:col-span-2 h-8" onClick={() => setFaceOpen(i)}>
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
                         <Camera className="h-3 w-3 mr-1" />
                         {d.face_descriptor?.length ? "Refazer" : "Foto"}
                       </Button>

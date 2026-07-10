@@ -106,28 +106,5 @@ export function usePermissoes(): {
     };
   }, [clinicaId, role]);
 
-<<<<<<< HEAD
   return { allowed, loading };
 }
-=======
-  return { allowed, nivel, loading };
-}
-
-/**
- * Nível de acesso do usuário atual num módulo específico.
- * - admin (ou ainda carregando com nivel=null) → "write" (sem restrição).
- * - Sem entrada no mapa → "none".
- */
-export function useAcessoModulo(modulo: string): Acesso {
-  const { nivel, allowed } = usePermissoes();
-  if (allowed === null) return "write"; // admin
-  const n = nivel?.get(modulo);
-  if (n) return n;
-  return "none";
-}
-
-/** Atalho: usuário pode gravar/editar/excluir neste módulo? */
-export function usePodeEscrever(modulo: string): boolean {
-  return useAcessoModulo(modulo) === "write";
-}
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b

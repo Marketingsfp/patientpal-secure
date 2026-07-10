@@ -1,15 +1,11 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
-<<<<<<< HEAD
 import {
   cadastrarUsuario,
   getFuncionarioLogin,
   definirSenhaFuncionario,
 } from "@/lib/equipe.functions";
-=======
-import { cadastrarUsuario, getFuncionarioLogin, definirSenhaFuncionario, editarMembro } from "@/lib/equipe.functions";
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -145,7 +141,6 @@ export function FuncionarioFormDialog({
     }
     void (async () => {
       setLoading(true);
-<<<<<<< HEAD
       const [{ data: contrato }, { data: prof }] = await Promise.all([
         supabase
           .from("hr_contratos")
@@ -158,28 +153,14 @@ export function FuncionarioFormDialog({
           .select("nome, telefone, telefone2")
           .eq("id", editingUserId)
           .maybeSingle(),
-=======
-      const [{ data: contrato }, { data: prof }, { data: mem }] = await Promise.all([
-        supabase.from("hr_contratos").select("*").eq("clinica_id", clinicaId).eq("user_id", editingUserId).maybeSingle(),
-        supabase.from("profiles").select("nome, telefone, telefone2").eq("id", editingUserId).maybeSingle(),
-        supabase.from("clinica_memberships").select("id, role, ativo").eq("clinica_id", clinicaId).eq("user_id", editingUserId).maybeSingle(),
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
       ]);
       const nome =
         (contrato?.funcionario_nome as string | undefined) ??
         (prof?.nome as string | undefined) ??
         "";
       const telefone = (prof?.telefone as string | undefined) ?? "";
-<<<<<<< HEAD
       const telefone2 =
         ((prof as { telefone2?: string | null } | null)?.telefone2 as string | undefined) ?? "";
-=======
-      const telefone2 = ((prof as { telefone2?: string | null } | null)?.telefone2 as string | undefined) ?? "";
-      const currentRole = (mem?.role as string | undefined) ?? "recepcao";
-      setMembershipId((mem?.id as string | undefined) ?? null);
-      setPerfilOriginal(currentRole);
-      setAtivoOriginal((mem?.ativo as boolean | undefined) ?? true);
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
       if (contrato) {
         setEditingContratoId(contrato.id as string);
         setPrefillUserId(null);
@@ -191,14 +172,10 @@ export function FuncionarioFormDialog({
           telefone2,
           setor_id: (contrato.setor_id as string) ?? "",
           status: (contrato.status as string) ?? "ativo",
-<<<<<<< HEAD
           criar_login: false,
           email: "",
           senha: "",
           perfil: "recepcao",
-=======
-          criar_login: false, email: "", senha: "", perfil: currentRole,
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
         });
       } else {
         setEditingContratoId(null);
@@ -322,29 +299,9 @@ export function FuncionarioFormDialog({
       error = e;
     }
     setSaving(false);
-<<<<<<< HEAD
     if (error) {
       mostrarErro(error);
       return;
-=======
-    if (error) { mostrarErro(error); return; }
-    // Atualiza perfil de acesso (membership) quando mudou
-    if (editingUserId && membershipId && form.perfil !== perfilOriginal) {
-      try {
-        await editarMembroFn({
-          data: {
-            clinicaId: form.clinica_id,
-            membershipId,
-            role: form.perfil as "recepcao",
-            ativo: ativoOriginal,
-          },
-        });
-        setPerfilOriginal(form.perfil);
-      } catch (e) {
-        toast.error((e as Error)?.message ?? "Erro ao atualizar perfil de acesso");
-        return;
-      }
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
     }
     // Atualiza telefones em profiles quando há um usuário vinculado
     const targetUserId = editingUserId ?? userId ?? prefillUserId ?? null;
@@ -584,90 +541,6 @@ export function FuncionarioFormDialog({
                         ))}
                       </SelectContent>
                     </Select>
-<<<<<<< HEAD
-=======
-                  )}
-                </div>
-                <div>
-                  <Label>Setor</Label>
-                  <Select value={form.setor_id} onValueChange={v => setForm({ ...form, setor_id: v })}>
-                    <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                    <SelectContent>{setores.map(s => <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Status</Label>
-                  <Select value={form.status} onValueChange={v => setForm({ ...form, status: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ativo">Ativo</SelectItem>
-                      <SelectItem value="afastado">Afastado</SelectItem>
-                      <SelectItem value="ferias">Em férias</SelectItem>
-                      <SelectItem value="desligado">Desligado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Telefone</Label>
-                  <Input value={form.telefone} onChange={e => setForm({ ...form, telefone: e.target.value })} placeholder="Telefone principal" />
-                </div>
-                <div>
-                  <Label>Telefone 2</Label>
-                  <Input value={form.telefone2} onChange={e => setForm({ ...form, telefone2: e.target.value })} placeholder="Telefone secundário (opcional)" />
-                </div>
-              </div>
-            </TabsContent>
-            <TabsContent value="login" className={asPage ? "space-y-3 pt-4" : "space-y-3 min-h-[480px] max-h-[70vh] overflow-y-auto pr-1"}>
-              {isEditingExisting ? (
-                <div className="space-y-4 py-2 text-sm">
-                  {existingEmail ? (
-                    <p><span className="text-muted-foreground">E-mail de login:</span> <span className="font-medium">{existingEmail}</span></p>
-                  ) : (
-                    <p className="text-muted-foreground">Não foi possível recuperar o e-mail de login deste funcionário.</p>
-                  )}
-                  {membershipId && (
-                    <div className="border-t pt-4">
-                      <Label>Perfil de acesso *</Label>
-                      <Select value={form.perfil} onValueChange={v => setForm({ ...form, perfil: v })}>
-                        <SelectTrigger className="max-w-sm"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {PERFIS.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Alterações no perfil são salvas ao clicar em "Salvar".
-                      </p>
-                    </div>
-                  )}
-                  <div className="border-t pt-4 space-y-3">
-                    {!showSenha ? (
-                      <Button type="button" variant="outline" size="sm" onClick={() => setShowSenha(true)}>
-                        Trocar senha
-                      </Button>
-                    ) : (
-                      <div className="space-y-3">
-                        <div className="text-sm font-medium">Definir nova senha</div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <Label>Nova senha *</Label>
-                            <Input type="text" value={novaSenha} onChange={e => setNovaSenha(e.target.value)} placeholder="Mín. 6 caracteres" />
-                          </div>
-                          <div>
-                            <Label>Confirmar senha *</Label>
-                            <Input type="text" value={confirmarSenha} onChange={e => setConfirmarSenha(e.target.value)} />
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button type="button" size="sm" onClick={salvarNovaSenha} disabled={savingSenha}>
-                            {savingSenha ? "Salvando…" : "Salvar nova senha"}
-                          </Button>
-                          <Button type="button" size="sm" variant="ghost" onClick={() => { setShowSenha(false); setNovaSenha(""); setConfirmarSenha(""); }}>
-                            Cancelar
-                          </Button>
-                        </div>
-                      </div>
-                    )}
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
                   </div>
                   <div>
                     <Label>E-mail (login) *</Label>

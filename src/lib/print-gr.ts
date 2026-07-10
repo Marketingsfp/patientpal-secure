@@ -197,7 +197,6 @@ export async function printGuiaAtendimento(input: PrintGRInput) {
   return printGuiaAtendimentoCore(input);
 }
 
-<<<<<<< HEAD
 async function printGuiaAtendimentoCore({
   agendamentoId,
   clinicaId,
@@ -206,9 +205,6 @@ async function printGuiaAtendimentoCore({
   reimpressao,
   pagamento,
 }: PrintGRInput) {
-=======
-async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome, usuarioId, reimpressao, pagamento, fichaNumero }: PrintGRInput) {
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
   // Controle de vias: máximo 2 (1ª e 2ª via). Reimpressão repete a última sem incrementar.
   const { data: visExistentes, error: errVias } = await supabase
     .from("gr_impressoes" as never)
@@ -232,13 +228,9 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   const [ag, cli] = await Promise.all([
     supabase
       .from("agendamentos")
-<<<<<<< HEAD
       .select(
         "id, paciente_nome, paciente_id, medico_id, agenda_id, inicio, procedimento, observacoes",
       )
-=======
-      .select("id, paciente_nome, paciente_id, medico_id, agenda_id, inicio, procedimento, observacoes, ficha_numero")
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
       .eq("id", agendamentoId)
       .maybeSingle(),
     supabase
@@ -300,20 +292,12 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   } | null;
   const medicoBasic = med.data as { nome: string; especialidade: { nome: string } | null } | null;
   const medicoNome = medicoBasic?.nome ?? "—";
-<<<<<<< HEAD
   const espNome = medicoBasic?.especialidade?.nome?.toUpperCase() ?? "";
   let medicoData: {
     tipo_repasse: string | null;
     percentual_repasse_padrao: number | null;
     valor_repasse_padrao: number | null;
   } | null = null;
-=======
-  // Fallback: especialidade "principal" do médico (coluna medicos.especialidade_id).
-  // Para médicos com mais de uma especialidade essa coluna é apenas a primeira da
-  // lista e pode não corresponder ao serviço atendido — por isso é só o último recurso.
-  let espNome = medicoBasic?.especialidade?.nome?.toUpperCase() ?? "";
-  let medicoData: { tipo_repasse: string | null; percentual_repasse_padrao: number | null; valor_repasse_padrao: number | null } | null = null;
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
   if (a.medico_id) {
     try {
       const { data: sens } = await supabase.rpc("medico_dados_sensiveis", {
@@ -357,51 +341,12 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
       medicoCb = null;
     }
   }
-<<<<<<< HEAD
   const procData = proc.data as {
     nome: string;
     valor_dinheiro_pix: number | null;
     valor_cartao: number | null;
     tipo: string | null;
   } | null;
-=======
-  const procData = proc.data as { id: string; nome: string; valor_dinheiro_pix: number | null; valor_cartao: number | null; tipo: string | null } | null;
-
-  // Especialidade correta = a que está vinculada a ESTE serviço para ESTE médico
-  // (medico_procedimentos.especialidade_id), definida na aba Especialidades/Serviços
-  // do cadastro do médico. Só assim a guia sai coerente com o atendimento quando o
-  // médico tem várias especialidades. Se não houver vínculo, mantém o fallback acima.
-  if (medicoIdEfetivo && procData?.id) {
-    try {
-      const { data: mps } = await supabase
-        .from("medico_procedimentos")
-        .select("especialidade_id")
-        .eq("medico_id", medicoIdEfetivo)
-        .eq("procedimento_id", procData.id)
-        .not("especialidade_id", "is", null);
-      const eids = Array.from(
-        new Set(
-          ((mps ?? []) as Array<{ especialidade_id: string | null }>)
-            .map((r) => r.especialidade_id)
-            .filter((v): v is string => !!v),
-        ),
-      );
-      // Só usa a especialidade do serviço quando ela é INEQUÍVOCA (uma só). Se o
-      // mesmo serviço estiver vinculado a várias especialidades para este médico
-      // (cadastro bagunçado / import em massa), não dá para adivinhar qual vale —
-      // mantém a especialidade principal do médico (fallback acima).
-      if (eids.length === 1) {
-        const { data: esp } = await supabase
-          .from("especialidades")
-          .select("nome")
-          .eq("id", eids[0])
-          .maybeSingle();
-        const nomeVinculo = (esp as { nome: string | null } | null)?.nome;
-        if (nomeVinculo) espNome = nomeVinculo.toUpperCase();
-      }
-    } catch { /* mantém o fallback da especialidade principal do médico */ }
-  }
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
 
   // Se já temos pagamento informado, usa ele; senão busca valor REALMENTE pago
   // (fin_lancamentos confirmado) — garante que reimpressões usem o mesmo
@@ -438,18 +383,10 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
         .eq("agendamento_id", agendamentoId)
         .eq("tipo", "receita")
         .eq("status", "confirmado");
-<<<<<<< HEAD
       for (const l of (lancs ?? []) as Array<{
         valor: number | string;
         descricao: string | null;
       }>) {
-=======
-      for (const l of ((lancs ?? []) as Array<{
-        valor: number | string; descricao: string | null;
-        forma_pagamento: string | null; parcelas: number | null;
-        bandeira_cartao: string | null; observacoes: string | null;
-      }>)) {
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
         valorPago += Number(l.valor);
         if (detectCartaoConsulta(l.descricao)) isCartaoConsulta = true;
         // Preserva a primeira forma "real" (ignora linhas-sombra de valor 0
@@ -535,7 +472,6 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   // agenda) passa o número já calculado em `fichaNumero` — assim a guia bate
   // EXATAMENTE com a lista. Sem ele, recalcula aqui como fallback.
   const inicioDt = new Date(a.inicio);
-<<<<<<< HEAD
   const diaIni = new Date(inicioDt);
   diaIni.setHours(0, 0, 0, 0);
   const diaFim = new Date(inicioDt);
@@ -569,28 +505,6 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     fichaNum > 0
       ? String(fichaNum).padStart(3, "0")
       : String(inicioDt.getHours() * 60 + inicioDt.getMinutes()).padStart(3, "0");
-=======
-  const diaIni = new Date(inicioDt); diaIni.setHours(0, 0, 0, 0);
-  const diaFim = new Date(inicioDt); diaFim.setHours(23, 59, 59, 999);
-  let fichaNum = typeof fichaNumero === "number" && fichaNumero > 0 ? fichaNumero : 0;
-  if (fichaNum === 0) {
-    try {
-      const { data: lista } = await supabase
-        .from("agendamentos")
-        .select("id, inicio")
-        .eq("clinica_id", clinicaId)
-        .gte("inicio", diaIni.toISOString())
-        .lte("inicio", diaFim.toISOString())
-        .order("inicio", { ascending: true })
-        .order("id", { ascending: true });
-      const idx = (lista ?? []).findIndex((r: any) => r.id === a.id);
-      fichaNum = idx >= 0 ? idx + 1 : 0;
-    } catch { fichaNum = 0; }
-  }
-  const ficha = fichaNum > 0
-    ? String(fichaNum).padStart(3, "0")
-    : String(inicioDt.getHours() * 60 + inicioDt.getMinutes()).padStart(3, "0");
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
   const prontuario = paciente?.codigo_prontuario || paciente?.numero_pasta || "";
 
   // Repasse conforme cadastro: tenta primeiro medico_convenios pelo nome do procedimento,
@@ -692,7 +606,6 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   }
   const clinica = +Math.max(0, valor - prestador).toFixed(2);
 
-<<<<<<< HEAD
   const formaLbl = pagamento?.forma_pagamento
     ? (FORMA_LABEL[pagamento.forma_pagamento] ?? pagamento.forma_pagamento.toUpperCase())
     : "DINHEIRO";
@@ -708,17 +621,6 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   const detalheRows = isMisto
     ? pagamento!
         .detalhe!.map((d) => {
-=======
-  const formaLbl = pagResolvido?.forma_pagamento ? (FORMA_LABEL[pagResolvido.forma_pagamento] ?? pagResolvido.forma_pagamento.toUpperCase()) : "DINHEIRO";
-  const parcelasTxt = pagResolvido && pagResolvido.forma_pagamento === "cartao_credito" && pagResolvido.parcelas && pagResolvido.parcelas > 1
-    ? `${pagResolvido.parcelas}x DE ${fmtBRL(valor / pagResolvido.parcelas)}`
-    : "À VISTA";
-  const bandeiraTxt = pagResolvido?.bandeira_cartao ? pagResolvido.bandeira_cartao.toUpperCase() : "";
-  const isMisto = pagResolvido?.forma_pagamento === "misto" && (pagResolvido.detalhe?.length ?? 0) > 0;
-  const detalheRows = isMisto
-    ? pagResolvido!.detalhe!
-        .map((d) => {
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
           const lbl = FORMA_LABEL[d.forma] ?? d.forma.toUpperCase();
           const trocoTxt =
             d.troco > 0 ? ` (RECEB. ${fmtBRL(d.recebido)} / TROCO ${fmtBRL(d.troco)})` : "";
@@ -793,13 +695,9 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
         : ""
     }
 
-<<<<<<< HEAD
     ${
       pagamento?.forma_pagamento === "cartao_credito"
         ? `
-=======
-    ${pagResolvido?.forma_pagamento === "cartao_credito" ? `
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
     <table>
       ${bandeiraTxt ? `<tr><td class="label">BANDEIRA:</td><td class="v right">${esc(bandeiraTxt)}</td></tr>` : ""}
       <tr><td class="label">PARCELAMENTO:</td><td class="v right">${parcelasTxt}</td></tr>
@@ -850,17 +748,9 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
         impresso_por_nome: usuarioNome ?? null,
         ficha_numero: fichaNum > 0 ? fichaNum : null,
       } as never);
-<<<<<<< HEAD
     } catch (_) {
       /* falha silenciosa: registro de via não deve bloquear impressão */
     }
-=======
-    } catch (_) { /* falha silenciosa: registro de via não deve bloquear impressão */ }
-    // Não "congela" mais ficha_numero no agendamento: a ficha é POSICIONAL e
-    // acompanha a lista da agenda (pode mudar se slots forem inseridos/removidos
-    // antes da paciente). O gr_impressoes acima guarda o número de cada via só
-    // para histórico.
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
   }
 }
 
@@ -1224,7 +1114,6 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   // mesma regra de app.agenda.tsx > fichaPorId e da GR individual: senha única
   // por dia/clínica, sem particionar por médico nem por agenda.
   const fichaByGrupo = new Map<string, number>();
-<<<<<<< HEAD
   await Promise.all(
     Array.from(grupos.entries()).map(async ([key, g]) => {
       try {
@@ -1258,24 +1147,6 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
       }
     }),
   );
-=======
-  await Promise.all(Array.from(grupos.entries()).map(async ([key, g]) => {
-    try {
-      const dt = new Date(g.inicioRef);
-      const ini = new Date(dt); ini.setHours(0,0,0,0);
-      const fim = new Date(dt); fim.setHours(23,59,59,999);
-      const { data } = await supabase.from("agendamentos")
-        .select("id, inicio")
-        .eq("clinica_id", clinicaId)
-        .gte("inicio", ini.toISOString())
-        .lte("inicio", fim.toISOString())
-        .order("inicio", { ascending: true })
-        .order("id", { ascending: true });
-      const idx = (data ?? []).findIndex((r: any) => r.id === g.agIdRef);
-      fichaByGrupo.set(key, idx >= 0 ? idx + 1 : 0);
-    } catch { fichaByGrupo.set(key, 0); }
-  }));
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
 
   const formaLbl = pagamento.forma_pagamento
     ? (FORMA_LABEL[pagamento.forma_pagamento] ?? pagamento.forma_pagamento.toUpperCase())
@@ -1320,7 +1191,6 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   const dataImpressao = fmtData(new Date().toISOString());
 
   // Uma GR completa por médico, separadas por linha tracejada bem visível
-<<<<<<< HEAD
   const grsHtml = gruposArr
     .map((g, idx) => {
       const isLast = idx === gruposArr.length - 1;
@@ -1334,20 +1204,6 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
       const linhas = g.itens
         .map(
           (it) => `<tr>
-=======
-  const grsHtml = gruposArr.map((g, idx) => {
-    const isLast = idx === gruposArr.length - 1;
-    const key = g.agIdRef;
-    const ficha = (() => {
-      const num = fichaByGrupo.get(key) ?? 0;
-      if (num > 0) return String(num).padStart(3, "0");
-      const d = new Date(g.inicioRef);
-      return String(d.getHours() * 60 + d.getMinutes()).padStart(3, "0");
-    })();
-    const linhas = g.itens
-      .map(
-        (it) => `<tr>
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
           <td style="width:14mm">1</td>
           <td>${esc(it.procNome)}</td>
         </tr>`,

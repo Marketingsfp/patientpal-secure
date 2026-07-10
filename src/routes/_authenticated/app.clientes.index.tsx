@@ -300,15 +300,9 @@ function ClientesPage() {
           >
             <Download className="h-4 w-4 mr-2" /> Exportar Excel
           </Button>
-<<<<<<< HEAD
           <Button onClick={() => setOpenNovo(true)}>
             <Plus className="h-4 w-4 mr-2" /> Novo cliente
           </Button>
-=======
-          {podeEscrever && (
-            <Button onClick={() => setOpenNovo(true)}><Plus className="h-4 w-4 mr-2" /> Novo cliente</Button>
-          )}
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
         </div>
       </div>
 
@@ -340,56 +334,9 @@ function ClientesPage() {
           </TableHeader>
           <TableBody>
             {loading ? (
-<<<<<<< HEAD
               <TableRow>
                 <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                   Carregando…
-=======
-              <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>
-            ) : !clinicaAtual ? (
-              <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
-            ) : filtrados.length === 0 ? (
-              <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Nenhum cliente encontrado.</TableCell></TableRow>
-            ) : filtrados.map(p => (
-              <TableRow key={p.id}>
-                <TableCell className="font-mono text-xs text-muted-foreground">{p.codigo_prontuario ?? "—"}</TableCell>
-                <TableCell className="font-medium">
-                  <div className="flex items-center gap-2">
-                    <div className="h-8 w-8 rounded-full overflow-hidden border bg-muted flex items-center justify-center shrink-0">
-                      {fotoSigned[p.id] ? (
-                        <img src={fotoSigned[p.id]} alt={p.nome} className="h-full w-full object-cover" />
-                      ) : (
-                        <Users className="h-4 w-4 text-muted-foreground" />
-                      )}
-                    </div>
-                    <span>{p.nome}</span>
-                  </div>
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground">{p.cpf ?? "—"}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">{fmtNasc(p.data_nascimento)}</TableCell>
-                <TableCell className="text-sm text-muted-foreground"><IdadeCell nascimento={p.data_nascimento} /></TableCell>
-                <TableCell className="text-sm text-muted-foreground">{p.telefone ?? "—"}</TableCell>
-                <TableCell>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${p.ativo ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}>
-                    {p.ativo ? "Ativo" : "Inativo"}
-                  </span>
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex items-center justify-end gap-1">
-                    <Button asChild variant="ghost" size="icon" title="Visualizar cliente">
-                      <Link to="/app/clientes/$pacienteId/visualizar" params={{ pacienteId: p.id }}>
-                        <Eye className="h-4 w-4" />
-                      </Link>
-                    </Button>
-                    {podeEscrever && (
-                      <Button asChild variant="ghost" size="icon" title="Editar cliente">
-                        <Link to="/app/clientes/$pacienteId/editar" params={{ pacienteId: p.id }}>
-                          <Pencil className="h-4 w-4" />
-                        </Link>
-                      </Button>
-                    )}
-                  </div>
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
                 </TableCell>
               </TableRow>
             ) : !clinicaAtual ? (

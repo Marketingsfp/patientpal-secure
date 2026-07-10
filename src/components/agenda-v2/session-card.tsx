@@ -1,31 +1,13 @@
 import { useState } from "react";
-<<<<<<< HEAD
 import { ChevronDown, ChevronRight, ArrowUpRight, CalendarClock, DollarSign } from "lucide-react";
-=======
-import {
-  ChevronDown, ChevronRight, ArrowUpRight, CalendarClock, DollarSign, Stethoscope,
-  MoreHorizontal, Check, LogIn, ClipboardCheck, XCircle, UserX,
-} from "lucide-react";
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
-<<<<<<< HEAD
   TIPO_SESSAO_ESTILO,
   TIPO_SESSAO_LABEL,
   type TipoSessao,
 } from "@/lib/agenda-v2/session-detect";
-=======
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { TIPO_SESSAO_ESTILO, TIPO_SESSAO_LABEL, type TipoSessao } from "@/lib/agenda-v2/session-detect";
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
 import { HhpChip } from "@/design-system/hhp";
 import type { StatusAgendamento } from "@/lib/agenda/status-agendamento.functions";
 
@@ -203,19 +185,12 @@ export function SessionCard({
   return (
     <div
       className={cn(
-<<<<<<< HEAD
         "group relative bg-white border border-slate-200/70 transition-all",
         "hover:border-slate-300 hover:shadow-[0_4px_20px_-8px_rgba(15,23,42,0.08)]",
         dim.radius,
         dim.padY,
         dim.padX,
         isCurrent && "ring-1 ring-indigo-300/70 shadow-[0_0_0_4px_rgba(99,102,241,0.06)]",
-=======
-        "group relative bg-white border-[1.5px] border-[color:var(--hhp-card-border-strong)] transition-all",
-        "hover:border-[color:var(--clinic-accent)]",
-        dim.radius, dim.padY, dim.padX,
-        isCurrent && "ring-2 shadow-[0_0_0_4px_var(--clinic-accent-glow)]",
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
       )}
       style={isCurrent ? { boxShadow: "0 0 0 4px var(--clinic-accent-glow)", borderColor: "var(--clinic-accent)" } : undefined}
     >
@@ -443,77 +418,3 @@ function QuickAction({
     </button>
   );
 }
-<<<<<<< HEAD
-=======
-
-// Sprint 2 · S2-A — menu de mudança de status, espelhando as transições
-// disponíveis na Agenda clássica (dropdown do card, `mudarStatus`).
-function StatusMenu({
-  data,
-  onChangeStatus,
-}: {
-  data: SessionCardData;
-  onChangeStatus: (data: SessionCardData, novoStatus: StatusAgendamento) => void;
-}) {
-  const s = data.status;
-  const podeConfirmar = s === "agendado";
-  const podeCheckin = s === "agendado" || s === "confirmado";
-  const podeRealizar = s === "agendado" || s === "confirmado" || s === "em_atendimento";
-  const podeCancelar = s !== "cancelado" && s !== "realizado";
-  const podeFaltou = s !== "faltou" && s !== "cancelado" && s !== "realizado";
-  const semAcoes = !podeConfirmar && !podeCheckin && !podeRealizar && !podeCancelar && !podeFaltou;
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          className={cn(
-            "inline-flex items-center justify-center h-7 w-7 rounded-lg",
-            "bg-white/95 backdrop-blur-sm border border-slate-200/70 shadow-sm",
-            "text-slate-600 hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-colors",
-          )}
-          aria-label="Alterar status"
-          disabled={semAcoes}
-        >
-          <MoreHorizontal className="h-3.5 w-3.5" />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-52">
-        <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-slate-400">
-          Alterar status
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {podeConfirmar && (
-          <DropdownMenuItem onClick={() => onChangeStatus(data, "confirmado")}>
-            <Check className="h-3.5 w-3.5 mr-2 text-blue-500" /> Confirmar
-          </DropdownMenuItem>
-        )}
-        {podeCheckin && (
-          <DropdownMenuItem onClick={() => onChangeStatus(data, "em_atendimento")}>
-            <LogIn className="h-3.5 w-3.5 mr-2 text-indigo-500" /> Check-in
-          </DropdownMenuItem>
-        )}
-        {podeRealizar && (
-          <DropdownMenuItem onClick={() => onChangeStatus(data, "realizado")}>
-            <ClipboardCheck className="h-3.5 w-3.5 mr-2 text-emerald-500" /> Realizar
-          </DropdownMenuItem>
-        )}
-        {(podeCancelar || podeFaltou) && <DropdownMenuSeparator />}
-        {podeFaltou && (
-          <DropdownMenuItem onClick={() => onChangeStatus(data, "faltou")}>
-            <UserX className="h-3.5 w-3.5 mr-2 text-amber-500" /> Faltou
-          </DropdownMenuItem>
-        )}
-        {podeCancelar && (
-          <DropdownMenuItem
-            onClick={() => onChangeStatus(data, "cancelado")}
-            className="text-rose-600 focus:text-rose-700"
-          >
-            <XCircle className="h-3.5 w-3.5 mr-2" /> Cancelar
-          </DropdownMenuItem>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b

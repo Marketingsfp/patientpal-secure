@@ -29,7 +29,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-<<<<<<< HEAD
 import {
   Table,
   TableBody,
@@ -38,10 +37,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-=======
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { buildCategoriaResolver } from "@/lib/procedimento/categoria";
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
 
 export const Route = createFileRoute("/_authenticated/app/painel")({
   component: DashboardPage,
@@ -146,7 +141,6 @@ function DashboardPage() {
     const ini = new Date(`${periodo.de}T00:00:00`).toISOString();
     const fim = new Date(`${periodo.ate}T23:59:59`).toISOString();
 
-<<<<<<< HEAD
     const [alertasR, agendR, lancR, atendR, medicosR, espR, medEspR] = await Promise.all([
       supabase
         .from("fin_alertas")
@@ -173,13 +167,6 @@ function DashboardPage() {
         .eq("clinica_id", cid)
         .gte("data", periodo.de)
         .lte("data", periodo.ate),
-=======
-    const [alertasR, agendR, lancR, atendR, medicosR, espR, medEspR, procR] = await Promise.all([
-      supabase.from("fin_alertas").select("id,mensagem").eq("clinica_id", cid).eq("lido", false).order("created_at", { ascending: false }).limit(5),
-      supabase.from("agendamentos").select("id,status,medico_id,paciente_id,procedimento,inicio").eq("clinica_id", cid).gte("inicio", ini).lte("inicio", fim),
-      supabase.from("fin_lancamentos").select("id,tipo,status,valor,medico_id").eq("clinica_id", cid).gte("data", periodo.de).lte("data", periodo.ate),
-      supabase.from("fin_atendimentos").select("id,valor_total,valor_medico,medico_id,status").eq("clinica_id", cid).gte("data", periodo.de).lte("data", periodo.ate),
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
       supabase.from("medicos").select("id,nome").eq("clinica_id", cid).eq("ativo", true),
       supabase.from("especialidades").select("id,nome"),
       supabase.from("medico_especialidades").select("medico_id,especialidade_id"),
@@ -232,7 +219,6 @@ function DashboardPage() {
     for (const me of medEspAll) {
       if (espLabIds.has(me.especialidade_id)) labMedicoIds.add(me.medico_id);
     }
-<<<<<<< HEAD
     const isLab = (a: { medico_id: string | null }) =>
       !!a.medico_id && labMedicoIds.has(a.medico_id);
     const contarGRs = <
@@ -246,18 +232,6 @@ function DashboardPage() {
       arr: T[],
     ) => {
       const naoLab = arr.filter((x) => !isLab(x)).length;
-=======
-    // Categoria por procedimento (fonte da verdade); fallback = especialidade do médico.
-    const catResolver = buildCategoriaResolver(
-      (procR.data ?? []) as { nome: string; tipo_procedimento: string | null }[],
-    );
-    const isLabAg = (a: { medico_id: string | null; procedimento?: string | null }) => {
-      if (a.procedimento) return catResolver.categoriaDoTexto(a.procedimento) === "laboratorio";
-      return !!a.medico_id && labMedicoIds.has(a.medico_id);
-    };
-    const contarGRs = <T extends { medico_id: string | null; paciente_id?: string | null; inicio?: string | null; procedimento?: string | null; id: string }>(arr: T[]) => {
-      const naoLab = arr.filter(x => !isLabAg(x)).length;
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
       const grupos = new Set<string>();
       for (const x of arr.filter(isLabAg)) {
         const dia = (x.inicio ?? "").slice(0, 10);

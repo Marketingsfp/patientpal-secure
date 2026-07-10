@@ -98,7 +98,6 @@ function BoletosPage() {
       })}
       renderForm={(f, set) => (
         <div className="space-y-3">
-<<<<<<< HEAD
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1">
               <Label>Valor *</Label>
@@ -126,15 +125,6 @@ function BoletosPage() {
                     </SelectItem>
                   ))}
                 </SelectContent>
-=======
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="space-y-1"><Label>Valor *</Label><CurrencyInput value={f.valor} onChange={(v) => set({ ...f, valor: v })} /></div>
-            <div className="space-y-1"><Label>Vencimento *</Label><Input type="date" required value={f.vencimento} onChange={e => set({ ...f, vencimento: e.target.value })} /></div>
-            <div className="space-y-1"><Label>Status</Label>
-              <Select value={f.status} onValueChange={v => set({ ...f, status: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{STATUS.map(s => <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>)}</SelectContent>
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
               </Select>
             </div>
           </div>

@@ -159,7 +159,6 @@ function PerfilPage() {
                   />
                 </div>
               </div>
-<<<<<<< HEAD
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1 col-span-2">
                   <Label>Logradouro</Label>
@@ -199,16 +198,6 @@ function PerfilPage() {
                     onChange={(e) => update(idx, { estado: e.target.value.toUpperCase() })}
                   />
                 </div>
-=======
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="space-y-1 sm:col-span-2"><Label>Logradouro</Label><Input value={p.logradouro ?? ""} onChange={e => update(idx, { logradouro: e.target.value })} /></div>
-                <div className="space-y-1"><Label>Número</Label><Input value={p.numero ?? ""} onChange={e => update(idx, { numero: e.target.value })} /></div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="space-y-1"><Label>Bairro</Label><Input value={p.bairro ?? ""} onChange={e => update(idx, { bairro: e.target.value })} /></div>
-                <div className="space-y-1"><Label>Cidade</Label><Input value={p.cidade ?? ""} onChange={e => update(idx, { cidade: e.target.value })} /></div>
-                <div className="space-y-1"><Label>UF</Label><Input value={p.estado ?? ""} maxLength={2} onChange={e => update(idx, { estado: e.target.value.toUpperCase() })} /></div>
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
               </div>
               <Button onClick={() => salvar(p)} disabled={saving} className="w-full">
                 <Save className="h-4 w-4 mr-1" /> {saving ? "Salvando..." : "Salvar"}

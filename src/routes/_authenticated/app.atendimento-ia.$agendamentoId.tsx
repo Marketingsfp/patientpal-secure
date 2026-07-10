@@ -288,7 +288,6 @@ function AtendimentoEditorPage() {
   const pacienteId = agendamento?.paciente_id ?? "";
   const pacienteNome = agendamento?.paciente_nome ?? "";
 
-<<<<<<< HEAD
   async function handleEstruturar() {
     if (!transcricao.trim()) {
       toast.error("Grave ou cole a transcrição primeiro");
@@ -313,33 +312,6 @@ function AtendimentoEditorPage() {
     } finally {
       setLoading(null);
     }
-=======
-  async function handleEstruturar(textoOverride?: string) {
-    const texto = (textoOverride ?? transcricao).trim();
-    if (!texto) { toast.error("Grave ou cole a transcrição primeiro"); return; }
-    setLoading("estruturar");
-    try {
-      const out = await estruturar({ data: { transcricao: texto, especialidade, promptExtra: modelo?.prompt_ia ?? undefined } });
-      const nextSoap = {
-        queixa_principal: out.queixa_principal || soap.queixa_principal,
-        historia_doenca: out.historia_doenca || soap.historia_doenca,
-        exame_fisico: out.exame_fisico || soap.exame_fisico,
-        hipotese_diagnostica: out.hipotese_diagnostica || soap.hipotese_diagnostica,
-        conduta: out.conduta || soap.conduta,
-        prescricao: out.prescricao || soap.prescricao,
-      };
-      setSoap(nextSoap);
-      toast.success("Prontuário preenchido pela IA como sugestão");
-      // Gera CIDs/exames/prescrição sugerida na sequência
-      try {
-        const sug = await sugerir({ data: { ...nextSoap, especialidade } });
-        setSugestoes(sug);
-      } catch (err) {
-        console.error("sugerir falhou", err);
-      }
-    } catch (e) { mostrarErro(e); }
-    finally { setLoading(null); }
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
   }
 
   async function handleSugerir() {
@@ -610,13 +582,9 @@ function AtendimentoEditorPage() {
           </div>
         </div>
         <Button variant="outline" asChild>
-<<<<<<< HEAD
           <Link to="/app/atendimento-ia">
             <ArrowLeft className="h-4 w-4" /> Voltar para fila
           </Link>
-=======
-          <Link to={backTo}><ArrowLeft className="h-4 w-4" /> {backLabel}</Link>
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
         </Button>
       </div>
 
@@ -785,17 +753,12 @@ function AtendimentoEditorPage() {
             onChange={(e) => setTranscricao(e.target.value)}
             placeholder="Clique no microfone para gravar a consulta, ou cole/digite aqui o relato…"
           />
-<<<<<<< HEAD
           <Button onClick={handleEstruturar} disabled={loading === "estruturar"} className="w-full">
             {loading === "estruturar" ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Wand2 className="h-4 w-4" />
             )}
-=======
-          <Button onClick={() => handleEstruturar()} disabled={loading === "estruturar"} className="w-full">
-            {loading === "estruturar" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
             Estruturar prontuário com IA
           </Button>
         </Card>

@@ -4,7 +4,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import {
-<<<<<<< HEAD
   Check,
   FileText,
   CalendarClock,
@@ -19,12 +18,6 @@ import {
   DollarSign,
   Clock,
   ClipboardCheck,
-=======
-  Check, FileText, CalendarClock, Wallet, FileSignature,
-  MessageCircle, History, Stethoscope, Sparkles, AlertTriangle,
-  Coffee, DollarSign, Clock, ClipboardCheck, LogIn, XCircle, UserX,
-  ArrowUpRight,
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
@@ -100,13 +93,9 @@ function idadeFromDob(dob: string | null | undefined): number | null {
  * - Abertura instantânea; detalhes do paciente carregam em segundo plano.
  */
 export function PatientDrawer({
-<<<<<<< HEAD
   open,
   onOpenChange,
   data,
-=======
-  open, onOpenChange, data, onChangeStatus, onOpenProntuario, onReagendar,
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -163,7 +152,6 @@ export function PatientDrawer({
   };
 
   return (
-<<<<<<< HEAD
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
@@ -176,15 +164,6 @@ export function PatientDrawer({
           </SheetDescription>
         </VisuallyHidden.Root>
         {data && (
-=======
-    <HhpDrawer
-      open={open}
-      onOpenChange={onOpenChange}
-      title={data?.paciente_nome ?? "Paciente"}
-      description="Centro de Atendimento do paciente: jornada, ações rápidas e sugestões."
-    >
-      {data && (
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
           <div className="animate-in fade-in duration-150">
             {/* Alerta de ficha em uso simultâneo por outro funcionário */}
             {open && primeiroAgendamentoId && (
@@ -357,17 +336,9 @@ export function PatientDrawer({
                   </div>
                 )}
                 {tab === "prontuario" && (
-<<<<<<< HEAD
                   <TabPlaceholder title="Prontuário">
                     Últimas evoluções, exames e sinais vitais.
                   </TabPlaceholder>
-=======
-                  <ProntuarioPanel
-                    proc={data.proc_titulo ?? null}
-                    canOpen={!!onOpenProntuario && !!primeiroAgendamentoId}
-                    onOpen={abrirProntuario}
-                  />
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
                 )}
               </div>
             </div>
@@ -478,21 +449,11 @@ function QuickAction({
   return (
     <button
       type="button"
-<<<<<<< HEAD
       onClick={() =>
         toast.info(label, {
           description:
             "Ação será integrada nas próximas fases sem alterar as regras dos módulos existentes.",
         })
-=======
-      onClick={
-        onClick ??
-        (() =>
-          toast.info(label, {
-            description:
-              "Ação será integrada nas próximas fases sem alterar as regras dos módulos existentes.",
-          }))
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
       }
       className="flex flex-col items-center justify-center gap-1 h-14 rounded-xl border border-slate-200/70 bg-white hover:bg-slate-50 hover:border-slate-300 transition-colors text-slate-600 hover:text-slate-900"
     >
